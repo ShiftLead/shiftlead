@@ -325,6 +325,9 @@ def _entry(i, **kw):
 
 async def test_the_home_samples_a_running_team_and_serves_its_shape(agent, tmp_path):
     await park_ticks(agent)
+    # the `shape` RPC reads the real clock, so the sample is taken now, not at the fixtures' `now`: a sample
+    # on 2026-10-14 left its week window on 2026-10-19 and the test went red on CI (TD-906)
+    now = datetime.now().astimezone()
     root = str(tmp_path / "repo")
     agent._repos[root] = {"name": "repo", "ledger": {"entries": [_entry("TD-1"), _entry("TD-2")]}}
     mgr = _rec("mgr", role="manager", seat={}, repo=root, capabilities=["control"])
@@ -334,14 +337,15 @@ async def test_the_home_samples_a_running_team_and_serves_its_shape(agent, tmp_p
     tl = _rec("tl", role="techlead", seat={}, repo=root, controllers=[mgr.id])
     shell = _rec("g1-sh", role="", adapter="shell", lane=[], repo=root)
     person = _rec("paul", role="", unattended=False, repo=root)  # a person's session keeps nothing running
-    ask = MailEntry(id="m-1", from_=g3.id, to=[tl.id], at="2026-10-14T09:00:00Z", kind="ask", text="read #9")
+    asked = (now - timedelta(hours=3)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ask = MailEntry(id="m-1", from_=g3.id, to=[tl.id], at=asked, kind="ask", text="read #9")
     ask.pr = 9
     tl.inbox.append(ask)
     for r in (mgr, g1, g2, g3, tl, shell, person):
         r.host = agent.host
         agent.sessions[r.id] = r
-    assert agent._shape_pass(NOW) is True
-    day = agent._shape["days"][NOW.astimezone().date().isoformat()]["grind"]
+    assert agent._shape_pass(now) is True
+    day = agent._shape["days"][now.astimezone().date().isoformat()]["grind"]
     classes = {k: next(iter(v["minutes"])) for k, v in day["records"].items()}
     assert classes == {
         g1.id: "idle_with_work",  # TD-1 is in its lane, unheld
@@ -354,11 +358,11 @@ async def test_the_home_samples_a_running_team_and_serves_its_shape(agent, tmp_p
 
     # the minute's sample is written; a minute with no running team writes nothing
     agent._shape_at = 0.0
-    await agent._shape_tick(NOW)
+    await agent._shape_tick(now)
     assert json.loads(paths.shape_file().read_text())["days"]
     for r in (mgr, g1, g2, g3, tl):
         r.state = "closed"
-    assert agent._shape_pass(NOW + timedelta(minutes=1)) is False
+    assert agent._shape_pass(now + timedelta(minutes=1)) is False
 
     async with LocalClient() as person_client:
         got = await person_client.call("shape", team="grind", window="week")
