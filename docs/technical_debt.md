@@ -73,7 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
 | TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-902, TD-901, TD-903, TD-904, TD-905, TD-907 |
-| TD-901 | Build TD-900 (2): the Queue numbers Up next per repo; a Repo page move's neighbours are the repo's own, scoped; `ao repo` prints the place | Medium | Open — blocked by TD-902 |
+| TD-901 | Build TD-900 (2): the Queue numbers Up next per repo; a Repo page move's neighbours are the repo's own, scoped; `ao repo` prints the place | Medium | Built (#2159) — live check |
 | TD-903 | Build TD-900 (3): the Repo page's board — For you, the flows' worker stages, Review, Merged; bounded | Medium | Open — blocked by TD-901 |
 | TD-904 | Build TD-900 (4): the promote reading's `live`, the divider on Merged and the Queue's mark by ancestry | Medium | Open — blocked by TD-902 |
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Open — blocked by TD-902 |
@@ -1533,9 +1533,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** feature
 **Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-902
+**Kind:** live-check #2159
+**Status:** Built in #2159 (2026-10-18, grinder-ao-2): `places` on the reading, the per-repo number and chips on the Queue, the Repo page's scoped move, `ao repo`'s *up next n*, the help paragraph. Read once it is live (`ao promote status`): a headless GET of `/queue` numbers ao-grind's (shiftlead's) and samscrape's cards each from 1 with their chips; `ao repo --json` carries `place` on the pickable entries; a Repo page ⤒ (the person's press, or on a scratch home) lands directly above the repo's first card — `ranks.json`'s intent carries `scope`.
 **Location:** the `queue` reading (`src/sessionorc/queue.py`, `{cards, completed, other_work, at}`; the Up next numbering), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/templates/queue_card.html` (the number's column, the repo chip), `src/shiftlead/ui/static/app.js` (`rank_move`'s `prev`/`next` and `scope` from the Repo page, ~3497–3550), the flush's re-derivation in `src/sessionorc/` (`ranks.json` intents, `scope`), `src/shiftlead/cli.py` (`ao repo`), `src/shiftlead/ui/help.py` (the help paragraph for *Queue page, Up next: the number*); `tests/test_ui_queue.py`, `tests/test_ui_queue_cards.py`, `tests/test_help.py`
 
 **Why:** TD-900: design §4.5 screen 12 *Up next* — a card's number is its place among the Up next cards with an open member in its repo, from 1, so two repos' leaders both read *1*; §4.4 *The Queue* names the reading's `places`; §4.4 *A move lands* makes a Repo page move's neighbours the repo's own Up next cards with a queued row in the same column, ⤒ and a last-card ↓ naming the whole-order card beyond the repo's first or last, the intent carrying `scope: <repo>` so the flush's remembered cards and nearest survivor are the repo's; §4.7 `ao repo` prints the place with *(lane order may differ)* on an undragged spanning card.
