@@ -3261,7 +3261,8 @@ def cmd_rank(args: argparse.Namespace) -> int:
                 n = len(c.get("order") or ())
                 # with a repo, the card's place among that repo's Up next cards (TD-901), else the whole order's
                 mine = _repo_place(c, want) if want else None
-                at = mine["n"] if mine else None if want else c.get("place")
+                # an older home serves no `places`: the whole order's place
+                at = mine["n"] if mine else None if want and "places" in c else c.get("place")
                 num = f"{at:>3}" if at else "  ·"
                 pr = f"{top.get('priority') or '-':<6}"
                 print(

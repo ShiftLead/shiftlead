@@ -2752,9 +2752,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         `{ids, prev, next}` — the moved card's open members and the Up next cards now just before and
         just after it in the whole order, each a member's `<repo>#TD-n` (none: the top, the end) — to the
         home's `rank_move`, the person's (§4.4 *A move lands*). From a Repo page, `scope` too, the repo: the
-        neighbours are then adjacent among its own Up next cards (TD-901), and it is sent only when given, so
-        an older home is asked as before. A refusal is a 400 in the home's words, which the page draws under
-        the heading as it puts the card back."""
+        neighbours are then adjacent among its own Up next cards (TD-901); a move without it is asked as
+        before, and a home older than the page refuses a scoped one until the pair is promoted together. A
+        refusal is a 400 in the home's words, which the page draws under the heading as it puts the card back."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         ids = [str(i) for i in (body.get("ids") or []) if i] if isinstance(body, dict) else []
         if not ids:
