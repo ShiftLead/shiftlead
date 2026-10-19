@@ -1077,8 +1077,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   restart of the home; the readings are held in memory and re-read at start, and what must survive
   one — a run in flight, a failure — is in the intent files below. Beside the three, for the page's
   build chip (§4.5a; TD-539): **`live_at`**, the live commit's committer time, and **`pending`**, the
-  commits of main past live as `{sha, subject}`, newest first, ten at most with the count of the rest —
-  one `git log` in the same pass, empty when live is main's head or cannot be compared. **Three preconditions** stand
+  commits of main past live as `{sha, subject}`, newest first — every commit of `live..main`, one `git log`
+  in the same pass, empty when live is main's head or cannot be compared (the chip draws the first ten
+  and the count of the rest; the Repo page's Merged column and the Queue's completed lines test a close's
+  commit against the whole list, §4.5 screen 11 *Merged*, TD-900) — and **`live`**, `{sha, subject, at,
+  by}`: the live commit, its subject, and when and by what it went live, read from `last.json` (*The
+  outcome*, below: `at` and `by` — *auto*, *you*, *rollback*) when its `sha` is the live commit's, and
+  absent when it is not, as for a copy installed by hand (TD-900, built by TD-904). **Three preconditions** stand
   between the readings and a promote: **(1) the checkout is on main's head with a clean tree** —
   `HEAD == origin/main` and `git status --porcelain` empty — because `run` installs from the tree
   (the tree is a person's: the policy reads it and never makes it — no checkout, no reset, nothing
