@@ -430,3 +430,37 @@ def test_a_reread_queue_reopens_its_folds_and_fills_each_open_one():
     assert "AO.fillFold(d)" in reopen
     q = js[js.index("AO.queue = function") :]
     assert "AO.reopenFolds(lists);" in q[: q.index("wire();")]
+
+
+def _placed() -> dict:
+    """`queue()` with each Up next card's `places` (TD-901): samscrape's cards 1, 2, db's 1, and the card
+    spanning both db's 2 and samscrape's 3."""
+    q = queue()
+    places = {"samscrape#TD-20": [("samscrape", 1)], "samscrape#TD-30": [("samscrape", 2)], "db#TD-5": [("db", 1)],
+              "db#TD-7": [("db", 2), ("samscrape", 3)]}  # fmt: skip
+    for c in q["cards"]:
+        c["places"] = [{"repo": r, "n": n} for r, n in places.get(c["id"], [])]
+    return q
+
+
+def test_the_repo_page_numbers_a_card_by_its_place_in_the_repo_and_sends_the_scope(tmp_path, monkeypatch):
+    """§4.5 screen 11 *Numbers, grips and moves are the card's*, §4.4 *A move lands* (TD-901): the Repo page
+    draws a card's place among the repo's own Up next cards, and its moves carry the repo as `scope`."""
+    moves: list = []
+    c = client(monkeypatch, tmp_path, fake(repos(tmp_path), _placed(), moves))
+    html = c.get("/repo/samscrape").text
+    d = cards_of(html)
+    assert (
+        '<span class="qplace" title="' in d["db#TD-7"] and '">3</span>' in d["db#TD-7"]
+    )  # samscrape's 3, not the whole 4
+    assert re.search(r'id="qcards" data-upnext=\'[^\']*\' data-scope="samscrape"', html)
+    got = c.post(
+        "/api/rank/move",
+        json={"ids": ["db#TD-7"], "prev": "samscrape#TD-20", "next": "samscrape#TD-30", "scope": "samscrape"},
+    )
+    assert got.status_code == 200
+    assert moves == [{"ids": ["db#TD-7"], "prev": "samscrape#TD-20", "next": "samscrape#TD-30", "scope": "samscrape"}]
+    js = JS.read_text()
+    body = js[js.index("async function moveCard(") :]
+    body = body[: body.index("\n    }\n")]
+    assert "AO.rankMoveScoped(before, own, card.dataset.card, how)" in body and "...(scope ? { scope } : {})" in body

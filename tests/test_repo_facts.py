@@ -494,7 +494,9 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
         "u": [{"team": "u", "id": "x", "text": "not this repo's", "at": now.isoformat()}],
     }
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": log, "inbox": inbox}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": log, "queue": {}, "inbox": inbox}[rpc],
     )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
@@ -589,7 +591,9 @@ def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypat
     ]
     reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []}, "ledger": {"entries": entries}}}
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
@@ -616,7 +620,9 @@ def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monk
     ]  # fmt: skip
     reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []}, "ledger": {"entries": entries}}}
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
@@ -643,7 +649,9 @@ def test_ao_repo_says_a_settling_or_held_entry_after_its_owner_and_counts_it_not
     reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []},
                            "ledger": {"entries": entries, "by_kind": {"pickable": 3}}}}  # fmt: skip
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
@@ -996,7 +1004,9 @@ def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_o
     fleet.append({"id": "old", "name": "grinder-ao-1", "team": "ao-grind", "repo": str(repo), "lane": ["free-pick"],
                   "superseded_by": "g1", "state": "closed"})  # fmt: skip
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
@@ -1077,7 +1087,9 @@ def test_ao_repo_names_an_out_of_work_member_by_its_own_count(repo, monkeypatch,
                            "ledger": {"entries": entries, "by_kind": by}}}  # fmt: skip
     fleet = [{**r, "repo": str(repo)} for r in records]
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0

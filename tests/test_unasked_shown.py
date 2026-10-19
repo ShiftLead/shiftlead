@@ -173,7 +173,13 @@ def _repo_world(monkeypatch, tmp_path, fleet):
     monkeypatch.setattr(
         cli,
         "call_sync",
-        lambda rpc, **kw: {"repos": {str(repo): r}, "list": fleet, "doing_log": {}, "inbox": {"entries": []}}[rpc],
+        lambda rpc, **kw: {
+            "repos": {str(repo): r},
+            "list": fleet,
+            "doing_log": {},
+            "queue": {},
+            "inbox": {"entries": []},
+        }[rpc],
     )
     monkeypatch.chdir(repo)
     return r

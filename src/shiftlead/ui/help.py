@@ -540,6 +540,18 @@ HELP: tuple[Help, ...] = (
             "window, the rest on hover, and a press changes no reserve and pauses nothing."
         ),
     ),
+    Help(
+        "up-next-number",
+        "the number",
+        "Queue page: Up next",
+        (
+            "Is the card's place among the Up next cards with an entry in its repo, from 1, so two repos' first "
+            "cards both read 1; where the home reads more than one repo each number carries its repo's name, and "
+            "a card whose entries span repos carries one per repo. Read it as the order that repo's lanes pick in, "
+            "the lowest number first — on a card spanning repos you never moved, a lane's own order can differ. "
+            "It is not a control: a card moves by its grip or ⤒ ↑ ↓, and an In progress card has no number."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -611,6 +623,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "held-missed",
         ),
     ),
+    ("queue", "Queue", ("up-next-number",)),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
 )

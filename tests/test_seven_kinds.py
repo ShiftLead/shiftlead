@@ -182,7 +182,9 @@ def test_ao_repo_reads_the_seven_counts_and_lists_by_the_mapping(tmp_path, monke
     subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)  # `ao repo` finds the checkout
     reading = {str(repo): {**_reading(str(repo)), "name": "r"}}
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0

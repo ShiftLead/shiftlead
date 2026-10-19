@@ -63,14 +63,21 @@ class RankMixin:
         return keys
 
     async def rpc_rank_move(
-        self, ids: list[str] | None = None, prev: str | None = None, next: str | None = None, caller: Any = None
+        self,
+        ids: list[str] | None = None,
+        prev: str | None = None,
+        next: str | None = None,
+        scope: str | None = None,
+        caller: Any = None,
     ) -> dict[str, Any]:
         """`ao rank` and the Queue's move (design §4.4 *A move lands*, §4.7, §4.5a *Queue page, Up next*): the
         card holding `ids` (`<repo>#TD-n` each) goes between the Up next cards holding `prev` (none: the top)
         and `next` (none: the end), kept as an intent and landed by the flush `RANK_FLUSH` after the last move.
-        Refused to an unattended session; refused for an id no open card holds, a card In progress, or a
-        neighbour not in Up next. Returns `{moved, card, entries, place, prev, next, flush}` — `moved` false
-        for a move that leaves the card where it is, which lands nothing."""
+        A move from a Repo page carries `scope`, the repo: its neighbours are adjacent among that repo's Up
+        next cards, not the whole order's (`rank.intent`, TD-901). Refused to an unattended session; refused
+        for an id no open card holds, a card In progress, or a neighbour not in Up next. Returns `{moved, card,
+        entries, place, prev, next, flush}` — `moved` false for a move that leaves the card where it is, which
+        lands nothing."""
         by = self._rank_caller(caller)
         # the order as the page draws it, the moves not yet landed applied: the neighbours are that order's
         shown = list(self._queue_ranked(self._queue or {}).get("cards") or [])
@@ -79,7 +86,7 @@ class RankMixin:
         with self.rank_store.lock:
             state = self.rank_store.load()
             try:
-                it = rank_mod.intent(shown, want, prev or None, next or None, by, now_iso())
+                it = rank_mod.intent(shown, want, prev or None, next or None, by, now_iso(), scope=scope or None)
             except rank_mod.Refused as e:
                 raise RpcError(str(e)) from None
             card = rank_mod.card_of(cards, want[0]) or {}
@@ -90,7 +97,10 @@ class RankMixin:
         keys = self._pending_keys(cards, state)
         if it is not None and self._queue:  # applied on the page at once (§4.4 *A move lands*)
             await self._broadcast({"event": "queue", "queue": self._queue_ranked(self._queue)})
-        log.info("rank_move by %s: %s between %s and %s%s", by, want, prev, next, "" if it else " (where it is)")
+        log.info(
+            "rank_move by %s: %s between %s and %s%s%s",
+            by, want, prev, next, f" in {scope}" if scope else "", "" if it else " (where it is)",
+        )  # fmt: skip
         return {
             "moved": it is not None,
             "card": card.get("id"),
@@ -104,7 +114,7 @@ class RankMixin:
     def _queue_ranked(self, got: dict[str, Any]) -> dict[str, Any]:
         """The `queue` reading with the intents not yet landed applied (§4.4 *A move lands*: applied on the
         page at once): each moved card at its new key and marked `pending`, the order and the Up next places
-        again, and `not_landed` on a card whose rank PR failed after its retry."""
+        (`rank.number`) again, and `not_landed` on a card whose rank PR failed after its retry."""
         cards = got.get("cards") or []
         if not cards:
             return got
@@ -126,11 +136,7 @@ class RankMixin:
         out = [c for c in rank_mod.order(out) if c.get("group") != "up_next"] + [
             c for c in rank_mod.order(out) if c.get("group") == "up_next"
         ]
-        n = 0
-        for c in out:
-            if c.get("group") == "up_next":
-                n += 1
-                c["place"] = n
+        rank_mod.number(out)
         return {**got, "cards": out}
 
     def _rank_repos(self) -> dict[str, tuple[str, str, Mapping[str, Any]]]:

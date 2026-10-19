@@ -12,7 +12,7 @@ import pathlib
 import re
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from importlib import resources
 from typing import Any
@@ -1800,6 +1800,11 @@ def cmd_repo(args: argparse.Namespace) -> int:
         # what the servicing teams hold and say (§4.8 *the doing log*), the reader's standing on
         # each open PR (§4.9b), and the board items due (§4.4) — TD-176 slice 6
         fleet, log = call_sync("list"), call_sync("doing_log")
+        # each card's place in its repo (§4.7, §4.4 *The Queue*, TD-901): an older home serves no `places`
+        try:
+            cards = (call_sync("queue", omit=["completed", "other_work"]) or {}).get("cards") or []
+        except AgentError:
+            cards = []
         for r in picked:
             root = pathlib.Path(r.get("root") or "").resolve()
             members = [
@@ -1829,6 +1834,14 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 if str(p["number"]) not in r["standing"] and (tag := reviewmod.unasked(r, p["number"], by_team)):
                     p["unasked_line"] = f"unasked {_age(tag['created'])} — {reviewmod.unasked_hint(p['number'], tag)}"
             r["board"] = _board_due(r)
+            name = str(r.get("name") or root.name)
+            for e in (r.get("ledger") or {}).get("entries") or []:
+                if not isinstance(e, dict) or not e.get("id"):
+                    continue
+                card = next((c for c in cards if f"{name}#{e['id']}" in (c.get("order") or ())), None)
+                if card is not None and (at := _repo_place(card, name)):
+                    e["place"] = at["n"]
+                    e["lane_order_may_differ"] = at["differs"]
             # the board's decided lines are in the lanes beside the entries (§4.4 *Board write-back*, TD-384)
             r["lanes"] = teamrun.repo_lanes(teamrun.lane_entries(r), root, fleet)
             # the repo's teams as its ledger declares them, and what needs one (§4.4 *An entry names its team*, TD-730)
@@ -1912,7 +1925,11 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     # in no team's lanes until it names one (§4.4 *An entry names its team*, TD-730)
                     if e.get("needs_team"):
                         owner += " needs a team"
-                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}")
+                    # its card's place in this repo's Up next (TD-901)
+                    at = f" · up next {e['place']}" if e.get("place") else ""
+                    if at and e.get("lane_order_may_differ"):
+                        at += " (lane order may differ)"
+                    print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}{at}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")
@@ -3212,6 +3229,16 @@ def cmd_td_hold(args: argparse.Namespace) -> int:
     return emit(args, got, lambda: print("\n".join(lines)))
 
 
+def _repo_place(card: Mapping[str, Any], repo: str) -> dict[str, Any] | None:
+    """The card's place among `repo`'s Up next cards (design §4.4 *The Queue*, §4.7 `ao repo`; TD-901):
+    `{n, differs}`, `differs` true on an undragged card that spans repos, whose lanes' own key can differ
+    from the home's (§4.4 *The rank*: *(lane order may differ)*) — or None on a card that is not Up next."""
+    n = next((p.get("n") for p in card.get("places") or () if p.get("repo") == repo), None)
+    if not n:
+        return None
+    return {"n": n, "differs": not card.get("lined") and len(card.get("repos") or ()) > 1}
+
+
 def _ordinal(n: int) -> str:
     return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
 
@@ -3232,7 +3259,11 @@ def cmd_rank(args: argparse.Namespace) -> int:
             for c in shown:
                 top = c.get("top") or {}
                 n = len(c.get("order") or ())
-                num = f"{c['place']:>3}" if c.get("place") else "  ·"
+                # with a repo, the card's place among that repo's Up next cards (TD-901), else the whole order's
+                mine = _repo_place(c, want) if want else None
+                # an older home serves no `places`: the whole order's place
+                at = mine["n"] if mine else None if want and "places" in c else c.get("place")
+                num = f"{at:>3}" if at else "  ·"
                 pr = f"{top.get('priority') or '-':<6}"
                 print(
                     f"{num}  {_short(c['id'], want):<18} {pr} {(top.get('title') or '')[:70]} · "

@@ -23,6 +23,7 @@ from typing import Any
 
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
+from sessionorc import rank as rank_mod
 from sessionorc import workorders
 from sessionorc.reports import branch_ref
 
@@ -259,7 +260,8 @@ def reading(
     `qid`, `repo`, `id`, `title`, `priority`, `state` — the one word of §4.4 *A row's state*, '' for a
     row that waits on the person, whose `needs` says how — `pr`, `holder`, `parent`, `depth`,
     `also_after`, `archived`, `key`), `done` and `of` (*d/m done*), `status` (the ledger's part), `group`
-    (`in_progress` or `up_next`), `place` (Up next numbered from 1), `order` (the open members in pick
+    (`in_progress` or `up_next`), `place` (Up next numbered from 1) and `places` (one `{repo, n}` per repo
+    of its open members, numbered among that repo's Up next cards, TD-901), `order` (the open members in pick
     order: dependency, then key), `repos`, `passed_over`. Cards are in key order, In progress first.
     **Completed** cards (`ids`, `top`, `titles`, `closed`, `pr`) are the archive's components no open
     entry touches, closed within `COMPLETED_WINDOW`, newest first. `other_work` is each live claim that
@@ -415,13 +417,7 @@ def reading(
     for c in cards:
         c["group"] = "in_progress" if any(q in held or q in prs for q in c["members"]) else "up_next"
     cards.sort(key=lambda c: (c["group"] != "in_progress", _key_sort(c["key"], c["id"])))
-    n = 0
-    for c in cards:
-        if c["group"] == "up_next":
-            n += 1
-            c["place"] = n
-        else:
-            c["place"] = None
+    rank_mod.number(cards)
     _passed_over(cards, open_, held, recs, rs, doing or {})
     for c in cards:
         del c["members"]

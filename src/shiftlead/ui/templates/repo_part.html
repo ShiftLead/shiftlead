@@ -42,7 +42,7 @@
   <div class="qwhy meta" id="qwhy" hidden></div>
   {% if cards %}{# the repo's Queue cards, in rank order (§4.5 screen 11 item 2, TD-770) #}
   {% if orders %}<div class="rlist">{% for e in orders %}{{ order_row(dict(e, repo_name=name), 'orders', false) }}{% endfor %}</div>{% endif %}
-  <div class="qcards" id="qcards" data-upnext='{{ cards.upnext | tojson }}'>
+  <div class="qcards" id="qcards" data-upnext='{{ cards.upnext | tojson }}' data-scope="{{ name }}">
   {% for c in cards.cards %}{{ qc.card(c, name) }}{% endfor %}
   </div>
   {% else %}

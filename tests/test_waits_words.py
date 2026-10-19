@@ -154,7 +154,9 @@ def test_ao_repo_says_what_each_row_waits_for_and_that_a_lane_only_waits(git_rep
     fleet[1]["progress"] = [{"ref": "TD-001", "status": "claimed"}]
     del fleet[1]["out_of_work"]
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(git_repo)
     assert cli.main(["repo"]) == 0

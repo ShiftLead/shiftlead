@@ -3511,6 +3511,30 @@
     return { prev: at > 0 ? rest[at - 1] : null, next: at < rest.length ? rest[at] : null, order: [...rest.slice(0, at), id, ...rest.slice(at)] };
   };
 
+  // The same move on a Repo page (design §4.4 *A move lands*, TD-901): `own` the repo's own Up next cards,
+  // in the whole order `order`. The neighbours are adjacent among `own`, but ⤒ names as `prev` the
+  // whole-order card just before the repo's first and a move past the repo's last names as `next` the
+  // whole-order card just after it, so a press never leaves the span between the repo's own cards. The
+  // card lands as the flush puts it: just after `prev`, else just before `next`, past other repos' cards.
+  // `{prev, next, order}` or null for a move that leaves the card where it is. Pure, for a test.
+  AO.rankMoveScoped = function (order, own, id, how) {
+    const i = own.indexOf(id); if (i < 0 || order.indexOf(id) < 0) return null;
+    const rest = own.filter((x) => x !== id), whole = order.filter((x) => x !== id);
+    let at;
+    if (how === "top") at = 0;
+    else if (how === "up") at = i - 1;
+    else if (how === "down") at = i + 1;
+    else {
+      const j = rest.indexOf(how && (how.before || how.after)); if (j < 0) return null;
+      at = how.before ? j : j + 1;
+    }
+    if (at < 0 || at > rest.length || at === i || !rest.length) return null;
+    const prev = at > 0 ? rest[at - 1] : (whole[whole.indexOf(rest[0]) - 1] ?? null);
+    const next = at < rest.length ? rest[at] : (whole[whole.indexOf(rest[rest.length - 1]) + 1] ?? null);
+    const k = prev !== null ? whole.indexOf(prev) + 1 : next !== null ? whole.indexOf(next) : 0;
+    return { prev, next, order: [...whole.slice(0, k), id, ...whole.slice(k)] };
+  };
+
   // The Queue's cards wherever they are drawn (design §4.5a *Queue page: card*, *Queue page, Up next:
   // grip / ⤒ ↑ ↓*; the Queue page, TD-771, and the Repo page's Technical debt, TD-770): a press on a
   // card's header folds or opens it, which this browser remembers; an Up next card moves by its grip or
@@ -3540,14 +3564,18 @@
       q.dataset.upnext = JSON.stringify(order);
     }
     async function moveCard(card, how) {
-      const before = upnext(), m = AO.rankMove(before, card.dataset.card, how);
+      // on a Repo page the neighbours are the repo's own (`data-scope`, TD-901): the Up next cards it draws
+      const q = $("#qcards", box), scope = (q && q.dataset.scope) || "", before = upnext();
+      const drawn = new Set($$(".qcard[data-up]", box).map((c) => c.dataset.card));
+      const own = scope ? before.filter((x) => drawn.has(x)) : null;
+      const m = scope ? AO.rankMoveScoped(before, own, card.dataset.card, how) : AO.rankMove(before, card.dataset.card, how);
       if (!m) return;
       const why = $("#qwhy", box); if (why) why.hidden = true;
       placeCards(m.order);
       try {
         const r = await fetch("/api/rank/move", {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ids: card.dataset.ids.split(" "), prev: m.prev, next: m.next }),
+          body: JSON.stringify({ ids: card.dataset.ids.split(" "), prev: m.prev, next: m.next, ...(scope ? { scope } : {}) }),
         });
         if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (err) {} throw new Error(t); }
       } catch (err) {

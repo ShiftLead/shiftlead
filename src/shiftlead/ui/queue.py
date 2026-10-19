@@ -309,7 +309,8 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
       badge and title, *n entries*, and the entries it opens to, each its `Resolved:` text and PR) and one
       per open card's archived row (*on TD-n's card*), newest first; each line's `wins` are the windows it
       falls in, and `counts` per window the entries the group lists (a completed card all its entries);
-    - `in_progress` and `up_next`: the cards in the reading's order, each row shaped for the partials;
+    - `in_progress` and `up_next`: the cards in the reading's order, each row shaped for the partials, and
+      `chips` on each where the home reads more than one repo: its `places` are drawn each with its repo;
     - `other`: the *other work* lines, each hold that names no open entry, with its holder;
     - `upnext`: the whole Up next order, each card's id (a move's neighbours, §4.4 *A move lands*);
     - `n`: the header's counts — cards, in progress, up next, and those whose status is *needs you*.
@@ -339,6 +340,8 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
                 "rows": rows,
                 "sections": secs,
                 "ids": list(c.get("order") or [c["id"]]),
+                # the number per repo, each with its chip, where the home reads more than one (TD-901)
+                "chips": not one_repo,
                 "kinds": _card_kinds([top, *rows], secs),
                 "find": _find_text([top, *rows]),
             }
