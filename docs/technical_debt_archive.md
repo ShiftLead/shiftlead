@@ -17090,3 +17090,25 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-19, live check of #2163 — it holds: the live Repo page is the board, its first byte within the 500 ms budget.
 
 ---
+
+## TD-908: `rpc_td_hold` cuts a hold's words and a drop notice's at 200 characters (#2160), and no test would notice it gone
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-19 (test audit of #2154–#2165, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_ids.py` (`WHY_CHARS`, the line `why, tell = " ".join(str(why or "").split())[:WHY_CHARS], …`); `tests/test_settle.py` (the TD-905 tests from `test_a_holds_words_are_on_the_record_…`)
+
+**Why:** #2160 added `WHY_CHARS = 200  # a hold's words and a drop notice's, one line` and applies `[:WHY_CHARS]` to both `why` and `tell`. Probe: deleting both `[:WHY_CHARS]` slices from that line leaves `tests/test_settle.py tests/test_ui_queue.py tests/test_cli.py tests/test_ui_board.py` at 207 passed. No test passes more than 200 characters, so a hold's note could carry a whole paragraph into the held record, the reading and every holder's mail. (Collapsing whitespace on the same line is covered: removing it fails `test_a_holds_words_are_on_the_record_…`; the other mutations tried — the `tell`/`release`/`why` refusals, `tell` wording, the told-again guard — each fail a test.)
+
+**Fix:** a test that holds with 300 characters of words and with a 300-character `tell`, and reads back exactly 200 in the record, the queue reading's `held.why` and the mailed note.
+
+**Done when** removing either slice fails a test.
+
+**Related:** TD-905.
+
+**Resolved:** 2026-10-19 (PR #2169) — `tests/test_settle.py::test_a_holds_words_and_a_drop_notice_are_cut_to_one_line_of_200` holds with 300 characters of words and of `tell`, and reads exactly 200 on the record, the reading and the note; removing either `[:WHY_CHARS]` slice fails it.
+
+---
