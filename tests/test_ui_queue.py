@@ -762,3 +762,20 @@ def test_the_completed_share_counts_only_the_lines_a_pick_leaves_on():
     assert v["shown_in"]["completed"] == {"4h": 0, "day": 0, "week": 1, "month": 1}
     v = apply_picks(queue_view(queue(), NOW), queue_picks({"filter": "needs-you"}), {})
     assert v["shown_in"]["completed"] == {"4h": 0, "day": 0, "week": 0, "month": 0}
+
+
+def test_two_repos_number_each_card_per_repo_with_its_chip(tmp_path, monkeypatch):
+    """§4.5 screen 12 *Up next*, §4.5a *Queue page, Up next: the number* (TD-901): where the home reads more
+    than one repo, each card's number is its place in its repo, drawn with the repo's chip — two repos'
+    leaders both read 1 — and one repo's Queue draws the plain number."""
+    q = queue(repo2=True)
+    for c in q["cards"]:
+        c["places"] = {"s#TD-20": [{"repo": "s", "n": 1}], "s#TD-30": [{"repo": "s", "n": 2}],
+                       "db#TD-5": [{"repo": "db", "n": 1}]}.get(c["id"], [])  # fmt: skip
+    html = client(monkeypatch, tmp_path, fake(q)).get("/queue").text
+    upnext = html[html.index('id="qupnext"') :]
+    assert 'class="qcards multi" id="qcards"' in upnext
+    assert '<span class="qpn"><span class="qn">1</span><span class="qprepo"' in upnext
+    assert upnext.count('<span class="qn">1</span>') == 2 and ">db</span>" in upnext and ">s</span>" in upnext
+    one = client(monkeypatch, tmp_path, fake(queue())).get("/queue").text
+    assert 'class="qcards" id="qcards"' in one and "qprepo" not in one

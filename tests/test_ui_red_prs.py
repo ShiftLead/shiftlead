@@ -231,7 +231,7 @@ def test_ao_repo_lists_no_order_for_a_draft_and_says_why_on_its_line(tmp_path, m
     subprocess.run(["git", "-C", str(root), "init", "-q", "-b", "main"], check=True)
     r = drafted(str(root))
     r["prs"]["open"][3]["draft"] = True  # #804, red 20m: before the bound, a draft as today
-    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {"repos": {str(root): r}, "list": [], "doing_log": {}, "inbox": {}}[rpc])  # fmt: skip
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {"repos": {str(root): r}, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc])  # fmt: skip
     monkeypatch.chdir(root)
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out

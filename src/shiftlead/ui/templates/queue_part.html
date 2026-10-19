@@ -55,7 +55,7 @@
   <div class="row gap rsh"><span class="h2 qghead" role="button" tabindex="0" aria-expanded="true" title="fold or open the group">Up next {{ share(q.shown_in.up_next if q.shown_in else q.n.up_next, q.n.up_next) }}</span> <span class="qsub qgfoldword">folded</span> <span class="qsub">worked from the top: drag a card by its grip, or use its arrows, to change the order</span></div>
   <div class="qwhy meta" id="qwhy" hidden></div>
   {% if q.up_next %}
-  <div class="qcards" id="qcards" data-upnext='{{ q.upnext | tojson }}'>
+  <div class="qcards{% if not q.one_repo %} multi{% endif %}" id="qcards" data-upnext='{{ q.upnext | tojson }}'>
   {% for c in q.up_next %}{{ qc.card(c) }}{% endfor %}
   </div>
   {% else %}<div class="rlist"><div class="rrow qsub">nothing is waiting to be picked</div></div>{% endif %}

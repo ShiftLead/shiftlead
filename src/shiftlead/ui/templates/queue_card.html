@@ -4,7 +4,9 @@
    status — and a press on it folds or opens the card (no chevron; the page remembers which). What is attached
    to the card is in its sections (TD-828): *Needs you* in the header, so a folded card still shows it, the
    other four in the body above the rows, each heading hidden at 0. An Up next
-   card carries its place, a grip and ⤒ ↑ ↓; an In progress one a green stripe and *d/m done* where the
+   card carries its place, a grip and ⤒ ↑ ↓ — its place **per repo** (§4.5a *Queue page, Up next: the number*,
+   TD-901): a Repo page draws the repo's own (`repo`), and where the home reads more than one repo (`c.chips`)
+   the Queue draws one number per repo, each with its repo's chip; an In progress one a green stripe and *d/m done* where the
    status would be. Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
 {% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, section %}
@@ -13,7 +15,10 @@
 <div class="qcard g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if body %} hasrows{% endif %}{% if c.off %} qoff{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %} data-status="{{ c.status or '' }}" data-kinds="{{ (c.kinds or []) | join(' ') }}" data-repos="{{ (c.repos or []) | join(' ') }}">
   <div class="qhead"{% if t.anchor %} id="{{ t.anchor }}"{% endif %} data-qid="{{ t.qid }}"{% if body %} role="button" tabindex="0" aria-expanded="true" title="fold or open the card"{% endif %}>
     <span class="qgrip"{% if up %} draggable="true" title="drag to move it in the order"{% endif %}>{% if up %}⋮⋮{% endif %}</span>
-    <span class="qplace">{{ c.place if c.place else '' }}</span>
+    {%- set mine = (c.places or []) | selectattr('repo', 'equalto', repo) | list if repo else [] %}
+    {% if mine %}<span class="qplace" title="{{ help_title('up-next-number') }}">{{ mine[0].n }}</span>
+    {%- elif c.chips and c.places and not repo %}<span class="qplace multi" title="{{ help_title('up-next-number') }}">{% for p in c.places %}<span class="qpn"><span class="qn">{{ p.n }}</span><span class="qprepo" title="its place among {{ p.repo }}'s Up next cards">{{ p.repo }}</span></span>{% endfor %}</span>
+    {%- else %}<span class="qplace">{{ c.place if c.place else '' }}</span>{% endif %}
     <div class="qmain">
     <span class="qid mono strong">{{ t.show }}</span>{{ pbadge(t.priority) }}
     <span class="qtitle">{{ t.title }}</span>

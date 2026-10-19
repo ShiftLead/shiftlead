@@ -2751,13 +2751,16 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """§4.5a *Queue page, Up next: grip / ⤒ ↑ ↓* and *Repo page: Technical debt cards* (TD-770):
         `{ids, prev, next}` — the moved card's open members and the Up next cards now just before and
         just after it in the whole order, each a member's `<repo>#TD-n` (none: the top, the end) — to the
-        home's `rank_move`, the person's (§4.4 *A move lands*). A refusal is a 400 in the home's words,
-        which the page draws under the heading as it puts the card back."""
+        home's `rank_move`, the person's (§4.4 *A move lands*). From a Repo page, `scope` too, the repo: the
+        neighbours are then adjacent among its own Up next cards (TD-901), and it is sent only when given, so
+        an older home is asked as before. A refusal is a 400 in the home's words, which the page draws under
+        the heading as it puts the card back."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         ids = [str(i) for i in (body.get("ids") or []) if i] if isinstance(body, dict) else []
         if not ids:
             raise HTTPException(400, "send {ids, prev, next}")
-        got = await call("rank_move", ids=ids, prev=body.get("prev") or None, next=body.get("next") or None)
+        scope = {"scope": str(body["scope"])} if body.get("scope") else {}
+        got = await call("rank_move", ids=ids, prev=body.get("prev") or None, next=body.get("next") or None, **scope)
         return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
 
     @app.post("/api/ledger/start")

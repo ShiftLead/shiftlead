@@ -183,7 +183,9 @@ def test_ao_repo_says_needs_a_team_and_json_carries_the_three_fields(git_repo, m
     reading = {str(git_repo): {"name": "r", "root": str(git_repo), "prs": {"open": []}, "ledger": led_reading}}
     fleet = [{"id": "w1", "name": "w1", "lane": GRINDER, "state": "idle", "repo": str(git_repo), "team": "db"}]
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(git_repo)
     assert cli.main(["repo"]) == 0
@@ -229,7 +231,9 @@ def test_ao_repo_names_the_tagging_seat_or_why_there_is_none(git_repo, monkeypat
     # a live grinder of db keeps db live; ops has nothing live but its seat, when that is idle
     fleet.append({"id": "g", "name": "g", "state": "idle", "repo": str(git_repo), "team": "db", "unattended": True})
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "inbox": {}}[rpc]
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(git_repo)
     assert cli.main(["repo"]) == 0

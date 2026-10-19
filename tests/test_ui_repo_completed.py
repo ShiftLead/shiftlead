@@ -122,7 +122,7 @@ def test_ao_repo_says_how_many_closed_this_week_and_its_json_carries_completed(t
         str(root): {"name": "r", "root": str(root), "prs": {"open": []}, "ledger": {"entries": []}, "completed": done}
     }
     monkeypatch.setattr(
-        cli, "call_sync", lambda rpc, **kw: {"repos": repos, "list": [], "doing_log": {}, "inbox": {}}[rpc]
+        cli, "call_sync", lambda rpc, **kw: {"repos": repos, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc]
     )
     monkeypatch.setattr(cli, "_main_checkout", lambda cwd: str(root.resolve()))
     assert cli.main(["repo"]) == 0

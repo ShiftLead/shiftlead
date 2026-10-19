@@ -806,6 +806,13 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qhead[role="button"] { cursor: pointer; }
 .qgrip { color: var(--ended); cursor: grab; letter-spacing: -.2em; font-size: var(--t-small); user-select: none; }
 .qplace { font-size: calc(var(--t-body) * 2); font-weight: 600; line-height: 1; color: var(--fg); opacity: .25; text-align: right; }
+/* where the home reads more than one repo, a number per repo, each over its repo's chip (§4.5a *Queue page,
+   Up next: the number*, TD-901): the column widens for the chip, and only the number is at a quarter strength */
+.qcards.multi .qhead { grid-template-columns: 1.4em 5.5em 1fr; }
+.qplace.multi { opacity: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
+.qpn { display: flex; flex-direction: column; align-items: flex-end; max-width: 100%; }
+.qpn .qn { opacity: .25; }
+.qprepo { font-size: var(--t-small); font-weight: 500; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the id, badge and title on one line, the words at the right on it when they fit, else under it */
 .qmain, .qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
 .qid { flex: none; white-space: nowrap; font-size: var(--t-mono-s); }
@@ -901,6 +908,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .qother { display: flex; gap: 10px; align-items: baseline; padding: 8px 14px 8px 17px; border-top: 1px solid var(--line); font-size: var(--t-small); }
 @media (max-width: 720px) {
   .qhead { grid-template-columns: 1em 1.6em 1fr; column-gap: 6px; }
+  .qcards.multi .qhead { grid-template-columns: 1em 4.5em 1fr; }
   .qplace { font-size: calc(var(--t-body) * 1.4); }
   .qtitle { flex: 1 1 0; min-width: 8em; }
   .qright { margin-left: 0; justify-content: flex-start; flex-basis: 100%; }

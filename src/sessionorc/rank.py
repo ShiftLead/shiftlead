@@ -63,12 +63,23 @@ def up_next(cards: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def intent(
-    cards: list[dict[str, Any]], ids: list[str], prev: str | None, next_: str | None, by: str, at: str
+    cards: list[dict[str, Any]],
+    ids: list[str],
+    prev: str | None,
+    next_: str | None,
+    by: str,
+    at: str,
+    scope: str | None = None,
 ) -> dict[str, Any] | None:
     """The intent of a move of the card holding `ids` to between the cards holding `prev` and `next_`
     (None: that end of the order), or None for a move that leaves it where it is. Refused: an id no open
     card holds, ids of two cards, a card In progress, a neighbour not in Up next or the card itself, and
-    neighbours not adjacent in the Up next order the card leaves."""
+    neighbours not adjacent in the Up next order the card leaves.
+
+    **A Repo page's move** carries `scope`, the repo (§4.4 *A move lands*, TD-901): its neighbours are
+    adjacent among that repo's own Up next cards, so in the whole order they need only be in order — the
+    card lands just after `prev` (else just before `next_`), past other repos' cards between them — and the
+    cards the intent remembers beyond them are the repo's. Refused also: a card with no member in `scope`."""
     if not ids:
         raise Refused("a move names the card's ids")
     card = card_of(cards, ids[0])
@@ -96,24 +107,59 @@ def intent(
     p, n = ends
     at_p = rest.index(p) if p is not None else -1
     at_n = rest.index(n) if n is not None else len(rest)
-    if at_n != at_p + 1:
-        raise Refused("the neighbours are not adjacent in the Up next order")
     i = ups.index(card)
     now_p = ups[i - 1] if i > 0 else None
     now_n = ups[i + 1] if i + 1 < len(ups) else None
-    if now_p is p and now_n is n:
-        return None  # where it is: accepted, and nothing lands
-    return {
+    # the cards beyond each neighbour, nearest first: a neighbour archived or out of the order by the
+    # flush is replaced by the nearest of these that survives (§4.4 *A move lands*) — a scoped move's
+    # from its repo's cards alone
+    before, after = rest[: max(0, at_p)], rest[at_n + 1 :]
+    if scope:
+        if scope not in (card.get("repos") or ()):
+            raise Refused(f"{card['id']}'s card has no entry of {scope}, the page it was moved on")
+        if at_n <= at_p:
+            raise Refused("the neighbours are not in order in the Up next order")
+        # where it lands, as the flush derives it: just after `prev`, else just before `next_`
+        if (now_p is p) if p is not None else (now_n is n if n is not None else i == 0):
+            return None  # where it is: accepted, and nothing lands
+        before = [c for c in before if scope in (c.get("repos") or ())]
+        after = [c for c in after if scope in (c.get("repos") or ())]
+    else:
+        if at_n != at_p + 1:
+            raise Refused("the neighbours are not adjacent in the Up next order")
+        if now_p is p and now_n is n:
+            return None  # where it is: accepted, and nothing lands
+    out = {
         "ids": list(card.get("order") or ids),
         "prev": prev,
         "next": next_,
-        # the cards beyond each neighbour, nearest first: a neighbour archived or out of the order by the
-        # flush is replaced by the nearest of these that survives (§4.4 *A move lands*)
-        "prevs": [c["id"] for c in reversed(rest[max(0, at_p - NEIGHBOURS_KEPT) : max(0, at_p)])],
-        "nexts": [c["id"] for c in rest[at_n + 1 : at_n + 1 + NEIGHBOURS_KEPT]],
+        "prevs": [c["id"] for c in reversed(before[-NEIGHBOURS_KEPT:])],
+        "nexts": [c["id"] for c in after[:NEIGHBOURS_KEPT]],
         "by": by,
         "at": at,
     }
+    if scope:
+        out["scope"] = scope
+    return out
+
+
+def number(cards: list[dict[str, Any]]) -> None:
+    """Number the Up next cards of `cards`, in the order given (§4.4 *The Queue*, §4.5 screen 12 *Up next*;
+    TD-901): `place` the card's place in the whole Up next order, from 1, and `places`, one `{repo, n}` per
+    repo an open member of it is in, `n` its place among the Up next cards with a member in that repo, so
+    two repos' leaders both read 1. A card In progress gets `place` None and no `places`."""
+    whole = 0
+    per: dict[str, int] = {}
+    for c in cards:
+        if c.get("group") != "up_next":
+            c["place"], c["places"] = None, []
+            continue
+        whole += 1
+        c["place"] = whole
+        c["places"] = []
+        for repo in c.get("repos") or ():
+            per[repo] = per.get(repo, 0) + 1
+            c["places"].append({"repo": repo, "n": per[repo]})
 
 
 def place(cards: list[dict[str, Any]], card_id: str, keys: Mapping[str, str]) -> int | None:
