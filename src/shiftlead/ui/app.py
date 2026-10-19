@@ -440,6 +440,30 @@ def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
     return out
 
 
+def road_refusal(org: orgmod.Org, root: str, road: str, host: str) -> str:
+    """Why **Done…** or **Back to design…** on a ledger row of the checkout `root` is refused before the home
+    is asked (design §4.5 screen 12 *any open row*, TD-905), or '': no team's `repo:` is the checkout, so
+    nobody would read the decided line; and, for Back to design, no member's lane and no stage of a
+    servicing team's current flow takes `design-first`, so nobody would design it. The home reads no
+    `org.yml`, so the page says it."""
+    want = Path(root).expanduser().resolve()
+    serving = [
+        t for t in org.teams.values() if (p := org.checkout(t.repo, host)) and Path(p).expanduser().resolve() == want
+    ]
+    if not serving:
+        return f"no team services {want.name}: nobody would read the line"
+    if road != "design":
+        return ""
+    for t in serving:
+        if any("design-first" in m.lane for m in t.members):
+            return ""
+        under = teams.compiled(org, t, t.host or host, host, None)
+        if under is not None and any("design-first" in st.lane for st in under.flow.stages):
+            return ""
+    names = ", ".join(t.name for t in serving)
+    return f"no lane of {names} takes design-first: nobody would design it"
+
+
 def repo_boards(org: orgmod.Org, host: str) -> dict[str, dict[str, Any]]:
     """Each checkout on `host` → what a board row of it carries (§4.5 screen 6 *a board item carries its
     repo*, TD-722, built by TD-741): the board is the repo's, so a row names the repo and no team —
@@ -2770,7 +2794,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.post("/api/ledger/hold")
     async def api_ledger_hold(request: Request):
         """§4.5a *Repo page: Hold / Release on an entry* and *Inbox row: held entry* (TD-707, built by
-        TD-710 slice 3 and TD-736): `{repo, id, release?}` — the repo by its name, as the page names it —
+        TD-710 slice 3 and TD-736): `{repo, id, release?, why?}` — the repo by its name, as the page names it —
         to the home's `td_hold`, the person's own act on its settle clock, no ledger edit; the reply's
         `told`, `readers` and `untold` are the Hold toast's. A refusal (*TD-707 has settled*) is
         the toast's, a 400 in its words; the row's mark moves on the next repo reading's push."""
@@ -2779,7 +2803,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if not repo or not ref:
             raise HTTPException(400, "send {repo, id, release?}")
         # the home resolves the repo by the name its reading carries, the page's own (a refusal is the 400)
-        got = await call("td_hold", repo=repo, id=ref, release=bool(body.get("release")))
+        why = " ".join(str(body.get("why") or "").split())  # **Hold…**'s words (TD-905), new words replacing old
+        more = {"why": why} if why else {}
+        got = await call("td_hold", repo=repo, id=ref, release=bool(body.get("release")), **more)
         return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
 
     @app.post("/api/rank/move")
@@ -4443,6 +4469,16 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not repo or not ref:
                 raise HTTPException(400, "a ledger answer names the repo and the entry")
             more: dict[str, Any] = {}
+            if road := str(body.get("road") or ""):
+                # **Done…** / **Back to design…** (§4.5 screen 12 *any open row*, TD-905): refused here where
+                # nobody would read the line; the home tells, clears a hold and writes it
+                if not repo.startswith(("/", "~")):  # a Queue row names its repo: the registered checkout's name
+                    repo = next((str(p) for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), repo)
+                org, _notes = await asyncio.to_thread(org_here)
+                if why := await asyncio.to_thread(road_refusal, org, repo, road, host_name()):
+                    raise HTTPException(409, why)
+                got = await call("ledger_decide", repo=repo, id=ref, road=road, words=str(body.get("words") or ""))
+                return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if body.get("go"):
                 more["go"] = True
             elif body.get("answer") is not None:

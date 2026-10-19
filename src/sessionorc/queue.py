@@ -389,6 +389,11 @@ def reading(
                 "pr": (prs.get(q) or {}).get("number"),
                 "holder": _holder(claim[0][0]) if claim else None,
                 "held": dict(e["held"]) if isinstance(e.get("held"), dict) else None,  # {at, why?} (TD-905)
+                # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
+                # id in its `Blocked by:`, and a design's open builds
+                "page": str(e.get("for_page") or ""),
+                "blocked_open": bool(blockers.get(q)),
+                "builds_open": e.get("for_page") == "design" and any(q in b for b in blockers.values()),
                 "key": e.get("key") or "",
                 "lined": bool(e.get("lined")),
                 "archived": False,
@@ -406,6 +411,9 @@ def reading(
             "pr": pr,
             "holder": None,
             "held": None,
+            "page": "",
+            "blocked_open": False,
+            "builds_open": False,
             "key": "",
             "lined": False,
             "archived": True,
