@@ -355,6 +355,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     repo_facet,  # noqa: F401
     repo_named,  # noqa: F401
     rollup,  # noqa: F401
+    rollup_counted,  # noqa: F401
     team_lanes,  # noqa: F401
     team_repo,  # noqa: F401
     team_summary,  # noqa: F401
@@ -1432,7 +1433,7 @@ def create_app() -> FastAPI:
                 needs,  # a member's open ask to the person: its team's *asked you* line (TD-354)
                 spend,
             )
-            ro = templates.get_template("rollup.html").render(ro=rollup(groups))
+            ro = templates.get_template("rollup.html").render(ro=rollup(groups, vs))
             return {"groups": render_heads(org_layout(groups, repos, projects, vs)), "rollup": ro}
 
         # off the loop (TD-670): a view of every record and every header rendered held the loop up to
@@ -1641,7 +1642,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     (await h.defs()).projects.values(),
                     vs,
                 ),
-                "rollup": rollup(groups),
+                "rollup": rollup(groups, vs),  # the flat page's sessions are `vs` (TD-924)
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),

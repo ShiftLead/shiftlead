@@ -335,7 +335,7 @@ def test_a_wound_down_team_shows_what_it_left():
     """§4.5a *team card: summary*, *card: compact* (TD-181, built by TD-192): a team whose members
     have all exited carries the three facets — the Repo facet from the live readings, TDs in motion
     from the claims the last records hold, and Doing, since nobody can be waiting — and its members
-    are compact; *No team* has neither, and the rollup sums only live teams."""
+    are compact; *No team* has neither, and the rollup counts none of their ended records."""
     perm = {"kind": "permission", "text": "Bash x", "tool_use_id": "t1"}
     ms = [
         member("g1", state="exited", progress=[claim("TD-301", 811)], role_label="Grinder", pending=perm),
@@ -356,8 +356,10 @@ def test_a_wound_down_team_shows_what_it_left():
     html = ui.templates.get_template("team_summary.html").render(g=g)
     assert "TD-301" in html and "TD-301: the last test" in html
     assert none["summary"] is None and not any(m.get("compact") for m in none["members"])
-    # nothing live: nothing summed, whatever the summaries hold — Needs you alone (TD-406)
-    assert ui.rollup(groups) == {"live": False}
+    # nothing live and no session counted — a stopped team's exited cards, a closed record, an exited
+    # session in no team are leftovers — so Needs you alone (TD-406, TD-924)
+    ro = ui.rollup(groups)
+    assert ro["quiet"] and ro["n_agents"] == 0 and ro["answer_needed"] == 0
     # the two that hold something; the Repo facet is the repo line's, never a team card's (TD-725)
     assert s["drawn"] == ["motion", "face"] and s["repo"]
     # nothing here, nothing claimed, no doing row: no facet, and no summary drawn (TD-418)
@@ -405,7 +407,7 @@ def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
     # the repos whose PRs could not be read, one per line on the hover (TD-270)
     bad = ui.templates.get_template("rollup.html").render(ro={**ro, "prs_errors": ["a: x", "b: y"]}, person_needs=4)
     assert 'title="a: x\nb: y"' in bad
-    assert ui.rollup(None) == ui.rollup([g for g in groups if not g["team"]]) == {"live": False}
+    assert ui.rollup(None)["quiet"] and ui.rollup([g for g in groups if not g["team"]])["quiet"]
     # a wound-down team beside them carries a summary now (TD-192), and adds nothing to the sums
     gone = [{**member("z1", state="exited", progress=[claim("TD-290")]), "team": "gone", "rank": 1, "slot": {}}]
     more = ui.team_groups([*a, *b, *gone], (), {"/r/samscrape": reading("/r/samscrape")}, {})
@@ -949,3 +951,162 @@ def test_a_claims_pr_the_tick_set_is_its_review_row_and_its_compact_lines_pr():
     (row,) = ui.motion_rows(ms, r)
     assert row["phase"] == "review" and row["pr"] == 1302 and row["pr_url"].endswith("/pull/1302")
     assert ui.compact_line({**ms[0], "role_label": "Grinder"}) == "Grinder · TD-1 → #1302"
+
+
+# -- the rollup counts every session the page draws (TD-924, built by TD-925) -------------------------------
+
+PERM = {"kind": "permission", "text": "Bash x", "tool_use_id": "t1"}
+
+
+def _s(sid: str, state: str = "working", team: str = "grind", rank: int = 1, **kw) -> dict:
+    """A session as a view hands it on: its pill the state's, as `view` sets it."""
+    pill = "on-call" if kw.get("seat") else state.rstrip("?")
+    return {**member(sid, state=state, team=team, **kw), "rank": rank, "slot": {}, "place": "x", "pill_word": pill}
+
+
+def _tally(ro: dict) -> dict:
+    return {a["word"]: a["n"] for a in ro["agents"]}
+
+
+def test_a_working_member_of_a_team_with_nothing_live_and_a_needs_you_session_in_no_team_are_counted():
+    """§4.5a *Sessions: rollup* (TD-924): Agents and *answer needed* count every session the page draws
+    that has not ended, whatever its team's state — a person's working session in a stopped team, a
+    session in no team waiting on a permission — and *answer needed* goes to the first of them in the
+    grid's one order: the no-team session's card."""
+    ms = [
+        _s("g1", "exited", team="stopped"),
+        _s("p1", "working", team="stopped", unattended=False),  # a person's: keeps nothing live (§4.9)
+        _s("n1", "needs-you", team="", pending=PERM),
+    ]
+    groups = ui.team_groups(ms, (), {}, {})
+    assert not any(g["live"] for g in groups if g["team"])
+    ro = ui.rollup(groups)
+    assert ro["lone"] and not ro["quiet"] and ro["n_agents"] == 2
+    assert _tally(ro) == {"needs-you": 1, "working": 1}
+    assert ro["answer_needed"] == 1 and ro["answer_card"] == "n1" and ro["answer_team"] == ""
+    html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=0)
+    assert 'class="rollup lone"' in html and "Agents (2)" in html and "TDs in motion" not in html
+    assert '<a href="#card-n1" data-open-card="n1"' in html and "answer needed</a>" in html
+
+
+def test_an_exited_member_of_a_live_team_counts_and_a_stopped_teams_exited_card_and_a_closed_record_do_not():
+    ms = [
+        _s("g1", "working"),
+        _s("g2", "exited"),  # stopped mid-run, in a live team
+        _s("p1", "exited", unattended=False),  # the person's own, in it too
+        _s("g3", "closed"),  # closed and no seat
+        _s("h1", "exited", team="other"),  # a stopped team's leftover
+        _s("n1", "exited", team=""),  # an exited session in no team: a leftover
+    ]
+    ro = ui.rollup(ui.team_groups(ms, (), {}, {}))
+    assert _tally(ro) == {"working": 1, "exited": 2} and ro["n_agents"] == 3
+    assert "closed" not in [w for w, _, _ in ui.ROLLUP_STATES]
+
+
+def test_a_seat_on_call_is_counted_by_its_pill_and_a_command_run_in_no_count():
+    ms = [
+        _s("g1", "working"),
+        _s("tl", "exited", seat=True),  # a seat with nobody in it: its record stays exited
+        _s("run", "working", kind="command"),
+        _s("run2", "working", team="", kind="command"),
+    ]
+    ro = ui.rollup(ui.team_groups(ms, (), {}, {}))
+    assert _tally(ro) == {"working": 1, "on-call": 1} and ro["n_agents"] == 2
+
+
+def test_the_flat_pages_sessions_are_counted_and_its_exited_cards_are_not():
+    vs = [_s("a", "working", team=""), _s("b", "needs-you", team="", pending=PERM), _s("c", "exited", team="")]
+    assert ui.team_groups(vs, (), {}, {}) is None  # no badge, nothing defined: the flat page
+    ro = ui.rollup(None, vs)
+    assert ro["lone"] and _tally(ro) == {"needs-you": 1, "working": 1}
+    assert ro["answer_card"] == "b" and ro["answer_needed"] == 1
+    assert ui.rollup(None, [vs[2]])["quiet"]
+
+
+def test_with_no_team_live_the_row_is_agents_and_needs_you_or_needs_you_alone_with_asked_you():
+    """No team live: a counted session gives Agents and Needs you; none gives Needs you alone, which
+    still holds *asked you* while a stopped team's line holds an open ask (§4.5a *Sessions: rollup*)."""
+    render = ui.templates.get_template("rollup.html").render
+    stopped = [_s("g1", "exited")]
+    needs = [_ask("m-1", "g1")]
+    ro = ui.rollup(ui.team_groups(stopped, (), {}, {}, needs=needs))
+    assert ro["quiet"] and ro["asked"] == 1 and ro["asked_team"] == "grind"
+    html = render(ro=ro, person_needs=1)
+    assert 'class="rollup quiet"' in html and "Agents (" not in html
+    assert '<a href="#tsum-grind" data-open-team="grind"' in html and ">asked you</a>" in html
+    lone = ui.rollup(ui.team_groups([*stopped, _s("n1", "idle", team="")], (), {}, {}))
+    assert lone["lone"] and not lone["quiet"] and lone["n_agents"] == 1
+    assert 'class="rollup lone"' in render(ro=lone, person_needs=0)
+
+
+def test_answer_needed_goes_to_the_first_waiting_session_in_card_order_and_asked_you_to_the_oldest_ask():
+    """*answer needed* goes to the first waiting session in the grid's one order (`card_order`: rank,
+    interactive first, name), whatever its team's state — a folded or stopped team's facet, which a team
+    of any state draws while it holds an answer; *asked you* to the team holding the oldest ask."""
+    ms = [
+        _s("a1", "needs-you", team="alpha", rank=2, pending=PERM),
+        _s("z1", "needs-you", team="zeta", rank=1, pending=PERM, unattended=False),  # a person's, in a stopped team
+        _s("z2", "exited", team="zeta"),
+    ]
+    needs = [_ask("m-new", "a1", minutes=5), _ask("m-old", "z2", minutes=50)]
+    groups = ui.team_groups(ms, (), {}, {}, needs=needs)
+    zeta = next(g for g in groups if g["team"] == "zeta")
+    assert not zeta["live"] and "face" in zeta["summary"]["drawn"], "a stopped team draws its Answer needed"
+    ro = ui.rollup(groups)
+    assert ro["answer_needed"] == 2 and ro["answer_team"] == "zeta" and ro["answer_card"] == ""
+    assert ro["asked"] == 2 and ro["asked_team"] == "zeta" and ro["asked_at"] == needs[1]["at"]
+    html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=0)
+    assert '<a href="#tsum-zeta" data-open-team="zeta"' in html
+
+
+ROLLUP_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+global.window = {}; global.document = { documentElement: el(), body: el(), querySelector: () => null,
+  querySelectorAll: () => [], addEventListener: noop, createElement: el };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO, out = [];
+for (const [team, folded] of [["grind", true], ["grind", false], ["", false]]) {
+  const filter = { value: "state:working team:x" }, set = {};
+  AO.rollupGo(team, filter, folded, (k, v) => (set[k] = v));
+  out.push({ filter: filter.value, set });
+}
+console.log(JSON.stringify(out));
+"""
+
+
+def test_a_press_on_the_rollups_link_clears_the_filter_and_opens_a_folded_team_storing_the_opening(tmp_path):
+    """The client half (§4.5a *Sessions: rollup*, *team card: fold*): a press clears the filter box, then
+    opens the team it goes to when folded, the opening stored as a press on its header is (`fold:<team>`
+    false), then scrolls; a no-team card's link only clears the filter."""
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rollup's press is JavaScript, and nothing else runs it")
+    probe = tmp_path / "rollup_probe.js"
+    probe.write_text(ROLLUP_PROBE)
+    js = ui.Path(ui.__file__).parent / "static" / "app.js"
+    run = subprocess.run([node, str(probe), str(js)], capture_output=True, text=True, timeout=30)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(run.stdout) == [
+        {"filter": "", "set": {"fold:grind": False}},
+        {"filter": "", "set": {}},
+        {"filter": "", "set": {}},
+    ]
+    src = js.read_text()
+    # the handler: the link's target read, the team's section found, the fold read, then the layout and the scroll
+    assert 'const go = e.target.closest("[data-open-team], [data-open-card]");' in src
+    assert 'AO.rollupGo(team, $("#filter"), !!sec && isFolded(sec), store.set);' in src
