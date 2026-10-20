@@ -83,6 +83,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-919 | #2179's orphaned-ask pick (`mail.picks_answer` on the orphan path of `_msg`) has no test that would notice a revert (test audit) | Medium | Open |
+| TD-920 | #2181's Queue header `Decide n` counts items, and no test has a card with two Decide items (test audit) | Low | Open |
 
 ---
 
@@ -1725,5 +1726,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** In `tests/test_ui_orphaned.py` or `tests/test_mail.py`, one test over a real orphaned `ask` whose stored answer is `<label> — <consequence>`: a person's `reply` with `--pick` and the label as its text is answered (the board and the reference holder told, as `_answer_orphan` does), the whole stored line too, and a word that is neither is refused. Revert the line and see it fail.
 
 **Done when** the orphan-branch revert above fails a test.
+
+---
+
+## TD-920: #2181's Queue page header reads `Decide n` as items, not cards, and no test has a card with more than one Decide item
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-19 (test audit of #2181, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/queue.py` (the counts in `reading`: `"decide": sum(c["wants"]["n"]["decide"] for c in shaped)`, under the comment *items, not cards*); `tests/test_queue_wants.py`, `tests/test_ui_queue.py`
+
+**Why:** #2181's comment says the header's *Decide n · Do n* count items, not cards. Probe on `origin/main` 44b05f1dd: change that line to `sum(1 for c in shaped if c["wants"]["n"]["decide"])` (cards with any Decide item) and the whole suite passes. Every test card has one Decide item at most, so items and cards read the same.
+
+**Fix:** One test over a card with two Decide items (a question and a paused `steer`) and one with a single item: the header's `decide` is 3, not 2. Revert the line and see it fail.
+
+**Done when** the probe above fails a test.
 
 ---
