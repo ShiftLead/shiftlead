@@ -1736,8 +1736,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** feature
 **Added:** 2026-10-19 (TD-909's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2178
+**Status:** Built (2026-10-19, #2178, grinder-ao-2): the reading's `waits`/`wait`/`would_be` and group `waiting`, `_status`'s *held (person)* (no longer a need), `rank.intent` and `ao rank` refusing a Waiting card, `ao rank --list`'s Waiting lines, the Queue's Waiting group and wait column, the Repo board's gutter, the wait column's help. **Live check**, read-only, once #2178 is live (`ao promote status`): a headless GET of `/queue` draws *Waiting (n)* between In progress and Up next, each Waiting card with its wait column (a date, *event*, *settling*, *not live*, *blocked*), *would be n in <repo>* and its phrase, no grip; Up next is numbered from 1 with no gaps; `ao rank --list` prints the Waiting cards unnumbered after In progress, and `ao rank <a Waiting id> --top` is refused naming Waiting (refused before any move is made).
 **Location:** `src/sessionorc/queue.py` (`waits`, `wait`, `would_be`, `group`, `places` over Up next alone; `_status` gains *held (person)* and loses its *needs you* from a held row), `src/sessionorc/rank.py` (`intent`'s refusal), `src/shiftlead/cli.py` (`ao rank --list` ~3253), `src/shiftlead/ui/queue.py`, `templates/queue_part.html`, `queue_card.html`, `src/shiftlead/ui/repo_board.py` and `templates/repo_part.html` (a Waiting card's gutter on the Repo page's board), `src/shiftlead/ui/help.py`
 
 **Why:** TD-909: design §4.4 *Waiting*, *The card's status*, *A move lands*, *One owner*; §4.5 screen 12 *Waiting*, *Up next*; §4.5a *Queue page, Waiting: the wait column*, *Queue page, Up next: grip*, *Queue page: group heading*. On 2026-10-19 the Queue drew 197 cards Up next, 11 saying only *waiting* and card 1 waiting on a date eleven days out. A held path (`src/sessionorc/**`): the techlead reads it.
