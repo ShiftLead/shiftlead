@@ -34,9 +34,10 @@ The page has four groups, furthest through first: **Recently completed**, **In p
 the card's status word (§4.4 *The card's status*: *needs you* > *steer* > *stalled* > *blocked* > *waiting*
 > *ready*) is unchanged, and the group is read from `waits`, never from the status. **`waits` is true when
 every open member that is not the person's own** — not `Owner: paul`, not `Blocked by: decision (paul)` —
-**waits**: has a `Waits:` line, is a live check whose build is not live, is settling, is blocked only by
-open ids **that are not the person's own** (a child blocked only by the person's Do is not waiting: the Do is
-its unblock), is blocked past the org's reach (the reading's `unreachable`: a `decision (<who>)` with `who`
+**waits**: has a `Waits:` line, is a live check whose build is not live, is settling, is blocked by open
+ids **once the person's own are set aside** (a child blocked only by the person's Do is not waiting: the Do
+is its unblock; one blocked by the Do and by TD-x waits on TD-x — the shape of `_status`'s own test, which
+sets the designer's decision aside before it looks), is blocked past the org's reach (the reading's `unreachable`: a `decision (<who>)` with `who`
 neither the person nor the designer, an id ledgerboard cannot resolve), or is an entry no lane takes (its
 `for_page` in `NO_LANE`: an *evaluation* or *other* entry, §4.4 *Repo facts*); and at least one open member
 is not the person's own. **The person's own** are `Owner: paul`, `Blocked by: decision (paul)`, and a *held
@@ -74,7 +75,7 @@ A card can want three things of the person, and the section names say which:
 | Want | What it is today | Where it is drawn |
 |---|---|---|
 | **Decide** | an `ask` with or without answers; a `steer`, running (with its countdown and Go with it) or paused; a board line of kind `decide`, `act` or `look` (cadence §3.3); a `Blocked by: decision (paul)` hold (*Lift the hold* its answer); an entry with `Answers:` | the header, open, amber, counted |
-| **Do** | an entry whose `Owner:` is the person (*yours*) | the header, open, amber, counted |
+| **Do** | an entry whose `Owner:` is the person (*yours*); a red PR nobody holds that names the entry, in a repo no team services (§4.5a *Inbox row: red PR*) — its answer is **Open**, no Snooze on the card, and Start session never chooses it (it is no entry) | the header, open, amber, counted |
 | **Read** | FYI (notes, the trail, a `watch` or `fyi` board line), *Answered for you*, *Waiting on them* (an answered ask or steer, a decided line its session has not landed) | under the rows, **folded, with its count**, uncounted |
 
 Decide and Do both colour the card amber and both are counted on its pill, *Decide 1 · Do 1*; the page
@@ -88,7 +89,10 @@ cannot steer a team unseen, and the fold's count keeps that. Inside Read's fold 
 own line and its **Dismiss all** (§4.5a): *answered for you (7)*, *waiting on them (1)*, *fyi (2)*.
 **A *held (person)* entry is no want**: the person owes nothing on it; its row reads *held (person) — why*
 with **Release** in the ⋯ in place of Hold, and the card is not amber for it — §4.4 *The card's status* loses
-its *needs you* from a *held (person)* row (a §4.4 edit of this ADR's). The Inbox's five section names stand on the Inbox (§4.5 screen 6); the card maps them to
+its *needs you* from a *held (person)* row, and gains the word ***held (person)*** for a card whose
+non-waiting open members are all held, between *stalled* and *blocked*, so such a card never reads *ready*
+(a §4.4 edit of this ADR's). A held card with a waiting child is Waiting, teal, no want; Start session on it
+starts on the held entry, which a hold allows — a hold withholds from lanes only (§4.4 *Hold*). The Inbox's five section names stand on the Inbox (§4.5 screen 6); the card maps them to
 these three, and this table is the whole map.
 
 ## 3. Three verbs
@@ -107,28 +111,33 @@ Whatever the item's kind, the person does one of three things, and the words are
   with the card as its context.** The road is the ledger row's (§4.5a *Inbox row: ledger entry: Start
   session*), **widened**: `/api/ledger/start` takes `{repo, id, card}` and no longer requires the entry to
   be *for you*; in its place it checks that the entry is open and is the card's choice as the reading has
-  it now. The entry the session is started on — its repo's team, its worktree `td-<n>`, its branch,
+  it now — **`start`, the chosen entry's id on each card of the `queue` reading**, one value the button and
+  the road both read (Do, `Answers:` and `decision (paul)` are ledger facts, so `sessionorc.queue` owns it). The entry the session is started on — its repo's team, its worktree `td-<n>`, its branch,
   and so the claim the tick derives — is **the card's Do entry when it has exactly one, else its first
   Decide ledger entry (an `Answers:` entry or a `decision (paul)` hold, by key), else the top entry**,
   **chosen by key alone, never by what is already claimed**, so two presses choose the same entry; a
   card spanning repos starts on that entry's repo's team and names the rest. **The claim is owned**: the
-  person's session holds that entry while it lives, the card is In progress and the row reads *held by
-  td-<n>* to every lane, exactly as a ledger row's Start session does today — on a card with nothing of the
-  person's that is the top entry, taken from the lanes for as long as the session runs, which is the
-  person's call. The opening prompt is `briefs/work.md` extended with **an id list** — the card's entries,
+  person's session holds that entry while it lives — the claim is in the reading's `held`, which is what
+  the lanes read — the card is In progress, and the row carries the session's pill, reading *held by
+  td-<n>* where it has a state word; a row of the person's keeps its need and a held row its *held
+  (person)*, `_state`'s order. On a card with nothing of the person's the held entry is the top entry, taken
+  from the lanes for as long as the session runs, which is the person's call. The opening prompt is `briefs/work.md` extended with **an id list** — the card's entries,
   and which of them are Decide and Do — ids only, never an entry's own words (§4.5a); any chosen entry that is
   neither `Owner: paul` nor a `decision (paul)` hold takes a third `why_key`, *card*, with its fixed words.
   While **the person's own interactive session** holds any of the card's entries the button reads **Open
-  session** and goes there; while an unattended worker holds the chosen entry the button is absent, the row
-  says *held by <name>*, and the road refuses a stale page's press with 409 *held by <name>* rather than
-  handing the person that worker's Focus. The existing refusals (no
+  session** and goes there, **whatever holds the chosen entry** — the button is once per card and the
+  person's session is where the card's work is; the road does the same before it starts anything, so a
+  stale page's press never starts a second session on the card. With no session of the person's on the card
+  and an unattended worker on the chosen entry, the button is absent, the row says *held by <name>*, and the
+  road refuses a stale press with 409 *held by <name>* rather than handing the person that worker's Focus. The existing refusals (no
   servicing team, the name not free, the team on another host) still fall to the filled New session form.
 - **⋯** — the team's controls, behind one visible mark on the card's header and on each row and item:
   **Hold** (*keep the team off this*, the one "not now" that survives on a card, because it stops a lane
   and is not about the person) or **Release** on a held row, **Back to design…**, **Done…** on an entry
   (not an `Owner: paul` row, whose Done is an answer, and not a design with open builds, as today), **Open**
-  on the Repo page (§4.5 screen 12 *any open row*); on an item, **Delete** on an ask (the decline) and
-  **Pause** / **Resume** on a steer. The names inside are drawn on hover or focus of the header, row or
+  on the Repo page (§4.5 screen 12 *any open row*); on an item, **Delete** on an ask (the decline),
+  **Pause** / **Resume** on a steer, **Send to reviewer** on a look that is an open ask (§4.5a *Inbox row: a
+  look*), and **Done** on a decided board line under *waiting on them*. The names inside are drawn on hover or focus of the header, row or
   item; **the ⋯ itself is always drawn**, at narrow width too, where there is no hover. It is a control
   class of its own with a keyboard model (`Enter` opens, arrows move, `Esc` closes) and gets its own §4.5a
   row.
@@ -136,7 +145,7 @@ Whatever the item's kind, the person does one of three things, and the words are
 **No dates of the person's on a card.** No Snooze, no Put on the board, no Due. The rank is the snooze: a
 card not wanted now moves down. Waiting is the ledger's own dates. The Inbox keeps Snooze, Put on the board
 and `Due:` for what names no entry (§5). A Read item opened on the card keeps its Dismiss and Put on the
-board, the Inbox's own.
+board, the Inbox's own, and **Overrule** on an *answered for you* item beside its Dismiss (§4.5a).
 
 ## 4. The header, the rows, and one renderer per kind with a card mode
 - **The header's right edge** reads, in order: the move arrows, Start session and ⋯, a gap, then the facts —
@@ -236,14 +245,17 @@ ADR 2026-10-15 forbids a lane change before then. Nothing here changes a lane's 
 what the readings measure, so **their builds are `Blocked by: TD-772`**: the backfill (grinder-lane time;
 rewrites the entries the page shows), the §5 brief line on `about` (changes how many TD asks exist), and
 the §6 warning. One more is the person's own: a Start session on a card claims an entry and takes it from
-the lanes while the session lives, as a ledger row's does today; it lands now because the passed-over
-reading skips every record that is not unattended (`_passed_over`, `sessionorc/queue.py`) and the person's
-session raises no flag, and the read-back counts such claims against the idle-while-work lines.
+the lanes while the session lives, as a ledger row's does today; it lands now, **and it moves both
+readings down**: the person's claim is in `held`, so its entry leaves `in_lanes` (an idle member beside it
+samples *starved*, not *idle with work*, §4.4 *A member's own count*) and its card leaves Up next (no worker
+below it is flagged for it; `_passed_over` reads Up next alone and skips every record that is not unattended).
+The read-back lists the person's claims with their spans beside the two readings.
 The rest change what the person sees and may land now:
 - the `waits` predicate, the Waiting group, numbering over Up next alone, the wait column and phrases (§1;
   the `queue` reading, `queue_part.html`, `queue_card.html`; the mockup's TD-900 card, drawn Up next with
   *after TD-904*, is Waiting under §1 with *event* in its column — the mockup was corrected, and its TD-905 row, drawn *after
-  TD-904*, reads *waits on an event* as the ledger has it)
+  TD-904*, reads *waits on an event* as the ledger has it; its blurb's *the item you came from* under Start
+  session is superseded by §3's choice by key)
 - the card's three wants: the sections, the pill's and the header's counts, *Read n* on a folded card,
   *held (person)* as no want, Dismiss all per sub-section (§2)
 - the three verbs: the answers row on every item, Start session on the card with its widened road, id list
@@ -255,7 +267,7 @@ The rest change what the person sees and may land now:
   consequences per answer, the briefs, the cadence check's warning, `mail.one_sentence` (§6; a dev-cadence
   entry first, then this repo's); the backfill, after TD-772
 - help text and §4.5a rows for every control whose words change, the filter row's *Needs you (n)* and the
-  kind pick's words among them (bound to `help.py`: the build entry's; run `grep -ln 4.5a tests` first,
+  kind pick's words among them, and display-only rows for the wait column with *would be n* and for *Read n* (bound to `help.py`: the build entry's; run `grep -ln 4.5a tests` first,
   since §4.5a rows are test keys)
 
 ## Review record
@@ -275,3 +287,8 @@ at 80; a child blocked only by the person's own entry is not a wait; `waits` rea
 `NO_LANE` itself and counts a *held (person)* entry as the person's own; the road's checks in place of
 *for you*, a deterministic choice, 409 on a worker's hold; *card* for every entry that is not the person's;
 the event phrase's member; the widened road lands now with its reason; the backfill count corrected.
+Round 3 (Fable, NOT READY, nothing blocking, 10 findings; adopted): a member blocked by the Do and by TD-x
+waits on TD-x; a row of the person's keeps its need over *held by*; Open session wins over a worker's hold and
+the road goes there before it starts; the red PR row is a Do item; Overrule, Send to reviewer and a decided
+line's Done placed; a held card reads *held (person)*, never *ready*; the widened road moves both readings
+down, said so; `start` on each card of the reading; display-only §4.5a rows named.
