@@ -237,7 +237,7 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
 
     for e in later or ():
         if e.get("later_section") == "later":
-            put(e, "needs", "later", e.get("row_id"), "do" if e.get("why") == "yours" else "decide")
+            put(e, "needs", "later", e.get("row_id"), _item_kind(e, "needs"))
     for sec in CARD_SECTIONS:
         for e in sections.get(sec) or ():
             if e.get("home") != "queue":
