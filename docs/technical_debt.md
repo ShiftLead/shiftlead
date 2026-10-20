@@ -75,7 +75,15 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-904 | Build TD-900 (4): the promote reading's `promoted`, the divider on Merged and the Queue's mark by ancestry | Medium | Built (#2158) — live check |
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
-| TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Agreed — the hold lifted; the designer's round is next |
+| TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Designed — built by TD-911–TD-918 (on dev-cadence#TD-121, #TD-122) |
+| TD-911 | Build TD-909 (2): Decide, Do and Read on a card, each renderer's `card` mode | High | Open — blocked by TD-918, TD-913 |
+| TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Open — blocked by TD-911 |
+| TD-913 | Build TD-909 (4): `render.one_sentence`, and answers split into labels and consequences (a held path) | Medium | Open |
+| TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open — blocked by TD-911, TD-913 |
+| TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open — blocked by TD-911 |
+| TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772, TD-913 |
+| TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
+| TD-918 | Build TD-909 (1): the Waiting group — unnumbered, unmoved, its wait column (a held path) | High | Open |
 
 ---
 
@@ -1576,7 +1584,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-19 (Paul, in an interactive session, over an afternoon of rounds on two review pages)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Agreed (2026-10-19) — [ADR 2026-10-19](decisions/2026-10-19-queue-card.md), drawn from the live ledger ([the page](mockups/reviews/2026-10-19-queue-redesign.html), [its shot](mockups/reviews/2026-10-19-queue-redesign.png)); the review rounds converged the same day (six rounds, Sonnet and Fable alternating, round 6 READY); the designer's round writes it into §4.4 *The Queue: cards, and the rank that orders them*, §4.5 screen 12, §4.5a and §4.10 and names the builds (ADR §8). Amends TD-748's ADR, which stands for what this does not touch. **Paul lifted the hold 2026-10-19 19:10 MDT** (in an interactive session): the design round is next, the designer's.
+**Status:** Designed (2026-10-19, the designer): §4.4 *Waiting* (a card-level `waits`, `wait` from a leaf, `would_be`, unnumbered and unmoved), *The card's status* (*held (person)* no need, a word of its own), *A move lands*, *One owner* (`group`, `start`), *Hold* (a derived claim is not refused); §4.5 screen 12 *Waiting*, *A card* (its own box, its edge, the tree), *Three wants* (Decide, Do, Read), *An item's shape* (a `card` mode per renderer), *Three verbs* (Answer, Start session widened to `{repo, id, card}`, ⋯), no dates of the person's on a card, the kind pick; screen 11's rows; §4.5a six rows amended and five new; §4.10 *An item leads with one sentence* (`render.one_sentence`, the answers' ` — ` split, the warning); glossary *Waiting*, *Decide / Do / Read*. Built by TD-911–TD-918; dev-cadence#TD-121 (the `Ask:` line, the split in cadence §3.5 and ledgerboard) and dev-cadence#TD-122 (the rule in cadence §3.3 and its stage briefs, the cadence check's warning, after TD-772). Was: Agreed (2026-10-19) — [ADR 2026-10-19](decisions/2026-10-19-queue-card.md), drawn from the live ledger ([the page](mockups/reviews/2026-10-19-queue-redesign.html), [its shot](mockups/reviews/2026-10-19-queue-redesign.png)); the review rounds converged the same day (six rounds, Sonnet and Fable alternating, round 6 READY); the designer's round writes it into §4.4 *The Queue: cards, and the rank that orders them*, §4.5 screen 12, §4.5a and §4.10 and names the builds (ADR §8). Amends TD-748's ADR, which stands for what this does not touch. **Paul lifted the hold 2026-10-19 19:10 MDT** (in an interactive session): the design round is next, the designer's.
+**Blocked by:** TD-918, TD-911, TD-912, TD-913, TD-914, TD-915, TD-916, TD-917
 **Location:** `docs/decisions/2026-10-19-queue-card.md`; the design text it rewrites: §4.4 *The card's status* and *Groups* (4.4-host-agent.md), §4.5 screen 12 *Groups*, *A card*, *What is attached to a card*, *What needs the person* (4.5-ui.md), §4.5a the Queue rows; `src/shiftlead/ui/templates/queue_part.html`, `queue_card.html`, `queue_row.html`, `src/shiftlead/ui/queue.py`; dev-cadence for the writing rule (ADR §6)
 
 **Why:** Measured on 2026-10-19 with the live ledger: 197 cards Up next, 82 amber, 11 saying only *waiting*, the tallest 3,212 px. Paul: *we have many ways that the user's attention is needed and multiple possible replies — we need to figure out how to simplify*; *lots of words all over the place, so I am relegated to reading everything in order*; *the description is written like someone took poor notes then handed them to me*.
@@ -1589,3 +1598,152 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
+## TD-911: Build TD-909 (2): a Queue card's sections are Decide, Do and Read — amber and counted for the first two, Read folded — drawn by each kind's renderer in a `card` mode
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-918, TD-913
+**Location:** `src/shiftlead/ui/queue.py` (the sections, the counts, the card's mail items), `templates/queue_card.html`, `queue_mail.html`, `queue_row.html`, `inbox_row.html` (the renderers' `card` mode), `queue_filters.html` (the kind pick), `src/shiftlead/ui/help.py`
+
+**Why:** TD-909: design §4.5 screen 12 *A card*, *Three wants*, *An item's shape*, *Filters*; §4.5a *Queue page: card*, *Queue page: filters, find*, *Queue card: Read n*. Paul, 2026-10-19: *there are lots of words all over the place (yours to do, asks, etc), so I am relegated to reading everything in order*.
+
+**Fix:** (1) The map of §4.5 screen 12 *Three wants*: Decide and Do in the header, open, amber, counted on the pill (*Decide 1 · Do 1*); Read under the rows, folded with its count, its lines *answered for you (n)*, *waiting on them (n)*, *fyi (n)*, each with Dismiss all where the Inbox has it; *Read n* on a folded card; a red PR nobody holds as a Do item, *#n red — Open*, counted on the pill only; a *held (person)* row no want — a held *for you* entry on a card draws the held row, *held (person) — <why>* with Release, never the for-you row (§4.5a *Inbox row: held entry*). (1b) An Up next card with a running steer draws the pill with *steer* beside it (test it), and *stalled* the same. (2) The page header's *Decide n · Do n*, display only, with a hover saying it is not the top bar's number. (3) Each kind's renderer takes a mode, `inbox` or `card`; in `card` a Read item is one line (who, kind, *on TD-n*, `subject`, age) opening to its body; a Decide or Do item draws its kind line, its sentence, its consequences where its reader gives them (TD-913, dev-cadence#TD-121), *context* folded in place of *details*, and its answers; a ledger entry with no `Ask:` draws its title as the sentence and Why and Fix under *context*; a mail item whose first paragraph fails `render.one_sentence` draws its `subject` as the sentence and its whole text folded. No second renderer. (3b) The header's layout (§4.5 screen 12 *A card*): the move arrows, the slots for **Start session** (TD-912) and **⋯** (TD-914), a gap, the count, *Read n*, the status last. (4) The kind pick: **Decide** · **Do** · *held (person)*. (5) Help text, written into §4.5a's help list and `help.py` in this PR: **Read n** (Queue card) — *How many things on this card are for reading only — answers given for you, answered questions, notes. Open the card to see them.*. Tests: each kind lands in its want; the counts are items, not cards, and the top bar's number is unchanged; a folded card shows *Read n*; Dismiss all acts on its line alone; the Inbox's rows are unchanged in `inbox` mode.
+
+**Done when** the live Queue's cards draw Decide, Do and Read as §4.5 screen 12 says, with the counts on the pill and the page header, and the Inbox draws as before.
+
+---
+
+## TD-912: Build TD-909 (3): Start session once per Queue card, on its repo's team with the card as its context — the road widened, the claim owned, the prompt's third key
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-911
+**Location:** `src/sessionorc/queue.py` (`start` on each card), `src/shiftlead/ui/app.py` (`/api/ledger/start` ~2828, `why_key` ~2888), `src/shiftlead/repoconfig.py` (`work_text`, `WORK_WHY`), `src/shiftlead/briefs/work.md`, `templates/queue_card.html` (the Repo page's board keeps the row's Inbox road), `src/shiftlead/ui/help.py`
+
+**Why:** TD-909: design §4.4 *One owner* (`start`), *Hold* (a derived claim is not refused); §4.5 screen 12 *Three verbs: Start session*; §4.5a *Queue card: Start session / Open session*, *Inbox row: ledger entry: Start session*. Paul, 2026-10-19: *if I have a "Do" item I am going to start a session and have the AI do as much of it as possible*. It lands now: ADR 2026-10-19 §8 says how it moves the trial's readings, and TD-772's read-back lists the person's claims beside them. A held path (`src/sessionorc/**`, `start`): the techlead reads it.
+
+**Fix:** (1) `start` on every open card of the `queue` reading, a `<repo>#TD-n` (the road's `{repo, id}` split from it): the `Owner: paul` entry when the card has exactly one, else the first `decision (paul)` entry by key, else the top entry — by key alone, a held entry no different; a completed card has none and draws no button; a Waiting card has one. Test a card with two `Owner: paul` entries (it falls to the Decide entry or the top entry). (2) `/api/ledger/start` takes `{repo, id, card}`, `card` the card's id as the reading has it (its top entry's `<repo>#TD-n`); with `card` it checks the entry is open and is that card's `start` now, in place of *for you* (409 with the reason otherwise); before it starts anything it goes to the person's own session on the card (`unattended: false`, no caller) where one holds any of its entries, and refuses 409 *held by <name>* where another holder has `start`. (3) `work.md` becomes `{opening} Its entries are: waits on me — {mine}; the rest — {rest}. Read the entry, check the code and the design for what is already built or decided, and tell me in a few lines what it asks of me and what you would do first. Then wait for me: I drive this one.`, and `WORK_WHY` becomes `WORK_OPENING`, one first sentence per `why_key` with the slots `{where}`, `{id}`, `{repo}`, `{ledger}`: *yours* `I opened this session from the {where} to work {id} of {repo}'s ledger ({ledger}) myself: it waits on me (its owner is me).`, *decision* the same ending `(it is blocked by a decision of mine).`, *card* `I opened this session from the Queue to work the card around {id} of {repo}'s ledger ({ledger}).`; `work_text(id_, repo, ledger, why, where="Inbox", mine=(), rest=())`, `where` *Queue* from a card, `mine` and `rest` `<repo>#TD-n` ids in key order (§4.5 screen 12 *Three verbs: Start session*), each *none* when empty; pressed on the Inbox row, the road reads the `queue` reading for the card holding the entry (as `app.py` already reads it), and where none does, `mine` is the entry and `rest` *none*. The road picks `why_key` from the chosen entry (`Owner: paul` *yours*, `decision (paul)` *decision*, else *card*). (4) The button once per card in the header, plain, in the slot TD-911's header layout leaves; **Open session** to the person's own session (the one holding `start`, else the first by id); absent with another holder on `start`, the row saying *held by <name>*. (5) Help text for the card's **Start session**, written into §4.5a's help list and `help.py` in this PR (`tests/test_help.py` holds them equal): *Starts your own session on this card's team, on the one entry owned by you, else the first decision of yours, else its top entry, with the card's entries as its context. Reads Open session while yours is running.* Tests: two presses choose one entry; a held entry starts and stays held; a worker's hold is a 409; a stale press with the person's session live goes there; the prompt's three keys and the id list.
+
+**Done when** a press on a Queue card starts the person's session on the card's `start` entry with the id-list prompt, the card reads In progress, and a second press goes to that session.
+
+---
+
+## TD-913: Build TD-909 (4): `render.one_sentence`, and a message's answers split into labels and what each leads to
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/render.py` (`one_sentence` beside `paragraph_break` ~180), `src/sessionorc/mail.py` (the subject's sentence pattern, imported by `render`; `ANSWER_LINE_CAP`; the envelope's `answers` and `consequences`), `src/sessionorc/agent_common.py` (`_clean_answer` ~808, which caps every stored answer), `src/sessionorc/agent_mail.py` (its callers ~348, ~1064), `src/shiftlead/cli.py` (`--default` matched against the answers ~3819), `src/sessionorc/ledger.py` (`answers_of` ~112, a ledger entry's `Answers:`; `detail_of` ~132, beside which `**Ask:**` is read), `src/shiftlead/cli.py` (`FIRST_PARA_WORDS` ~3477, moved to `render.py` and imported back)
+
+**Why:** TD-909: design §4.10 *An item leads with one sentence* (the test, the answers' split); §4.5 screen 12 *An item's shape*. A held path (`src/sessionorc/**`): the techlead reads it.
+
+**Fix:** (1) `render.one_sentence(text)` in `shiftlead.ui.render`: the first paragraph by `paragraph_break`, folded, within `FIRST_PARA_WORDS` (moved from `cli` to `render`, `cli` importing it) and matched whole by the subject rule's sentence pattern — `mail._SENTENCE` (~54), exposed as `mail.SENTENCE` and imported, not `render._SENTENCE_END` — inline code spans skipped. (1b) A ledger entry's reading carries `ask` (its body's `**Ask:**` line, read as `detail_of` reads Why and Fix; empty when absent) and its `answers` with `consequences`. (2) The envelope's reader and `answers_of` split each answer on its first ` — `: `answers` the labels, the `(default)` mark read on the label, `consequences` beside; what is stored and what a press sends are unchanged. A board item's answers split in ledgerboard (dev-cadence#TD-121) and reach the page with its sync; until then a board line's answers read whole. (3) `_clean_answer` caps the stored line at `ANSWER_LINE_CAP` (200); the reader caps the label at `ANSWER_CAP` (80) after the split; a `steer`'s `--default` is stored as today, and the readers mark the answer whose label or whole line equals it and show the label; an `ask`'s label ending in ` (default)` is read as its recommended mark (§4.10 *The answers' split*). No warning yet (TD-916); the card's drawing of a non-conforming item is TD-911's. Tests: the pattern's false warnings named (*TD-909. Which…*); a dashless answer reads whole; a press still matches word for word.
+
+**Done when** `render.one_sentence` and the readers' `answers` and `consequences` are on the readings, and a press still matches word for word.
+
+---
+
+## TD-914: Build TD-909 (5): a Queue card's three verbs — the Answer row, and the team's controls behind ⋯ — with no Reply, Snooze, Put on the board or Due on a card
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-911, TD-913
+**Location:** `templates/queue_row.html` (the row macro the Inbox's ledger row and the Repo page import), `queue_card.html`, `queue_mail.html`, `src/shiftlead/ui/static/app.js` (the ⋯'s keyboard model), `src/shiftlead/ui/help.py`
+
+**Why:** TD-909: design §4.5 screen 12 *Three verbs: Answer*, *⋯*, *No dates of the person's on a card*; screen 11 *For you*, *A row*; §4.5a *Queue card: answers, Answer…*, *Queue card: ⋯*, *Queue card: what needs the person*. Paul, 2026-10-19: *there are multiple possible replies … I think we need to figure out how to simplify*.
+
+**Fix:** (1) The Answer row on every Decide or Do item but a red PR (no entry: no Answer row, no ⋯, its Open in its line; test it): answers as buttons, the recommended outlined, each with its consequence where `consequences` has one, **Answer…** for words; Done, Lift the hold, Go with it and a look's pair in this row, each on its kind's road; no **Reply** word on a ledger row drawn in `card` mode — on a card or on the Repo page's board; the macro's `inbox` mode, which the Inbox's own ledger row draws (§4.5a *Inbox row: ledger entry*), keeps Reply, as do the Repo page's *Waiting on you* board lines; a test holds both modes. (2) The ⋯ on the header (the top entry; Hold only where eligible), each row and each item, always drawn, names on hover or focus, `Enter` / arrows / `Esc` with focus returned; inside it Hold… or Release, Back to design…, Done…, Open, and an item's Delete, Pause / Resume, Send to reviewer, a decided line's Done. (3) No Snooze, Put on the board or `Due:` on a card; an opened Read item keeps Dismiss, Put on the board and Overrule. (4) The ⋯ in the header slot TD-911's layout leaves. (5) Help text, written into §4.5a's help list and `help.py` in this PR: **answers, Answer…** (Queue card) — *Answers this item: each button says what it leads to, and the outlined one is recommended. Answer… sends your own words.*; **⋯** (Queue card) — *The team's controls for this card, row or item: hold or release it, send it back to design, close it, open it on the Repo page, and an item's own — delete, pause, send to reviewer.*; and the *Queue card: what needs the person* paragraph rewritten without Reply. Tests: the keyboard model; the header's ⋯ acts on the top entry; no Reply word anywhere on `/queue`; the Inbox's own rows keep Reply and Snooze.
+
+**Done when** every item on a live Queue card but a red PR answers by its Answer row with every other control behind its ⋯, a red PR item its Open in its line, and the Inbox is unchanged.
+
+---
+
+## TD-915: Build TD-909 (6): each Queue card its own box with a coloured edge, its rows' tree drawn, and a row's mentions one phrase
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-911
+**Location:** `templates/queue_card.html`, `queue_row.html`, `src/shiftlead/ui/static/app.css`, `src/shiftlead/ui/queue.py` (mentions deduplicated by item)
+
+**Why:** TD-909: design §4.5 screen 12 *A card* (the box, the edge, the tree), *Three wants* (mentions); §4.5a *Queue page: card*. In the mockup three Waiting cards ran together under a 1 px rule, and TD-772's card carried one item twice.
+
+**Fix:** (1) Each card a box — a border, a gap, a 4 px left edge: amber for a Decide or Do item, else teal Waiting, else green In progress, else grey. (2) A 2 px rule down each level's left edge in its branch's colour — green done, teal waiting, amber the person's, grey open — the state word kept. (3) A row's mentions one phrase, *mentioned in n items*, deduplicated by item, the subjects on hover from the data the row already has. Tests: the edge's precedence; one item mentioned twice counts once; dark and light themes both draw the colours from tokens.
+
+**Done when** the live Queue draws each card boxed with its edge, the tree's rules, and one mentions phrase per row.
+
+---
+
+## TD-916: Build TD-909 (7): `ao msg` warns on a question to the person that does not lead with one sentence, and the briefs say the rule and `--about`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — waits for TD-772's read-back, since the warning and the briefs change what the trial's readings measure (ADR 2026-10-19 §8)
+**Blocked by:** TD-772, TD-913
+**Location:** `src/shiftlead/cli.py` (the warning beside the `FIRST_PARA_WORDS` one), `docs/briefs/` (a held path), `src/shiftlead/briefs/*.md` (the presets' message-shape line)
+
+**Why:** TD-909: design §4.10 *An item leads with one sentence* (*The home warns, never refuses*; *A question to the person about an entry names it*).
+
+**Fix:** (1) `ao msg` to the person, `ask` or `steer`, whose first paragraph fails `render.one_sentence` prints one line, *the person reads one sentence first: this paragraph is not one*, and sends; home-authored rows and `--source` replies exempt. (2) The presets and `docs/briefs/`: an `ask` or `steer` to the person leads with one sentence, then what each answer leads to, then the context; answers written `<label> (default) — <consequence>`; `--about` set when the claim is not the subject. Tests: the warning and its exemptions; the briefs' line held by the brief tests.
+
+**Done when** `ao msg` warns as §4.10 says and the briefs carry the rule.
+
+---
+
+## TD-917: Build TD-909 (8): the backfill — an `Ask:` line and each answer's consequence on every open entry that waits on the person
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — waits for TD-772's read-back, since it rewrites the entries the trial's page shows (ADR 2026-10-19 §8), and for dev-cadence#TD-121 (the `Ask:` line and the answers' split in cadence §2, §3.5 and ledgerboard)
+**Blocked by:** TD-772, dev-cadence#TD-121
+**Location:** `docs/technical_debt.md` (on 2026-10-19 about 17 open entries carry `Owner: paul` or `decision (paul)`, none an `Answers:`)
+
+**Why:** TD-909: design §4.10 *An item leads with one sentence* (*with a backfill*).
+
+**Fix:** For every open entry with `Owner: paul`, `decision (paul)` or `Answers:`: an `**Ask:**` line in its body beside Why and Fix — one sentence a cold reader can decide or start a session from — and its answers in `<label> (default) — <consequence>` form where it has some. One PR per few entries, read by the lead; never a header field.
+
+**Done when** no open entry that waits on the person lacks an `Ask:` line.
+
+---
+
+## TD-918: Build TD-909 (1): a Queue card that waits sits in a Waiting group, unnumbered and unmoved, and says what it waits for where Up next draws the number
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/queue.py` (`waits`, `wait`, `would_be`, `group`, `places` over Up next alone; `_status` gains *held (person)* and loses its *needs you* from a held row), `src/sessionorc/rank.py` (`intent`'s refusal), `src/shiftlead/cli.py` (`ao rank --list` ~3253), `src/shiftlead/ui/queue.py`, `templates/queue_part.html`, `queue_card.html`, `src/shiftlead/ui/repo_board.py` and `templates/repo_part.html` (a Waiting card's gutter on the Repo page's board), `src/shiftlead/ui/help.py`
+
+**Why:** TD-909: design §4.4 *Waiting*, *The card's status*, *A move lands*, *One owner*; §4.5 screen 12 *Waiting*, *Up next*; §4.5a *Queue page, Waiting: the wait column*, *Queue page, Up next: grip*, *Queue page: group heading*. On 2026-10-19 the Queue drew 197 cards Up next, 11 saying only *waiting* and card 1 waiting on a date eleven days out. A held path (`src/sessionorc/**`): the techlead reads it.
+
+**Fix:** (1) The reading: a card-level `waits` predicate as §4.4 *Waiting* says — the person's own set aside, `unreachable` and `NO_LANE` read first, never `_status`'s nested test — and `group` `waiting` for a card that is not In progress and `waits`; `places` numbered over Up next alone; `would_be` (one `{repo, n}` per repo, the place the card would take among Up next today); `wait {column, phrase, id}` from a leaf by the order §4.4 gives, a cycle with no leaf read as past reach. (2) `_status`: a *held (person)* row is no need; *held (person)* between *stalled* and *blocked* by one rule: split the open members into the held ones (waiting or not) and the rest; *held (person)* when at least one is held and every one of the rest waits by `_status`'s own nested test (not `waits`), or there is no rest; test a held member with a `Waits:` line beside a waiting one (*held (person)*) and beside a ready one (*ready*), and a held top entry with one child blocked only by it, and a card of held members that each have a `Waits:` line — those two *held (person)*, not *waiting*. (3) `rank.intent` refuses a Waiting card's ids and a Waiting neighbour, *TD-n's card is Waiting, which does not move*; `ao rank --list` prints Waiting cards unnumbered after In progress, each with its `wait.phrase` (§4.7). `waits` tests `NO_LANE` per member, apart from `_status`'s all-members test. (4) The page: the Waiting group between In progress and Up next, *Waiting (n)* and *n of m* while a pick is on, no grip and no ⤒ ↑ ↓ on its cards, the wait column at the number's size and strength with the repo chip and *would be n in <repo>* under it, the phrase as the card's status; on the Repo page's board a Waiting card's gutter draws the wait column and no grip (§4.5 screen 11 *For you*). (5) Help text, written into §4.5a's help list and `help.py` in this PR (`tests/test_help.py` holds them equal): **the wait column** (Queue page: Waiting) — *What the card waits for — a date, an event, settling, a build not yet live, or blocked — and the place it would take in Up next once the wait ends.*; and **the number**'s paragraph rewritten to end *…and a Waiting or In progress card has no number.*; run `grep -ln 4.5a tests` first, since §4.5a rows are test keys. Tests: a card blocked only by the person's `Owner: paul` entry is Up next; one blocked by it and by an open TD-x is Waiting on TD-x; the column's order (top entry's `Waits:` first, then the earliest date, then *event*, then the reason); a cycle reads *blocked: TD-a and TD-b block each other*; a typo'd id reads *blocked*; `rank_move` refuses a Waiting card; Up next numbers have no gaps.
+
+**Done when** the live Queue draws a Waiting group with the wait column and phrase, Up next is numbered over its own cards alone, and a Waiting card refuses a move.
+
+---
