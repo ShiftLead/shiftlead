@@ -261,7 +261,7 @@ fold for mail, the cadence check for entries, the briefs for all four. Paul, 202
 would be having the techlead monitor new items added to the queue for clarity* — no seat watches.
 **The rule lives in dev-cadence** (cadence §3.3 and §2's entry shape, the briefs under `docs/briefs/` and the
 stage briefs), **with a backfill**: a grind job writes the `Ask:` line and the answers' consequences for every
-open entry that waits on the person, as PRs the lead reads (on 2026-10-19 about 17 of shiftlead's 62 open entries carry `Owner: paul` or
+open entry that waits on the person, as PRs the lead reads (on 2026-10-19 about 17 of shiftlead's 62 open entries, this one counted, carry `Owner: paul` or
 `decision (paul)` and none an `Answers:`; the dev-cadence entry counts the other repos' at filing), **dated
 from the read-back** (§8). TD-127's *one to three plain sentences* for a message's first paragraph (§4.10) is
 unchanged for mail that is not to the person.
