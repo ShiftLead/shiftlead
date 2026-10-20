@@ -76,6 +76,7 @@ button:focus-visible, [tabindex]:focus-visible, summary:focus-visible { outline:
 .qstatus.needs::before { content: ""; }
 .qcount { color: var(--muted); }
 .qkept { color: var(--muted); font-size: 12px; }
+.qsub { color: var(--muted); font-size: 12px; margin: 2px 0 2px 14px; }
 /* the card's verbs: Start session always, the ledger acts behind ⋯ */
 .qverbs { display: inline-flex; gap: 10px; align-items: baseline; }
 .vbtn { font: 500 13px var(--sans); border: 1px solid var(--border); background: var(--card); color: var(--fg); border-radius: 4px; padding: 2px 10px; cursor: pointer; }
@@ -172,7 +173,7 @@ table.v { border-collapse: collapse; font-size: 14px; width: 100%; } table.v td,
     </div>
 
     <div class="group">
-      <div class="ghead" role="button" tabindex="0"><span class="h">Waiting (11)</span><span class="why">nothing to pick until a date or an event; each keeps its place in Up next</span></div>
+      <div class="ghead" role="button" tabindex="0"><span class="h">Waiting (11)</span><span class="why">nothing to pick until a date or an event, or blocked past the org; each says the place it would take in Up next</span></div>
       <div class="qcards">
         <div class="qcard waitc">
           <div class="qhead" role="button" tabindex="0">
@@ -180,7 +181,7 @@ table.v { border-collapse: collapse; font-size: 14px; width: 100%; } table.v td,
             <div class="qmain">
               <span class="qid">shiftlead#TD-748</span><span class="qpri">M</span>
               <span class="qtitle">The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD</span>
-              <span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">keeps place 1</span><span class="qcount">5 entries</span><span class="qstatus waiting">waits until Oct 30</span></span>
+              <span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">would be 1</span><span class="qcount">5 entries</span><span class="qcount" title="drawn only while the card is folded">Read 1</span><span class="qstatus waiting">waits until Oct 30</span></span>
             </div>
           </div>
           <div class="qrows">
@@ -195,12 +196,28 @@ table.v { border-collapse: collapse; font-size: 14px; width: 100%; } table.v td,
         </div>
         <div class="qcard waitc">
           <div class="qhead" role="button" tabindex="0"><span class="qgrip"></span><span class="qplace qwhen">Oct 21<small>shiftlead</small></span>
-            <div class="qmain"><span class="qid">shiftlead#TD-410</span><span class="qpri">M</span><span class="qtitle">A session's own name in its title: the terminal title the adapter sets</span><span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">keeps place 7</span><span class="qcount">2 entries</span><span class="qstatus waiting">waits until Oct 21</span></span></div>
+            <div class="qmain"><span class="qid">shiftlead#TD-410</span><span class="qpri">M</span><span class="qtitle">A session's own name in its title: the terminal title the adapter sets</span><span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">would be 7</span><span class="qcount">2 entries</span><span class="qstatus waiting">waits until Oct 21</span></span></div>
           </div>
         </div>
         <div class="qcard waitc">
           <div class="qhead" role="button" tabindex="0"><span class="qgrip"></span><span class="qplace qwhen">event<small>shiftlead</small></span>
-            <div class="qmain"><span class="qid">shiftlead#TD-717</span><span class="qpri">M</span><span class="qtitle">A launch whose first hook is lost gets its brief from the record</span><span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">keeps place 12</span><span class="qcount">2 entries</span><span class="qstatus waiting">waits on the next launch whose first hook is lost</span></span></div>
+            <div class="qmain"><span class="qid">shiftlead#TD-717</span><span class="qpri">M</span><span class="qtitle">A launch whose first hook is lost gets its brief from the record</span><span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">would be 12</span><span class="qcount">2 entries</span><span class="qstatus waiting">waits on the next launch whose first hook is lost</span></span></div>
+          </div>
+        </div>
+        <div class="qcard waitc">
+          <div class="qhead" role="button" tabindex="0">
+            <span class="qgrip"></span><span class="qplace qwhen">event<small>shiftlead</small></span>
+            <div class="qmain"><span class="qid">shiftlead#TD-900</span><span class="qpri">M</span><span class="qtitle">The Repo page is a board by stage, the Org page is Sessions, the Queue numbers Up next per repo and marks what is live</span><span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">would be 2</span><span class="qcount">7 entries</span><span class="qstatus waiting">waits on an event (TD-904)</span></span></div>
+          </div>
+          <div class="qrows">
+            <div class="qrow wait" style="--qd: 1"><span class="qid">shiftlead#TD-904</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (4): a line's promote state on Recently completed</span><span class="qright"><span class="qstate">waits on an event</span></span></div>
+            <div class="qrow" style="--qd: 1"><span class="qid">shiftlead#TD-905</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (5): the ledger row's controls on a card</span><span class="qright"><span class="qstate">after TD-904</span></span></div>
+            <div class="qrow done archived" style="--qd: 1"><span class="qid">shiftlead#TD-901</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (2)</span><span class="qright"><span class="qstate done">done #2157</span></span></div>
+            <details class="qsec"><summary>Read (7)</summary>
+              <div class="qsub">answered for you (7) · Dismiss all</div>
+              <div class="qitem read"><div><span class="who">techlead-ao-1</span> <span class="kind">answered grinder-ao-1 · on TD-905</span> <span class="lead">Your nit on #2162: Back to design on a blocked row counts a blocker only while it is an open entry.</span></div><span class="age">14h</span></div>
+              <div class="qitem read"><div><span class="who">techlead-ao-1</span> <span class="kind">answered grinder-ao-1 · on TD-905</span> <span class="lead">TD-905 slice 2 merged as #2162, nothing to change.</span></div><span class="age">14h</span></div>
+            </details>
           </div>
         </div>
       </div>
@@ -278,22 +295,6 @@ table.v { border-collapse: collapse; font-size: 14px; width: 100%; } table.v td,
           </div>
         </div>
 
-        <div class="qcard">
-          <div class="qhead" role="button" tabindex="0">
-            <span class="qgrip">⋮⋮</span><span class="qplace">2<small>shiftlead</small></span>
-            <div class="qmain"><span class="qid">shiftlead#TD-900</span><span class="qpri">M</span><span class="qtitle">The Repo page is a board by stage, the Org page is Sessions, the Queue numbers Up next per repo and marks what is live</span><span class="qright"><span class="qmoves">⤒ ↑ ↓</span><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qcount">7 entries</span><span class="qstatus">after TD-904</span></span></div>
-          </div>
-          <div class="qrows">
-            <div class="qrow wait" style="--qd: 1"><span class="qid">shiftlead#TD-904</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (4): a line's promote state on Recently completed</span><span class="qright"><span class="qstate">waits on an event</span></span></div>
-            <div class="qrow" style="--qd: 1"><span class="qid">shiftlead#TD-905</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (5): the ledger row's controls on a card</span><span class="qright"><span class="qstate">after TD-904</span></span></div>
-            <div class="qrow done archived" style="--qd: 1"><span class="qid">shiftlead#TD-901</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (2)</span><span class="qright"><span class="qstate done">done #2157</span></span></div>
-            <details class="qsec"><summary>Read (7) — answered for you</summary>
-              <div class="qitem read"><div><span class="who">techlead-ao-1</span> <span class="kind">answered grinder-ao-1 · on TD-905</span> <span class="lead">Your nit on #2162: Back to design on a blocked row counts a blocker only while it is an open entry.</span></div><span class="age">14h</span></div>
-              <div class="qitem read"><div><span class="who">techlead-ao-1</span> <span class="kind">answered grinder-ao-1 · on TD-905</span> <span class="lead">TD-905 slice 2 merged as #2162, nothing to change.</span></div><span class="age">14h</span></div>
-            </details>
-          </div>
-        </div>
-
       </div>
     </div>
   </section>
@@ -301,7 +302,7 @@ table.v { border-collapse: collapse; font-size: 14px; width: 100%; } table.v td,
   <section>
     <h2>What the drawing decides</h2>
     <div class="notes">
-      <div class="note"><b>Four groups</b><p>Recently completed, In progress, Waiting, Up next. Waiting holds every card with nothing to pick: a date, an event, a blocker past the org's reach. The card carries its date, or <i>event</i>, where Up next draws the number, and says which place it keeps; when the wait ends it is back in Up next at that place. Only Up next is numbered.</p></div>
+      <div class="note"><b>Four groups</b><p>Recently completed, In progress, Waiting, Up next. Waiting holds every card with nothing to pick among what is not yours: a date, an event, settling, a blocker past the org's reach (TD-900 moved here after review round 1: its open rows all wait). The card carries its date, or <i>event</i>, or <i>blocked</i>, where Up next draws the number, and says the place it would take; when the wait ends it is back in Up next at that place. Only Up next is numbered.</p></div>
       <div class="note"><b>Three wants</b><table class="v"><tr><th>Decide</th><td>a question with answers, a steer, a board line, a hold of yours</td></tr><tr><th>Do</th><td>an entry that names you as owner</td></tr><tr><th>Read</th><td>notes, what was answered for you; folded with its count</td></tr></table></div>
       <div class="note"><b>Three verbs</b><table class="v"><tr><th>Answer</th><td>the item's answers as buttons, the recommended one outlined, and Answer… for your own words; Done and Lift the hold are answers</td></tr><tr><th>Start session</th><td>once per card, in its header; the Do verb. The session gets the card and the item you came from</td></tr><tr><th>⋯</th><td>the team's controls: Hold (keep the team off this), Back to design, Done on an entry, Open on the Repo page</td></tr></table></div>
       <div class="note"><b>No dates of yours on a card</b><p>No Snooze, no Put on the board, no due date. The rank is the snooze. Waiting is the ledger's own dates. The Inbox keeps its dates for what names no entry.</p></div>
