@@ -529,6 +529,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-05 (TD-144, grinder-ao-2; Paul's look of 2026-10-04 at the live page: *bigger*): `--t-body` raised from 14 px to 15 px and nothing else moved, as the *Type scale* says; the card's rows, slot and foot keep their pixel tokens, so every Org card is still one height (read headless at 1440 and 390 px on a scratch home).
 
 ## 4.5a Controls
+- 2026-10-20 (TD-914, grinder-ao-1): *The help text* gains **answers, Answer…** and **⋯** (Queue card), after **Start session** on the Help page's *Queue* screen.
 - 2026-10-19 (TD-912, grinder-ao-2): *The help text* gains **Start session** (Queue card), after **Read n** on the Help page's *Queue* screen; *Inbox row: ledger entry: Start session* loses *until TD-912 lands the prompt has no such sentence*, the id-list sentence built.
 - 2026-10-19 (TD-909, the designer; [ADR 2026-10-19](decisions/2026-10-19-queue-card.md)): *Queue page: card*, *grip*, *group heading*, *filters*, *Queue card: what needs the person* and *Inbox row: ledger entry: Start session* amended at their ends; new rows *Queue card: answers, Answer…*, *Start session / Open session*, *⋯* (a control of its own with a keyboard model), and display rows *Queue page, Waiting: the wait column* and *Queue card: Read n*. Help text for each is its build's (TD-918, TD-911, TD-912, TD-914).
 - 2026-10-19 (TD-903, grinder-ao-2): *The help text* gains **the board** (Repo page: Technical debt), first on the Help page's *Repo page* screen.
