@@ -10,8 +10,9 @@ reading for the page — the three groups, furthest through first, the window pi
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
@@ -327,6 +328,53 @@ def _find_word(w: str) -> str:
     return (refs[0] if refs else w).lower()
 
 
+def same_td(a: Any, b: Any) -> bool:
+    """Two ids one entry, by number where both are `TD-n` (`TD-9` and a card's `TD-009`), else as written."""
+    a, b = str(a or ""), str(b or "")
+    if re.fullmatch(r"TD-\d+", a, re.I) and re.fullmatch(r"TD-\d+", b, re.I):
+        return int(a[3:]) == int(b[3:])
+    return a == b
+
+
+def card_session(card: Mapping[str, Any], fleet: Iterable[Mapping[str, Any]] | None) -> dict[str, Any]:
+    """Who a card's **Start session** meets (§4.5a *Queue card: Start session / Open session*, TD-912), one answer
+    the button and `/api/ledger/start` both read: `start`, the reading's entry to start on; `own`, the person's
+    own session (`unattended: false`) holding any of the card's open entries — the one holding `start`, else the
+    first by id — whose Focus the press opens; `other`, the name of any other live session holding `start` while
+    none of the person's does, when the button is absent and a press is refused. A session holds an entry by its
+    claim, or by the name `td-<n>` in the entry's repo before the tick derives the claim (TD-678)."""
+    start = str(card.get("start") or "")
+    rows = [r for r in [card.get("top"), *(card.get("rows") or [])] if isinstance(r, Mapping) and not r.get("archived")]
+    live = [s for s in fleet or () if s.get("state") not in ("exited", "closed") and s.get("repo")]
+
+    def holders(q: str) -> list[Mapping[str, Any]]:
+        repo, _, ref = q.partition("#")
+        return [
+            s
+            for s in live
+            if Path(str(s["repo"])).name == repo
+            and (
+                same_td(str(s.get("name") or "").upper(), ref)
+                or any(
+                    isinstance(p, Mapping) and same_td(p.get("ref"), ref) and p.get("status") == "claimed"
+                    for p in s.get("progress") or ()
+                )
+            )
+        ]
+
+    def mine(ss: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+        return sorted((s for s in ss if not s.get("unattended")), key=lambda s: str(s.get("id")))
+
+    on_start = holders(start) if start else []
+    own = mine(on_start) or mine(s for r in rows for s in holders(str(r.get("qid") or "")))
+    other = on_start[0] if on_start and not own else {}
+    return {
+        "start": start,
+        "own": str(own[0]["id"]) if own else "",
+        "other": str(other.get("name") or other.get("id") or ""),
+    }
+
+
 def _mail_status(status: str, wants: Mapping[str, Any]) -> str:
     """The mail's part of a card's status (§4.4 *The card's status*: *needs you* > *steer* > the ledger's): a
     Decide or Do item — a question, a paused `steer`, a board line due or not, the person's ledger row, a red PR —
@@ -339,7 +387,11 @@ def _mail_status(status: str, wants: Mapping[str, Any]) -> str:
 
 
 def queue_view(
-    queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str, Any] | None = None, promotes: Any = None
+    queue: Mapping[str, Any] | None,
+    now: datetime,
+    mail: Mapping[str, Any] | None = None,
+    promotes: Any = None,
+    fleet: Iterable[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """The page's groups from the `queue` reading (§4.5 screen 12 *Groups*):
 
@@ -357,7 +409,9 @@ def queue_view(
     `mail` is what is attached to each card (`attach`), gathered into its `wants` (`card_wants`): Decide and Do
     drawn in the header, Read in the body, raising the card's status to *needs you* or *steer*. `promotes` is the `host`
     reading's: each completed line's `live` is its close's promote state, *not yet live* or *live* by the
-    newest close it holds, "" where its repo promotes nothing or live is unknown (§4.5 screen 12, TD-904)."""
+    newest close it holds, "" where its repo promotes nothing or live is unknown (§4.5 screen 12, TD-904). `fleet`
+    is the live records: each open card's `session` (`card_session`) is what its **Start session** reads (TD-912)."""
+    fleet = list(fleet or ())
     q = queue or {}
     cards = [c for c in q.get("cards") or [] if isinstance(c, Mapping) and c.get("top")]
     repos = {str(r) for c in cards for r in c.get("repos") or ()}
@@ -385,6 +439,7 @@ def queue_view(
                 "chips": not one_repo,
                 "kinds": _card_kinds([top, *rows], wants),
                 "find": _find_text([top, *rows]),
+                "session": card_session(c, fleet),
             }
         )
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]

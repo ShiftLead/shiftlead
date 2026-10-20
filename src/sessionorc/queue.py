@@ -263,8 +263,9 @@ def reading(
     (`in_progress`, `waiting` or `up_next`), `wait` (a Waiting card's `{column, phrase, id}`, else None;
     §4.4 *Waiting*, TD-918), `place` (Up next numbered from 1) and `places` (one `{repo, n}` per repo of its
     open members, numbered among that repo's Up next cards, TD-901), `would_be` (a Waiting card's `{repo, n}`
-    per repo: its place in Up next once the wait ends), `order` (the open members in pick order: dependency,
-    then key), `repos`, `passed_over`. Cards are in key order, In progress first.
+    per repo: its place in Up next once the wait ends), `start` (the `<repo>#TD-n` a **Start session** on the
+    card starts on, `_start`, TD-912), `order` (the open members in pick order: dependency, then key), `repos`,
+    `passed_over`. Cards are in key order, In progress first.
     **Completed** cards (`ids`, `top`, `titles`, `closed`, `pr`) are the archive's components no open
     entry touches, closed within `COMPLETED_WINDOW`, newest first. `other_work` is each live claim that
     names no open entry (`board:<key>`, a PR naming none), with its holder."""
@@ -559,11 +560,33 @@ def _card(
         "of": len(members) + len(done_rows),
         "status": _status(open_rows, [open_[q] for q in members]),
         "wait": _wait(members, open_, blockers, keyed, top),
+        "start": _start(members, open_, keyed, top),
         "order": picked,
         "repos": sorted({open_[q]["repo"] for q in members}),
         "members": members,
         "passed_over": [],
     }
+
+
+def _start(members: list[str], open_: Mapping[str, Mapping[str, Any]], keyed: Mapping[str, str], top: str) -> str:
+    """The entry a **Start session** on the card starts on (§4.4 *One owner*, TD-912): its one `Owner: paul`
+    entry, else its first `decision (paul)` entry by key, else the top entry — by key alone, a held entry no
+    different and never by what is claimed, so two presses choose the same entry."""
+    by_key = sorted(members, key=lambda q: _key_sort(keyed[q], q))
+    owned = [q for q in by_key if str(open_[q].get("owner") or "").lower() == PERSON]
+    if len(owned) == 1:
+        return owned[0]
+    return next((q for q in by_key if ledger_mod.decided_by(dict(open_[q]), PERSON)), top)
+
+
+def card_entries(card: Mapping[str, Any]) -> tuple[list[str], list[str]]:
+    """A card's open entries as **Start session**'s prompt names them (§4.5 screen 12 *Three verbs: Start
+    session*, TD-912): *waits on me*, its Decide and Do ledger entries (a row whose `needs` is set; a held one
+    is no want), and *the rest*, every other open member — each a `<repo>#TD-n`, in key order."""
+    rows = [r for r in [card.get("top"), *(card.get("rows") or [])] if isinstance(r, Mapping) and not r.get("archived")]
+    rows.sort(key=lambda r: _key_sort(str(r.get("key") or ""), str(r.get("qid") or "")))
+    mine = [str(r["qid"]) for r in rows if r.get("needs")]
+    return mine, [str(r["qid"]) for r in rows if not r.get("needs")]
 
 
 def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:

@@ -1208,13 +1208,16 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      // design §4.5a *Inbox row: ledger entry* → **Start session** / **Open session** (TD-678): one press —
+      // design §4.5a *Inbox row: ledger entry* → **Start session** / **Open session** (TD-678), and a Queue card's
+      // (TD-912): one press —
       // the session that holds the entry or its name (`focus`), the one it started (`id`), or the New
       // session form filled in with the reason (`form`), as **Resume**'s press lands
       if (action === "ledger_start") {
         pressed();
         const got = await fetch("/api/ledger/start", {
-          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ repo: b.dataset.repo, id: b.dataset.ref }),
+          method: "POST", headers: { "content-type": "application/json" },
+          // a Queue card's press names its card (TD-912): the road checks the entry is the card's `start`
+          body: JSON.stringify({ repo: b.dataset.repo, id: b.dataset.ref, ...(b.dataset.card ? { card: b.dataset.card } : {}) }),
         });
         if (!got.ok) { let t = got.statusText; try { t = (await got.json()).detail || t; } catch (e) {} throw new Error(t); }
         const r = await got.json();

@@ -391,9 +391,12 @@ def test_a_repos_name_goes_with_its_last_row_and_the_poll_puts_later_back():
 # -- **Start session** / **Open session** (§4.5a *Inbox row: ledger entry*, TD-676 designed, TD-678 built) --
 
 
-def _start_world(tmp_path, monkeypatch, *, fleet=(), team=True, entries=None, checks=None, refuse="", host=""):
+def _start_world(
+    tmp_path, monkeypatch, *, fleet=(), team=True, entries=None, checks=None, refuse="", host="", queue=None
+):
     """`test_ui_entry`'s repo, team and fake host agent, whose repo facts hold TD-9 (*ledger · yours*, a
-    debt), TD-12 (*ledger · your decision*, a feature) and TD-20 (pickable: no longer for you)."""
+    debt), TD-12 (*ledger · your decision*, a feature) and TD-20 (pickable: no longer for you); `queue` the
+    `queue` reading it serves (TD-912), else none."""
     import yaml
     from test_ui_entry import client, fake, world
 
@@ -418,6 +421,8 @@ def _start_world(tmp_path, monkeypatch, *, fleet=(), team=True, entries=None, ch
         async def call(self, method, **kw):
             if method == "repos":
                 return {root: reading}
+            if method == "queue" and queue is not None:
+                return queue
             if method == "create" and refuse:
                 raise AgentError(refuse)
             return await super().call(method, **kw)
@@ -457,14 +462,16 @@ def test_start_session_starts_the_persons_session_in_td_n_with_work_md_sent(tmp_
     assert kw["unattended"] is False and kw["role"] == role and kw["team"] == "sam-grind"
     assert kw["lane"] == [ref] and kw["controllers"] == ["ao-samscrape-manager-sam"]
     assert "start_context" not in kw and kw["ledger"] == "docs/technical_debt.md"
+    # an entry on no card: *waits on me* is the entry, *the rest* none (TD-912)
+    qid = f"samscrape#TD-{int(ref[3:]):03d}"
     assert kw["prompt"] == repoconfig.work_text(
-        ref, "samscrape", "docs/technical_debt.md", "yours" if role == "techlead" else "decision"
+        ref, "samscrape", "docs/technical_debt.md", "yours" if role == "techlead" else "decision", mine=[qid]
     )
     assert kw["prompt"] == (
         f"I opened this session from the Inbox to work {ref} of samscrape's ledger (docs/technical_debt.md) myself: "
-        f"it waits on me ({why}). Read the entry, check the code and the design for what is already built or "
-        "decided, and tell me in a few lines what it asks of me and what you would do first. Then wait for me: "
-        "I drive this one."
+        f"it waits on me ({why}). Its entries are: waits on me — {qid}; the rest — none. Read the entry, check the "
+        "code and the design for what is already built or decided, and tell me in a few lines what it asks of me "
+        "and what you would do first. Then wait for me: I drive this one."
     )
 
 

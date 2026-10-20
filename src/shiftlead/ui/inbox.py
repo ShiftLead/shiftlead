@@ -2411,7 +2411,7 @@ def ledger_for_you(
                     "release": hold is not None,  # **Release** (§4.5a *Inbox row: held entry*)
                     "holder": str(holders[0].get("id") or "") if holders else "",  # **Open session** (TD-678)
                     "type": str(e.get("type") or ""),  # the role **Start session** takes, by `entries:`
-                    "why": "yours" if owner else "decision",  # `repoconfig.WORK_WHY`'s key
+                    "why": "yours" if owner else "decision",  # `repoconfig.WORK_OPENING`'s key
                     "until": str(e.get("until") or "") if for_you else "",  # *held until <it>* (TD-795)
                     "team": team,
                     "at": added,
