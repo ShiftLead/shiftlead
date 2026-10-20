@@ -76,10 +76,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
 | TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Designed — built by TD-911–TD-918 (on dev-cadence#TD-121, #TD-122) |
-| TD-911 | Build TD-909 (2): Decide, Do and Read on a card, each renderer's `card` mode | High | Open |
-| TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Open — blocked by TD-911 |
-| TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open — blocked by TD-911 |
-| TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open — blocked by TD-911 |
+| TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Open |
+| TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open |
+| TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-919 | #2179's orphaned-ask pick (`mail.picks_answer` on the orphan path of `_msg`) has no test that would notice a revert (test audit) | Medium | Open |
@@ -1594,24 +1593,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** the design says what the ADR decided, with a build entry per slice of ADR §8, and `Blocked by:` names them.
 
 **Related:** TD-748 (the Queue, designed), TD-772 (the trial's read-back, which counts the Waiting group as a change to what the person sees), TD-900 (the Repo page's board, whose card is the Queue's).
-
----
-
-## TD-911: Build TD-909 (2): a Queue card's sections are Decide, Do and Read — amber and counted for the first two, Read folded — drawn by each kind's renderer in a `card` mode
-
-**Priority:** High
-**Type:** feature
-**Added:** 2026-10-19 (TD-909's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2182
-**Status:** Built (2026-10-19, grinder-ao-1) — slice 1 #2181: the wants map, the pill, the page header's counts, the header's layout, the kind pick, **Read n**'s help, Read under the rows; slice 2 #2182: (3) each kind's renderer's `card` mode — a Read item one line opening to its row, a Decide or Do item whole (its kind line, its sentence, what each answer leads to, *context* folded, its answers), checked on a scratch home. **Live check:** once #2182 is live, a headless GET of `/queue` — a card with a Decide or Do item draws `.sentence` and a *context* fold, its Read lines `details.cardline`, and `/inbox` draws no `cardline` and no *context* fold.
-**Location:** `src/shiftlead/ui/queue.py` (the sections, the counts, the card's mail items), `templates/queue_card.html`, `queue_mail.html`, `queue_row.html`, `inbox_row.html` (the renderers' `card` mode), `queue_filters.html` (the kind pick), `src/shiftlead/ui/help.py`
-
-**Why:** TD-909: design §4.5 screen 12 *A card*, *Three wants*, *An item's shape*, *Filters*; §4.5a *Queue page: card*, *Queue page: filters, find*, *Queue card: Read n*. Paul, 2026-10-19: *there are lots of words all over the place (yours to do, asks, etc), so I am relegated to reading everything in order*.
-
-**Fix:** (1) The map of §4.5 screen 12 *Three wants*: Decide and Do in the header, open, amber, counted on the pill (*Decide 1 · Do 1*); Read under the rows, folded with its count, its lines *answered for you (n)*, *waiting on them (n)*, *fyi (n)*, each with Dismiss all where the Inbox has it; *Read n* on a folded card; a red PR nobody holds as a Do item, *#n red — Open*, counted on the pill only; a *held (person)* row no want — a held *for you* entry on a card draws the held row, *held (person) — <why>* with Release, never the for-you row (§4.5a *Inbox row: held entry*). (1b) An Up next card with a running steer draws the pill with *steer* beside it (test it), and *stalled* the same. (2) The page header's *Decide n · Do n*, display only, with a hover saying it is not the top bar's number. (3) Each kind's renderer takes a mode, `inbox` or `card`; in `card` a Read item is one line (who, kind, *on TD-n*, `subject`, age) opening to its body; a Decide or Do item draws its kind line, its sentence, its consequences where its reader gives them (TD-913, dev-cadence#TD-121), *context* folded in place of *details*, and its answers; a ledger entry with no `Ask:` draws its title as the sentence and Why and Fix under *context*; a mail item whose first paragraph fails `render.one_sentence` draws its `subject` as the sentence and its whole text folded. No second renderer. (3b) The header's layout (§4.5 screen 12 *A card*): the move arrows, the slots for **Start session** (TD-912) and **⋯** (TD-914), a gap, the count, *Read n*, the status last. (4) The kind pick: **Decide** · **Do** · *held (person)*. (5) Help text, written into §4.5a's help list and `help.py` in this PR: **Read n** (Queue card) — *How many things on this card are for reading only — answers given for you, answered questions, notes. Open the card to see them.*. Tests: each kind lands in its want; the counts are items, not cards, and the top bar's number is unchanged; a folded card shows *Read n*; Dismiss all acts on its line alone; the Inbox's rows are unchanged in `inbox` mode.
-
-**Done when** the live Queue's cards draw Decide, Do and Read as §4.5 screen 12 says, with the counts on the pill and the page header, and the Inbox draws as before.
 
 ---
 
