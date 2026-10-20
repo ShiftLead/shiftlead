@@ -78,7 +78,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Designed — built by TD-911–TD-918 (on dev-cadence#TD-121, #TD-122) |
 | TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Built — live check #2186 |
 | TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open |
-| TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Built — live check #2187 |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-920 | #2181's Queue header `Decide n` counts items, and no test has a card with two Decide items (test audit) | Low | Open |
@@ -1632,25 +1631,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** (1) The Answer row on every Decide or Do item but a red PR (no entry: no Answer row, no ⋯, its Open in its line; test it): answers as buttons, the recommended outlined, each with its consequence where `consequences` has one, **Answer…** for words; Done, Lift the hold, Go with it and a look's pair in this row, each on its kind's road; no **Reply** word on a ledger row drawn in `card` mode — on a card or on the Repo page's board; the macro's `inbox` mode, which the Inbox's own ledger row draws (§4.5a *Inbox row: ledger entry*), keeps Reply, as do the Repo page's *Waiting on you* board lines; a test holds both modes. (2) The ⋯ on the header (the top entry; Hold only where eligible), each row and each item, always drawn, names on hover or focus, `Enter` / arrows / `Esc` with focus returned; inside it Hold… or Release, Back to design…, Done…, Open, and an item's Delete, Pause / Resume, Send to reviewer, a decided line's Done. (3) No Snooze, Put on the board or `Due:` on a card; an opened Read item keeps Dismiss, Put on the board and Overrule. (4) The ⋯ in the header slot TD-911's layout leaves. (5) Help text, written into §4.5a's help list and `help.py` in this PR: **answers, Answer…** (Queue card) — *Answers this item: each button says what it leads to, and the outlined one is recommended. Answer… sends your own words.*; **⋯** (Queue card) — *The team's controls for this card, row or item: hold or release it, send it back to design, close it, open it on the Repo page, and an item's own — delete, pause, send to reviewer.*; and the *Queue card: what needs the person* paragraph rewritten without Reply. Tests: the keyboard model; the header's ⋯ acts on the top entry; no Reply word anywhere on `/queue`; the Inbox's own rows keep Reply and Snooze.
 
 **Done when** every item on a live Queue card but a red PR answers by its Answer row with every other control behind its ⋯, a red PR item its Open in its line, and the Inbox is unchanged.
-
----
-
-## TD-915: Build TD-909 (6): each Queue card its own box with a coloured edge, its rows' tree drawn, and a row's mentions one phrase
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-19 (TD-909's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2187
-**Status:** Built (2026-10-20, #2187, grinder-ao-2): `card_edge` and each card's box and 4 px edge, `branch` and each row's `rails` (the tree drawn, rows depth first under their own parent), `attach`'s mentions keyed by item and the row's *mentioned in n items*. **Live check:** once #2187 is live, a headless GET of `/queue` — each card a `qcard edge-<needs|waiting|working|ended>` box; rows under a card carry `qrail b-<done|waiting|needs|open>` spans, one per level; a row named by mail beside its home reads *mentioned in n items*, never *also mentioned in*.
-**Blocked by:** TD-911
-**Location:** `templates/queue_card.html`, `queue_row.html`, `src/shiftlead/ui/static/app.css`, `src/shiftlead/ui/queue.py` (mentions deduplicated by item)
-
-**Why:** TD-909: design §4.5 screen 12 *A card* (the box, the edge, the tree), *Three wants* (mentions); §4.5a *Queue page: card*. In the mockup three Waiting cards ran together under a 1 px rule, and TD-772's card carried one item twice.
-
-**Fix:** (1) Each card a box — a border, a gap, a 4 px left edge: amber for a Decide or Do item, else teal Waiting, else green In progress, else grey. (2) A 2 px rule down each level's left edge in its branch's colour — green done, teal waiting, amber the person's, grey open — the state word kept. (3) A row's mentions one phrase, *mentioned in n items*, deduplicated by item, the subjects on hover from the data the row already has. Tests: the edge's precedence; one item mentioned twice counts once; dark and light themes both draw the colours from tokens.
-
-**Done when** the live Queue draws each card boxed with its edge, the tree's rules, and one mentions phrase per row.
 
 ---
 
