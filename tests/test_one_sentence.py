@@ -68,6 +68,8 @@ def test_a_ledger_entry_carries_its_ask_and_its_answers_consequences():
     assert asked["answers"] == ["The team's", "Yours"]
     assert asked["consequences"] == ["one login for all", "your quota"] and asked["default"] == 0
     assert "**Ask:**" not in "\n".join(asked["detail"])  # context is Why and Fix alone
+    long = "x" * 120 + " (default)"  # a ledger answer is not capped: it is what the decided line writes
+    assert ledger.answers_of(f"{long} — y | b") == (["x" * 120, "b"], ["y", ""], 0)
     assert bare["ask"] == "" and bare["answers"] == [] and bare["consequences"] == []
 
 
@@ -83,6 +85,11 @@ def test_the_inbox_row_shows_each_answer_whole_and_a_press_sends_its_label(tmp_p
     marked = {**e, "kind": "ask", "recommended": 0}
     assert ui.suggested_answers(marked) == ["Merge it (default) — it ships Friday", "Hold it"]
     assert ui.suggested_answers({**marked, "kind": "steer"})[0] == "Merge it — it ships Friday"
+    # a steer's default badge sits on its recommended answer, whatever the shown text is
+    row = ui.templates.get_template("inbox_row.html").module.answers
+    steer = {**e, "kind": "steer", "default": "Merge it (default) — it ships Friday", "recommended": 0, "from": "s"}
+    drawn = str(row(steer))
+    assert drawn.count('class="st adflt"') == 1 and drawn.index("adflt") < drawn.index("Hold it")
     assert ui.suggested_answers({"answers": ["a"], "consequences": "bad"}) == ["a"]
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     calls = []

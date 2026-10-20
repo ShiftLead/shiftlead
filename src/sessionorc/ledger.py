@@ -121,7 +121,9 @@ def answers_of(value: str) -> tuple[list[str], list[str], int | None]:
     consequences: list[str] = []
     marked: list[int] = []
     for raw in lb.ANSWER_SPLIT_RE.split((value or "").strip().rstrip(".")):
-        words, consequence = mail.split_answer(raw.replace("\\|", "|").strip())
+        # split as `mail.split_answer` does, uncapped: a ledger answer is what a decided line writes (TD-913)
+        words, _sep, consequence = raw.replace("\\|", "|").strip().partition(mail.CONSEQUENCE_SEP)
+        words, consequence = words.strip(), consequence.strip()
         if lb.DEFAULT_MARK_RE.search(words):
             words = lb.DEFAULT_MARK_RE.sub("", words).strip()
             if words:
