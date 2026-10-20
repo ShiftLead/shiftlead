@@ -3260,6 +3260,9 @@ def cmd_rank(args: argparse.Namespace) -> int:
     if args.list:
         want = pathlib.Path(_td_repo(args.repo)[0]).expanduser().name if args.repo else None
         shown = [c for c in cards if not want or want in (c.get("repos") or ())]
+        # In progress first, then Waiting, then Up next, each in the home's order (design §4.7, TD-918)
+        groups = ("in_progress", "waiting", "up_next")
+        shown.sort(key=lambda c: groups.index(c["group"]) if c.get("group") in groups else len(groups))
 
         def prose() -> None:
             for c in shown:
@@ -3271,9 +3274,10 @@ def cmd_rank(args: argparse.Namespace) -> int:
                 at = mine["n"] if mine else None if want and "places" in c else c.get("place")
                 num = f"{at:>3}" if at else "  ·"
                 pr = f"{top.get('priority') or '-':<6}"
+                status = (c.get("wait") or {}).get("phrase") or c.get("status") or ""  # a Waiting card's phrase
                 print(
                     f"{num}  {_short(c['id'], want):<18} {pr} {(top.get('title') or '')[:70]} · "
-                    f"{n} entr{'y' if n == 1 else 'ies'} · {c.get('status') or ''}"
+                    f"{n} entr{'y' if n == 1 else 'ies'} · {status}"
                     + (" · not landed — retrying" if c.get("not_landed") else "")
                 )
             if not shown:
@@ -3293,7 +3297,8 @@ def cmd_rank(args: argparse.Namespace) -> int:
     if card is None:
         raise AgentError(f"{args.entry} is on no open card of the Queue")
     if card.get("group") != "up_next":
-        raise AgentError(f"{args.entry}'s card is In progress, which does not move (design §4.4 *A move lands*)")
+        grp = "Waiting" if card.get("group") == "waiting" else "In progress"
+        raise AgentError(f"{args.entry}'s card is {grp}, which does not move (design §4.4 *A move lands*)")
     rest = [c for c in cards if c.get("group") == "up_next" and c is not card]
     prev = nxt = None
     if args.top:
@@ -3304,7 +3309,8 @@ def cmd_rank(args: argparse.Namespace) -> int:
         if mc is card:
             raise AgentError(f"{args.above or args.below} is on {args.entry}'s own card")
         if mc is None or mc.get("group") != "up_next":
-            raise AgentError(f"{args.above or args.below}'s card is not in Up next: a card moves only among them")
+            grp = {"waiting": "Waiting, ", "in_progress": "In progress, "}.get((mc or {}).get("group"), "")
+            raise AgentError(f"{args.above or args.below}'s card is {grp}not in Up next: a card moves only among them")
         i = rest.index(mc)
         if args.above:
             prev, nxt = (rest[i - 1]["id"] if i > 0 else None), mc["id"]

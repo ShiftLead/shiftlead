@@ -2,7 +2,7 @@
 {% from "queue_row.html" import pbadge, holder %}
 {# The Queue page's lists (design §4.5 screen 12; TD-771), re-read whole with `?part=1` #}
 <div class="row gap qtitlebar"><span class="h1">Queue</span>
-  {% if q.served %}<span class="qsub">{{ q.n.cards }} card{{ '' if q.n.cards == 1 else 's' }}: {{ q.n.in_progress }} in progress, {{ q.n.up_next }} up next.{% if q.n.needs_you %} <b class="needsword">{{ q.n.needs_you }} need{{ 's' if q.n.needs_you == 1 else '' }} you.</b>{% endif %}</span>{% endif %}
+  {% if q.served %}<span class="qsub">{{ q.n.cards }} card{{ '' if q.n.cards == 1 else 's' }}: {{ q.n.in_progress }} in progress, {% if q.n.waiting %}{{ q.n.waiting }} waiting, {% endif %}{{ q.n.up_next }} up next.{% if q.n.needs_you %} <b class="needsword">{{ q.n.needs_you }} need{{ 's' if q.n.needs_you == 1 else '' }} you.</b>{% endif %}</span>{% endif %}
 </div>
 {% if agent_down %}<div class="warn">the host agent is not answering — nothing to draw</div>
 {% elif not q.served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>
@@ -48,6 +48,17 @@
   {% for o in q.other %}<div class="qother{% if o.off %} qoff{% endif %}" data-other="1"><span class="qsub">other work</span>{{ holder(o.holder) }}<span class="mono">{{ o.ref }}</span>{% if o.pr %}<span class="qsub">#{{ o.pr }}</span>{% endif %}</div>{% endfor %}
   </div>
   {% else %}<div class="rlist"><div class="rrow qsub">nobody holds an entry</div></div>{% endif %}
+</section>
+
+{# Waiting — every open card whose `waits` holds (§4.5 screen 12 *Waiting*, TD-918): in key order, unnumbered and
+   unmoved, the wait column where Up next draws the number #}
+<section class="rsec qgroup" id="qwaiting" data-group="waiting">
+  <div class="row gap rsh"><span class="h2 qghead" role="button" tabindex="0" aria-expanded="true" title="fold or open the group">Waiting {{ share(q.shown_in.waiting if q.shown_in else q.n.waiting, q.n.waiting) }}</span> <span class="qsub qgfoldword">folded</span> <span class="qsub">nobody can pick these now: each waits on a date, an event, a build or a block</span></div>
+  {% if q.waiting %}
+  <div class="qcards qwaits{% if not q.one_repo %} multi{% endif %}">
+  {% for c in q.waiting %}{{ qc.card(c) }}{% endfor %}
+  </div>
+  {% else %}<div class="rlist"><div class="rrow qsub">nothing is waiting</div></div>{% endif %}
 </section>
 
 {# Up next — every other open card, numbered in the pick order, with the grip and ⤒ ↑ ↓ #}

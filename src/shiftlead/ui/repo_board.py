@@ -170,11 +170,14 @@ def board(
     serves no Queue reading — a node, a home before its first tick — and the rows are then the ledger's, in
     `lists`' order, with no number and no grip. Each column `{key, name, people, kinds, claimed, groups, more,
     blocked, n_blocked, n}`: `claimed` its rows a member claims, each with `holders` and `doing`, the first
-    holder's newest `ao doing` line; `groups` its queued rows by card, `{card, ids, up, place, rows}`, in the
+    holder's newest `ao doing` line; `groups` its queued rows by card, `{card, ids, up, place, wait, would_be,
+    rows}`, in the
     Queue's order, cut after `SHOWN` rows (`more` the rest) unless `opened` names `<key>:queued` or an id in
     them; `blocked` its blocked rows, sent only when `opened` names `<key>:blocked` or an id in them,
     `n_blocked` always. `up` is a card Up next with its first row here (the grip and ⤒ ↑ ↓), `place` its
-    number in this repo. The work orders `orders` (open decided board lines) lead the pick's queued rows.
+    number in this repo; `wait` a Waiting card's `{column, phrase, id}` and `would_be` its place here once the
+    wait ends, drawn in the gutter with no grip (TD-918). The work orders `orders` (open decided board lines)
+    lead the pick's queued rows.
     `fold` is *no lane takes these*: `(row, words)` pairs. `numbered` is whether the home served the cards."""
     opened = set(opened)
     doing = doing or {}
@@ -255,11 +258,15 @@ def board(
             if g is None:
                 up = cards is not None and card.get("group") == "up_next"
                 mine = next((p["n"] for p in card.get("places") or () if p.get("repo") == name), None)
+                # a Waiting card's gutter draws its wait column and no grip (§4.5 screen 11 *For you*, TD-918)
+                waits = cards is not None and card.get("group") == "waiting" and card.get("wait")
                 g = col["groups"][card["id"]] = {
                     "card": card["id"],
                     "ids": card.get("ids") or [card["id"]],
                     "up": up,
                     "place": mine if up else None,
+                    "wait": card["wait"] if waits else None,
+                    "would_be": next((w["n"] for w in card.get("would_be") or () if w.get("repo") == name), None),
                     "rows": [],
                 }
             g["rows"].append(r)

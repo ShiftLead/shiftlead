@@ -34,7 +34,7 @@ QUEUE_STALL_AFTER = timedelta(hours=24)
 COMPLETED_WINDOW = timedelta(days=30)
 # The card's status words, by need (§4.4 *The card's status*); the reading gives the ledger's part —
 # *needs you* and *steer* are raised from the mail by the page
-STATUSES = ("needs you", "steer", "stalled", "blocked", "waiting", "ready")
+STATUSES = ("needs you", "steer", "stalled", "held (person)", "blocked", "waiting", "ready")
 PERSON = ledger_mod.PERSON_OWNER
 DESIGNER = ledger_mod.DESIGNER_OWNER
 NO_LANE = ("evaluation", "other")  # the page kinds no lane takes (§4.4 *Repo facts*)
@@ -260,9 +260,11 @@ def reading(
     `qid`, `repo`, `id`, `title`, `priority`, `state` — the one word of §4.4 *A row's state*, '' for a
     row that waits on the person, whose `needs` says how — `pr`, `holder`, `parent`, `depth`,
     `also_after`, `archived`, `key`), `done` and `of` (*d/m done*), `status` (the ledger's part), `group`
-    (`in_progress` or `up_next`), `place` (Up next numbered from 1) and `places` (one `{repo, n}` per repo
-    of its open members, numbered among that repo's Up next cards, TD-901), `order` (the open members in pick
-    order: dependency, then key), `repos`, `passed_over`. Cards are in key order, In progress first.
+    (`in_progress`, `waiting` or `up_next`), `wait` (a Waiting card's `{column, phrase, id}`, else None;
+    §4.4 *Waiting*, TD-918), `place` (Up next numbered from 1) and `places` (one `{repo, n}` per repo of its
+    open members, numbered among that repo's Up next cards, TD-901), `would_be` (a Waiting card's `{repo, n}`
+    per repo: its place in Up next once the wait ends), `order` (the open members in pick order: dependency,
+    then key), `repos`, `passed_over`. Cards are in key order, In progress first.
     **Completed** cards (`ids`, `top`, `titles`, `closed`, `pr`) are the archive's components no open
     entry touches, closed within `COMPLETED_WINDOW`, newest first. `other_work` is each live claim that
     names no open entry (`board:<key>`, a PR naming none), with its holder."""
@@ -326,7 +328,8 @@ def reading(
             else:
                 far = True
             if far:
-                e["unreachable"] = True
+                # the first such item's phrase, what a Waiting card's `wait` says (§4.4 *Waiting*)
+                e.setdefault("unreachable", b if b.startswith("decision (") else f"{b} unresolved")
         # the components (union-find over the open members)
     parent = {q: q for q in open_}
 
@@ -426,7 +429,10 @@ def reading(
     for members in comps.values():
         cards.append(_card(members, open_, blockers, adj, touch, row))
     for c in cards:
-        c["group"] = "in_progress" if any(q in held or q in prs for q in c["members"]) else "up_next"
+        if any(q in held or q in prs for q in c["members"]):
+            c["group"], c["wait"] = "in_progress", None  # In progress whatever `waits` says (§4.4 *Waiting*)
+        else:
+            c["group"] = "waiting" if c["wait"] else "up_next"
     cards.sort(key=lambda c: (c["group"] != "in_progress", _key_sort(c["key"], c["id"])))
     rank_mod.number(cards)
     _passed_over(cards, open_, held, recs, rs, doing or {})
@@ -552,6 +558,7 @@ def _card(
         "done": len(done_rows),
         "of": len(members) + len(done_rows),
         "status": _status(open_rows, [open_[q] for q in members]),
+        "wait": _wait(members, open_, blockers, keyed, top),
         "order": picked,
         "repos": sorted({open_[q]["repo"] for q in members}),
         "members": members,
@@ -560,15 +567,14 @@ def _card(
 
 
 def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
-    """The ledger's part of a card's status (§4.4 *The card's status*): *needs you* > *stalled* >
-    *blocked* > *waiting* > *ready*; *steer*, and a question's *needs you*, are the mail's."""
-    if any(r["needs"] or r["state"] == "held (person)" for r in rows):
+    """The ledger's part of a card's status (§4.4 *The card's status*): *needs you* > *stalled* > *held
+    (person)* > *blocked* > *waiting* > *ready*; *steer*, and a question's *needs you*, are the mail's. A
+    *held (person)* row is no need (TD-918): the card reads *held (person)* when at least one open member is
+    held and every other one waits by this function's own test, or there is no other."""
+    if any(r["needs"] for r in rows):
         return "needs you"
     if any(r["state"] == "stalled" for r in rows):
         return "stalled"
-
-    if any(e.get("unreachable") for e in ents) or all(e.get("for_page") in NO_LANE for e in ents):
-        return "blocked"
 
     def waits(e: Mapping[str, Any]) -> bool:
         if e.get("waiting") or e.get("waits") or e.get("settling"):
@@ -579,9 +585,100 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
         ids = [b for b in e.get("blocked_by") or [] if b.lower() != f"decision ({DESIGNER})"]
         return bool(ids) and all(not b.startswith("decision (") for b in ids)
 
+    if any(e.get("held") for e in ents) and all(waits(e) for e in ents if not e.get("held")):
+        return "held (person)"
+    if any(e.get("unreachable") for e in ents) or all(e.get("for_page") in NO_LANE for e in ents):
+        return "blocked"
     if all(waits(e) for e in ents):
         return "waiting"
     return "ready"
+
+
+def _own(e: Mapping[str, Any]) -> bool:
+    """The person's own member (§4.4 *Waiting*): `Owner: paul`, `Blocked by: decision (paul)`, or held."""
+    return bool(e.get("held")) or str(e.get("owner") or "").lower() == PERSON or ledger_mod.decided_by(dict(e), PERSON)
+
+
+def _wait(
+    members: list[str],
+    open_: Mapping[str, Mapping[str, Any]],
+    blockers: Mapping[str, set[str]],
+    keyed: Mapping[str, str],
+    top: str,
+) -> dict[str, str] | None:
+    """A card's `waits` and what it waits for (§4.4 *Waiting*, TD-918): None when it does not wait, else
+    `{column, phrase, id}` read from a leaf. `waits` holds when every open member that is not the person's
+    own waits — a `Waits:` line in force, a live check whose build is not live, settling, blocked by open
+    ids once the person's own are set aside, blocked past the org's reach, or no lane takes it — and at
+    least one is not the person's own. The leaf is a member that waits for a reason of its own, the first
+    that applies: the top entry with a `Waits:` line, the earliest `Waits:` date, an event, settling, a
+    live check not live, past reach — ties by key; a cycle of open ids with none is read as past reach."""
+    own = {q for q in members if _own(open_[q])}
+    rest = [q for q in members if q not in own]
+
+    def by_key(q: str) -> tuple[tuple[int, ...], int, str]:
+        return _key_sort(keyed[q], q)
+
+    def far(e: Mapping[str, Any]) -> bool:
+        return bool(e.get("unreachable")) or e.get("for_page") in NO_LANE
+
+    def not_live(e: Mapping[str, Any]) -> bool:
+        return e.get("kind") == "live-check" and e.get("live") != "yes"
+
+    def of_its_own(q: str) -> bool:
+        e = open_[q]
+        return bool(e.get("waiting") or e.get("settling")) or not_live(e) or far(e)
+
+    if not rest or not all(of_its_own(q) or blockers[q] - own for q in rest):
+        return None
+    home = top.partition("#")[0]
+
+    def show(q: str) -> str:
+        repo, _, tid = q.partition("#")
+        return tid if repo == home else q
+
+    def waited(q: str) -> dict[str, str] | None:
+        w = open_[q].get("waiting")
+        if not isinstance(w, Mapping):
+            return None
+        if w.get("on") == "until" and DATE.fullmatch(str(w.get("until") or "")):
+            day = date.fromisoformat(str(w["until"]))
+            words = f"{day:%b} {day.day}"
+            return {"column": words, "phrase": f"waits until {words}", "id": q}
+        why = str((open_[q].get("waits") or {}).get("why") or "") if isinstance(open_[q].get("waits"), Mapping) else ""
+        return {"column": "event", "phrase": f"waits on {why}" if why else "waits on an event", "id": q}
+
+    leaves = sorted((q for q in rest if of_its_own(q)), key=by_key)
+    if top in leaves and open_[top].get("waiting"):
+        return waited(top)
+    dated = [q for q in leaves if (open_[q].get("waiting") or {}).get("until")]
+    if dated:
+        return waited(min(dated, key=lambda q: (str(open_[q]["waiting"]["until"]), by_key(q))))
+    for q in leaves:
+        if open_[q].get("waiting"):
+            return waited(q)
+    for q in leaves:
+        if open_[q].get("settling"):
+            return {"column": "settling", "phrase": "settling", "id": q}
+    for q in leaves:
+        if not_live(open_[q]):
+            built = " ".join(f"#{n}" for n in open_[q].get("built") or ())
+            return {"column": "not live", "phrase": f"not live {built}".strip(), "id": q}
+    for q in leaves:
+        e = open_[q]
+        said = e.get("unreachable") if isinstance(e.get("unreachable"), str) else "no lane takes it"
+        return {"column": "blocked", "phrase": f"blocked: {said}", "id": q}
+    # no leaf: the rest wait on each other's ids alone, so a cycle runs through them; read from its
+    # lowest-keyed member as past reach
+    seen: list[str] = []
+    q = min(rest, key=by_key)
+    while q not in seen:
+        seen.append(q)
+        q = min(blockers[q] - own, key=by_key)
+    loop = sorted(seen[seen.index(q) :], key=by_key)
+    names = [show(x) for x in loop]
+    said = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+    return {"column": "blocked", "phrase": f"blocked: {said} block each other", "id": loop[0]}
 
 
 def _passed_over(

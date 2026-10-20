@@ -30,6 +30,10 @@ TOOL = "shiftlead"  # the `(<tool>)` of every rank PR's subject (ledgerboard's `
 NEIGHBOURS_KEPT = 5  # the cards beyond each neighbour an intent remembers, for a neighbour that is gone
 
 
+# the groups a card that does not move is in, as a refusal names them (§4.4 *A move lands*)
+GROUPS = {"in_progress": "In progress", "waiting": "Waiting"}
+
+
 class Refused(Exception):
     """A move the rank refuses, in words the caller is shown."""
 
@@ -88,7 +92,7 @@ def intent(
     if any(card_of(cards, q) is not card for q in ids):
         raise Refused(f"{', '.join(ids)} are not one card's")
     if card.get("group") != "up_next":
-        raise Refused(f"{card['id']}'s card is In progress, which does not move")
+        raise Refused(f"{card['id']}'s card is {GROUPS.get(card.get('group'), 'In progress')}, which does not move")
     ups = up_next(cards)
     rest = [c for c in ups if c is not card]
     ends: list[dict[str, Any] | None] = []
@@ -102,7 +106,10 @@ def intent(
         if c is card:
             raise Refused(f"{q} is on the moved card itself")
         if c.get("group") != "up_next":
-            raise Refused(f"{q}'s card is not in Up next: a card moves only among Up next cards")
+            raise Refused(
+                f"{q}'s card is {GROUPS.get(c.get('group'), 'In progress')}, not in Up next: "
+                "a card moves only among Up next cards"
+            )
         ends.append(c)
     p, n = ends
     at_p = rest.index(p) if p is not None else -1
@@ -147,10 +154,13 @@ def number(cards: list[dict[str, Any]]) -> None:
     """Number the Up next cards of `cards`, in the order given (§4.4 *The Queue*, §4.5 screen 12 *Up next*;
     TD-901): `place` the card's place in the whole Up next order, from 1, and `places`, one `{repo, n}` per
     repo an open member of it is in, `n` its place among the Up next cards with a member in that repo, so
-    two repos' leaders both read 1. A card In progress gets `place` None and no `places`."""
+    two repos' leaders both read 1. A card In progress or Waiting gets `place` None and no `places`; a
+    Waiting card gets `would_be` (§4.4 *Waiting*, TD-918), one `{repo, n}` per repo: one more than the Up next
+    cards with a member in that repo whose key sorts before its own — its place once the wait ends."""
     whole = 0
     per: dict[str, int] = {}
     for c in cards:
+        c["would_be"] = []
         if c.get("group") != "up_next":
             c["place"], c["places"] = None, []
             continue
@@ -160,6 +170,14 @@ def number(cards: list[dict[str, Any]]) -> None:
         for repo in c.get("repos") or ():
             per[repo] = per.get(repo, 0) + 1
             c["places"].append({"repo": repo, "n": per[repo]})
+    ups = [c for c in cards if c.get("group") == "up_next"]
+    for c in cards:
+        if c.get("group") == "waiting":
+            at = _sort(c)
+            c["would_be"] = [
+                {"repo": r, "n": 1 + sum(1 for u in ups if r in (u.get("repos") or ()) and _sort(u) < at)}
+                for r in c.get("repos") or ()
+            ]
 
 
 def place(cards: list[dict[str, Any]], card_id: str, keys: Mapping[str, str]) -> int | None:

@@ -549,7 +549,19 @@ HELP: tuple[Help, ...] = (
             "cards both read 1; where the home reads more than one repo each number carries its repo's name, and "
             "a card whose entries span repos carries one per repo. Read it as the order that repo's lanes pick in, "
             "the lowest number first — on a card spanning repos you never moved, a lane's own order can differ. "
-            "It is not a control: a card moves by its grip or ⤒ ↑ ↓, and an In progress card has no number."
+            "It is not a control: a card moves by its grip or ⤒ ↑ ↓, and a Waiting or In progress card has no "
+            "number."
+        ),
+    ),
+    Help(
+        "wait-column",
+        "the wait column",
+        "Queue page: Waiting",
+        (
+            "Shows what the card waits for — a date, an event, settling, a build not yet live, or blocked — and "
+            "the place it would take in Up next once the wait ends. Read it to know when a card nobody can pick "
+            "now comes back, and where. It is not a control: a Waiting card has no grip and no ⤒ ↑ ↓, and it "
+            "returns to Up next by itself when the wait ends."
         ),
     ),
     Help(
@@ -692,7 +704,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     ("repo", "Repo page", ("board", "live-divider")),
-    ("queue", "Queue", ("up-next-number", "live-mark", "row-done", "row-back-to-design", "row-hold")),
+    ("queue", "Queue", ("up-next-number", "wait-column", "live-mark", "row-done", "row-back-to-design", "row-hold")),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
 )

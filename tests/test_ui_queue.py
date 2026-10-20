@@ -114,7 +114,7 @@ def test_the_groups_and_the_headers_counts():
     v = queue_view(queue(), NOW)
     assert [c["id"] for c in v["in_progress"]] == ["s#TD-10"]
     assert [c["id"] for c in v["up_next"]] == ["s#TD-20", "s#TD-30"] and v["upnext"] == ["s#TD-20", "s#TD-30"]
-    assert v["n"] == {"cards": 3, "in_progress": 1, "up_next": 2, "needs_you": 1}
+    assert v["n"] == {"cards": 3, "in_progress": 1, "waiting": 0, "up_next": 2, "needs_you": 1}
     # one repo: the ids are written `TD-n`, and a `/queue#TD-n` finds an open row
     assert v["up_next"][0]["top"]["show"] == "TD-20" and v["up_next"][0]["rows"][0]["anchor"] == "TD-21"
     assert v["other"] == [
@@ -530,7 +530,8 @@ def test_a_group_heading_carries_its_count_and_its_share_under_a_pick(tmp_path, 
         'Recently completed<span class="qwinword"' in head
         and '<span class="qwinword" data-wv="day"> <span class="qshare" data-of="3">(3)</span></span>' in head
     )
-    assert html.count('class="h2 qghead" role="button"') == 3 and 'data-group="up_next"' in html
+    assert 'Waiting <span class="qshare" data-of="0">(0)</span>' in html  # TD-918: between, even empty
+    assert html.count('class="h2 qghead" role="button"') == 4 and 'data-group="up_next"' in html
     html = c.get("/queue?find=queue").text
     assert 'data-of="2">(1 of 2)</span>' in html and 'data-of="1">(0 of 1)</span>' in html
     js = c.get("/static/app.js").text
