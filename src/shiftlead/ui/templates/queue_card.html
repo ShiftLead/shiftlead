@@ -6,7 +6,8 @@
    other four in the body above the rows, each heading hidden at 0. An Up next
    card carries its place, a grip and ⤒ ↑ ↓ — its place **per repo** (§4.5a *Queue page, Up next: the number*,
    TD-901): a Repo page draws the repo's own (`repo`), and where the home reads more than one repo (`c.chips`)
-   the Queue draws one number per repo, each with its repo's chip; an In progress one a green stripe and *d/m done* where the
+   the Queue draws one number per repo, each with its repo's chip; a Waiting one (TD-918) its wait column there,
+   no grip and no arrows, a teal stripe and its wait phrase as its status; an In progress one a green stripe and *d/m done* where the
    status would be. Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
 {% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, section, controls %}
@@ -16,7 +17,10 @@
   <div class="qhead"{% if t.anchor %} id="{{ t.anchor }}"{% endif %} data-qid="{{ t.qid }}"{% if body %} role="button" tabindex="0" aria-expanded="true" title="fold or open the card"{% endif %}>
     <span class="qgrip"{% if up %} draggable="true" title="drag to move it in the order"{% endif %}>{% if up %}⋮⋮{% endif %}</span>
     {%- set mine = (c.places or []) | selectattr('repo', 'equalto', repo) | list if repo else [] %}
-    {% if mine %}<span class="qplace" title="{{ help_title('up-next-number') }}">{{ mine[0].n }}</span>
+    {#- a Waiting card's wait column where the number would be (§4.5a *Queue page, Waiting: the wait column*,
+        TD-918): what it waits for at the number's size, the repo's chip, and the place it would take #}
+    {% if c.group == 'waiting' and c.wait %}<span class="qplace qwait" title="{{ help_title('wait-column') }}"><span class="qn">{{ c.wait.column }}</span>{% for w in c.would_be or [] if not repo or w.repo == repo %}{% if c.chips and not repo %}<span class="qprepo">{{ w.repo }}</span>{% endif %}<span class="qwouldbe">would be {{ w.n }} in {{ w.repo }}</span>{% endfor %}</span>
+    {%- elif mine %}<span class="qplace" title="{{ help_title('up-next-number') }}">{{ mine[0].n }}</span>
     {%- elif c.chips and c.places and not repo %}<span class="qplace multi" title="{{ help_title('up-next-number') }}">{% for p in c.places %}<span class="qpn"><span class="qn">{{ p.n }}</span><span class="qprepo" title="its place among {{ p.repo }}'s Up next cards">{{ p.repo }}</span></span>{% endfor %}</span>
     {%- else %}<span class="qplace">{{ c.place if c.place else '' }}</span>{% endif %}
     <div class="qmain">
@@ -25,13 +29,15 @@
     <span class="qright">
       {% if up %}<span class="qmoves"><button type="button" class="qmove" data-move="top" title="to the top of Up next" aria-label="to the top">⤒</button><button type="button" class="qmove" data-move="up" title="up one card" aria-label="up one">↑</button><button type="button" class="qmove" data-move="down" title="down one card" aria-label="down one">↓</button></span>{% endif %}
       {# the top entry's state where the card's own words do not already say it: *ready* is the status's,
-         a need the amber badge's, *held by X* the holder's pill #}
-      {{ extras(t.ext, repo) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') %}{{ state(t) }}{% endif %}
+         a need the amber badge's, *held by X* the holder's pill, a Waiting card's leaf its wait phrase #}
+      {{ extras(t.ext, repo) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) %}{{ state(t) }}{% endif %}
       {#- the top entry's own controls, the same macro as a row's (§4.5 screen 12 *any open row*, TD-905) #}
       {%- if not t.ext %}{{ controls(t) }}{% endif %}
       {% if c.group == 'in_progress' %}<span class="qcount qdone">{{ c.done }}/{{ c.of }} done</span>
       {% else %}{% if c.of and c.of > 1 %}<span class="qcount meta">{{ c.of }} entries</span>{% endif %}
-        {% if c.status == 'needs you' %}<span class="qstatus needsyou">Needs you</span>{% elif c.status %}<span class="qstatus s-{{ c.status | replace(' ', '-') }}">{{ c.status }}</span>{% endif %}{% endif %}
+        {% if c.group == 'waiting' and c.wait %}{#- the wait phrase is a Waiting card's status, the pill or *steer* / *stalled* beside it #}
+          {% if c.status == 'needs you' %}<span class="qstatus needsyou">Needs you</span>{% elif c.status in ('steer', 'stalled') %}<span class="qstatus s-{{ c.status }}">{{ c.status }}</span>{% endif %}<span class="qstatus s-waits" title="{{ help_title('wait-column') }}">{{ c.wait.phrase }}</span>
+        {% elif c.status == 'needs you' %}<span class="qstatus needsyou">Needs you</span>{% elif c.status %}<span class="qstatus s-{{ c.status | replace(' ', '-') }}">{{ c.status }}</span>{% endif %}{% endif %}
       {% if c.new %}<span class="meta">not on the Queue yet</span>{% endif %}
     </span>
     {{ builds(t.ext) }}

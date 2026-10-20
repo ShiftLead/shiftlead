@@ -737,6 +737,10 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .bgut { flex: none; width: 2.2em; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; }
 .repopage .bgut .qplace { font-size: calc(var(--t-body) * 1.4); text-align: center; }
 .repopage .bgut .qmoves { flex-direction: column; }
+/* a Waiting card's gutter: its wait column, no grip (TD-918) — the word in the gutter's own size, wrapped */
+.repopage .bcard.g-waiting .bgut { width: 4.4em; }
+.repopage .bgut .qwait { align-items: center; font-size: var(--t-body); }
+.repopage .bgut .qwait .qn, .repopage .bgut .qwouldbe { white-space: normal; text-align: center; }
 .repopage .brows { flex: 1 1 auto; min-width: 0; }
 .repopage .bcol .qrow { padding: 6px 10px 6px 8px; }
 .repopage .bcol .qtitle { flex-basis: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }  /* wrapped to two lines */
@@ -828,6 +832,7 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qcard { border-top: 1px solid var(--line); border-left: 3px solid transparent; }
 .qcard:first-child { border-top: 0; }
 .qcard.g-in_progress { border-left-color: var(--working); }
+.qcard.g-waiting { border-left-color: var(--waiting); }
 .qcard.st-needs-you { border-left-color: var(--needs); }
 .qcard.st-needs-you > .qhead { background: var(--warn-bg); }
 .qcard.hasrows:not(.folded) > .qhead { background: var(--hover); }
@@ -845,6 +850,12 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qplace.multi { opacity: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
 .qpn { display: flex; flex-direction: column; align-items: flex-end; max-width: 100%; }
 .qpn .qn { opacity: .25; }
+/* a Waiting card's wait column (§4.5a *Queue page, Waiting: the wait column*, TD-918): the date or word at the
+   number's size and strength, the chip and *would be n in <repo>* under it, at full strength in small type */
+.qwaits .qhead, .qwaits.multi .qhead { grid-template-columns: 1.4em 8.5em 1fr; }
+.qplace.qwait { opacity: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 0; }
+.qwait .qn { opacity: .25; white-space: nowrap; }
+.qwouldbe { font-size: var(--t-small); font-weight: 400; color: var(--muted); text-align: right; line-height: 1.3; }
 .qprepo { font-size: var(--t-small); font-weight: 500; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* the id, badge and title on one line, the words at the right on it when they fit, else under it */
 .qmain, .qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
@@ -870,7 +881,7 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qcount.qdone::before { content: "● "; color: var(--working); }
 .qstatus { white-space: nowrap; color: var(--strong); }
 .qstatus::before { content: "● "; color: var(--ended); }
-.qstatus.s-ready::before { color: var(--idle); } .qstatus.s-waiting::before { color: var(--waiting); }
+.qstatus.s-ready::before { color: var(--idle); } .qstatus.s-waiting::before, .qstatus.s-waits::before { color: var(--waiting); }
 .qstatus.s-blocked::before { content: "○ "; color: var(--muted); }
 .qstatus.s-stalled { border-bottom: 1px dashed var(--ended); } .qstatus.s-stalled::before { content: ""; }
 .qstatus.needsyou { padding: 1px 9px; border-radius: 10px; background: var(--needs); color: #3b2300; font-weight: 600; }  /* dark on amber in both themes */
@@ -943,6 +954,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   .qhead { grid-template-columns: 1em 1.6em 1fr; column-gap: 6px; }
   .qcards.multi .qhead { grid-template-columns: 1em 4.5em 1fr; }
   .qplace { font-size: calc(var(--t-body) * 1.4); }
+  .qwaits .qhead, .qwaits.multi .qhead { grid-template-columns: 1.4em 6em 1fr; }
   .qtitle { flex: 1 1 0; min-width: 8em; }
   .qright { margin-left: 0; justify-content: flex-start; flex-basis: 100%; }
   .qbuilds, .qnote { padding-left: 0; }

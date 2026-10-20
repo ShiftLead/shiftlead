@@ -311,11 +311,12 @@ def queue_view(
       badge and title, *n entries*, and the entries it opens to, each its `Resolved:` text and PR) and one
       per open card's archived row (*on TD-n's card*), newest first; each line's `wins` are the windows it
       falls in, and `counts` per window the entries the group lists (a completed card all its entries);
-    - `in_progress` and `up_next`: the cards in the reading's order, each row shaped for the partials, and
-      `chips` on each where the home reads more than one repo: its `places` are drawn each with its repo;
+    - `in_progress`, `waiting` and `up_next`: the cards in the reading's order, each row shaped for the
+      partials, and `chips` on each where the home reads more than one repo: its `places` (a Waiting card's
+      `would_be`, TD-918) are drawn each with its repo;
     - `other`: the *other work* lines, each hold that names no open entry, with its holder;
     - `upnext`: the whole Up next order, each card's id (a move's neighbours, §4.4 *A move lands*);
-    - `n`: the header's counts — cards, in progress, up next, and those whose status is *needs you*.
+    - `n`: the header's counts — cards, in progress, waiting, up next, and those whose status is *needs you*.
 
     `mail` is what is attached to each card (`attach`): its `sections`, *Needs you* drawn in the header and
     the rest in the body, raising the card's status to *needs you* or *steer*. `promotes` is the `host`
@@ -351,6 +352,7 @@ def queue_view(
             }
         )
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]
+    waiting = [c for c in shaped if c.get("group") == "waiting"]
     up_next = [c for c in shaped if c.get("group") == "up_next"]
 
     readings: dict[str, Any] = {}
@@ -393,7 +395,7 @@ def queue_view(
                 "live": live(str(c.get("id") or "").partition("#")[0], (ents[0] if ents else {}).get("sha")),
             }
         )
-    for c in in_progress + up_next:
+    for c in in_progress + waiting + up_next:
         for r in c["rows"]:
             if not r.get("archived"):
                 continue
@@ -441,12 +443,14 @@ def queue_view(
     return {
         "completed": {"lines": lines, "counts": counts},
         "in_progress": in_progress,
+        "waiting": waiting,
         "up_next": up_next,
         "other": other,
         "upnext": [str(c["id"]) for c in up_next],
         "n": {
             "cards": len(shaped),
             "in_progress": len(in_progress),
+            "waiting": len(waiting),
             "up_next": len(up_next),
             "needs_you": sum(1 for c in shaped if c.get("status") == "needs you"),
         },
@@ -536,7 +540,7 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
             return False
         return all(_finds(w, text) for w in words)
 
-    cards = [*(view.get("in_progress") or ()), *(view.get("up_next") or ())]
+    cards = [*(view.get("in_progress") or ()), *(view.get("waiting") or ()), *(view.get("up_next") or ())]
     for c in cards:
         ok = by_repo_find(c.get("repos"), str(c.get("find") or ""))
         if picks.get("filter") == "needs-you":
@@ -566,6 +570,7 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
     done = (view.get("completed") or {}).get("lines") or ()
     view["shown_in"] = {
         "in_progress": sum(1 for c in view.get("in_progress") or () if not c["off"]),
+        "waiting": sum(1 for c in view.get("waiting") or () if not c["off"]),
         "up_next": sum(1 for c in view.get("up_next") or () if not c["off"]),
         "completed": {w: sum(ln["n"] for ln in done if w in ln["wins"] and not ln["off"]) for w in WINDOWS},
     }
