@@ -629,7 +629,6 @@ async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_whe
         assert e["answer"] == 0
 
 
-
 async def test_an_orphaned_question_is_answered_by_its_label_or_its_whole_line(agent, repo, tmp_path):
     """TD-919 (§4.10 *The answers' split*, TD-913): an orphaned `ask` whose stored answers are
     `<label> — <consequence>` is answered by the label the page draws, and by the whole stored line;
@@ -653,6 +652,7 @@ async def test_an_orphaned_question_is_answered_by_its_label_or_its_whole_line(a
         assert got["closed"] == whole
         e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == whole][0]
         assert e["closed_reason"] == "replied" and e["answer"] == 0
+
 
 async def test_a_refused_note_to_the_holder_is_said_beside_the_committed_line_and_closes_the_entry(
     agent, repo, tmp_path, monkeypatch
