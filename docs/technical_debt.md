@@ -77,7 +77,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Built — live check #2186 |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
-| TD-924 | The Sessions page's Agents count leaves out every session of a team that is not running, so a working or waiting session can be missing from it | Medium | Open — design first |
+| TD-924 | The Sessions page's Agents count leaves out every session of a team that is not running, so a working or waiting session can be missing from it | Medium | Designed — built by TD-925 |
+| TD-925 | Build TD-924: the Sessions rollup's Agents and Needs you count every session on the page, whatever its team's state | Medium | Open |
 
 ---
 
@@ -1613,7 +1614,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-20 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — the behaviour is what the design says today, so the design changes first
+**Status:** Designed (2026-10-20, the designer): §4.5 screen 1 *The rollup*, its fold paragraph, §4.5a *Sessions: rollup* and §4.9 *The Sessions page* — Agents and *answer needed* count every session the page draws that has not ended, whatever its team's state, and an exited member of a live team — narrower than the Fix's *every session not closed*: a wound-down or stopped team's exited cards and exited no-team sessions are leftovers waiting for Forget (the techlead's reply to steer m-cf2d36071669, 2026-10-20); *asked you* sums every team's line; TDs and PRs in motion keep summing live teams; with no team live and a counted session the row is Agents and Needs you. Built by TD-925.
+**Blocked by:** TD-925
 **Location:** design §4.5 screen 1 *The rollup* (*Sums over every live team*) and the fold paragraph (*The rollup still sums live teams only*), §4.5a row *Sessions: rollup*, §4.9 *The Sessions page* (*The rollup is unchanged: sums over every live team*); `src/shiftlead/ui/org.py` `rollup()` (`live = [g … if g.get("live")]`, the Agents tally and *answer needed* both over those members alone)
 
 **Why:** The rollup's **Agents (n)** reads as "what my sessions are doing", but it counts only the members of teams that are live. The person's own interactive sessions, and any session left standing, keep running after their team winds down, and drop out of the count. Seen 2026-10-20 (Paul's screenshot, `~/.shiftlead/attachments/draft-54521b5d/paste-20261020-091830.png`): Agents (5) read *idle (2) · on call (2) · exited (1)* — dc-grind's five, the one live team — while `ao-shiftlead-ao-paul` in the wound-down ao-grind was **working** on its card below, and `ao status` held twenty records, among them `ao-samscrape-sam-queue` in **needs-you** in samscrape-grind, which the rollup's *answer needed* missed too. The person waited to rule out a late update; the count was not late, it was scoped. A summary that hides a working session, or one waiting on the person, is worse than none: it is read as "nothing is going on".
@@ -1621,5 +1623,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** Design first: decide what the Agents facet and *answer needed* sum over — the recommendation is every session the page draws that is not closed, whatever its team's state (a wound-down or stopped team's live members, and sessions in no team), while TDs in motion and PRs in motion keep summing live teams; and whether, with no team live, the row still carries Agents when any session is live. Then the build: `rollup()` takes the page's whole fleet for those two counts, the *no team live* and *one team live* cases follow the design's new words, and a test holds a working member of a wound-down team in the count.
 
 **Done when** a session that is working or needs the person is counted in the rollup whatever its team's state, as the design then says.
+
+---
+
+## TD-925: Build TD-924: the Sessions rollup's Agents and Needs you count every session on the page, whatever its team's state
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-20 (TD-924's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/org.py` `rollup()`, `src/shiftlead/ui/templates/rollup.html` and `org.html`, `src/shiftlead/ui/static/app.js` (the fold, `toggleFold`, and the filter box), `src/shiftlead/ui/app.py` (the `rollup(groups)` calls, which pass the views too), `tests/test_ui_team_summary.py` (the rollup tests), `tests/test_ui_org_chrome.py` and `tests/test_ui_keys.py` (the node harness the page's client handlers run under)
+
+**Why:** TD-924: design §4.5 screen 1 *The rollup* and §4.5a *Sessions: rollup* now say Agents and *answer needed* count every session the page draws that has not ended, whatever its team's state, plus an exited member of a live team and a seat on call; `rollup()` sums them over live teams alone, so a working member of a wound-down team and a needs-you session in another were missing from the row on 2026-10-20.
+
+**Fix:** `rollup()` takes the page's sessions (`team_groups`' groups, the `NO_TEAM` group included, or the views themselves on the flat page, where `team_groups` is `None`). The sessions it counts: every one not in `DEAD`, whatever its team's state, an `exited` member of a live team (the group's `live`, its crew alone; a person's exited session in it counted too), and a seat on call (`seat`: its record stays exited or closed; tallied by its `pill_word`, as today and as `state_counts` does); never a stopped team's or a no-team session's exited record, never a `closed` one that is no seat (drop `ROLLUP_STATES`' `closed` row), never a command run (`kind: command`). `rollup()` computes *asked you* in every layout, the quiet one too. The Agents tally (`agents`, `n_agents`) and *answer needed* (`answer_blocks` over the counted sessions, one per session) read those; *asked you* sums every team's `summary["asked"]`, live or not; TDs in motion, PRs in motion and *waiting on review* keep reading the live teams. *answer needed*'s link goes to the first such session in the grid's one order (`card_order`: rank, interactive first, name) over all of them: `#tsum-<team>` when it is in a team (a team of any state draws its Answer needed facet while it holds an answer — `drawn_facets` already does; fix `team_summary`'s docstring, which says nobody can be waiting on a team with nothing live), the client opening that team's card first when it is folded and storing the opening as a press on its header is, or `#card-<id>` when it is in no team. *asked you*'s link goes to the team holding the oldest ask, opened first the same way. The rollup returns each link's target — `answer_team` or `answer_card` (the session's id when it is in no team), and `asked_team` — and `rollup.html` draws it on the link (`href` and a `data-open-team` the client reads); a press clears the Sessions filter box first, then opens the team, then scrolls. The director's session, where its card is drawn, is counted and linked to as any session in no team. The layout keys: no team live and no session counted — Needs you alone (`quiet`); one team live, or none and a session counted — Agents and Needs you (`lone`); two or more live — all four. The docstring and the comments in `rollup.html` and `org.html` say the same.
+
+**Done when** tests hold: a working member of a team with nothing live and a needs-you session in no team in Agents and *answer needed*; an exited member of a live team counted, a person's exited session in it too, a stopped team's exited card and a `closed` record not; the flat page's sessions counted, its exited cards not; the no-team-live row with a counted session reading Agents and Needs you, and Needs you alone with none, with *asked you* while a stopped team's line holds an ask; a running command run in no count; *answer needed*'s link to a folded team's facet opening that team (and *asked you*'s), and to the card of a session in no team; a seat on call counted; the rendered links carrying their targets, and `app.js`'s handler (clear the filter, open the team, store the fold) asserted as the page's other client handlers are, and looked at once in headless Chromium (§4.9b).
 
 ---
