@@ -179,12 +179,13 @@
 {%- set raw = e.get('answers') if how != 'owed' else [] %}{% set raw = raw if raw is sequence and raw is not string else [] %}
 {%- set cs = e.get('consequences') %}{% set cs = cs if cs is sequence and cs is not string else [] %}
 {%- set dflt = e.get('default') %}
-{%- set rec = e.get('recommended') if how == 'mail' else (raw.index(dflt) if dflt and dflt in raw else none) %}
+{%- set rec = e.get('recommended') if how == 'mail' else none %}
+{%- set rec = rec if rec is not none else (raw.index(dflt) if dflt and dflt in raw else none) %}
 {%- set pair = look_pair(e) if how == 'mail' else (e.get('pair') if how == 'board' else false) %}
 {%- set by = e.get('passer_name') or e.get('from_name') or e.get('from') or e.get('name') or e.get('repo') %}
 {%- set where = (e.get('repo_name') or e.get('repo') or e.get('name') or 'the repo') ~ "'s board" %}
 <div class="row gap wrap sugg qanswers" role="group" aria-label="answer this item">
-  {%- for a in raw if a is string and a.strip() %}
+  {%- for a in raw %}{% if a is string and a.strip() %}
   {%- set i = loop.index0 %}{% set form = pair and i == 1 %}
   <span class="qans"><button class="btn sm answer{% if i == rec and not pair %} rec{% endif %}" type="button"
   {%- if how == 'mail' and form %} data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"
@@ -194,7 +195,7 @@
   {%- else %} data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ i }}" data-answer="{{ a }}" title="{{ a }}"
   {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% else %}{{ a }}{% endif %}</span></button>
   {%- set c = cs[i] if i < cs | length else '' %}{% if c is string and c.strip() %}<span class="st alead">{{ c }}</span>{% endif %}</span>
-  {%- endfor %}
+  {%- endif %}{% endfor %}
   {%- if gwi %}<button class="btn sm ghost" type="button" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="{{ gwi }}">Go with it</button>{% endif %}
   {%- if how == 'ledger' and e.home == 'queue' and e.why == 'yours' %}
   <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>
@@ -872,7 +873,7 @@
   <span class="grow"></span>
   {%- call qrow.dots(['Done'] + (['Open board'] if e.editor else [])) %}
   <button role="menuitem" type="button" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
-  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "") }}{% endif %}
+  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "", role="menuitem") }}{% endif %}
   {%- endcall %}
 </div>
 {%- else %}

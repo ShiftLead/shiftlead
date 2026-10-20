@@ -4,7 +4,7 @@
     `folder` is set (`data-folder`, `data-wait` in seconds), else the file form alone. `cls` is the
     button's own classes, kept (the Inbox's `o` and Enter find **Open board** by `a.btn`). A test holds
     every **Open file**, **Open ledger**, **Open board** and transcript button to this macro. -#}
-{% macro file_link(l, text, title="", cls="", id="", hidden=false) -%}
-<a class="editor{% if cls %} {{ cls }}{% endif %}{% if hidden %} hidden{% endif %}"{% if id %} id="{{ id }}"{% endif %} data-file-link href="{{ l.url }}" data-label="{{ l.label }}"
+{% macro file_link(l, text, title="", cls="", id="", hidden=false, role="") -%}
+<a class="editor{% if cls %} {{ cls }}{% endif %}{% if hidden %} hidden{% endif %}"{% if id %} id="{{ id }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} data-file-link href="{{ l.url }}" data-label="{{ l.label }}"
 {%- if l.folder %} data-folder="{{ l.folder }}" data-wait="{{ l.wait }}"{% endif %}{% if title %} title="{{ title }}"{% endif %}>{{ text }}</a>
 {%- endmacro %}

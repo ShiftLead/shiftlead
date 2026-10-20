@@ -47,6 +47,12 @@ def test_a_decide_ask_draws_its_answer_row_and_its_controls_behind_its_dots():
     assert "default</span>" not in html and "suggested by" not in html  # no caption: the outline is the convention
     assert dots(html) == ["Delete"] and 'role="menuitem" type="button" data-act="unmail"' in html
     assert not re.search(r"\bReply\b", html) and ">Snooze" not in html
+    # a question with a default and no `recommended` outlines its default
+    plain = card({**e, "recommended": None, "default": "home"}, "decide")
+    assert (
+        '<button class="btn sm answer rec" type="button" data-act="answer" data-id="person" data-msg="m-1" '
+        'data-index="1"' in plain
+    )
     # the Inbox's own row is unchanged
     page = inbox(e)
     assert ">Reply</button>" in page and "qanswers" not in page and "qdots" not in page and ">Snooze<" in page
@@ -105,6 +111,7 @@ def test_a_board_line_answers_on_its_line_and_checks_off_behind_its_dots(tmp_pat
     ans = html[html.index("qanswers") :]
     assert 'data-act="board_reply"' in ans and ">Answer…</button>" in ans
     assert dots(html) == ["Done, Open board"]
+    assert 'role="menuitem" data-file-link' in html  # the arrows reach Open board too
     assert 'role="menuitem" type="button" data-act="board" data-id="person" data-board-act="done"' in html
     assert not re.search(r"\bReply\b", html) and "Snooze" not in html
     # a decided line under *waiting on them*, opened from its Read line: no Answer row, its Done behind its ⋯
