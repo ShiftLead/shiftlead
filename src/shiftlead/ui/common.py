@@ -147,6 +147,36 @@ def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
 templates.env.globals["shaped"] = shaped
 
 
+def card_shape(text: Any, origin: Any = None) -> dict[str, Any]:
+    """A mail item drawn whole on a Queue card (design §4.5 screen 12 *An item's shape*, §4.10 *An item leads
+    with one sentence*; TD-911): `one`, whether its first paragraph is one sentence (`render.one_sentence`);
+    if so `sentence` that paragraph, `leads` the second — what each answer leads to — and `context` the rest;
+    if not, no sentence (the row draws its `subject`, the 80-character clip) and `context` the whole text, so
+    the person always reads one line first. Each part rendered as `shaped` renders it."""
+    t, o = str(text or ""), (str(origin) if origin else None)
+    if not rendermod.one_sentence(t):
+        return {"one": False, "sentence": Markup(""), "leads": Markup(""), "context": Markup(rendermod.render(t, o))}
+    lead, rest = rendermod.paragraph_break(t) or (t, "")
+    second, after = rendermod.paragraph_break(rest) or (rest, "")
+
+    def r(part: str) -> Markup:
+        return Markup(rendermod.render(part, o) if part.strip() else "")
+
+    return {"one": True, "sentence": r(lead), "leads": r(second), "context": r(after)}
+
+
+templates.env.globals["card_shape"] = card_shape
+
+
+def card_whole(mode: Any, e: Any) -> bool:
+    """Whether a row is drawn whole on a card (§4.5 screen 12 *An item's shape*, TD-911): its renderer in `card`
+    mode and the item a Decide or Do (`queue.want_of`); a Read item is one line, and the Inbox draws neither."""
+    return mode == "card" and hasattr(e, "get") and e.get("want") in ("decide", "do")
+
+
+templates.env.globals["card_whole"] = card_whole
+
+
 def md(text: Any, origin: Any = None, *, inline: bool = False, links: bool = True) -> Markup:
     """Text from the closed markdown subset as `shaped` renders it, unsplit — a board row's halves
     and its replies (§4.5a *Inbox board row: text*, TD-279), already cut where they are drawn.

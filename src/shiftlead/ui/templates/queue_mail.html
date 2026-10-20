@@ -1,5 +1,7 @@
 {# One Inbox item drawn on its Queue card (design §4.5 screen 12 *What is attached to a card*, *What needs
    the person*; TD-771): the Inbox's own row renderer, never a copy, so its controls, RPCs and confirms
    are the Inbox's. Imported with context so a row's text knows the page's `origin` (TD-138), and the
-   renderer that it draws for the Queue: no `data-find` on a row and no Snooze (§4.5 *Page loads*, TD-890). #}
-{% set drawn_on_queue = true %}{% import "inbox_row.html" as r with context %}{{ r.row(e, section) }}
+   renderer that it draws for the Queue: no `data-find` on a row and no Snooze (§4.5 *Page loads*, TD-890),
+   in its `card` mode (§4.5 screen 12 *An item's shape*, TD-911) — a Read item one line, a Decide or Do item
+   whole, by the item's `want`. #}
+{% set drawn_on_queue = true %}{% set mode = 'card' %}{% import "inbox_row.html" as r with context %}{{ r.row(e, section) }}
