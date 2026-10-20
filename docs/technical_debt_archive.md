@@ -17112,3 +17112,25 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-19 (PR #2169) — `tests/test_settle.py::test_a_holds_words_and_a_drop_notice_are_cut_to_one_line_of_200` holds with 300 characters of words and of `tell`, and reads exactly 200 on the record, the reading and the note; removing either `[:WHY_CHARS]` slice fails it.
 
 ---
+
+## TD-888: The live Queue's HTML is 148 KB on the wire against its 150 KB budget: the open cards alone fill it, so a few more cards cross it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-2, reading TD-882 live)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed (2026-10-18, the designer; design §4.5 *Page loads* — *Only what is shown*, *Nothing the page does not read* — screen 12, §4.5a *Queue page: card*, *Inbox row: details*): a Queue card's closed *details* read on its first open (TD-891), its mail rows sent with no `data-find`, Snooze or repeated `title` (TD-890), and a card's find text built in the browser (TD-892). Measured on the live Queue 2026-10-18 (141 KB gzipped): the mail rows' unopened folds 20 KB, their `data-find` 10 KB, Snooze 2 KB, the cards' `data-find` 5 KB — some 105 KB without them. Was: Open — needs a design: measured 2026-10-18 (grinder-ao-2), everything the Queue sends at load is already shown at load (§4.5 *Only what is shown* holds), so what is left to cut is what §4.5 screen 12 and §4.5a say each card draws. Gzipped shares of the 148 KB, each measured by stripping it from the live page: the cards' *Needs you* sections 68 KB (127 mail rows, drawn in the header so a folded card still shows them, each row the Inbox's whole renderer with its body); `data-find` 18 KB (88 KB raw on the mail rows, 40 KB on the cards, 19 KB on the completed lines — each row's whole text lowercased by the server, §4.5 screen 6 *Find*); `title` attributes 9 KB; the mail rows' rendered bodies 5 KB; whitespace 2 KB. Cards are drawn open (174 of 202 have no body to fold).
+**Location:** design §4.5 *Page loads* (*Only what is shown*, the 150 KB budget), §4.5 screen 12 (the Queue); `src/shiftlead/ui/templates/queue_card.html` (`section(c, 'needs')` in the header), `queue_row.html` (`section`), the Inbox's row renderer, `src/shiftlead/ui/queue.py`; design §4.5 screen 6 *Find* and §4.5a *Inbox page: find* (`data-find` from the server)
+
+**Why:** With TD-882 live, a gzipped GET of the live `/queue` on 2026-10-18 08:16Z read 148,246 bytes (1,033,433 uncompressed) with the picked window's completed lines alone; its markup is some 200 cards' heads (`qhead`, `qgrip`, `qplace`, 591 `qmove` controls, 487 `btn`). The budget's margin is 1.7 KB, so the Queue misses it as soon as a handful of cards are added, and a promote's smoke then names it.
+
+**Fix:** a design round choosing among: a card's *Needs you* rows drawn short (the subject line, the body on open) or fetched on a card's open; `data-find` built in the browser from the row's text once instead of sent (§4.5 screen 6 says the server lowercases it); `title` text kept once per kind rather than per row. Then the build entries, named in `Blocked by:`.
+
+**Done when** the live Queue sends under 120 KB of HTML on the wire at load.
+
+**Related:** TD-805, TD-882.
+
+**Resolved:** 2026-10-19 — its three builds merged and archived: TD-890 (PR #2136, a Queue card's mail rows send no `data-find`, no Snooze and no repeated `title`), TD-891 (PR #2139, a card's closed *details* read on first open, `GET /api/fold`) and TD-892 (PR #2142, a card's find text built in the browser); read live by TD-893 (PR #2144): the Queue 114 KB against its 150 KB budget.
+
+---
