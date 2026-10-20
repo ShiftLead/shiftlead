@@ -1602,9 +1602,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** feature
 **Added:** 2026-10-19 (TD-909's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 1 built (2026-10-19, grinder-ao-1, td911-three-wants): `queue.want_of` / `card_wants` (the map of (1), a held entry no want, drawn as the held row), the pill in every group with *steer* / *stalled* beside it (1b), the page header's *Decide n · Do n* (2), the header's layout (3b, the top entry's controls in the ⋯ slot until TD-914), the kind pick Decide · Do · held (person) (4), **Read n**'s help (5), Read under the rows with its three lines and Dismiss all. **Left:** (3), each kind's renderer's `card` mode — a Read item one line, a Decide or Do item drawn whole with its sentence, consequences and *context*; the items are still drawn by the Inbox's renderer as they are.
-**Blocked by:** TD-918, TD-913
+**Kind:** live-check #2182
+**Status:** Built (2026-10-19, grinder-ao-1) — slice 1 #2181: the wants map, the pill, the page header's counts, the header's layout, the kind pick, **Read n**'s help, Read under the rows; slice 2 #2182: (3) each kind's renderer's `card` mode — a Read item one line opening to its row, a Decide or Do item whole (its kind line, its sentence, what each answer leads to, *context* folded, its answers), checked on a scratch home. **Live check:** once #2182 is live, a headless GET of `/queue` — a card with a Decide or Do item draws `.sentence` and a *context* fold, its Read lines `details.cardline`, and `/inbox` draws no `cardline` and no *context* fold.
 **Location:** `src/shiftlead/ui/queue.py` (the sections, the counts, the card's mail items), `templates/queue_card.html`, `queue_mail.html`, `queue_row.html`, `inbox_row.html` (the renderers' `card` mode), `queue_filters.html` (the kind pick), `src/shiftlead/ui/help.py`
 
 **Why:** TD-909: design §4.5 screen 12 *A card*, *Three wants*, *An item's shape*, *Filters*; §4.5a *Queue page: card*, *Queue page: filters, find*, *Queue card: Read n*. Paul, 2026-10-19: *there are lots of words all over the place (yours to do, asks, etc), so I am relegated to reading everything in order*.
