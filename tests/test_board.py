@@ -629,6 +629,31 @@ async def test_an_answer_to_an_orphaned_question_is_refused_touching_nothing_whe
         assert e["answer"] == 0
 
 
+async def test_an_orphaned_question_is_answered_by_its_label_or_its_whole_line(agent, repo, tmp_path):
+    """TD-919 (§4.10 *The answers' split*, TD-913): an orphaned `ask` whose stored answers are
+    `<label> — <consequence>` is answered by the label the page draws, and by the whole stored line;
+    a press whose text is neither is refused and the entry stays open."""
+    _registry(tmp_path, repo)
+    answers = ["Keep it — the window stays as it is", "Lift it — the cap goes for a week"]
+    async with LocalClient() as me:
+        q = await _orphan(me, repo, tmp_path, "Which window?", "TD-190", kind="ask", answers=answers)
+        with pytest.raises(AgentError, match="suggested answers"):
+            await me.call("msg", text="Lift", kind="reply", reply_to=q, answer=1)
+        e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
+        assert e["closed_reason"] is None and e["orphaned"]
+        got = await me.call("msg", text="Lift it", kind="reply", reply_to=q, answer=1)
+        assert got["closed"] == q
+        e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == q][0]
+        assert e["closed_reason"] == "replied" and e["answer"] == 1
+        assert origin_board(repo).count(": Lift it. Context: TD-190.") == 1
+
+        whole = await _orphan(me, repo, tmp_path, "Which window again?", "TD-191", kind="ask", answers=answers)
+        got = await me.call("msg", text=answers[0], kind="reply", reply_to=whole, answer=0)
+        assert got["closed"] == whole
+        e = [e for e in (await me.call("inbox"))["entries"] if e["id"] == whole][0]
+        assert e["closed_reason"] == "replied" and e["answer"] == 0
+
+
 async def test_a_refused_note_to_the_holder_is_said_beside_the_committed_line_and_closes_the_entry(
     agent, repo, tmp_path, monkeypatch
 ):
