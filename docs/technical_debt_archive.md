@@ -17282,3 +17282,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-20 (live check, grinder-ao-2, read-only on the live copy at d981b41, #2188 among its ancestors) — a headless GET of `/queue` draws 200 cards, each with a `details.qdots` in its header (356 ⋯ on the page), and no `>Reply<`, no `>Snooze` and no `Reply</button>`; 98 `qanswers` rows and 139 **Answer…** buttons; 83 of the 84 cards with a Decide or Do item carry an Answer row, and the 84th (samscrape#TD-458) holds only a red PR item (samscrape #1096), drawn with its Open in its line and no Answer row. A headless GET of `/inbox` draws no `qdots` and keeps its Reply (22) and Snooze (56): the Inbox is unchanged.
 
 ---
+
+## TD-920: #2181's Queue page header reads `Decide n` as items, not cards, and no test has a card with more than one Decide item
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-19 (test audit of #2181, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/queue.py` (the counts in `reading`: `"decide": sum(c["wants"]["n"]["decide"] for c in shaped)`, under the comment *items, not cards*); `tests/test_queue_wants.py`, `tests/test_ui_queue.py`
+
+**Why:** #2181's comment says the header's *Decide n · Do n* count items, not cards. Probe on `origin/main` 44b05f1dd: change that line to `sum(1 for c in shaped if c["wants"]["n"]["decide"])` (cards with any Decide item) and the whole suite passes. Every test card has one Decide item at most, so items and cards read the same.
+
+**Fix:** One test over a card with two Decide items (a question and a paused `steer`) and one with a single item: the header's `decide` is 3, not 2. Revert the line and see it fail.
+
+**Done when** the probe above fails a test.
+
+**Resolved:** 2026-10-20 — PR #2191: `test_queue_wants.py::test_the_page_headers_decide_counts_items_on_a_card_with_two`, a card with a question and a paused steer beside one with a running steer, reads Decide 3; the probe (cards with any Decide item) fails it.
+
+---

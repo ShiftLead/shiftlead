@@ -79,7 +79,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Built — live check #2186 |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
-| TD-920 | #2181's Queue header `Decide n` counts items, and no test has a card with two Decide items (test audit) | Low | Open |
 | TD-921 | #2188 added two help texts and two §4.5a help-list entries and no `docs/design-history.md` line (docs audit) | Low | Open |
 
 ---
@@ -1653,23 +1652,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-920: #2181's Queue page header reads `Decide n` as items, not cards, and no test has a card with more than one Decide item
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-19 (test audit of #2181, test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/queue.py` (the counts in `reading`: `"decide": sum(c["wants"]["n"]["decide"] for c in shaped)`, under the comment *items, not cards*); `tests/test_queue_wants.py`, `tests/test_ui_queue.py`
-
-**Why:** #2181's comment says the header's *Decide n · Do n* count items, not cards. Probe on `origin/main` 44b05f1dd: change that line to `sum(1 for c in shaped if c["wants"]["n"]["decide"])` (cards with any Decide item) and the whole suite passes. Every test card has one Decide item at most, so items and cards read the same.
-
-**Fix:** One test over a card with two Decide items (a question and a paused `steer`) and one with a single item: the header's `decide` is 3, not 2. Revert the line and see it fail.
-
-**Done when** the probe above fails a test.
-
----
 
 ## TD-921: #2188 added the help texts of **answers, Answer…** and **⋯** to §4.5a's help list and to `help.py`, and wrote no line of `docs/design-history.md` for them
 
