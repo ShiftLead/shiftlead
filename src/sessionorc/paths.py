@@ -7,17 +7,13 @@ import re
 from pathlib import Path
 
 DEFAULT_HOME = Path("~/.shiftlead")
-# A repo's own file (design §4.9), and the name it carried before the rename (TD-060): read when
-# the new one is absent, so each repo renames its file in its own PR.
+# A repo's own file (design §4.9).
 REPO_FILE = ".shiftlead.yml"
-LEGACY_REPO_FILE = ".agentorc.yml"
 
 
 def repo_file(root: Path | str) -> Path:
-    """`<root>/.shiftlead.yml`, or the legacy `.agentorc.yml` when only that one is there."""
-    root = Path(root).expanduser()
-    new = root / REPO_FILE
-    return root / LEGACY_REPO_FILE if not new.is_file() and (root / LEGACY_REPO_FILE).is_file() else new
+    """`<root>/.shiftlead.yml`."""
+    return Path(root).expanduser() / REPO_FILE
 
 
 def home() -> Path:

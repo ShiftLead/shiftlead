@@ -146,8 +146,8 @@ reach:                                        # §4.5b *The setting*: the person
   dev-cadence is a repo like any other: what ShiftLead requires of it is *The seams*, below. Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
   ones per host in `~/.shiftlead/recent_dirs`.
-- Per repo: `.shiftlead.yml` (checked in). A repo that has not renamed its file since the project was
-  `agentorc` is read from `.agentorc.yml` while no `.shiftlead.yml` is beside it (`sessionorc.paths.repo_file`, TD-060):
+- Per repo: `.shiftlead.yml` (checked in). A repo's `.agentorc.yml`, its name while the project was
+  `agentorc`, is read by nothing; `ao org check` names a registered checkout that holds only it (TD-553):
 
 ```yaml
 unattended:                           # read by nothing yet (below)

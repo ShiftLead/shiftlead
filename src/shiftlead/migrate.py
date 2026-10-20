@@ -17,8 +17,8 @@ live session breaks its hooks. In order:
 
 What is left is printed, not done: the root line that swaps the system units first (`install
 --system` removes the old ones and starts the new tmux server), then `ao service install` from the
-new venv (the user units, whose agent then finds that server). A repo's
-`.agentorc.yml` is read as a fallback until that repo renames it (`sessionorc.paths.repo_file`).
+new venv (the user units, whose agent then finds that server). A repo's `.agentorc.yml` is not
+read: the repo renames it `.shiftlead.yml` by its own PR, and `ao org check` names one left (TD-553).
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ from pathlib import Path
 OLD_HOME = Path("~/.agentorc")
 OLD_UNITS = ("agentorc-agent", "agentorc-ui")
 # The old names as they appear inside the home's own files: paths into it (the directory, never a
-# repo's `.agentorc.yml`, which keeps its name until the repo renames it), the venv, the console
+# repo's `.agentorc.yml`, which is the repo's to rename), the venv, the console
 # scripts as whole words (never inside an `ao-agentorc-…` session id), and the environment variables.
 REWRITES = (
     (re.compile(r"/\.agentorc(?![\w.-])"), "/.shiftlead"),

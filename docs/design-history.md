@@ -904,6 +904,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-20 (TD-553, grinder-ao-1): `ao org check` names a registered checkout whose only repo file is `.agentorc.yml` as a lack — rename it `.shiftlead.yml`. Was: no word of it, since the file was read as a fallback; samscrape, contractmatch and dev-cadence had all renamed theirs.
 - 2026-10-17 (TD-871, the designer): `ao doctor`'s hooks line reads the machine's Gemini layer against the wanted copy and prints the `sudo install` line that puts it in place — never runs it.
 - 2026-10-17 (TD-831, grinder-ao-2): `ao spend` and `ao status -v`'s seat-ledger line built. The record's `spend` object rides on `-v --json` alone, so a plain `ao status --json` asks the home nothing more. A record that spent nothing this week prints no line.
 - 2026-10-17 (TD-818 amended, the designer): `ao spend` gains `--window month`, `--at <date>`, a *By team* block first when no `--team`, then the interactive sessions' block, then *outside shiftlead*; `--team interactive` reads the person's own. Built by TD-831.
@@ -1478,6 +1479,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-20 (TD-553, grinder-ao-1): a repo's `.agentorc.yml` is read by nothing; `sessionorc.paths.repo_file` is `.shiftlead.yml` alone. Was: read while no `.shiftlead.yml` was beside it (TD-060 step 2), until samscrape, contractmatch and dev-cadence renamed theirs, which they had by 2026-10-20.
 - 2026-10-17 (TD-818, the designer; Paul, 2026-10-16: *is there a way to keep a token count per team member … see which ones use the most tokens, and make adjustments if there are surprises*): `spend.weights` in `settings.yml`: a price per kind per model prefix, dated `as_of`, the API's list prices by default. Built by TD-830.
 - 2026-10-16 (TD-804, the designer; Paul, 2026-10-16: *for a production system working correctly would be vital*; steer m-bf390074fccb, the default): `promote:` takes an optional `smoke:`. It is run after `check` reads the new commit and judged by its exit code. Built by TD-811, with this repo's line by TD-812.
 - 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — a repo's `anchor:` is retired (`false` passed over) and the org file's `anchors:` is removed. Built by TD-724.

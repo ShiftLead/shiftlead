@@ -18,6 +18,7 @@ from shiftlead import flowdefs, repoconfig, teams
 from shiftlead import org as orgmod
 
 GIT_TIMEOUT = 5.0
+OLD_REPO_FILE = ".agentorc.yml"  # a repo's file before the rename (TD-060): read by nothing, named by the check
 
 
 def where(org: orgmod.Org, team: orgmod.TeamDef, here: str) -> tuple[str, str]:
@@ -212,7 +213,8 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     hosts a `place:` may name beside this one, `settings` the settings file as read (None: absent
     or broken, which lacks nothing here).
 
-    A lack, each on its own line: a registered checkout that is not there; a team a start would
+    A lack, each on its own line: a registered checkout that is not there, or one holding only the
+    old `.agentorc.yml` (TD-553); a team a start would
     refuse — its role's profile not in `profiles.yml`, a brief not in the checkout, a checkout
     missing, each in the start's own words (`teams.plan`, which creates nothing); a name defined
     twice; a team whose definition names one session twice (TD-268); a `place:` naming no linked
@@ -237,6 +239,8 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
         if not path.is_dir():
             lack(f"{root}: a registered checkout that is not there — remove its line from the registry, or clone it")
         else:
+            if (path / OLD_REPO_FILE).is_file() and not paths.repo_file(path).is_file():
+                lack(f"{root}: its {OLD_REPO_FILE} is read by nothing — rename it {paths.REPO_FILE} (TD-553)")
             warnings.extend(checkout_warnings(path))
     elsewhere, unread = held_elsewhere(roots, linked, repos_of)
     warnings.extend(held_line(row, here) for row in elsewhere)
