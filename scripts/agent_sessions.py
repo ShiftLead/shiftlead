@@ -18,8 +18,9 @@ tool with no backend, or no readable state, goes into `blind`.
 Backends: claude (the live registry ~/.claude/sessions/*.json and the transcripts under
 ~/.claude/projects/<munged path>/, both undocumented Claude Code internals — TD-050's
 canary watches the registry); gemini (TD-109: ~/.gemini's projects.json and its
-tmp/<slug>/chats/*.jsonl, liveness from /proc — Gemini CLI keeps no live registry). Codex
-is TD-102's.
+tmp/<slug>/chats/*.jsonl, liveness from /proc — Gemini CLI keeps no live registry); codex
+(TD-102: the rollouts under ${CODEX_HOME:-~/.codex}/sessions/, found by the cwd their first
+record names, liveness from /proc — the process holds its rollout open, which names it).
 
 Stdlib only; imported by the scripts beside it.
 """
@@ -32,7 +33,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-BACKENDS = ("claude", "gemini")
+BACKENDS = ("claude", "codex", "gemini")
 
 
 @dataclass
@@ -72,11 +73,15 @@ def _blind_line(tool: str, what: str) -> str:
     """Why a listed tool is blind for `what` (sessions, transcripts)."""
     if tool.startswith("!"):
         return tool[1:]
-    return f"{tool} {what}: no backend for {tool} (TD-102)"
+    return f"{tool} {what}: no backend for {tool}"
 
 
 def _gemini_dir(*parts: str) -> Path:
     return Path.home().joinpath(".gemini", *parts)
+
+
+def _codex_dir(*parts: str) -> Path:
+    return Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex").joinpath(*parts)
 
 
 def _claude_dir(*parts: str) -> Path:
@@ -119,6 +124,13 @@ def live(repo: "Path | str | None" = None) -> Seen:
                     out.blind.append(f"gemini sessions: {why}")
                 continue
             out.items += gemini_live()
+        elif tool == "codex":
+            why = _unreadable(_codex_dir()) or (None if procfs_available() else "no /proc to find its processes by")
+            if why:
+                if tool in want:
+                    out.blind.append(f"codex sessions: {why}")
+                continue
+            out.items += codex_live()
         else:
             out.blind.append(_blind_line(tool, "sessions"))
     return out
@@ -126,8 +138,9 @@ def live(repo: "Path | str | None" = None) -> Seen:
 
 def history_dirs(repo: Path) -> Seen:
     """Where each tool keeps this repo's transcripts: items are (tool, dir, worktree name or
-    None). A listed tool with no transcript store at all is blind; one whose store exists
-    but holds nothing for this repo is simply empty."""
+    None), each dir's files listed by transcripts(). A listed tool with no transcript store
+    at all is blind; one whose store exists but holds nothing for this repo is simply empty.
+    Codex keeps every rollout in one dated tree, so its "dir" is the cwd its rollouts name."""
     out, want = Seen(), wanted(repo)
     for tool in sorted(set(BACKENDS) | set(want)):
         if tool == "claude":
@@ -146,6 +159,13 @@ def history_dirs(repo: Path) -> Seen:
                     out.blind.append(f"gemini transcripts: {why}")
                 continue
             out.items += [("gemini", d, wt) for d, wt in gemini_chat_dirs(repo)]
+        elif tool == "codex":
+            why = _codex_unreadable()
+            if why:
+                if tool in want:
+                    out.blind.append(f"codex transcripts: {why}")
+                continue
+            out.items += [("codex", Path(cwd), wt) for cwd, wt in _codex_cwds(repo)]
         else:
             out.blind.append(_blind_line(tool, "transcripts"))
     return out
@@ -156,8 +176,8 @@ def ever_ran(repo: Path) -> "bool | None":
     False, or None when a listed tool cannot be looked at. Deliberately broad for Claude:
     every project dir whose name starts with the repo's munged path counts, which also
     counts a sibling repo sharing the prefix — that only ever says "ran", the safe
-    direction for the line that hides a warning (TD-28). Gemini's is broad the same way:
-    a history in any directory under the repo counts."""
+    direction for the line that hides a warning (TD-28). Gemini's and Codex's are broad the
+    same way: a history in any directory under the repo counts."""
     blind, want = False, wanted(repo)
     for tool in sorted(set(BACKENDS) | set(want)):
         if tool == "claude":
@@ -180,6 +200,13 @@ def ever_ran(repo: Path) -> "bool | None":
             for path, slug in gemini_projects().items():
                 if (path == me or path.startswith(me + "/")) and any(_gemini_dir("tmp", slug, "chats").glob("*.jsonl")):
                     return True
+        elif tool == "codex":
+            if _codex_unreadable():
+                blind = blind or tool in want
+                continue
+            me = str(Path(repo).resolve())
+            if any(cwd == me or cwd.startswith(me + "/") for cwd in codex_rollouts()):
+                return True
         else:
             blind = True
     return None if blind else False
@@ -189,19 +216,27 @@ def resume_hint(session_id: str, tool: str = "claude") -> str:
     # gemini --resume <uuid> resumed that session when read (TD-109), though its --help names
     # only `latest` and an index; it is per project, so it runs in the session's directory
     return {"claude": f"claude --resume {session_id}",
+            "codex": f"codex resume {session_id}",
             "gemini": f"gemini --resume {session_id}"}.get(tool, f"resume {tool} session {session_id}")
+
+
+def transcripts(tool: str, d: Path) -> list[Path]:
+    """The transcript files of one history_dirs() item."""
+    if tool == "codex":
+        return list(codex_rollouts().get(_codex_key(str(d)), []))
+    return sorted(d.glob("*.jsonl"))
 
 
 def scan(tool: str, path: Path) -> "dict | None":
     """A non-Claude transcript's head and tail, unclipped, in list_sessions' keys (id, start,
     last, first_user, last_assistant, summary); None when it cannot be read or says nothing.
     Claude's scan stays list_sessions.scan_session — its format is that script's history."""
-    return gemini_scan(path) if tool == "gemini" else None
+    return {"gemini": gemini_scan, "codex": codex_scan}.get(tool, lambda _p: None)(path)
 
 
 def format_canary() -> "str | None":
     """Each backend's format warning, or None (TD-050)."""
-    notes = [n for n in (registry_format_note(), gemini_format_note()) if n]
+    notes = [n for n in (registry_format_note(), gemini_format_note(), codex_format_note()) if n]
     return "\n".join(notes) or None
 
 
@@ -407,6 +442,232 @@ def gemini_format_note() -> "str | None":
 
 
 # ----------------------------------------------------------------------------------------
+# The Codex CLI backend (TD-102), on the facts read off codex-cli 0.163.0 on 2026-10-20
+# (docs/plans/2026-10-12-session-introspection-adapter.md in dev-cadence, *Codex CLI, as
+# read*): one rollout per session at $CODEX_HOME/sessions/YYYY/MM/DD/rollout-<local
+# time>-<uuid>.jsonl, every record {timestamp, ordinal, type, payload}, the first a
+# session_meta whose payload carries id, timestamp and cwd; user and assistant turns are
+# response_item messages. No live registry: the running process (comm codex, under a node
+# shim from npm) holds its rollout open, so /proc names the live session's id.
+# ----------------------------------------------------------------------------------------
+
+CODEX_COMM = "codex"
+CODEX_ROLLOUT_RE = re.compile(r"^rollout-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$")
+# What Codex injects as a user message ahead of the person's own: the repo's AGENTS.md and
+# a tag-led block (<environment_context>, and the like)
+CODEX_PREAMBLE_RE = re.compile(r"^(# AGENTS\.md instructions for |<([a-z_]+)>.*</\2>\s*$)", re.DOTALL)
+
+# CODEX_HOME's sessions dir -> (cwd -> its rollouts, why some of it could not be read)
+_codex_index: "dict[str, tuple[dict[str, list[Path]], str | None]]" = {}
+
+
+def _codex_key(cwd: str) -> str:
+    return os.path.normpath(cwd) if cwd.startswith("/") else cwd
+
+
+def _codex_head(path: Path) -> "dict | None":
+    """A rollout's session_meta payload, or None. An unreadable file raises OSError."""
+    with open(path, encoding="utf-8", errors="replace") as f:
+        line = f.readline()
+    try:
+        head = json.loads(line)
+    except ValueError:
+        return None
+    if not isinstance(head, dict) or head.get("type") != "session_meta" or not isinstance(head.get("payload"), dict):
+        return None
+    return head["payload"]
+
+
+def _codex_walk() -> "tuple[dict[str, list[Path]], str | None]":
+    """Every rollout's first record, grouped by its cwd (read once per process). The
+    rollouts are not grouped by directory, so this is the one way to find a repo's. Each
+    level is listed with os.listdir, never glob(), which swallows a PermissionError: an
+    unreadable day dir or rollout makes the store blind, not empty. A home with no
+    sessions/ yet (installed, never run) is empty."""
+    root = _codex_dir("sessions")
+    key = str(root)
+    if key in _codex_index:
+        return _codex_index[key]
+    out: dict[str, list[Path]] = {}
+    why = _unreadable(_codex_dir())
+    if why is None and root.exists():
+        try:
+            for y in sorted(os.listdir(root)):
+                for m in sorted(os.listdir(root / y)) if (root / y).is_dir() else []:
+                    for d in sorted(os.listdir(root / y / m)) if (root / y / m).is_dir() else []:
+                        day = root / y / m / d
+                        for name in sorted(os.listdir(day)) if day.is_dir() else []:
+                            if not CODEX_ROLLOUT_RE.match(name):
+                                continue
+                            meta = _codex_head(day / name)
+                            cwd = meta.get("cwd") if meta else None
+                            if isinstance(cwd, str) and cwd:
+                                out.setdefault(_codex_key(cwd), []).append(day / name)
+        except OSError as e:
+            why = f"{getattr(e, 'filename', None) or root} unreadable ({e.strerror or e})"
+    _codex_index[key] = (out, why)
+    return out, why
+
+
+def _codex_unreadable() -> "str | None":
+    """Why Codex's store cannot be read, or None."""
+    return _codex_walk()[1]
+
+
+def codex_rollouts() -> dict[str, list[Path]]:
+    """cwd -> its rollouts (see _codex_walk)."""
+    return _codex_walk()[0]
+
+
+def _codex_cwds(repo: "Path | str") -> list[tuple[str, "str | None"]]:
+    """(cwd, worktree name or None) for the repo itself and each Claude-layout worktree
+    under it that a rollout names — the dirs the other backends find."""
+    me = str(Path(repo).resolve())
+    wt_dir = me + "/.claude/worktrees/"
+    out = []
+    for cwd in sorted(codex_rollouts()):
+        if cwd == me:
+            out.append((cwd, None))
+        elif cwd.startswith(wt_dir) and "/" not in cwd[len(wt_dir):]:
+            out.append((cwd, cwd[len(wt_dir):]))
+    return out
+
+
+def _codex_comm(pid: int) -> str:
+    try:
+        return Path(f"/proc/{pid}/comm").read_text(encoding="ascii", errors="replace").strip()
+    except OSError:
+        return ""
+
+
+def _codex_open_rollout(pid: int) -> "str | None":
+    """The session id of the rollout pid holds open (the oldest, when its sub-agents hold
+    their own too); None when its fds cannot be read."""
+    ids = []
+    try:
+        for fd in os.listdir(f"/proc/{pid}/fd"):
+            try:
+                m = CODEX_ROLLOUT_RE.match(os.path.basename(os.readlink(f"/proc/{pid}/fd/{fd}")))
+            except OSError:
+                continue
+            if m:
+                ids.append((os.path.basename(m.string), m.group(1)))
+    except OSError:
+        return None
+    return min(ids)[1] if ids else None
+
+
+def codex_live() -> list[dict]:
+    """Running Codex sessions, from /proc: each process whose comm is codex (the native
+    binary — the npm install's node shim is its parent and is not counted), a codex child
+    of a codex in the same cwd folded into it (one in another cwd is a session of its own).
+    The id is the rollout it holds open, else codex:<pid>.
+    comm alone is the identity test, so another program named codex reads as a session:
+    the guard then warns once too often, never too seldom."""
+    pids = set()
+    try:
+        for name in os.listdir("/proc"):
+            if name.isdigit() and _codex_comm(int(name)) == CODEX_COMM:
+                pids.add(int(name))
+    except OSError:
+        return []
+    def cwd_of(pid: int) -> str:
+        try:
+            return os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            return ""
+    out = []
+    for pid in sorted(pids):
+        cwd, parent = cwd_of(pid), _ppid(pid)
+        if parent in pids and cwd_of(parent) == cwd:
+            continue
+        started = _proc_start_epoch(pid)
+        out.append({"tool": "codex", "id": _codex_open_rollout(pid) or f"codex:{pid}", "pid": pid, "cwd": cwd,
+                    **({"startedAt": started * 1000} if started is not None else {})})
+    return out
+
+
+def _codex_text(content) -> str:
+    """A Codex message's text: its list of {type: input_text|output_text, text} parts."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(p["text"] for p in content if isinstance(p, dict) and isinstance(p.get("text"), str))
+    return ""
+
+
+def codex_scan(path: Path) -> "dict | None":
+    """One rollout: its id and start from session_meta, `last` from the newest record's
+    timestamp, the first user text past Codex's own preamble, and the last assistant text —
+    a response_item from the assistant, or a task_complete's last_agent_message."""
+    from datetime import datetime, timezone
+    info = {"id": None, "file": path, "start": None, "last": None, "first_user": "", "last_assistant": "", "summary": ""}
+    last = None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                try:
+                    obj = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(obj, dict):
+                    continue
+                last = obj.get("timestamp") or last
+                p, kind = obj.get("payload"), obj.get("type")
+                if not isinstance(p, dict):
+                    continue
+                if kind == "session_meta":
+                    info["id"] = info["id"] or p.get("id") or p.get("session_id")
+                    info["start"] = info["start"] or p.get("timestamp") or obj.get("timestamp")
+                elif kind == "response_item" and p.get("type") == "message":
+                    text = _codex_text(p.get("content"))
+                    if p.get("role") == "user" and not info["first_user"] and text.strip() \
+                            and not CODEX_PREAMBLE_RE.match(text.lstrip()):
+                        info["first_user"] = text
+                    elif p.get("role") == "assistant" and text.strip():
+                        info["last_assistant"] = text
+                elif kind == "event_msg" and p.get("type") == "task_complete" \
+                        and isinstance(p.get("last_agent_message"), str) and p["last_agent_message"].strip():
+                    info["last_assistant"] = p["last_agent_message"]
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return None
+    try:
+        info["last"] = datetime.fromisoformat(str(last).replace("Z", "+00:00")) if last else mtime
+    except ValueError:
+        info["last"] = mtime
+    if info["last"].tzinfo is None:
+        info["last"] = info["last"].replace(tzinfo=timezone.utc)
+    if not info["id"] or not (info["first_user"] or info["last_assistant"]):
+        return None
+    return info
+
+
+def codex_format_note() -> "str | None":
+    """TD-050's canary for Codex (read on 0.163.0): the newest settled rollout must open
+    with a session_meta record carrying id and cwd. Silent when there is no rollout yet;
+    an empty one (a crash before its first write) is not judged."""
+    now = time.time()
+    try:
+        settled = sorted(((f.stat().st_mtime, f) for f in _codex_dir("sessions").glob("*/*/*/rollout-*.jsonl")
+                          if now - f.stat().st_mtime >= REGISTRY_SETTLE_S and f.stat().st_size), reverse=True)
+    except OSError:
+        return None
+    if not settled:
+        return None
+    newest = settled[0][1]
+    try:
+        meta = _codex_head(newest)
+    except OSError:
+        return None  # unreadable is the store's blind line, not a format change
+    if meta and meta.get("id") and meta.get("cwd"):
+        return None
+    return (f"⚠ Codex's session files have moved on (read on 0.163.0): the newest rollout ({newest}) does not "
+            "open with a session_meta record naming its id and cwd — until the scripts are updated, the "
+            "session index and the sweep row may miss Codex sessions.")
+
+
+# ----------------------------------------------------------------------------------------
 # The Claude backend (moved from check_anchor.py and list_sessions.py, TD-100)
 # ----------------------------------------------------------------------------------------
 
@@ -582,7 +843,7 @@ def _ancestor_pids() -> set[int]:
 
     The hook runs as a descendant of the claude process, so the session that
     spawned it is always an ancestor. The walk stops at (and includes) the
-    first ancestor whose comm is "claude" — that one is our session; anything
+    first ancestor whose comm is "claude" (or "codex", TD-102) — that one is our session; anything
     ABOVE it is foreign, possibly a different claude session that spawned the
     shell this one was started from, and excluding it would silently suppress
     a genuine conflict. If no claude ancestor is identifiable (no /proc, or a
@@ -600,7 +861,7 @@ def _ancestor_pids() -> set[int]:
             comm = Path(f"/proc/{pid}/comm").read_text(encoding="ascii", errors="replace").strip()
         except OSError:
             comm = ""
-        if comm == "claude" and pid != os.getpid():
+        if comm in ("claude", CODEX_COMM) and pid != os.getpid():
             break  # our own session process — its ancestors are not us
         try:
             status = Path(f"/proc/{pid}/status").read_text(encoding="ascii", errors="replace")
