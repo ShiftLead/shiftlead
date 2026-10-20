@@ -78,7 +78,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Designed — built by TD-911–TD-918 (on dev-cadence#TD-121, #TD-122) |
 | TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Built — live check #2186 |
 | TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open |
-| TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open |
+| TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Built — live check #2187 |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-919 | #2179's orphaned-ask pick (`mail.picks_answer` on the orphan path of `_msg`) has no test that would notice a revert (test audit) | Medium | Open |
@@ -1641,8 +1641,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** feature
 **Added:** 2026-10-19 (TD-909's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2187
+**Status:** Built (2026-10-20, #2187, grinder-ao-2): `card_edge` and each card's box and 4 px edge, `branch` and each row's `rails` (the tree drawn, rows depth first under their own parent), `attach`'s mentions keyed by item and the row's *mentioned in n items*. **Live check:** once #2187 is live, a headless GET of `/queue` — each card a `qcard edge-<needs|waiting|working|ended>` box; rows under a card carry `qrail b-<done|waiting|needs|open>` spans, one per level; a row named by mail beside its home reads *mentioned in n items*, never *also mentioned in*.
 **Blocked by:** TD-911
 **Location:** `templates/queue_card.html`, `queue_row.html`, `src/shiftlead/ui/static/app.css`, `src/shiftlead/ui/queue.py` (mentions deduplicated by item)
 
