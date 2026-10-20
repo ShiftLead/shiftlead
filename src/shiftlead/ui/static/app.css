@@ -837,6 +837,17 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qcard.st-needs-you > .qhead { background: var(--warn-bg); }
 .qcard.hasrows:not(.folded) > .qhead { background: var(--hover); }
 .qcard.st-needs-you.hasrows:not(.folded) > .qhead { background: var(--warn-bg); }
+/* a card with a Decide or Do item is amber, whatever its status (§4.5 screen 12 *A card*, TD-911) */
+.qcard.wants { border-left-color: var(--needs); }
+.qcard.wants > .qhead, .qcard.wants.hasrows:not(.folded) > .qhead { background: var(--warn-bg); }
+.qwant .qsech { color: var(--needs-fg); }
+/* *Read n*: quiet and grey, on a folded card alone; Read under the rows, folded with its count */
+.qreadn { color: var(--muted); }
+.qcard:not(.folded) .qreadn { display: none; }
+.qread { flex: 1 0 100%; }
+.qread > summary.qsech { display: list-item; cursor: pointer; padding-left: calc(4em + 20px + 2ch); }
+.qread .qsec .qsech, .qread .qsec .qmail { padding-left: calc(4em + 20px + 4ch); }
+.qwantsn { font-weight: 600; color: var(--needs-fg); }
 .qcard.dragging { opacity: .45; }
 .qcard.dropbefore { box-shadow: inset 0 3px 0 var(--link); }
 .qcard.dropafter { box-shadow: inset 0 -3px 0 var(--link); }

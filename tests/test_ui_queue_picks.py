@@ -198,7 +198,7 @@ def test_each_card_and_line_carries_what_the_picks_read(tmp_path, monkeypatch):
     assert '<span class="qwinword" data-wv="month" hidden> in the last month</span></div>' in html
     row = html[html.index('id="qfilters"') : html.index('id="qcompleted"')]
     assert "data-teams='{}'" in row and 'data-k="all" href="/queue"' in row
-    assert row.count('data-k="kind"') == 6 and 'data-k="filter" data-v="steering"' in row
+    assert row.count('data-k="kind"') == 3 and 'data-k="filter" data-v="steering"' in row
     js = c.get("/static/app.js").text
     assert 'history[push ? "pushState" : "replaceState"]' in js and 'store.set("qpicks", "")' in js
     assert "setTimeout(() => { typing = null; setPicks(typed(), false); }, 150)" in js

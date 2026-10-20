@@ -2,7 +2,7 @@
 {% from "queue_row.html" import pbadge, holder %}
 {# The Queue page's lists (design §4.5 screen 12; TD-771), re-read whole with `?part=1` #}
 <div class="row gap qtitlebar"><span class="h1">Queue</span>
-  {% if q.served %}<span class="qsub">{{ q.n.cards }} card{{ '' if q.n.cards == 1 else 's' }}: {{ q.n.in_progress }} in progress, {% if q.n.waiting %}{{ q.n.waiting }} waiting, {% endif %}{{ q.n.up_next }} up next.{% if q.n.needs_you %} <b class="needsword">{{ q.n.needs_you }} need{{ 's' if q.n.needs_you == 1 else '' }} you.</b>{% endif %}</span>{% endif %}
+  {% if q.served %}<span class="qsub">{{ q.n.cards }} card{{ '' if q.n.cards == 1 else 's' }}: {{ q.n.in_progress }} in progress, {% if q.n.waiting %}{{ q.n.waiting }} waiting, {% endif %}{{ q.n.up_next }} up next.{% if q.n.decide or q.n.do %} <span class="qwantsn" title="what on the cards waits on you, counted in items, not cards — display only: it is not the top bar's number, which counts the Inbox">{% if q.n.decide %}Decide {{ q.n.decide }}{% endif %}{% if q.n.decide and q.n.do %} · {% endif %}{% if q.n.do %}Do {{ q.n.do }}{% endif %}</span>.{% endif %}{% if q.n.needs_you %} <b class="needsword">{{ q.n.needs_you }} need{{ 's' if q.n.needs_you == 1 else '' }} you.</b>{% endif %}</span>{% endif %}
 </div>
 {% if agent_down %}<div class="warn">the host agent is not answering — nothing to draw</div>
 {% elif not q.served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>

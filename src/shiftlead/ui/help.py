@@ -565,6 +565,15 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "read-n",
+        "Read n",
+        "Queue card",
+        (
+            "How many things on this card are for reading only — answers given for you, answered questions, notes. "
+            "Open the card to see them."
+        ),
+    ),
+    Help(
         "board",
         "the board",
         "Repo page: Technical debt",
@@ -704,7 +713,11 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     ("repo", "Repo page", ("board", "live-divider")),
-    ("queue", "Queue", ("up-next-number", "wait-column", "live-mark", "row-done", "row-back-to-design", "row-hold")),
+    (
+        "queue",
+        "Queue",
+        ("up-next-number", "wait-column", "read-n", "live-mark", "row-done", "row-back-to-design", "row-hold"),
+    ),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
 )

@@ -114,7 +114,7 @@ def test_the_groups_and_the_headers_counts():
     v = queue_view(queue(), NOW)
     assert [c["id"] for c in v["in_progress"]] == ["s#TD-10"]
     assert [c["id"] for c in v["up_next"]] == ["s#TD-20", "s#TD-30"] and v["upnext"] == ["s#TD-20", "s#TD-30"]
-    assert v["n"] == {"cards": 3, "in_progress": 1, "waiting": 0, "up_next": 2, "needs_you": 1}
+    assert v["n"] == {"cards": 3, "in_progress": 1, "waiting": 0, "up_next": 2, "needs_you": 1, "decide": 0, "do": 0}
     # one repo: the ids are written `TD-n`, and a `/queue#TD-n` finds an open row
     assert v["up_next"][0]["top"]["show"] == "TD-20" and v["up_next"][0]["rows"][0]["anchor"] == "TD-21"
     assert v["other"] == [
@@ -297,8 +297,9 @@ def test_a_question_about_a_td_is_on_its_card_and_still_counted():
     got = attach(secs, lambda e, sec: f"<{e['id']}>")
     # TD-828: by card and section, not by row — TD-21 is a row of TD-20's card
     assert got["cards"]["s#TD-20"]["needs"] == [
-        {"section": "needs", "id": "m1", "html": "<m1>", "kind": "questions", "on_row": "s#TD-21"}
-    ]
+        {"section": "needs", "id": "m1", "html": "<m1>", "kind": "decide", "want": "decide", "red": False,
+         "running": False, "on_row": "s#TD-21"}
+    ]  # fmt: skip
     assert got["cards"]["s#TD-20"]["steering"][0]["on_row"] == "s#TD-20"
     view = queue_view(queue(), NOW, got)
     status = {c["id"]: c["status"] for c in view["up_next"]}
@@ -318,7 +319,7 @@ def test_the_page_draws_the_question_on_its_card_and_the_inbox_does_not(tmp_path
     card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
     assert 'class="qmail inboxrows"' in card20 and "which one?" in card20  # on its row
     assert "also mentioned in TD-20 is the parent" in html[html.index('data-card="s#TD-30"') :]
-    assert "Needs you</span>" in card20
+    assert "Decide 2</span>" in card20 and "Decide (2)" in card20  # the pill, and the want in the header (m1, m9)
     css = c.get("/static/app.css").text
     assert ".qmail details.more { display: none; }" in css  # no Snooze on the Queue
     inbox = c.get("/inbox").text
@@ -453,12 +454,13 @@ def test_a_board_line_not_yet_due_is_under_its_cards_needs_you_and_leaves_later(
     ]
     got = attach({}, lambda e, sec: f"<{e['id']}:{sec}>", moved)
     assert got["cards"]["s#TD-20"] == {
-        "needs": [{"section": "needs", "id": "b1", "html": "<b1:coming>", "kind": "board", "on_row": "s#TD-21"}]
-    }
+        "needs": [{"section": "needs", "id": "b1", "html": "<b1:coming>", "kind": "decide", "want": "decide",
+                   "red": False, "running": False, "on_row": "s#TD-21"}]
+    }  # fmt: skip
     v = queue_view(queue(), NOW, got)
     c20 = next(c for c in v["up_next"] if c["id"] == "s#TD-20")
-    assert c20["status"] == "needs you" and c20["kinds"] == ["board"] and v["n"]["needs_you"] == 2
-    assert c20["sections"]["needs"][0]["on"] == "TD-21"  # about a lower row: *on TD-21*
+    assert c20["status"] == "needs you" and c20["kinds"] == ["decide"] and v["n"]["needs_you"] == 2
+    assert c20["wants"]["decide"][0]["on"] == "TD-21"  # about a lower row: *on TD-21*
 
 
 def test_the_inbox_fold_loses_a_line_a_card_draws():
@@ -475,28 +477,30 @@ def sections_of(*items: tuple[str, str, str]) -> dict:
     """A card's attached items as `attach` answers them: (section, id, the row it is about)."""
     got: dict = {}
     for sec, mid, on_row in items:
-        got.setdefault(sec, []).append(
+        got.setdefault("needs" if sec == "do" else sec, []).append(
             {
                 "section": sec,
                 "id": mid,
                 "html": f'<div class="mailrow" data-msg="{mid}">{mid}</div>',
                 "kind": "",
+                "want": {"needs": "decide", "do": "do"}.get(sec, "read"),
                 "on_row": on_row,
             }
         )
     return {"cards": {"s#TD-20": got}, "mentioned": {}}
 
 
-def test_a_cards_sections_draw_their_counts_and_none_at_zero(tmp_path, monkeypatch):
-    """§4.5 screen 12 *What is attached to a card*, §4.5a *Queue page: card* (TD-828): Needs you in the header,
-    the others in the body above the rows, each heading with its count and not drawn at 0; an item about a
-    lower row says *on TD-n*; Dismiss all on Answered for you and FYI alone."""
+def test_a_cards_wants_draw_their_counts_and_none_at_zero(tmp_path, monkeypatch):
+    """§4.5 screen 12 *Three wants*, §4.5a *Queue page: card*, *Queue card: Read n* (TD-911): Decide and Do in
+    the header, open, counted on the pill; Read under the rows, folded with its count, its lines each with its
+    count and not drawn at 0; *Read n* on the header for a folded card; an item about a lower row says *on
+    TD-n*; Dismiss all on answered for you and fyi alone."""
     from markupsafe import Markup
 
     from shiftlead.ui.app import templates
 
-    mail = sections_of(("needs", "m1", "s#TD-20"), ("answered", "a1", "s#TD-21"), ("answered", "a2", "s#TD-20"),
-                       ("fyi", "f1", "s#TD-20"))  # fmt: skip
+    mail = sections_of(("needs", "m1", "s#TD-20"), ("do", "d1", "s#TD-20"), ("answered", "a1", "s#TD-21"),
+                       ("answered", "a2", "s#TD-20"), ("fyi", "f1", "s#TD-20"))  # fmt: skip
     for items in mail["cards"]["s#TD-20"].values():
         for m in items:
             m["html"] = Markup(m["html"])
@@ -504,15 +508,18 @@ def test_a_cards_sections_draw_their_counts_and_none_at_zero(tmp_path, monkeypat
     c20 = next(c for c in view["up_next"] if c["id"] == "s#TD-20")
     html = templates.env.get_template("queue_card.html").module.card(c20)
     head, body = html.split('<div class="qrows">')
-    assert "Needs you (1)" in head and "Answered for you" not in head
+    assert "Decide (1)" in head and "Do (1)" in head and "answered for you" not in head
+    assert ">Decide 1 · Do 1</span>" in head and ">Read 3</span>" in head  # the pill; Read n, drawn when folded
+    assert head.index(">Read 3</span>") < head.index(">Decide 1 · Do 1</span>")  # the status ends the line
     assert (
-        "Answered for you (2)" in body
-        and "FYI (1)" in body
-        and "Steering" not in body
-        and "Waiting on them" not in body
+        '<details class="qread"><summary class="qsech">Read (3)</summary>' in body
+        and "answered for you (2)" in body
+        and "fyi (1)" in body
+        and "waiting on them" not in body
     )
-    assert body.index("FYI (1)") < body.index('data-qid="s#TD-21"')  # above the rows
+    assert body.index("fyi (1)") > body.index('data-qid="s#TD-21"')  # under the rows
     assert body.count(">Dismiss all</button>") == 2 and "Dismiss all" not in head
+    assert 'class="qcard g-up_next st-needs-you wants hasrows"' in html  # amber
     assert body.count('class="qon qsub" href="#TD-21"') == 1  # a1 is about TD-21; a2 is the top entry's
     assert c20["status"] == "needs you"
 
@@ -558,11 +565,11 @@ def shown(v: dict) -> list[str]:
 
 
 def test_the_picks_read_from_the_url_and_toggle_back():
-    p = queue_picks({"filter": "needs-you", "team": "a,b", "kind": "yours,nonsense", "find": "  the   queue "})
-    assert p == {"filter": "needs-you", "team": ["a", "b"], "repo": [], "kind": ["yours"], "find": "the queue"}
+    p = queue_picks({"filter": "needs-you", "team": "a,b", "kind": "do,yours", "find": "  the   queue "})
+    assert p == {"filter": "needs-you", "team": ["a", "b"], "repo": [], "kind": ["do"], "find": "the queue"}
     assert queue_picks({"filter": "bogus"})["filter"] == ""  # a stale link reads as All
-    assert picks_query(p, filter="needs-you") == "/queue?team=a%2Cb&kind=yours&find=the%20queue"  # pressed again: All
-    assert picks_query(p, team="a") == "/queue?filter=needs-you&team=b&kind=yours&find=the%20queue"
+    assert picks_query(p, filter="needs-you") == "/queue?team=a%2Cb&kind=do&find=the%20queue"  # pressed again: All
+    assert picks_query(p, team="a") == "/queue?filter=needs-you&team=b&kind=do&find=the%20queue"
     assert picks_query(queue_picks({}), repo="s") == "/queue?repo=s"
 
 
@@ -574,13 +581,15 @@ def test_needs_you_and_steering_filter_the_cards_and_hide_the_completed():
     secs = inbox_sections([mail("m3", "TD-21 steer", kind="steer", bound=at(-1))], now=NOW, cards=card_index(queue()))
     v = apply_picks(queue_view(queue(), NOW, attach(secs, lambda e, sec: "")), queue_picks({"filter": "steering"}), {})
     assert shown(v) == ["s#TD-20"]
-    assert queue_view(queue(), NOW, attach(secs, lambda e, sec: ""))["up_next"][0]["kinds"] == ["steering"]
+    # a running steer is Decide, on the pill, and leaves the status *steer* (§4.5 screen 12 *Three wants*)
+    c20 = queue_view(queue(), NOW, attach(secs, lambda e, sec: ""))["up_next"][0]
+    assert c20["kinds"] == ["decide", "steering"] and c20["status"] == "steer" and c20["wants"]["n"]["decide"] == 1
 
 
 def test_the_kind_pick_narrows_to_the_needs_of_that_kind():
     v = apply_picks(queue_view(queue(), NOW), queue_picks({"kind": "held-person"}), {})
     assert shown(v) == ["s#TD-30"]
-    assert apply_picks(queue_view(queue(), NOW), queue_picks({"kind": "questions"}), {})["shown"] == 0
+    assert apply_picks(queue_view(queue(), NOW), queue_picks({"kind": "decide"}), {})["shown"] == 0
 
 
 def test_a_team_chip_and_the_repo_pick_read_the_cards_repos():
@@ -622,7 +631,7 @@ def test_steering_shows_a_card_with_a_steering_item_whatever_its_status():
     secs = inbox_sections([mail("m3", "TD-30 steer", kind="steer", bound=at(-1))], now=NOW, cards=card_index(queue()))
     v = queue_view(queue(), NOW, attach(secs, lambda e, sec: ""))
     assert [(c["status"], c["kinds"]) for c in v["up_next"] if c["id"] == "s#TD-30"] == [
-        ("needs you", ["steering", "held-person"])
+        ("needs you", ["decide", "held-person", "steering"])
     ]
     assert shown(apply_picks(v, queue_picks({"filter": "steering"}), {})) == ["s#TD-30"]
 
@@ -632,7 +641,7 @@ def test_an_archived_rows_need_is_no_kind_of_its_card():
     q["cards"][0]["rows"][0]["needs"] = "owner"  # TD-10's archived TD-9: its owner need was met when it closed
     v = queue_view(q, NOW)
     assert v["in_progress"][0]["kinds"] == []
-    assert shown(apply_picks(v, queue_picks({"kind": "yours"}), {})) == []
+    assert shown(apply_picks(v, queue_picks({"kind": "do"}), {})) == []
 
 
 def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, monkeypatch):

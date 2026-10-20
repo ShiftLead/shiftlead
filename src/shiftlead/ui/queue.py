@@ -40,12 +40,11 @@ CONTEXT = re.compile(r"\bContext:\s*(.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$
 # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): the status toggles, and the
 # kind pick's words in its order — the kinds of what needs the person on a card
 FILTERS = {"needs-you": "Needs you", "steering": "Steering"}
+# the kind pick (§4.5a *Queue page: filters, find*, TD-911): the two wants that need the person, and a card the
+# person holds
 KINDS = {
-    "questions": "questions",
-    "steering": "steering",
-    "board": "board lines",
-    "yours": "yours to do",
-    "held-until": "held until",
+    "decide": "Decide",
+    "do": "Do",
     "held-person": "held (person)",
 }
 
@@ -168,7 +167,7 @@ def _row(r: Mapping[str, Any], one_repo: bool, mentioned: Mapping[str, Any] | No
     """A card's row (or its top entry) as the partials take it: `show`, `also`, `anchor` (the id a
     `/queue#TD-n` finds, its open rows alone), no `ext` — the Repo page's extras are not the Queue's — and
     `mentioned`, the first words of each item that names it beside another row (`attach`). What is attached to
-    it is the card's, in the card's sections, never the row's (§4.5 screen 12 *What is attached to a card*)."""
+    it is the card's, in the card's wants, never the row's (§4.5 screen 12 *Three wants*)."""
     q = str(r.get("qid") or "")
     return {
         "mentioned": list((mentioned or {}).get(q) or ()),
@@ -181,15 +180,31 @@ def _row(r: Mapping[str, Any], one_repo: bool, mentioned: Mapping[str, Any] | No
     }
 
 
-# a card's sections (§4.5 screen 12 *What is attached to a card*, TD-816): the Inbox's names in the Inbox's
-# order — *Needs you* drawn in the card's header, the other four in its body above the rows
-CARD_SECTIONS = {
-    "needs": "Needs you",
-    "steering": "Steering",
-    "waiting": "Waiting on them",
-    "answered": "Answered for you",
-    "fyi": "FYI",
-}
+# the Inbox's sections a card gathers its items from, in the Inbox's order (§4.5 screen 12 *Three wants*)
+CARD_SECTIONS = ("needs", "steering", "waiting", "answered", "fyi")
+# a card's three wants (§4.5 screen 12 *Three wants*, TD-909, built by TD-911): Decide and Do drawn in the header,
+# open and counted on the pill; Read under the rows, folded, its lines the Inbox's three it gathers
+WANTS = {"decide": "Decide", "do": "Do"}
+READ_LINES = {"answered": "answered for you", "waiting": "waiting on them", "fyi": "fyi"}
+
+
+def want_of(e: Mapping[str, Any], sec: str) -> str:
+    """An attached item's want (§4.5 screen 12 *Three wants*): `decide` — an `ask`, a `steer` running or
+    paused, a board line but a `watch` or `fyi` one, a `decision (paul)` entry; `do` — an `Owner: paul` entry,
+    a red PR nobody holds, and what else needs the person (a blocked outcome); `read` — what is answered,
+    waits on others or is for reading; `held` — an entry the person holds, which is no want while held."""
+    if sec in READ_LINES:
+        return "read"
+    row = e.get("row")
+    if row == "ledger":
+        return "held" if e.get("release") else ("do" if e.get("why") == "yours" else "decide")
+    if row == "red_pr":
+        return "do"
+    if row == "board":
+        return "read" if str(e.get("kind") or "").lower() in ("watch", "fyi") else "decide"
+    if sec == "steering" or e.get("kind") in ("ask", "steer"):
+        return "decide"
+    return "do"
 
 
 def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str, Any]:
@@ -204,13 +219,25 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
     mentioned: dict[str, list[str]] = {}
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
+        want = want_of(e, sec)
+        if want == "held":  # the held row, never the for-you row (§4.5a *Inbox row: held entry*)
+            e = {**e, "kind": "ledger · held", "claimed": True, "answers": [], "default": ""}
         cards.setdefault(str(e.get("on_card") or ""), {}).setdefault(sec, []).append(
-            {"section": sec, "id": str(mid or ""), "html": drawn(e, drawn_as), "kind": kind, "on_row": e["on_row"]}
+            {
+                "section": sec,
+                "id": str(mid or ""),
+                "html": drawn(e, drawn_as),
+                "kind": kind,
+                "want": want,
+                "red": e.get("row") == "red_pr",
+                "running": sec == "steering",
+                "on_row": e["on_row"],
+            }
         )
 
     for e in later or ():
         if e.get("later_section") == "later":
-            put(e, "needs", "later", e.get("row_id"), "")
+            put(e, "needs", "later", e.get("row_id"), _item_kind(e, "needs"))
     for sec in CARD_SECTIONS:
         for e in sections.get(sec) or ():
             if e.get("home") != "queue":
@@ -222,50 +249,57 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
         if sec == "needs":
             for e in later or ():
                 if e.get("later_section") == "coming":
-                    put(e, "needs", "coming", e.get("id"), "board")
+                    put(e, "needs", "coming", e.get("id"), _item_kind(e, "needs"))
     return {"cards": cards, "mentioned": mentioned}
 
 
-def card_sections(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) -> dict[str, list[dict[str, Any]]]:
-    """A card's attached items as its sections draw them: each section with any item, in `CARD_SECTIONS`' order,
-    each item carrying `on` — the row it is about, written as the page writes ids, where that is not the top
-    entry (*on TD-n*, a link to the row)."""
-    out: dict[str, list[dict[str, Any]]] = {}
+def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) -> dict[str, Any]:
+    """A card's attached items as its three wants draw them (§4.5 screen 12 *Three wants*): `decide` and `do`,
+    each item in the Inbox's order; `read`, `{line: [item]}` for each of `READ_LINES` with any; `held`, the
+    entries the person holds, no want; and `n`, the counts — `decide`, `do` (the pill's, a red PR in it) and
+    `read`. Each item carries `on` — the row it is about, written as the page writes ids, where that is not the
+    top entry (*on TD-n*, a link to the row)."""
+    out: dict[str, Any] = {"decide": [], "do": [], "read": {}, "held": []}
     for sec in CARD_SECTIONS:
-        items = (got or {}).get(sec) or ()
-        if items:
-            out[sec] = [{**m, "on": "" if m.get("on_row") == top else _show(str(m.get("on_row") or ""), one_repo)}
-                        for m in items]  # fmt: skip
+        for m in (got or {}).get(sec) or ():
+            m = {**m, "on": "" if m.get("on_row") == top else _show(str(m.get("on_row") or ""), one_repo)}
+            want = m.get("want") or want_of({}, sec)
+            if want == "read":  # a `watch` or `fyi` board line the Inbox counts is fyi on a card
+                out["read"].setdefault(sec if sec in READ_LINES else "fyi", []).append(m)
+            else:
+                out[want].append(m)
+    out["n"] = {
+        "decide": len(out["decide"]),
+        "do": len(out["do"]),
+        "read": sum(len(v) for v in out["read"].values()),
+    }
     return out
 
 
 def _item_kind(e: Mapping[str, Any], sec: str) -> str:
-    """The kind pick's word for an attached item that waits on the person (`KINDS`): a question, a running
-    or paused `steer`, a board line; '' for what waits on nobody (FYI, an answered one, a state row)."""
-    if sec not in ("needs", "steering"):
-        return ""
-    if e.get("row") == "board":
-        return "board"
-    if e.get("kind") == "steer":
-        return "steering"
-    return "questions" if not e.get("row") else ""
+    """The kind pick's word for an attached item (`KINDS`): its want where that is Decide or Do; '' for what
+    waits on nobody (Read, a held entry)."""
+    want = want_of(e, sec)
+    return want if want in WANTS else ""
 
 
 def _card_kinds(rows: list[Mapping[str, Any]], secs: Mapping[str, Any] | None = None) -> list[str]:
     """The kinds of what needs the person on a card (the kind pick, §4.5a *Queue page: filters, find*): its
-    rows' own needs — *yours to do*, *held until*, *held (person)* — and its attached items' kinds."""
+    rows' own needs — *yours to do* a Do, *held until* a Decide, *held (person)* — and its attached items' wants."""
     got: set[str] = set()
     for r in rows:
         if r.get("archived"):
             continue
         if r.get("needs") == "owner":
-            got.add("yours")
+            got.add("do")
         elif r.get("needs") == "decision":
-            got.add("held-until")
+            got.add("decide")
         if str(r.get("state") or "") == "held (person)":
             got.add("held-person")
-    got |= {str(m.get("kind")) for items in (secs or {}).values() for m in items if m.get("kind")}
-    return [k for k in KINDS if k in got]
+    got |= {w for w in WANTS if (secs or {}).get(w)}
+    # a running `steer` is Decide, and `steering` besides: what the Steering filter reads (§4.5 screen 12 *Filters*)
+    steering = any(m.get("running") for m in (secs or {}).get("decide") or ())
+    return [k for k in KINDS if k in got] + (["steering"] if steering else [])
 
 
 def _find_text(rows: list[Mapping[str, Any]]) -> str:
@@ -293,13 +327,15 @@ def _find_word(w: str) -> str:
     return (refs[0] if refs else w).lower()
 
 
-def _mail_status(status: str, secs: Mapping[str, Any]) -> str:
-    """The mail's part of a card's status (§4.4 *The card's status*: *needs you* > *steer* > the ledger's):
-    an item in the card's *Needs you* — a question, a board line due or not, the person's ledger row — else an
-    attached running `steer`."""
-    if status == "needs you" or "needs" in secs:
+def _mail_status(status: str, wants: Mapping[str, Any]) -> str:
+    """The mail's part of a card's status (§4.4 *The card's status*: *needs you* > *steer* > the ledger's): a
+    Decide or Do item — a question, a paused `steer`, a board line due or not, the person's ledger row, a red PR —
+    but a running `steer`, which is Decide and leaves the status *steer* (§4.5 screen 12 *Three wants*); a held
+    entry is no need."""
+    items = [*(wants.get("decide") or ()), *(wants.get("do") or ())]
+    if status == "needs you" or any(not m.get("running") for m in items):
         return "needs you"
-    return "steer" if "steering" in secs else status
+    return "steer" if any(m.get("running") for m in items) else status
 
 
 def queue_view(
@@ -318,8 +354,8 @@ def queue_view(
     - `upnext`: the whole Up next order, each card's id (a move's neighbours, §4.4 *A move lands*);
     - `n`: the header's counts — cards, in progress, waiting, up next, and those whose status is *needs you*.
 
-    `mail` is what is attached to each card (`attach`): its `sections`, *Needs you* drawn in the header and
-    the rest in the body, raising the card's status to *needs you* or *steer*. `promotes` is the `host`
+    `mail` is what is attached to each card (`attach`), gathered into its `wants` (`card_wants`): Decide and Do
+    drawn in the header, Read in the body, raising the card's status to *needs you* or *steer*. `promotes` is the `host`
     reading's: each completed line's `live` is its close's promote state, *not yet live* or *live* by the
     newest close it holds, "" where its repo promotes nothing or live is unknown (§4.5 screen 12, TD-904)."""
     q = queue or {}
@@ -335,19 +371,19 @@ def queue_view(
     for c in cards:
         top = _row(c["top"], one_repo, mentioned)
         rows = [_row(r, one_repo, mentioned) for r in c.get("rows") or []]
-        secs = card_sections(((mail or {}).get("cards") or {}).get(str(c["id"])), str(top.get("qid") or ""), one_repo)
-        status = _mail_status(str(c.get("status") or ""), secs)
+        wants = card_wants(((mail or {}).get("cards") or {}).get(str(c["id"])), str(top.get("qid") or ""), one_repo)
+        status = _mail_status(str(c.get("status") or ""), wants)
         shaped.append(
             {
                 **c,
                 "status": status,
                 "top": top,
                 "rows": rows,
-                "sections": secs,
+                "wants": wants,
                 "ids": list(c.get("order") or [c["id"]]),
                 # the number per repo, each with its chip, where the home reads more than one (TD-901)
                 "chips": not one_repo,
-                "kinds": _card_kinds([top, *rows], secs),
+                "kinds": _card_kinds([top, *rows], wants),
                 "find": _find_text([top, *rows]),
             }
         )
@@ -453,6 +489,10 @@ def queue_view(
             "waiting": len(waiting),
             "up_next": len(up_next),
             "needs_you": sum(1 for c in shaped if c.get("status") == "needs you"),
+            # the page header's *Decide n · Do n*: items, not cards, display only — in no top-bar or rail
+            # number; a red PR is counted on its card's pill alone (§4.5 screen 12 *Three wants*)
+            "decide": sum(c["wants"]["n"]["decide"] for c in shaped),
+            "do": sum(sum(1 for m in c["wants"]["do"] if not m.get("red")) for c in shaped),
         },
         "one_repo": one_repo,
         "repos": sorted(repos - {""}),
