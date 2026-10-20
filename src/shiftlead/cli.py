@@ -3478,18 +3478,13 @@ def _offered(reply_to: str) -> list[str] | None:
     return None
 
 
-# design §4.10 *How a message to a person is written* (TD-127, built by TD-139): past this many words
-# the first paragraph is more than the person reads before deciding, and `ao msg` says so.
-FIRST_PARA_WORDS = 60
-
-
 def shape_warning(text: str) -> str | None:
     """The one line `ao msg` prints when a message the person will read is not shaped for them
     (design §4.10): its first paragraph runs past `FIRST_PARA_WORDS`, or it has no blank line and
     runs past the Inbox's `FOLD_CHARS`, where the row cuts it at a sentence for them. It warns and
     never refuses: mail is never lost to a style rule. The blank line is the Inbox row's own
     (`paragraph_break`, which `fold` uses), so what is counted here is what the row draws."""
-    from shiftlead.ui.render import FOLD_CHARS, paragraph_break
+    from shiftlead.ui.render import FIRST_PARA_WORDS, FOLD_CHARS, paragraph_break
 
     split = paragraph_break(text)
     if split is None:  # no blank line: the whole text is its first paragraph
@@ -3824,8 +3819,11 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             # from 1**, which is the number `ao msg --reply-to <id> --pick <n>` takes. The one that
             # is a `steer`'s default word for word is marked, since doing nothing takes it anyway.
             if _open_entry(e):
+                # the reading's labels, each with what it leads to, the recommended one marked (§4.10, TD-913)
+                leads = e.get("consequences") or []
                 for i, a in enumerate(e.get("answers") or [], 1):
-                    print(f"  {i}. {a}" + (" — default" if a == e.get("default") else ""))
+                    lead = f" — {leads[i - 1]}" if i <= len(leads) and leads[i - 1] else ""
+                    print(f"  {i}. {a}{lead}" + (" — default" if e.get("recommended") == i - 1 else ""))
             if e.get("shots"):  # a look (design §4.10 *A look*)
                 print(f"  screenshots: {', '.join(e['shots'])}")
             # a reply that picked one says which, so a sender branches on the number (design §4.10)

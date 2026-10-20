@@ -31,7 +31,7 @@ from typing import Any
 import yaml
 
 from sessionorc import ledgerboard as lb
-from sessionorc import paths
+from sessionorc import mail, paths
 from sessionorc.models import owner_word
 
 # origin's default branch as last fetched; the two usual names when `origin/HEAD` was never set
@@ -109,23 +109,42 @@ def until_of(blocked_raw: str | None) -> str:
     return "" if rest.startswith(",") else rest.lstrip("—–-").strip()
 
 
-def answers_of(value: str) -> tuple[list[str], int | None]:
+def answers_of(value: str) -> tuple[list[str], list[str], int | None]:
     """An `**Answers:**` line read in the board's `Answers:` grammar (cadence §3.5), by ledgerboard's
-    split and mark: the items split on `|` (`\\|` a literal bar), the closing full stop dropped, and
-    the index of the one marked ` (default)` — None unless exactly one is (cadence §3.5, TD-066: at
-    most one, and with two there is no single recommendation). The value is the field alone, so a
-    `Due:` or `Decided:` in it is words, not a board item's trailing field."""
+    split and mark: the items split on `|` (`\\|` a literal bar), the closing full stop dropped, each
+    split on its first ` — ` into its label and what it leads to (§4.10 *The answers' split*, TD-913),
+    and the index of the one whose label is marked ` (default)` — None unless exactly one is (cadence
+    §3.5, TD-066: at most one, and with two there is no single recommendation). `(labels, consequences,
+    default)`. The value is the field alone, so a `Due:` or `Decided:` in it is words, not a board item's
+    trailing field."""
     out: list[str] = []
+    consequences: list[str] = []
     marked: list[int] = []
     for raw in lb.ANSWER_SPLIT_RE.split((value or "").strip().rstrip(".")):
-        words = raw.replace("\\|", "|").strip()
+        words, consequence = mail.split_answer(raw.replace("\\|", "|").strip())
         if lb.DEFAULT_MARK_RE.search(words):
             words = lb.DEFAULT_MARK_RE.sub("", words).strip()
             if words:
                 marked.append(len(out))
         if words:
             out.append(words)
-    return out, marked[0] if len(marked) == 1 else None
+            consequences.append(consequence)
+    return out, consequences, marked[0] if len(marked) == 1 else None
+
+
+def ask_of(body: str) -> str:
+    """The entry's `**Ask:**` line, from it to the next blank line, folded to one line and its name dropped —
+    the one sentence its Queue item leads with (§4.10 *An item leads with one sentence*, TD-913); '' when the
+    body has none. Read from the body, as `detail_of` reads Why and Fix, never from the header block."""
+    lines = body.split("\n")
+    at = next((i for i, ln in enumerate(lines) if (m := lb.FIELD_RE.match(ln)) and m.group(1) == "Ask"), None)
+    if at is None:
+        return ""
+    out: list[str] = []
+    while at < len(lines) and lines[at].strip():
+        out.append(lines[at])
+        at += 1
+    return " ".join(" ".join(out).split()).removeprefix("**Ask:**").strip()
 
 
 def detail_of(body: str) -> list[str]:
@@ -515,9 +534,11 @@ def entries(
         # held row opens with its Why and Fix (§4.5 screen 6 *A held entry waits on the person too*, TD-736)
         added = DATE.search(fields.get("added", ""))
         e["added"] = added.group(0) if added else ""
-        e["detail"] = detail_of(t[m.end() : nxt.start() if nxt else len(t)])
+        body = t[m.end() : nxt.start() if nxt else len(t)]
+        e["detail"] = detail_of(body)
         if e["for_page"] == "for-you":
-            e["answers"], e["default"] = answers_of(fields.get("answers", ""))
+            e["answers"], e["consequences"], e["default"] = answers_of(fields.get("answers", ""))
+            e["ask"] = ask_of(body)  # its one sentence (§4.10 *An item leads with one sentence*, TD-913)
             e["until"] = until_of(read["blocked_raw"])
         out.append(e)
     return out

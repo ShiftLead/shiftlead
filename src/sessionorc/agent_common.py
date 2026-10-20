@@ -813,7 +813,8 @@ def _clean_answer(text: Any) -> str:
     zero-width marks), because an answer becomes the label of something a person presses and a
     label that can reorder or hide its own letters can look like what it is not. One line — the
     first, taken before `_clean`, which would otherwise drop the newline and run two lines
-    together — stripped, and capped at `ANSWER_CAP`.
+    together — stripped, and capped at `ANSWER_LINE_CAP`, consequence and all: its reader caps the label at
+    `ANSWER_CAP` after the split (§4.10 *The answers' split*, TD-913).
 
     Two things this costs and one it does not cover, so nobody reads it as more: a zero-width
     joiner is `Cf` too, so a multi-part emoji falls apart in a label, and a soft hyphen goes —
@@ -824,11 +825,11 @@ def _clean_answer(text: Any) -> str:
     # Every line break a renderer honours ends the label, not `\n` alone: `\r`, NEL (U+0085, a
     # control `_clean` keeps because it is above U+0020), and the line and paragraph separators
     # (U+2028, U+2029: categories Zl and Zp, so the `Cf` strip below does not see them). And the
-    # work is bounded by the cap, not by what was sent: a 10 MB item costs what 320 characters do.
-    raw = str(text or "")[: mail.ANSWER_CAP * 4]
+    # work is bounded by the cap, not by what was sent: a 10 MB item costs what 800 characters do.
+    raw = str(text or "")[: mail.ANSWER_LINE_CAP * 4]
     line = _clean(_LINE_BREAKS.split(raw, 1)[0])
     line = "".join(ch for ch in line if unicodedata.category(ch) != "Cf")
-    return line.strip()[: mail.ANSWER_CAP]
+    return line.strip()[: mail.ANSWER_LINE_CAP]
 
 
 def _cap(usage: dict[str, Any] | None) -> str | None:

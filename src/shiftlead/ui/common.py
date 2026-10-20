@@ -107,11 +107,23 @@ def suggested_answers(e: Any) -> list[str]:
 
     Registered as a template global rather than folded into `person_inbox`, so that every path
     that renders a row — the page, the poll, a test rendering the template directly — shapes it
-    the same way, and so that an entry's answers reach the markup nowhere else."""
+    the same way, and so that an entry's answers reach the markup nowhere else.
+
+    The reading gives labels and a parallel `consequences` (§4.10 *The answers' split*, TD-913); a row
+    with no card mode shows each whole, `<label> (default) — <consequence>`, as before the split, the mark
+    on an `ask`'s recommended one (a `steer` says its default under the row). A press sends the index, and
+    the route reads the label by it (`suggested_answers` of the labels alone)."""
     raw = e.get("answers") if hasattr(e, "get") else None
     if not isinstance(raw, list):
         return []
-    return [a for a in raw if isinstance(a, str) and a.strip()][: mail.ANSWERS_MAX]
+    leads = e.get("consequences")
+    leads = leads if isinstance(leads, list) and len(leads) == len(raw) else [""] * len(raw)
+    rec = e.get("recommended") if e.get("kind") == "ask" else None
+    return [
+        (f"{a} (default)" if i == rec else a) + (f" — {c}" if isinstance(c, str) and c.strip() else "")
+        for i, (a, c) in enumerate(zip(raw, leads, strict=True))
+        if isinstance(a, str) and a.strip()
+    ][: mail.ANSWERS_MAX]
 
 
 templates.env.globals["suggested_answers"] = suggested_answers

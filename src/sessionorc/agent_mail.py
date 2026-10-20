@@ -391,7 +391,7 @@ class MailMixin:
                     isinstance(answer, bool)
                     or not isinstance(answer, int)
                     or not 0 <= answer < len(replied.answers)
-                    or text != replied.answers[answer]
+                    or not mail.picks_answer(text, replied.answers[answer])
                 ):
                     raise RpcError("that is not one of the suggested answers, word for word (design §4.10)")
                 return await self._answer_orphan(replied, text, "replied", answer)
@@ -431,8 +431,9 @@ class MailMixin:
             if not 0 <= answer < len(replied.answers):
                 raise RpcError(f"{no}: {replied.id} carries {len(replied.answers)} of them (design §4.10)")
             said = replied.answers[answer]
-            # `text` is stripped above, so words after the blank line are never blank
-            if text != said and not text.startswith(said + "\n\n"):
+            # `text` is stripped above, so words after the blank line are never blank; the answer is the
+            # stored line or the label its reader drew (§4.10 *The answers' split*, TD-913)
+            if not mail.picks_answer(text.split("\n\n", 1)[0], said):
                 raise RpcError(f"{no}: the text of a picked answer is that answer, word for word (design §4.10)")
             picked = answer
         # -- a reader's verdict on a PR's ask (§4.9c, TD-315 slice 1): a word, never read from the text ----
@@ -1118,7 +1119,7 @@ class MailMixin:
                     "id": PERSON,
                     "entries": [
                         {
-                            **e.to_dict(),
+                            **mail.read_answers(e.to_dict()),  # labels and consequences (§4.10, TD-913)
                             "from_role": mail.from_role(self._graph(), PERSON, e.from_, controllers=self._ctl),
                             # on a handed entry's thread (TD-218): the Reply composer's line is `refill`
                             "on_handed": e.open and e.kind == "ask" and handed.get(e.root) == e.from_,
@@ -1166,7 +1167,10 @@ class MailMixin:
         return {
             "id": who,
             "entries": [
-                {**e.to_dict(), "from_role": mail.from_role(self._graph(), who, e.from_, controllers=self._ctl)}
+                {
+                    **mail.read_answers(e.to_dict()),  # labels and consequences (§4.10, TD-913)
+                    "from_role": mail.from_role(self._graph(), who, e.from_, controllers=self._ctl),
+                }
                 for e in entries
             ],
             "threads": {k: t.to_dict() for k, t in s.threads.items()},
@@ -1259,7 +1263,10 @@ class MailMixin:
             "id": msg,
             "root": root,
             "entries": [
-                {**e.to_dict(), "from_role": mail.from_role(graph, PERSON, e.from_, controllers=self._ctl)}
+                {
+                    **mail.read_answers(e.to_dict()),
+                    "from_role": mail.from_role(graph, PERSON, e.from_, controllers=self._ctl),
+                }
                 for e in _oldest_first(found, chains)
             ],
             "pruned": root not in found,

@@ -51,14 +51,20 @@ SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where t
 # A subject on every entry (§4.10 *A subject on every entry*, TD-561): the headline a person browses the
 # Inbox by, apart from the text, at most this many characters.
 SUBJECT_CHARS = 80
-_SENTENCE = re.compile(r"(.+?[.?!])(?:\s|$)")
+# The subject rule's sentence: to the first full stop, question or exclamation mark followed by a space or the
+# end. Public, since `shiftlead.ui.render.one_sentence` matches a first paragraph by it (§4.10 *An item leads
+# with one sentence*, TD-913) and `sessionorc` never imports `shiftlead`.
+SENTENCE = re.compile(r"(.+?[.?!])(?:\s|$)")
 # Suggested answers (§4.10 *Suggested answers*, 2026-09-20, TD-070): how many an `ask` or a `steer`
 # may carry, and how long each may be. They are a field of their own and do not
 # count toward `TEXT_CAP`. Each is cleaned **more strictly than displayed text is** (the tail's
 # cleaning and also every Unicode format character), because an answer becomes the label of
 # something a person presses.
 ANSWERS_MAX = 4
-ANSWER_CAP = 80
+ANSWER_CAP = 80  # a label, read after the split (§4.10 *The answers' split*, TD-913)
+ANSWER_LINE_CAP = 200  # a stored answer, consequence and all: `<label> (default) — <consequence>`
+CONSEQUENCE_SEP = " — "  # the split, on its first occurrence (cadence §3.5's answer form)
+_DEFAULT_MARK = re.compile(r"\s*\(default\)$", re.IGNORECASE)
 # A look's screenshots (§4.10 *A look*, TD-290, TD-292): up to four repo-relative paths, each a `.png`
 # directly under `docs/mockups/reviews/`, matched whole — the page serves that one directory and
 # nothing else, so a path of any other shape is refused rather than cleaned into one.
@@ -187,8 +193,55 @@ def subject_of(text: str) -> str:
         if n >= len(text) or len(flat) > SUBJECT_CHARS + 1:
             break
         n *= 4
-    m = _SENTENCE.match(flat)
+    m = SENTENCE.match(flat)
     return clip_subject(m.group(1) if m else flat)
+
+
+def split_answer(line: str) -> tuple[str, str]:
+    """One answer as its reader reads it (§4.10 *The answers' split*, TD-913): `(label, consequence)`, split
+    on the first ` — `, the label capped at `ANSWER_CAP`; a line with no dash is all label, consequence ''.
+    The `(default)` mark stays on the label: `answer_mark` reads it."""
+    label, sep, rest = str(line).partition(CONSEQUENCE_SEP)
+    if not sep:
+        label, rest = str(line), ""
+    return label.strip()[:ANSWER_CAP], rest.strip()
+
+
+def answer_mark(label: str) -> tuple[str, bool]:
+    """A label with its ` (default)` mark taken off, and whether it carried one (§4.10 *The answers' split*)."""
+    bare = _DEFAULT_MARK.sub("", label).strip()
+    return (bare, True) if bare != label.strip() and bare else (label, False)
+
+
+def picks_answer(text: str, line: str) -> bool:
+    """Whether a press's `text` is the stored answer `line` word for word: the whole line, as before the
+    split, or the label its reader drew from it, mark and all (§4.10 *The answers' split*, TD-913)."""
+    label = split_answer(line)[0]
+    return text in (line, label, answer_mark(label)[0])
+
+
+def read_answers(entry: dict[str, Any]) -> dict[str, Any]:
+    """A mail entry's reading with its `answers` split (§4.10 *The answers' split*, TD-913): `answers` the
+    labels, a parallel `consequences`, and `recommended` — the index of a `steer`'s `default` (matched on
+    the label or the whole line, word for word) or of the one `ask` label ending in ` (default)`, else None.
+    What is stored is unchanged; a reading without answers is returned as it is."""
+    lines = [str(a) for a in entry.get("answers") or ()]
+    if not lines:
+        return entry
+    labels, consequences, marked = [], [], []
+    for i, line in enumerate(lines):
+        label, consequence = split_answer(line)
+        bare, mark = answer_mark(label)
+        labels.append(bare)
+        consequences.append(consequence)
+        if mark:
+            marked.append(i)
+    d = entry.get("default")
+    if entry.get("kind") == "steer" and d:
+        rec = next((i for i, line in enumerate(lines) if d in (line, split_answer(line)[0], labels[i])), None)
+    else:
+        rec = marked[0] if len(marked) == 1 else None
+    return {**entry, "answers": labels, "consequences": consequences, "recommended": rec}
 
 
 def is_person(caller: Any) -> bool:

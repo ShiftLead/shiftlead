@@ -1910,12 +1910,12 @@ async def test_a_lapse_wakes_uncharged_across_a_resume_and_a_restart(agent, hook
 
 
 async def test_a_question_carries_its_likely_answers_cleaned_more_strictly_than_its_text(agent, tmp_path):
-    """Design §4.10 *Suggested answers*: an `ask` or a `steer` may carry up to four
-    `answers`, each one line capped at `ANSWER_CAP` and cleaned **more strictly than displayed text
-    is** — the tail's cleaning *and* every Unicode format character (`Cf`), because an answer
-    becomes the label of something a person presses. One that cleans to nothing or repeats an
-    earlier one exactly is dropped; a fifth is refused; a `note` and a `reply` are refused
-    outright; and they do not count toward `TEXT_CAP`."""
+    """Design §4.10 *Suggested answers*: an `ask` or a `steer` may carry up to four `answers`, each one
+    line capped at `ANSWER_LINE_CAP` (its label at `ANSWER_CAP`, on reading) and cleaned **more strictly
+    than displayed text is** — the tail's cleaning *and* every Unicode format character (`Cf`), because
+    an answer becomes the label of something a person presses. One that cleans to nothing or repeats an
+    earlier one exactly is dropped; a fifth is refused; a `note` and a `reply` are refused outright; and
+    they do not count toward `TEXT_CAP`."""
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         loner = await mk("loner", unattended=True)
@@ -1933,9 +1933,9 @@ async def test_a_question_carries_its_likely_answers_cleaned_more_strictly_than_
                 ],
             )
             assert got["entry"]["answers"] == ["merge it", "hold it", "thgir ot tfel", "zapit"]
-            # one line, and capped at 80 characters after cleaning
-            long = await c.call("msg", to="person", text="?", kind="ask", answers=["x" * 200, "one\ntwo"])
-            assert long["entry"]["answers"] == ["x" * mail.ANSWER_CAP, "one"]
+            # one line, and capped at 200 characters after cleaning, consequence and all (TD-913)
+            long = await c.call("msg", to="person", text="?", kind="ask", answers=["x" * 300, "one\ntwo"])
+            assert long["entry"]["answers"] == ["x" * mail.ANSWER_LINE_CAP, "one"]
             # cleaning to nothing, and repeating an earlier one exactly, are drops — not refusals;
             # the comparison is after cleaning and is case-sensitive
             thin = await c.call(
@@ -2132,6 +2132,45 @@ async def test_the_home_checks_that_a_picked_answer_is_one_of_them(agent, tmp_pa
         await person.call("kill", id=loner)
 
 
+async def test_an_answers_reader_splits_label_from_consequence_and_a_press_still_matches(agent, tmp_path):
+    """§4.10 *The answers' split* (TD-913): what is stored is the whole line; every reading — the person's
+    inbox, a session's, a thread — gives the labels as `answers`, a parallel `consequences`, and the
+    `recommended` index (an `ask`'s one ` (default)` label, a `steer`'s `default` by label or whole line); a
+    press of the label, or of the whole line as before, is that answer word for word."""
+    lines = ["Merge it (default) — it ships Friday", "Hold it — it waits a week", "plain"]
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        loner = await mk("loner", unattended=True)
+        async with LocalClient(caller=loner) as c:
+            sent = (await c.call("msg", to="person", text="merge?", kind="ask", answers=lines))["entry"]
+            assert sent["answers"] == lines  # stored whole
+            steer = await c.call(
+                "msg", to="person", text="hold?", kind="steer", default="Hold it", answers=lines[1:2] + ["Go"]
+            )
+            whole = await c.call(
+                "msg", to="person", text="go?", kind="steer", default=lines[1], answers=["Go", lines[1]]
+            )
+        got = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
+        ask = got[sent["id"]]
+        assert ask["answers"] == ["Merge it", "Hold it", "plain"]
+        assert ask["consequences"] == ["it ships Friday", "it waits a week", ""]
+        assert ask["recommended"] == 0
+        assert got[steer["entry"]["id"]]["recommended"] == 0 and got[whole["entry"]["id"]]["recommended"] == 1
+        thread = (await person.call("thread", msg=sent["id"]))["entries"]
+        assert thread[0]["answers"] == ask["answers"]
+        with pytest.raises(AgentError, match="not one of the suggested answers"):
+            await person.call("msg", kind="reply", reply_to=sent["id"], text="it waits a week", answer=1)
+        ok = await person.call("msg", kind="reply", reply_to=sent["id"], text="Hold it\n\nuntil Monday", answer=1)
+        assert ok["entry"]["answer"] == 1
+        ok = await person.call("msg", kind="reply", reply_to=sent["id"], text=lines[0], answer=0)
+        assert ok["entry"]["answer"] == 0
+        # the asker's own copy of the person's reply reads as it was sent
+        async with LocalClient(caller=loner) as c:
+            mine = [e for e in (await c.call("inbox"))["entries"] if e.get("reply_to") == sent["id"]]
+        assert [e["text"] for e in mine] == ["Hold it\n\nuntil Monday", lines[0]]
+        await person.call("kill", id=loner)
+
+
 async def test_a_picked_answer_is_an_ordinary_reply_on_an_ask_and_on_a_steer(agent, tmp_path):
     """Design §4.10: **it is always a reply, on a `steer` too** — the same gate, the same tallies,
     the same close (`replied`, never `go_with_it`) and the same wake as the free-text Reply, so
@@ -2206,7 +2245,7 @@ def test_no_line_break_of_any_kind_survives_in_an_answer_and_the_work_is_bounded
 
     for brk in ("\n", "\r", "\r\n", "\x0b", "\x0c", "\x85", "\u2028", "\u2029"):
         assert _clean_answer(f"merge it{brk}and also delete everything") == "merge it", repr(brk)
-    assert _clean_answer("x" * 10_000_000) == "x" * 80  # bounded by the cap, not by what was sent
+    assert _clean_answer("x" * 10_000_000) == "x" * mail.ANSWER_LINE_CAP  # bounded by the cap, not by what was sent
     assert _clean_answer("   " + "\u202e" + "hold it  ") == "hold it"
 
 
@@ -2832,7 +2871,7 @@ def test_a_subject_folded_from_a_prefix_is_the_whole_texts():
 
     def whole(text: str) -> str:
         flat = " ".join("".join(" " if ord(c) < 32 else c for c in text).split())
-        m = mail._SENTENCE.match(flat)
+        m = mail.SENTENCE.match(flat)
         return mail.clip_subject(m.group(1) if m else flat)
 
     rnd = random.Random(747)
