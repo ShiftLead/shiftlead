@@ -1478,8 +1478,8 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-04 (TD-308, grinder-ao-1; met on a TD-297 press): the trail writes *pushed*, *answered in the terminal* and *the limit reset* from the record still standing (`_ended_by`), as the `how` list says. Until then each fell back to *resolved*, and an `unpushed` row that ended by a push read *resolved: resolved*.
 
 ## 5. Configuration
-- 2026-10-20 (TD-553, grinder-ao-1): a repo's `.agentorc.yml` is read by nothing; `sessionorc.paths.repo_file` is `.shiftlead.yml` alone. Was: read while no `.shiftlead.yml` was beside it (TD-060 step 2), until samscrape, contractmatch and dev-cadence renamed theirs, which they had by 2026-10-20.
 
+- 2026-10-20 (TD-553, grinder-ao-1): a repo's `.agentorc.yml` is read by nothing; `sessionorc.paths.repo_file` is `.shiftlead.yml` alone. Was: read while no `.shiftlead.yml` was beside it (TD-060 step 2), until samscrape, contractmatch and dev-cadence renamed theirs, which they had by 2026-10-20.
 - 2026-10-17 (TD-818, the designer; Paul, 2026-10-16: *is there a way to keep a token count per team member … see which ones use the most tokens, and make adjustments if there are surprises*): `spend.weights` in `settings.yml`: a price per kind per model prefix, dated `as_of`, the API's list prices by default. Built by TD-830.
 - 2026-10-16 (TD-804, the designer; Paul, 2026-10-16: *for a production system working correctly would be vital*; steer m-bf390074fccb, the default): `promote:` takes an optional `smoke:`. It is run after `check` reads the new commit and judged by its exit code. Built by TD-811, with this repo's line by TD-812.
 - 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — a repo's `anchor:` is retired (`false` passed over) and the org file's `anchors:` is removed. Built by TD-724.

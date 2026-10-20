@@ -17369,6 +17369,6 @@ Then file the build entry and name it in `Blocked by:`.
 
 **Related:** TD-060, TD-552.
 
-**Resolved:** 2026-10-20 — PR #2201: `LEGACY_REPO_FILE` and every use gone, `repo_file` is `.shiftlead.yml` alone; `ao org check` (so `ao doctor`'s org line) names a registered checkout holding only `.agentorc.yml` as a lack; §5 and §4.7 say so. The three repos' `origin/main` read 2026-10-20: each carries `.shiftlead.yml` and no `.agentorc.yml`. `ao team list` is the live copy's to read after the promote.
+**Resolved:** 2026-10-20 — PR #2201: `LEGACY_REPO_FILE` and every use gone, `repo_file` is `.shiftlead.yml` alone; `ao org check` (so `ao doctor`'s org line) names a registered checkout holding only `.agentorc.yml` as a lack (`orgcheck.OLD_REPO_FILE`, the check's own name for it); §5 and §4.7 say so. The three repos' `origin/main` read 2026-10-20: each carries `.shiftlead.yml` and no `.agentorc.yml`. `ao team list` is the live copy's to read after the promote.
 
 ---
