@@ -77,9 +77,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Built — live check #2186 |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
+| TD-923 | The Focus's disconnect card: while the terminal reconnects, the spend the page last held (session, team, All, the account's windows), and a script that reaches the state on demand | Medium | Open — designed 2026-10-20 (#2200); Paul lifted the hold 2026-10-20 |
 | TD-924 | The Sessions page's Agents count leaves out every session of a team that is not running, so a working or waiting session can be missing from it | Medium | Designed — built by TD-925 |
 | TD-925 | Build TD-924: the Sessions rollup's Agents and Needs you count every session on the page, whatever its team's state | Medium | Open |
 | TD-926 | Hovering a Queue card's header or row draws its ⋯ names inline, which narrows the title and reflows it under the pointer | Medium | Open — design first |
+| TD-927 | Token counts on the Spend page, beside every figure: by team, Top sessions, a team's seats, the head's total and the bar's hover | Medium | Open — design-first |
 
 ---
 
@@ -1441,7 +1443,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-
 ---
 
 ## TD-900: The Repo page is a board by stage, the Org page is Sessions, the Queue numbers Up next per repo and marks what is live
@@ -1608,6 +1609,26 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
+## TD-923: The Focus's disconnect card — while the terminal reconnects, the spend the page last held, and `scripts/focus_drop.py` to see the state on demand
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-20 (Paul, in an interactive session: *when a focus session disconnects we get a short message from shiftlead saying so. I wonder if it would be more helpful to tell the user the session disconnected and we are trying to reconnect and in the meantime show the current usage for the session, the team, and the org*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — designed 2026-10-20 (#2200; §4.6 *The disconnect card*, §4.5 screen 2 the header line, §4.5a *Focus: disconnect card*). **Paul lifted the hold 2026-10-20** on the rendering's second round (tokens on every row, `$` apart from `≈$`): pickable.
+**Location:** the rendering `docs/mockups/reviews/2026-10-20-td923-disconnect-card-dark.png`, `-light.png`, `-before-dark.png` (the live Focus with its socket held closed, the card injected with the live figures, 2026-10-20; Paul saw them and lifted the hold on the second round; the build's shots go beside them); `src/shiftlead/ui/static/app.js` (the Focus's terminal path ~5100–5160: `openTerm`, `ws.onclose`, `drawMark`; `onUsage` ~1966, `AO.usageChip` ~1941), `src/shiftlead/ui/templates/focus.html` (the header, the pane's parent), `src/shiftlead/ui/static/app.css`, `src/shiftlead/ui/help.py`, `src/shiftlead/ui/app.py` (`/api/spend` ~3627, uncached: `spend_reading` calls `seats` each time; `team_spend`'s 60 s cache is the team card's today-only figure, not this), `scripts/smoke.py` (the browser half's venv, the pattern for the new script), `tests/test_help.py`, `docs/mockups/reviews/`
+
+**Why:** A dropped Focus is a blank pane and a grey retry line, for as long as the UI process is down or the attach is slow: the one reload after a stream's close (§4.5 *A reconnect reloads once*) empties the terminal until the attach paints, which is what Paul sees as *the old screen disappears*. The wait is where the person wonders what the stall is costing, and the page already holds the answer: the Spend reading and the last `usage` event. Paul named Google's offline dinosaur as the model; the design says a card, not a game — what the stall costs is the one thing the page can say that the pane cannot. Nothing is fetched while down: the figures are what the page held, stamped.
+
+**Fix:** (1) `scripts/focus_drop.py <session> [--for 20] [--shot path]`: in the smoke's venv (`scripts/smoke.py --setup`; skipped with the smoke's reason when it is absent), open the live UI's Focus for the session in Playwright, hold `/term/*` and `/events` closed for the given seconds (Playwright's `route` does not reach a WebSocket: an init script shims `window.WebSocket` for those paths to close with 1006 after a tick, as `~/ao-shots/scripts/td923_drop.py` does for the rendering), wait out the mark's grace, write the screenshot, release the routes and assert the terminal mark clears on the first pane byte. Commit the **before** shot as `docs/mockups/reviews/2026-10-20-td923-disconnect-before.png`. Read-only against the live UI (the memory *Headless screenshots on kmaster*). (2) The reading: at the Focus's load and in `ws.onopen` of each reconnect, `GET /api/spend` four times — `team=<its team>` and `team=` (All), each for `window=day` and `window=week`, with `top=all` so the session's row is in the team reading (the default caps Top sessions at 8, `spend.py` `TOP`); the last `usage` event from `onUsage`; both in `sessionStorage` under `ao.drop.<id>` as the reload's keys are (`reloadsKey`, ~1693). (3) The card: one element between the header and `#term`, hidden; `drawMark` shows it when the mark is *reconnecting…* and hides it when the mark is not — the same grace, the same first byte — with the rows, the window line and *as of* of §4.5a — per row and window the seats' figures summed **by `unit`** (`≈$` and `$` as two figures, never one), `unweighed` beside, and the `tokens` of every seat summed over the four kinds, `tokShort` (app.js ~1848; the server's `spend.tokens`) with the kinds on the row's hover — drawn as the Spend page draws each (`spend_part.html`'s rule), except that the card keeps `≈$` and `$` apart where the page folds a mixed sum to `≈$` (§4.6), *no reading* where a figure is absent; the rule for the card's rows exposed on `AO` beside `AO.termMark` so a node test reaches it without a browser; nothing fetched while the socket is closed; the retry line untouched. Dark and light. (4) The help paragraph in `help.py` under the Focus screen (bound by `tests/test_help.py` to §4.5a's list; this entry supplies its words): *Disconnect card — While the terminal reconnects, the spend the page last held: this session, its team and all teams, today and this week, as money and as tokens, a subscription's API-equivalent (≈$) apart from a metered profile's bill ($), the account's windows under them with their resets, and when the figures were read. It fetches nothing while the link is down and goes when the terminal paints; the Spend page has the live figures.* Then the **after** shot beside the before, `2026-10-20-td923-disconnect-card.png`, both into the PR, and a line on the board for Paul's look.
+
+**Done when** a dropped Focus shows the card within the mark's grace with the figures the page held, stamped, money by unit and tokens on every row; the card goes on the first pane byte; the retry line and its countdown read as before; `scripts/focus_drop.py` writes a screenshot of the state against the live UI without changing it; `pdm run test` passes with the help paragraph bound; the before and after shots are under `docs/mockups/reviews/` and Paul has seen them.
+
+**Related:** TD-474/TD-480 (the terminal mark, whose grace and first-byte rule the card shares), TD-692 (the one reload, whose empty terminal this fills), TD-818/TD-830–833 (Spend per seat, the figures), TD-029 (the reconnect contract)
+
+---
+
 ## TD-924: The Sessions page's Agents count leaves out every session of a team that is not running, so a working or waiting session can be missing from it
 
 **Priority:** Medium
@@ -1662,5 +1683,27 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Coordinate with:** TD-909's builds still open (TD-916, TD-917 — neither touches the ⋯), and PR #2195 (TD-922, a test over the card's look pair) — none edits `.qdotsnames`, checked 2026-10-20.
 
 **Done when** hovering or focusing a Queue card's header, row or item leaves its title's wrap and the card's height as they were.
+
+---
+
+## TD-927: Token counts on the Spend page, beside every figure — by team, Top sessions, a team's seats, the head's total, the bar's hover
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-20 (Paul, in an interactive session, on TD-923's rendering: *Wow are those numbers real? Thats alot of tokens! Lets add a TD to show token counts on the spend page as well*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 screen 13 *Spend* (4.5-ui.md ~1519–1560: *By team*, *Top sessions*, a team's seat table, *Over time*'s hover), §4.5a *Spend page* rows (4.5a-controls.md ~123–127); `src/shiftlead/ui/spend.py` (`tokens`, the short shape; the seat rows' `tokens` dict), `src/shiftlead/ui/templates/spend_part.html` (the three tables' heads at ~45, ~60, ~76), `src/shiftlead/ui/static/app.js` (`tokShort` ~1848, the bar's hover), `docs/mockups/gen.py` (`Spend.dc.html`, `SpendTeam.dc.html`)
+
+**Why:** The seat ledger reads every turn's tokens by kind (§4.3 `spend`, §4.4 *Spend per seat*: input, output, cache read, cache write) and the reading carries them on every seat (`tokens`), but the Spend page draws money alone, and tokens only as *unweighed* where no weight matched. TD-923's disconnect card drew the window's tokens beside the money, and the live figures (434.9M tokens across all teams in the week of 2026-10-19, this session 7.4M in a day) are the kind of number people quote — *we used a million tokens on this* — and the page that answers *who spent it* should say it. The sum is dominated by cache reads (this session's day: 5.5M cache read, 36k output), which cost a fraction of input: a headline that sums every kind is honest about volume and silent about cost, which the money figure beside it already carries.
+
+**Fix:** The designer's round: (1) a **tokens** column beside the figure in *By team*, *Top sessions* and a team's seat table, the chip's short shape (*95M*, `spend.tokens` without the *tok* where the column head says it), the four kinds on the cell's hover, sortable with the figure; (2) the head's line carries the period's total tokens after its money (*≈$219 · 435M tokens*); (3) *Over time*'s bar hover lists each series' tokens beside its figure; (4) decide and say whether the headline sums every kind as TD-923's card does, or shows *input + output* with cache reads apart — one rule for the card and the page, written once in §4.4 *Spend per seat* and read by both; (5) `ao spend` prints the same column (§4.7). Then the build entry, with the mockups regenerated and a before/after shot under `docs/mockups/reviews/`.
+
+**Done when** the design says where tokens are drawn on the Spend page and by what rule, the card's rule and the page's are one sentence in §4.4, and a build entry is named and pickable.
+
+**Related:** TD-923 (the disconnect card, which draws the window's tokens first), TD-818 and TD-830–833 (Spend per seat), TD-859 (the Spend page's tables)
+
+---
 
 ---
