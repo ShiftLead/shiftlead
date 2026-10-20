@@ -64,7 +64,10 @@ waits on an event; else the earliest `Waits:` date among its open members (the f
 card can be picked); else *event* when any member waits on one; else the word for the reason — *settling*,
 *not live* (a live check whose build is not live), *blocked*. **The column and the phrase always come from a
 leaf**: a member that waits for a reason of its own, never one that waits only on open ids — a card is
-Waiting only when every chain of open ids ends in such a leaf, so one always exists — and when several
+Waiting only when every chain of open ids ends in such a leaf, so one always exists — except a cycle of
+open ids with no leaf (ledgerboard tolerates one; the key order breaks it), which is read as past reach:
+the column says *blocked*, the phrase *blocked: TD-a and TD-b block each other*, from the cycle's
+lowest-keyed member, and no builder asserts a leaf — and when several
 leaves tie on the rule above, the one with the lowest key supplies both. Its status at the right is the
 whole phrase for the same member: *waits until Oct 30*, *waits on
 the next launch whose first hook is lost*, *settling*, *blocked: decision (techlead)*, *blocked: dev-cadence#TD-119
@@ -97,8 +100,12 @@ own line and its **Dismiss all** (§4.5a): *answered for you (7)*, *waiting on t
 with **Release** in the ⋯ in place of Hold, and the card is not amber for it — §4.4 *The card's status* loses
 its *needs you* from a *held (person)* row, and gains the word ***held (person)*** for a card whose
 non-waiting open members are all held, between *stalled* and *blocked*, so such a card never reads *ready*
-(a §4.4 edit of this ADR's). A held card with a waiting child is Waiting, teal, no want; Start session on it
-starts on the held entry, which a hold allows — a hold withholds from lanes only (§4.4 *Hold*). The Inbox's five section names stand on the Inbox (§4.5 screen 6); the card maps them to
+(a §4.4 edit of this ADR's). A held card with a waiting child is Waiting, teal, no want, and does not move; Start
+session on it starts on the card's chosen entry (§3), and when that is the held entry a hold allows it — a
+hold withholds from lanes only (§4.4 *Hold*). Two more design sentences change with this: §4.4 *A move
+lands*' *a card the person holds is in Up next and moves as any other* and screen 11's *a held (person)
+card is Up next and moves* each gain *unless a child of it waits (§1)*; and `rank.intent`'s refusal names the
+group it refuses, *is Waiting, which does not move*, as it names In progress today. The Inbox's five section names stand on the Inbox (§4.5 screen 6); the card maps them to
 these three, and this table is the whole map.
 
 ## 3. Three verbs
@@ -127,15 +134,21 @@ Whatever the item's kind, the person does one of three things, and the words are
   the lanes read — the card is In progress, and the row carries the session's pill, reading *held by
   td-<n>* where it has a state word; a row of the person's keeps its need and a held row its *held
   (person)*, `_state`'s order. On a card with nothing of the person's the held entry is the top entry, taken
-  from the lanes for as long as the session runs, which is the person's call. The opening prompt is `briefs/work.md` extended with **an id list** — the card's entries,
-  `<repo>#TD-n`, comma-separated, in two labelled groups, *waits on me* (the Decide and Do ledger entries)
-  and *the rest* — ids only, never an entry's own words (§4.5a); any chosen entry that is neither `Owner:
-  paul` nor a `decision (paul)` hold takes a third `why_key`, *card*, whose fixed words are: *I opened this
-  session from the Queue to work the card around TD-n. Its entries are: waits on me — <ids>; the rest —
-  <ids>. Read them, tell me in a few lines what you would do first, then wait for me.* **The session's claim
-  is the tick's derived one** from the branch `td-<n>` (§4.8); `work.md` runs no `ao progress claim`, so a
-  held or settling entry, on which a claim is refused, still starts — on a held entry the person's own
-  start is the person's own window, the hold stays and the claim is derived anyway. **The person's own
+  from the lanes for as long as the session runs, which is the person's call. The opening prompt is **one template, `briefs/work.md`, reshaped**: its first sentence
+  by `why_key` — *yours* and *decision* keep today's words, with *from the Queue* in place of *from the
+  Inbox* when pressed on a card (the Inbox row keeps *Inbox*, and the §4.5a row's quoted text changes with
+  it), and a third key, *card*, for any chosen entry that is neither `Owner: paul` nor a `decision (paul)`
+  hold, reads *I opened this session from the Queue to work the card around TD-n*; then, for every key, **the
+  id-list sentence** — *Its entries are: waits on me — <ids>; the rest — <ids>*, each `<repo>#TD-n`,
+  comma-separated, *waits on me* the Decide and Do ledger entries — ids only, never an entry's own words
+  (§4.5a); then today's closing sentences unchanged (*check the code and the design for what is already
+  built or decided*, *I drive this one*), so the three keys read in one voice. **The session's claim is the
+  tick's derived one** from the branch `td-<n>` (§4.8): `reports.derive` writes it from the branch alone and
+  never calls `claim_refusal`, which only a declared `ao progress claim` meets; `work.md` runs none, so a
+  held or settling entry still starts — on a held entry the person's own start is the person's own window,
+  the hold stays and the claim is derived anyway. §4.4 *Hold* gains that sentence (the design round's): *a
+  derived claim is not refused — the person's own `td-<n>` session holds a held entry, and the hold still
+  withholds it from lanes*. **The person's own
   session** is a record with `unattended: false` and no caller (§4.5a *Inbox row: ledger entry*); any other
   holder of the chosen entry, a lead's interactive session included, is *held by <name>*. With several of
   the person's own sessions on the card, Open session goes to the one holding the chosen entry, else the
@@ -224,11 +237,15 @@ the first `.`, `?` or `!` followed by a space or the end) matches all of it, wit
 before the match. `subject_of` itself cannot be the test: it clips at `SUBJECT_CHARS` (80). An id or an
 abbreviation followed by a space (*TD-909. Which…*, *e.g. this*) fails the pattern; that is a false warning,
 and a warning is all it is (below). **The answers' split** is cadence §3.5's `a | b` grammar with one addition: an answer splits on its first
-` — ` (space, em dash, space); the left part is the label, carries the `(default)` marker, and is what
-the press writes to `Decided:` or sends as the answer; the right part is drawn as the consequence only; a
-reader without the card mode, and a board line or `--answer` with no dash, shows and sends the whole string
-as today, and a board line with no consequence draws bare answers. That is a change to cadence §3.5 and to
-ledgerboard's `ANSWERS_RE` reader (the dev-cadence entry's). No rule on answers: an open question is legitimate (cadence §3.3: *when
+` — ` (space, em dash, space). **The written form is `<label> (default) — <consequence>`**: the mark is read
+on the label after the split (§3.5's *ends in ` (default)`* becomes *its label ends in*), and `decided_line`
+writes the mark on the label. **The split is the readers'**: `answers` on every reading — board item, ledger
+entry, mail envelope — becomes the labels, with a parallel `consequences` list beside it; no writer changes,
+and a press sends the index or the label as it does today, so the home's word-for-word check against
+`answers` still passes. The right part is drawn as the consequence only; a reader without the card mode, a
+board line or `--answer` with no dash, shows and sends the whole string as today, and a board line with no
+consequence draws bare answers. That is a change to cadence §3.5 and to ledgerboard's answer readers
+(`parse_answers`, `parse_default`, `answers_of`) and `decided_line` (the dev-cadence entry's). No rule on answers: an open question is legitimate (cadence §3.3: *when
 only the person can know, say so and mark no default*), and Answer… is for the person's own words.
 
 **The home warns, never refuses** — §4.10's rule stands, and this ADR does not amend it (an earlier draft
@@ -326,3 +343,9 @@ never a leaf); the header's ⋯ acts on the top entry; the pill beside a Waiting
 precedence; the person's own session defined, several sessions ordered; an entry with no `Ask:` yet draws
 its title; the *card* prompt's words and the id list's format; the claim is the tick's derived one, a hold
 stays; `rank_move` refuses Waiting; *Waiting (n)* in §8.
+Round 5 (Fable, NOT READY, nothing blocking, no contradiction, 6 findings; adopted): a cycle with no leaf
+reads *blocked* from its lowest-keyed member; the answers' written form `<label> (default) — <consequence>`,
+the split the readers' (`answers` the labels, `consequences` beside) with no writer changed, the readers
+named; one `work.md` template reshaped by key with the id list for every key and today's closing sentences
+kept; a held Waiting card starts on the card's chosen entry; the two design sentences on a held card moving
+and `rank.intent`'s words listed; §4.4 *Hold* gains the derived-claim sentence.
