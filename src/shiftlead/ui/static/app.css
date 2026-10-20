@@ -848,6 +848,20 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qread > summary.qsech { display: list-item; cursor: pointer; padding-left: calc(4em + 20px + 2ch); }
 .qread .qsec .qsech, .qread .qsec .qmail { padding-left: calc(4em + 20px + 4ch); }
 .qwantsn { font-weight: 600; color: var(--needs-fg); }
+/* each card its own box on the Queue page (§4.5 screen 12 *A card*, TD-915): a border, a gap to the next, and a
+   4 px left edge in the card's colour — amber a Decide or Do item, else teal Waiting, else green In progress, else
+   grey (`card_edge`); the Repo page's board keeps its cards in one column box */
+.qcards:not(.bcards) { border: 0; border-radius: 0; background: none; overflow: visible; display: flex; flex-direction: column; gap: 8px; }
+.qcards:not(.bcards) > .qcard, .qcards:not(.bcards) > .qother { border: 1px solid var(--line); border-left: 4px solid var(--qedge, var(--ended)); border-radius: 6px; background: var(--card); overflow: hidden; }
+.qcard.edge-needs { --qedge: var(--needs); } .qcard.edge-waiting { --qedge: var(--waiting); }
+.qcard.edge-working { --qedge: var(--working); } .qcard.edge-ended { --qedge: var(--ended); }
+/* the tree drawn (TD-915): a 2 px rule down each level's left edge, just left of that level's id, in its branch's
+   colour — green done, teal waiting, amber the person's, grey open; rows abut, so a level's rule runs unbroken */
+.qrow { position: relative; }
+.qrail { position: absolute; top: 0; bottom: 0; width: 2px; left: calc(4em + 20px + var(--ql, 1) * 2ch - 1.2ch); background: var(--ended); }
+.qrail.b-done { background: var(--done); } .qrail.b-waiting { background: var(--waiting); }
+.qrail.b-needs { background: var(--needs); } .qrail.b-open { background: var(--ended); }
+.repopage .bcol .qrail { display: none; }
 .qcard.dragging { opacity: .45; }
 .qcard.dropbefore { box-shadow: inset 0 3px 0 var(--link); }
 .qcard.dropafter { box-shadow: inset 0 -3px 0 var(--link); }
@@ -982,6 +996,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   .qfind { margin-left: 0; flex-basis: 100%; }
   .qfind input { width: 100%; min-width: 0; }
   .qrow { padding-left: calc(2.6em + var(--qd, 1) * 1ch); }
+  .qrail { left: calc(2.6em + var(--ql, 1) * 1ch - .6ch); }
 }
 
 /* the Spend page (design §4.5 screen 13, §4.5a *Spend page*; TD-832): one centred column, the picks a row of

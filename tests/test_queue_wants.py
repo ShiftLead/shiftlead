@@ -99,7 +99,7 @@ def test_a_card_draws_decide_and_do_in_its_header_and_read_folded_under_its_rows
     # Dismiss all on fyi's line alone; waiting on them has none
     assert body.count(">Dismiss all</button>") == 1
     assert body.index('data-sec="fyi"') < body.index(">Dismiss all</button>")
-    assert 'class="qcard g-up_next st-needs-you wants hasrows"' in html
+    assert 'class="qcard edge-needs g-up_next st-needs-you wants hasrows"' in html
 
 
 def test_a_card_with_nothing_attached_draws_no_want():

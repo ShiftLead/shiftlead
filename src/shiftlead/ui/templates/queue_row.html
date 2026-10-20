@@ -36,9 +36,10 @@
   <div class="qbuilds">{% if e.builds.done %}every build archived — archive this entry{% else %}builds:{% for b in e.builds.builds %}{% if not loop.first %} ·{% endif %} {% if b.row %}<a href="#{{ b.row }}">{{ b.id }}</a>{% else %}{{ b.id }}{% endif %} <span class="bstate">{% if b.state == 'archived' %}archived{% elif b.state == 'review' %}in review {% if b.url %}<a href="{{ b.url }}" target="_blank" rel="noopener">#{{ b.pr }}</a>{% else %}#{{ b.pr }}{% endif %}{% elif b.state == 'held' %}held by {{ b.held }}{% else %}open{% endif %}{% if b.blocked_by %}, blocked by {{ b.blocked_by | join(', ') }}{% endif %}</span>{% endfor %}{% endif %}</div>
 {% endif %}{% endmacro %}
 
-{# a quiet line on a row for each item that names it beside another row (§4.5 screen 12 *Three wants*); the
-   items themselves are the card's, in its wants (`want` and `read` below). The Repo page attaches nothing. #}
-{% macro mentioned(r) %}{% for w in r.mentioned or [] %}<div class="qnote qmention">also mentioned in {{ w }}</div>{% endfor %}{% endmacro %}
+{# a row's mentions, one phrase however many items name it beside another row (§4.5 screen 12 *Three wants*,
+   TD-915): *mentioned in n items*, counted by item, their subjects on hover; the items themselves are the card's,
+   in its wants (`want` and `read` below). The Repo page attaches nothing. #}
+{% macro mentioned(r) %}{% set ms = r.mentioned or [] %}{% if ms %}<div class="qnote qmention" title="{{ ms | join('\n') }}">mentioned in {{ ms | length }} item{{ '' if ms | length == 1 else 's' }}</div>{% endif %}{% endmacro %}
 
 {# an item on a card, drawn by the Inbox's own renderer (`queue_mail.html`); one about another row says *on
    TD-n*, a link that scrolls to that row and rings it #}
@@ -74,9 +75,12 @@
 {# the card's pill (§4.5 screen 12 *A card*): its Decide and Do counts, amber, in every group where it has one #}
 {% macro pill(c) %}{% set n = (c.wants or {}).get('n') or {} %}{% if n.decide or n.do %}<span class="qstatus needsyou qwpill" title="what on this card waits on you: Decide and Do items">{% if n.decide %}Decide {{ n.decide }}{% endif %}{% if n.decide and n.do %} · {% endif %}{% if n.do %}Do {{ n.do }}{% endif %}</span>{% endif %}{% endmacro %}
 
-{# a row: its state word, and the holder's pill unless the word already names it (*held by X*) #}
+{# a row: its state word, and the holder's pill unless the word already names it (*held by X*); the tree drawn
+   (§4.5 screen 12 *A card*, TD-915) — a 2 px rule down each level's left edge in its branch's colour, `r.rails`
+   one per level, its ancestors' then its own #}
 {% macro row(r, repo='') %}
   <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
+    {%- for b in r.rails or [] %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endfor %}
     <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}</span>
     <span class="qright">{{ extras(r.ext, repo) }}{% if r.also %}<span class="meta">also after {{ r.also | join(', ') }}</span>{% endif %}{{ state(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ controls(r) }}{% endif %}</span>
     {{ builds(r.ext) }}
