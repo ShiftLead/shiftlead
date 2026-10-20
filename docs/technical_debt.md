@@ -1634,7 +1634,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/shiftlead/ui/org.py` `rollup()`, `src/shiftlead/ui/templates/rollup.html` and `org.html`, `src/shiftlead/ui/static/app.js` (the fold, `toggleFold`, and the filter box), `src/shiftlead/ui/app.py` (the `rollup(groups)` calls, which pass the views too), `tests/test_ui_team_summary.py` (the rollup tests)
+**Location:** `src/shiftlead/ui/org.py` `rollup()`, `src/shiftlead/ui/templates/rollup.html` and `org.html`, `src/shiftlead/ui/static/app.js` (the fold, `toggleFold`, and the filter box), `src/shiftlead/ui/app.py` (the `rollup(groups)` calls, which pass the views too), `tests/test_ui_team_summary.py` (the rollup tests), `tests/test_ui_org_chrome.py` and `tests/test_ui_keys.py` (the node harness the page's client handlers run under)
 
 **Why:** TD-924: design §4.5 screen 1 *The rollup* and §4.5a *Sessions: rollup* now say Agents and *answer needed* count every session the page draws that has not ended, whatever its team's state, plus an exited member of a live team and a seat on call; `rollup()` sums them over live teams alone, so a working member of a wound-down team and a needs-you session in another were missing from the row on 2026-10-20.
 
