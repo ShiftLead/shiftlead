@@ -66,6 +66,18 @@ def test_the_counts_are_items_and_a_running_steer_leaves_the_status_steer():
     assert (v["n"]["decide"], v["n"]["do"], v["n"]["needs_you"]) == (2, 0, 1)
 
 
+def test_the_page_headers_decide_counts_items_on_a_card_with_two():
+    """TD-920: a card with a question and a paused steer, and one with a running steer alone, read Decide 3 — the
+    cards with any Decide item would read 2."""
+    secs = {
+        "needs": [item("needs", "s#TD-3", id="a1", kind="ask"), item("needs", "s#TD-2", id="p1", kind="steer")],
+        "steering": [item("steering", "s#TD-1", id="s1", kind="steer", card="s#TD-1")],
+    }
+    v = queue_view(queue(), NOW, attach(secs, lambda e, sec: Markup(f"<{e['id']}>")))
+    one, two = v["up_next"]
+    assert one["wants"]["n"]["decide"] == 1 and two["wants"]["n"]["decide"] == 2
+    assert v["n"]["decide"] == 3
+
 def test_a_held_entry_is_no_want_and_draws_the_held_row():
     later = [
         {"row": "ledger", "id": "TD-3", "row_id": "ledger:s:TD-3", "why": "yours", "release": True,
