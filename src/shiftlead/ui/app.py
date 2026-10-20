@@ -143,6 +143,8 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_line,  # noqa: F401
     _usage_profiles,  # noqa: F401
     build_chip,  # noqa: F401
+    card_shape,  # noqa: F401
+    card_whole,  # noqa: F401
     checkout_of,  # noqa: F401
     close_state,  # noqa: F401
     editor_file,  # noqa: F401
