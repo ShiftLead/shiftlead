@@ -122,6 +122,12 @@ def test_the_colours_are_tokens_in_both_themes():
         assert not re.search(r"#[0-9a-fA-F]{3,8}\b", line), line  # no literal colour: a token, so each theme's
     used = set(re.findall(r"var\(--(needs|waiting|working|ended|done)\)", "\n".join(rules)))
     assert used == {"needs", "waiting", "working", "ended", "done"}
+    # the box is the Queue page's alone, and outranks the older `.qcard` border rules; the Repo page's board keeps
+    # its one-column box (`bcards`)
+    box = next(line for line in css.splitlines() if line.startswith(".qcards:not(.bcards) > .qcard"))
+    assert "border-left: 4px solid var(--qedge" in box and "border-radius: 6px" in box
+    repo = (CSS.parents[1] / "templates/repo_part.html").read_text()
+    assert 'class="qcards bcards"' in repo
     root = css[css.index(":root {") : css.index("}", css.index(":root {"))]
     for token in used:
         assert f"--{token}:" in root

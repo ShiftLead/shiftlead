@@ -10,8 +10,7 @@
    card carries its place, a grip and ⤒ ↑ ↓ — its place **per repo** (§4.5a *Queue page, Up next: the number*,
    TD-901): a Repo page draws the repo's own (`repo`), and where the home reads more than one repo (`c.chips`)
    the Queue draws one number per repo, each with its repo's chip; a Waiting one (TD-918) its wait column there,
-   no grip and no arrows, a teal stripe and its wait phrase as its status; an In progress one a green stripe and *d/m done* where the
-   status would be. Each card is its own box, its 4 px left edge `c.edge` (amber for a Decide or Do item, else
+   no grip and no arrows, its wait phrase as its status; an In progress one *d/m done* where the status would be. Each card is its own box, its 4 px left edge `c.edge` (amber for a Decide or Do item, else
    teal Waiting, else green In progress, else grey; TD-915). Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
 {% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, want, read, held, pill, controls %}

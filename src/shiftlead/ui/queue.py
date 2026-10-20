@@ -431,7 +431,8 @@ def _tree(rows: list[dict[str, Any]], top: str) -> list[dict[str, Any]]:
             depth = max(int(r.get("depth") or 1), 1)
             r["rails"] = [*(up + ["open"] * depth)[: depth - 1], branch(r)]
             out.append(r)
-            walk(str(r.get("qid") or ""), r["rails"])
+            if r.get("qid"):
+                walk(str(r["qid"]), r["rails"])
 
     walk(top, [])
     for r in rows:
@@ -440,7 +441,8 @@ def _tree(rows: list[dict[str, Any]], top: str) -> list[dict[str, Any]]:
             depth = max(int(r.get("depth") or 1), 1)
             r["rails"] = [*["open"] * (depth - 1), branch(r)]
             out.append(r)
-            walk(str(r.get("qid") or ""), r["rails"])
+            if r.get("qid"):
+                walk(str(r["qid"]), r["rails"])
     return out
 
 
