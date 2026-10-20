@@ -1,11 +1,10 @@
 # ADR 2026-10-19: The Queue card — three wants, three verbs, a Waiting group, items that lead with one sentence
 
-Status: **proposed, held** — drawn with Paul on 2026-10-19 over an afternoon of rounds on two review
-pages built from the live ledger ([the card](../mockups/reviews/2026-10-19-queue-card.html),
+Status: **agreed, held for Paul's lift** — the review rounds converged on 2026-10-19 (round 6 READY, below);
+drawn with Paul the same day over an afternoon of rounds on two review pages built from the live ledger ([the card](../mockups/reviews/2026-10-19-queue-card.html),
 [the page](../mockups/reviews/2026-10-19-queue-redesign.html), its shot
 [`2026-10-19-queue-redesign.png`](../mockups/reviews/2026-10-19-queue-redesign.png)). TD-909 carries it; its
-`Blocked by: decision (paul)` stands until the review rounds below converge, then the designer's round writes
-it into §4.4 *The Queue: cards, and the rank that orders them*, §4.5 screen 12, §4.5a and §4.10, and the
+`Blocked by: decision (paul)` stands until Paul lifts it, then the designer's round writes it into §4.4 *The Queue: cards, and the rank that orders them*, §4.5 screen 12, §4.5a and §4.10, and the
 build entries follow. Where this ADR and the design differ once that lands, the design is what is true.
 It amends [ADR 2026-10-15](2026-10-15-queue.md), which stands for everything it does not touch: the one-card
 rule, the top entry, rows, the rank, the Inbox split, the trial.
@@ -140,8 +139,8 @@ Whatever the item's kind, the person does one of three things, and the words are
   it), and a third key, *card*, for any chosen entry that is neither `Owner: paul` nor a `decision (paul)`
   hold, reads *I opened this session from the Queue to work the card around TD-n*; then, for every key, **the
   id-list sentence** — *Its entries are: waits on me — <ids>; the rest — <ids>*, each `<repo>#TD-n`,
-  comma-separated, *waits on me* the Decide and Do ledger entries — ids only, never an entry's own words
-  (§4.5a); then today's closing sentences unchanged (*check the code and the design for what is already
+  comma-separated, *waits on me* the Decide and Do ledger entries, either group *none* when empty (a card
+  whose only want is a red PR has no such entry) — ids only, never an entry's own words (§4.5a); then today's closing sentences unchanged (*check the code and the design for what is already
   built or decided*, *I drive this one*), so the three keys read in one voice. **The session's claim is the
   tick's derived one** from the branch `td-<n>` (§4.8): `reports.derive` writes it from the branch alone and
   never calls `claim_refusal`, which only a declared `ao progress claim` meets; `work.md` runs none, so a
@@ -349,3 +348,6 @@ the split the readers' (`answers` the labels, `consequences` beside) with no wri
 named; one `work.md` template reshaped by key with the id list for every key and today's closing sentences
 kept; a held Waiting card starts on the card's chosen entry; the two design sentences on a held card moving
 and `rank.intent`'s words listed; §4.4 *Hold* gains the derived-claim sentence.
+Round 6 (Sonnet): **READY** — the six round-5 adoptions match the code and the design; one nit adopted, the
+id list says *none* for an empty group. Converged 2026-10-19: six rounds, three each, alternating from
+round 2 with a fix between each.
