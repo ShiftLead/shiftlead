@@ -80,6 +80,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-920 | #2181's Queue header `Decide n` counts items, and no test has a card with two Decide items (test audit) | Low | Open |
+| TD-921 | #2188 added two help texts and two §4.5a help-list entries and no `docs/design-history.md` line (docs audit) | Low | Open |
 
 ---
 
@@ -1667,5 +1668,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** One test over a card with two Decide items (a question and a paused `steer`) and one with a single item: the header's `decide` is 3, not 2. Revert the line and see it fail.
 
 **Done when** the probe above fails a test.
+
+---
+
+## TD-921: #2188 added the help texts of **answers, Answer…** and **⋯** to §4.5a's help list and to `help.py`, and wrote no line of `docs/design-history.md` for them
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-20 (docs audit of #2182–#2192, docs-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design-history.md` (the `## 4.5a Controls` section, its newest lines); `docs/design/4.5a-controls.md` *The help text*
+
+**Why:** The repo's rule (CLAUDE.md): a change to the design gets its dated fact in `docs/design-history.md` under the same section. #2188's diff to `docs/design/4.5a-controls.md` adds two entries to *The help text* (`- **answers, Answer…** (Queue card)` and `- **⋯** (Queue card)`) and to `src/shiftlead/ui/help.py` (`card-answers`, `card-dots`, in the Queue screen's list), and touches `docs/design-history.md` not at all. Its sibling #2186 did write the line for its own (`2026-10-19 (TD-912, grinder-ao-2): *The help text* gains **Start session** (Queue card), after **Read n** …`), as TD-903 and TD-901 did before it. `grep -n 'TD-914' docs/design-history.md` on `origin/main` finds only the TD-909 review lines, none that says the help text was added. The TD-909 line at 4.5a says only that help text *is its build's*.
+
+**Fix:** One line under `## 4.5a Controls`, above its newest: *2026-10-20 (TD-914, grinder-ao-1): *The help text* gains **answers, Answer…** and **⋯** (Queue card), after **Start session** on the Help page's *Queue* screen.*
+
+**Done when** `grep -n 'TD-914' docs/design-history.md` finds that line under `## 4.5a Controls`.
 
 ---
