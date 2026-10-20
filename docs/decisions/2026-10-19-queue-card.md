@@ -53,16 +53,22 @@ pick order the repo's lanes read among what is pickable. A Waiting card is unnum
 and no ⤒ ↑ ↓; its rank line is untouched, it stays a neighbour in the whole order (§4.4 *A move lands*: a
 drop between two Up next cards may land either side of a Waiting card between them, which nobody sees), and
 it says the place it would take today if its wait ended, *would be 1 in shiftlead*, one per repo for a card
-spanning repos. When the wait ends the card is Up next at that place.
+spanning repos. `rank_move` refuses a Waiting card's ids and a Waiting neighbour, as it refuses an In
+progress card's; §4.4's *Up next is every other open card* becomes *every open card that is neither In
+progress nor Waiting*; the group's heading reads *Waiting (n)*, and *n of m* while a pick is on, as the
+others do. When the wait ends the card is Up next at that place.
 
 **The wait column.** Where Up next draws the number, a Waiting card draws, at the same size and strength
 with the repo chip under it: the top entry's own `Waits:` date, *Oct 30*; else *event* when the top entry
 waits on an event; else the earliest `Waits:` date among its open members (the first moment anything on the
 card can be picked); else *event* when any member waits on one; else the word for the reason — *settling*,
-*blocked*. Its status at the right is the whole phrase for the same member: *waits until Oct 30*, *waits on
+*not live* (a live check whose build is not live), *blocked*. **The column and the phrase always come from a
+leaf**: a member that waits for a reason of its own, never one that waits only on open ids — a card is
+Waiting only when every chain of open ids ends in such a leaf, so one always exists — and when several
+leaves tie on the rule above, the one with the lowest key supplies both. Its status at the right is the
+whole phrase for the same member: *waits until Oct 30*, *waits on
 the next launch whose first hook is lost*, *settling*, *blocked: decision (techlead)*, *blocked: dev-cadence#TD-119
-unresolved*, *blocked: no lane takes it* — for the member the column was read from, and when several members
-wait on events, the first of them by key. **The word *blocked* is kept** in the phrase for a card time will
+unresolved*, *blocked: no lane takes it*, *not live #1838* — for the leaf the column was read from. **The word *blocked* is kept** in the phrase for a card time will
 not free, so a typo'd id or an outside decision does not read as a date to wait for; such a card is in
 Waiting because nobody can pick it, and reads *blocked* so the person knows why. Up next is then what is
 pickable now, needs the person, or is held by the person (*held (person)* stays in Up next, §4.5 screen 12).
@@ -75,7 +81,7 @@ A card can want three things of the person, and the section names say which:
 | Want | What it is today | Where it is drawn |
 |---|---|---|
 | **Decide** | an `ask` with or without answers; a `steer`, running (with its countdown and Go with it) or paused; a board line of kind `decide`, `act` or `look` (cadence §3.3); a `Blocked by: decision (paul)` hold (*Lift the hold* its answer); an entry with `Answers:` | the header, open, amber, counted |
-| **Do** | an entry whose `Owner:` is the person (*yours*); a red PR nobody holds that names the entry, in a repo no team services (§4.5a *Inbox row: red PR*) — its answer is **Open**, no Snooze on the card, and Start session never chooses it (it is no entry) | the header, open, amber, counted |
+| **Do** | an entry whose `Owner:` is the person (*yours*); a red PR nobody holds that names one of the card's entries, in a repo no team services (§4.5a *Inbox row: red PR*; the card is In progress, its PR open) — the row stays in the Inbox, counted once there as today; the card draws it as a Do item, *#n red — Open*, counted in the pill only, never a second top-bar count, amber; no Snooze on the card, and Start session never chooses it (it is no entry) | the header, open, amber, counted |
 | **Read** | FYI (notes, the trail, a `watch` or `fyi` board line), *Answered for you*, *Waiting on them* (an answered ask or steer, a decided line its session has not landed) | under the rows, **folded, with its count**, uncounted |
 
 Decide and Do both colour the card amber and both are counted on its pill, *Decide 1 · Do 1*; the page
@@ -113,17 +119,27 @@ Whatever the item's kind, the person does one of three things, and the words are
   be *for you*; in its place it checks that the entry is open and is the card's choice as the reading has
   it now — **`start`, the chosen entry's id on each card of the `queue` reading**, one value the button and
   the road both read (Do, `Answers:` and `decision (paul)` are ledger facts, so `sessionorc.queue` owns it). The entry the session is started on — its repo's team, its worktree `td-<n>`, its branch,
-  and so the claim the tick derives — is **the card's Do entry when it has exactly one, else its first
+  and so the claim the tick derives — is **the card's Do ledger entry when it has exactly one (a red PR is never counted), else its first
   Decide ledger entry (an `Answers:` entry or a `decision (paul)` hold, by key), else the top entry**,
   **chosen by key alone, never by what is already claimed**, so two presses choose the same entry; a
   card spanning repos starts on that entry's repo's team and names the rest. **The claim is owned**: the
-  person's session holds that entry while it lives — the claim is in the reading's `held`, which is what
+  person's session holds that entry while it lives — the claim is in the reading's `held`, the claims map, which is what
   the lanes read — the card is In progress, and the row carries the session's pill, reading *held by
   td-<n>* where it has a state word; a row of the person's keeps its need and a held row its *held
   (person)*, `_state`'s order. On a card with nothing of the person's the held entry is the top entry, taken
   from the lanes for as long as the session runs, which is the person's call. The opening prompt is `briefs/work.md` extended with **an id list** — the card's entries,
-  and which of them are Decide and Do — ids only, never an entry's own words (§4.5a); any chosen entry that is
-  neither `Owner: paul` nor a `decision (paul)` hold takes a third `why_key`, *card*, with its fixed words.
+  `<repo>#TD-n`, comma-separated, in two labelled groups, *waits on me* (the Decide and Do ledger entries)
+  and *the rest* — ids only, never an entry's own words (§4.5a); any chosen entry that is neither `Owner:
+  paul` nor a `decision (paul)` hold takes a third `why_key`, *card*, whose fixed words are: *I opened this
+  session from the Queue to work the card around TD-n. Its entries are: waits on me — <ids>; the rest —
+  <ids>. Read them, tell me in a few lines what you would do first, then wait for me.* **The session's claim
+  is the tick's derived one** from the branch `td-<n>` (§4.8); `work.md` runs no `ao progress claim`, so a
+  held or settling entry, on which a claim is refused, still starts — on a held entry the person's own
+  start is the person's own window, the hold stays and the claim is derived anyway. **The person's own
+  session** is a record with `unattended: false` and no caller (§4.5a *Inbox row: ledger entry*); any other
+  holder of the chosen entry, a lead's interactive session included, is *held by <name>*. With several of
+  the person's own sessions on the card, Open session goes to the one holding the chosen entry, else the
+  first by id.
   While **the person's own interactive session** holds any of the card's entries the button reads **Open
   session** and goes there, **whatever holds the chosen entry** — the button is once per card and the
   person's session is where the card's work is; the road does the same before it starts anything, so a
@@ -131,7 +147,9 @@ Whatever the item's kind, the person does one of three things, and the words are
   and an unattended worker on the chosen entry, the button is absent, the row says *held by <name>*, and the
   road refuses a stale press with 409 *held by <name>* rather than handing the person that worker's Focus. The existing refusals (no
   servicing team, the name not free, the team on another host) still fall to the filled New session form.
-- **⋯** — the team's controls, behind one visible mark on the card's header and on each row and item:
+- **⋯** — the team's controls, behind one visible mark on the card's header and on each row and item; **the
+  header's ⋯ acts on the top entry, a row's on the row**, and Hold is in the header's only where the top
+  entry is open and eligible (§4.5a *Repo page: Hold*):
   **Hold** (*keep the team off this*, the one "not now" that survives on a card, because it stops a lane
   and is not about the person) or **Release** on a held row, **Back to design…**, **Done…** on an entry
   (not an `Owner: paul` row, whose Done is an answer, and not a design with open builds, as today), **Open**
@@ -151,9 +169,12 @@ board, the Inbox's own, and **Overrule** on an *answered for you* item beside it
 - **The header's right edge** reads, in order: the move arrows, Start session and ⋯, a gap, then the facts —
   *n entries*, *Read n* when the card is folded and has Read items, and one status. The status ends the
   line. On an Up next card the status is the ledger's word or the amber pill with its counts; on a Waiting
-  card the wait phrase; on an In progress card *d/m done* beside *in review #n*.
+  card the wait phrase, with the pill, *steer* or *stalled* beside it when the card has one, as an In
+  progress card's sits beside *d/m done*; on an In progress card *d/m done* beside *in review #n*. The
+  phrase ends the line.
 - **Each card is its own box**: a border, a gap to the next, and a 4 px left edge in the card's colour —
-  amber for Decide or Do, teal for Waiting, green for In progress, grey otherwise. (In the mockup three
+  in this order of precedence: amber for any Decide or Do item, else teal for Waiting, else green for In
+  progress, else grey. (In the mockup three
   Waiting cards ran together under a 1 px rule; the box is what Paul chose.)
 - **The rows' tree is drawn**: a 2 px rule down each level's left edge in the branch's colour — green a done
   row, teal a waiting one, amber the person's, grey open. The state word stays (*after TD-875*, *waits
@@ -195,14 +216,19 @@ part lives is fixed per kind**:
 |---|---|---|---|
 | an `ask` or `steer` to the person | its first paragraph | its second paragraph | the rest, under *context* |
 | a board line | its line, before `Context:` (cadence §3.3) | `Answers:`, each `text — what it leads to`; `Recommended:` | the item's sub-bullets |
-| a ledger entry that waits on the person | a new **`**Ask:**`** line **in the entry's body, beside `**Why:**` and `**Fix:**`, never in the header block** (ledgerboard validates the header field by field and rejects an undeclared one on an edited entry; `Answers:` goes in the body for the same reason) — new to cadence §2's entry shape | `**Answers:**`, each `text — what it leads to` | `**Why:**` and `**Fix:**`, as today |
+| a ledger entry that waits on the person | a new **`**Ask:**`** line **in the entry's body, beside `**Why:**` and `**Fix:**`, never in the header block** (ledgerboard validates the header field by field and rejects an undeclared one on an edited entry; `Answers:` goes in the body for the same reason) — new to cadence §2's entry shape | `**Answers:**`, each `text — what it leads to` | `**Why:**` and `**Fix:**`, as today; **an entry with no `Ask:` yet** (the backfill lands after the read-back) draws its title as the sentence and Why and Fix under *context*, as today |
 
 **The test for one sentence is a reader of its own beside `subject_of`**, `mail.one_sentence(text)`: the
 first paragraph, folded, is within `FIRST_PARA_WORDS` (60) and the subject rule's sentence pattern (§4.10: to
 the first `.`, `?` or `!` followed by a space or the end) matches all of it, with inline code spans skipped
 before the match. `subject_of` itself cannot be the test: it clips at `SUBJECT_CHARS` (80). An id or an
 abbreviation followed by a space (*TD-909. Which…*, *e.g. this*) fails the pattern; that is a false warning,
-and a warning is all it is (below). No rule on answers: an open question is legitimate (cadence §3.3: *when
+and a warning is all it is (below). **The answers' split** is cadence §3.5's `a | b` grammar with one addition: an answer splits on its first
+` — ` (space, em dash, space); the left part is the label, carries the `(default)` marker, and is what
+the press writes to `Decided:` or sends as the answer; the right part is drawn as the consequence only; a
+reader without the card mode, and a board line or `--answer` with no dash, shows and sends the whole string
+as today, and a board line with no consequence draws bare answers. That is a change to cadence §3.5 and to
+ledgerboard's `ANSWERS_RE` reader (the dev-cadence entry's). No rule on answers: an open question is legitimate (cadence §3.3: *when
 only the person can know, say so and mark no default*), and Answer… is for the person's own words.
 
 **The home warns, never refuses** — §4.10's rule stands, and this ADR does not amend it (an earlier draft
@@ -251,7 +277,8 @@ samples *starved*, not *idle with work*, §4.4 *A member's own count*) and its c
 below it is flagged for it; `_passed_over` reads Up next alone and skips every record that is not unattended).
 The read-back lists the person's claims with their spans beside the two readings.
 The rest change what the person sees and may land now:
-- the `waits` predicate, the Waiting group, numbering over Up next alone, the wait column and phrases (§1;
+- the `waits` predicate, the Waiting group with its heading *Waiting (n)*, numbering over Up next alone,
+  `rank_move`'s refusal, the wait column and phrases (§1;
   the `queue` reading, `queue_part.html`, `queue_card.html`; the mockup's TD-900 card, drawn Up next with
   *after TD-904*, is Waiting under §1 with *event* in its column — the mockup was corrected, and its TD-905 row, drawn *after
   TD-904*, reads *waits on an event* as the ledger has it; its blurb's *the item you came from* under Start
@@ -263,8 +290,8 @@ The rest change what the person sees and may land now:
   §4.5a row, Delete and Pause inside it (§3)
 - the box, the tree's rules, mentions deduplicated, the one-line Read item, the `card` mode of each
   renderer (§4)
-- dev-cadence: the `Ask:` line in cadence §2's entry shape (a body line, ledgerboard untouched), §3.3's
-  consequences per answer, the briefs, the cadence check's warning, `mail.one_sentence` (§6; a dev-cadence
+- dev-cadence: the `Ask:` line in cadence §2's entry shape (a body line, nothing for ledgerboard to
+  validate), the answers' ` — ` split in §3.5 and ledgerboard's reader, the briefs, the cadence check's warning, `mail.one_sentence` (§6; a dev-cadence
   entry first, then this repo's); the backfill, after TD-772
 - help text and §4.5a rows for every control whose words change, the filter row's *Needs you (n)* and the
   kind pick's words among them, and display-only rows for the wait column with *would be n* and for *Read n* (bound to `help.py`: the build entry's; run `grep -ln 4.5a tests` first,
@@ -292,3 +319,10 @@ waits on TD-x; a row of the person's keeps its need over *held by*; Open session
 the road goes there before it starts; the red PR row is a Do item; Overrule, Send to reviewer and a decided
 line's Done placed; a held card reads *held (person)*, never *ready*; the widened road moves both readings
 down, said so; `start` on each card of the reading; display-only §4.5a rows named.
+Round 4 (Sonnet, NOT READY, no contradictions, 12 decisions left to a builder; adopted): the answers' ` — `
+split and its cadence §3.5 / ledgerboard change; the red PR row's count and card; the column and phrase from
+a leaf, *not live* added (not adopted: *after TD-n* as a column word — a member waiting only on open ids is
+never a leaf); the header's ⋯ acts on the top entry; the pill beside a Waiting card's phrase and the edge's
+precedence; the person's own session defined, several sessions ordered; an entry with no `Ask:` yet draws
+its title; the *card* prompt's words and the id list's format; the claim is the tick's derived one, a hold
+stays; `rank_move` refuses Waiting; *Waiting (n)* in §8.
