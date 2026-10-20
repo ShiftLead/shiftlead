@@ -82,6 +82,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open — blocked by TD-911 |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
+| TD-919 | #2179's orphaned-ask pick (`mail.picks_answer` on the orphan path of `_msg`) has no test that would notice a revert (test audit) | Medium | Open |
 
 ---
 
@@ -1710,3 +1711,20 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
+## TD-919: #2179's orphaned-ask pick — a press of an answer on an orphaned question matches by `mail.picks_answer`, and no test reaches it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-20 (test audit of #2179, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_mail.py` (`_msg`, the orphan branch ~387–397: `or not mail.picks_answer(text, replied.answers[answer])`); `tests/test_ui_orphaned.py`, `tests/test_mail.py`
+
+**Why:** #2179 (TD-913) changed both pick checks in `_msg` from `text != replied.answers[answer]` to `mail.picks_answer`, so a press sends the label the reader drew and still matches the stored `<label> — <consequence>` line. Probe on `origin/main` 44b05f1dd: in the orphan branch (`sender == PERSON and replied.orphaned`) put `or text != replied.answers[answer]` back for `or not mail.picks_answer(text, replied.answers[answer])`, and the whole suite passes (`pdm run test`: 3759 passed, 1 skipped). The same revert in the other branch (`not mail.picks_answer(text.split("\n\n", 1)[0], said)`) fails a test, so the live-asker pick is covered and the orphan pick is not. The page's route sends the bare label (`suggested_answers` of the labels alone, `app.py` ~4614), so with the revert a person's press on an orphaned ask whose answer has a consequence is refused with *that is not one of the suggested answers, word for word*.
+
+**Fix:** In `tests/test_ui_orphaned.py` or `tests/test_mail.py`, one test over a real orphaned `ask` whose stored answer is `<label> — <consequence>`: a person's `reply` with `--pick` and the label as its text is answered (the board and the reference holder told, as `_answer_orphan` does), the whole stored line too, and a word that is neither is refused. Revert the line and see it fail.
+
+**Done when** the orphan-branch revert above fails a test.
+
+---
