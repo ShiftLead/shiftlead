@@ -76,7 +76,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
 | TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Agreed — the hold lifted; the designer's round is next |
-| TD-910 | The ledger row's page route (#2162): `road` and a hold's `why` are posted by no test, and the fields the home builds for the row's controls are asserted by none | Medium | Open |
 
 ---
 
@@ -1590,26 +1589,3 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-910: The ledger row's controls (#2162): the page route's `road` and `why`, and the `page` / `blocked_open` / `builds_open` / `hold_why` the home builds for them, have no test
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-20 (test audit of #2162, #2163, #2167, test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`api_person_action`'s `road` branch, `api_ledger_hold`'s `why`, `road_refusal`'s flow-stage loop); `src/shiftlead/ui/inbox.py` (`ledger_for_you`'s four new keys); `src/sessionorc/queue.py` (`page`, `blocked_open`, `builds_open`); `tests/test_row_controls.py`
-
-**Why:** #2162 tests the controls' macro with hand-written row dicts (`test_row_controls.py::_controls`) and the home's `ledger_decide` over RPC (`test_board.py`), but nothing joins them. Probes, each reverting one line of #2162 on `origin/main` and running the PR's tests (`test_row_controls.py`, `test_board.py`, `test_settle_pages.py`, `test_ui_board.py`, `test_ui_inbox.py`, `test_ui_queue*.py`, `test_queue.py`, `test_repo_facts.py`) — every one still passes:
-- `api_ledger_hold`: `more = {"why": why} if why else {}` → `more = {}` — **Hold…**'s words never reach the home; `test_settle_pages.py` posts the route with no `why`, and the only `why` tests call `td_hold` directly.
-- `api_person_action`: `raise HTTPException(409, why)` → `pass`, and `if not repo.startswith(("/", "~")):` → `if False:` — the route's refusal and its Queue-row name-to-checkout lookup run in no test; no test posts `road` to `/api/person/…`.
-- `road_refusal`: the `under is not None and any("design-first" in st.lane for st in under.flow.stages)` clause → `False` — the stage-lane road (the one the line above it in the docstring promises) is never taken; `test_back_to_design_is_refused_…` uses member lanes only.
-- `inbox.py` `ledger_for_you`: `"builds_open": …` → `False` and `"hold_why": …` → `""`; `queue.py`: `"builds_open": …` → `False`. `grep -rn "builds_open\|hold_why\|blocked_open" tests` finds them only in `test_row_controls.py` (the macro fed a hand-built dict) — so a row the home draws could lose **Done…**'s guard on a design with open builds, or the held words, and the macro's test would still pass on its own fixture.
-
-**Fix:** (1) a route test: POST `/api/ledger/hold` with `why` and read the `td_hold` call; POST `road` through `/api/person/ledger` for a Queue row's name, for a repo no team services (409), and for one a stage lane serves. (2) a test that feeds `ledger_for_you` and `queue.build` a ledger with a design, its open build, a blocked row and a held row and asserts the four keys per row, then renders `queue_row.controls` from that output, not a literal.
-
-**Done when** reverting any of the lines above fails a test.
-
-**Related:** TD-905, TD-900.
-
----
