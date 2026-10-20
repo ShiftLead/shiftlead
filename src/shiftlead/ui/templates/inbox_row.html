@@ -124,7 +124,7 @@
   {%- set pair = look_pair(e) %}
   {%- for a in opts %}
   {%- set form = pair and loop.index0 == 1 %}
-  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and (a == e.default or (e.kind == 'steer' and e.recommended == loop.index0)) %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}

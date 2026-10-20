@@ -25,8 +25,13 @@ import re
 from html import escape
 from urllib.parse import urlsplit
 
+from sessionorc.mail import SENTENCE
+
 # §4.5a *Inbox row: details*: the backstop for text nobody shaped — no blank line and longer than this.
 FOLD_CHARS = 300
+# design §4.10 *How a message to a person is written* (TD-127, built by TD-139): past this many words
+# the first paragraph is more than the person reads before deciding, and `ao msg` says so.
+FIRST_PARA_WORDS = 60
 
 _FENCE = re.compile(r"^[ \t]*```")
 _UL = re.compile(r"^[ \t]*-[ \t]+(.*)$")
@@ -39,6 +44,7 @@ _INLINE = re.compile(
 )
 # the end of a sentence, for the backstop: a stop and then white space or the end
 _SENTENCE_END = re.compile(r"[.!?][)\"'”’]*(?=\s|$)")
+_CODE_SPAN = re.compile(r"(`+).+?\1")
 
 
 def _netloc(url: str) -> str:
@@ -206,6 +212,22 @@ def fold(text: str) -> tuple[str, str]:
     ends = [m.end() for m in _SENTENCE_END.finditer(t, 0, FOLD_CHARS)]
     cut = ends[-1] if ends else FOLD_CHARS
     return t[:cut].rstrip(), t[cut:].strip()
+
+
+def one_sentence(text: str) -> bool:
+    """design §4.10 *An item leads with one sentence* (TD-913): whether the text's first paragraph
+    (`paragraph_break`, else the whole text), folded, is one sentence — within `FIRST_PARA_WORDS` and
+    matched whole by the subject rule's sentence pattern (`sessionorc.mail.SENTENCE`), its inline code
+    spans skipped first so a stop inside one ends nothing. An id or an abbreviation followed by a space
+    (*TD-909. Which…*, *e.g. this*) fails it: a false warning, and a warning is all it is."""
+    split = paragraph_break(text)
+    first = split[0] if split is not None else (text or "")
+    flat = " ".join(first.split())
+    if not flat or len(flat.split()) > FIRST_PARA_WORDS:
+        return False
+    bare = " ".join(_CODE_SPAN.sub("code", flat).split())
+    m = SENTENCE.match(bare)
+    return m is not None and m.group(1) == bare
 
 
 # §4.5a *Inbox board row: text* (TD-279): how far into a board line its bold head may start — past

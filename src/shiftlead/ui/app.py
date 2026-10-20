@@ -4610,7 +4610,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if isinstance(answer, bool) or not isinstance(answer, int):
                     raise HTTPException(400, "a suggested answer is picked by its index")
                 held = next((e for e in (await call("inbox"))["entries"] if e.get("id") == ref), None)
-                offered = suggested_answers(held or {})
+                # the labels alone (§4.10 *The answers' split*, TD-913): what the home matches the index by
+                offered = suggested_answers({"answers": (held or {}).get("answers")})
                 if not 0 <= answer < len(offered):
                     raise HTTPException(400, "that is not one of the suggested answers")
                 text = offered[answer]
