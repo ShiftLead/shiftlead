@@ -29,15 +29,20 @@ one combined, recency-sorted index (e.g. --repo ~/samscrape --repo ~/contractmat
 names that repo's path (absolute, or ~/-relative) — work on repo A routinely
 happens from a session running in repo B, and its transcript lives under B.
 `--roster --mentioning <this repo>` lists the candidates from every repo on the
-machine. A path in a transcript is a heuristic: it surfaces candidates for a
-person or the sweeping session to judge; it decides nothing.
+machine. Three signals make a candidate, each named on the session's `via:` line:
+the transcript names the repo's path or any of its worktrees'; the session started
+in a worktree of the repo outside the repo's dir (its transcripts are scanned too);
+or the transcript names a commit of the repo (any ref) made while the session ran.
+Each is a heuristic: it surfaces candidates for a person or the sweeping session to
+judge; it decides nothing.
 
 --format text (default) prints terminal-friendly blocks; --format md renders a
 markdown overview table plus per-session detail sections (what the
 generate_session_index.sh cron wrapper writes to docs/session_index.md).
 
 Resume a listed session with the line each block prints (Claude Code: claude --resume <session-uuid>;
-Gemini CLI: gemini --resume <session-uuid>, run from the directory the block names).
+Gemini CLI: gemini --resume <session-uuid>, run from the directory the block names; Codex:
+codex resume <session-uuid>).
 A tool the `agents` setting lists that the adapter cannot read is named on stderr, not skipped.
 """
 
@@ -267,6 +272,8 @@ def print_text(sessions: list[dict], live: dict, parked: dict) -> None:
             print(f"  started: {s['first_user']}")
         if s["last_assistant"]:
             print(f"  ended:   {s['last_assistant']}")
+        if s.get("via"):
+            print(f"  via:     {s['via']}")
         for item in parked.get(s["id"][:8], []):
             print(f"  parked:  {_clip(item, 200)}")
         print(f"  resume:  {_resume(s, live)}")
@@ -311,6 +318,8 @@ def print_md(sessions: list[dict], live: dict, parked: dict) -> None:
                            ("started", "first_user"), ("ended", "last_assistant")):
             if s[key]:
                 print(f"- **{label}:** {s[key]}")
+        if s.get("via"):
+            print(f"- **via (--mentioning):** {s['via']}")
         for item in parked.get(s["id"][:8], []):
             print(f"- **parked (board item, needs action):** {item}")
         print(f"- **resume:** `{_resume(s, live)}`" if s["id"] not in live
@@ -353,19 +362,47 @@ def roster_repos() -> list[Path]:
     return out
 
 
+def _git(repo: Path, *args: str) -> str:
+    """A git command's stdout in repo, or "" when it fails or git is absent."""
+    try:
+        r = subprocess.run(["git", "-C", str(repo), *args],
+                           capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return r.stdout if r.returncode == 0 else ""
+
+
+def main_checkout(spec: str) -> "Path | None":
+    """The main checkout of the git repo a path is in (a worktree maps to it), or None."""
+    common = _git(Path(spec).expanduser().absolute(), "rev-parse", "--path-format=absolute", "--git-common-dir").strip()
+    return Path(common).parent if common else None
+
+
+def worktrees(main: Path) -> list[Path]:
+    """Every worktree git knows for the repo, its main checkout included (TD-28's
+    worktree signal: a worktree outside <repo>/.claude/worktrees is a path no needle
+    built from the repo's own path would match)."""
+    return [Path(line[9:]) for line in _git(main, "worktree", "list", "--porcelain").splitlines()
+            if line.startswith("worktree ")]
+
+
+def outside_worktrees(main: Path) -> list[Path]:
+    """The worktrees not under the main checkout's dir: one under it already matches as
+    the repo's path, and a needle per worktree is a regex search per transcript."""
+    return [w for w in worktrees(main) if w != main and main not in w.parents]
+
+
 def mention_needles(spec: str) -> list[bytes]:
     """The spellings a transcript may use for a repo: the path as given and resolved
     (a symlinked checkout), each also ~/-relative, and — when the path is inside a git
-    worktree — its main checkout's root, which is how other sessions usually name it."""
+    worktree — its main checkout's root, which is how other sessions usually name it,
+    and each of its worktrees outside that root (a path of its own, TD-28)."""
     given = Path(spec).expanduser().absolute()
     paths = [given, given.resolve()]
-    try:
-        r = subprocess.run(["git", "-C", str(given), "rev-parse", "--path-format=absolute", "--git-common-dir"],
-                           capture_output=True, text=True, timeout=5, check=False)
-        if r.returncode == 0 and r.stdout.strip():
-            paths.append(Path(r.stdout.strip()).parent)
-    except (OSError, subprocess.TimeoutExpired):
-        pass
+    main = main_checkout(spec)
+    if main:
+        paths.append(main)
+        paths += outside_worktrees(main)
     out: list[bytes] = []
     for p in paths:
         for form in (str(p), short_path(p)):
@@ -394,6 +431,78 @@ def mentions(path: Path, needles: list[bytes]) -> bool:
     return False
 
 
+# A commit id as a transcript prints one: git's short form or longer, lowercase hex,
+# with no hex either side (so never a slice of a longer hash; a uuid's group of 12 is a
+# token, and counts only if it begins a commit made in the window)
+HEX_TOKEN = re.compile(rb"(?<![0-9a-f])[0-9a-f]{7,40}(?![0-9a-f])")
+FIRST_TS = re.compile(rb'"(?:timestamp|startTime)"\s*:\s*"([0-9T:.+\-]{19,}Z?)"')
+WINDOW_SLACK = timedelta(minutes=5)   # a forge's merge clock against this machine's
+
+
+def repo_commits(main: Path, since: "datetime | None") -> list[tuple[datetime, bytes]]:
+    """The repo's commits on every ref (a squash merge reaches here only by a fetch):
+    (committer time, full id)."""
+    args = ["log", "--all", "--format=%H %ct"]
+    if since:
+        args.append(f"--since={int((since - WINDOW_SLACK).timestamp())}")
+    out = []
+    for line in _git(main, *args).splitlines():
+        sha, _, ct = line.partition(" ")
+        if len(sha) == 40 and ct.isdigit():
+            out.append((datetime.fromtimestamp(int(ct), tz=timezone.utc), sha.encode()))
+    return out
+
+
+def _window_start(path: Path) -> "datetime | None":
+    """When the session began: the first timestamp its transcript records."""
+    try:
+        with open(path, "rb") as f:
+            m = FIRST_TS.search(f.read(1 << 16))
+        when = datetime.fromisoformat(m.group(1).decode().replace("Z", "+00:00")) if m else None
+        return when.replace(tzinfo=timezone.utc) if when and when.tzinfo is None else when
+    except (OSError, ValueError):
+        return None
+
+
+def names_commit(path: Path, commits: list[tuple[datetime, bytes]]) -> "bytes | None":
+    """TD-28's commit signal: the first commit of the repo the transcript names (git
+    prints the id when it commits, merges or fetches) that was made while the session
+    ran — from its first timestamp to its last write. The window keeps a stray hex
+    token naming an old commit from counting, and leaves most transcripts unread: one
+    with no commit of the repo in its window is never opened. Like the path, it decides
+    nothing."""
+    try:
+        end = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc) + WINDOW_SLACK
+    except OSError:
+        return None
+    start = _window_start(path)
+    start = start - WINDOW_SLACK if start else None
+    by7: dict[bytes, list[bytes]] = {}
+    for when, sha in commits:
+        if when <= end and (start is None or when >= start):
+            by7.setdefault(sha[:7], []).append(sha)
+    if not by7:
+        return None
+    tail = b""
+    try:
+        with open(path, "rb") as f:
+            while True:
+                chunk = f.read(1 << 20)
+                buf = tail + chunk
+                # scan whole lines only: a hex run cut at the chunk's end is not a token
+                cut = buf.rfind(b"\n") + 1 if chunk else len(buf)
+                head, tail = buf[:cut], buf[cut:]
+                if any(k in head for k in by7):   # C-speed gate before the token scan
+                    for tok in HEX_TOKEN.findall(head):
+                        for sha in by7.get(tok[:7], ()):
+                            if sha.startswith(tok):
+                                return tok
+                if not chunk:
+                    return None
+    except OSError:
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--repo", action="append", dest="repos", metavar="PATH",
@@ -402,7 +511,9 @@ def main() -> int:
     ap.add_argument("--roster", action="store_true",
                     help="Also scan every repo on this machine's roster (cadence.md §9)")
     ap.add_argument("--mentioning", action="append", default=[], metavar="PATH",
-                    help="Keep only sessions whose transcript names this repo's path; repeatable (TD-28)")
+                    help="Keep only sessions with a sign of work on this repo — its path or a worktree's, "
+                         "a session started in an outside worktree, a commit of it made while it ran; "
+                         "repeatable (TD-28)")
     ap.add_argument("--limit", type=int, default=20, help="Max sessions to show (default 20)")
     ap.add_argument("--days", type=int, default=0, help="Only sessions active in the last N days (0 = all)")
     ap.add_argument("--chars", type=int, default=160, help="Blurb length (default 160)")
@@ -416,27 +527,37 @@ def main() -> int:
         if not repos:
             print("No repos: the machine roster is empty or missing, and no --repo was given.")
             return 1
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=args.days) if args.days else None
     needles: list[bytes] = []
+    commits: list[tuple[datetime, bytes]] = []
+    elsewhere: list[Path] = []   # worktrees of a mentioned repo outside its dir (TD-28)
     for m in args.mentioning:
         needles += [n for n in mention_needles(m) if n not in needles]
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=args.days) if args.days else None
+        main_ = main_checkout(m)
+        if main_:
+            commits += repo_commits(main_, cutoff)
+            elsewhere += [w for w in (w.resolve() for w in outside_worktrees(main_))
+                          if w not in repos and w not in elsewhere]
 
     sessions = []
     scanned = 0  # transcript files read, for the TD-050 canary below
     parked: dict[str, list[str]] = {}
     missing = []
     blind: list[str] = []
-    for repo in repos:
+    for repo in repos + elsewhere:
         found = agent_sessions.history_dirs(repo)
         blind += [b for b in found.blind if b not in blind]
-        if not found.items:
+        if repo in elsewhere:
+            if not found.items:
+                continue   # a worktree no session started in: nothing to say
+        elif not found.items:
             missing.append(repo)
             continue
         for tool, d, wt_name in found.items:
             # NB wt_name comes from the munged project-dir name, so dots in a worktree
             # name display as dashes — display-only, and the path still names the repo.
             run_dir = repo / ".claude" / "worktrees" / wt_name if wt_name else repo
-            for f in d.glob("*.jsonl"):
+            for f in agent_sessions.transcripts(tool, d):
                 # --days by mtime BEFORE reading anything: across a roster, reading every
                 # transcript in full only to drop most of them is the expensive part
                 try:
@@ -444,20 +565,32 @@ def main() -> int:
                         continue
                 except OSError:
                     continue  # gone since the glob (a session exiting) — TD-053's race, here too
-                if needles and not mentions(f, needles):
-                    continue
+                via = ""
+                if needles:
+                    # TD-28's signals, cheapest first; each makes a candidate, none a verdict
+                    if repo in elsewhere:
+                        via = "ran in a worktree of it"
+                    elif mentions(f, needles):
+                        via = "names its path"
+                    elif sha := names_commit(f, commits):
+                        via = f"names commit {sha.decode()}, made there while this session ran"
+                    else:
+                        continue
                 scanned += 1
                 s = scan_session(f, args.chars) if tool == "claude" else _clipped(agent_sessions.scan(tool, f), args.chars)
                 if s:
                     s["where"] = short_path(run_dir)
                     s["tool"] = tool
+                    s["via"] = via
                     sessions.append(s)
+        if repo in elsewhere:
+            continue   # its board is the main checkout's, read already
         for sid, items in board_items(repo).items():
             parked.setdefault(sid, []).extend(items)
     if blind:
         # a tool the repo lists cannot be looked at: the index is partial, said first (TD-100)
         print(f"note: cannot see {'; '.join(blind)} — this index leaves those sessions out.", file=sys.stderr)
-    if len(missing) == len(repos):
+    if len(missing) == len(repos) and not sessions:
         print(f"No session transcripts found for: {', '.join(str(r) for r in repos)}"
               + (f" (cannot see {'; '.join(blind)})" if blind else ""))
         return 1

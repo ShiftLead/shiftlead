@@ -12,6 +12,18 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (ShiftLead design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-20 — Codex sessions are seen: `agents = "claude,codex"`
+Do: in a repo where Codex sessions run, list `codex` in `docs/cadence.toml`'s `agents`; the anchor guard, the reaper, `list_sessions.py` (`codex resume <uuid>`) and the sweep row then see them, and "cannot see codex" means no readable `${CODEX_HOME:-~/.codex}` (or `/proc`) here.
+See: cadence.md §1.13, §9.18; TD-102.
+
+## 2026-10-16 — the deep sweep's candidates from elsewhere now say why they are candidates
+Do: in `/stranded-work deep`, read each candidate's `via:` line — besides naming the repo's path, a session is now a candidate when it started in a worktree of the repo outside its dir or names a commit of the repo made while it ran; judge each as before, stamp only this repo's board.
+See: stranded-work procedure (Deep additions); `scripts/list_sessions.py` (`--mentioning`); TD-28.
+
+## 2026-10-16 — A TD title is written for a person, in plain words
+Do: title a new entry with what is wrong (or wanted) and why it matters, in words someone who has not read the code can follow — the behaviour, not the function; no identifier opens it, evidence goes in the Why. Fix an old title when you next touch its entry.
+See: cadence.md §2.3; TD-120.
+
 ## 2026-10-16 — The pick order is the rank, and a `queue:` rank PR is a tool edit
 Do: pick in `ledger.py --pickable`'s order as before — it now reads `docs/technical_debt_rank.yml` (a tool's, never typed) and moves joined entries as one card; with no file, ties go by id. A `queue: rank|join|prune TD-… (<tool>)` PR touching only that file passes review with no comment.
 See: cadence.md §2.4, §7.9; ledgerboard SPEC *The rank*; TD-119.
