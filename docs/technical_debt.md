@@ -76,13 +76,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
 | TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Designed — built by TD-911–TD-918 (on dev-cadence#TD-121, #TD-122) |
-| TD-911 | Build TD-909 (2): Decide, Do and Read on a card, each renderer's `card` mode | High | Open — blocked by TD-918, TD-913 |
+| TD-911 | Build TD-909 (2): Decide, Do and Read on a card, each renderer's `card` mode | High | Open |
 | TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Open — blocked by TD-911 |
-| TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open — blocked by TD-911, TD-913 |
+| TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open — blocked by TD-911 |
 | TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open — blocked by TD-911 |
-| TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772, TD-913 |
+| TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
-| TD-918 | Build TD-909 (1): the Waiting group — unnumbered, unmoved, its wait column (a held path) | High | Open |
 
 ---
 
@@ -1711,20 +1710,3 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-918: Build TD-909 (1): a Queue card that waits sits in a Waiting group, unnumbered and unmoved, and says what it waits for where Up next draws the number
-
-**Priority:** High
-**Type:** feature
-**Added:** 2026-10-19 (TD-909's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2178
-**Status:** Built (2026-10-19, #2178, grinder-ao-2): the reading's `waits`/`wait`/`would_be` and group `waiting`, `_status`'s *held (person)* (no longer a need), `rank.intent` and `ao rank` refusing a Waiting card, `ao rank --list`'s Waiting lines, the Queue's Waiting group and wait column, the Repo board's gutter, the wait column's help. **Live check**, read-only, once #2178 is live (`ao promote status`): a headless GET of `/queue` draws *Waiting (n)* between In progress and Up next, each Waiting card with its wait column (a date, *event*, *settling*, *not live*, *blocked*), *would be n in <repo>* and its phrase, no grip; Up next is numbered from 1 with no gaps; `ao rank --list` prints the Waiting cards unnumbered after In progress, and `ao rank <a Waiting id> --top` is refused naming Waiting (refused before any move is made).
-**Location:** `src/sessionorc/queue.py` (`waits`, `wait`, `would_be`, `group`, `places` over Up next alone; `_status` gains *held (person)* and loses its *needs you* from a held row), `src/sessionorc/rank.py` (`intent`'s refusal), `src/shiftlead/cli.py` (`ao rank --list` ~3253), `src/shiftlead/ui/queue.py`, `templates/queue_part.html`, `queue_card.html`, `src/shiftlead/ui/repo_board.py` and `templates/repo_part.html` (a Waiting card's gutter on the Repo page's board), `src/shiftlead/ui/help.py`
-
-**Why:** TD-909: design §4.4 *Waiting*, *The card's status*, *A move lands*, *One owner*; §4.5 screen 12 *Waiting*, *Up next*; §4.5a *Queue page, Waiting: the wait column*, *Queue page, Up next: grip*, *Queue page: group heading*. On 2026-10-19 the Queue drew 197 cards Up next, 11 saying only *waiting* and card 1 waiting on a date eleven days out. A held path (`src/sessionorc/**`): the techlead reads it.
-
-**Fix:** (1) The reading: a card-level `waits` predicate as §4.4 *Waiting* says — the person's own set aside, `unreachable` and `NO_LANE` read first, never `_status`'s nested test — and `group` `waiting` for a card that is not In progress and `waits`; `places` numbered over Up next alone; `would_be` (one `{repo, n}` per repo, the place the card would take among Up next today); `wait {column, phrase, id}` from a leaf by the order §4.4 gives, a cycle with no leaf read as past reach. (2) `_status`: a *held (person)* row is no need; *held (person)* between *stalled* and *blocked* by one rule: split the open members into the held ones (waiting or not) and the rest; *held (person)* when at least one is held and every one of the rest waits by `_status`'s own nested test (not `waits`), or there is no rest; test a held member with a `Waits:` line beside a waiting one (*held (person)*) and beside a ready one (*ready*), and a held top entry with one child blocked only by it, and a card of held members that each have a `Waits:` line — those two *held (person)*, not *waiting*. (3) `rank.intent` refuses a Waiting card's ids and a Waiting neighbour, *TD-n's card is Waiting, which does not move*; `ao rank --list` prints Waiting cards unnumbered after In progress, each with its `wait.phrase` (§4.7). `waits` tests `NO_LANE` per member, apart from `_status`'s all-members test. (4) The page: the Waiting group between In progress and Up next, *Waiting (n)* and *n of m* while a pick is on, no grip and no ⤒ ↑ ↓ on its cards, the wait column at the number's size and strength with the repo chip and *would be n in <repo>* under it, the phrase as the card's status; on the Repo page's board a Waiting card's gutter draws the wait column and no grip (§4.5 screen 11 *For you*). (5) Help text, written into §4.5a's help list and `help.py` in this PR (`tests/test_help.py` holds them equal): **the wait column** (Queue page: Waiting) — *What the card waits for — a date, an event, settling, a build not yet live, or blocked — and the place it would take in Up next once the wait ends.*; and **the number**'s paragraph rewritten to end *…and a Waiting or In progress card has no number.*; run `grep -ln 4.5a tests` first, since §4.5a rows are test keys. Tests: a card blocked only by the person's `Owner: paul` entry is Up next; one blocked by it and by an open TD-x is Waiting on TD-x; the column's order (top entry's `Waits:` first, then the earliest date, then *event*, then the reason); a cycle reads *blocked: TD-a and TD-b block each other*; a typo'd id reads *blocked*; `rank_move` refuses a Waiting card; Up next numbers have no gaps.
-
-**Done when** the live Queue draws a Waiting group with the wait column and phrase, Up next is numbered over its own cards alone, and a Waiting card refuses a move.
-
----
