@@ -61,7 +61,8 @@
 {%- if e.detail %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}
 {%- else %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}
 {%- endmacro %}
-{#- a Decide or Do item drawn whole on a card folds its *context* in place of *details* (§4.5 screen 12) -#}
+{#- a Decide or Do item drawn whole on a card folds its *context* in place of *details*, drawn closed even with
+    answers to press and read on its first open (§4.5 screen 12 *An item's shape*) -#}
 {% macro fold(key, is_open, kind, e, rest=none) -%}
 {%- set label = 'context' if card_whole(mode, e) else 'details' %}
 <details class="fold" data-fold="{{ key }}"{% if is_open %} open{% endif %}
@@ -76,7 +77,7 @@
    its kind line, its one sentence, what each answer leads to, *context* folded, and its answers. -#}
 {% macro read_line(e, section) -%}
 {%- if mode == 'card' and e.want == 'read' %}
-<details class="cardline"><summary class="row gap mhead" title="open it: the whole item and its controls">
+<details class="cardline" data-fold="line:{{ e.row_id or e.id }}"><summary class="row gap mhead" title="open it: the whole item and its controls">
   <span class="ref">{{ e.from_name or e['from'] or e.repo or e.name or '' }}</span>
   {%- set by_mate = e.answered and not e.row %}
   <span class="badge kindmark k-{{ 'answered' if by_mate else (e.row or e.kind) }}">{{ 'answered for you' if by_mate else ('board · ' ~ e.kind if e.row == 'board' else (e.kind or e.row)) }}</span>
@@ -768,7 +769,7 @@
     the page keeps the person's press either way (`foldsOpen`, `foldsShut`). -#}
 {%- if e.rest or e.detail %}
 {%- set press = (e.answers and not e.decided) or e.pair %}
-{{ fold(e.id, fold_open or (e.detail and press), 'board', e) }}
+{{ fold(e.id, fold_open or (e.detail and press and not card_whole(mode, e)), 'board', e) }}
 {%- endif %}
 {%- for r in e.replies %}
 <div class="st boardreply">{{ r.by }}, {{ r.date }}: {{ md(r.text, origin, inline=True) }}</div>
@@ -1039,7 +1040,7 @@
 {%- else %}<div class="body{% if card_whole(mode, e) %} sentence{% endif %}"><b class="mono">{{ e.id }}</b> {{ e.title }}</div>{% endif %}
 {{ leads(e) }}
 {%- if e.detail %}
-{{ fold(e.row_id, fold_open or e.answers, 'ledger', e) }}
+{{ fold(e.row_id, fold_open or (e.answers and not card_whole(mode, e)), 'ledger', e) }}
 {%- endif %}
 {%- if e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">

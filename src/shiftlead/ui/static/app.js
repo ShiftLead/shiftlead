@@ -1343,7 +1343,7 @@
   // the capture runs before the summary's own toggling, so `d.open` is the state being left.
   const foldsOpen = new Set(), foldsShut = new Set();
   document.addEventListener?.("click", (ev) => {
-    const s = ev.target && ev.target.closest && ev.target.closest("details.fold > summary");
+    const s = ev.target && ev.target.closest && ev.target.closest("details.fold > summary, details.cardline > summary");
     const d = s && s.parentElement;
     if (!d || !d.dataset.fold) return;
     const id = d.dataset.fold;
@@ -1359,7 +1359,7 @@
     if (d) { if (d.dataset.fold) { foldsShut.delete(d.dataset.fold); foldsOpen.add(d.dataset.fold); } d.open = true; d.scrollIntoView({ block: "nearest" }); }
   });
   AO.reopenFolds = function (root) {
-    (root ? $$("details.fold", root) : []).forEach((d) => {
+    (root ? $$("details.fold, details.cardline", root) : []).forEach((d) => {  // a card's Read line too (TD-911)
       if (foldsShut.has(d.dataset.fold)) d.open = false;
       else if (foldsOpen.has(d.dataset.fold)) { d.open = true; AO.fillFold(d); }
     });

@@ -65,7 +65,7 @@ def test_a_mail_item_of_more_than_one_sentence_leads_with_its_subject_and_folds_
 def test_a_read_item_is_one_line_opening_to_its_row():
     e = entry("m-3", "note", text="the build is live.\n\nthe rest.", subject="the build is live")
     html = card(e, "read", "fyi")
-    line = re.search(r'<details class="cardline"><summary[^>]*>(.*?)</summary>', html, re.S)
+    line = re.search(r'<details class="cardline" data-fold="line:m-3"><summary[^>]*>(.*?)</summary>', html, re.S)
     assert line, html
     assert "w1" in line.group(1) and ">note<" in line.group(1) and "the build is live" in line.group(1)
     assert "1h 0m" in line.group(1)
@@ -84,7 +84,8 @@ def test_a_ledger_item_leads_with_its_ask_and_says_what_each_answer_leads_to(tmp
     html = card(row, "decide")
     assert '<div class="body sentence">Should the walk use the work account?</div>' in html
     assert "<li><b>work</b> — the paid seat</li>" in html and "<b>home</b>" not in html
-    assert "<summary>context</summary>" in html
+    # its *context* is drawn closed and read on its first open, though it has answers to press
+    assert f'data-fold="{row['row_id']}" data-lazy="1"><summary>context</summary></details>' in html
     # with no `Ask:`, its title is the sentence
     no_ask = card({**row, "ask": ""}, "do")
     assert '<div class="body sentence"><b class="mono">TD-60</b> yours</div>' in no_ask
