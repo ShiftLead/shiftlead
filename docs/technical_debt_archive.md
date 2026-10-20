@@ -17160,3 +17160,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-19 (PR #2175) — `tests/test_row_controls.py` posts `why` to `/api/ledger/hold` and `road` to `/api/person/ledger` (a Queue row's name looked up to its checkout, a path kept, a refusal a 409 with no `ledger_decide`), takes `road_refusal`'s stage-lane road, and asserts `page`, `blocked_open`, `builds_open` and `hold_why` from `queue.reading` and `ledger_for_you` over one ledger, drawing the controls from that output; reverting each of the 11 lines named fails a test.
 
 ---
+
+## TD-913: Build TD-909 (4): `render.one_sentence`, and a message's answers split into labels and what each leads to
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-19 (TD-909's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/render.py` (`one_sentence` beside `paragraph_break` ~180), `src/sessionorc/mail.py` (the subject's sentence pattern, imported by `render`; `ANSWER_LINE_CAP`; the envelope's `answers` and `consequences`), `src/sessionorc/agent_common.py` (`_clean_answer` ~808, which caps every stored answer), `src/sessionorc/agent_mail.py` (its callers ~348, ~1064), `src/shiftlead/cli.py` (`--default` matched against the answers ~3819), `src/sessionorc/ledger.py` (`answers_of` ~112, a ledger entry's `Answers:`; `detail_of` ~132, beside which `**Ask:**` is read), `src/shiftlead/cli.py` (`FIRST_PARA_WORDS` ~3477, moved to `render.py` and imported back)
+
+**Why:** TD-909: design §4.10 *An item leads with one sentence* (the test, the answers' split); §4.5 screen 12 *An item's shape*. A held path (`src/sessionorc/**`): the techlead reads it.
+
+**Fix:** (1) `render.one_sentence(text)` in `shiftlead.ui.render`: the first paragraph by `paragraph_break`, folded, within `FIRST_PARA_WORDS` (moved from `cli` to `render`, `cli` importing it) and matched whole by the subject rule's sentence pattern — `mail._SENTENCE` (~54), exposed as `mail.SENTENCE` and imported, not `render._SENTENCE_END` — inline code spans skipped. (1b) A ledger entry's reading carries `ask` (its body's `**Ask:**` line, read as `detail_of` reads Why and Fix; empty when absent) and its `answers` with `consequences`. (2) The envelope's reader and `answers_of` split each answer on its first ` — `: `answers` the labels, the `(default)` mark read on the label, `consequences` beside; what is stored and what a press sends are unchanged. A board item's answers split in ledgerboard (dev-cadence#TD-121) and reach the page with its sync; until then a board line's answers read whole. (3) `_clean_answer` caps the stored line at `ANSWER_LINE_CAP` (200); the reader caps the label at `ANSWER_CAP` (80) after the split; a `steer`'s `--default` is stored as today, and the readers mark the answer whose label or whole line equals it and show the label; an `ask`'s label ending in ` (default)` is read as its recommended mark (§4.10 *The answers' split*). No warning yet (TD-916); the card's drawing of a non-conforming item is TD-911's. Tests: the pattern's false warnings named (*TD-909. Which…*); a dashless answer reads whole; a press still matches word for word.
+
+**Done when** `render.one_sentence` and the readers' `answers` and `consequences` are on the readings, and a press still matches word for word.
+
+**Resolved:** 2026-10-19 (PR #2179) — `render.one_sentence` (with `FIRST_PARA_WORDS` moved to `render` and `mail.SENTENCE` made public); `mail.split_answer`, `answer_mark`, `read_answers` on every inbox reading (`answers` the labels, `consequences`, `recommended`), `picks_answer` in both pick checks so a press of the label or the whole line matches; `_clean_answer` at `ANSWER_LINE_CAP`; a for-you ledger entry's `consequences` and `ask`. The Inbox row, with no card mode yet, shows each answer whole; tests in `tests/test_one_sentence.py` and `tests/test_mail.py`.
+
+---
