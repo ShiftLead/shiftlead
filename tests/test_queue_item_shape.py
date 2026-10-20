@@ -83,15 +83,17 @@ def test_a_ledger_item_leads_with_its_ask_and_says_what_each_answer_leads_to(tmp
     assert row["ask"] and row["consequences"] == ["the paid seat", ""]
     html = card(row, "decide")
     assert '<div class="body sentence">Should the walk use the work account?</div>' in html
-    assert "<li><b>work</b> — the paid seat</li>" in html and "<b>home</b>" not in html
+    # what each answer leads to stands beside its button (§4.5 screen 12 *Three verbs: Answer*, TD-914)
+    assert '<span class="alabel">work</span></button><span class="st alead">the paid seat</span>' in html
+    assert '<span class="alabel">home</span></button></span>' in html
     # its *context* is drawn closed and read on its first open, though it has answers to press
-    assert f'data-fold="{row['row_id']}" data-lazy="1"><summary>context</summary></details>' in html
+    assert f'data-fold="{row["row_id"]}" data-lazy="1"><summary>context</summary></details>' in html
     # with no `Ask:`, its title is the sentence
     no_ask = card({**row, "ask": ""}, "do")
     assert '<div class="body sentence"><b class="mono">TD-60</b> yours</div>' in no_ask
     # the Inbox's own ledger row is unchanged
     page = inbox(row)
-    assert "sentence" not in page and "<li><b>work</b>" not in page and "<summary>details</summary>" in page
+    assert "sentence" not in page and "alead" not in page and "<summary>details</summary>" in page
 
 
 def test_the_fold_route_answers_a_cards_context(tmp_path, monkeypatch):

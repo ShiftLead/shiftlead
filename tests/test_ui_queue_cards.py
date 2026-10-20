@@ -295,7 +295,8 @@ def test_a_queue_cards_mail_rows_send_no_find_text_and_no_snooze(tmp_path, monke
     assert ">Snooze" not in queue and 'data-act="snooze"' not in queue and 'data-board-act="snooze"' not in queue
     assert 'data-act="snooze"' in inbox and inbox.count('data-board-act="snooze"') == 3
     # the board row's foot says what the Queue's row does: no Snooze moving its `Due:` date
-    assert "Snooze moves its" not in queue and "Reply writes on its line and Done checks it off" in queue
+    assert "Snooze moves its" not in queue and "Answer… writes on its line and Done checks it off</span>" in queue
+    assert "Reply writes" not in queue  # no Reply word on a card (TD-914)
     assert "Snooze moves its <code>Due:</code> date" in inbox
 
 

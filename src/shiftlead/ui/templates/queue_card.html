@@ -5,7 +5,7 @@
    to the card is its three wants (§4.5 screen 12 *Three wants*, TD-911): Decide and Do in the header, open and
    amber, so a folded card still shows them, their counts the pill; Read under the rows, folded with its count,
    *Read n* on a folded card's header; a held entry no want. The header's right edge reads the move arrows,
-   **Start session** (TD-912), the slot for **⋯** (TD-914, the top entry's controls until then), a gap, then the
+   **Start session** (TD-912), the **⋯** on the top entry (TD-914), a gap, then the
    count, *Read n* and the status last (§4.5 screen 12 *A card*). An Up next
    card carries its place, a grip and ⤒ ↑ ↓ — its place **per repo** (§4.5a *Queue page, Up next: the number*,
    TD-901): a Repo page draws the repo's own (`repo`), and where the home reads more than one repo (`c.chips`)
@@ -13,7 +13,7 @@
    no grip and no arrows, its wait phrase as its status; an In progress one *d/m done* where the status would be. Each card is its own box, its 4 px left edge `c.edge` (amber for a Decide or Do item, else
    teal Waiting, else green In progress, else grey; TD-915). Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
-{% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, want, read, held, pill, controls %}
+{% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, want, read, held, pill, menu %}
 {% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
 {%- set w = c.wants or {} %}{% set n = w.n or {} %}
 {%- set body = c.rows or w.read or w.held %}
@@ -31,7 +31,7 @@
     <span class="qid mono strong">{{ t.show }}</span>{{ pbadge(t.priority) }}
     <span class="qtitle">{{ t.title }}</span>
     <span class="qright">
-      {#- the move arrows, Start session, then the slot for ⋯ (TD-914), a gap, then the facts #}
+      {#- the move arrows, Start session, then the ⋯ (TD-914), a gap, then the facts #}
       {% if up %}<span class="qmoves"><button type="button" class="qmove" data-move="top" title="to the top of Up next" aria-label="to the top">⤒</button><button type="button" class="qmove" data-move="up" title="up one card" aria-label="up one">↑</button><button type="button" class="qmove" data-move="down" title="down one card" aria-label="down one">↓</button></span>{% endif %}
       {#- **Start session** once per card (§4.5a *Queue card: Start session / Open session*, TD-912): on the card's
           `start`; **Open session** while the person's own session holds any of its entries; absent while
@@ -42,9 +42,8 @@
       {# the top entry's state where the card's own words do not already say it: *ready* is the status's,
          a need the amber badge's, *held by X* the holder's pill, a Waiting card's leaf its wait phrase #}
       {{ extras(t.ext, repo) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) %}{{ state(t) }}{% endif %}
-      {#- the top entry's own controls, the same macro as a row's (§4.5 screen 12 *any open row*, TD-905): the ⋯'s
-          slot until TD-914 #}
-      {%- if not t.ext %}{{ controls(t) }}{% endif %}
+      {#- the header's ⋯ acts on the top entry, the same macro as a row's (§4.5 screen 12 *Three verbs: ⋯*, TD-914) #}
+      {%- if not t.ext %}{{ menu(t) }}{% endif %}
       <span class="qgap"></span>
       {%- if c.group == 'in_progress' %}<span class="qcount qdone">{{ c.done }}/{{ c.of }} done</span>
       {%- elif c.of and c.of > 1 %}<span class="qcount meta">{{ c.of }} entries</span>{% endif %}

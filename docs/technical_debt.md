@@ -1623,8 +1623,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** feature
 **Added:** 2026-10-19 (TD-909's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2188
+**Status:** Built (2026-10-20, grinder-ao-1) — #2188: the Answer row in each renderer's `card` mode (answers as buttons, the recommended outlined, what each leads to beside it, Go with it / Done / Lift the hold, Answer…), the ⋯ on the header, each row and each item with its keyboard model (`AO.qDots`), no Reply word and no Snooze on a card, the help for **answers, Answer…** and **⋯**; checked on a scratch home. Answer… on a board line writes its words on the line (the board's Reply road), since `board_edit decide` refuses an answer not in its `Answers:`. **Live check:** once #2188 is live, a headless GET of `/queue` draws `details.qdots` on each card's header and no `>Reply<` or `>Snooze`, and `/inbox` draws no `qdots`.
 **Blocked by:** TD-911, TD-913
 **Location:** `templates/queue_row.html` (the row macro the Inbox's ledger row and the Repo page import), `queue_card.html`, `queue_mail.html`, `src/shiftlead/ui/static/app.js` (the ⋯'s keyboard model), `src/shiftlead/ui/help.py`
 

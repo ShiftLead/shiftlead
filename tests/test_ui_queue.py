@@ -321,7 +321,7 @@ def test_the_page_draws_the_question_on_its_card_and_the_inbox_does_not(tmp_path
     assert ">mentioned in 1 item<" in html[html.index('data-card="s#TD-30"') :]
     assert "Decide 2</span>" in card20 and "Decide (2)" in card20  # the pill, and the want in the header (m1, m9)
     css = c.get("/static/app.css").text
-    assert ".qmail details.more { display: none; }" in css  # no Snooze on the Queue
+    assert ".qmail details.more:not(.qdots) { display: none; }" in css  # no Snooze on the Queue; its ⋯ drawn
     inbox = c.get("/inbox").text
     rows = inbox[inbox.index('id="rows-needs"') : inbox.index('id="sec-fyi"')]
     assert "which one?" not in rows and "TD-20 is the parent" not in rows
@@ -376,8 +376,8 @@ def ledger_repos() -> dict:
 
 def test_the_ledger_rows_leave_later_for_their_cards(tmp_path, monkeypatch):
     """§4.5 screen 6 *Where a row is drawn*, screen 12 *What needs the person* (TD-771 slice 3): a ledger row
-    whose entry a card holds is drawn on that row — *yours to do* with Done and Start session, a decision with
-    Lift the hold and no Start session, *held (person)* with Release — and leaves the Inbox's *Later*; one no
+    whose entry a card holds is drawn on that row — *yours to do* with Done, a decision with Lift the hold (Start
+    session is the card header's alone), *held (person)* with Release — and leaves the Inbox's *Later*; one no
     card holds stays there."""
     c = client(monkeypatch, tmp_path, fake(queue(), [], ledger_repos()))
     html = c.get("/queue").text
@@ -386,7 +386,8 @@ def test_the_ledger_rows_leave_later_for_their_cards(tmp_path, monkeypatch):
     assert "held until your decision" in card20 and ">Lift the hold</button>" in card20
     assert 'data-words="go ahead"' in card20
     assert "yours to do" in card20 and 'data-words="done"' in card20 and ">Done</button>" in card20
-    assert card20.count(">Start session</button>") == 1  # the decision has none
+    # no row draws Start session: it is the card's, once, in its header (TD-912, TD-914)
+    assert card20.count('data-act="ledger_start"') == card20.count("qstart")
     assert "held (person)" in card30 and 'data-act="ledger_release"' in card30
     assert "entry TD-99" not in html
     inbox = c.get("/inbox").text

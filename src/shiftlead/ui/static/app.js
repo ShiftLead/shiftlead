@@ -604,6 +604,28 @@
     placeMenu(d);
   }, true);
   const placeOpen = () => $$("details.more[open]").forEach(placeMenu);
+  // the Queue card's ⋯ (§4.5 screen 12 *Three verbs: ⋯*, §4.5a *Queue card: ⋯*; TD-914): a control of its own —
+  // `Enter` opens it (its summary's own press) with focus on its first name, the arrows move among its names,
+  // `Esc` closes it and puts focus back on the mark. True where the key was the ⋯'s.
+  AO.qDots = function (ev) {
+    const d = ev.target && ev.target.closest && ev.target.closest("details.qdots");
+    if (!d) return false;
+    const mark = $("summary", d), items = $$('.menu [role="menuitem"]', d), at = items.indexOf(document.activeElement);
+    if (ev.key === "Escape" && d.open) { d.open = false; mark.focus(); return true; }
+    if ((ev.key === "ArrowDown" || ev.key === "ArrowUp") && items.length) {
+      if (!d.open) d.open = true;
+      const step = ev.key === "ArrowDown" ? 1 : -1;
+      items[at < 0 ? (step > 0 ? 0 : items.length - 1) : (at + step + items.length) % items.length].focus();
+      return true;
+    }
+    return false;
+  };
+  document.addEventListener("keydown", (ev) => { if (AO.qDots(ev)) { ev.preventDefault(); ev.stopPropagation(); } }, true);
+  document.addEventListener("toggle", (ev) => {
+    const d = ev.target;
+    if (!d.matches || !d.matches("details.qdots[open]") || document.activeElement !== $("summary", d)) return;
+    const first = $('.menu [role="menuitem"]', d); if (first) first.focus();
+  }, true);
   document.addEventListener("scroll", placeOpen, true);
 
   // ---- whole on hover (§4.5a **subject**, *suggested answers*; §4.5 *Page loads*, TD-890) ----
@@ -3648,7 +3670,7 @@
       if (mv) return moveCard(mv.closest(".qcard"), mv.dataset.move);
       // a card's header folds it; a link, a button, the grip or an Inbox item in it keeps its own press
       const head = e.target.closest(".qcard.hasrows > .qhead");
-      if (head && !e.target.closest("a, button, .qgrip, .qmail, .qsec")) toggleFold(head.closest(".qcard"));
+      if (head && !e.target.closest("a, button, .qgrip, .qmail, .qsec, details.qdots")) toggleFold(head.closest(".qcard"));
     });
     box.addEventListener("keydown", (e) => {  // a card's header is a button: Enter or Space folds it
       const head = (e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".qcard.hasrows > .qhead");

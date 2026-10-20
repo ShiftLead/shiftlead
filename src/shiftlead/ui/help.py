@@ -584,6 +584,24 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "card-answers",
+        "answers, Answer…",
+        "Queue card",
+        (
+            "Answers this item: each button says what it leads to, and the outlined one is recommended. Answer… "
+            "sends your own words."
+        ),
+    ),
+    Help(
+        "card-dots",
+        "⋯",
+        "Queue card",
+        (
+            "The team's controls for this card, row or item: hold or release it, send it back to design, close it, "
+            "open it on the Repo page, and an item's own — delete, pause, send to reviewer."
+        ),
+    ),
+    Help(
         "board",
         "the board",
         "Repo page: Technical debt",
@@ -731,6 +749,8 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "wait-column",
             "read-n",
             "card-start",
+            "card-answers",
+            "card-dots",
             "live-mark",
             "row-done",
             "row-back-to-design",

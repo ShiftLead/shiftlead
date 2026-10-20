@@ -1599,7 +1599,7 @@ def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
     assert 'b.closest("details.more")' in js and 'b.closest("details")' not in js
     for tpl in (UI / "templates").glob("*.html"):
         for tag in re.findall(r"<details[^>]*>", tpl.read_text(encoding="utf-8")):
-            menu = 'class="more"' in tag
+            menu = 'class="more"' in tag or 'class="more qdots"' in tag  # a Queue card's ⋯ is a menu (TD-914)
             section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox"))
             # …or the board's *not shown* fold (TD-220): rows with controls, and never closed by a press
             # …or the ledger's *for you* fold (TD-368): links only, remembered by the Inbox

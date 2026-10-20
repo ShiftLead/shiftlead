@@ -17,12 +17,38 @@
    holders, clears a person's hold, writes the decided line. **Hold…** on a row not held, an optional line, the
    record's `why`, where §4.5a *Repo page: Hold / Release on an entry* draws Hold (a kind a lane takes, *for you*, or
    a row a member holds). `root` is the checkout the press names the repo by (a Queue row's repo is its name). #}
-{% macro controls(r, root='') %}{% if r and not r.archived and r.id %}<span class="qctl">
+{% macro controls(r, root='', in_menu=False) %}{% if r and not r.archived and r.id %}{% set b = 'role="menuitem"' | safe if in_menu else 'class="btn sm ghost"' | safe %}
   {%- set repo = root or r.repo %}{% set board = (r.repo or 'the repo') ~ "'s board" %}
-  {%- if r.needs != 'owner' and not r.builds_open %}<button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-road="done" data-repo="{{ repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" data-name="{{ board }}" title="{{ help_title('row-done') }}">Done…</button>{% endif %}
-  {%- if r.page in ('pickable', 'live-check') or (r.page == 'blocked' and r.blocked_open) %}<button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-road="design" data-repo="{{ repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" data-name="{{ board }}" title="{{ help_title('row-back-to-design') }}">Back to design…</button>{% endif %}
-  {%- if r.state != 'held (person)' and (r.page in ('pickable', 'design', 'live-check', 'for-you') or r.holder) %}<button class="btn sm ghost" type="button" data-act="ledger_hold" data-id="person" data-repo="{{ r.repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" title="{{ help_title('row-hold') }}">Hold…</button>{% endif %}
-</span>{% endif %}{% endmacro %}
+  {%- set done %}{% if r.needs != 'owner' and not r.builds_open %}<button {{ b }} type="button" data-act="ledger" data-id="person" data-road="done" data-repo="{{ repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" data-name="{{ board }}" title="{{ help_title('row-done') }}">Done…</button>{% endif %}{% endset %}
+  {%- set design %}{% if r.page in ('pickable', 'live-check') or (r.page == 'blocked' and r.blocked_open) %}<button {{ b }} type="button" data-act="ledger" data-id="person" data-road="design" data-repo="{{ repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" data-name="{{ board }}" title="{{ help_title('row-back-to-design') }}">Back to design…</button>{% endif %}{% endset %}
+  {%- set hold %}{% if r.state != 'held (person)' and (r.page in ('pickable', 'design', 'live-check', 'for-you') or r.holder) %}<button {{ b }} type="button" data-act="ledger_hold" data-id="person" data-repo="{{ r.repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" title="{{ help_title('row-hold') }}">Hold…</button>{% endif %}{% endset %}
+  {#- inline the Inbox's order; in the ⋯ the design's, Hold… first (§4.5 screen 12 *Three verbs: ⋯*) #}
+  {%- if in_menu %}{{ hold }}{{ design }}{{ done }}{% else %}<span class="qctl">{{ done }}{{ design }}{{ hold }}</span>{% endif %}
+{%- endif %}{% endmacro %}
+
+{# the ⋯ (design §4.5 screen 12 *Three verbs: ⋯*, §4.5a *Queue card: ⋯*; TD-909, built by TD-914): the team's
+   controls behind one mark, always drawn, at narrow width too; the names it holds drawn beside it on hover or focus
+   of its header, row or item (`.qdotsnames`, by the page's CSS; never at narrow width), and in its label. A control of its own: `Enter` opens it, the arrows move, `Esc` closes and
+   puts focus back on the mark (`AO.qDots`). Its menu is the page's `details.more`, placed by the same script. #}
+{% macro dots(names) %}<details class="more qdots"><summary class="qdotsbtn" role="button" aria-haspopup="menu" title="{{ names | join(' · ') }}" aria-label="the team's controls: {{ names | join(', ') }}">⋯<span class="qdotsnames" aria-hidden="true">{{ names | join(' · ') }}</span></summary><div class="menu" role="menu" title="{{ help_title('card-dots') }}">{{ caller() }}</div></details>{% endmacro %}
+
+{# a Queue row's ⋯, and the card header's on its top entry (§4.5 screen 12 *Three verbs: ⋯*): the row's controls
+   (`controls`, the Inbox's ledger row draws them inline), **Release** on a row the person holds, and **Open**, the
+   Repo page on the id. An archived row has its Open alone. #}
+{% macro menu(r) %}{% if r and r.id %}
+  {%- set names = [] %}
+  {%- if not r.archived %}
+    {%- if r.state == 'held (person)' %}{% set _ = names.append('Release') %}{% elif r.page in ('pickable', 'design', 'live-check', 'for-you') or r.holder %}{% set _ = names.append('Hold…') %}{% endif %}
+    {%- if r.page in ('pickable', 'live-check') or (r.page == 'blocked' and r.blocked_open) %}{% set _ = names.append('Back to design…') %}{% endif %}
+    {%- if r.needs != 'owner' and not r.builds_open %}{% set _ = names.append('Done…') %}{% endif %}
+  {%- endif %}
+  {%- set _ = names.append('Open') %}
+  {%- call dots(names) %}
+    {%- if not r.archived and r.state == 'held (person)' %}<button type="button" data-act="ledger_release" data-id="person" data-repo="{{ r.repo }}" data-ref="{{ r.id }}" role="menuitem" title="make {{ r.id }} pickable now: a lane may take it at once (design §4.4)">Release</button>{% endif %}
+    {{- controls(r, in_menu=True) }}
+    <a href="/repo/{{ r.repo }}#{{ r.id }}" role="menuitem" title="{{ r.id }} on the {{ r.repo }} Repo page">Open</a>
+  {%- endcall %}
+{%- endif %}{% endmacro %}
 
 {% macro holder(h) %}{% if h %}<a class="qpill mono" href="/focus/{{ h.id }}" title="holds it: {{ h.name }}">{{ h.name }}</a>{% endif %}{% endmacro %}
 
@@ -82,7 +108,7 @@
   <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
     {%- for b in r.rails or [] %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endfor %}
     <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}</span>
-    <span class="qright">{{ extras(r.ext, repo) }}{% if r.also %}<span class="meta">also after {{ r.also | join(', ') }}</span>{% endif %}{{ state(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ controls(r) }}{% endif %}</span>
+    <span class="qright">{{ extras(r.ext, repo) }}{% if r.also %}<span class="meta">also after {{ r.also | join(', ') }}</span>{% endif %}{{ state(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
     {{ builds(r.ext) }}
     {{ mentioned(r) }}
   </div>
