@@ -321,7 +321,7 @@ def test_the_page_draws_the_question_on_its_card_and_the_inbox_does_not(tmp_path
     assert ">mentioned in 1 item<" in html[html.index('data-card="s#TD-30"') :]
     assert "Decide 2</span>" in card20 and "Decide (2)" in card20  # the pill, and the want in the header (m1, m9)
     css = c.get("/static/app.css").text
-    assert ".qmail details.more { display: none; }" in css  # no Snooze on the Queue
+    assert ".qmail details.more:not(.qdots) { display: none; }" in css  # no Snooze on the Queue; its ⋯ drawn
     inbox = c.get("/inbox").text
     rows = inbox[inbox.index('id="rows-needs"') : inbox.index('id="sec-fyi"')]
     assert "which one?" not in rows and "TD-20 is the parent" not in rows

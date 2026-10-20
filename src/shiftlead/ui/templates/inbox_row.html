@@ -89,14 +89,6 @@
 {%- else %}{{ caller() }}{% endif %}
 {%- endmacro %}
 
-{#- what each answer leads to, where the item's reader gives it (§4.10 *The answers' split*): a ledger entry's
-    and a board line's `consequences`, beside their labels; drawn on a card's whole item alone -#}
-{% macro leads(e) -%}
-{%- set cs = e.consequences if e.consequences is sequence and e.consequences is not string else [] %}
-{%- if card_whole(mode, e) and cs | select | list %}
-<ul class="body leads">{% for a in e.answers or [] %}{% if cs[loop.index0] %}<li><b>{{ a }}</b> — {{ cs[loop.index0] }}</li>{% endif %}{% endfor %}</ul>
-{%- endif %}
-{%- endmacro %}
 {% macro body(e) -%}
 {%- if card_whole(mode, e) %}
 {#- on a card (§4.5 screen 12 *An item's shape*): its one sentence, its second paragraph — what each answer
@@ -133,8 +125,10 @@
 {%- endif %}
 {%- endmacro %}
 
+{#- no Reply word on a card (§4.5 screen 12 *Three verbs*, TD-914): a Decide or Do item's own words go by
+    **Answer…** in its Answer row, and an opened Read item keeps Dismiss, Put on the board and Overrule -#}
 {% macro reply_btn(e) -%}
-{%- if e['from'] not in ('person', 'system') %}<button class="btn sm ghost" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}">Reply</button>{% endif %}
+{%- if mode != 'card' and e['from'] not in ('person', 'system') %}<button class="btn sm ghost" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}">Reply</button>{% endif %}
 {%- endmacro %}
 
 {# design §4.5a **Inbox row: suggested answers** (§4.10 *Suggested answers*; TD-070). The sender's
@@ -172,6 +166,49 @@
   {%- endfor %}
 </div>
 {%- endif %}
+{%- endmacro %}
+
+{# design §4.5 screen 12 *Three verbs: Answer* (§4.5a *Queue card: answers, Answer…*; TD-909, built by TD-914): a
+   card's Decide or Do item draws its answers as buttons, the recommended one outlined with no caption, each with
+   what it leads to beside it where the reader gives `consequences` (§4.10 *The answers' split*); then its kind's
+   own answers — **Go with it** on a steer, **Done** on *yours to do*, **Lift the hold** on a decision — and
+   **Answer…**, a box for the person's own words. Each takes the road its kind already has (`how`): a message's
+   reply, a board line's decided line (its words written on the line, the board's Reply road), a ledger entry's
+   decided board line. A red PR has no Answer row. -#}
+{% macro answer_row(e, how, gwi='') -%}
+{%- set raw = e.get('answers') if how != 'owed' else [] %}{% set raw = raw if raw is sequence and raw is not string else [] %}
+{%- set cs = e.get('consequences') %}{% set cs = cs if cs is sequence and cs is not string else [] %}
+{%- set dflt = e.get('default') %}
+{%- set rec = e.get('recommended') if how == 'mail' else (raw.index(dflt) if dflt and dflt in raw else none) %}
+{%- set pair = look_pair(e) if how == 'mail' else (e.get('pair') if how == 'board' else false) %}
+{%- set by = e.get('passer_name') or e.get('from_name') or e.get('from') or e.get('name') or e.get('repo') %}
+{%- set where = (e.get('repo_name') or e.get('repo') or e.get('name') or 'the repo') ~ "'s board" %}
+<div class="row gap wrap sugg qanswers" role="group" aria-label="answer this item">
+  {%- for a in raw if a is string and a.strip() %}
+  {%- set i = loop.index0 %}{% set form = pair and i == 1 %}
+  <span class="qans"><button class="btn sm answer{% if i == rec and not pair %} rec{% endif %}" type="button"
+  {%- if how == 'mail' and form %} data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ by }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"
+  {%- elif how == 'mail' %} data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ i }}"
+  {%- elif how == 'board' and form %} data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ where }}" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"
+  {%- elif how == 'board' %} data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"
+  {%- else %} data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ i }}" data-answer="{{ a }}" title="{{ a }}"
+  {%- endif %}><span class="alabel">{% if pair %}{{ 'Not right…' if form else 'Works' }}{% else %}{{ a }}{% endif %}</span></button>
+  {%- set c = cs[i] if i < cs | length else '' %}{% if c is string and c.strip() %}<span class="st alead">{{ c }}</span>{% endif %}</span>
+  {%- endfor %}
+  {%- if gwi %}<button class="btn sm ghost" type="button" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="{{ gwi }}">Go with it</button>{% endif %}
+  {%- if how == 'ledger' and e.home == 'queue' and e.why == 'yours' %}
+  <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>
+  {%- elif how == 'ledger' and e.home == 'queue' %}
+  <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button>
+  {%- endif %}
+  {%- if how == 'board' %}
+  <button class="btn sm ghost" type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ where }}" title="{{ help_title('card-answers') }}">Answer…</button>
+  {%- elif how == 'ledger' %}
+  <button class="btn sm ghost" type="button" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="{{ help_title('card-answers') }}">Answer…</button>
+  {%- elif e['from'] not in ('person', 'system') %}
+  <button class="btn sm ghost" type="button" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" title="{{ help_title('card-answers') }}">Answer…</button>
+  {%- endif %}
+</div>
 {%- endmacro %}
 
 {# §4.5a **Snooze** on an `ask`: 1 h · tomorrow 08:00 · a date. The person's own bookkeeping — the
@@ -273,6 +310,7 @@
 {{ body(e) }}
 {{ answer_given(e) }}
 {{ outcome_line(e) }}
+{%- if card_whole(mode, e) %}{{ answer_row(e, 'owed') }}{% endif %}
 <div class="row gap wrap mfoot">
   {%- if e.asker_gone_quiet %}
   <span class="st">its asker {{ e.asker_state }} without reporting what came of your answer — only you, or its manager, can find out</span>
@@ -357,14 +395,21 @@
 {{ body(e) }}
 {{ recommends(e) }}
 {{ looked_by(e) }}
-{{ answers(e) }}
+{%- set whole = card_whole(mode, e) %}
+{%- if whole %}{{ answer_row(e, 'mail') }}{% else %}{{ answers(e) }}{% endif %}
 <div class="row gap wrap mfoot">
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% else %}<span class="st">open · no bound — it waits until you answer it</span>{% endif %}
   <span class="grow"></span>
+  {#- on a card the item's own controls are behind its ⋯ (§4.5 screen 12 *Three verbs: ⋯*, TD-914) -#}
+  {%- if whole %}{% call qrow.dots(['Delete'] + (['Send to reviewer'] if e.review_seat else [])) %}
+  <button role="menuitem" type="button" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: the sender is told, and nothing else answers it.">Delete</button>
+  {%- if e.review_seat %}<button role="menuitem" type="button" data-act="hand_look" data-id="person" data-msg="{{ e.id }}" data-team="{{ e.team or '' }}" data-name="{{ e.review_name }}" title="hand this look to {{ e.review_name }}, {{ e.team }}'s techlead, to read: it is set aside until the seat reports, and comes back with its reading above the answers">Send to reviewer</button>{% endif %}
+  {%- endcall %}{% else %}
   {{ reply_btn(e) }}
   {{ review_btn(e) }}
   {{ snooze_btn(e) }}
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: the sender is told, and nothing else answers it.">Delete</button>
+  {%- endif %}
 </div>
 {%- endmacro %}
 
@@ -377,7 +422,8 @@
 {{ body(e) }}
 <div class="st dflt">unless you say otherwise: {{ e.default or '—' }}</div>
 {{ recommends(e) }}
-{{ answers(e) }}
+{%- set whole = card_whole(mode, e) %}
+{%- if whole %}{{ answer_row(e, 'mail', 'Go with it? The sender takes its default now instead of waiting out the clock.') }}{% else %}{{ answers(e) }}{% endif %}
 <div class="row gap wrap mfoot">
   {%- if e.paused_at %}
   <span class="st">paused · the clock is stopped, and the sender was told not to take its default yet</span>
@@ -388,12 +434,17 @@
   <span class="st timeleft" data-deadline="{{ e.bound or '' }}">{% if not e.bound %}no bound{% elif e.left %}{{ e.left }} left — then it goes with its default{% else %}the time is up: the sender goes with its default{% endif %}</span>
   {%- endif %}
   <span class="grow"></span>
+  {%- if whole %}{% call qrow.dots(['Resume' if e.paused_at else 'Pause']) %}
+  {%- if e.paused_at %}<button role="menuitem" type="button" data-act="resume" data-id="person" data-msg="{{ e.id }}" title="give back the time that was left">Resume</button>
+  {%- else %}<button role="menuitem" type="button" data-act="pause" data-id="person" data-msg="{{ e.id }}" title="stop the clock: the sender is told not to take its default yet">Pause</button>{% endif %}
+  {%- endcall %}{% else %}
   {{ reply_btn(e) }}
   <button class="btn sm ghost" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="Go with it? The sender takes its default now instead of waiting out the clock.">Go with it</button>
   {%- if e.paused_at %}
   <button class="btn sm ghost" data-act="resume" data-id="person" data-msg="{{ e.id }}" title="give back the time that was left">Resume</button>
   {%- else %}
   <button class="btn sm ghost" data-act="pause" data-id="person" data-msg="{{ e.id }}" title="stop the clock: the sender is told not to take its default yet">Pause</button>
+  {%- endif %}
   {%- endif %}
 </div>
 {%- endmacro %}
@@ -411,7 +462,8 @@
 {{ body(e) }}
 {%- if e.kind == 'steer' %}<div class="st dflt">its asker would have gone with: {{ e.default or '—' }}</div>{% endif %}
 {{ recommends(e) }}
-{{ answers(e) }}
+{%- set whole = card_whole(mode, e) %}
+{%- if whole %}{{ answer_row(e, 'mail', 'Go with it? Its default is written on the board as your answer, and sent to whoever holds ' ~ e.about ~ '.' if e.kind == 'steer' else '') }}{% else %}{{ answers(e) }}{% endif %}
 <div class="st standing" title="where your answer goes (design §4.10): the board always, and whoever holds the reference">{{ e.standing.text if e.standing else 'its session is gone' }}</div>
 <div class="row gap wrap mfoot">
   {%- if e.kind == 'steer' and e.bound %}
@@ -420,12 +472,16 @@
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% else %}<span class="st">open · its asker is gone — it waits until you answer it</span>{% endif %}
   {%- endif %}
   <span class="grow"></span>
+  {%- if whole %}{% call qrow.dots(['Delete']) %}
+  <button role="menuitem" type="button" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: nothing is written, and there is nobody to tell.">Delete</button>
+  {%- endcall %}{% else %}
   {{ reply_btn(e) }}
   {%- if e.kind == 'steer' %}
   <button class="btn sm ghost" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="Go with it? Its default is written on the board as your answer, and sent to whoever holds {{ e.about }}.">Go with it</button>
   {%- endif %}
   {%- if not (e.kind == 'steer' and e.bound) %}{{ snooze_btn(e) }}{% endif %}
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: nothing is written, and there is nobody to tell.">Delete</button>
+  {%- endif %}
 </div>
 {%- endmacro %}
 
@@ -761,7 +817,6 @@
 {%- if not card_whole(mode, e) %}{{ subj(e) }}{% endif %}
 {%- if e.lead is defined %}
 <div class="body md{% if card_whole(mode, e) %} sentence{% endif %}">{{ md(e.lead, origin) }}</div>
-{{ leads(e) }}
 {#- §4.5a **Inbox board row: detail block** (TD-312): the reader's `detail` drawn after the rest of
     the line inside the same fold, through the same renderer — text, never a control or a field. A
     row with a block has the fold however short its line; the fold is drawn open on a row with
@@ -796,6 +851,7 @@
 {%- if waits %}
 <div class="st waitingon">{{ e.waiting_on }}</div>
 {%- elif e.decided %}
+{%- elif card_whole(mode, e) %}{{ answer_row(e, 'board') }}
 {%- elif e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this item's answers">
   <span class="st sugglabel">its answers</span>
@@ -810,6 +866,16 @@
 {%- endif %}
 {#- a live look's default is its Works button, *Go with it: Works* (§4.5a) -#}
 {%- set gwi = e.default and e.answers and not e.decided and not e.pair and not waits %}
+<div class="row gap wrap mfoot">
+  {%- if mode == 'card' %}{# a card: no Reply word, no Snooze; Done is behind the ⋯ (screen 12 *Three verbs*) #}
+  <span class="st" title="each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request">on the board — {% if not (waits or e.decided) %}Answer… writes on its line and {% endif %}Done checks it off</span>
+  <span class="grow"></span>
+  {%- call qrow.dots(['Done'] + (['Open board'] if e.editor else [])) %}
+  <button role="menuitem" type="button" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
+  {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "") }}{% endif %}
+  {%- endcall %}
+</div>
+{%- else %}
 <div class="row gap wrap mfoot">
   {%- if waits or drawn_on_queue %}{# a waiting line, or the Queue, has no Snooze (screen 12) #}
   <span class="st">on the board — Reply writes on its line and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
@@ -835,6 +901,7 @@
   {%- endif %}
   <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
 </div>
+{%- endif %}
 {%- endmacro %}
 
 {# ── design §4.5a **Inbox row: promote** (§6 *Promote*, TD-132 slice 3) ──────────────────────────
@@ -1038,11 +1105,12 @@
 {#- on a card its `**Ask:**` line is the sentence, else its title (§4.5 screen 12 *An item's shape*) -#}
 {%- if card_whole(mode, e) and e.ask %}<div class="body sentence">{{ e.ask }}</div>
 {%- else %}<div class="body{% if card_whole(mode, e) %} sentence{% endif %}"><b class="mono">{{ e.id }}</b> {{ e.title }}</div>{% endif %}
-{{ leads(e) }}
 {%- if e.detail %}
 {{ fold(e.row_id, fold_open or (e.answers and not card_whole(mode, e)), 'ledger', e) }}
 {%- endif %}
-{%- if e.answers %}
+{%- set whole = card_whole(mode, e) %}
+{%- if whole and not e.claimed %}{{ answer_row(e, 'ledger') }}
+{%- elif e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
   <span class="st sugglabel">its answers</span>
   {%- for a in e.answers %}
@@ -1057,6 +1125,7 @@
   {%- else %}
   <span class="st">in {{ e.name }}'s ledger — waits on you, with no date; an answer is written on {{ e.name }}'s board as a decided line, its session's work order</span>
   <span class="grow"></span>
+  {%- if not whole %}
   <button class="btn sm ghost" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="your words written on {{ e.name }}'s board as your decision on {{ e.id }}, one line landed on origin by shiftlead's own pull request">Reply</button>
   {%- if e.default %}
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-go="1" data-answer="{{ e.default }}" title="the answer marked default, written on {{ e.name }}'s board as your decision on {{ e.id }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Go with it</button>
@@ -1069,6 +1138,7 @@
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>
   {%- elif e.home == 'queue' %}
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button>
+  {%- endif %}
   {%- endif %}
   {%- if e.home == 'queue' and e.why != 'yours' %}
   {%- elif e.held %}
@@ -1083,7 +1153,8 @@
   {%- if e.release %}
   <button class="btn sm ghost" data-act="ledger_release" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="make {{ e.id }} pickable now: a lane may take it at once (design §4.4)">Release</button>
   {%- endif %}
-  <a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
+  {%- if whole %}{% call qrow.dots(['Open']) %}<a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
+  {%- else %}<a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endif %}
 </div>
 {%- endmacro %}
 

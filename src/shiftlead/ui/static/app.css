@@ -923,7 +923,17 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qrow .qmail { padding-left: 2ch; }
 .qmail > * { margin: 4px 0; }
 .qmention { font-style: italic; }
-.qmail details.more { display: none; }  /* every row's Snooze: the Queue has no Snooze (§4.5 screen 12) */
+.qmail details.more:not(.qdots) { display: none; }  /* every row's Snooze: the Queue has no Snooze (§4.5 screen 12) */
+/* the three verbs (§4.5 screen 12 *Three verbs*, TD-914): the Answer row's buttons, the recommended one outlined
+   with no caption, what each leads to beside it; the ⋯, one mark always drawn, its menu the page's `details.more` */
+.qanswers .qans { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; }
+.qanswers .btn.answer { max-width: 30ch; }
+.qanswers .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qanswers .btn.answer.rec { border: 2px solid var(--link); }
+.qanswers .alead { color: var(--muted); }
+details.qdots { display: inline-block; }
+.qdotsbtn { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 22px; padding: 0 6px; border-radius: 4px; color: var(--muted); cursor: pointer; font-weight: 600; letter-spacing: .05em; user-select: none; }
+.qdotsbtn:hover, .qdotsbtn:focus-visible, details.qdots[open] > .qdotsbtn { background: var(--hover); color: var(--fg); }
 /* an item's shape on a card (§4.5 screen 12 *An item's shape*, TD-911): a Read item one line, opening to its row;
    a Decide or Do item its one sentence first, then what each answer leads to, then *context* folded */
 .qmail .mailrow:has(> .cardline) { padding: 2px 8px; }
