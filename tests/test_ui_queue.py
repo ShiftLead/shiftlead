@@ -318,7 +318,7 @@ def test_the_page_draws_the_question_on_its_card_and_the_inbox_does_not(tmp_path
     html = c.get("/queue").text
     card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
     assert 'class="qmail inboxrows"' in card20 and "which one?" in card20  # on its row
-    assert "also mentioned in TD-20 is the parent" in html[html.index('data-card="s#TD-30"') :]
+    assert ">mentioned in 1 item<" in html[html.index('data-card="s#TD-30"') :]
     assert "Decide 2</span>" in card20 and "Decide (2)" in card20  # the pill, and the want in the header (m1, m9)
     css = c.get("/static/app.css").text
     assert ".qmail details.more { display: none; }" in css  # no Snooze on the Queue
@@ -519,7 +519,7 @@ def test_a_cards_wants_draw_their_counts_and_none_at_zero(tmp_path, monkeypatch)
     )
     assert body.index("fyi (1)") > body.index('data-qid="s#TD-21"')  # under the rows
     assert body.count(">Dismiss all</button>") == 2 and "Dismiss all" not in head
-    assert 'class="qcard g-up_next st-needs-you wants hasrows"' in html  # amber
+    assert 'class="qcard edge-needs g-up_next st-needs-you wants hasrows"' in html  # amber
     assert body.count('class="qon qsub" href="#TD-21"') == 1  # a1 is about TD-21; a2 is the top entry's
     assert c20["status"] == "needs you"
 
@@ -657,7 +657,7 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     )  # again: All
     upnext = html[html.index('id="qupnext"') :]
     # what a pick hides is hidden, never dropped: the whole Up next order is still on the page
-    assert re.search(r'class="qcard g-up_next st-ready hasrows qoff" data-card="s#TD-20"', upnext)
+    assert re.search(r'class="qcard edge-ended g-up_next st-ready hasrows qoff" data-card="s#TD-20"', upnext)
     assert 'data-card="s#TD-30"' in upnext and "s#TD-20" in upnext[upnext.index("data-upnext") :]
     part = c.get("/queue?part=1&find=TD-3").text
     assert 'id="qfindmiss" data-for="TD-3"' in part and 'href="/repo/s#TD-003"' in part

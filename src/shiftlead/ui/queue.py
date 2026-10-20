@@ -167,11 +167,11 @@ def _show(q: str, one_repo: bool) -> str:
 def _row(r: Mapping[str, Any], one_repo: bool, mentioned: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """A card's row (or its top entry) as the partials take it: `show`, `also`, `anchor` (the id a
     `/queue#TD-n` finds, its open rows alone), no `ext` — the Repo page's extras are not the Queue's — and
-    `mentioned`, the first words of each item that names it beside another row (`attach`). What is attached to
-    it is the card's, in the card's wants, never the row's (§4.5 screen 12 *Three wants*)."""
+    `mentioned`, the first words of each item that names it beside another row, one per item (`attach`). What is
+    attached to it is the card's, in the card's wants, never the row's (§4.5 screen 12 *Three wants*)."""
     q = str(r.get("qid") or "")
     return {
-        "mentioned": list((mentioned or {}).get(q) or ()),
+        "mentioned": list(((mentioned or {}).get(q) or {}).values()),
         **r,
         "priority": str(r.get("priority") or "").lower(),
         "show": _show(q, one_repo),
@@ -212,12 +212,13 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
     """The Inbox's rows the Queue draws (`home: queue`, §4.5 screen 6 *Where a row is drawn*), by the card each
     is attached to and the card's section it is in (§4.5 screen 12 *What is attached to a card*, TD-828):
     `cards`, each card's `{section: [item]}`, every item `{section, id, html, kind, on_row}` with the row drawn
-    by the Inbox's own renderer (`drawn(e, section)`), in the Inbox's order; and `mentioned`, a quiet line's
-    words on each row an item names beside its own. The snoozed list is the Inbox's alone: no Snooze on the
+    by the Inbox's own renderer (`drawn(e, section)`), in the Inbox's order; and `mentioned`, on each row an item
+    names beside its own, `{item id: its first words}` — one per item however often it is drawn, so the row's
+    one phrase counts items (*mentioned in n items*, TD-915). The snoozed list is the Inbox's alone: no Snooze on the
     Queue. `later` is `split_later`'s rows, all under *Needs you* whatever their `Due:`: a ledger row the
     person's, drawn first, and a board line not yet due after the questions, drawn with its due date."""
     cards: dict[str, dict[str, list[Any]]] = {}
-    mentioned: dict[str, list[str]] = {}
+    mentioned: dict[str, dict[str, str]] = {}
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
         want = want_of(e, sec)
@@ -246,7 +247,7 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
             put(e, sec, sec, e.get("id"), _item_kind(e, sec))
             words = " ".join(str(e.get("subject") or e.get("text") or "").split()[:8])
             for m in e.get("mentions") or ():
-                mentioned.setdefault(m, []).append(words)
+                mentioned.setdefault(m, {}).setdefault(str(e.get("id") or words), words)
         if sec == "needs":
             for e in later or ():
                 if e.get("later_section") == "coming":
@@ -386,6 +387,63 @@ def _mail_status(status: str, wants: Mapping[str, Any]) -> str:
     return "steer" if any(m.get("running") for m in items) else status
 
 
+def card_edge(group: str, status: str, wants: Mapping[str, Any]) -> str:
+    """A card's 4 px left edge (§4.5 screen 12 *A card*, TD-915), in this order: `needs` (amber) for any Decide or
+    Do item — or a *needs you* status, the same need read from the ledger — else `waiting` (teal) on a Waiting
+    card, else `working` (green) In progress, else `ended` (grey)."""
+    n = wants.get("n") or {}
+    if n.get("decide") or n.get("do") or status == "needs you":
+        return "needs"
+    return {"waiting": "waiting", "in_progress": "working"}.get(group, "ended")
+
+
+def branch(r: Mapping[str, Any]) -> str:
+    """A row's colour in the card's tree (§4.5 screen 12 *A card*, TD-915): `done` (green) an archived row,
+    `needs` (amber) the person's — *yours to do*, *your decision*, *held (person)* — `waiting` (teal) one that
+    waits — *waits until*, *waits on an event*, *after TD-n*, *settling* — else `open` (grey)."""
+    state = str(r.get("state") or "")
+    if r.get("archived"):
+        return "done"
+    if r.get("needs") or state == "held (person)":
+        return "needs"
+    if state.startswith(("waits ", "after ")) or state == "settling":
+        return "waiting"
+    return "open"
+
+
+def _tree(rows: list[dict[str, Any]], top: str) -> list[dict[str, Any]]:
+    """The rows as the tree draws them (TD-915): depth first from the top entry, each row's children under it
+    in the reading's order (which is breadth first), so a row sits under its own parent; a row whose parent is
+    not on the card keeps its place at the end. Each row gains `rails`, one colour per level down to its own —
+    its ancestors' branches, then its own — so the 2 px rule down a level's left edge runs unbroken past the
+    deeper rows under it."""
+    kids: dict[str, list[dict[str, Any]]] = {}
+    for r in rows:
+        kids.setdefault(str(r.get("parent") or ""), []).append(r)
+    out: list[dict[str, Any]] = []
+    seen: set[int] = set()
+
+    def walk(q: str, up: list[str]) -> None:
+        for r in kids.get(q) or ():
+            if id(r) in seen:
+                continue
+            seen.add(id(r))
+            depth = max(int(r.get("depth") or 1), 1)
+            r["rails"] = [*(up + ["open"] * depth)[: depth - 1], branch(r)]
+            out.append(r)
+            walk(str(r.get("qid") or ""), r["rails"])
+
+    walk(top, [])
+    for r in rows:
+        if id(r) not in seen:
+            seen.add(id(r))
+            depth = max(int(r.get("depth") or 1), 1)
+            r["rails"] = [*["open"] * (depth - 1), branch(r)]
+            out.append(r)
+            walk(str(r.get("qid") or ""), r["rails"])
+    return out
+
+
 def queue_view(
     queue: Mapping[str, Any] | None,
     now: datetime,
@@ -424,13 +482,14 @@ def queue_view(
     shaped: list[dict[str, Any]] = []
     for c in cards:
         top = _row(c["top"], one_repo, mentioned)
-        rows = [_row(r, one_repo, mentioned) for r in c.get("rows") or []]
+        rows = _tree([_row(r, one_repo, mentioned) for r in c.get("rows") or []], str(top.get("qid") or ""))
         wants = card_wants(((mail or {}).get("cards") or {}).get(str(c["id"])), str(top.get("qid") or ""), one_repo)
         status = _mail_status(str(c.get("status") or ""), wants)
         shaped.append(
             {
                 **c,
                 "status": status,
+                "edge": card_edge(str(c.get("group") or ""), status, wants),
                 "top": top,
                 "rows": rows,
                 "wants": wants,
