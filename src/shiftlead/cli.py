@@ -3309,7 +3309,8 @@ def cmd_rank(args: argparse.Namespace) -> int:
         if mc is card:
             raise AgentError(f"{args.above or args.below} is on {args.entry}'s own card")
         if mc is None or mc.get("group") != "up_next":
-            raise AgentError(f"{args.above or args.below}'s card is not in Up next: a card moves only among them")
+            grp = {"waiting": "Waiting, ", "in_progress": "In progress, "}.get((mc or {}).get("group"), "")
+            raise AgentError(f"{args.above or args.below}'s card is {grp}not in Up next: a card moves only among them")
         i = rest.index(mc)
         if args.above:
             prev, nxt = (rest[i - 1]["id"] if i > 0 else None), mc["id"]

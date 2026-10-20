@@ -317,7 +317,6 @@ def reading(
     # an open member blocked past the org's reach (§4.4 *Blocked*): a decision neither the person's nor
     # the designer's, an id in no reading (an unknown id keeps its block), a `<repo>#TD-n` no reading
     # holds open, or an item ledgerboard cannot read
-    # holds the first such item's phrase, what a Waiting card's `wait` says (§4.4 *Waiting*)
     for e in open_.values():
         for b in e.get("blocked_by") or []:
             if m := re.fullmatch(r"decision \((.+)\)", b):
@@ -329,6 +328,7 @@ def reading(
             else:
                 far = True
             if far:
+                # the first such item's phrase, what a Waiting card's `wait` says (§4.4 *Waiting*)
                 e.setdefault("unreachable", b if b.startswith("decision (") else f"{b} unresolved")
         # the components (union-find over the open members)
     parent = {q: q for q in open_}
