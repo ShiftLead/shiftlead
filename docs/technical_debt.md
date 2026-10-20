@@ -76,10 +76,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
 | TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Designed — built by TD-911–TD-918 (on dev-cadence#TD-121, #TD-122) |
-| TD-911 | Build TD-909 (2): Decide, Do and Read on a card, each renderer's `card` mode | High | Open |
-| TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Open — blocked by TD-911 |
-| TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open — blocked by TD-911 |
-| TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open — blocked by TD-911 |
+| TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Open |
+| TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open |
+| TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-919 | #2179's orphaned-ask pick (`mail.picks_answer` on the orphan path of `_msg`) has no test that would notice a revert (test audit) | Medium | Open |
