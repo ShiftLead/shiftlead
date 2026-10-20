@@ -1705,5 +1705,3 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Related:** TD-923 (the disconnect card, which draws the window's tokens first), TD-818 and TD-830–833 (Spend per seat), TD-859 (the Spend page's tables)
 
 ---
-
----
