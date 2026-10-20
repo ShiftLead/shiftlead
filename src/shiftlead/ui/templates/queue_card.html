@@ -2,18 +2,22 @@
    ⤒ ↑ ↓*; TD-770), drawn by the Queue page and the Repo page alike. Its header is the top entry — id,
    Priority badge, the whole title wrapped, then the holder's pill, its state, the count and the card's
    status — and a press on it folds or opens the card (no chevron; the page remembers which). What is attached
-   to the card is in its sections (TD-828): *Needs you* in the header, so a folded card still shows it, the
-   other four in the body above the rows, each heading hidden at 0. An Up next
+   to the card is its three wants (§4.5 screen 12 *Three wants*, TD-911): Decide and Do in the header, open and
+   amber, so a folded card still shows them, their counts the pill; Read under the rows, folded with its count,
+   *Read n* on a folded card's header; a held entry no want. The header's right edge reads the move arrows, the
+   slots for **Start session** (TD-912) and **⋯** (TD-914, the top entry's controls until then), a gap, then the
+   count, *Read n* and the status last (§4.5 screen 12 *A card*). An Up next
    card carries its place, a grip and ⤒ ↑ ↓ — its place **per repo** (§4.5a *Queue page, Up next: the number*,
    TD-901): a Repo page draws the repo's own (`repo`), and where the home reads more than one repo (`c.chips`)
    the Queue draws one number per repo, each with its repo's chip; a Waiting one (TD-918) its wait column there,
    no grip and no arrows, a teal stripe and its wait phrase as its status; an In progress one a green stripe and *d/m done* where the
    status would be. Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
-{% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, section, controls %}
+{% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, want, read, held, pill, controls %}
 {% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
-{%- set body = c.rows or ((c.sections or {}) | reject('equalto', 'needs') | list) %}
-<div class="qcard g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if body %} hasrows{% endif %}{% if c.off %} qoff{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %} data-status="{{ c.status or '' }}" data-kinds="{{ (c.kinds or []) | join(' ') }}" data-repos="{{ (c.repos or []) | join(' ') }}">
+{%- set w = c.wants or {} %}{% set n = w.n or {} %}
+{%- set body = c.rows or w.read or w.held %}
+<div class="qcard g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if n.decide or n.do %} wants{% endif %}{% if body %} hasrows{% endif %}{% if c.off %} qoff{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %} data-status="{{ c.status or '' }}" data-kinds="{{ (c.kinds or []) | join(' ') }}" data-repos="{{ (c.repos or []) | join(' ') }}">
   <div class="qhead"{% if t.anchor %} id="{{ t.anchor }}"{% endif %} data-qid="{{ t.qid }}"{% if body %} role="button" tabindex="0" aria-expanded="true" title="fold or open the card"{% endif %}>
     <span class="qgrip"{% if up %} draggable="true" title="drag to move it in the order"{% endif %}>{% if up %}⋮⋮{% endif %}</span>
     {%- set mine = (c.places or []) | selectattr('repo', 'equalto', repo) | list if repo else [] %}
@@ -27,17 +31,26 @@
     <span class="qid mono strong">{{ t.show }}</span>{{ pbadge(t.priority) }}
     <span class="qtitle">{{ t.title }}</span>
     <span class="qright">
+      {#- the move arrows, then the slots for Start session (TD-912) and ⋯ (TD-914), a gap, then the facts #}
       {% if up %}<span class="qmoves"><button type="button" class="qmove" data-move="top" title="to the top of Up next" aria-label="to the top">⤒</button><button type="button" class="qmove" data-move="up" title="up one card" aria-label="up one">↑</button><button type="button" class="qmove" data-move="down" title="down one card" aria-label="down one">↓</button></span>{% endif %}
       {# the top entry's state where the card's own words do not already say it: *ready* is the status's,
          a need the amber badge's, *held by X* the holder's pill, a Waiting card's leaf its wait phrase #}
       {{ extras(t.ext, repo) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) %}{{ state(t) }}{% endif %}
-      {#- the top entry's own controls, the same macro as a row's (§4.5 screen 12 *any open row*, TD-905) #}
+      {#- the top entry's own controls, the same macro as a row's (§4.5 screen 12 *any open row*, TD-905): the ⋯'s
+          slot until TD-914 #}
       {%- if not t.ext %}{{ controls(t) }}{% endif %}
-      {% if c.group == 'in_progress' %}<span class="qcount qdone">{{ c.done }}/{{ c.of }} done</span>
-      {% else %}{% if c.of and c.of > 1 %}<span class="qcount meta">{{ c.of }} entries</span>{% endif %}
-        {% if c.group == 'waiting' and c.wait %}{#- the wait phrase is a Waiting card's status, the pill or *steer* / *stalled* beside it #}
-          {% if c.status == 'needs you' %}<span class="qstatus needsyou">Needs you</span>{% elif c.status in ('steer', 'stalled') %}<span class="qstatus s-{{ c.status }}">{{ c.status }}</span>{% endif %}<span class="qstatus s-waits" title="{{ help_title('wait-column') }}">{{ c.wait.phrase }}</span>
-        {% elif c.status == 'needs you' %}<span class="qstatus needsyou">Needs you</span>{% elif c.status %}<span class="qstatus s-{{ c.status | replace(' ', '-') }}">{{ c.status }}</span>{% endif %}{% endif %}
+      <span class="qgap"></span>
+      {%- if c.group == 'in_progress' %}<span class="qcount qdone">{{ c.done }}/{{ c.of }} done</span>
+      {%- elif c.of and c.of > 1 %}<span class="qcount meta">{{ c.of }} entries</span>{% endif %}
+      {%- if n.read %}<span class="qreadn meta" title="{{ help_title('read-n') }}">Read {{ n.read }}</span>{% endif %}
+      {#- the status ends the line: the pill wherever the card has a Decide or Do item, *steer* or *stalled* beside
+          it when that is the status; on Up next the ledger's word without one; on a Waiting card its wait phrase,
+          the pill or the word beside it; on an In progress card *d/m done* stands where the word would #}
+      {%- set word = c.status if c.status in ('steer', 'stalled') else '' %}
+      {{ pill(c) }}{% if not (n.decide or n.do) and c.status == 'needs you' %}<span class="qstatus needsyou">Needs you</span>{% endif %}
+      {%- if word %}<span class="qstatus s-{{ word }}">{{ word }}</span>{% endif %}
+      {%- if c.group == 'waiting' and c.wait %}<span class="qstatus s-waits" title="{{ help_title('wait-column') }}">{{ c.wait.phrase }}</span>
+      {%- elif c.group != 'in_progress' and c.status and c.status not in ('needs you', 'steer', 'stalled') %}<span class="qstatus s-{{ c.status | replace(' ', '-') }}">{{ c.status }}</span>{% endif %}
       {% if c.new %}<span class="meta">not on the Queue yet</span>{% endif %}
     </span>
     {{ builds(t.ext) }}
@@ -45,10 +58,10 @@
     {% if c.not_landed %}<div class="qnote">not landed — retrying</div>{% endif %}
     {% for f in c.passed_over or [] %}<div class="qnote">passed over by {{ f.name }}{% if f.why %}: {{ f.why }}{% endif %}</div>{% endfor %}
     {{ mentioned(t) }}
-    {#- the card's *Needs you* is drawn in the header, so a folded card still shows it (§4.5 screen 12) #}
-    {{ section(c, 'needs') }}
+    {#- the card's Decide and Do are drawn in the header, so a folded card still shows them (§4.5 screen 12) #}
+    {{ want(c, 'decide') }}{{ want(c, 'do') }}
     </div>
   </div>
-  {% if body %}<div class="qrows">{% for sec in ('steering', 'waiting', 'answered', 'fyi') %}{{ section(c, sec) }}{% endfor %}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}</div>{% endif %}
+  {% if body %}<div class="qrows">{{ held(c) }}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}{{ read(c) }}</div>{% endif %}
 </div>
 {% endmacro %}

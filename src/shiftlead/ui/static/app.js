@@ -3660,7 +3660,7 @@
   // `qFinds` `_find_word` and `_finds`, `qRefs` the home's `refs`, and `qPass` the test `apply_picks` makes of a
   // card, a completed line or an *other work* line. A press answers with these and no request.
   const Q_FILTERS = ["needs-you", "steering"];
-  const Q_KINDS = ["questions", "steering", "board", "yours", "held-until", "held-person"];
+  const Q_KINDS = ["decide", "do", "held-person"];
   AO.qRefs = (text) => {
     const seen = [];
     for (const m of String(text || "").matchAll(/(?<![\w-])(?:([\w.-]+)#)?TD-(\d+)\b/g)) {
