@@ -934,6 +934,13 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 details.qdots { display: inline-block; }
 .qdotsbtn { display: inline-flex; align-items: center; justify-content: center; min-width: 26px; height: 22px; padding: 0 6px; border-radius: 4px; color: var(--muted); cursor: pointer; font-weight: 600; letter-spacing: .05em; user-select: none; }
 .qdotsbtn:hover, .qdotsbtn:focus-visible, details.qdots[open] > .qdotsbtn { background: var(--hover); color: var(--fg); }
+/* its names, drawn beside the mark on hover or focus of its header, row or item; at narrow width the bare ⋯ */
+.qdotsnames { display: none; margin-left: 6px; font-weight: 400; letter-spacing: 0; white-space: nowrap; }
+.qhead:hover:not(:has(.qmail:hover)) > .qmain > .qright .qdotsnames,
+.qhead:focus-within:not(:has(.qmail:focus-within)) > .qmain > .qright .qdotsnames,
+.qrow:hover:not(:has(.qmail:hover)) > .qright .qdotsnames, .qrow:focus-within:not(:has(.qmail:focus-within)) > .qright .qdotsnames,
+.qmail .mailrow:hover .mfoot .qdotsnames, .qmail .mailrow:focus-within .mfoot .qdotsnames { display: inline; }
+@media (max-width: 640px) { .qdotsnames { display: none !important; } }
 /* an item's shape on a card (§4.5 screen 12 *An item's shape*, TD-911): a Read item one line, opening to its row;
    a Decide or Do item its one sentence first, then what each answer leads to, then *context* folded */
 .qmail .mailrow:has(> .cardline) { padding: 2px 8px; }

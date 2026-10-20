@@ -1141,7 +1141,8 @@
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button>
   {%- endif %}
   {%- endif %}
-  {%- if e.home == 'queue' and e.why != 'yours' %}
+  {#- on a card Start session is the card's, once, in its header (§4.5 screen 12 *Three verbs: Start session*) -#}
+  {%- if mode == 'card' or (e.home == 'queue' and e.why != 'yours') %}
   {%- elif e.held %}
   <button class="btn sm ghost" data-act="ledger_start" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="{{ e.held }} holds {{ e.id }}: go to its Focus — nothing is started">Open session</button>
   {%- else %}

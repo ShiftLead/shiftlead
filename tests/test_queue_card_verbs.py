@@ -88,6 +88,7 @@ def test_a_ledger_item_answers_done_or_lift_the_hold_in_its_row_and_opens_behind
     assert 'data-words="done"' in ans and ">Done</button>" in ans and 'data-act="ledger_reply"' in ans
     assert ">Answer…</button>" in ans and "Lift the hold" not in ans
     assert dots(html) == ["Open"] and not re.search(r"\bReply\b", html) and "Go with it" not in html
+    assert 'data-act="ledger_start"' not in html  # Start session is the card's header's alone (TD-912)
     decision = card({**row, "why": "decision"}, "decide")
     assert ">Lift the hold</button>" in decision[decision.index("qanswers") :]
     # the Inbox's own ledger row keeps Reply, Go with it and its controls inline (§4.5a *Inbox row: ledger entry*)
@@ -135,6 +136,13 @@ def test_a_rows_dots_hold_its_controls_in_order_and_the_headers_act_on_the_top_e
     r = {"id": "TD-5", "title": "t", "repo": "s", "page": "pickable", "state": "ready", "needs": ""}
     html = str(q.menu(r))
     assert dots(html) == ["Hold…, Back to design…, Done…, Open"]
+    # its names drawn beside the mark on hover or focus of the row (the page's CSS), inside the mark's press
+    assert (
+        '⋯<span class="qdotsnames" aria-hidden="true">Hold… · Back to design… · Done… · Open</span></summary>' in html
+    )
+    css = (UI / "static" / "app.css").read_text(encoding="utf-8")
+    assert ".qrow:hover:not(:has(.qmail:hover)) > .qright .qdotsnames" in css
+    assert "@media (max-width: 640px) { .qdotsnames { display: none !important; } }" in css
     acts = re.findall(
         r'<button role="menuitem" type="button" data-act="(\w+)"(?: data-id="person")?(?: data-road="(\w+)")?'
         r'|<a href="([^"]+)" role="menuitem"',
