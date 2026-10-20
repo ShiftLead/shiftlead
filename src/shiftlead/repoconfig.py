@@ -668,12 +668,7 @@ def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
     root = Path(repo_root).expanduser()
     reader = read or _read_here
     path = root / FILE
-    text = reader(path)
-    if text is None:  # a repo that has not renamed its file yet (TD-060)
-        legacy = root / paths.LEGACY_REPO_FILE
-        text = reader(legacy)
-        path = legacy if text is not None else path
-    cfg = load_text(text, root, path=path)
+    cfg = load_text(reader(path), root, path=path)
     cfg.read = read
     for name in cfg.roles:
         # an overlay is not a definition (design §4.9c): a key naming no preset and no directory is refused
@@ -710,7 +705,7 @@ def discover(start: Path | str) -> RepoConfig:
     the first `.git` — a directory session has no repo file and gets the defaults for its own dir."""
     here = Path(start).expanduser().resolve()
     for d in (here, *here.parents):
-        if (d / FILE).is_file() or (d / paths.LEGACY_REPO_FILE).is_file():
+        if (d / FILE).is_file():
             return load(d)
         if (d / ".git").exists():
             return RepoConfig(root=d)

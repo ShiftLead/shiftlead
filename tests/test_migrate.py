@@ -107,14 +107,12 @@ def test_migrate_is_refused_with_a_session_running_a_new_home_or_no_old_one(tmp_
     assert old.exists() == make_old
 
 
-def test_a_repo_that_has_not_renamed_its_file_is_read_from_the_legacy_name(tmp_path):
+def test_a_repo_that_has_not_renamed_its_file_is_read_by_nothing(tmp_path):
     (tmp_path / ".git").mkdir()
-    (tmp_path / paths.LEGACY_REPO_FILE).write_text("ledger: docs/ledger.md\n")
-    assert paths.repo_file(tmp_path) == tmp_path / ".agentorc.yml"
-    cfg = repoconfig.load(tmp_path)
-    assert cfg.path == tmp_path / ".agentorc.yml" and cfg.ledger == "docs/ledger.md"
-    assert repoconfig.discover(tmp_path).path == tmp_path / ".agentorc.yml"
-    # the new name wins once it is there
+    (tmp_path / ".agentorc.yml").write_text("ledger: docs/ledger.md\n")  # TD-553: no fallback
+    assert paths.repo_file(tmp_path) == tmp_path / ".shiftlead.yml"
+    assert repoconfig.load(tmp_path).ledger != "docs/ledger.md"
+    assert repoconfig.discover(tmp_path).path != tmp_path / ".agentorc.yml"
     (tmp_path / ".shiftlead.yml").write_text("ledger: docs/new.md\n")
     assert paths.repo_file(tmp_path) == tmp_path / ".shiftlead.yml"
     assert repoconfig.load(tmp_path).ledger == "docs/new.md"

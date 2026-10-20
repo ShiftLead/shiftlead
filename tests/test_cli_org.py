@@ -159,6 +159,22 @@ def test_a_registered_checkout_that_is_not_there_is_lacking(world, capsys):
     assert f"lacking: {tmp_path / 'gone'}" in out and out.strip().endswith("1 lacking")
 
 
+def test_a_checkout_holding_only_the_old_agentorc_file_is_lacking_naming_the_rename(world, capsys):
+    tmp_path, home, _ = world
+    old = tmp_path / "old"
+    old.mkdir()
+    (old / ".agentorc.yml").write_text("ledger: docs/ledger.md\n")
+    (home / "repos.txt").write_text(f"{tmp_path / 'alpha'}\n{tmp_path / 'beta'}\n{old}\n")
+    code, got = check(capsys)
+    assert code == 1
+    assert [x for x in got["lacks"] if ".agentorc.yml" in x] == [
+        f"{old}: its .agentorc.yml is read by nothing — rename it .shiftlead.yml (TD-553)"
+    ]
+    (old / ".shiftlead.yml").write_text("ledger: docs/ledger.md\n")  # renamed: the stale file beside it says nothing
+    code, got = check(capsys)
+    assert not [x for x in got["lacks"] if ".agentorc.yml" in x]
+
+
 def test_a_settings_team_no_definition_names_is_lacking(world, capsys):
     _, home, _ = world
     kept = {"alpha-grind": {"reserve": 5}, "old": {"reserve": 5}}
