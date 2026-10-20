@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from markupsafe import Markup
 
 from sessionorc import gitinfo, hosts, mail, naming, paths
+from sessionorc import ledger as ledger_mod
 from sessionorc import settle as settle_mod
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.containers import attach_argv_in, container_nodes
@@ -39,6 +40,7 @@ from sessionorc.models import (
     start_note,
     stop_note,
 )
+from sessionorc.queue import card_entries, qid
 from sessionorc.store import kept as doing_kept
 from shiftlead import org as orgmod
 from shiftlead import profiles as profiles_mod
@@ -374,10 +376,12 @@ from .queue import (
     apply_picks,
     attach,
     card_index,
+    card_session,
     picks_query,
     queue_picks,
     queue_view,
     queue_window,
+    same_td,
     send_window,
     split_later,
 )
@@ -2841,11 +2845,20 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         answering `{id}`. **When it cannot be silent it is not a guess**: no team, a team on another
         host, a name not free by Add entry's test (`entry_name_why`), a role or profile that does not
         resolve, or the create refused answers `{form, why}` — New session filled in
-        (`ledger_start_form`) with the reason on it."""
+        (`ledger_start_form`) with the reason on it.
+
+        **On a Queue card** (TD-909, built by TD-912; §4.5 screen 12 *Three verbs: Start session*): `card`, the
+        card's id as the `queue` reading has it, widens the road — the entry must be open and the card's `start`
+        now, in place of *for you* (409 in words otherwise); the person's own session on any of the card's
+        entries answers `{focus}`, another holder of `start` is refused 409 *held by <name>* (`card_session`);
+        `why_key` is the entry's — *yours*, *decision*, else *card* — and the prompt reads *from the Queue*.
+        Either way the prompt names the card's entries, waits on me and the rest (`card_entries`); an entry
+        on no card is the one it names."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if not isinstance(body, dict):
             raise HTTPException(400, "send {repo, id}")
         repo, ref = str(body.get("repo") or ""), str(body.get("id") or "")
+        card_id = str(body.get("card") or "")
         root = next((p for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), None)
         if root is None:
             raise HTTPException(404, f"no registered repo is named {repo!r} — ao repo --all lists them")
@@ -2860,13 +2873,38 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             {},
         )
         entry = next(
-            (e for e in (facts.get("ledger") or {}).get("entries") or () if isinstance(e, dict) and e.get("id") == ref),
+            (
+                e
+                for e in (facts.get("ledger") or {}).get("entries") or ()
+                if isinstance(e, dict) and same_td(e.get("id"), ref)
+            ),
             None,
         )
-        if entry is None or entry.get("for_page") != "for-you":
-            raise HTTPException(409, f"{ref} no longer waits on you in {repo}'s ledger — nothing was started")
-        name = ref.lower()  # cadence's work-branch shape: the tick derives the claim from it (§4.8)
+        ref = str(entry["id"]) if entry is not None else ref  # the ledger's own spelling: a card's is `TD-009`
+        cards: list[dict[str, Any]] = []
+        with contextlib.suppress(HTTPException):  # an older home serves no `queue`: the prompt names the entry
+            got = (await call("queue", omit=["completed"])) or {}
+            cards = [c for c in got.get("cards") or [] if isinstance(c, dict)]
         records = await call("list")
+        if card_id:  # a Queue card: the entry is the card's `start` now, not *for you*
+            card = next((c for c in cards if c.get("id") == card_id), None)
+            if card is None or entry is None:
+                raise HTTPException(409, f"the card around {card_id} is no longer open — nothing was started")
+            if card.get("start") != qid(repo, ref):
+                raise HTTPException(
+                    409, f"{ref} is no longer the entry this card starts on ({card.get('start')}) — nothing was started"
+                )
+            met = card_session(card, records)
+            if met["own"]:
+                return {"ok": True, "focus": met["own"]}
+            if met["other"]:
+                raise HTTPException(409, f"held by {met['other']} — nothing was started")
+        else:
+            if entry is None or entry.get("for_page") != "for-you":
+                raise HTTPException(409, f"{ref} no longer waits on you in {repo}'s ledger — nothing was started")
+            card = next((c for c in cards if qid(repo, ref) in sum(card_entries(c), [])), None)
+        mine, rest = card_entries(card) if card is not None else ([qid(repo, ref)], [])
+        name = ref.lower()  # cadence's work-branch shape: the tick derives the claim from it (§4.8)
         live = [
             s
             for s in records
@@ -2887,7 +2925,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return {"ok": True, "focus": holder["id"]}
         type_ = str(entry.get("type") or "")
         type_ = type_ if type_ in orgmod.ENTRY_TYPES else orgmod.ENTRY_TYPES[0]
-        why_key = "yours" if str(entry.get("owner") or "").lower() == "paul" else "decision"
+        if str(entry.get("owner") or "").lower() == "paul":
+            why_key = "yours"
+        elif ledger_mod.decided_by(entry, "paul") or not card_id:
+            why_key = "decision"
+        else:
+            why_key = "card"
         org, _notes = await asyncio.to_thread(org_here)
         team = repo_teams(org, host_name()).get(root, "")
         role = await asyncio.to_thread(entry_role, org, team, type_)
@@ -2897,7 +2940,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ledger = cfg.ledger
         except ValueError as e:
             cfg, cfg_why = None, str(e).strip('"')
-        prompt = repoconfig.work_text(ref, repo, ledger, why_key)
+        prompt = repoconfig.work_text(
+            ref, repo, ledger, why_key, where="Queue" if card_id else "Inbox", mine=mine, rest=rest
+        )
         t = org.teams.get(team) if team else None
         if t is not None:
             mid = teams.manager_id(org, t, t.host or host_name(), host_name())
@@ -3541,7 +3586,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         promotes = (info or {}).get("promotes")
         # Recently completed sends the picked window's lines alone (§4.5 *Page loads*, TD-882)
         view = send_window(
-            apply_picks(queue_view(got, datetime.now(UTC), mail, promotes), picks, teams),
+            apply_picks(queue_view(got, datetime.now(UTC), mail, promotes, fleet), picks, teams),
             queue_window(request.query_params),
         )
         ctx = {

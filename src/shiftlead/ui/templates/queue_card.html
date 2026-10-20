@@ -4,8 +4,8 @@
    status — and a press on it folds or opens the card (no chevron; the page remembers which). What is attached
    to the card is its three wants (§4.5 screen 12 *Three wants*, TD-911): Decide and Do in the header, open and
    amber, so a folded card still shows them, their counts the pill; Read under the rows, folded with its count,
-   *Read n* on a folded card's header; a held entry no want. The header's right edge reads the move arrows, the
-   slots for **Start session** (TD-912) and **⋯** (TD-914, the top entry's controls until then), a gap, then the
+   *Read n* on a folded card's header; a held entry no want. The header's right edge reads the move arrows,
+   **Start session** (TD-912), the slot for **⋯** (TD-914, the top entry's controls until then), a gap, then the
    count, *Read n* and the status last (§4.5 screen 12 *A card*). An Up next
    card carries its place, a grip and ⤒ ↑ ↓ — its place **per repo** (§4.5a *Queue page, Up next: the number*,
    TD-901): a Repo page draws the repo's own (`repo`), and where the home reads more than one repo (`c.chips`)
@@ -31,8 +31,14 @@
     <span class="qid mono strong">{{ t.show }}</span>{{ pbadge(t.priority) }}
     <span class="qtitle">{{ t.title }}</span>
     <span class="qright">
-      {#- the move arrows, then the slots for Start session (TD-912) and ⋯ (TD-914), a gap, then the facts #}
+      {#- the move arrows, Start session, then the slot for ⋯ (TD-914), a gap, then the facts #}
       {% if up %}<span class="qmoves"><button type="button" class="qmove" data-move="top" title="to the top of Up next" aria-label="to the top">⤒</button><button type="button" class="qmove" data-move="up" title="up one card" aria-label="up one">↑</button><button type="button" class="qmove" data-move="down" title="down one card" aria-label="down one">↓</button></span>{% endif %}
+      {#- **Start session** once per card (§4.5a *Queue card: Start session / Open session*, TD-912): on the card's
+          `start`; **Open session** while the person's own session holds any of its entries; absent while
+          another holds `start`, the row saying *held by <name>* #}
+      {%- set ss = c.session or {} %}{% set sp = (ss.start or '').split('#') %}
+      {%- if ss.own %}<button class="btn sm ghost qstart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ sp[0] }}" data-ref="{{ sp[1] }}" data-card="{{ c.id }}" title="your session on this card: go to its Focus — nothing is started">Open session</button>
+      {%- elif ss.start and not ss.other %}<button class="btn sm ghost qstart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ sp[0] }}" data-ref="{{ sp[1] }}" data-card="{{ c.id }}" title="{{ help_title('card-start') }}">Start session</button>{% endif %}
       {# the top entry's state where the card's own words do not already say it: *ready* is the status's,
          a need the amber badge's, *held by X* the holder's pill, a Waiting card's leaf its wait phrase #}
       {{ extras(t.ext, repo) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) %}{{ state(t) }}{% endif %}

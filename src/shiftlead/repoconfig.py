@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass, field
 from functools import lru_cache
 from importlib import resources
@@ -118,12 +118,19 @@ NO_REPO = "none"
 # opening lines of the composer a person's entry session starts with, the slots filled from the form.
 ENTRY_TEMPLATE = "entry.md"
 ENTRY_PLACEHOLDER = "{entry}"
-# The opening prompt of the person's own session on an entry that waits on them (design §4.5a *Inbox
-# row: ledger entry: Start session*, TD-676, built by TD-678): fixed text in the package, an opening
-# text and not a brief, its slots the id, the repo, the ledger file and why the entry is the person's.
+# The opening prompt of the person's own session on an entry (design §4.5a *Inbox row: ledger entry: Start
+# session*, TD-676, built by TD-678; a Queue card's, TD-912): fixed text in the package, an opening text and
+# not a brief — its first sentence `WORK_OPENING`'s by the chosen entry's `why_key` (its own slots the page it
+# was pressed on, the id, the repo and the ledger file), then the card's ids, waits on me and the rest.
 WORK_TEMPLATE = "work.md"
-WORK_SLOTS = ("{id}", "{repo}", "{ledger}", "{why}")
-WORK_WHY = {"yours": "its owner is me", "decision": "it is blocked by a decision of mine"}
+WORK_SLOTS = ("{opening}", "{mine}", "{rest}")
+WORK_OPENING = {
+    "yours": "I opened this session from the {where} to work {id} of {repo}'s ledger ({ledger}) myself: it waits "
+    "on me (its owner is me).",
+    "decision": "I opened this session from the {where} to work {id} of {repo}'s ledger ({ledger}) myself: it "
+    "waits on me (it is blocked by a decision of mine).",
+    "card": "I opened this session from the Queue to work the card around {id} of {repo}'s ledger ({ledger}).",
+}
 # A template's shape for a seat on call (design §6 *What is left is judgement, and a seat holds it*,
 # TD-247): the manager's, which reads one `seat_due` and ends, where `manager.md` rounds on `ao wait`.
 ON_CALL_BRIEFS = {"manager.md": "manager_on_call.md"}
@@ -229,11 +236,25 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
     }
 
 
-def work_text(id_: str, repo: str, ledger: str, why: str) -> str:
-    """`work.md` with its four slots filled: the opening prompt **Start session** sends (TD-678), `why`
-    a key of `WORK_WHY` — the Inbox row's kind, *ledger · yours* or *ledger · your decision*."""
+def work_text(
+    id_: str,
+    repo: str,
+    ledger: str,
+    why: str,
+    where: str = "Inbox",
+    mine: Iterable[str] = (),
+    rest: Iterable[str] = (),
+) -> str:
+    """`work.md` filled: the opening prompt **Start session** sends (TD-678, TD-912). `why` a key of
+    `WORK_OPENING` — *yours* (`Owner: paul`), *decision* (`decision (paul)`), *card* (any other entry a
+    card starts on) — `where` the page pressed on, *Inbox* or *Queue*; `mine` and `rest` the card's
+    `<repo>#TD-n` ids in key order, each group *none* when empty."""
     text = resources.files("shiftlead").joinpath("briefs", WORK_TEMPLATE).read_text(encoding="utf-8")
-    for slot, value in zip(WORK_SLOTS, (id_, repo, ledger, WORK_WHY[why]), strict=True):
+    opening = WORK_OPENING[why]
+    for slot, value in (("{where}", where), ("{id}", id_), ("{repo}", repo), ("{ledger}", ledger)):
+        opening = opening.replace(slot, value)
+    ids = [", ".join(mine) or "none", ", ".join(rest) or "none"]
+    for slot, value in zip(WORK_SLOTS, (opening, *ids), strict=True):
         text = text.replace(slot, value)
     return text.strip()
 

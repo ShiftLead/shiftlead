@@ -574,6 +574,16 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "card-start",
+        "Start session",
+        "Queue card",
+        (
+            "Starts your own session on this card's team, on the one entry owned by you, else the first decision "
+            "of yours, else its top entry, with the card's entries as its context. Reads Open session while yours "
+            "is running."
+        ),
+    ),
+    Help(
         "board",
         "the board",
         "Repo page: Technical debt",
@@ -716,7 +726,16 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "queue",
         "Queue",
-        ("up-next-number", "wait-column", "read-n", "live-mark", "row-done", "row-back-to-design", "row-hold"),
+        (
+            "up-next-number",
+            "wait-column",
+            "read-n",
+            "card-start",
+            "live-mark",
+            "row-done",
+            "row-back-to-design",
+            "row-hold",
+        ),
     ),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
