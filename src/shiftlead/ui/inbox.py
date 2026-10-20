@@ -2388,7 +2388,11 @@ def ledger_for_you(
             owner = str(e.get("owner") or "").lower() == "paul"
             for_you = e.get("for_page") == "for-you" and e.get("id") not in decided  # else here for its hold
             hold = e.get("held") if isinstance(e.get("held"), dict) else None
-            answers = [str(a) for a in e.get("answers") or () if str(a).strip()] if for_you else []
+            # the labels and, beside each, what it leads to (§4.10 *The answers' split*, TD-913): a card draws both
+            got = e.get("consequences") if isinstance(e.get("consequences"), list) else []
+            pairs = [(str(a), str(got[i]) if i < len(got) else "") for i, a in enumerate(e.get("answers") or ())]
+            pairs = [(a, c) for a, c in pairs if a.strip()] if for_you else []
+            answers = [a for a, _ in pairs]
             d = e.get("default")
             ok = isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers)
             added = str(e.get("added") or "") if for_you else str((hold or {}).get("at") or "")
@@ -2414,6 +2418,8 @@ def ledger_for_you(
                     "added": _added_words(added) if for_you else settle_mod.words({"held": hold}, now),
                     "detail": "\n".join(str(x) for x in e.get("detail") or () if isinstance(x, str)).strip("\n"),
                     "answers": answers,
+                    "consequences": [c for _, c in pairs],
+                    "ask": str(e.get("ask") or "") if for_you else "",  # its one sentence on a card (§4.10)
                     "default": answers[d] if ok else "",
                     "root": str(r.get("root") or root),  # the checkout `ledger_decide` names the repo by
                     # what the row's controls read, as a Queue row carries them (§4.5 screen 12 *any open row*, TD-905)

@@ -910,6 +910,16 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qmail > * { margin: 4px 0; }
 .qmention { font-style: italic; }
 .qmail details.more { display: none; }  /* every row's Snooze: the Queue has no Snooze (§4.5 screen 12) */
+/* an item's shape on a card (§4.5 screen 12 *An item's shape*, TD-911): a Read item one line, opening to its row;
+   a Decide or Do item its one sentence first, then what each answer leads to, then *context* folded */
+.qmail .mailrow:has(> .cardline) { padding: 2px 8px; }
+.qmail .cardline > summary { cursor: pointer; list-style: none; flex-wrap: nowrap; min-width: 0; }
+.qmail .cardline > summary::-webkit-details-marker { display: none; }
+.qmail .cardline > summary .subj { font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.qmail .cardline[open] > summary { border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-bottom: 4px; }
+.qmail .sentence { font-weight: 600; }
+.qmail ul.leads { margin: 2px 0; padding-left: 2ch; }
+.qmail .leads { color: var(--muted); }
 /* a card's sections (TD-828): Needs you in the header, the rest in the body above the rows, each with its count */
 .qsec { flex: 1 0 100%; }
 .qsech { display: flex; gap: 8px; align-items: center; padding: 6px 0 0 calc(6ch + 2.4em); font-size: var(--t-small); font-weight: 600; color: var(--muted); }

@@ -1608,6 +1608,8 @@ def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
             fold = fold or 'class="bfold"' in tag
             # …or a Queue card's Read (TD-911): rows with controls, never closed by a press
             fold = fold or 'class="qread"' in tag
+            # …or a Read item's one line on a card (TD-911): its row with controls, never closed by a press
+            fold = fold or 'class="cardline"' in tag
             # …or a Focus side card (TD-156): a fold the Focus page remembers, never closed by a press
             side = "data-side=" in tag
             assert menu + section + fold + side == 1, f"{tpl.name}: {tag} is not a menu, a known section or a fold"

@@ -55,22 +55,66 @@
    read on its first open; drawn open, and on every other page, it is sent whole. #}
 {% macro fold_body(kind, e, rest=none) -%}
 {%- if kind == 'mail' %}<div class="body md">{{ rest if rest is not none else shaped(e.text, origin).rest }}</div>
+{%- elif kind == 'card' %}<div class="body md">{{ rest if rest is not none else card_shape(e.text, origin).context }}</div>
 {%- elif kind == 'board' %}
 {%- if e.rest %}<div class="body md">{{ md(e.rest, origin) }}</div>{% endif %}
 {%- if e.detail %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}
 {%- else %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}
 {%- endmacro %}
+{#- a Decide or Do item drawn whole on a card folds its *context* in place of *details*, drawn closed even with
+    answers to press and read on its first open (§4.5 screen 12 *An item's shape*) -#}
 {% macro fold(key, is_open, kind, e, rest=none) -%}
+{%- set label = 'context' if card_whole(mode, e) else 'details' %}
 <details class="fold" data-fold="{{ key }}"{% if is_open %} open{% endif %}
-{%- if drawn_on_queue and not is_open %} data-lazy="1"><summary>details</summary></details>
-{%- else %}><summary>details</summary>{{ fold_body(kind, e, rest) }}</details>{% endif %}
+{%- if drawn_on_queue and not is_open %} data-lazy="1"><summary>{{ label }}</summary></details>
+{%- else %}><summary>{{ label }}</summary>{{ fold_body(kind, e, rest) }}</details>{% endif %}
+{%- endmacro %}
+
+{# design §4.5 screen 12 *An item's shape* (TD-909, built by TD-911): **one renderer per kind, with a `card`
+   mode** — `mode` is set by the Queue's `queue_mail.html`, the Inbox's own pages leave it unset (`inbox`), and
+   the item's `want` is the card's (`queue.want_of`). In `card` mode a Read item is one line — who, kind, the
+   subject, its age — opening on press to its row whole, controls and all; a Decide or Do item is drawn whole:
+   its kind line, its one sentence, what each answer leads to, *context* folded, and its answers. -#}
+{% macro read_line(e, section) -%}
+{%- if mode == 'card' and e.want == 'read' %}
+<details class="cardline" data-fold="line:{{ e.row_id or e.id }}"><summary class="row gap mhead" title="open it: the whole item and its controls">
+  <span class="ref">{{ e.from_name or e['from'] or e.repo or e.name or '' }}</span>
+  {%- set by_mate = e.answered and not e.row %}
+  <span class="badge kindmark k-{{ 'answered' if by_mate else (e.row or e.kind) }}">{{ 'answered for you' if by_mate else ('board · ' ~ e.kind if e.row == 'board' else (e.kind or e.row)) }}</span>
+  <span class="subj grow">{{ row_subject(e) }}</span>
+  {#- a board line says its due words, as its row does; the rest their age -#}
+  {%- if e.row == 'board' %}<span class="st" title="Due: {{ e.due }}">{{ e.due_tag }}</span>
+  {%- else %}<span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>{% endif %}
+</summary>{{ caller() }}</details>
+{%- else %}{{ caller() }}{% endif %}
+{%- endmacro %}
+
+{#- what each answer leads to, where the item's reader gives it (§4.10 *The answers' split*): a ledger entry's
+    and a board line's `consequences`, beside their labels; drawn on a card's whole item alone -#}
+{% macro leads(e) -%}
+{%- set cs = e.consequences if e.consequences is sequence and e.consequences is not string else [] %}
+{%- if card_whole(mode, e) and cs | select | list %}
+<ul class="body leads">{% for a in e.answers or [] %}{% if cs[loop.index0] %}<li><b>{{ a }}</b> — {{ cs[loop.index0] }}</li>{% endif %}{% endfor %}</ul>
+{%- endif %}
 {%- endmacro %}
 {% macro body(e) -%}
+{%- if card_whole(mode, e) %}
+{#- on a card (§4.5 screen 12 *An item's shape*): its one sentence, its second paragraph — what each answer
+    leads to — and the rest under *context*; a first paragraph that is not one sentence draws the subject as
+    the sentence and the whole text under *context* -#}
+{%- set c = card_shape(e.text, origin) %}
+{%- if c.one %}<div class="body md sentence">{{ c.sentence }}</div>{% else %}<div class="subj sentence">{{ row_subject(e) }}</div>{% endif %}
+{%- if c.leads %}<div class="body md leads">{{ c.leads }}</div>{% endif %}
+{%- if c.context %}
+{{ fold('card:' ~ e.id, fold_open, 'card', e, c.context) }}
+{%- endif %}
+{%- else %}
 {{ subj(e) }}
 {%- set s = shaped(e.text, origin) %}
 <div class="body md">{{ s.lead }}</div>
 {%- if s.rest %}
 {{ fold(e.id, fold_open, 'mail', e, s.rest) }}
+{%- endif %}
 {%- endif %}
 {{ shots(e) }}
 {%- endmacro %}
@@ -714,9 +758,10 @@
     text is (§4.10), its bold head and the sentence after it drawn and the rest under *details*,
     kept open across the poll as a message's fold is; the `Due:` is the head's due words, the
     `Context:` closes the fold, and the person's replies stand under the text, outside it. -#}
-{{ subj(e) }}
+{%- if not card_whole(mode, e) %}{{ subj(e) }}{% endif %}
 {%- if e.lead is defined %}
-<div class="body md">{{ md(e.lead, origin) }}</div>
+<div class="body md{% if card_whole(mode, e) %} sentence{% endif %}">{{ md(e.lead, origin) }}</div>
+{{ leads(e) }}
 {#- §4.5a **Inbox board row: detail block** (TD-312): the reader's `detail` drawn after the rest of
     the line inside the same fold, through the same renderer — text, never a control or a field. A
     row with a block has the fold however short its line; the fold is drawn open on a row with
@@ -724,7 +769,7 @@
     the page keeps the person's press either way (`foldsOpen`, `foldsShut`). -#}
 {%- if e.rest or e.detail %}
 {%- set press = (e.answers and not e.decided) or e.pair %}
-{{ fold(e.id, fold_open or (e.detail and press), 'board', e) }}
+{{ fold(e.id, fold_open or (e.detail and press and not card_whole(mode, e)), 'board', e) }}
 {%- endif %}
 {%- for r in e.replies %}
 <div class="st boardreply">{{ r.by }}, {{ r.date }}: {{ md(r.text, origin, inline=True) }}</div>
@@ -990,9 +1035,12 @@
   <span class="grow"></span>
   <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
 </div>
-<div class="body"><b class="mono">{{ e.id }}</b> {{ e.title }}</div>
+{#- on a card its `**Ask:**` line is the sentence, else its title (§4.5 screen 12 *An item's shape*) -#}
+{%- if card_whole(mode, e) and e.ask %}<div class="body sentence">{{ e.ask }}</div>
+{%- else %}<div class="body{% if card_whole(mode, e) %} sentence{% endif %}"><b class="mono">{{ e.id }}</b> {{ e.title }}</div>{% endif %}
+{{ leads(e) }}
 {%- if e.detail %}
-{{ fold(e.row_id, fold_open or e.answers, 'ledger', e) }}
+{{ fold(e.row_id, fold_open or (e.answers and not card_whole(mode, e)), 'ledger', e) }}
 {%- endif %}
 {%- if e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
@@ -1045,17 +1093,17 @@
 {% macro row(e, section, origin_first=False) -%}
 {%- if e.row == 'board' %}
 <div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-teams="{{ (e.teams or []) | join(' ') }}" data-repo="{{ e.repo_name or '' }}" data-repo-label="{{ e.repo }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %} data-text="{{ e.text }}">
-{{ board(e, section, origin_first) }}
+{% call read_line(e, section) %}{{ board(e, section, origin_first) }}{% endcall %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row == 'ledger' %}
 <div class="mailrow ledgerrow" tabindex="0" data-msg="{{ e.row_id }}" data-at="{{ e.at or '' }}" data-kind="ledger" data-rkind="ledger" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
-{{ ledger(e, section) }}
+{% call read_line(e, section) %}{{ ledger(e, section) }}{% endcall %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row == 'trail' %}
 <div class="mailrow trailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="trail" data-rkind="trail" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
-{{ trail(e, section) }}
+{% call read_line(e, section) %}{{ trail(e, section) }}{% endcall %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row %}
@@ -1071,6 +1119,7 @@
 <div class="mailrow" tabindex="0" data-page="/inbox/{{ e.id }}" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
+{%- call read_line(e, section) %}
 {%- if e.handed_row %}{{ handed(e, section) }}
 {%- elif section == 'waiting' %}{{ waiting(e, section) }}
 {%- elif section == 'answered' %}{{ answered(e, section) }}
@@ -1087,6 +1136,7 @@
 {%- elif e.kind == 'steer' %}{{ steer(e, section) }}
 {%- else %}{{ ask(e, section) }}
 {%- endif %}
+{%- endcall %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- endif %}

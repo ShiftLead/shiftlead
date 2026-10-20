@@ -226,7 +226,7 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
             {
                 "section": sec,
                 "id": str(mid or ""),
-                "html": drawn(e, drawn_as),
+                "html": drawn({**e, "want": want}, drawn_as),  # its renderer's `card` mode reads the want
                 "kind": kind,
                 "want": want,
                 "red": e.get("row") == "red_pr",

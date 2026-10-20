@@ -143,6 +143,8 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_line,  # noqa: F401
     _usage_profiles,  # noqa: F401
     build_chip,  # noqa: F401
+    card_shape,  # noqa: F401
+    card_whole,  # noqa: F401
     checkout_of,  # noqa: F401
     close_state,  # noqa: F401
     editor_file,  # noqa: F401
@@ -4139,8 +4141,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): one fold's body, read
         on its first open, by the row renderer's own macro — the one source its key names: a board line
         (`board:<root>:<line>`) from the home's board reading, a ledger row (`ledger:<repo>:<id>`) from its
-        repo's ledger reading, else a person-inbox entry or a row handed to a seat by its id, a person's
-        read marking nothing. A key that names nothing is a 404, which the fold says as *gone — reload*."""
+        repo's ledger reading, a mail item's *context* on a card (`card:<id>`, TD-911), else a person-inbox
+        entry or a row handed to a seat by its id, a person's read marking nothing. A key that names nothing is a
+        404, which the fold says as *gone — reload*."""
         e: Any = None
         if key.startswith("board:"):
             kind = "board"
@@ -4152,10 +4155,11 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             rows = (r for g in (await h.ledger_view(fleet)).get("groups") or () for r in g.get("rows") or ())
             e = next((r for r in rows if r.get("row_id") == key), None)
         elif key:
-            kind = "mail"
+            # a mail item drawn whole on a card folds its *context* (`card:<id>`, §4.5 screen 12 *An item's shape*)
+            kind, mid = ("card", key.removeprefix("card:")) if key.startswith("card:") else ("mail", key)
             got = await call("inbox", id=PERSON)
             # a row the person handed to a seat is the seat's entry, carried as `handed` (§4.10 *A look*)
-            e = next((x for x in [*(got.get("entries") or ()), *(got.get("handed") or ())] if x.get("id") == key), None)
+            e = next((x for x in [*(got.get("entries") or ()), *(got.get("handed") or ())] if x.get("id") == mid), None)
         if e is None:
             raise HTTPException(404, f"{key or 'no key'}: gone — reload")
         with timing.step("render"):
