@@ -76,7 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
 | TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Designed — built by TD-911–TD-918 (on dev-cadence#TD-121, #TD-122) |
-| TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Open |
+| TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Built — live check #2186 |
 | TD-914 | Build TD-909 (5): the Answer row and the ⋯, no Reply, Snooze or Due on a card | High | Open |
 | TD-915 | Build TD-909 (6): each card boxed with a coloured edge, the tree drawn, mentions one phrase | Medium | Open |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
@@ -1602,8 +1602,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** feature
 **Added:** 2026-10-19 (TD-909's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2186
+**Status:** Built (2026-10-19, #2186, grinder-ao-2): the reading's `start` and `card_entries`, `ui.queue.card_session`, `/api/ledger/start`'s `card`, `work.md`'s `WORK_OPENING` and id-list sentence on both roads, the card header's button and its help text. **Live check:** once #2186 is live, a headless GET of `/queue` — each open card with nothing held by another on its `start` draws **Start session** with `data-card`; the live records and the transcript of the person's next press show a `td-<n>` session whose first prompt names the card's ids, and the card In progress.
 **Blocked by:** TD-911
 **Location:** `src/sessionorc/queue.py` (`start` on each card), `src/shiftlead/ui/app.py` (`/api/ledger/start` ~2828, `why_key` ~2888), `src/shiftlead/repoconfig.py` (`work_text`, `WORK_WHY`), `src/shiftlead/briefs/work.md`, `templates/queue_card.html` (the Repo page's board keeps the row's Inbox road), `src/shiftlead/ui/help.py`
 
