@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queue Card Review</title>
+<meta name="description" content="A design pass over one Queue card: what it says today, the shape proposed, and the findings behind each change (2026-10-19, drawn from the live ledger).">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* the app's own tokens (app.css, dark), so the proposed card is drawn in the page's real clothes */
+:root {
+  --bg: #f4f5f7; --fg: #1c2128; --muted: #6b7280; --strong: #374151; --line: #dfe3e8; --card: #fff; --hover: #eef0f3;
+  --link: #1f5fa8; --idle: #2563eb; --waiting: #0d9488; --done-fg: #065f46; --ended: #9aa3ae;
+  --needs: #f59e0b; --needs-bg: #fde68a; --needs-fg: #7c3d00; --warn-bg: #fff7ed;
+  --pri: #2563eb; --accent: #2b5fd9; --accent-fg: #fff; --rv-warn: #a15c00; --rv-warn-bg: #fff3df;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --card: #171b21; --hover: #232a33;
+  --link: #7fb2f0; --idle: #3b82f6; --waiting: #14b8a6; --done-fg: #a7f3d0; --ended: #6b7684;
+  --needs: #f59e0b; --needs-bg: #4a3608; --needs-fg: #fde68a; --warn-bg: #3a2410;
+  --pri: #3b82f6; --accent: #5b8cff; --accent-fg: #0f1216; --rv-warn: #f0b45a; --rv-warn-bg: #2c2210; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --card: #171b21; --hover: #232a33;
+  --link: #7fb2f0; --idle: #3b82f6; --waiting: #14b8a6; --done-fg: #a7f3d0; --ended: #6b7684;
+  --needs: #f59e0b; --needs-bg: #4a3608; --needs-fg: #fde68a; --warn-bg: #3a2410;
+  --pri: #3b82f6; --accent: #5b8cff; --accent-fg: #0f1216; --rv-warn: #f0b45a; --rv-warn-bg: #2c2210; color-scheme: dark }
+
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 72px; display: flex; flex-direction: column; gap: 30px; }
+h1 { font-size: 26px; margin: 0; text-wrap: balance; } h2 { font-size: 18px; margin: 0 0 10px; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 72ch; }
+.mono, code { font-family: var(--mono); font-size: .88em; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button { font: 500 14px var(--sans); padding: 6px 14px; border-radius: 4px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.tabs button:focus-visible, .qhead:focus-visible, .qact:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pane[hidden] { display: none; }
+.shot { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #0b0f14; }
+.shot img { display: block; width: 100%; height: auto; }
+.cap { color: var(--muted); font-size: 13px; margin-top: 6px; max-width: 80ch; }
+
+/* ---- the proposed card, in the app's shapes ---- */
+.qcards { border: 1px solid var(--line); border-radius: 6px; background: var(--card); overflow: hidden; }
+.qcard { border-top: 1px solid var(--line); border-left: 3px solid transparent; }
+.qcard:first-child { border-top: 0; }
+.qcard.needsyou { border-left-color: var(--needs); }
+.qcard.needsyou > .qhead { background: var(--warn-bg); }
+.qhead { display: grid; grid-template-columns: 1.4em 2.6em minmax(0, 1fr); column-gap: 8px; align-items: baseline; padding: 9px 14px 9px 4px; cursor: pointer; }
+.qhead:hover, .qhead:focus-within { background: var(--hover); }
+.qcard.needsyou > .qhead:hover { background: var(--warn-bg); }
+.qgrip { color: var(--ended); cursor: grab; letter-spacing: -.2em; font-size: 12px; user-select: none; }
+.qplace { font-size: 30px; font-weight: 600; line-height: 1; color: var(--fg); opacity: .25; text-align: right; }
+.qplace small { display: block; font-size: 12px; font-weight: 400; opacity: 1; color: var(--muted); letter-spacing: 0; margin-top: 2px; }
+.qmain, .qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.qid { font-family: var(--mono); font-size: 13px; color: var(--strong); white-space: nowrap; }
+.qhead .qid { font-weight: 600; }
+.qpri { font: 600 11px var(--mono); color: #fff; background: var(--pri); border-radius: 3px; padding: 1px 5px; }
+.qtitle { flex: 1 1 28ch; min-width: 0; }
+.qhead .qtitle { font-weight: 600; }
+.qright { margin-left: auto; display: inline-flex; align-items: baseline; gap: 12px; white-space: nowrap; font-size: 13px; }
+.qmoves { color: var(--muted); letter-spacing: .1em; }
+.qstatus { color: var(--strong); }
+.qstatus::before { content: "● "; color: var(--ended); }
+.qstatus.waiting::before { color: var(--waiting); } .qstatus.ready::before { color: var(--idle); }
+.qstatus.needs { padding: 1px 9px; border-radius: 10px; background: var(--needs); color: #3b2300; font-weight: 600; }
+.qstatus.needs::before { content: ""; }
+.qcount { color: var(--muted); }
+/* the ledger actions: there on hover or focus, and always one visible ⋯ for the keyboard */
+.qacts { display: inline-flex; gap: 10px; color: var(--strong); }
+.qacts .qact { background: none; border: 0; color: var(--strong); font: inherit; cursor: pointer; padding: 0; }
+.qacts .qact.more { color: var(--muted); }
+.qacts .qact:not(.more) { opacity: 0; transition: opacity .12s; }
+.qhead:hover .qacts .qact, .qhead:focus-within .qacts .qact, .qrow:hover .qacts .qact, .qrow:focus-within .qacts .qact { opacity: 1; }
+.qstate { white-space: nowrap; color: var(--muted); font-size: 13px; }
+.qstate.needs { color: var(--needs-fg); font-weight: 600; }
+.qstate.done { color: var(--done-fg); }
+.qnote { grid-column: 3; color: var(--muted); font-size: 13px; }
+.qnote i { font-style: normal; color: var(--strong); }
+.qrows { padding-bottom: 6px; }
+/* rows: a tree with its lines drawn, the depth a left rule rather than air */
+.qrow { padding: 4px 14px 4px 0; margin-left: calc(4em + 20px + (var(--qd, 1) - 1) * 22px); border-left: 1px solid var(--line); padding-left: 12px; }
+.qrow.archived .qtitle, .qrow.archived .qid { color: var(--muted); }
+.qrow .qtitle { font-size: 14px; }
+.qmention { color: var(--muted); font-size: 12px; text-decoration: underline dotted; cursor: help; }
+/* attached items: one line each, opening on press; Needs you stays in the header */
+.qsec { grid-column: 3; margin-top: 6px; }
+.qrows .qsec { margin: 8px 0 4px calc(4em + 20px); }
+.qsec summary { list-style: none; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--strong); }
+.qsec summary::-webkit-details-marker { display: none; }
+.qsec summary::before { content: "▸ "; color: var(--muted); } .qsec[open] summary::before { content: "▾ "; }
+.qsec.needs summary { color: var(--needs-fg); }
+.qitem { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 4px 0 4px 14px; font-size: 14px; align-items: baseline; }
+.qitem .who { font-family: var(--mono); font-size: 12.5px; color: var(--strong); }
+.qitem .kind { font-size: 12px; color: var(--muted); }
+.qitem .age { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.qitem .on { color: var(--link); font-size: 12px; text-decoration: none; }
+.qitem .subj { color: var(--fg); }
+.qitem .body { grid-column: 1 / -1; color: var(--muted); font-size: 13px; max-width: 90ch; }
+.qitem .acts { grid-column: 1 / -1; display: flex; gap: 14px; justify-content: flex-end; font-size: 13px; }
+.qitem .acts span { color: var(--link); cursor: pointer; }
+.qitem .acts .primary { color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 10px; }
+
+/* ---- the findings ---- */
+.changes { display: grid; gap: 10px; counter-reset: c; }
+.chg { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 4px 10px; }
+.chg::before { counter-increment: c; content: counter(c); font: 600 14px var(--mono); color: var(--accent); }
+.chg b { display: block; } .chg p { margin: 2px 0 0; color: var(--muted); grid-column: 2; max-width: 84ch; }
+.chg .t { grid-column: 2; }
+.ask { background: var(--rv-warn-bg); border: 1px solid var(--rv-warn); border-radius: 6px; padding: 14px 18px; }
+.ask ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; } .ask li { max-width: 80ch; }
+table.n { border-collapse: collapse; font-size: 14px; } table.n td, table.n th { padding: 4px 14px 4px 0; text-align: left; border-bottom: 1px solid var(--line); } table.n th { color: var(--muted); font-weight: 500; }
+@media (max-width: 640px) { .qhead { grid-template-columns: 1em 2em minmax(0, 1fr); } .qplace { font-size: 22px; } .qrow { margin-left: calc(2.6em + (var(--qd, 1) - 1) * 14px); } .qrows .qsec { margin-left: 2.6em; } }
+@media (prefers-reduced-motion: reduce) { .qacts .qact { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>One Queue card, read closely</h1>
+    <p class="sub">Card 1 and card 2 of Up next as the live page drew them on 2026-10-19, then the same two cards in the proposed shape. The content is the real ledger's. Press a header or a section to fold it, and rest on a header to see its actions.</p>
+  </header>
+
+  <section>
+    <div class="tabs" role="tablist" aria-label="shape">
+      <button role="tab" aria-selected="true" data-pane="today">Today</button>
+      <button role="tab" aria-selected="false" data-pane="proposed">Proposed</button>
+      <button role="tab" aria-selected="false" data-pane="tallest">Today's tallest card</button>
+    </div>
+
+    <div class="pane" id="pane-today">
+      <div class="shot"><img src="2026-10-19-queue-card-today.png" alt="Card 1 (TD-748) as drawn today: a header with six things at its right, an FYI item above the rows, a duplicated mention line, and card 2 (TD-112) amber below it"></div>
+      <p class="cap">Card 1 is waiting on a date eleven days out and says only <i>waiting</i>. Its one FYI, about a row already done, sits above the rows and reads as the headline. The two <i>also mentioned</i> lines under TD-772 are one item, listed twice.</p>
+    </div>
+
+    <div class="pane" id="pane-proposed" hidden>
+      <div class="qcards">
+
+        <div class="qcard">
+          <div class="qhead" role="button" tabindex="0" aria-expanded="true">
+            <span class="qgrip">⋮⋮</span>
+            <span class="qplace">1<small>shiftlead</small></span>
+            <div class="qmain">
+              <span class="qid">shiftlead#TD-748</span><span class="qpri">M</span>
+              <span class="qtitle">The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD</span>
+              <span class="qright">
+                <span class="qmoves">⤒ ↑ ↓</span>
+                <span class="qacts"><button class="qact" type="button">Done…</button><button class="qact" type="button">Back to design…</button><button class="qact more" type="button" aria-label="more actions">⋯</button></span>
+                <span class="qcount">5 entries</span>
+                <span class="qstatus waiting">waits until Oct 30</span>
+              </span>
+              <div class="qnote">nothing to pick until Oct 30 — the card keeps its place meanwhile</div>
+            </div>
+          </div>
+          <div class="qrows">
+            <div class="qrow" style="--qd: 1">
+              <span class="qid">shiftlead#TD-772</span><span class="qpri">M</span>
+              <span class="qtitle">Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask</span>
+              <span class="qright"><span class="qmention" title="ao-grind finished and the host agent wound it">mentioned in 1 item</span><span class="qacts"><button class="qact" type="button">Done…</button><button class="qact" type="button">Hold…</button><button class="qact more" type="button" aria-label="more actions">⋯</button></span><span class="qstate">waits until 2026-10-30</span></span>
+            </div>
+            <div class="qrow archived" style="--qd: 1">
+              <span class="qid">shiftlead#TD-769</span><span class="qpri">M</span>
+              <span class="qtitle">Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs</span>
+              <span class="qright"><span class="qstate done">done #1939</span></span>
+            </div>
+            <div class="qrow archived" style="--qd: 1">
+              <span class="qid">shiftlead#TD-770</span><span class="qpri">M</span>
+              <span class="qtitle">Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons</span>
+              <span class="qright"><span class="qstate done">done #1955</span></span>
+            </div>
+            <div class="qrow archived" style="--qd: 1">
+              <span class="qid">shiftlead#TD-771</span><span class="qpri">M</span>
+              <span class="qtitle">Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over</span>
+              <span class="qright"><span class="qmention" title="The Queue: one number in the top bar">mentioned in 1 item</span><span class="qstate done">done #1957</span></span>
+            </div>
+            <details class="qsec fyi">
+              <summary>FYI (1)</summary>
+              <div class="qitem">
+                <div><span class="who">designer-ao-1</span> <span class="kind">note · on <a class="on" href="#">TD-769</a></span> <span class="subj">The Queue: one number in the top bar</span></div>
+                <span class="age">3d</span>
+                <div class="body">The Queue tab has no number of its own, as designed and merged in #1904; TD-769–TD-771 build it.</div>
+                <div class="acts"><span>Put on the board</span><span>Dismiss</span></div>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div class="qcard needsyou">
+          <div class="qhead" role="button" tabindex="0" aria-expanded="true">
+            <span class="qgrip">⋮⋮</span>
+            <span class="qplace">2<small>shiftlead</small></span>
+            <div class="qmain">
+              <span class="qid">shiftlead#TD-112</span><span class="qpri">M</span>
+              <span class="qtitle">The adapter contract has grown Claude-shaped and neutrality is untested</span>
+              <span class="qright">
+                <span class="qmoves">⤒ ↑ ↓</span>
+                <span class="qacts"><button class="qact" type="button">Done…</button><button class="qact" type="button">Back to design…</button><button class="qact more" type="button" aria-label="more actions">⋯</button></span>
+                <span class="qcount">9 entries</span>
+                <span class="qstatus needs">Needs you</span>
+              </span>
+              <details class="qsec needs" open>
+                <summary>Needs you (2)</summary>
+                <div class="qitem">
+                  <div><span class="kind">yours to do · on <a class="on" href="#">TD-875</a></span> <span class="subj">Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission</span></div>
+                  <span class="age">added Oct 17</span>
+                  <div class="acts"><span>Reply</span><span>Start session</span><span>Hold…</span></div>
+                </div>
+                <div class="qitem">
+                  <div><span class="who">grinder-ao-2</span> <span class="kind">asks · on <a class="on" href="#">TD-785</a></span> <span class="subj">TD-785 needs a Gemini profile for two things</span></div>
+                  <span class="age">2d</span>
+                  <div class="body">No ~/.gemini-conformance exists and ao doctor profiles lists no gemini-conformance profile yet; its fixtures and live walk start once it does — reply on this thread when it is signed in.</div>
+                  <div class="acts"><span class="primary">Reply</span><span>Put on the board</span></div>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div class="qrows">
+            <div class="qrow" style="--qd: 1"><span class="qid">shiftlead#TD-052</span><span class="qpri">M</span><span class="qtitle">Messages between sessions — build design §4.10</span><span class="qright"><span class="qacts"><button class="qact more" type="button" aria-label="more actions">⋯</button></span><span class="qstate">after TD-112</span></span></div>
+            <div class="qrow" style="--qd: 1"><span class="qid">shiftlead#TD-035</span><span class="qpri">L</span><span class="qtitle">Adapters without a session-start hook still run dev-cadence's SessionStart set</span><span class="qright"><span class="qacts"><button class="qact more" type="button" aria-label="more actions">⋯</button></span><span class="qstate">after TD-112</span></span></div>
+            <div class="qrow" style="--qd: 1"><span class="qid">shiftlead#TD-875</span><span class="qpri">M</span><span class="qtitle">Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission</span><span class="qright"><span class="qmention" title="#2158 conflicts with main · ao-grind finished and the host agent wound it · TD-871 amended · Gemini hooks: where the layer lives">mentioned in 4 items</span><span class="qacts"><button class="qact" type="button">Hold…</button><button class="qact more" type="button" aria-label="more actions">⋯</button></span><span class="qstate needs">yours to do</span></span></div>
+            <div class="qrow" style="--qd: 2"><span class="qid">shiftlead#TD-785</span><span class="qpri">M</span><span class="qtitle">Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title</span><span class="qright"><span class="qmention" title="Which profiles are set aside for the adapter conformance suite's live walk">mentioned in 1 item</span><span class="qacts"><button class="qact more" type="button" aria-label="more actions">⋯</button></span><span class="qstate">after TD-875</span></span></div>
+            <div class="qrow" style="--qd: 3"><span class="qid">shiftlead#TD-786</span><span class="qpri">M</span><span class="qtitle">Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live</span><span class="qright"><span class="qacts"><button class="qact more" type="button" aria-label="more actions">⋯</button></span><span class="qstate">after TD-785</span></span></div>
+            <div class="qrow" style="--qd: 4"><span class="qid">shiftlead#TD-857</span><span class="qpri">M</span><span class="qtitle">Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's</span><span class="qright"><span class="qacts"><button class="qact more" type="button" aria-label="more actions">⋯</button></span><span class="qstate">after TD-786</span></span></div>
+            <div class="qrow" style="--qd: 2"><span class="qid">shiftlead#TD-871</span><span class="qpri">M</span><span class="qtitle">Gemini CLI skips a `GEMINI_CLI_SYSTEM_SETTINGS_PATH` file that root does not own, so the launch layer is never read and no hook reaches a Gemini session</span><span class="qright"><span class="qacts"><button class="qact more" type="button" aria-label="more actions">⋯</button></span><span class="qstate">after TD-875</span></span></div>
+            <div class="qrow archived" style="--qd: 1"><span class="qid">shiftlead#TD-784</span><span class="qpri">M</span><span class="qtitle">Build TD-112 (1): the adapter conformance suite — `tests/conformance/`, offline fixtures in CI, `pdm run conformance <adapter>` live by hand; Claude Code passes it</span><span class="qright"><span class="qstate done">done #1949</span></span></div>
+            <details class="qsec fyi">
+              <summary>FYI (2)</summary>
+              <div class="qitem">
+                <div><span class="who">grinder-ao-2</span> <span class="kind">note · on <a class="on" href="#">TD-784</a></span> <span class="subj">Which profiles are set aside for the adapter conformance suite's live walk</span></div>
+                <span class="age">3d</span>
+              </div>
+              <div class="qitem">
+                <div><span class="who">grinder-ao-2</span> <span class="kind">note · on <a class="on" href="#">TD-871</a></span> <span class="subj">TD-871 amended</span></div>
+                <span class="age">3d</span>
+              </div>
+            </details>
+          </div>
+        </div>
+
+      </div>
+      <p class="cap">Drawn by hand from the live page's content. The ledger actions appear when the pointer or the keyboard rests on a header or row; the ⋯ is always there. Rows keep their tree, now with its lines. Attached mail is one line until opened; Needs you opens by itself, FYI and Answered for you stay folded under the rows.</p>
+    </div>
+
+    <div class="pane" id="pane-tallest" hidden>
+      <div class="shot"><img src="2026-10-19-queue-card-tallest.png" alt="Card 20 (TD-900) today: seven Answered for you items drawn in full above its six rows, the card 3,212 pixels tall"></div>
+      <p class="cap">TD-900's card today. Seven answers, each drawn in the Inbox's full shape, push the card's six rows three screens down. Nothing on the card waits on you.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What the live page measured</h2>
+    <table class="n">
+      <tr><th>Up next cards</th><td>197</td></tr>
+      <tr><th>of them amber (needs you)</th><td>82</td></tr>
+      <tr><th>of them waiting</th><td>11, every one saying only <i>waiting</i></td></tr>
+      <tr><th>cards with attached mail</th><td>21 with rows; 13 FYI, 8 Answered for you, 82 Needs you</td></tr>
+      <tr><th>tallest card</th><td>3,212 px (TD-900, seven answers); the median 138 px</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>Findings, each with the change it asks for</h2>
+    <div class="changes">
+      <div class="chg"><b class="t">The status word does not say what it waits for.</b><p>Eleven cards read <i>waiting</i>; the date or event is on one row, inside the card. The card's status becomes the top entry's wait phrase, <i>waits until Oct 30</i>, <i>waits on an event</i>, <i>after dev-cadence#TD-119</i>, with the full words on hover. The reading already has them (<code>wait_words</code>).</p></div>
+      <div class="chg"><b class="t">Six kinds of thing share the header's right edge.</b><p>Move arrows, a state, two or three text buttons, a count and a status sit in one run, so the eye lands on <i>Done… Back to design…</i> before the status. The ledger actions show on hover or focus, with one ⋯ always visible for the keyboard; the status word is last and alone. A header then reads id, title, count, status.</p></div>
+      <div class="chg"><b class="t">Attached mail is drawn in the Inbox's full shape, above the rows.</b><p>An FYI about a done row heads card 1; seven answers make card 20 three screens tall. On a card an item is one line, who · kind · subject · age, opening on press to its body and buttons. Needs you keeps opening by itself, in the header, as today. FYI and Answered for you move under the rows and stay folded with their count.</p></div>
+      <div class="chg"><b class="t">The mention lines repeat and are cut mid-sentence.</b><p>TD-875 carries four italic lines, TD-772 the same line twice. One quiet phrase per row, <i>mentioned in 4 items</i>, with the subjects on hover; a row's mentions deduplicated by item.</p></div>
+      <div class="chg"><b class="t">The tree is drawn in air.</b><p>Depth is two characters of indent and a state word, <i>after TD-875</i>, that the reader has to match by eye. A thin rule down each level's left edge makes parent and child visible without reading; the state word stays, since it also carries the date and the PR.</p></div>
+      <div class="chg"><b class="t">A card at the top of Up next with nothing to pick says nothing about why it holds its place.</b><p>One quiet line under the header, <i>nothing to pick until Oct 30 — the card keeps its place meanwhile</i>. The lists pass decides whether such a card moves to a Waiting group instead; the line is the card-only answer and does no harm if the group comes.</p></div>
+      <div class="chg"><b class="t">Amber is on 82 of 197 cards.</b><p>Not a card finding, but measured here: when four in ten cards need you, the colour stops saying anything. Most are <i>Owner: paul</i> entries drawn as <i>yours to do</i>. For the lists pass: whether a ledger row that only names you as owner should colour its card, or only a question, a hold or a decision should.</p></div>
+    </div>
+  </section>
+
+  <section class="ask">
+    <b>Open calls for Paul</b>
+    <ul>
+      <li>Hidden-until-hover actions: a tradeoff of calm for discoverability. The ⋯ keeps them reachable. Say if you would rather keep them visible on the top entry and hide them on rows only.</li>
+      <li>The one-line mail item drops the item's team chip and kind chip from the first line. Both are in the opened item. Fine, or keep the kind chip on the line?</li>
+      <li>Needs you stays open by default; FYI and Answered for you folded. Should Steering (a paused steer) open by default too?</li>
+    </ul>
+  </section>
+</div>
+<script>
+(() => {
+  const tabs = [...document.querySelectorAll('[role=tab]')];
+  const show = (name) => {
+    tabs.forEach(t => t.setAttribute('aria-selected', String(t.dataset.pane === name)));
+    document.querySelectorAll('.pane').forEach(p => p.hidden = p.id !== 'pane-' + name);
+    try { localStorage.setItem('qcard-pane', name); } catch (e) {}
+  };
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.pane)));
+  let saved = null; try { saved = localStorage.getItem('qcard-pane'); } catch (e) {}
+  if (saved && tabs.some(t => t.dataset.pane === saved)) show(saved);
+  document.querySelectorAll('.qhead').forEach(h => {
+    const toggle = () => { const rows = h.parentElement.querySelector('.qrows'); if (!rows) return; rows.hidden = !rows.hidden; h.setAttribute('aria-expanded', String(!rows.hidden)); };
+    h.addEventListener('click', e => { if (e.target.closest('button, a, summary, details')) return; toggle(); });
+    h.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === h) { e.preventDefault(); toggle(); } });
+  });
+})();
+</script>
+</body>
+</html>

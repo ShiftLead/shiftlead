@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queue Redesign Draft</title>
+<meta name="description" content="The Queue page drawn in the proposed shape: a Waiting group, three wants and three verbs on a card, Start session once per card, no dates on a card, items written to lead with one sentence (2026-10-19, real ledger content).">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --bg: #f4f5f7; --fg: #1c2128; --muted: #6b7280; --strong: #374151; --line: #dfe3e8; --card: #fff; --hover: #eef0f3; --border: #cbd0d6;
+  --link: #1f5fa8; --idle: #2563eb; --waiting: #0d9488; --done: #059669; --done-fg: #065f46; --ended: #9aa3ae; --working: #16a34a;
+  --needs: #f59e0b; --needs-bg: #fde68a; --needs-fg: #7c3d00; --warn-bg: #fff7ed;
+  --pri: #2563eb; --accent: #2b5fd9; --accent-fg: #fff; --rv-warn: #a15c00; --rv-warn-bg: #fff3df;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --card: #171b21; --hover: #232a33; --border: #3a424d;
+  --link: #7fb2f0; --idle: #3b82f6; --waiting: #14b8a6; --done: #22c55e; --done-fg: #a7f3d0; --ended: #6b7684; --working: #22c55e;
+  --needs: #f59e0b; --needs-bg: #4a3608; --needs-fg: #fde68a; --warn-bg: #3a2410;
+  --pri: #3b82f6; --accent: #5b8cff; --accent-fg: #0f1216; --rv-warn: #f0b45a; --rv-warn-bg: #2c2210; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --card: #171b21; --hover: #232a33; --border: #3a424d;
+  --link: #7fb2f0; --idle: #3b82f6; --waiting: #14b8a6; --done: #22c55e; --done-fg: #a7f3d0; --ended: #6b7684; --working: #22c55e;
+  --needs: #f59e0b; --needs-bg: #4a3608; --needs-fg: #fde68a; --warn-bg: #3a2410;
+  --pri: #3b82f6; --accent: #5b8cff; --accent-fg: #0f1216; --rv-warn: #f0b45a; --rv-warn-bg: #2c2210; color-scheme: dark }
+
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 72px; display: flex; flex-direction: column; gap: 30px; }
+h1 { font-size: 26px; margin: 0; text-wrap: balance; } h2 { font-size: 18px; margin: 0 0 10px; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 72ch; }
+.mono, code { font-family: var(--mono); font-size: .88em; }
+a { color: var(--link); text-decoration: none; }
+button:focus-visible, [tabindex]:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---- the page mock ---- */
+.page { display: flex; flex-direction: column; gap: 22px; }
+.pagehead { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; }
+.pagehead .h { font-size: 18px; font-weight: 600; }
+.pagehead .meta { color: var(--muted); font-size: 13px; }
+.pagehead .meta b { color: var(--needs-fg); font-weight: 600; }
+.ghead { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin-bottom: 8px; cursor: pointer; }
+.ghead .h { font-weight: 600; font-size: 16px; }
+.ghead .h::before { content: "▾ "; color: var(--muted); font-weight: 400; } .group.folded .ghead .h::before { content: "▸ "; }
+.ghead .why { color: var(--muted); font-size: 13px; }
+.group.folded .qcards { display: none; }
+.qcards { display: flex; flex-direction: column; gap: 10px; }
+.qcard { border: 1px solid var(--border); border-left: 4px solid var(--ended); border-radius: 6px; background: var(--card); overflow: hidden; }
+.qcard.needsyou { border-left-color: var(--needs); }
+.qcard.waitc { border-left-color: var(--waiting); }
+.qcard.waitc .qhead { grid-template-columns: 1.4em 4.8em minmax(0, 1fr); }
+.qcard.waitc .qrow { margin-left: calc(6.2em + 20px + (var(--qd, 1) - 1) * 22px); }
+.qcard.waitc .qrows .qsec { margin-left: calc(6.2em + 20px); }
+.qcard.needsyou > .qhead { background: var(--warn-bg); }
+.qcard.inprog { border-left-color: var(--working); }
+.qhead { display: grid; grid-template-columns: 1.4em 2.6em minmax(0, 1fr); column-gap: 8px; align-items: baseline; padding: 9px 14px 9px 4px; cursor: pointer; }
+.qhead:hover, .qhead:focus-within { background: var(--hover); }
+.qcard.needsyou > .qhead:hover { background: var(--warn-bg); }
+.qgrip { color: var(--ended); cursor: grab; letter-spacing: -.2em; font-size: 12px; user-select: none; }
+.qplace { font-size: 30px; font-weight: 600; line-height: 1; color: var(--fg); opacity: .25; text-align: right; }
+.qplace.qwhen { font-size: 17px; opacity: .45; line-height: 1.2; white-space: nowrap; }
+.qplace small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+.qmain, .qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.qid { font-family: var(--mono); font-size: 13px; color: var(--strong); white-space: nowrap; }
+.qhead .qid { font-weight: 600; }
+.qpri { font: 600 11px var(--mono); color: #fff; background: var(--pri); border-radius: 3px; padding: 1px 5px; }
+.qtitle { flex: 1 1 28ch; min-width: 0; }
+.qhead .qtitle { font-weight: 600; }
+.qright { margin-left: auto; display: inline-flex; align-items: baseline; gap: 12px; white-space: nowrap; font-size: 13px; }
+.qverbs + * { margin-left: 10px; }
+.qmoves { color: var(--muted); letter-spacing: .1em; }
+.qstatus { color: var(--strong); }
+.qstatus::before { content: "● "; color: var(--ended); }
+.qstatus.waiting::before { color: var(--waiting); } .qstatus.ready::before { color: var(--idle); } .qstatus.review::before { color: var(--working); }
+.qstatus.needs { padding: 1px 9px; border-radius: 10px; background: var(--needs); color: #3b2300; font-weight: 600; }
+.qstatus.needs::before { content: ""; }
+.qcount { color: var(--muted); }
+.qkept { color: var(--muted); font-size: 12px; }
+.qsub { color: var(--muted); font-size: 12px; margin: 2px 0 2px 14px; }
+/* the card's verbs: Start session always, the ledger acts behind ⋯ */
+.qverbs { display: inline-flex; gap: 10px; align-items: baseline; }
+.vbtn { font: 500 13px var(--sans); border: 1px solid var(--border); background: var(--card); color: var(--fg); border-radius: 4px; padding: 2px 10px; cursor: pointer; }
+.vbtn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.vbtn.ghost { border-color: transparent; background: transparent; color: var(--strong); }
+.vbtn.more { border-color: transparent; background: transparent; color: var(--muted); padding: 2px 6px; }
+.qstate { white-space: nowrap; color: var(--muted); font-size: 13px; }
+.qstate.needs { color: var(--needs-fg); font-weight: 600; }
+.qstate.done { color: var(--done-fg); }
+.qnote { grid-column: 3; color: var(--muted); font-size: 13px; }
+.qrows { padding-bottom: 8px; }
+/* rows: the tree with its lines, 2px in the branch's own colour */
+.qrow { padding: 4px 14px 4px 12px; margin-left: calc(4em + 20px + (var(--qd, 1) - 1) * 22px); border-left: 2px solid var(--ended); }
+.qrow.done { border-left-color: var(--done); } .qrow.wait { border-left-color: var(--waiting); } .qrow.needs { border-left-color: var(--needs); }
+.qrow.archived .qtitle, .qrow.archived .qid { color: var(--muted); }
+.qrow .qtitle { font-size: 14px; }
+.qmention { color: var(--muted); font-size: 12px; text-decoration: underline dotted; cursor: help; }
+/* sections: Decide and Do in the header; Read under the rows, folded, with its count */
+.qsec { grid-column: 3; margin-top: 6px; }
+.qrows .qsec { margin: 8px 0 2px calc(4em + 20px); }
+.qsec > summary { list-style: none; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--strong); }
+.qsec > summary::-webkit-details-marker { display: none; }
+.qsec > summary::before { content: "▸ "; color: var(--muted); } .qsec[open] > summary::before { content: "▾ "; }
+.qsec.want > summary { color: var(--needs-fg); }
+.qitem { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 12px; padding: 6px 0 6px 14px; font-size: 14px; align-items: baseline; border-left: 2px solid var(--line); margin: 4px 0 4px 2px; }
+.qitem.read { border-left-color: var(--line); }
+.qitem .who { font-family: var(--mono); font-size: 12.5px; color: var(--strong); }
+.qitem .kind { font-size: 12px; color: var(--muted); }
+.qitem .age { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.qitem .lead { color: var(--fg); font-weight: 500; }
+.qitem .body { grid-column: 1 / -1; color: var(--muted); font-size: 13px; max-width: 90ch; }
+.qitem .body b { color: var(--strong); font-weight: 500; }
+.qitem details { grid-column: 1 / -1; font-size: 13px; color: var(--muted); max-width: 90ch; }
+.qitem details summary { cursor: pointer; color: var(--muted); }
+.qitem .answers { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 2px; }
+.qitem .answers .vbtn.rec { border-color: var(--accent); }
+.qitem .answers .hint { color: var(--muted); font-size: 12px; }
+.qcards.list { gap: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--card); overflow: hidden; }
+.compl { display: grid; grid-template-columns: 5em 11em 2em minmax(0, 1fr) auto; gap: 4px 10px; padding: 8px 14px; font-size: 14px; border-top: 1px solid var(--line); align-items: baseline; }
+.compl:first-child { border-top: 0; } .compl .age { color: var(--muted); font-size: 13px; } .compl .live { color: var(--muted); font-size: 12px; }
+
+/* ---- notes ---- */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.note { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; }
+.note b { display: block; margin-bottom: 4px; } .note p, .note ul { margin: 0; color: var(--muted); font-size: 14px; } .note ul { padding-left: 18px; display: grid; gap: 4px; }
+table.v { border-collapse: collapse; font-size: 14px; width: 100%; } table.v td, table.v th { padding: 5px 12px 5px 0; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; } table.v th { color: var(--muted); font-weight: 500; }
+.ask { background: var(--rv-warn-bg); border: 1px solid var(--rv-warn); border-radius: 6px; padding: 14px 18px; }
+.ask ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; } .ask li { max-width: 80ch; }
+@media (max-width: 640px) { .qhead { grid-template-columns: 1em 2em minmax(0, 1fr); } .qplace { font-size: 22px; } .qrow { margin-left: calc(2.6em + (var(--qd, 1) - 1) * 14px); } .qrows .qsec { margin-left: 2.6em; } .compl { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>The Queue, redrawn</h1>
+    <p class="sub">Every card and item is the live ledger's on 2026-10-19. Four groups, three things a card can want from you, three verbs. Press a group or card heading to fold it; rest on a header to see its verbs. The two session questions are rewritten to the proposed writing shape, marked where they are.</p>
+  </header>
+
+  <section class="page">
+    <div class="pagehead"><span class="h">Queue</span><span class="meta">200 cards: 3 in progress, 11 waiting, 186 up next. <b>Decide 12 · Do 70</b> · 23 more in the Inbox, none about an entry</span></div>
+
+    <div class="group folded">
+      <div class="ghead" role="button" tabindex="0"><span class="h">Recently completed (6)</span><span class="why">in the last day · 4 h · <u>day</u> · week · month</span></div>
+      <div class="qcards list">
+        <div class="compl"><span class="age">13h 57m</span><span class="qid">shiftlead#TD-908</span><span class="qpri">L</span><span>`rpc_td_hold` cuts a hold's words and a drop notice's at 200 characters (#2160), and no test would notice it gone</span><span class="live">live</span></div>
+        <div class="compl"><span class="age">14h 38m</span><span class="qid">shiftlead#TD-903</span><span class="qpri">M</span><span>Build TD-900 (3): the Repo page's board</span><span class="live">live · on TD-900's card</span></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="ghead" role="button" tabindex="0"><span class="h">In progress (3)</span><span class="why">someone holds an entry, or its PR is open</span></div>
+      <div class="qcards">
+        <div class="qcard inprog needsyou">
+          <div class="qhead" role="button" tabindex="0">
+            <span class="qgrip"></span><span class="qplace"></span>
+            <div class="qmain">
+              <span class="qid">samscrape#TD-257</span><span class="qpri">H</span>
+              <span class="qtitle">the ~350 GB `notice_data` share has no backup of any kind — single-host, single-array, no second copy</span>
+              <span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qstatus review">in review #1024</span><span class="qcount">0/1 done</span><span class="qstatus needs">Decide 1</span></span>
+              <details class="qsec want" open>
+                <summary>Decide (1)</summary>
+                <div class="qitem">
+                  <div><span class="kind">board line · samscrape · 8d overdue</span></div><span class="age">added Oct 4</span>
+                  <div class="lead">Turn on the nightly backup of the notice_data share to R2? It is built and switched off.</div>
+                  <div class="body"><b>If yes:</b> the share is copied nightly from tonight; R2 costs about $5 a month at this size. <b>If not yet:</b> it stays single-copy and this comes back in a week.</div>
+                  <details><summary>context</summary>TD-257. grinder-sam-2 built the job on 2026-10-04 and left it off so the first run is yours to time. The share is the only copy of every notice body since 2024.</details>
+                  <div class="answers"><button class="vbtn rec">Yes, turn it on</button><button class="vbtn">Not yet</button><button class="vbtn ghost">Answer…</button></div>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="ghead" role="button" tabindex="0"><span class="h">Waiting (11)</span><span class="why">nothing to pick until a date or an event, or blocked past the org; each says the place it would take in Up next</span></div>
+      <div class="qcards">
+        <div class="qcard waitc">
+          <div class="qhead" role="button" tabindex="0">
+            <span class="qgrip"></span><span class="qplace qwhen">Oct 30<small>shiftlead</small></span>
+            <div class="qmain">
+              <span class="qid">shiftlead#TD-748</span><span class="qpri">M</span>
+              <span class="qtitle">The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD</span>
+              <span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">would be 1</span><span class="qcount">5 entries</span><span class="qcount" title="drawn only while the card is folded">Read 1</span><span class="qstatus waiting">waits until Oct 30</span></span>
+            </div>
+          </div>
+          <div class="qrows">
+            <div class="qrow wait" style="--qd: 1"><span class="qid">shiftlead#TD-772</span><span class="qpri">M</span><span class="qtitle">Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask</span><span class="qright"><span class="qmention" title="ao-grind finished and the host agent wound it">mentioned in 1 item</span><span class="qstate">waits until 2026-10-30</span></span></div>
+            <div class="qrow done archived" style="--qd: 1"><span class="qid">shiftlead#TD-769</span><span class="qpri">M</span><span class="qtitle">Build TD-748 (1): the rank</span><span class="qright"><span class="qstate done">done #1939</span></span></div>
+            <div class="qrow done archived" style="--qd: 1"><span class="qid">shiftlead#TD-770</span><span class="qpri">M</span><span class="qtitle">Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order</span><span class="qright"><span class="qstate done">done #1955</span></span></div>
+            <div class="qrow done archived" style="--qd: 1"><span class="qid">shiftlead#TD-771</span><span class="qpri">M</span><span class="qtitle">Build TD-748 (3): the Queue page</span><span class="qright"><span class="qmention" title="The Queue: one number in the top bar">mentioned in 1 item</span><span class="qstate done">done #1957</span></span></div>
+            <details class="qsec"><summary>Read (1)</summary>
+              <div class="qitem read"><div><span class="who">designer-ao-1</span> <span class="kind">note · on TD-769</span> <span class="lead">The Queue tab has no number of its own, as designed.</span></div><span class="age">3d</span></div>
+            </details>
+          </div>
+        </div>
+        <div class="qcard waitc">
+          <div class="qhead" role="button" tabindex="0"><span class="qgrip"></span><span class="qplace qwhen">Oct 21<small>shiftlead</small></span>
+            <div class="qmain"><span class="qid">shiftlead#TD-410</span><span class="qpri">M</span><span class="qtitle">A session's own name in its title: the terminal title the adapter sets</span><span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">would be 7</span><span class="qcount">2 entries</span><span class="qstatus waiting">waits until Oct 21</span></span></div>
+          </div>
+        </div>
+        <div class="qcard waitc">
+          <div class="qhead" role="button" tabindex="0"><span class="qgrip"></span><span class="qplace qwhen">event<small>shiftlead</small></span>
+            <div class="qmain"><span class="qid">shiftlead#TD-717</span><span class="qpri">M</span><span class="qtitle">A launch whose first hook is lost gets its brief from the record</span><span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">would be 12</span><span class="qcount">2 entries</span><span class="qstatus waiting">waits on the next launch whose first hook is lost</span></span></div>
+          </div>
+        </div>
+        <div class="qcard waitc">
+          <div class="qhead" role="button" tabindex="0">
+            <span class="qgrip"></span><span class="qplace qwhen">event<small>shiftlead</small></span>
+            <div class="qmain"><span class="qid">shiftlead#TD-900</span><span class="qpri">M</span><span class="qtitle">The Repo page is a board by stage, the Org page is Sessions, the Queue numbers Up next per repo and marks what is live</span><span class="qright"><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qkept">would be 2</span><span class="qcount">7 entries</span><span class="qstatus waiting">waits on an event (TD-904)</span></span></div>
+          </div>
+          <div class="qrows">
+            <div class="qrow wait" style="--qd: 1"><span class="qid">shiftlead#TD-904</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (4): a line's promote state on Recently completed</span><span class="qright"><span class="qstate">waits on an event</span></span></div>
+            <div class="qrow wait" style="--qd: 1"><span class="qid">shiftlead#TD-905</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (5): the ledger row's controls on a card</span><span class="qright"><span class="qstate">waits on an event</span></span></div>
+            <div class="qrow done archived" style="--qd: 1"><span class="qid">shiftlead#TD-901</span><span class="qpri">M</span><span class="qtitle">Build TD-900 (2)</span><span class="qright"><span class="qstate done">done #2157</span></span></div>
+            <details class="qsec"><summary>Read (7)</summary>
+              <div class="qsub">answered for you (7) · Dismiss all</div>
+              <div class="qitem read"><div><span class="who">techlead-ao-1</span> <span class="kind">answered grinder-ao-1 · on TD-905</span> <span class="lead">Your nit on #2162: Back to design on a blocked row counts a blocker only while it is an open entry.</span></div><span class="age">14h</span></div>
+              <div class="qitem read"><div><span class="who">techlead-ao-1</span> <span class="kind">answered grinder-ao-1 · on TD-905</span> <span class="lead">TD-905 slice 2 merged as #2162, nothing to change.</span></div><span class="age">14h</span></div>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="ghead" role="button" tabindex="0"><span class="h">Up next (186)</span><span class="why">worked from the top: drag a card by its grip, or use its arrows, to change the order</span></div>
+      <div class="qcards">
+
+        <div class="qcard needsyou">
+          <div class="qhead" role="button" tabindex="0">
+            <span class="qgrip">⋮⋮</span><span class="qplace">1<small>shiftlead</small></span>
+            <div class="qmain">
+              <span class="qid">shiftlead#TD-112</span><span class="qpri">M</span>
+              <span class="qtitle">The adapter contract has grown Claude-shaped and neutrality is untested</span>
+              <span class="qright"><span class="qmoves">⤒ ↑ ↓</span><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qcount">9 entries</span><span class="qstatus needs">Decide 1 · Do 1</span></span>
+              <details class="qsec want" open>
+                <summary>Decide (1)</summary>
+                <div class="qitem">
+                  <div><span class="who">grinder-ao-2</span> <span class="kind">asks · on TD-785</span></div><span class="age">2d</span>
+                  <div class="lead">Which Gemini account should the conformance walk sign in with?</div>
+                  <div class="body"><b>A separate conformance profile (recommended):</b> you sign a throwaway Google account in once, and the live walk never touches your own Gemini history. <b>Your own account:</b> no setup, but the walk's sessions appear in your Gemini activity.</div>
+                  <details><summary>context</summary>TD-785 and TD-784 slice 2 wait for a `gemini-conformance` profile that does not exist yet. Either answer is one line in `profiles.yml` and one sign-in, which the session can walk you through. <i>Rewritten from the sent text to the proposed shape.</i></details>
+                  <div class="answers"><button class="vbtn rec">A separate profile</button><button class="vbtn">My own account</button><button class="vbtn ghost">Answer…</button></div>
+                </div>
+              </details>
+              <details class="qsec want" open>
+                <summary>Do (1)</summary>
+                <div class="qitem">
+                  <div><span class="kind">yours · on TD-875</span></div><span class="age">added Oct 17 · <a href="#">Done</a></span>
+                  <div class="lead">Put the Gemini launch layer in place on this machine, with sudo, so a Gemini session can be launched.</div>
+                  <div class="body">Start session does it with you: it writes the file, shows you the one sudo line to paste, and checks the launch. Done, at the right, is for when you did it yourself.</div>
+                  <details><summary>context</summary>TD-875 builds TD-871: Gemini CLI skips a system settings file root does not own, so the launch layer is never read and no hook reaches a Gemini session. Mentioned in 4 other items.</details>
+                                  </div>
+              </details>
+            </div>
+          </div>
+          <div class="qrows">
+            <div class="qrow" style="--qd: 1"><span class="qid">shiftlead#TD-052</span><span class="qpri">M</span><span class="qtitle">Messages between sessions — build design §4.10</span><span class="qright"><span class="qstate">after TD-112</span></span></div>
+            <div class="qrow" style="--qd: 1"><span class="qid">shiftlead#TD-035</span><span class="qpri">L</span><span class="qtitle">Adapters without a session-start hook still run dev-cadence's SessionStart set</span><span class="qright"><span class="qstate">after TD-112</span></span></div>
+            <div class="qrow needs" style="--qd: 1"><span class="qid">shiftlead#TD-875</span><span class="qpri">M</span><span class="qtitle">Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission</span><span class="qright"><span class="qmention" title="#2158 conflicts with main · ao-grind finished and the host agent wound it · TD-871 amended · Gemini hooks: where the layer lives">mentioned in 4 items</span><span class="qstate needs">yours</span></span></div>
+            <div class="qrow" style="--qd: 2"><span class="qid">shiftlead#TD-785</span><span class="qpri">M</span><span class="qtitle">Build TD-112 (2): the Gemini CLI adapter, launch and state</span><span class="qright"><span class="qmention" title="Which profiles are set aside for the adapter conformance suite's live walk">mentioned in 1 item</span><span class="qstate">after TD-875</span></span></div>
+            <div class="qrow" style="--qd: 3"><span class="qid">shiftlead#TD-786</span><span class="qpri">M</span><span class="qtitle">Build TD-112 (3): the Gemini CLI adapter's reads; the full conformance suite live</span><span class="qright"><span class="qstate">after TD-785</span></span></div>
+            <div class="qrow" style="--qd: 4"><span class="qid">shiftlead#TD-857</span><span class="qpri">M</span><span class="qtitle">Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier</span><span class="qright"><span class="qstate">after TD-786</span></span></div>
+            <div class="qrow" style="--qd: 2"><span class="qid">shiftlead#TD-871</span><span class="qpri">M</span><span class="qtitle">Gemini CLI skips a `GEMINI_CLI_SYSTEM_SETTINGS_PATH` file that root does not own, so the launch layer is never read</span><span class="qright"><span class="qstate">after TD-875</span></span></div>
+            <div class="qrow done archived" style="--qd: 1"><span class="qid">shiftlead#TD-784</span><span class="qpri">M</span><span class="qtitle">Build TD-112 (1): the adapter conformance suite; Claude Code passes it</span><span class="qright"><span class="qstate done">done #1949</span></span></div>
+            <details class="qsec"><summary>Read (2)</summary>
+              <div class="qitem read"><div><span class="who">grinder-ao-2</span> <span class="kind">note · on TD-784</span> <span class="lead">Which profiles are set aside for the conformance suite's live walk.</span></div><span class="age">3d</span></div>
+              <div class="qitem read"><div><span class="who">grinder-ao-2</span> <span class="kind">note · on TD-871</span> <span class="lead">TD-871 amended.</span></div><span class="age">3d</span></div>
+            </details>
+          </div>
+        </div>
+
+        <div class="qcard">
+          <div class="qhead" role="button" tabindex="0">
+            <span class="qgrip">⋮⋮</span><span class="qplace">1<small>pneuma-ops</small></span>
+            <div class="qmain"><span class="qid">pneuma-ops#TD-003</span><span class="qpri">H</span><span class="qtitle">The size-regression guard is dead for `contractmatch`: it compares against the run's own post-restore file</span><span class="qright"><span class="qmoves">⤒ ↑ ↓</span><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qstatus ready">ready</span></span></div>
+          </div>
+        </div>
+
+        <div class="qcard needsyou">
+          <div class="qhead" role="button" tabindex="0">
+            <span class="qgrip">⋮⋮</span><span class="qplace">1<small>guardians-…</small></span>
+            <div class="qmain"><span class="qid">guardians-devenv#TD-005</span><span class="qpri">H</span><span class="qtitle">Ad networks are not a blocklist category, and injected ads are not in the threat model</span><span class="qright"><span class="qmoves">⤒ ↑ ↓</span><span class="qverbs"><button class="vbtn">Start session</button><button class="vbtn more" aria-label="more">⋯</button></span><span class="qstatus needs">Decide 1</span></span>
+              <details class="qsec want" open>
+                <summary>Decide (1)</summary>
+                <div class="qitem">
+                  <div><span class="kind">your hold · since Aug 14</span></div><span class="age">66d</span>
+                  <div class="lead">Does the ad-injection incident change the roadmap's order? You held this until that is settled.</div>
+                  <div class="body"><b>Lift the hold:</b> the team takes it in its lane now. <b>Keep holding:</b> nothing changes, and this stays here. <i>The hold's own words, as written: "held until fix (c), whether the incident changes roadmap sequencing; see the Sequencing note".</i></div>
+                  <div class="answers"><button class="vbtn rec">Lift the hold</button><button class="vbtn ghost">Answer…</button></div>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What the drawing decides</h2>
+    <div class="notes">
+      <div class="note"><b>Four groups</b><p>Recently completed, In progress, Waiting, Up next. Waiting holds every card with nothing to pick among what is not yours: a date, an event, settling, a blocker past the org's reach (TD-900 moved here after review round 1: its open rows all wait). The card carries its date, or <i>event</i>, or <i>blocked</i>, where Up next draws the number, and says the place it would take; when the wait ends it is back in Up next at that place. Only Up next is numbered.</p></div>
+      <div class="note"><b>Three wants</b><table class="v"><tr><th>Decide</th><td>a question with answers, a steer, a board line, a hold of yours</td></tr><tr><th>Do</th><td>an entry that names you as owner</td></tr><tr><th>Read</th><td>notes, what was answered for you; folded with its count</td></tr></table></div>
+      <div class="note"><b>Three verbs</b><table class="v"><tr><th>Answer</th><td>the item's answers as buttons, the recommended one outlined, and Answer… for your own words; Done and Lift the hold are answers</td></tr><tr><th>Start session</th><td>once per card, in its header; the Do verb. The session is started on the card's Do entry, else its first Decide entry, else the top entry, with the card's ids in its opening prompt</td></tr><tr><th>⋯</th><td>the team's controls: Hold (keep the team off this), Back to design, Done on an entry, Open on the Repo page</td></tr></table></div>
+      <div class="note"><b>No dates of yours on a card</b><p>No Snooze, no Put on the board, no due date. The rank is the snooze. Waiting is the ledger's own dates. The Inbox keeps its dates for what names no entry.</p></div>
+      <div class="note"><b>An item leads with one sentence</b><p>A question or a task to you states itself in one sentence a cold reader understands, then what each answer leads to, then its context folded. The rule goes in dev-cadence, the home refuses an ask to you without it, and a backfill rewrites the open entries that name you. The two session questions above were rewritten to show the shape.</p></div>
+      <div class="note"><b>The tree has lines</b><p>Two pixels down each level, in the branch's colour: green done, teal waiting, amber yours, grey open. Mentions on a row are one phrase, the subjects on hover.</p></div>
+    </div>
+  </section>
+
+  <section class="ask">
+    <b>Decided with Paul</b>
+    <ul>
+      <li>Decided 2026-10-19: Decide and Do both colour the card; Start session is plain on every card (a filled one was too loud, 2026-10-19); the pill carries counts; a Waiting card draws its date or <i>event</i> where Up next draws the number, and each card is its own box.</li>
+    </ul>
+  </section>
+</div>
+<script>
+(() => {
+  document.querySelectorAll('.group .ghead').forEach(h => {
+    const t = () => h.parentElement.classList.toggle('folded');
+    h.addEventListener('click', t);
+    h.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t(); } });
+  });
+  document.querySelectorAll('.qhead').forEach(h => {
+    const toggle = () => { const rows = h.parentElement.querySelector('.qrows'); if (rows) rows.hidden = !rows.hidden; };
+    h.addEventListener('click', e => { if (e.target.closest('button, a, summary, details')) return; toggle(); });
+    h.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === h) { e.preventDefault(); toggle(); } });
+  });
+})();
+</script>
+</body>
+</html>

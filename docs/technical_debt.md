@@ -76,6 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-904 | Build TD-900 (4): the promote reading's `promoted`, the divider on Merged and the Queue's mark by ancestry | Medium | Built (#2158) — live check |
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
+| TD-909 | The Queue card: Decide / Do / Read, Answer / Start session / ⋯, a Waiting group, one-sentence items (ADR 2026-10-19) | High | Agreed — held for Paul's lift; the ADR's rounds converged 2026-10-19 |
 
 ---
 
@@ -1589,3 +1590,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
+## TD-909: The Queue card — three wants (Decide, Do, Read), three verbs (Answer, Start session on the card's team, ⋯), a Waiting group, items that lead with one sentence
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-19 (Paul, in an interactive session, over an afternoon of rounds on two review pages)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Agreed (2026-10-19) — [ADR 2026-10-19](decisions/2026-10-19-queue-card.md), drawn from the live ledger ([the page](mockups/reviews/2026-10-19-queue-redesign.html), [its shot](mockups/reviews/2026-10-19-queue-redesign.png)); the review rounds converged the same day (six rounds, Sonnet and Fable alternating, round 6 READY); held for Paul's lift, then the designer's round writes it into §4.4 *The Queue: cards, and the rank that orders them*, §4.5 screen 12 and §4.5a and names the builds (ADR §8). Amends TD-748's ADR, which stands for what this does not touch.
+**Blocked by:** decision (paul) — lift it to send the design round to the designer; the ADR's review rounds have converged
+**Location:** `docs/decisions/2026-10-19-queue-card.md`; the design text it rewrites: §4.4 *The card's status* and *Groups* (4.4-host-agent.md), §4.5 screen 12 *Groups*, *A card*, *What is attached to a card*, *What needs the person* (4.5-ui.md), §4.5a the Queue rows; `src/shiftlead/ui/templates/queue_part.html`, `queue_card.html`, `queue_row.html`, `src/shiftlead/ui/queue.py`; dev-cadence for the writing rule (ADR §6)
+
+**Why:** Measured on 2026-10-19 with the live ledger: 197 cards Up next, 82 amber, 11 saying only *waiting*, the tallest 3,212 px. Paul: *we have many ways that the user's attention is needed and multiple possible replies — we need to figure out how to simplify*; *lots of words all over the place, so I am relegated to reading everything in order*; *the description is written like someone took poor notes then handed them to me*.
+
+**Fix:** The ADR's §1–§6: a Waiting group between In progress and Up next (unnumbered, keeps its place, the date or *event* in the number column); Decide and Do in the header and amber, Read folded with its count; Answer, Start session once per card on its repo's team with the card as context, and ⋯ for the team's controls; no Snooze, Put on the board or Due on a card; each card its own box, the tree's rules drawn, mentions deduplicated; the writing rule (one sentence, consequences, context) in dev-cadence with a backfill, enforced by the home. The design round names the build entries from ADR §8; the dev-cadence entry for the writing rule is filed when the design names it.
+
+**Done when** the design says what the ADR decided, with a build entry per slice of ADR §8, and `Blocked by:` names them.
+
+**Related:** TD-748 (the Queue, designed), TD-772 (the trial's read-back, which counts the Waiting group as a change to what the person sees), TD-900 (the Repo page's board, whose card is the Queue's).
+
+---
