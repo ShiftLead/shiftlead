@@ -78,6 +78,7 @@ def test_the_page_headers_decide_counts_items_on_a_card_with_two():
     assert one["wants"]["n"]["decide"] == 1 and two["wants"]["n"]["decide"] == 2
     assert v["n"]["decide"] == 3
 
+
 def test_a_held_entry_is_no_want_and_draws_the_held_row():
     later = [
         {"row": "ledger", "id": "TD-3", "row_id": "ledger:s:TD-3", "why": "yours", "release": True,
