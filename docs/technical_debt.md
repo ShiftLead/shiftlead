@@ -75,6 +75,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-937 | The top bar's Settings glyph is a sun (eight rays), read as a brightness control beside ◐; draw a cog | Low | Open |
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
+| TD-939 | TD-937's cog is on main (#2225) and its entry still reads Open, owner paul, *the glyph is a sun* (docs audit) | Low | Open |
 
 ---
 
@@ -1523,5 +1524,23 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 **Fix:** A design round on §4.5a's bar rows and §4.5 screens 1 and 8, with a comparison page (one shape per answer, `docs/mockups/reviews/`) for Paul to pick from, then build entries: one for the build chip's audience, one for the host dot across nodes (with a line in §4.3 that the tool is the card's, never the bar's), and a §10 question for New's place that the director's design answers. The design round's history lines name the superseded ADR sentences (ADR 2026-09-25 on Settings and the promote's auto switch; §4.2's host chip sentence).
 
 **Done when** the design says who sees the build chip and where, what the bar's host reading means with nodes and what stays on the card, and where New lives under a director, and the build entries are named here.
+
+---
+
+## TD-939: TD-937's cog is on main and its entry still reads Open, owner paul, "the glyph is a sun"
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-21 (docs audit of #2218–#2227)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt.md` (TD-937's summary row and entry); `src/shiftlead/ui/templates/base.html` (`#settingstab`)
+
+**Why:** #2225 (merge `9bfca332c`) both filed TD-937 and carried its fix: `base.html`'s `#settingstab` is now `<svg class="gear" viewBox="0 0 24 24" …>` and `tests/test_ui_queue.py` asserts `svg.count("a1.65") >= 8 and "v2M" not in svg`. On `origin/main` at `91ea67dd4` the entry still reads `**Status:** Open` with `**Owner:** paul`, its **Fix** says *The `svg` draws a toothed ring* in the future tense, and the summary row says *The top bar's Settings glyph is a sun (eight rays)*, so a session picking work, or Paul on the board, reads a built change as undone.
+
+**Fix:** Say what #2225 did in TD-937: **Status** `Built (#2225)`, and a live check or an archive with a `**Resolved:**` line naming #2225 and the test, whichever the cadence wants for a UI-only glyph; the row follows the entry.
+
+**Done when** TD-937's row and entry say the cog is built, or the entry is archived with its `**Resolved:**` naming #2225.
 
 ---
