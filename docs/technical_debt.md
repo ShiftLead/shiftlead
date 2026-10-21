@@ -81,6 +81,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-926 | Hovering a Queue card's header or row draws its ⋯ names inline, which narrows the title and reflows it under the pointer | Medium | Designed — built by TD-928 |
 | TD-927 | Token counts on the Spend page, beside every figure: by team, Top sessions, a team's seats, the head's total and the bar's hover | Medium | Open — design-first |
 | TD-928 | Build TD-926: a Queue card's ⋯ drawn bare at every width — no names on hover, so the title never rewraps under the pointer | Medium | Open |
+| TD-931 | The top bar's pages look like three different kinds of control, and its one number says nothing about where to go | Medium | Designed — built by TD-932 |
+| TD-932 | Build TD-931: the top bar's three groups, a number on each of the Inbox and Queue tabs, Settings as a gear, `3` for the Queue | Medium | Open |
 
 ---
 
@@ -1684,5 +1686,42 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** Drop the `.qdotsnames` span from `dots` and every rule naming `.qdotsnames` (`app.css`, the base, the one hover/focus block and the `@media` one) (the summary's `title` and `aria-label` keep the names); update the macro's comment and the one above the rules in `app.css`; `help.py`'s *card-dots* text says nothing of hover and stays. Replace the test's asserts on the hover rule with: the rendered ⋯ carries its names in `title` and no `qdotsnames`, and a test over `app.css` that every declaration in a rule whose selector holds `:hover`, `:focus-within`, `:focus-visible`, `:focus` or `:active` is one of `color`, `background*`, `border-color`, `outline*`, `text-decoration*`, `box-shadow`, `filter`, `cursor` — an allowlist, the design's rule held for every page (the set the stylesheet uses today once the span's rules are gone). The test reads the stylesheet with `tests/test_css.py`'s `_rules()`, which already strips `/* */` comments and reads the rules inside `@media` blocks as any other, and judges a rule whole: a selector list any of whose selectors holds a state anywhere (`:has(.qmail:hover)` and `:not(:hover)` included) puts every declaration of the rule under the allowlist. At pickup, re-check whether PR #2195 (a test over a Queue card's look pair; TD-922 in its diff) already reads `app.css`'s state rules. Look once at a scratch home's Queue (`scripts/look_home.py`) in headless Chromium, a card's header hovered and not, and commit the pair under `docs/mockups/reviews/`.
 
 **Done when** hovering or focusing a Queue card's header, row or item leaves its title's wrap and the card's height as they were (the shot pair shows the same wrap), and the stylesheet test holds the rule.
+## TD-931: The top bar's pages look like three different kinds of control, and its one number says nothing about where to go
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-20 (Paul, with the ao-paul session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed (2026-10-20, Paul with the ao-paul session, shape B of `docs/mockups/reviews/2026-10-20-topbar-shapes-*.png`): §4.5a row *Sessions top bar: the bar's three groups* — the places as one strip of tabs (Sessions, Inbox, Queue, in key order, the open one lit), the readings as one monospace strip (usage, build, host), the tools at the right (Settings as a gear, ◐, ?, + New); *Inbox* and *Queue tab* each carry their own number, the rows drawn on their own page (`home: inbox`, `home: queue`), summing to what waits on a person; the rail's *+ n on the Queue*, the Queue's *+ n in the Inbox* and the Inbox number's digits-only link to the Queue are dropped; *Settings* leaves the tabs; *keys* gains `3` Queue; §4.5 screens 6, 8 and 12, §4.4 *The Inbox's counts* and §4.7 `ao inbox --counts` say the same. Built by TD-932.
+**Blocked by:** decision (paul) — the review round (Fable, then Sonnet, alternating) has not run; lift it when the round converges, then TD-932 is the blocker
+**Location:** design §4.5a rows *Sessions top bar: Inbox*, *Queue tab*, *Settings*, *the bar's three groups*, *keys*; §4.5 screen 6 *Needs you* and *Where a row is drawn*, screen 8 (Settings), screen 12 (the tab); §4.4 *The Inbox's counts*; §4.7 `ao inbox --counts`; `src/shiftlead/ui/templates/base.html` (the `topbar` block), `src/shiftlead/ui/static/app.css` (`.topbar`, `.tabs`, `.btn.light`, `#hostchip`, `#usagechip`, `#buildchip`)
+
+**Why:** Paul's screenshot of 2026-10-20 (`~/.shiftlead/attachments/ao-shiftlead-ao-paul/paste-20261020-171517.png`): Sessions is a tab beside the wordmark, while Inbox, Queue and Settings are outlined buttons at the far right, interleaved with the usage and build readings and the host chip — four pages drawn as three kinds of control, *spread out like they are different* (Paul). The bar's one number, the Inbox's *Needs you*, counts rows drawn on two pages, so its digits link to the Queue while its word links to the Inbox (a link inside a link a script follows), and each page carries a *+ n* line to say what the other holds. The rows split cleanly by home — the Inbox's are session states, promotes, team starts and mail about no open effort; the Queue's are everything attached to an open card — so a number on each tab says where to go, and the cross-references say nothing the bar does not. A count of the Queue's *Decide · Do* was weighed and refused: it would count a card's questions a second time and add the ledger backlog Paul keeps out of the bar (ADR 2026-10-19 §2).
+
+**Fix:** Design first (done, above). Then the build, TD-932.
+
+**Done when** the design says the bar's three groups and the two numbers (done), and TD-932 is pickable.
+
+**Related:** TD-748 and TD-771 (the Queue tab and the digits-only link), TD-614 and TD-616 (the `counts` stream), TD-124 (the ? overlay), TD-148 (the Settings tab)
+
+---
+
+## TD-932: Build TD-931: the top bar's three groups, a number on each of the Inbox and Queue tabs, Settings as a gear, `3` for the Queue
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-20 (TD-931's design, Paul with the ao-paul session)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-931
+**Location:** `src/shiftlead/ui/templates/base.html` (the `topbar` block: `.tabs`, `#personinbox`, `#queuetab`, `#settingstab`, `#hostchip`, `#usagechip`, `#buildchip`, `#theme`, `#keyhelpbtn`, `#newmenu`), `src/shiftlead/ui/static/app.css` (`.topbar`, `.tabs`, `.tab`, `.btn.light`, `#hostchip`, `#usagechip`, `#buildchip`; the 720 px rule), `src/shiftlead/ui/static/app.js` (the key table's `1`/`2` rows and the `data-href` follower on `#personneeds`; the `counts` handler that draws `#personneeds`; `fitUsage`), `src/shiftlead/ui/inbox.py` `inbox_sections` (the per-home totals the rail and the Queue's filter row already read), `src/shiftlead/ui/app.py` (the `counts` payload and `/api/person/inbox?counts=1`, the rail's `railqueue`, the Queue's `qininbox`), `src/shiftlead/cli.py` `ao inbox --counts`, `src/shiftlead/ui/help.py` and the Help page (the keys list), `tests/test_ui_queue.py`, `tests/test_ui_settings.py`, `tests/test_ui_inbox.py`, `tests/test_ui_keys.py`, `tests/test_ui_org_chrome.py`, `tests/test_help.py`, `tests/test_css.py`
+
+**Why:** TD-931: design §4.5a *Sessions top bar: the bar's three groups* now says the pages are one strip of tabs with a number on each of Inbox and Queue, the readings one monospace strip, the tools at the right with Settings as a gear; the template draws Sessions as a tab and the other three as `.btn.light` buttons among the readings, the Inbox's one number carrying a `data-href` to the Queue, and the Inbox rail and the Queue's filter row each a *+ n* line the design has dropped.
+
+**Fix:** `base.html`: after the wordmark, `.tabs` holds Sessions, Inbox (`#personinbox`, its `#personneeds` badge the `home: inbox` total, no `data-href`; `#personfyi` stays) and Queue (`#queuetab`, a `#queueneeds` badge the `home: queue` total, hidden at zero as the Inbox's is); then `.grow`; then one `.readings` strip — `#usagechip`, `#buildchip`, `#hostchip` as today's spans with a hairline divider between and no button border; then `.tools` — `#settingstab` as a gear `svg` with `aria-label="Settings"` and the word in its `title`, `.on` on the Settings page, then `#theme`, then `#keyhelpbtn`, then `#newmenu`. `app.css`: the `.tab` rule carries the badges; `.readings > * + *` the divider; the tools one ghost size; the 720 px rule hides `.readings`. `app.js`: the key table gains `{ keys: ["3"], page: "all", control: "Queue", sel: "#queuetab" }`; the `#personneeds` `data-href` follower goes; the `counts` handler draws both badges from the payload's two totals. `inbox_sections` already tags each row's home: `counts` (the stream and `/api/person/inbox?counts=1`) carry `needs_inbox` and `needs_queue` beside `needs`, one computation; the rail's `#railqueue` line and the Queue's `#qininbox` go, the hover titles on the two badges say what each counts and that the other holds the rest. `ao inbox --counts` prints *needs you n (inbox n · queue n) · …*. The Help page's keys list gains `3` Queue, and `help.py`'s text for *Settings* and the two tabs follows the rows. Tests: the three tabs in order inside `.tabs`, the badges' totals from a fixture with a question about an open card and a state row (one on each tab, summing to `needs`), no `data-href` on `#personneeds`, no `#railqueue` and no `#qininbox`, `3` in the key table and the overlay, the gear's accessible name, `.on` on Settings, and a headless-Chromium look at the bar at 1440 and 900 px in both themes kept under `docs/mockups/reviews/` beside the shapes.
+
+**Done when** every page's bar draws the three groups as the design says, both numbers move with the stream and sum to what `ao inbox --counts` prints as *needs you*, `3` opens the Queue, and the tests above hold.
 
 ---
