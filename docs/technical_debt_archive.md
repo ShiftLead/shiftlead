@@ -17693,3 +17693,22 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-21 (grinder-ao-1) — the live check holds: built in #2158; read on the live copy with `main` ahead of a held rollback, the divider, its *not yet live (14)* words, the held line at the foot and the Queue's *not yet live* marks as the entry says (Status, the 2026-10-21 read). TD-900 stays open on TD-905 and TD-907.
 
 ---
+## TD-935: Design §4.5 still says Settings is a tab "until TD-932 builds it", and TD-932 built it as a gear
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-21 (docs audit of #2209–#2217)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `docs/design/4.5-ui.md` (screen 8, the Settings item: line 1024 on `origin/main` at `091b11e5c`)
+
+**Why:** `docs/design/4.5-ui.md:1024` reads *"**Settings** in the top bar's tools, a gear at the right (§4.5a *Sessions top bar: Settings*, TD-931; a tab, last, until TD-932 builds it)."* PR #2212 built TD-932 and removed the *until TD-932 builds this* clauses from the other rows (design-history 2026-10-20 lines for TD-932), but not this one. The clause now contradicts both the sentence it ends and the code: `base.html` draws `#settingstab` as a gear `svg` among the tools, not a tab (§4.5a row *Settings*, line 110: *"Not a tab"*), and the design is written in the present tense, so no build is pending.
+
+**Fix:** In `docs/design/4.5-ui.md` screen 8, drop `; a tab, last, until TD-932 builds it` so the item reads *… (§4.5a *Sessions top bar: Settings*, TD-931).* Add a line to `docs/design-history.md` under §4.5 above the section's newest lines saying the clause went with TD-932's build. Grep `docs/design/` once more for `until TD-93` and `builds it`.
+
+**Done when** `grep -rn "until TD-93" docs/design/` finds nothing and the Settings item says only what is true now.
+
+**Resolved:** 2026-10-21 (grinder-ao-2) — PR #2222: screen 8's Settings item reads *… (§4.5a *Sessions top bar: Settings*, TD-931).*, a dated line under §4.5 in the design history; `grep -rn "until TD-93" docs/design/` finds nothing.
+
+---
