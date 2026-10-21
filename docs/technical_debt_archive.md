@@ -17434,3 +17434,44 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-20 — PR #2208: the card (`#fdrop`, drawn with the *reconnecting…* mark, gone on the first pane byte) from `AO.dropCard` — each row's seats summed by unit, *unweighed* beside, every kind of token summed with the kinds on the hover, the chips' windows, *as of* — on the reading `AO.dropRead` takes in each socket open and keeps under `ao.drop.<id>`; the help paragraph in §4.5a and `help.py`; `scripts/focus_drop.py`; the before and after shots under `docs/mockups/reviews/` (the after matches the rendering Paul lifted the hold on), and the UI check on a scratch home (the PR's body).
 
 ---
+## TD-926: Hovering a Queue card's header or row draws its ⋯ names inline, which narrows the title and reflows it under the pointer
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-20 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved. Designed (2026-10-20, the designer): §4.5 screen 12 *Three verbs: ⋯* draws the ⋯ bare at every width, its names in its `title` and its menu; §4.5 *A hover changes colour, never layout* states the rule once, beside *Page loads*; §4.5a *Queue card: ⋯* says the same. Built by TD-928.
+**Blocked by:** TD-928
+**Location:** design §4.5 screen 12 *Three verbs*, the **⋯** item (was: *the names inside are drawn on hover or focus of the header, row or item*), §4.5a row *Queue card: ⋯*; `src/shiftlead/ui/static/app.css` `.qdotsnames` and its `:hover` / `:focus-within` rules (header, row, mail item; hidden at narrow width), `src/shiftlead/ui/templates/queue_row.html` macro `dots` (the summary already carries the names as its `title`); `tests/test_queue_card_verbs.py` (asserts the hover rule)
+
+**Why:** Pointing at a card — to read it, or on the way to another — draws *Hold… · Done… · Open* beside the ⋯ in the header's right column. The names take width from the title column, so the title rewraps (two lines become three, the words jump) and the header grows, everything below moving with it; leaving the card puts it back. Seen 2026-10-20 (Paul's screenshots, `~/.shiftlead/attachments/draft-527e721e/paste-20261020-101910.png` with the pointer on TD-924's header, `paste-20261020-102005.png` without): a page whose job is to be read moves under the reader's pointer. The names were drawn so the ⋯ says what it holds (TD-914); the cost is a layout change on every hover. The same rule family is the only hover on the UI's stylesheet that changes layout (`app.css`, 2026-10-20: every other `:hover` changes colour, background or underline only), so the fix is the Queue's ⋯ wherever it is drawn — header, row and mail item.
+
+**Fix:** Design first: a hover never changes a card's layout. The recommendation is the bare ⋯ at every width, as narrow width already draws it, its names in the mark's `title` (already sent) and in the menu that opens; the alternative is to keep the names but in space the column always holds, or over nothing the reader is reading. The design states the rule once (§4.5, beside *Page loads*: *a hover changes colour, never layout*) so a later control keeps it. Then the build: drop `.qdotsnames` and its rules (or whatever the design picks), the test asserts no hover rule sets `display`, and a scratch-home screenshot of a header hovered and not shows the same wrap.
+
+**Coordinate with:** TD-909's builds still open (TD-916, TD-917 — neither touches the ⋯), and PR #2195 (TD-922, a test over the card's look pair) — none edits `.qdotsnames`, checked 2026-10-20.
+
+**Done when** hovering or focusing a Queue card's header, row or item leaves its title's wrap and the card's height as they were.
+
+**Resolved:** 2026-10-20 — filed by #2203, designed by #2205, built by TD-928 (PR #2210).
+
+---
+## TD-928: Build TD-926: a Queue card's ⋯ drawn bare at every width — no names on hover, so the title never rewraps under the pointer
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-20 (TD-926's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/static/app.css` (`.qdotsnames` and its `:hover` / `:focus-within` rules, and the narrow-width one), `src/shiftlead/ui/templates/queue_row.html` (macro `dots`, its comment), `tests/test_queue_card_verbs.py` (the ⋯'s `title`, `aria-label` and no `qdotsnames`), and a new `tests/test_ui_hover_layout.py` for the page-wide stylesheet test
+
+**Why:** TD-926: design §4.5 screen 12 *Three verbs: ⋯* and §4.5 *A hover changes colour, never layout* — the ⋯ is bare at every width, its names in its `title` (already sent) and its menu; a pointer or focus state (`:hover`, `:focus-within`, `:focus-visible`, `:focus`, `:active`) sets only colour-like properties, so nothing in the page's flow is drawn, hidden or resized; text shown on focus floats (the *i* mark's tooltip) and a `title` is the browser's layer. Today `.qdotsnames` is shown inline on a header's, row's or mail item's hover or focus, which narrows the title column and rewraps it (Paul's screenshots of 2026-10-20).
+
+**Fix:** Drop the `.qdotsnames` span from `dots` and every rule naming `.qdotsnames` (`app.css`, the base, the one hover/focus block and the `@media` one) (the summary's `title` and `aria-label` keep the names); update the macro's comment and the one above the rules in `app.css`; `help.py`'s *card-dots* text says nothing of hover and stays. Replace the test's asserts on the hover rule with: the rendered ⋯ carries its names in `title` and no `qdotsnames`, and a test over `app.css` that every declaration in a rule whose selector holds `:hover`, `:focus-within`, `:focus-visible`, `:focus` or `:active` is one of `color`, `background*`, `border-color`, `outline*`, `text-decoration*`, `box-shadow`, `filter`, `cursor` — an allowlist, the design's rule held for every page (the set the stylesheet uses today once the span's rules are gone). The test reads the stylesheet with `tests/test_css.py`'s `_rules()`, which already strips `/* */` comments and reads the rules inside `@media` blocks as any other, and judges a rule whole: a selector list any of whose selectors holds a state anywhere (`:has(.qmail:hover)` and `:not(:hover)` included) puts every declaration of the rule under the allowlist. At pickup, re-check whether PR #2195 (a test over a Queue card's look pair; TD-922 in its diff) already reads `app.css`'s state rules. Look once at a scratch home's Queue (`scripts/look_home.py`) in headless Chromium, a card's header hovered and not, and commit the pair under `docs/mockups/reviews/`.
+
+**Done when** hovering or focusing a Queue card's header, row or item leaves its title's wrap and the card's height as they were (the shot pair shows the same wrap), and the stylesheet test holds the rule.
+
+**Resolved:** 2026-10-20 — PR #2210: the ⋯ is drawn bare at every width, its names in its `title` and `aria-label`; every `.qdotsnames` rule is gone from `app.css`; `tests/test_ui_hover_layout.py` holds every `:hover`/`:focus*`/`:active` rule of `app.css` to colour-like properties; the shot pair `docs/mockups/reviews/2026-10-20-td928-dots-*.png`.
+
+---
