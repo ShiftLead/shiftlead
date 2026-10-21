@@ -186,6 +186,19 @@ def md(text: Any, origin: Any = None, *, inline: bool = False, links: bool = Tru
 
 
 templates.env.globals["md"] = md
+# design §4.5a Sessions top bar **Inbox** and **Queue** tab (TD-931, built by TD-932): each tab's number says on
+# hover what it counts and that the other tab's holds the rest — the two add up to what waits on a person
+TOPBAR_TITLES = {
+    "inbox": "needs you, drawn in the Inbox: the session states the Sessions page counts too (a pending permission or "
+    "question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions "
+    "sessions asked you and steering you paused, minus anything snoozed — the Sessions page's needs-you count is the "
+    "states alone. What needs you about an entry on a Queue card is the Queue tab's number; the two add up to what "
+    "waits on you",
+    "queue": "needs you, drawn on the Queue's cards: questions and lines about an entry a card holds, one per item. "
+    "The rest is the Inbox tab's number; the two add up to what waits on you. The Queue's Needs you filter "
+    "counts cards, so the two can differ",
+}
+templates.env.globals["topbar_titles"] = TOPBAR_TITLES
 # design §4.5a *The help text* (TD-167): a control's `title` is its paragraph's first sentence, and a
 # mark's panel the group's paragraphs — every one of them from `help.py`, the one table
 templates.env.globals["help_title"] = helpmod.first_sentence

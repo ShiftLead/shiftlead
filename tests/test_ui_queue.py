@@ -225,11 +225,24 @@ def test_the_window_picker_carries_each_windows_count(tmp_path, monkeypatch):
     assert 'data-loaded="day"' in client(monkeypatch, tmp_path, fake(queue())).get("/queue?win=year").text
 
 
-def test_the_queue_tab_follows_inbox_with_no_number(tmp_path, monkeypatch):
+def test_the_bar_draws_three_tabs_in_their_keys_order_then_the_readings_and_the_tools(tmp_path, monkeypatch):
+    """§4.5a *the bar's three groups* (TD-931, built by TD-932): Sessions, Inbox, Queue in one strip of tabs, the
+    open page lit, no glyph on a tab; the readings in one strip; Settings a gear among the tools, named for a reader."""
     html = client(monkeypatch, tmp_path, fake(queue())).get("/queue").text
-    nav = html[html.index('id="personinbox"') : html.index('id="settingstab"')]
-    tab = re.search(r'<a class="btn light on" href="/queue" id="queuetab"[^>]*>([^<]*)</a>', nav)
-    assert tab and tab.group(1) == "Queue"  # the active tab, its word alone
+    tabs = html[html.index('<div class="tabs">') : html.index('<div class="grow">')]
+    assert re.findall(r'<a class="tab(?: on)?" href="([^"]+)"', tabs) == ["/", "/inbox", "/queue"]
+    assert '<a class="tab on" href="/queue" id="queuetab"' in tabs and "✉" not in tabs  # lit, no glyph
+    assert re.search(r'id="queueneeds">\s*</span>', tabs) and 'hidden" id="queueneeds"' in tabs  # nothing at zero
+    readings = html[html.index('<span class="readings"') : html.index('<span class="tools">')]
+    assert all(f'id="{c}"' in readings for c in ("usagechip", "buildchip", "hostchip")) and "btn" not in readings
+    tools = html[html.index('<span class="tools">') : html.index('id="newmenu"')]
+    assert re.findall(r'id="(settingstab|theme|keyhelpbtn)"', tools) == ["settingstab", "theme", "keyhelpbtn"]
+    gear = re.search(
+        r'<a class="btn ghost light" href="/settings" id="settingstab" aria-label="Settings" title="([^"]+)"><svg',
+        tools,
+    )
+    assert gear and gear.group(1).startswith("Settings: ")  # its word on hover and as its accessible name
+    assert html.index('id="newmenu"') > html.index('<span class="tools">')  # + New ▾ closes the bar
 
 
 def test_the_lists_alone_and_an_older_home(tmp_path, monkeypatch):
@@ -325,10 +338,13 @@ def test_the_page_draws_the_question_on_its_card_and_the_inbox_does_not(tmp_path
     inbox = c.get("/inbox").text
     rows = inbox[inbox.index('id="rows-needs"') : inbox.index('id="sec-fyi"')]
     assert "which one?" not in rows and "TD-20 is the parent" not in rows
-    assert 'id="railqueue"' in inbox and '<span id="railqueuen">2</span> on the Queue' in inbox
-    # the number is unchanged and links to the Queue's needs-you filter
-    assert 'data-href="/queue?filter=needs-you"' in inbox and 'class="badge needs" id="personneeds">2</span>' in inbox
-    assert c.get("/api/person/inbox?counts=1").json()["queue_n"] == 2
+    # each tab its own number (§4.5a *the bar's three groups*, TD-932): the two on the cards are the Queue's, the
+    # Inbox's is the rest (none here), and no number is a link of its own; no *+ n on the Queue* line in the rail
+    assert 'class="badge needs" id="queueneeds">2</span>' in inbox and 'hidden" id="personneeds"></span>' in inbox
+    assert "data-href" not in inbox[inbox.index('id="personinbox"') : inbox.index('id="settingstab"')]
+    assert 'id="railqueue"' not in inbox
+    got = c.get("/api/person/inbox?counts=1").json()
+    assert got["queue_n"] == 2 and got["needs"] == 2
 
 
 def test_each_request_reads_the_board_choices_once_however_many_rows(tmp_path, monkeypatch):
@@ -355,11 +371,11 @@ def test_each_request_reads_the_board_choices_once_however_many_rows(tmp_path, m
         assert len(calls) <= 1, url
 
 
-def test_with_nothing_on_the_queue_the_number_links_to_the_inbox(tmp_path, monkeypatch):
+def test_with_nothing_on_the_queue_the_inbox_tab_holds_the_number(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(queue(), [mail("m2", "about nothing")]))
     inbox = c.get("/inbox").text
-    assert "data-href" not in inbox[inbox.index('id="personinbox"') : inbox.index('id="queuetab"')]
-    assert 'id="railqueue"' in inbox and "about nothing" in inbox
+    assert 'class="badge needs" id="personneeds">1</span>' in inbox and 'hidden" id="queueneeds"></span>' in inbox
+    assert "about nothing" in inbox
 
 
 def ledger_repos() -> dict:
@@ -650,7 +666,7 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     html = c.get("/queue").text
     row = html[html.index('id="qfilters"') : html.index('id="qcompleted"')]
     assert 'aria-pressed="true">All</a>' in row and 'Needs you (<span id="qfneedsn">1</span>)' in row
-    assert "Steering" in row and '+ <span id="qininboxn">1</span> in the Inbox' in row  # the question about nothing
+    assert "Steering" in row and "qininbox" not in row  # the question about nothing is the Inbox tab's number (TD-932)
     assert 'name="find"' in row and "held (person)</a>" in row
     html = c.get("/queue?filter=needs-you").text
     assert re.search(
@@ -668,7 +684,7 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     html = c.get("/queue").text
     assert html.index('id="qfilters"') < html.index('id="queuelists"')
     part = c.get("/queue?part=1").text
-    assert 'id="qfilters"' not in part and 'id="qcounts" hidden data-needs="1" data-ininbox="1"' in part
+    assert 'id="qfilters"' not in part and 'id="qcounts" hidden data-needs="1">' in part
 
 
 def test_a_passed_over_flag_is_drawn_on_its_card(tmp_path, monkeypatch):
@@ -701,16 +717,18 @@ def test_an_id_in_find_matches_that_id_whole():
 
 
 def test_the_rows_on_cards_and_in_the_inbox_add_up_to_the_top_bars_number(tmp_path, monkeypatch):
-    """The top bar counts both homes (§4.5 screen 6 *Where a row is drawn*): the counted rows drawn on cards and
-    the filter row's *+ m in the Inbox* make its number. *Needs you (n)* counts cards whose status is *needs you*
-    (the held TD-30 among them, which no number counts), so it is the cards, not a part of this sum."""
+    """The top bar counts both homes (§4.5 screen 6 *Where a row is drawn*, §4.5a *the bar's three groups*,
+    TD-932): the Queue tab's number is the counted rows drawn on cards, the Inbox tab's the rest, and the two make
+    `needs`. *Needs you (n)* counts cards whose status is *needs you* (the held TD-30 among them, which no number
+    counts), so it is the cards, not a part of this sum."""
     entries = [mail("m1", "TD-21: which one?"), mail("m2", "TD-20: and this?"), mail("m3", "about nothing"),
                mail("m4", "nor this")]  # fmt: skip
     c = client(monkeypatch, tmp_path, fake(queue(), entries))
     top = c.get("/api/person/inbox?counts=1").json()
     html = c.get("/queue").text
-    m = int(re.search(r'id="qininboxn">(\d+)<', html)[1])
-    assert top["needs"] == 4 and top["queue_n"] == 2 and m == 2 and top["queue_n"] + m == top["needs"]
+    m = int(re.search(r'id="personneeds">(\d+)<', html)[1])
+    q = int(re.search(r'id="queueneeds">(\d+)<', html)[1])
+    assert top["needs"] == 4 and top["queue_n"] == q == 2 and m == 2 and q + m == top["needs"]
     assert 'Needs you (<span id="qfneedsn">2</span>)' in html  # TD-20's card and the held TD-30's
 
 
@@ -790,3 +808,24 @@ def test_two_repos_number_each_card_per_repo_with_its_chip(tmp_path, monkeypatch
     assert upnext.count('<span class="qn">1</span>') == 2 and ">db</span>" in upnext and ">s</span>" in upnext
     one = client(monkeypatch, tmp_path, fake(queue())).get("/queue").text
     assert 'class="qcards" id="qcards"' in one and "qprepo" not in one
+
+
+def test_each_tab_has_its_number_and_the_rollup_reads_the_inboxs_beside_an_overdue_count_over_both():
+    """§4.5a *the bar's three groups* and §4.5 screen 1 (TD-931, built by TD-932): a question about an open card
+    and a board line past its date about another are the Queue tab's, a state row the Inbox tab's; the two make
+    `count`. The rollup's *in the Inbox* is the Inbox tab's number, while *m overdue* counts both homes, so it
+    can exceed it."""
+    from shiftlead.ui import app as ui
+
+    board = {"row": "board", "id": "b", "text": "**Pick** one. Context: TD-30. Due: 2026-10-10", "due": "2026-10-10"}
+    secs = inbox_sections(
+        [mail("m1", "TD-21: which one?")], states=[{"row": "state", "id": "s1", "state": "needs-you"}],
+        boards=[board], now=NOW, cards=card_index(queue()),
+    )  # fmt: skip
+    tabs = ui.tab_counts(secs)
+    assert tabs["person_queue_n"] == 2 and tabs["person_needs"] == 1 and secs["count"] == 3
+    assert secs["overdue_n"] == 1
+    ro = {"agents": [], "n_agents": 0, "phases": [], "motion": 0, "prs_open": 0, "has_repo": False,
+          "answer_needed": 0, "answer_team": ""}  # fmt: skip
+    html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=0, person_overdue=1)
+    assert "data-inbox-needs>0<" in html and "data-inbox-overdue>1</span> overdue" in html  # 1 overdue over 0

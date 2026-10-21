@@ -112,6 +112,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     NO_GRANTS,  # noqa: F401
     PLACE_TTL,  # noqa: F401
     PLACE_WAIT,  # noqa: F401
+    TOPBAR_TITLES,  # noqa: F401
     UNDESCRIBED_GRANT,  # noqa: F401
     USAGE_AGED,  # noqa: F401
     USAGE_FRESH,  # noqa: F401
@@ -525,6 +526,13 @@ def json_answer(body: bytes, gz: bool) -> Response:
     return Response(body, media_type="application/json", headers=headers)
 
 
+def tab_counts(sections: Mapping[str, Any]) -> dict[str, int]:
+    """The top bar's numbers at first paint (§4.5a *the bar's three groups*, TD-932): the Inbox tab's, the needs-you
+    rows the Inbox draws, and the Queue tab's, those drawn on its cards — together `count`, what waits on a person."""
+    queue_n = sections.get("queue_n", 0)
+    return {"person_needs": sections["count"] - queue_n, "person_queue_n": queue_n, "person_fyi": sections["fyi_n"]}
+
+
 def counts_of(sections: Mapping[str, Any], build: Any) -> dict[str, Any]:
     """`INBOX_COUNTS` from the Inbox's sections (`inbox_sections`): the one place the top bar's
     numbers are taken from, by the full read, the counts read and the counts keeper alike."""
@@ -536,8 +544,8 @@ def counts_of(sections: Mapping[str, Any], build: Any) -> dict[str, Any]:
         "fyi_n": sections["fyi_n"],
         "overdue_n": sections["overdue_n"],  # the Org rollup's *m overdue* (TD-178)
         "snoozed_n": len(sections["snoozed"]),
-        # the counted rows the Queue draws on their cards (§4.5 screen 6 *Where a row is drawn*, TD-771):
-        # while any is, the top bar's number links to the Queue's needs-you filter
+        # the counted rows the Queue draws on their cards (§4.5 screen 6 *Where a row is drawn*, TD-771): the
+        # Queue tab's number, and `needs` less it the Inbox tab's (§4.5a *the bar's three groups*, TD-932)
         "queue_n": sections.get("queue_n", 0),
         # §4.5a **team header** → *answered for you* count (§4.9b, TD-075): each row's team and
         # time, and nothing it says — the browser counts those newer than it last opened the group
@@ -1617,8 +1625,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 handed=handed_rows(handed, {s.get("id"): s for s in sessions}, datetime.now(UTC)),
                 cards=await h.queue_cards(),
             )
-            person_needs, person_fyi, person_overdue = secs["count"], secs["fyi_n"], secs["overdue_n"]
-            person_queue_n = secs["queue_n"]
+            # the rollup's *in the Inbox* is the Inbox tab's number (TD-932); *m overdue* still counts both homes
+            tabs = tab_counts(secs)
+            person_needs, person_queue_n, person_fyi = tabs["person_needs"], tabs["person_queue_n"], tabs["person_fyi"]
+            person_overdue = secs["overdue_n"]
             h.needs_cache["rows"] = secs["needs"]
         return templates.TemplateResponse(
             request,
@@ -3540,7 +3550,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 why = f"the home did not serve the Queue: {e.detail}"  # an older home: no `queue` RPC
         fleet: list[dict[str, Any]] = []
         mail: dict[str, Any] = {}
-        in_inbox = None  # the counted rows the Inbox draws: the filter row's *+ n in the Inbox*
+        tabs: dict[str, int] = {}  # the top bar's numbers at first paint
         if got is not None:
             # what is attached to a card (§4.5 screen 12, TD-771, TD-828): the Inbox's own sections over the
             # same reads, each `home: queue` row drawn in its card's section by the Inbox's own renderer
@@ -3564,7 +3574,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # *Later*'s ledger rows and the board's lines not yet due, folded or not, whose entry a card
                 # holds (TD-771, TD-828)
                 later = split_later(await h.ledger_view(fleet), hz["ahead"], index, hz["hidden"])[2]
-                in_inbox = sections["count"] - sections.get("queue_n", 0)
+                tabs = tab_counts(sections)
                 one = templates.get_template("queue_mail.html")
                 origin = page_origin(request)
                 with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
@@ -3597,7 +3607,6 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "kinds": KINDS,
             "teams": sorted(n for n, r in teams.items() if r in view["repos"] or n in picks["team"]),
             "team_repos": teams,  # a team chip's repo, which the browser's apply reads as the server's does (TD-829)
-            "in_inbox": in_inbox,
             "labels": WINDOW_LABEL,
             "words": WINDOW_WORD,
             "why": why,
@@ -3612,6 +3621,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "queue.html",
             {
                 **ctx,
+                **tabs,
                 "host": host_name(),
                 "active": "Queue",
                 "volatile": hosts.local_host().volatile,
@@ -4169,10 +4179,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "horizon": hz,
                 "ledger": lf,
                 "board_choices": choices,
-                "person_needs": sections["count"],
-                "person_queue_n": sections["queue_n"],
-                "on_queue": sections["queue_n"],
-                "person_fyi": sections["fyi_n"],
+                **tab_counts(sections),
                 "host": host_name(),
                 "active": "Inbox",
                 "agent_down": agent_down,

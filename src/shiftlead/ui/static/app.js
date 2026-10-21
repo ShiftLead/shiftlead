@@ -1518,20 +1518,23 @@
     if (got.unchanged) return got;
     return AO.drawCounts(got);
   };
+  // A tab's number: shown only above zero (§4.5a *the bar's three groups*)
+  AO.drawTabCount = function (el, n) {
+    if (!el) return;
+    el.textContent = n > 0 ? String(n) : ""; el.classList.toggle("hidden", !(n > 0));
+  };
   // The top bar's numbers, from a read or from the stream's `counts` (TD-616): one drawing for both.
   AO.drawCounts = function (got) {
     // a count with the host agent down holds no revision: the next read must not be `unchanged`
     countsRev = typeof got.rev === "number" && !got.agent_down ? got.rev : null;
     // `needs: null` is *not known* — the host agent is down — and a chip that read 0 would be a
     // lie in the one place a person looks to see whether anything is waiting (TD-069).
-    const chip = $("#personneeds"), n = got.needs || 0;
-    if (chip && got.needs !== null) { chip.textContent = n ? String(n) : ""; chip.classList.toggle("hidden", !n); }
-    // the number alone opens the Queue's needs-you filter while a counted row is drawn on a card (TD-771)
-    if (chip && typeof got.queue_n === "number") {
-      if (got.queue_n) { chip.dataset.href = "/queue?filter=needs-you"; chip.title = "some of these are drawn on their Queue cards: open the Queue's needs-you filter"; }
-      else { delete chip.dataset.href; chip.removeAttribute("title"); }
-      const rq = $("#railqueue"), rn = $("#railqueuen");
-      if (rq && rn) { rn.textContent = String(got.queue_n); rq.hidden = !got.queue_n; }
+    // Two numbers, one per tab (§4.5a *the bar's three groups*, TD-932): the Queue's is the needs-you rows its
+    // cards draw (`queue_n`), the Inbox's the rest — they add up to `needs`, what waits on a person
+    if (got.needs !== null && got.needs !== undefined) {
+      const q = typeof got.queue_n === "number" ? got.queue_n : 0;
+      AO.drawTabCount($("#personneeds"), (got.needs || 0) - q);
+      AO.drawTabCount($("#queueneeds"), q);
     }
     if (typeof document.dispatchEvent === "function" && typeof CustomEvent === "function") document.dispatchEvent(new CustomEvent("ao:counts", { detail: got }));
     // §4.10 *The Inbox is a queue* (TD-079 step 2): FYI's own quiet number, *Inbox 1 · 5*, never
@@ -1581,10 +1584,6 @@
   }
   drawBuildChip(null);
   if ($("#personneeds")) {
-    $("#personneeds").addEventListener("click", (e) => {
-      const to = e.currentTarget.dataset.href;
-      if (to) { e.preventDefault(); e.stopPropagation(); location.href = to; }
-    });
     // the Sessions page and the Inbox page render the count server-side; every other page reads it at
     // load. On the Inbox page the poll is the page's own, which refreshes the rows as well.
     // The Org reads it at load too: its number is server-rendered, but the team headers' *answered
@@ -4149,10 +4148,8 @@
           // the filter row stands outside the lists, so typed find words and its focus survive: its numbers follow
           const n = $("#qcounts", lists);
           if (n) {
-            const a = $("#qfneedsn", box), b = $("#qininboxn", box), link = $("#qininbox", box);
+            const a = $("#qfneedsn", box);
             if (a) a.textContent = n.dataset.needs || "0";
-            if (b) b.textContent = n.dataset.ininbox || "0";
-            if (link) link.hidden = !Number(n.dataset.ininbox);
           }
           opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
           AO.reopenFolds(lists);  // a row's *details* the person opened, filled from what was kept (TD-891)
@@ -6004,6 +6001,7 @@
   AO.KEYS = [
     { keys: ["1"], page: "all", control: "Sessions", sel: '.topbar .tab[href="/"]' },
     { keys: ["2"], page: "all", control: "Inbox", sel: "#personinbox" },
+    { keys: ["3"], page: "all", control: "Queue", sel: "#queuetab" },
     { keys: ["n"], page: "all", control: "New session", sel: '.topbar a[href="/new"]' },
     { keys: ["/"], page: "all", control: "the filter box (Esc leaves it)", sel: "#filter, #ifilter", focus: true },
     { keys: ["?"], page: "all", control: "this list (? or Esc closes it)", help: true },
@@ -6046,7 +6044,7 @@
     // — an `ask`'s suggested answers, a board item's answers — in the order written (TD-254, TD-255).
     // `1` and `2` are the page's on any row without them: `AO.keyAnswers` is where they yield.
     { keys: ["g"], page: "inbox", ring: true, control: "Go with it", sel: "button", text: ["Go with it", "Go with it: Works"] },
-    { keys: ["1", "2", "3", "4"], page: "inbox", ring: true, control: "its answers, in the order written (a row without any: 1 Sessions, 2 Inbox)", sel: ".btn.answer", nth: true },
+    { keys: ["1", "2", "3", "4"], page: "inbox", ring: true, control: "its answers, in the order written (a row without any: 1 Sessions, 2 Inbox, 3 Queue)", sel: ".btn.answer", nth: true },
   ];
   AO.keyPage = (path) => (path === "/" ? "org" : path === "/inbox" ? "inbox" : path.startsWith("/inbox/") ? "msg" : path.startsWith("/focus/") ? "focus" : "other");
   // the message page's one row is its entry: its keys press that row's controls, never a thread's

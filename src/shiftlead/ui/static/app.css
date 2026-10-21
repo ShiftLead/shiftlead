@@ -11,7 +11,7 @@
   color-scheme: light;
   --bg: #f4f5f7; --fg: #1c2128; --muted: #6b7280; --strong: #374151; --line: #dfe3e8; --line2: #eceef1;
   --card: #fff; --input: #fff; --border: #cbd0d6; --hover: #eef0f3;
-  --link: #1f5fa8; --top: #1c2128; --topfg: #e6e9ee; --topdim: #aab3bf; --tab-on: #2b323b;
+  --link: #1f5fa8; --top: #1c2128; --topfg: #e6e9ee; --topdim: #aab3bf; --tab-on: #2b323b; --topline: #3a424d;
   --term: #0f1419; --termfg: #d5dbe3; --tail: #aab3bf;
   --needs: #f59e0b; --needs-bg: #fde68a; --needs-fg: #7c3d00;
   /* design §4.5 *The card's anatomy* (TD-095): *working* is green — alive; *idle* is blue — alive,
@@ -50,7 +50,7 @@ html[data-theme="dark"] {
   color-scheme: dark;
   --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --line2: #222831;
   --card: #171b21; --input: #11151a; --border: #3a424d; --hover: #232a33;
-  --link: #7fb2f0; --top: #0b0e12; --topfg: #e6e9ee; --topdim: #8b95a3; --tab-on: #232a33;
+  --link: #7fb2f0; --top: #0b0e12; --topfg: #e6e9ee; --topdim: #8b95a3; --tab-on: #232a33; --topline: #39414b;
   --term: #0b0e12; --termfg: #d5dbe3; --tail: #8b95a3;
   --needs-bg: #4a3608; --needs-fg: #fde68a; --working: #22c55e; --working-bg: #123d27; --working-fg: #bbf7d0;
   --idle: #3b82f6; --idle-bg: #1a2c52; --idle-fg: #bfdbfe; --ended-bg: #2a313a; --ended-fg: #c9d1db;
@@ -81,7 +81,20 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 /* the bar wraps rather than widening the page, and the usage chip keeps its width rather than being
    squeezed to nothing, which made `fitUsage` hide every account behind a bare `+n` (TD-296 #9) */
 .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: var(--t-title); color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
-.tabs { display: flex; gap: 2px; } .tab { padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; } .tab.on { background: var(--tab-on); color: #fff; }
+.tabs { display: flex; gap: 2px; } .tab { display: inline-flex; align-items: center; padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; white-space: nowrap; } .tab.on { background: var(--tab-on); color: #fff; }
+/* §4.5a Sessions top bar **the bar's three groups** (TD-931, built by TD-932): the places (the tabs, each number
+   after its word), the readings (one dim monospace strip, hairline dividers, nothing shaped like a button) and the
+   tools (Settings, ◐ and ? as borderless glyphs at the bar's button height, then + New ▾). The readings and the
+   tools wrap together, right-aligned, when the bar does not fit its row */
+.barend { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px 14px; }
+.readings { display: inline-flex; align-items: center; min-width: 0; font-family: "JetBrains Mono", monospace; font-size: var(--t-small); color: var(--topdim); white-space: nowrap; }
+.readings > * + * { margin-left: 10px; padding-left: 10px; border-left: 1px solid var(--topline); }
+#usagechip:not(:has([data-account])) { display: none; }  /* no account to read: no empty place in the strip */
+#usagechip:not(:has([data-account])) + *, #usagechip:not(:has([data-account])) + .hidden + * { margin-left: 0; padding-left: 0; border-left: 0; }
+.tools { display: inline-flex; align-items: center; gap: 2px; }
+.tools .btn.light { height: 26px; padding: 0 7px; border-color: transparent; color: var(--topdim); }
+.tools .btn.light.on { background: var(--tab-on); color: #fff; }
+.tools .btn svg { width: 15px; height: 15px; }
 #hostchip { font-size: var(--t-small); color: var(--topdim); } #hostdot.down { color: var(--stalled); }
 /* The chips sit side by side and are measured against this width to decide what still fits
    (TD-073): `max-width` plus `overflow: hidden` is what makes scrollWidth > clientWidth mean
@@ -101,7 +114,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--strong); }
-.btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; }
+.btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; background: var(--topfg); color: var(--top); border-color: var(--topfg); }  /* + New ▾, the bar's one filled button in both themes (§4.5a *the bar's three groups*) */
 .btn.sm { height: 26px; font-size: var(--t-small); padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
 .btn.on { background: var(--ended-bg); color: var(--fg); }
 /* §4.5a **a control's look** (§4.5 screen 6 *A control answers the press*, TD-340): one hover, one
@@ -175,7 +188,7 @@ details#morefields[open] > summary { margin-bottom: 10px; }
 .keydlg .note[hidden] { display: none; }
 .keys { border-collapse: collapse; font-size: var(--t-small); } .keys td { padding: 3px 12px 3px 0; vertical-align: top; } .keys td:first-child { white-space: nowrap; }
 kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--card); }
-#personinbox .badge { margin-left: 4px; }
+.tab .badge { margin-left: 6px; }
 /* §4.10 *The Inbox is a queue*: FYI's own **quiet** number — *Inbox 1 · 5*. Never added to the
    first, and deliberately plainer than it: the first is what needs a person. A mark, not a
    control: the whole chip is the link, and this never had a border. */
@@ -580,8 +593,9 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   .page.focus { flex-direction: column; align-items: stretch; } .focus .side { width: 100%; }
   /* put away on a phone, the rail is one row under the composer, 44px targets (TD-412) */
   .focus .side.rail { width: 100%; } .focus .siderail { flex-direction: row; flex-wrap: wrap; } .focus .railbtn { width: 44px; height: 44px; } .termbox { height: 50vh; } .topbar { gap: 6px 8px; padding: 8px 10px; } #hostchip { display: none; }
-  /* a phone (TD-296 #9): the usage chip takes a row of its own under the buttons */
-  #usagechip { order: 1; flex-basis: 100%; max-width: 100%; } #usagechip:empty, #usagechip:not(:has([data-account])) { display: none; }
+  /* a phone (TD-296 #9; §4.5a *the bar's three groups*, TD-932): the readings are a row of their own, full width,
+     the tools stay at the right of the tabs' row, and the host is left off (above) */
+  .barend { display: contents; } .readings { order: 1; flex-basis: 100%; } #usagechip { flex-shrink: 1; max-width: none; }
   .grid { grid-template-columns: 1fr; }
 }
 
@@ -966,7 +980,6 @@ details.qdots { display: inline-block; }
 .qgfoldword { display: none; }
 .qgroup.qgfolded .qgfoldword { display: inline; }
 .qgroup.qgfolded > :not(.rsh) { display: none; }
-.railqueue { display: block; padding: 2px 0 2px 1.6em; font-size: var(--t-small); }
 .qwhy { margin: 4px 0 8px; color: var(--needs-fg); }
 #debt .rlist + .qcards { margin-top: 8px; }
 /* The Queue page (design §4.5 screen 12, TD-771): the Inbox's centred column, its three groups a panel

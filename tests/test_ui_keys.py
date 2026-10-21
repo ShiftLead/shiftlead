@@ -58,7 +58,9 @@ console.log(JSON.stringify({
     // the digits on the Inbox: the page's, and the row's when the ringed row has answer buttons
     inbox_1: (AO.keyEntry("inbox", "1") || {}).control,
     inbox_1_answers: AO.keyEntry("inbox", "1", true),
-    inbox_3: AO.keyEntry("inbox", "3"),
+    inbox_3: (AO.keyEntry("inbox", "3") || {}).control,
+    inbox_3_answers: AO.keyEntry("inbox", "3", true),
+    other_3: (AO.keyEntry("other", "3") || {}).control,
     inbox_g: (AO.keyEntry("inbox", "g", true) || {}).control,
   },
   labels: ["Open", "▣ Focus", "Snooze ▾", "Open board", "Dismiss"].map(AO.keyLabel),
@@ -202,15 +204,16 @@ def test_a_key_fires_only_when_nothing_editable_has_focus():
 @pytest.mark.unit
 def test_the_digits_yield_to_a_row_with_answer_buttons_and_g_is_go_with_it():
     """§4.5a **keys**: the ring (TD-255): `1`–`4` press a ringed row's answer buttons in the order
-    written and are the page's on any other row; `3` and `4` name nothing but an answer; `g` is the
-    row's **Go with it**. Both an `ask`'s suggested answers and a board item's are `.btn.answer`."""
+    written and are the page's on any other row — `3` the Queue (TD-932); `4` names nothing but an answer; `g` is
+    the row's **Go with it**. Both an `ask`'s suggested answers and a board item's are `.btn.answer`."""
     got = _probe()
     js = (UI / "static" / "app.js").read_text()
     e = got["entry"]
     assert e["inbox_1"] == "Sessions"
     nth = e["inbox_1_answers"]
     assert nth["nth"] and nth["ring"] and nth["sel"] == ".btn.answer" and nth["keys"] == ["1", "2", "3", "4"]
-    assert e["inbox_3"]["nth"]  # no page key: on a row without answers the handler leaves it alone
+    assert e["inbox_3"] == e["other_3"] == "Queue"  # the Queue tab's key, on a row without answers too
+    assert e["inbox_3_answers"]["nth"]  # …and the ringed row's third answer where it has answers
     assert got["answers"] == [["first", "second"], []]
     assert "if (!k || (k.nth && !answers.length)) return;" in js
     assert (
