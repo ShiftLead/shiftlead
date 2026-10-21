@@ -17828,3 +17828,41 @@ The other cases:
 **Resolved:** 2026-10-21 (grinder-ao-1) — the live check holds: the person's Start session on a Queue card started their session on the card's `start` entry with the id-list prompt, the card reads In progress, and its button is Open session (Status, read 2026-10-21).
 
 ---
+## TD-937: The top bar's Settings glyph reads as a brightness control; draw a cog
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-21 (Paul, with the ao-paul session)
+**Owner:** paul
+**Kind:** build
+**Status:** Built (#2225)
+**Location:** `src/shiftlead/ui/templates/base.html` (the `topbar` block, `#settingstab`'s `svg`); `tests/test_ui_queue.py` (`test_the_bar_draws_three_tabs_in_their_keys_order_then_the_readings_and_the_tools`)
+
+**Why:** Design §4.5a *Sessions top bar: Settings* says *a gear glyph before ◐ and ?*. TD-932 (#2212) drew a hub with eight rays — a sun — which is the common brightness icon, and it stands next to ◐, the theme toggle, so the two read as one brightness pair. Paul, 2026-10-21: *our settings icon looks like a brightness icon*.
+
+**Fix:** The `svg` draws a toothed ring round a hub (a cog with eight teeth, Feather's *settings* outline, MIT) at the same 15 px and stroke. The test asserts the glyph is the cog, not rays. No design change: the row already says gear.
+
+**Done when** the bar's Settings glyph is a cog at every width and on `/settings` lit, and the test holds.
+
+**Resolved:** 2026-10-21 (grinder-ao-1, through TD-939) — built by #2225 (merge `9bfca332c`), the same PR that filed it: `base.html`'s `#settingstab` draws `<svg class="gear">`, a toothed ring round a hub, and `test_the_bar_draws_three_tabs_in_their_keys_order_then_the_readings_and_the_tools` asserts `svg.count("a1.65") >= 8 and "v2M" not in svg`. Read live 2026-10-21 23:20Z (live 3fd4f5a, which contains #2225): a headless GET of `/` and of `/settings` draws the cog in `#settingstab`, lit (`on`) on `/settings`.
+
+---
+## TD-939: TD-937's cog is on main and its entry still reads Open, owner paul, "the glyph is a sun"
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-21 (docs audit of #2218–#2227)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — TD-937 archived
+**Location:** `docs/technical_debt.md` (TD-937's summary row and entry); `src/shiftlead/ui/templates/base.html` (`#settingstab`)
+
+**Why:** #2225 (merge `9bfca332c`) both filed TD-937 and carried its fix: `base.html`'s `#settingstab` is now `<svg class="gear" viewBox="0 0 24 24" …>` and `tests/test_ui_queue.py` asserts `svg.count("a1.65") >= 8 and "v2M" not in svg`. On `origin/main` at `91ea67dd4` the entry still reads `**Status:** Open` with `**Owner:** paul`, its **Fix** says *The `svg` draws a toothed ring* in the future tense, and the summary row says *The top bar's Settings glyph is a sun (eight rays)*, so a session picking work, or Paul on the board, reads a built change as undone.
+
+**Fix:** Say what #2225 did in TD-937: **Status** `Built (#2225)`, and a live check or an archive with a `**Resolved:**` line naming #2225 and the test, whichever the cadence wants for a UI-only glyph; the row follows the entry.
+
+**Done when** TD-937's row and entry say the cog is built, or the entry is archived with its `**Resolved:**` naming #2225.
+
+**Resolved:** 2026-10-21 (grinder-ao-1) — TD-937 archived in this PR with its `**Resolved:**` naming #2225 and the test.
+
+---
