@@ -33,12 +33,13 @@ from smoke import SMOKE_VENV, UNAVAILABLE, address  # noqa: E402
 GRACE = 3.0  # AO.TERM_GRACE, in seconds: the mark and the card wait it out
 BYTE_BOUND = 30.0  # seconds the released terminal may take to paint
 
-# The stand-in socket (see the docstring). `__aoHold` is this page's alone: the reload the events stream
-# makes once it is back starts a page with no hold.
+# The stand-in socket (see the docstring). The release is kept in the tab's `sessionStorage`, so the reload
+# the events stream makes once it is back starts a page that holds nothing.
 SHIM = """
 (() => {
   const Real = window.WebSocket;
-  window.__aoHold = true; window.__aoBytes = 0; let first = true;
+  let released = false; try { released = !!sessionStorage.getItem("ao.drop.released"); } catch (e) { /* none */ }
+  window.__aoHold = !released; window.__aoBytes = 0; let first = true;
   const held = (u) => u.includes("/term/") || u.includes("/events");
   window.WebSocket = function (url, protocols) {
     const u = String(url);
@@ -78,8 +79,13 @@ def run(base: str, sid: str, hold: float, shot: Path, scheme: str, release: bool
         from playwright.sync_api import sync_playwright
 
         pw = sync_playwright().start()
+    except Exception as e:  # no Playwright: the venv's fault, nothing written
+        print(f"focus_drop: cannot start Playwright ({type(e).__name__}: {str(e).splitlines()[0] if str(e) else ''})")
+        return UNAVAILABLE
+    try:
         b = pw.chromium.launch()
-    except Exception as e:  # no Playwright, no Chromium: the venv's fault, nothing written
+    except Exception as e:  # no Chromium
+        pw.stop()
         print(f"focus_drop: cannot start a browser ({type(e).__name__}: {str(e).splitlines()[0] if str(e) else ''})")
         return UNAVAILABLE
     try:
@@ -92,6 +98,8 @@ def run(base: str, sid: str, hold: float, shot: Path, scheme: str, release: bool
             pg.wait_for_function(SHOWN, timeout=(GRACE + 5) * 1000)
         except PlaywrightTimeout:
             print("focus_drop: the disconnect card did not show within the mark's grace", file=sys.stderr)
+            for e in errors[:1]:
+                print(f"focus_drop: script error on the page: {e.splitlines()[0]}", file=sys.stderr)
             return 1
         mark = pg.text_content("#ftermmark") or ""
         box = pg.locator("#fdrop").bounding_box() or {"y": 0, "height": 0}
@@ -103,7 +111,7 @@ def run(base: str, sid: str, hold: float, shot: Path, scheme: str, release: bool
         if not release:
             return 0
         pg.wait_for_timeout(max(0.0, hold - GRACE) * 1000)
-        pg.evaluate("window.__aoHold = false")
+        pg.evaluate("try { sessionStorage.setItem('ao.drop.released', '1'); } catch (e) {} window.__aoHold = false")
         try:
             pg.wait_for_function(CLEARED, timeout=BYTE_BOUND * 1000)
         except PlaywrightTimeout:

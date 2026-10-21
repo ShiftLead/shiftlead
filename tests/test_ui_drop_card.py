@@ -53,8 +53,49 @@ console.log(JSON.stringify({
   nothing: AO.dropCard(null, "me", "ao-grind", now),
   two: AO.dropCard(two, "me", "", now).windows,
   only_unweighed: AO.dropSays(AO.dropSum({ seats: [seat(["x"], "≈$", 0, tok(0, 0, 0, 0), 2500)] })).money,
+  metered_zero: AO.dropSays(AO.dropSum({ seats: [seat(["x"], "$", 0, tok(0, 0, 0, 0))] })).money,
+  mixed_zero: AO.dropSays(AO.dropSum({ seats: [seat(["x"], "$", 0, tok(0, 0, 0, 0)),
+    seat(["y"], "≈$", 0, tok(0, 0, 0, 0))] })).money,
 }));
 """
+
+READ_PROBE = (
+    PROBE.split("const AO = window.AO;")[0].replace(
+        'global.fetch = () => Promise.reject(new Error("the probe makes no calls"));', ""
+    )
+    + """
+const AO = window.AO;
+const store = {};
+global.sessionStorage = { getItem: (k) => (k in store ? store[k] : null),
+  setItem: (k, v) => { store[k] = String(v); } };
+const asked = [];
+let fail = new Set();
+global.fetch = (u) => {
+  asked.push(u);
+  if ([...fail].some((f) => u.includes(f))) return Promise.resolve({ ok: false, status: 503, json: () => ({}) });
+  const w = u.includes("window=week") ? "week" : "day", t = u.includes("team=") ? "t" : "all";
+  const one = { records: ["me"], unit: "≈$", figure: w === "day" ? 1 : 7, tokens: { input: 1 },
+    unweighed_tokens: 0, series: [1, 2], seat: `${t}-${w}` };
+  return Promise.resolve({ ok: true, json: () => Promise.resolve({ seats: [null, one] }) });
+};
+(async () => {
+  const out = {};
+  await AO.dropRead("me", "ao grind", 1000);
+  out.asked = asked.slice();
+  out.first = AO.dropHeld("me");
+  asked.length = 0;
+  await AO.dropRead("me", "ao grind", 1000 + AO.DROP_FRESH - 1);
+  out.fresh_asked = asked.length;
+  fail = new Set(["window=week"]);
+  await AO.dropRead("me", "ao grind", 1000 + AO.DROP_FRESH);
+  out.partial = AO.dropHeld("me");
+  fail = new Set(["/api/spend"]);
+  await AO.dropRead("me", "ao grind", 1000 + 3 * AO.DROP_FRESH);
+  out.none_at = AO.dropHeld("me").at;
+  console.log(JSON.stringify(out));
+})();
+"""
+)
 
 
 def probe(tmp_path) -> dict:
@@ -107,6 +148,7 @@ def test_the_windows_and_the_time_and_what_was_never_read(tmp_path):
     nothing = got["nothing"]
     assert nothing["asof"] is None and nothing["windows"] == []
     assert all(r["day"] is None and r["week"] is None for r in nothing["rows"])
+    assert got["metered_zero"] == "$0.00" and got["mixed_zero"] == "≈$0.00"  # nothing spent, in its own unit
     assert got["only_unweighed"] == "unweighed · 2k tok"  # nothing weighed, the Spend page's shape
 
 
@@ -130,3 +172,33 @@ def test_the_focus_reads_at_each_open_and_draws_the_card_with_the_mark():
         ' the last figures the page held; the Spend page has the live ones"></div>'
     )
     assert slot in html and html.index(slot) < html.index('id="termwrap"')
+
+
+@pytest.mark.unit
+def test_the_reading_is_kept_and_a_failed_read_keeps_what_was_held(tmp_path):
+    """`AO.dropRead`: the team's and All's day and week (the team URL-quoted), each seat kept slim, a null
+    seat passed over; a reading under `DROP_FRESH` old is not taken again; a read that fails keeps the
+    scope as it was held and the others move; `at` moves only when a read came back."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    f = tmp_path / "read_probe.js"
+    f.write_text(READ_PROBE)
+    run = subprocess.run([node, str(f), str(APP)], capture_output=True, text=True, timeout=30)
+    assert run.returncode == 0, run.stderr
+    got = json.loads(run.stdout)
+    assert got["asked"] == [
+        "/api/spend?window=day&top=all&team=ao%20grind",
+        "/api/spend?window=day&top=all",
+        "/api/spend?window=week&top=all&team=ao%20grind",
+        "/api/spend?window=week&top=all",
+    ]
+    first = got["first"]
+    assert first["at"] == 1000 and set(first) == {"at", "team", "all", "usage"}
+    assert first["team"]["week"]["seats"] == [
+        {"records": ["me"], "unit": "≈$", "figure": 7, "unweighed_tokens": 0, "tokens": {"input": 1}}
+    ]
+    assert got["fresh_asked"] == 0
+    partial = got["partial"]
+    assert partial["at"] == 1000 + 30000 and partial["team"]["week"] == first["team"]["week"]
+    assert got["none_at"] == partial["at"]

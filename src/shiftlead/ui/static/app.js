@@ -2814,7 +2814,7 @@
     for (const s of reading.seats) {
       if (!s || typeof s !== "object" || (keep && !keep(s))) continue;
       const unit = s.unit === "$" ? "$" : "≈$", fig = Number(s.figure) || 0;
-      if (fig) out.money[unit] = (out.money[unit] || 0) + fig;
+      out.money[unit] = (out.money[unit] || 0) + fig;  // a unit with nothing spent still says which it is
       out.unweighed += Number(s.unweighed_tokens) || 0;
       const t = s.tokens && typeof s.tokens === "object" ? s.tokens : {};
       for (const [k] of AO.DROP_KINDS) out.tokens[k] += Number(t[k]) || 0;
@@ -2829,7 +2829,8 @@
     const parts = ["≈$", "$"].filter((u) => sum.money[u]).map((u) => cash(u, sum.money[u]));
     let money = parts.join(" · ");
     if (sum.unweighed) money = parts.length ? `${money} + ${tokShort(sum.unweighed)} tok unweighed` : `unweighed · ${tokShort(sum.unweighed)} tok`;
-    if (!money) money = cash("≈$", 0);
+    // nothing spent: a zero in the scope's own unit (a metered profile's `$0.00`), `≈$` where it has no seat
+    if (!money) money = cash("$" in sum.money && !("≈$" in sum.money) ? "$" : "≈$", 0);
     const total = AO.DROP_KINDS.reduce((n, [k]) => n + sum.tokens[k], 0);
     const kinds = AO.DROP_KINDS.map(([k, word]) => `${word} ${sum.tokens[k].toLocaleString("en-US")}`).join(" · ");
     return { money, tok: `${tokShort(total)} tok`, kinds };
@@ -2883,15 +2884,21 @@
     return out;
   }
   AO.dropUsage = function (id) { const h = AO.dropHeld(id) || {}; h.usage = chipUsage(); dropKeep(id, h); };
-  AO.dropRead = function (id, team) {
+  AO.DROP_FRESH = 30e3;  // a reading this young is not taken again: a socket that opens and ends retries often
+  AO.dropRead = function (id, team, now) {
+    now = typeof now === "number" ? now : Date.now();
+    const was = AO.dropHeld(id);
+    if (was && Number.isFinite(was.at) && now - was.at < AO.DROP_FRESH) return Promise.resolve(was);
     const got = {};
     const one = (scope, t, w) => fetch(`/api/spend?window=${w}&top=all${t ? `&team=${encodeURIComponent(t)}` : ""}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j) => {
         if (!j || !Array.isArray(j.seats)) return;
-        const seats = j.seats.map((s) => ({ records: s.records, unit: s.unit, figure: s.figure, unweighed_tokens: s.unweighed_tokens, tokens: s.tokens }));
+        const seats = j.seats.filter((s) => s && typeof s === "object")
+          .map((s) => ({ records: s.records, unit: s.unit, figure: s.figure, unweighed_tokens: s.unweighed_tokens, tokens: s.tokens }));
         (got[scope] = got[scope] || {})[w] = { seats };
-      }, () => { /* this one stays as the page last held it */ });
+      })
+      .catch(() => { /* this one stays as the page last held it */ });
     const reads = [];
     for (const w of ["day", "week"]) {
       if (team) reads.push(one("team", team, w));
@@ -2900,7 +2907,7 @@
     return Promise.all(reads).then(() => {
       const h = AO.dropHeld(id) || {};
       for (const scope of Object.keys(got)) h[scope] = { ...(h[scope] || {}), ...got[scope] };
-      if (Object.keys(got).length) h.at = Date.now();
+      if (Object.keys(got).length) h.at = now;
       h.usage = chipUsage();
       dropKeep(id, h);
       return h;
