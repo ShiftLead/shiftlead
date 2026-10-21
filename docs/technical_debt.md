@@ -1486,7 +1486,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 ## TD-937: The top bar's Settings glyph reads as a brightness control; draw a cog
 
 **Priority:** Low
-**Type:** bug
+**Type:** debt
 **Added:** 2026-10-21 (Paul, with the ao-paul session)
 **Owner:** paul
 **Kind:** build
