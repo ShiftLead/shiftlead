@@ -1630,24 +1630,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-929: Build TD-927 (1): the Spend reading carries tokens beside every figure, and `ao spend` prints them (a held path)
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-20 (TD-927's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/seats.py` (the reading: `_blank` and `_add_row`, which `_sum` folds into every `teams` row, the `teams`, `roles` and whole rows, `_series`; `_add_tokens`, retired), `src/shiftlead/ui/spend.py` (`_team_line`, which `spend_lines` calls for `--team`'s head line; `tokens`; `figure`, whose bare callers `team_figure` and `_chart`'s bar `total` stay as they are), `src/sessionorc/models.py` (`tokens_short`, and its readers, unchanged below a billion), `src/shiftlead/cli.py` (`spend_lines`), `src/shiftlead/ui/static/app.js` (`tokShort`); `tests/test_spend.py`, `tests/test_ao_spend.py`, `tests/test_ui_spend.py`
-
-**Why:** TD-927: design §4.4 *Spend per seat* (*Tokens beside every figure*) — every figure the readings carry carries its tokens by kind, drawn as every kind summed; §4.7 `ao spend` prints them. Today only a seat's row carries `tokens`.
-
-**Fix:** In the reading, a `tokens` dict by kind (`KINDS`) beside every figure: each `teams` row for the period (`interactive` and `outside` among them; the previous period, `week` and `month` stay figures alone, since nothing draws their tokens), the `roles` and `repos` group rows (read by nothing drawn; for `--json`'s symmetry), the period's **whole**, and in `series` each bucket (`tokens` on the bucket, the sum of its series) and each of its series beside its figure. `ao spend` prints the summed count in the short shape after each figure — *ao-grind · ≈$426 · 95.2M tok · 82% · …*, a seat's line *· ≈$38.20 · 8.4M tok · 31% · …*, By team's heading *By team · Fri 16 Oct · ≈$520 · 117.3M tok*, and the team's head line, which is the page's (`spend._team_line`, built here for both: *≈$1,498 · 310M tokens this week (so far) · …*, *tokens* spelled out as the page writes it) — and `--json` is the reply. `_add_row` becomes the one place a row's tokens are summed, a `tokens` dict by kind in `_blank`: `_add_tokens`, the seat's `s.setdefault("tokens", …)` call beside `_add_row` and `seat_out`'s own `"tokens"` line go (a seat's `tokens` then comes out of `_rounded` with the other `_blank` keys, a dict passed through as it is — copy it there, as `seat_out` does today, so a reply never shares the accumulator), so no row sums its tokens twice. The short shape is the chip's, one rule: `shiftlead.ui.spend.tokens` reads `sessionorc.models.tokens_short` (adding ` tok`) instead of its own `.1f` form (*22M*, never *22.0M*), and *B* past a billion (*2.1B*) lands in `tokens_short` and `app.js`'s `tokShort`, so the page, `ao spend`, the chip and the disconnect card read one shape. The shape is otherwise unchanged — a tenth past a million, `.0` dropped (*95.2M*, *117.3M*, *22M*), whole thousands below one (*412k*) — so every other reader of `tokens_short` and `tokShort` (the usage chip, `ui/common.py`; Settings, `settings_page.py`; `ao status` and `ao usage`, `cli.py`; `sessionorc/spend.py`; the context chip, `ending.py`; a card's context bound, `ui/cards.py`) changes only past a billion. Wherever a figure and its tokens are written together, a wholly unweighed one reads *unweighed* and the count once: a `figure` helper told its tokens follow, shared by `spend.py` and `cli.py` (`spend_lines`), so neither prints *unweighed · 4.1M tok · 4.1M tok* — `figure(acc, unit=None, *, count=None | False | "tok" | "tokens")`, `unit` optional as today and `count` keyword-only (not `tokens`, which would shadow the module's `tokens()` the note reads; the spelled-out word reads `tokens_short` and appends *tokens*, as `tokens()` appends *tok*). `None` returns today's composition (figure, note, count, the count in the one short shape above: *unweighed · 4.1M tok*, *$2.00 + 812k tok unweighed*): the Repo page's team card (`team_figure`, §4.5a *team card: spend*) and a bar's `total` label keep it, and `tests/test_ui_spend.py::test_an_unweighed_figure_is_named_beside_never_in_it` holds. A word appends the row's summed count after the figure in that word — weighed *≈$426 · 95.2M tok*, part unweighed *≈$38.20 + 4.1M tok unweighed · 8.4M tok* (the note beside the figure, then the count), wholly unweighed *unweighed · 4.1M tok* (the count once): `spend_lines` *tok*, `_team_line` and the page's headings *tokens*. `False` is a table's figure cell, whose count is in the tokens cell beside it: wholly unweighed reads *unweighed* alone, part unweighed keeps its note (TD-930 calls it so). A row whose reading carries no `tokens` (one from before them) falls back to `None`'s string under either, so its unweighed count is never lost.
-
-**Done when** the reading's team, role, whole and bucket rows carry `tokens` summing their seats' (a test with two seats on two models), a seat's `tokens` equals the sum of its models' kinds once (not twice), `ao spend` prints the count after each figure as §4.7 says, and `tokens(2_100_000_000)` reads *2.1B tok* (`tokens_short` *2.1B*) and `tokens(22_000_000)` *22M tok*, in Python and in `tokShort`, a unit promoting where its rounding reaches the next (999,500 → *1M*, 999,950,000 → *1B*, never *1000k* or *1000M*), the existing cases (`tests/test_models.py`, `tests/test_ui_org.py`'s half-even pair) passing unchanged and the *B* promotion keeping each home's tie rule — one table of edge cases read by the Python test and the node one.
-
----
-
 ## TD-930: Build TD-927 (2): the Spend page's tokens column, the totals' tokens and the bar's hover
 
 **Priority:** Medium
@@ -1655,7 +1637,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-20 (TD-927's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — blocked by TD-929
+**Status:** Open — TD-929 merged (#2213): the reading carries `tokens` on every row, `figure(…, count=False)` and `_team_line` are built
 **Blocked by:** TD-929
 **Location:** `src/shiftlead/ui/spend.py` (`spend_view`, `_chart`, the figure cells' `figure(…, count=False)`; `_team_line` and `figure` are TD-929's), `src/shiftlead/ui/templates/spend_part.html` (By team, Top sessions, By seat), `src/shiftlead/ui/static/app.css` (the narrow fold), `tests/test_ui_spend*.py`
 
