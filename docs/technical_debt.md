@@ -75,7 +75,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
-| TD-935 | Design §4.5 screen 8 still says Settings is *a tab, last, until TD-932 builds it*; TD-932 built a gear among the tools (docs audit) | Low | Open |
 | TD-936 | The Spend page's three tokens cells can each go from the template and no test notices (test audit of #2215) | Low | Open |
 
 ---
@@ -1560,23 +1559,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 **Done when** the flow exists in `src/shiftlead/flows/`, design §4.9c describes it and when to use it, and a first reading against `td` is recorded.
 
----
-
-## TD-935: Design §4.5 still says Settings is a tab "until TD-932 builds it", and TD-932 built it as a gear
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-21 (docs audit of #2209–#2217)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/design/4.5-ui.md` (screen 8, the Settings item: line 1024 on `origin/main` at `091b11e5c`)
-
-**Why:** `docs/design/4.5-ui.md:1024` reads *"**Settings** in the top bar's tools, a gear at the right (§4.5a *Sessions top bar: Settings*, TD-931; a tab, last, until TD-932 builds it)."* PR #2212 built TD-932 and removed the *until TD-932 builds this* clauses from the other rows (design-history 2026-10-20 lines for TD-932), but not this one. The clause now contradicts both the sentence it ends and the code: `base.html` draws `#settingstab` as a gear `svg` among the tools, not a tab (§4.5a row *Settings*, line 110: *"Not a tab"*), and the design is written in the present tense, so no build is pending.
-
-**Fix:** In `docs/design/4.5-ui.md` screen 8, drop `; a tab, last, until TD-932 builds it` so the item reads *… (§4.5a *Sessions top bar: Settings*, TD-931).* Add a line to `docs/design-history.md` under §4.5 above the section's newest lines saying the clause went with TD-932's build. Grep `docs/design/` once more for `until TD-93` and `builds it`.
-
-**Done when** `grep -rn "until TD-93" docs/design/` finds nothing and the Settings item says only what is true now.
 ---
 
 ## TD-936: The Spend page's three tokens cells can each go from `spend_part.html` and no test notices (test audit of #2215)
