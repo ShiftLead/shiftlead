@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
+| TD-937 | The top bar's Settings glyph is a sun (eight rays), read as a brightness control beside ◐; draw a cog | Low | Open |
 
 ---
 
@@ -1479,5 +1480,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 - **Once it runs,** compare it with `td` using the prompt-cache ADR's method (main-conversation transcripts, API weights). Measure weighted tokens per merged TD, review findings per PR, rework rounds, and reopened or follow-up TDs. Record the readings in design §4.9c or an ADR. Drop the flow only if it proves broken.
 
 **Done when** the flow exists in `src/shiftlead/flows/`, design §4.9c describes it and when to use it, and a first reading against `td` is recorded.
+
+---
+
+## TD-937: The top bar's Settings glyph reads as a brightness control; draw a cog
+
+**Priority:** Low
+**Type:** bug
+**Added:** 2026-10-21 (Paul, with the ao-paul session)
+**Owner:** paul
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/templates/base.html` (the `topbar` block, `#settingstab`'s `svg`); `tests/test_ui_queue.py` (`test_the_bar_draws_three_tabs_in_their_keys_order_then_the_readings_and_the_tools`)
+
+**Why:** Design §4.5a *Sessions top bar: Settings* says *a gear glyph before ◐ and ?*. TD-932 (#2212) drew a hub with eight rays — a sun — which is the common brightness icon, and it stands next to ◐, the theme toggle, so the two read as one brightness pair. Paul, 2026-10-21: *our settings icon looks like a brightness icon*.
+
+**Fix:** The `svg` draws a toothed ring round a hub (a cog with eight teeth, Feather's *settings* outline, MIT) at the same 15 px and stroke. The test asserts the glyph is the cog, not rays. No design change: the row already says gear.
+
+**Done when** the bar's Settings glyph is a cog at every width and on `/settings` lit, and the test holds.
 
 ---

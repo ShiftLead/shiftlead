@@ -242,6 +242,9 @@ def test_the_bar_draws_three_tabs_in_their_keys_order_then_the_readings_and_the_
         tools,
     )
     assert gear and gear.group(1).startswith("Settings: ")  # its word on hover and as its accessible name
+    # TD-937: a toothed ring round a hub, not a sun — the sun's eight rays read as the brightness control beside it
+    svg = tools[tools.index('<svg class="gear"') : tools.index("</svg>")]
+    assert "<circle" in svg and svg.count("a1.65") >= 8 and "v2M" not in svg
     assert html.index('id="newmenu"') > html.index('<span class="tools">')  # + New ▾ closes the bar
 
 
