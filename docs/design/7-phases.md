@@ -40,7 +40,7 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    side-by-side window has not started.
 4. **Commands + board.** `.shiftlead.yml` buttons (cmdorc where it fits), command-kind sessions
    and the Commands page, the Resumable page (§4.5 screen 4), the Due strip on the Sessions page,
-   stranded-work flags; each page gets its top-bar tab when it is built (TD-123). **Not
+   stranded-work flags; each page the person works in gets its tab when it is built (TD-123; the tabs are §4.5a *the bar's three groups*). **Not
    started**, except the board's Snooze / Done write-back, built for the Inbox's board rows
    (TD-069 step 3); the Attention tab is struck (§4.5 screen 7).
 5. **Second adapter.** Gemini CLI, hook-fed with its terminal title as the check (§4.3 *The second
