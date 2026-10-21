@@ -59,6 +59,7 @@ def test_the_title_is_the_bracketed_cli_title():
     assert [GeminiAdapter().title(t) for t in titles] == MANIFEST["titles"][0]["names"]
     assert GeminiAdapter().title("✋  Action Required (a (b) c)") == "a (b) c"
     assert GeminiAdapter().title("kmaster@kmaster: ~/x") is None
+    assert GeminiAdapter().title("kmaster@kmaster: ~/d (copy)") is None
     assert GeminiAdapter().title("") is None
 
 

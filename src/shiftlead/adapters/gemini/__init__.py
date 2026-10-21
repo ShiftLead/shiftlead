@@ -64,8 +64,8 @@ LAYER_SETTINGS = {
 # shell waiting for input. The glyph alone is matched; the words and the context after it are not.
 TITLE_STATES: dict[str, State] = {"◇": "idle", "✦": "working", "⏲": "working", "✋": "needs-you"}
 # The title's bracketed context, `CLI_TITLE` (design §4.3 `title`): `◇  Ready (name)`, the name's own
-# brackets kept
-TITLE_NAME = re.compile(r"^\S+\s+[^(]*\((.+)\)$")
+# brackets kept; a title not led by a state glyph (a shell's `user@host: ~/d (copy)`) has none
+TITLE_NAME = re.compile(rf"^[{''.join(TITLE_STATES)}]\s+[^(]*\((.+)\)$")
 # The composer (design §4.3 `composer`, read 2026-10-21 on 0.64.0): an input box whose top border is a row
 # of `▄`, its first row the prompt glyph (`>`, `*` under yolo, `!` in shell mode). A submitted prompt is
 # drawn in the same box in the history above, without the reverse-video cursor the composer holds.
