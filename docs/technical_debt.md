@@ -77,8 +77,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Built — live check #2186 |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
-| TD-927 | Token counts on the Spend page, beside every figure: by team, Top sessions, a team's seats, the head's total and the bar's hover | Medium | Designed — built by TD-929, TD-930 |
-| TD-930 | Build TD-927 (2): the Spend page's tokens column, the totals' tokens and the bar's hover | Medium | Open |
 | TD-931 | The top bar's pages look like three different kinds of control, and its one number says nothing about where to go | Medium | Designed — built by TD-932 |
 | TD-932 | Build TD-931: the top bar's three groups, a number on each of the Inbox and Queue tabs, Settings as a gear, `3` for the Queue | Medium | Open |
 
@@ -1605,46 +1603,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** For every open entry with `Owner: paul`, `decision (paul)` or `Answers:`: an `**Ask:**` line in its body beside Why and Fix — one sentence a cold reader can decide or start a session from — and its answers in `<label> (default) — <consequence>` form where it has some. One PR per few entries, read by the lead; never a header field.
 
 **Done when** no open entry that waits on the person lacks an `Ask:` line.
-
----
-
-## TD-927: Token counts on the Spend page, beside every figure — by team, Top sessions, a team's seats, the head's total, the bar's hover
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-20 (Paul, in an interactive session, on TD-923's rendering: *Wow are those numbers real? Thats alot of tokens! Lets add a TD to show token counts on the spend page as well*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-20, the designer): §4.4 *Spend per seat* (*Tokens beside every figure*: every kind summed, the four kinds on hover — one rule for the page, `ao spend` and the disconnect card), §4.5 screen 13 (a **tokens** column in By team, Top sessions and By seat; the period's total and a bar's hover carry tokens; money first), §4.5a *Spend page* rows, §4.6 *The disconnect card*, §4.7 `ao spend`; mockups `Spend.dc.html`, `SpendTeam.dc.html`, rendered as `docs/mockups/reviews/2026-10-20-td927-spend-all-tokens.png` and `…-spend-team-tokens.png` (before: `2026-10-17-td818-spend-all.png`, `…-spend-team.png`). Built by TD-929, TD-930.
-**Blocked by:** TD-929, TD-930
-**Location:** design §4.5 screen 13 *Spend* (4.5-ui.md ~1519–1560: *By team*, *Top sessions*, a team's seat table, *Over time*'s hover), §4.5a *Spend page* rows (4.5a-controls.md ~123–127); `src/shiftlead/ui/spend.py` (`tokens`, the short shape; the seat rows' `tokens` dict), `src/shiftlead/ui/templates/spend_part.html` (the three tables' heads at ~45, ~60, ~76), `src/shiftlead/ui/static/app.js` (`tokShort` ~1848, the bar's hover), `docs/mockups/gen.py` (`Spend.dc.html`, `SpendTeam.dc.html`)
-
-**Why:** The seat ledger reads every turn's tokens by kind (§4.3 `spend`, §4.4 *Spend per seat*: input, output, cache read, cache write) and the reading carries them on every seat (`tokens`), but the Spend page draws money alone, and tokens only as *unweighed* where no weight matched. TD-923's disconnect card drew the window's tokens beside the money, and the live figures (434.9M tokens across all teams in the week of 2026-10-19, this session 7.4M in a day) are the kind of number people quote — *we used a million tokens on this* — and the page that answers *who spent it* should say it. The sum is dominated by cache reads (this session's day: 5.5M cache read, 36k output), which cost a fraction of input: a headline that sums every kind is honest about volume and silent about cost, which the money figure beside it already carries.
-
-**Fix:** The designer's round: (1) a **tokens** column beside the figure in *By team*, *Top sessions* and a team's seat table, the chip's short shape (*95M*, `spend.tokens` without the *tok* where the column head says it), the four kinds on the cell's hover, sortable with the figure; (2) the head's line carries the period's total tokens after its money (*≈$219 · 435M tokens*); (3) *Over time*'s bar hover lists each series' tokens beside its figure; (4) decide and say whether the headline sums every kind as TD-923's card does, or shows *input + output* with cache reads apart — one rule for the card and the page, written once in §4.4 *Spend per seat* and read by both; (5) `ao spend` prints the same column (§4.7). Then the build entry, with the mockups regenerated and a before/after shot under `docs/mockups/reviews/`.
-
-**Done when** the design says where tokens are drawn on the Spend page and by what rule, the card's rule and the page's are one sentence in §4.4, and a build entry is named and pickable.
-
-**Related:** TD-923 (the disconnect card, which draws the window's tokens first), TD-818 and TD-830–833 (Spend per seat), TD-859 (the Spend page's tables)
-
----
-
-## TD-930: Build TD-927 (2): the Spend page's tokens column, the totals' tokens and the bar's hover
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-20 (TD-927's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — TD-929 merged (#2213): the reading carries `tokens` on every row, `figure(…, count=False)` and `_team_line` are built
-**Blocked by:** TD-929
-**Location:** `src/shiftlead/ui/spend.py` (`spend_view`, `_chart`, the figure cells' `figure(…, count=False)`; `_team_line` and `figure` are TD-929's), `src/shiftlead/ui/templates/spend_part.html` (By team, Top sessions, By seat), `src/shiftlead/ui/static/app.css` (the narrow fold), `tests/test_ui_spend*.py`
-
-**Why:** TD-927: design §4.5 screen 13 *Tokens* and §4.5a *Spend page* rows — a **tokens** column beside the figure in By team, Top sessions and By seat (a role's subtotal too), the short shape without *tok* (*95.2M*), the four kinds on the cell's hover; the period's total carries its tokens after its money in By team's heading, the team's line and By seat's heading; a bar's hover gives each series' tokens; a bar's label, the change, *this week · month* and Finished entries stay money alone; at narrow width the tokens column folds under the row with turns.
-
-**Fix:** As the mockups `Spend.dc.html` and `SpendTeam.dc.html` draw it (rendered `docs/mockups/reviews/2026-10-20-td927-spend-all-tokens.png`, `…-spend-team-tokens.png`): the column after the figure, its `title` *input 1.2M · output 310k · cache read 88M · cache write 5.4M*; the cell's `title` is a `kinds_line(tokens)` helper's — the four kinds without *tok* (*input 1.2M · output 310k · cache read 88M · cache write 5.4M*) — which `_weights_title` opens with too, one wording, never a second; a wholly unweighed row's figure cell reads *unweighed* and its count is in the tokens cell alone; a row with no `tokens` in its reading draws the cell empty, never *0*; the headings' and the team line's *≈$520 · 117.3M tokens in Fri 16 Oct*; each bar's `title`, its first line the bucket's figure and tokens, then a line per series *ao-grind: ≈$426 · 95.2M tok* (`_chart`'s `<word>: <figure>`). Rows keep their order by figure. A role's subtotal's tokens and By seat's heading's are the seats' `tokens` summed in `spend_view`, as their figures are. A row with no turns reads *0*; one whose reading has no `tokens` an empty cell; a *spend unknown* seat its count, as any row. `tests/test_ui_spend.py`'s seat-hover case (`test_a_team_draws_its_line_by_seat_with_a_role_subtotal_and_its_finished_entries`, its `g1["title"]` line) takes the kinds line without *tok* (round 2's `kinds_line`, the first line of `_weights_title`) — a changed expectation, not a regression. Look once at a scratch home's Spend page (`scripts/look_home.py`) in headless Chromium and commit the shot under `docs/mockups/reviews/`.
-
-**Done when** the three tables draw the tokens column with the kinds on its hover (a wholly unweighed row and a row with no `tokens` among the tests), the totals and the bar hover carry tokens, the narrow fold folds the column, and a test renders each from a reading with tokens.
 
 ---
 
