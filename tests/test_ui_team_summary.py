@@ -1110,3 +1110,51 @@ def test_a_press_on_the_rollups_link_clears_the_filter_and_opens_a_folded_team_s
     # the handler: the link's target read, the team's section found, the fold read, then the layout and the scroll
     assert 'const go = e.target.closest("[data-open-team], [data-open-card]");' in src
     assert 'AO.rollupGo(team, $("#filter"), !!sec && isFolded(sec), store.set);' in src
+
+
+def test_the_flat_pages_rollup_counts_its_sessions_on_load_and_on_a_delta(tmp_path, monkeypatch):
+    """§4.5a *Sessions: rollup* (TD-924, test audit TD-933): on a host with no team defined or badged the page
+    is flat (`groups` is `None`) and `vs`, the sessions it draws, is the rollup's only source — so both call
+    sites, the page's `#rollup` and every delta's `rollup`, must hand it over, or the flat page reads *quiet*
+    with no Agents and no *answer needed* whatever it holds."""
+    import json
+
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    base = {"confidence": "hook", "since": at, "kind": "agent", "adapter": "shell", "dir": str(tmp_path)}
+    fleet = [
+        {**base, "id": "w1", "name": "w1", "state": "working"},
+        {**base, "id": "n1", "name": "n1", "state": "needs-you", "pending": PERM},
+    ]
+    replies = {"list": fleet, "repos": {}, "doing_log": {}, "usage": {}, "host": {"name": "kmaster"}}
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            return {"entries": []} if method == "inbox" else replies.get(method, {})
+
+        async def subscribe(self, omit=None):
+            yield {"event": "session", "session": fleet[0]}
+
+    monkeypatch.setattr(ui, "LocalClient", Fake)
+    c = TestClient(ui.create_app())
+    page = c.get("/").text
+    loaded = page[page.index('<div id="rollup">') :][:4000]
+    with c.websocket_connect("/events") as ws:
+        ev = json.loads(ws.receive_text())
+        while ev["event"] == "counts":  # the counts may come first: the groups are built off the loop (TD-670)
+            ev = json.loads(ws.receive_text())
+    assert ev["event"] == "session" and ev["groups"] is None  # the flat page
+    for html in (loaded, ev["rollup"]):
+        assert 'class="rollup lone"' in html and "Agents (2)" in html
+        assert '<a href="#card-n1" data-open-card="n1"' in html and "answer needed</a>" in html
