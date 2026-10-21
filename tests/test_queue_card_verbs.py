@@ -136,13 +136,11 @@ def test_a_rows_dots_hold_its_controls_in_order_and_the_headers_act_on_the_top_e
     r = {"id": "TD-5", "title": "t", "repo": "s", "page": "pickable", "state": "ready", "needs": ""}
     html = str(q.menu(r))
     assert dots(html) == ["Hold…, Back to design…, Done…, Open"]
-    # its names drawn beside the mark on hover or focus of the row (the page's CSS), inside the mark's press
-    assert (
-        '⋯<span class="qdotsnames" aria-hidden="true">Hold… · Back to design… · Done… · Open</span></summary>' in html
-    )
-    css = (UI / "static" / "app.css").read_text(encoding="utf-8")
-    assert ".qrow:hover:not(:has(.qmail:hover)) > .qright .qdotsnames" in css
-    assert "@media (max-width: 640px) { .qdotsnames { display: none !important; } }" in css
+    # bare at every width: its names in its title and label, never drawn beside it on hover (TD-926)
+    assert 'title="Hold… · Back to design… · Done… · Open"' in html
+    assert 'aria-label="the team\'s controls: Hold…, Back to design…, Done…, Open">⋯</summary>' in html
+    assert "qdotsnames" not in html
+    assert "qdotsnames" not in (UI / "static" / "app.css").read_text(encoding="utf-8")
     acts = re.findall(
         r'<button role="menuitem" type="button" data-act="(\w+)"(?: data-id="person")?(?: data-road="(\w+)")?'
         r'|<a href="([^"]+)" role="menuitem"',
