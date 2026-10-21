@@ -182,7 +182,7 @@ def test_a_team_draws_its_line_by_seat_with_a_role_subtotal_and_its_finished_ent
     # each seat's own: grinder-ao-1 spent on TD-813, grinder-ao-2 on nothing finished
     assert (g1["per"], g1["per_title"]) == ("1 · median ≈$24.70", "TD-813")
     assert (g2["per"], g2["per_title"], d1["per"]) == ("—", "", "—")
-    assert g1["title"].splitlines()[0] == "input 1k tok · output 0 tok · cache read 0 tok · cache write 0 tok"
+    assert g1["title"].splitlines()[0] == "input 1k · output 0 · cache read 0 · cache write 0"  # kinds_line, no *tok*
     assert g2["between"] == "≈$6.10" and g1["past_200k"] == "12%"
     assert [g["word"] for g in v["chart"]["legend"]] == ["grinder", "designer"]  # by role
     (e,) = v["entries"]
@@ -190,6 +190,52 @@ def test_a_team_draws_its_line_by_seat_with_a_role_subtotal_and_its_finished_ent
         "TD-813", "The page's send lands once", "/queue#TD-813", "≈$24.70", "5h40m",
     )  # fmt: skip
     assert e["roles"] == ["grinder ≈$24.70"]
+
+
+def test_the_three_tables_draw_a_tokens_cell_and_the_totals_and_bars_carry_tokens(tmp_path, monkeypatch):
+    """§4.5 screen 13 *Tokens*, §4.5a *Spend page* (TD-930): a **tokens** cell beside the figure in By team, Top
+    sessions and By seat (a role's subtotal too), the short shape without *tok*, the four kinds on its hover; a
+    wholly unweighed row reads *unweighed* in its figure cell and its count in the tokens cell; a row with no
+    turns *0*; a row whose reading has no `tokens` an empty cell; the totals and each bar's hover carry tokens."""
+    led = ledger()
+    led["days"]["2026-10-17"]["g1"]["models"]["m"] |= {"output": 310_000, "cache_read": 88_000_000}
+    led["days"]["2026-10-17"]["c1"] = _row(0.0, 50, "dc-grinder", team="dc-grind", unweighed=50)
+    got = seats.reading(led, "day", NOW, weights=W) | {"unknown": {}}
+    v = spend_view(got, spend_picks({}), fleet=FLEET, today=TODAY)
+    by = {r["name"]: r for r in v["by_team"]}
+    assert (by["ao-grind"]["tok"], by["ao-grind"]["figure"]) == ("88.3M", "≈$138")
+    assert by["ao-grind"]["tok_title"] == "input 3k · output 310k · cache read 88M · cache write 0"
+    assert (by["dc-grind"]["figure"], by["dc-grind"]["tok"]) == ("unweighed", "1k")  # the count once, in its cell
+    assert v["whole"] == "≈$150 + 1k tok unweighed · 88.3M tokens"
+    top = {s["name"]: s for s in v["top"]}
+    assert (top["grinder-ao-1"]["tok"], top["dc-grinder"]["figure"], top["dc-grinder"]["tok"]) == (
+        "88.3M", "unweighed", "1k",
+    )  # fmt: skip
+    bar = [b for b in v["chart"]["bars"] if b["picked"]][0]
+    assert bar["title"].splitlines()[:2] == [
+        "Sat 17 Oct: ≈$150 + 1k tok unweighed · 88.3M tok",
+        "ao-grind: ≈$138 · 88.3M tok",
+    ]
+    assert bar["total"] == "≈$150 + 1k tok unweighed"  # the total above a bar stays money alone
+
+    mine = seats.reading(led, "day", NOW, team="ao-grind", weights=W) | {"unknown": {}}
+    t = spend_view(mine, spend_picks({"team": "ao-grind"}), fleet=FLEET, today=TODAY)
+    g1, g2, sub, d1 = t["seats"]
+    assert (g1["tok"], g2["tok"], sub["tok"], d1["tok"]) == ("88.3M", "1k", "88.3M", "1k")
+    assert sub["tok_title"] == "input 2k · output 310k · cache read 88M · cache write 0"
+    assert t["total"] == "≈$138 · 88.3M tokens"
+    assert t["line"].startswith("≈$138 · 88.3M tokens today (so far)")
+
+    old = {**mine, "seats": [{k: v for k, v in s.items() if k != "tokens"} for s in mine["seats"]]}
+    assert {s["tok"] for s in spend_view(old, spend_picks({"team": "ao-grind"}), today=TODAY)["seats"]} == {""}
+    led["days"]["2026-10-16"]["x1"] = _row(5.0, 10, "old", team="old-grind")  # spent yesterday, not today
+    quiet = spend_view(seats.reading(led, "day", NOW, weights=W) | {"unknown": {}}, spend_picks({}), today=TODAY)
+    assert {r["name"]: r["tok"] for r in quiet["by_team"]}["old-grind"] == "0"
+
+    c = client(monkeypatch, tmp_path, fake())
+    html = c.get("/spend").text
+    assert '<th class="spfold">tokens</th>' in html
+    assert re.search(r'<td class="spfold mono" title="input [^"]+ · cache write [^"]+">\d', html)
 
 
 def test_an_unweighed_figure_is_named_beside_never_in_it():
