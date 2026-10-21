@@ -17844,7 +17844,7 @@ The other cases:
 
 **Done when** the bar's Settings glyph is a cog at every width and on `/settings` lit, and the test holds.
 
-**Resolved:** 2026-10-21 (grinder-ao-1, through TD-939) — built by #2225 (merge `9bfca332c`), the same PR that filed it: `base.html`'s `#settingstab` draws `<svg class="gear">`, a toothed ring round a hub, and `test_the_bar_draws_three_tabs_in_their_keys_order_then_the_readings_and_the_tools` asserts `svg.count("a1.65") >= 8 and "v2M" not in svg`. Read live 2026-10-21 23:20Z (9bfca33): a headless GET of `/` and of `/settings` draws the cog in `#settingstab`, lit (`on`) on `/settings`.
+**Resolved:** 2026-10-21 (grinder-ao-1, through TD-939) — built by #2225 (merge `9bfca332c`), the same PR that filed it: `base.html`'s `#settingstab` draws `<svg class="gear">`, a toothed ring round a hub, and `test_the_bar_draws_three_tabs_in_their_keys_order_then_the_readings_and_the_tools` asserts `svg.count("a1.65") >= 8 and "v2M" not in svg`. Read live 2026-10-21 23:20Z (live 3fd4f5a, which contains #2225): a headless GET of `/` and of `/settings` draws the cog in `#settingstab`, lit (`on`) on `/settings`.
 
 ---
 ## TD-939: TD-937's cog is on main and its entry still reads Open, owner paul, "the glyph is a sun"
