@@ -1,0 +1,13 @@
+{
+ "panes": [
+  {"file": "panes/idle-empty.txt", "state": null, "composer": ""},
+  {"file": "panes/idle-typed.txt", "state": null, "composer": "hello there"},
+  {"file": "panes/idle-pasted.txt", "state": null, "composer": "line one"},
+  {"file": "panes/working-empty.txt", "state": null, "composer": ""},
+  {"file": "panes/working-typed.txt", "state": null, "composer": "a queued prompt"},
+  {"file": "panes/working-queued.txt", "state": null, "composer": ""}
+ ],
+ "titles": [
+  {"file": "captured/titles.json", "names": ["probe", "probe"]}
+ ]
+}

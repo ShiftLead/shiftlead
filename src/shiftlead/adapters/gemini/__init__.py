@@ -18,6 +18,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shlex
 import shutil
 import stat
@@ -28,7 +29,7 @@ from pathlib import Path
 from sessionorc import paths
 from sessionorc.adapters import LaunchSpec
 from sessionorc.models import Confidence, Pending, State
-from sessionorc.screen import Match
+from sessionorc.screen import Match, painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
 from shiftlead.adapters.claude_code import _resolves
@@ -62,6 +63,17 @@ LAYER_SETTINGS = {
 # responding, `⏲  Working…` its shell quiet with no output, `✋  Action Required` a confirmation or that
 # shell waiting for input. The glyph alone is matched; the words and the context after it are not.
 TITLE_STATES: dict[str, State] = {"◇": "idle", "✦": "working", "⏲": "working", "✋": "needs-you"}
+# The title's bracketed context, `CLI_TITLE` (design §4.3 `title`): `◇  Ready (name)`, the name's own
+# brackets kept
+TITLE_NAME = re.compile(r"^\S+\s+[^(]*\((.+)\)$")
+# The composer (design §4.3 `composer`, read 2026-10-21 on 0.64.0): an input box whose top border is a row
+# of `▄`, its first row the prompt glyph (`>`, `*` under yolo, `!` in shell mode). A submitted prompt is
+# drawn in the same box in the history above, without the reverse-video cursor the composer holds.
+COMPOSER_TOP = "▄"
+COMPOSER_ROW = re.compile(r"^\s*[>*!] ")
+CURSOR = "\x1b[7m"
+# painted grey, not faint, so read as empty by its words
+PLACEHOLDER = "Type your message or @path/to/file"
 
 
 def home(profile: Profile) -> Path:
@@ -209,9 +221,9 @@ class GeminiAdapter:
     state_in_title = True
     # no hook answers a confirmation: a pending permission is answered in the terminal (§4.3, §4.5a)
     permission_channel = False
-    # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): none yet — the
-    # composer, title, reads and the rest come with TD-785's later slices
-    implements: frozenset[str] = frozenset()
+    # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads and
+    # the rest come with TD-785's and TD-786's later slices
+    implements: frozenset[str] = frozenset({"composer", "title"})
 
     def __init__(self, binary: str | None = None):
         self._binary = binary
@@ -270,6 +282,27 @@ class GeminiAdapter:
             return None
         pending = Pending(kind="question", text="") if state == "needs-you" else None
         return Match(rule=f"title {title.lstrip()[0]}", state=state, evidence=[title.strip()], pending=pending)
+
+    def composer(self, tail_raw: list[str]) -> str | None:
+        """The text in the composer (design §4.3 `composer`): the prompt row under the last input box's top
+        border, stripped; "" when it holds the placeholder; None when that box holds no cursor (a dialog
+        in its place, a history prompt the last box on screen) or no box is on screen. Faint text — the
+        *Queued* lines above the box — is not counted. A multi-line text reads as its first row."""
+        rows = [painted_text(r) for r in tail_raw]
+        top = next((i for i in range(len(rows) - 1, -1, -1) if _border(rows[i])), None)
+        if top is None or not any(CURSOR in r for r in tail_raw[top + 1 :]):
+            return None
+        for row in rows[top + 1 :]:
+            if m := COMPOSER_ROW.match(row):
+                text = row[m.end() :].strip("\xa0 ")
+                return "" if text == PLACEHOLDER else text
+        return None
+
+    def title(self, pane_title: str) -> str | None:
+        """The session's name as the tool holds it (design §4.3 `title`): the title's bracketed context,
+        which is `CLI_TITLE`; None for a title with none (a shell's, the tool's before it mounts)."""
+        m = TITLE_NAME.match((pane_title or "").strip())
+        return (m.group(1).strip() or None) if m else None
 
     # -- account ---------------------------------------------------------------------------------
 
@@ -355,6 +388,11 @@ class GeminiAdapter:
         except (KeyError, ValueError):
             return None
         return prof.account or prof.name
+
+
+def _border(row: str) -> bool:
+    text = row.strip()
+    return bool(text) and set(text) == {COMPOSER_TOP}
 
 
 def _without_yolo(args: list[str]) -> list[str]:
