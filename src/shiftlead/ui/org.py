@@ -18,7 +18,7 @@ from sessionorc.reports import branch_ref
 from shiftlead import teamrun
 
 from . import uiconf
-from .cards import DEAD, terminal_only
+from .cards import DEAD, NO_TEAM, card_order, terminal_only
 from .common import _age, _instant, _short_age, templates
 from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
@@ -513,8 +513,9 @@ def team_summary(
 ) -> dict[str, Any]:
     """A team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and Answer
     needed / Doing — the facet opening on *answer* while any member waits on one. A team with nothing
-    live has one too (TD-192): its claims as the members' last records hold them, and Doing, since
-    nobody can be waiting. `repo` is the definition's (§4.9 *Teams*, TD-725): its reading is the
+    live has one too (TD-192): its claims as the members' last records hold them, Doing, and Answer
+    needed while a session in it waits on one — a person's own, which keeps nothing live (TD-924).
+    `repo` is the definition's (§4.9 *Teams*, TD-725): its reading is the
     team's, else the one its members sit in (`team_repo`, a badge no definition holds). The Sessions page
     draws the Repo facet on the repo's line (`org_layout`); the Repo page and the rollup read it here."""
     now = now or datetime.now(UTC)
@@ -567,30 +568,53 @@ ROLLUP_STATES = (
     ("idle", "idle", "idle"),
     ("on-call", "oncall", "on call"),
     ("exited", "exited", "exited"),
-    ("closed", "closed", "closed"),
 )
 
 
-def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any]:
-    """The Org **rollup** (§4.5a *Sessions: rollup*, TD-176 slice 4): sums over every live team — the
-    Agents pills by state, TDs in motion by phase (each phase's link the Repo page of the team
-    holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
-    counted once), and Needs you's *answer needed* and *asked you*. When no team is live there is
-    nothing to sum — a wound-down team's summary (TD-192) is not summed — and the rollup is the Needs
-    you facet alone, `live` false, its *in the Inbox* (TD-406); with one team live, `lone`: Agents and
-    Needs you, that team's own facets saying the rest (TD-418). The Inbox's count is the top bar's,
-    filled in by the client."""
+def rollup_counted(
+    groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]] = ()
+) -> list[tuple[str, dict[str, Any]]]:
+    """The sessions the rollup's Agents and *answer needed* count (§4.5a *Sessions: rollup*, TD-924), each
+    with its group's team (`NO_TEAM` for one in no team): every session the page draws that has not ended,
+    whatever its team's state, an `exited` member of a live team (a person's own in it too), and a seat on
+    call, whose record stays exited or closed — never a stopped team's or a no-team session's exited
+    record, never a `closed` one that is no seat, never a command run (`kind: command`). `groups` is
+    `team_groups`' list; on the flat page (`None`) the sessions are `views`, none of them in a team."""
+    pairs = [(str(g.get("team") or NO_TEAM), g, m) for g in groups for m in g["members"]] if groups else []
+    if groups is None:
+        pairs = [(NO_TEAM, {}, v) for v in views]
+    out = []
+    for team, g, m in pairs:
+        if m.get("kind") == "command":
+            continue
+        state = m.get("state")
+        if m.get("seat") or state not in DEAD or (state == "exited" and team != NO_TEAM and g.get("live")):
+            out.append((team, m))
+    return out
+
+
+def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]] = ()) -> dict[str, Any]:
+    """The Org **rollup** (§4.5a *Sessions: rollup*, TD-176 slice 4, TD-924). **Agents** — the pills by
+    state — and *answer needed* (`answer_blocks`, one per session) count the page's sessions as
+    `rollup_counted` says, whatever their team's state; *asked you* sums every team's line, live or not;
+    TDs in motion by phase (each phase's link the Repo page of the team holding the most of it) and PRs
+    in motion per window over the teams' repos (a repo two teams share counted once) sum the live teams.
+    *answer needed* goes to the first waiting session in the grid's one order (`card_order`): its team's
+    facet (`answer_team`), or its own card when it is in no team (`answer_card`); *asked you* to the team
+    holding the oldest ask (`asked_team`). The layout: no team live and no session counted — the Needs you
+    facet alone (`quiet`, TD-406); one team live, or none and a session counted — Agents and Needs you
+    (`lone`, TD-418); two or more live — all four. The Inbox's count is the top bar's, filled in by the
+    client."""
     live = [g for g in groups or [] if g.get("team") and g.get("summary") and g.get("live")]
-    if not live:
-        return {"live": False}
-    members = [m for g in live for m in g["members"]]
+    counted = rollup_counted(groups, views)
     tally: dict[str, int] = {}
-    for m in members:
-        tally[str(m.get("pill_word") or m.get("state"))] = tally.get(str(m.get("pill_word") or m.get("state")), 0) + 1
+    for _, m in counted:
+        word = str(m.get("pill_word") or m.get("state"))
+        tally[word] = tally.get(word, 0) + 1
     agents = [{"word": w, "cls": c, "label": label, "n": tally[w]} for w, c, label in ROLLUP_STATES if tally.get(w)]
     phases: dict[str, int] = {ph: 0 for ph in PHASES}
     lead: dict[str, str] = {}
-    for ph in PHASES:
+    for ph in PHASES if live else ():
         best = max(live, key=lambda g: g["summary"]["phases"].get(ph, 0))
         phases[ph] = sum(g["summary"]["phases"].get(ph, 0) for g in live)
         if phases[ph] and best["summary"].get("repo"):
@@ -612,15 +636,17 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any]:
             for k in ("opened", "closed"):
                 wins[w][k] += int(((p["windows"] or {}).get(w) or {}).get(k) or 0)
     busiest = max(repos.values(), key=lambda r: r["prs"]["n"] or 0, default=None)
-    answers = [(g["team"], a) for g in live for a in g["summary"]["answers"]]
-    # *asked you* (TD-354): the teams' lines summed, the oldest's age, the first such team's anchor
-    asked = [(g["team"], g["summary"]["asked"]) for g in live if g["summary"].get("asked")]
-    oldest = min((a for _, a in asked), key=lambda a: a["at"], default=None)
+    team_of = {m["id"]: team for team, m in counted}
+    answers = answer_blocks(sorted((m for _, m in counted), key=card_order))
+    first = answers[0]["id"] if answers else ""
+    # *asked you* (TD-354): every team's line summed, live or not, the oldest's age and its team (TD-924)
+    asked = [(g["team"], g["summary"]["asked"]) for g in groups or [] if (g.get("summary") or {}).get("asked")]
+    oldest = min(asked, key=lambda ta: ta[1]["at"], default=None)
     return {
-        "live": True,
-        "lone": len(live) == 1,
+        "quiet": not live and not counted,
+        "lone": len(live) == 1 or (not live and bool(counted)),
         "agents": agents,
-        "n_agents": len(members),
+        "n_agents": len(counted),
         "phases": [
             {"key": ph, "n": phases[ph], "pct": round(100 * phases[ph] / motion, 1), "url": lead.get(ph, "")}
             for ph in PHASES
@@ -634,11 +660,12 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any]:
         "has_repo": bool(repos),
         "waiting": sum(int((g.get("prs_waiting") or {}).get("n") or 0) for g in live),
         "answer_needed": len(answers),
-        "answer_team": answers[0][0] if answers else "",
+        "answer_team": team_of.get(first, ""),
+        "answer_card": first if first and not team_of.get(first) else "",
         "asked": sum(a["n"] for _, a in asked),
-        "asked_at": oldest["at"] if oldest else "",
-        "asked_age": oldest["age"] if oldest else "",
-        "asked_team": asked[0][0] if asked else "",
+        "asked_at": oldest[1]["at"] if oldest else "",
+        "asked_age": oldest[1]["age"] if oldest else "",
+        "asked_team": oldest[0] if oldest else "",
     }
 
 

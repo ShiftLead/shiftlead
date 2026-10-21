@@ -16,7 +16,7 @@
        runs, hidden without it) — in place of the ***mine*** toggle and the *show command runs* box #}
     <input class="input" id="filter" placeholder="filter… team: state: mine kind:command" title="every word must match: team:<name>, state:<pill>, mine (your own sessions), kind:command (the command runs, hidden without it), or any text" style="width: 320px; max-width: 100%;">
   </div>
-  {# design §4.5a *Sessions: rollup* (TD-176 slice 4): sums over every live team, re-sent with the groups #}
+  {# design §4.5a *Sessions: rollup* (TD-176 slice 4, TD-924): counts the page's sessions and sums the live teams, re-sent with the groups #}
   <div id="rollup">{% with ro = rollup %}{% include "rollup.html" %}{% endwith %}</div>
   <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
   {# design §4.4a: a node's page says whose org it is part of and whether its link is up #}

@@ -2302,6 +2302,13 @@
     store.set(foldKey(sec.dataset.team), !isFolded(sec));
     syncTeams();
   }
+  // a press on the rollup's *answer needed* or *asked you* (§4.5a *Sessions: rollup*, TD-924): the
+  // filter box cleared first, since the count reads every counted session whatever the filter shows,
+  // then the team it goes to opened when folded, the opening stored as a press on its header is
+  AO.rollupGo = function (team, filter, folded, set) {
+    if (filter) filter.value = "";
+    if (team && folded) set(foldKey(team), false);
+  };
   function syncTeams() {
     sections().forEach((sec) => {
       const team = sec.dataset.team, b = $(".ghead .fold", sec), head = $(".ghead", sec);
@@ -3491,6 +3498,16 @@
     if (rollupBox) rollupBox.addEventListener("click", (e) => {
       const p = e.target.closest(".seg[data-pick] button");
       if (p) return pickSummary(p);
+      const go = e.target.closest("[data-open-team], [data-open-card]");
+      if (go) {
+        e.preventDefault();
+        const team = go.dataset.openTeam || "", sec = team ? sections().find((s) => s.dataset.team === team) : null;
+        AO.rollupGo(team, $("#filter"), !!sec && isFolded(sec), store.set);
+        layout();
+        const at = document.getElementById(go.getAttribute("href").slice(1));
+        if (at) at.scrollIntoView({ block: "start" });
+        return;
+      }
       const pill = e.target.closest("[data-state-filter]"); if (!pill) return;
       const f = $("#filter");
       f.value = AO.orgToggleWord(f.value, "state:" + pill.dataset.stateFilter);
