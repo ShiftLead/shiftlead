@@ -55,3 +55,4 @@
 - [Agent settings are the person's](agent-settings-are-the-persons.md) — never add allow rules or change Claude/other tool settings; propose them and let the person decide
 - [Hold a design until its round ends](hold-a-design-until-its-round-ends.md) — an unblocked design-first entry or design PR, once merged, is in a lane in 10 min (a design's builds at once); keep `Blocked by: decision (paul)` or the PR unmerged until Fable and Sonnet converge (TD-722 → #1832 → #1840, 2026-10-15)
 - [Replace the span, not the lead](replace-the-span-not-the-lead.md) — an edit that swaps a section's lead sentence leaves its old items standing; replace from the lead to the next survivor, then grep for the old items (#2154, 2026-10-18)
+- [Walk an unregistered adapter](walk-an-unregistered-adapter.md) — conformance walk on an adapter with no entry point (Gemini before TD-785): a scratch `*.dist-info` on `PYTHONPATH`, nothing installed
