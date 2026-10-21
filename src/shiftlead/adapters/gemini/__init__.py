@@ -8,8 +8,8 @@ person's own `settings.json` is edited and hand-started sessions are untouched. 
 file only when root owns it, so it is the machine's layer, `MACHINE_LAYER`, installed by the person once
 with the line `ao doctor` prints from the wanted copy ShiftLead writes (TD-871, TD-875).
 
-Not yet registered under the `shiftlead.adapters` entry points: the conformance suite tests every
-registered agent adapter against fixtures captured from the real tool, which TD-785's later slice records.
+Registered under the `shiftlead.adapters` entry points, so the conformance suite tests it against the
+fixtures captured from the real tool (`tests/conformance/fixtures/gemini/`).
 """
 
 from __future__ import annotations
