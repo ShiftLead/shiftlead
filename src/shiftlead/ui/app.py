@@ -112,6 +112,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     NO_GRANTS,  # noqa: F401
     PLACE_TTL,  # noqa: F401
     PLACE_WAIT,  # noqa: F401
+    TOPBAR_TITLES,  # noqa: F401
     UNDESCRIBED_GRANT,  # noqa: F401
     USAGE_AGED,  # noqa: F401
     USAGE_FRESH,  # noqa: F401
