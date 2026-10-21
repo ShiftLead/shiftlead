@@ -74,6 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-937 | The top bar's Settings glyph is a sun (eight rays), read as a brightness control beside ◐; draw a cog | Low | Open |
+| TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
 
 ---
 
@@ -1498,5 +1499,29 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** The `svg` draws a toothed ring round a hub (a cog with eight teeth, Feather's *settings* outline, MIT) at the same 15 px and stroke. The test asserts the glyph is the cog, not rays. No design change: the row already says gear.
 
 **Done when** the bar's Settings glyph is a cog at every width and on `/settings` lit, and the test holds.
+
+---
+
+## TD-938: The top bar's readings and tools past one developer — the build chip's audience, the host reading across nodes, + New's place under a director
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-21 (Paul, with the ao-paul session)
+**Owner:** paul
+**Kind:** design-first
+**Status:** Open — nothing designed yet. Paul runs the design round (Sonnet and Fable alternating, as TD-931's), so no unattended designer picks it up.
+**Blocked by:** decision (paul) — Paul runs the design round; when it has converged this line names the build entries
+**Location:** design §4.5a *Sessions top bar: the bar's three groups*, *build chip*, *usage chip*, *+ New ▾*; §4.5 screen 1 (the cards' `host / repo` header and the *tool · account · model* row), screen 8 (Settings); §4.2 *unreachable* (the host chip goes hollow, the Sessions banner); §4.4a *Home and nodes*; §4.9 and §4.9b (the director); `src/shiftlead/ui/templates/base.html` (the `topbar` block: `#buildchip`, `#hostchip`, `#newmenu`)
+
+**Why:** Paul, 2026-10-21, reading the bar TD-932 built, three questions the design answers for one developer on one host and no further:
+- **The build chip is shiftlead's own.** It reads the live host agent's commit and the shiftlead repo's promote state (*main +n*, the hover from `git log live..main`), on every page for everyone. Only the person developing shiftlead on the home can act on it; a self-hoster who installs a release needs at most a version and an *update available* hint. *Does anyone but me (shiftlead dev) need that?*
+- **The host reading across nodes.** The bar draws one `<host> ●`, the home's; §4.2 says an unreachable host hollows the dot and the Sessions page banners it. With nodes (§4.4a) there are several hosts to be unreachable, and a session's host is already on its card header (`host / repo`, `host / directory`). *Does kmaster become a scroll, or does that belong on the session cards?* The same question for the tool: §4.5 screen 1 row 4 already draws *tool · account · model* on every card, so a second adapter (Gemini CLI, phase 5) asks nothing of the bar — the design should say so.
+- **+ New under a director.** Today New is the bar's one filled button: the person's way to start a loose session or a shell, a team's sessions starting from its card's **+**. Once a director is the person's top-level interaction (§4.9b), the person's first act is to talk to it and the director starts the teams. *Is the New button out of place now?* The director level is not yet designed, so the answer is a note and a direction, not a redesign of the bar twice.
+
+The ao-paul session's assessment, for the round to test: the build chip moves to the Settings page beside the promote's **auto** switch (its *main +n* links to the Inbox's promote row today), drawn in the bar only when the home's shiftlead checkout carries a `promote:` block (the sign that this person is the developer); the host reading stays one name, the home's, its dot the sum of the nodes — hollow when any is unreachable, the hover listing them — and a session's host and tool stay on the card; New is demoted, not dropped: it stops being the filled button when the director's composer is, and moves to the Sessions page's header beside the team cards' **+**, with the change written into §10 until the director is designed.
+
+**Fix:** A design round on §4.5a's bar rows and §4.5 screens 1 and 8, with a comparison page (one shape per answer, `docs/mockups/reviews/`) for Paul to pick from, then build entries: one for the build chip's audience, one for the host dot across nodes (with a line in §4.3 that the tool is the card's, never the bar's), and a §10 question for New's place that the director's design answers. The design round's history lines name the superseded ADR sentences (ADR 2026-09-25 on Settings and the promote's auto switch; §4.2's host chip sentence).
+
+**Done when** the design says who sees the build chip and where, what the bar's host reading means with nodes and what stays on the card, and where New lives under a director, and the build entries are named here.
 
 ---
