@@ -2100,7 +2100,7 @@ def spend_page(view="all"):
     additions: the **Day · Week · Month** window and its period, the **Over time** chart (by team on All, by role on
     a team), and on All **By team** and **Top sessions**, the person's own sessions as *interactive sessions*. A
     team's view (`view="team"`) keeps the seat table and the finished entries under its chart. Illustrative figures,
-    after Paul's proposal over the transcript tally of Oct 3–17."""
+    after Paul's proposal over the transcript tally of Oct 3–17. Tokens beside every figure, every kind summed (TD-927)."""
     def chip(t, on=False):
         return (f'<span style="border: 1px solid #d0d5dc; border-radius: 5px; padding: 2px 9px; font-size: 12px;'
                 f'{" background: #e9edf2; font-weight: 600;" if on else ""}">{t}</span>')
@@ -2110,17 +2110,18 @@ def spend_page(view="all"):
         return (f'<span style="display: inline-flex; align-items: center; gap: 6px;"><span style="display: inline-block; width: 90px; height: 8px; '
                 f'background: #eef1f4; border-radius: 4px; overflow: hidden;"><i style="display: block; height: 100%; width: {pct}%; background: #2563eb;"></i></span>'
                 f'<span class="mono" style="font-size: 12px;">{pct}%</span></span>')
-    cols = ("seat", "role", "≈ figure", "share", "turns", "per finished entry", "between", "past 200k", "past 300k")
+    cols = ("seat", "role", "≈ figure", "tokens", "share", "turns", "per finished entry", "between", "past 200k", "past 300k")
     def thead():
-        return ('<div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.6fr .8fr 1.8fr 1fr .9fr .9fr; gap: 8px; padding: 6px 14px; '
+        return ('<div style="display: grid; grid-template-columns: 1.8fr 1fr .9fr .8fr 1.5fr .7fr 1.7fr .9fr .8fr .8fr; gap: 8px; padding: 6px 14px; '
                 'font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7480; border-bottom: 1px solid #e3e7ec;">'
                 + "".join(f"<span>{c}</span>" for c in cols) + "</div>")
-    def srow(name, role, fig, share, turns, per, between, p2, p3, sub=False):
+    def srow(name, role, fig, tok, share, turns, per, between, p2, p3, sub=False):
         st = "background: #f7f8fa; font-weight: 600;" if sub else ""
-        return ('<div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.6fr .8fr 1.8fr 1fr .9fr .9fr; gap: 8px; padding: 8px 14px; '
+        return ('<div style="display: grid; grid-template-columns: 1.8fr 1fr .9fr .8fr 1.5fr .7fr 1.7fr .9fr .8fr .8fr; gap: 8px; padding: 8px 14px; '
                 f'border-top: 1px solid #eef1f4; align-items: center; font-size: 13px; {st}">'
                 f'<span>{"<a href=\"#\">" + name + "</a>" if not sub else name}</span><span>{pillr(role) if role else ""}</span>'
-                f'<span class="mono" style="font-weight: 600;">{fig}</span><span>{bar(share) if share is not None else ""}</span>'
+                f'<span class="mono" style="font-weight: 600;">{fig}</span><span class="mono" title="input · output · cache read · cache write">{tok}</span>'
+                f'<span>{bar(share) if share is not None else ""}</span>'
                 f'<span class="mono">{turns}</span><span>{per}</span><span class="mono">{between}</span>'
                 f'<span class="mono">{p2}</span><span class="mono">{p3}</span></div>')
     def panel(title, sub, body):
@@ -2128,12 +2129,12 @@ def spend_page(view="all"):
                 f'<span style="font-size: 17px; font-weight: 600;">{title}</span><span class="meta" style="font-size: 12px;">{sub}</span></div>'
                 f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{body}</div></div>')
     grind = thead() + "".join([
-        srow("grinder-ao-1", "grinder", "≈$52.30", 34, "611", "3 · median ≈$11.20", "≈$4.80", "12%", "2%"),
-        srow("grinder-ao-2", "grinder", "≈$47.90", 31, "540", "2 · median ≈$19.60", "≈$6.10", "15%", "4%"),
-        srow("grinders", "", "≈$100.20", 65, "1151", "5 · median ≈$13.40", "≈$10.90", "13%", "3%", sub=True),
-        srow("designer-ao-1", "designer", "≈$38.20", 25, "412", "2 · median ≈$14.90", "≈$3.10", "22%", "6%"),
-        srow("techlead-ao-1", "techlead", "≈$13.60", 9, "188", "—", "≈$13.60", "4%", "0%"),
-        srow("manager-ao-1", "manager", "≈$2.40", 1, "41", "—", "≈$2.40", "0%", "0%"),
+        srow("grinder-ao-1", "grinder", "≈$52.30", "11.6M", 34, "611", "3 · median ≈$11.20", "≈$4.80", "12%", "2%"),
+        srow("grinder-ao-2", "grinder", "≈$47.90", "10.4M", 31, "540", "2 · median ≈$19.60", "≈$6.10", "15%", "4%"),
+        srow("grinders", "", "≈$100.20", "22M", 65, "1151", "5 · median ≈$13.40", "≈$10.90", "13%", "3%", sub=True),
+        srow("designer-ao-1", "designer", "≈$38.20", "8.4M", 25, "412", "2 · median ≈$14.90", "≈$3.10", "22%", "6%"),
+        srow("techlead-ao-1", "techlead", "≈$13.60", "3.1M", 9, "188", "—", "≈$13.60", "4%", "0%"),
+        srow("manager-ao-1", "manager", "≈$2.40", "512k", 1, "41", "—", "≈$2.40", "0%", "0%"),
     ])
     def erow(t, title, parts, total, turns, held):
         return ('<div style="display: flex; gap: 10px; align-items: baseline; padding: 8px 14px; border-top: 1px solid #eef1f4; font-size: 13px;">'
@@ -2204,46 +2205,47 @@ def spend_page(view="all"):
                 "Tue 13", "Wed 14", "Thu 15", "Fri 16", "Sat 17"]
         labels = [d if i % 2 == 1 or i == 28 else "" for i, d in enumerate(days)]
         c = chart(series, keys, TEAMC, labels, 28, "the ledger begins 2026-10-03 · press a bar to read that day")
-        tcols = "1.6fr 1fr 1.5fr .9fr .8fr 1.7fr 1.9fr"
-        teams = grid(tcols, ("team", "≈ figure", "share", "vs day before", "turns", "this week · month", "spent most"), True) + "".join(
-            grid(tcols, (sw(TEAMC[k]) + name, f'<span class="mono" style="font-weight: 600;">{fig}</span>', sbar(sh, TEAMC[k]), ch,
+        tcols = "1.9fr .9fr .7fr 1.4fr .9fr .6fr 1.5fr 1.6fr"
+        teams = grid(tcols, ("team", "≈ figure", "tokens", "share", "vs day before", "turns", "this week · month", "spent most"), True) + "".join(
+            grid(tcols, (sw(TEAMC[k]) + name, f'<span class="mono" style="font-weight: 600;">{fig}</span>', f'<span class="mono">{tok}</span>', sbar(sh, TEAMC[k]), ch,
                          f'<span class="mono">{tu}</span>', f'<span class="mono">{wm}</span>', most))
-            for k, name, fig, sh, ch, tu, wm, most in (
-                ("ao-grind", '<a href="#">ao-grind</a>', "≈$426", 82, '<span class="mono" style="color: #b45309;">▲ 51%</span>', "7,716", "≈$1,498 · ≈$3,496", "grinder-ao-2 · 36%"),
-                ("interactive", '<span class="meta">interactive sessions</span>', "≈$92.40", 18, '<span class="mono" style="color: #b45309;">▲ 34%</span>', "1,096", "≈$401 · ≈$803", "ao-paul · shiftlead · 60%"),
-                ("dc-grind", '<a href="#">dc-grind</a>', "≈$0.00", 0, '<span class="mono" style="color: #166534;">▼ 100%</span>', "0", "≈$49.72 · ≈$72.01", "—"),
-                ("outside", '<span class="meta">outside shiftlead</span>', "≈$1.90", 0, "—", "21", "≈$4.10 · ≈$9.80", "—"),
+            for k, name, fig, tok, sh, ch, tu, wm, most in (
+                ("ao-grind", '<a href="#">ao-grind</a>', "≈$426", "95.2M", 82, '<span class="mono" style="color: #b45309;">▲ 51%</span>', "7,716", "≈$1,498 · ≈$3,496", "grinder-ao-2 · 36%"),
+                ("interactive", '<span class="meta">interactive sessions</span>', "≈$92.40", "21.7M", 18, '<span class="mono" style="color: #b45309;">▲ 34%</span>', "1,096", "≈$401 · ≈$803", "ao-paul · shiftlead · 60%"),
+                ("dc-grind", '<a href="#">dc-grind</a>', "≈$0.00", "0", 0, '<span class="mono" style="color: #166534;">▼ 100%</span>', "0", "≈$49.72 · ≈$72.01", "—"),
+                ("outside", '<span class="meta">outside shiftlead</span>', "≈$1.90", "406k", 0, "—", "21", "≈$4.10 · ≈$9.80", "—"),
             ))
-        scols = "1.8fr 1.2fr .9fr 1fr 1.4fr .8fr .9fr"
-        top = grid(scols, ("session", "team", "role", "≈ figure", "share of all", "turns", "past 300k"), True) + "".join(
+        scols = "1.7fr 1.2fr .9fr .9fr .8fr 1.4fr .7fr .8fr"
+        top = grid(scols, ("session", "team", "role", "≈ figure", "tokens", "share of all", "turns", "past 300k"), True) + "".join(
             grid(scols, (f'<a href="#">{n}</a>', sw(TEAMC[t]) + ("interactive" if t == "interactive" else t), pillr(r),
-                         f'<span class="mono" style="font-weight: 600;">{f}</span>', sbar(sh, TEAMC[t]), f'<span class="mono">{tu}</span>',
+                         f'<span class="mono" style="font-weight: 600;">{f}</span>', f'<span class="mono">{tk}</span>', sbar(sh, TEAMC[t]), f'<span class="mono">{tu}</span>',
                          f'<span class="mono">{p3}</span>'))
-            for n, t, r, f, sh, tu, p3 in (
-                ("grinder-ao-2", "ao-grind", "grinder", "≈$151", 29, "2,741", "4%"), ("designer-ao-1", "ao-grind", "designer", "≈$123", 24, "1,822", "9%"),
-                ("grinder-ao-1", "ao-grind", "grinder", "≈$107", 20, "2,116", "3%"), ("ao-paul · shiftlead", "interactive", "other", "≈$56.76", 11, "474", "2%"),
-                ("techlead-ao-1", "ao-grind", "techlead", "≈$33.28", 6, "616", "0%"), ("ao-queue-vs-inbox · shiftlead", "interactive", "other", "≈$24.90", 5, "389", "1%"),
-                ("test-audit-ao-1", "ao-grind", "other", "≈$11.48", 2, "421", "0%"), ("dc-grinder · dev-cadence", "interactive", "grinder", "≈$9.45", 2, "147", "0%"),
+            for n, t, r, f, tk, sh, tu, p3 in (
+                ("grinder-ao-2", "ao-grind", "grinder", "≈$151", "33.4M", 29, "2,741", "4%"), ("designer-ao-1", "ao-grind", "designer", "≈$123", "27M", 24, "1,822", "9%"),
+                ("grinder-ao-1", "ao-grind", "grinder", "≈$107", "23.9M", 20, "2,116", "3%"), ("ao-paul · shiftlead", "interactive", "other", "≈$56.76", "13.3M", 11, "474", "2%"),
+                ("techlead-ao-1", "ao-grind", "techlead", "≈$33.28", "7.6M", 6, "616", "0%"), ("ao-queue-vs-inbox · shiftlead", "interactive", "other", "≈$24.90", "5.8M", 5, "389", "1%"),
+                ("test-audit-ao-1", "ao-grind", "other", "≈$11.48", "2.6M", 2, "421", "0%"), ("dc-grinder · dev-cadence", "interactive", "grinder", "≈$9.45", "2.2M", 2, "147", "0%"),
             ))
         body = (heading("Over time", "a bar a day, the last 30 days, by team") + c
-                + heading("By team", "≈$520 on Fri 16 · most first · a team opens its view")
+                + heading("By team", "≈$520 · 117.3M tokens in Fri 16 Oct · most first · a team opens its view")
                 + f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{teams}</div>'
                 + heading("Top sessions", 'every team\'s seats and your own sessions, most first · 8 of 31 · <a href="#">all →</a>')
                 + f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{top}</div>')
         notes = ("Reached from the top bar's usage chip (here, on All), a team card's spend figure (on its team) and the Settings page's "
                  "Usage heading; no top-bar tab. A press on a bar, or ‹ ›, picks the period every table reads. Interactive sessions are "
-                 "the person's own (no team): one total row under By team, each its own row under Top sessions. Built by TD-832 and TD-859.")
+                 "the person's own (no team): one total row under By team, each its own row under Top sessions. Built by TD-832 and TD-859. "
+                 "Tokens beside each figure, every kind summed, the four kinds on the cell's hover (TD-927).")
     else:
         weeks = ["27 Jul", "3 Aug", "10 Aug", "17 Aug", "24 Aug", "31 Aug", "7 Sep", "14 Sep", "21 Sep", "28 Sep", "5 Oct", "12 Oct"]
         roles = ("grinder", "designer", "techlead", "manager", "other")
         figs = [None] * 9 + [(240, 70, 0, 95, 10), (880, 330, 320, 12, 41), (1030, 280, 150, 8, 30)]
         series = [dict(zip(roles, f)) if f else {} for f in figs]
         c = chart(series, roles, ROLEC, weeks, 11, "the ledger begins 2026-10-03 · by role · press a bar to read that week")
-        body = (heading("ao-grind", "≈$1,498 this week (so far) · last week ≈$1,583 · October ≈$3,496") + c
-                + panel("By seat", "ao-grind · ≈$1,498 this week (so far) · 13,410 turns", grind)
+        body = (heading("ao-grind", "≈$1,498 · 310M tokens this week (so far) · last week ≈$1,583 · October ≈$3,496") + c
+                + panel("By seat", "ao-grind · ≈$1,498 · 310M tokens this week (so far) · 13,410 turns", grind)
                 + panel("Finished entries", "4 this week · by total, most first", entries))
         notes = ("A team's view, from its card's spend figure or its name under By team: the chart by role, then the seat table and the "
-                 "finished entries for the picked week, as TD-818 first drew them (the rows here are its day figures, not this week's). The week of 28 Sep holds only the ledger's first two days, so its bar's hover says partial. Built by TD-832 and TD-859.")
+                 "finished entries for the picked week, as TD-818 first drew them (the rows here are its day figures, not this week's). The week of 28 Sep holds only the ledger's first two days, so its bar's hover says partial. Built by TD-832 and TD-859. Tokens beside each figure, every kind summed (TD-927).")
     note = f'<div class="note" style="margin-top: 18px;">Design notes, not page text. {notes} Figures illustrative.</div>'
     return head("Spend") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Sessions")}
