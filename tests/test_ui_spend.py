@@ -173,7 +173,7 @@ def test_a_team_draws_its_line_by_seat_with_a_role_subtotal_and_its_finished_ent
     titles = {"TD-813": "The page's send lands once"}
     v = spend_view(reading(team="ao-grind"), picks, fleet=FLEET, all_teams=["ao-grind", "dc-grind"], titles=titles,
                    today=TODAY)  # fmt: skip
-    assert v["line"] == "≈$138 today (so far) · yesterday ≈$20.00 · this week ≈$158 · October ≈$158"
+    assert v["line"] == "≈$138 · 3k tokens today (so far) · yesterday ≈$20.00 · this week ≈$158 · October ≈$158"
     assert [c[1] for c in v["chips"]] == ["All", "ao-grind", "dc-grind"]
     rows = [(s["name"], bool(s.get("subtotal"))) for s in v["seats"]]
     assert rows == [("grinder-ao-1", False), ("grinder-ao-2", False), ("grinders", True), ("designer-ao-1", False)]
@@ -197,6 +197,28 @@ def test_an_unweighed_figure_is_named_beside_never_in_it():
 
     assert figure({"figure": 0.0, "unweighed_tokens": 4_100_000}) == "unweighed · 4.1M tok"
     assert figure({"figure": 2.0, "unweighed_tokens": 812_000, "unit": "$"}) == "$2.00 + 812k tok unweighed"
+
+
+def test_a_figure_told_its_tokens_follow_writes_its_count_once_in_the_word_asked():
+    """§4.4 *Tokens beside every figure* (TD-929): `count` appends the row's every kind summed, in the chip's
+    short shape; a wholly unweighed row its count once; `False` (a table cell) none; a row with no `tokens` in
+    its reading falls back to the bare composition, so its unweighed count is never lost."""
+    from shiftlead.ui.spend import figure, tokens
+
+    kinds = {"input": 1_200_000, "output": 300_000, "cache_read": 93_000_000, "cache_write": 700_000}
+    row = {"figure": 426.0, "tokens": kinds}
+    assert figure(row, count="tok") == "≈$426 · 95.2M tok"
+    assert figure(row, count="tokens") == "≈$426 · 95.2M tokens"
+    assert figure(row, count=False) == figure(row) == "≈$426"
+    part = {"figure": 38.2, "unweighed_tokens": 4_100_000, "tokens": {"input": 8_400_000}}
+    assert figure(part, count="tok") == "≈$38.20 + 4.1M tok unweighed · 8.4M tok"
+    assert figure(part, count=False) == "≈$38.20 + 4.1M tok unweighed"
+    wholly = {"figure": 0.0, "unweighed_tokens": 4_100_000, "tokens": {"input": 4_100_000}}
+    assert figure(wholly, count="tok") == "unweighed · 4.1M tok"
+    assert figure(wholly, count=False) == "unweighed"
+    old = {"figure": 0.0, "unweighed_tokens": 4_100_000}  # a reading from before `tokens`
+    assert figure(old, count="tok") == figure(old, count=False) == figure(old) == "unweighed · 4.1M tok"
+    assert tokens(22_000_000) == "22M tok" and tokens(2_100_000_000) == "2.1B tok"
 
 
 def test_the_page_draws_the_reading_and_a_pick_re_reads_its_body(tmp_path, monkeypatch):

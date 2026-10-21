@@ -15,6 +15,7 @@ from sessionorc.models import (
     context_reading,
     normalize_ref,
     report_line,
+    tokens_short,
 )
 
 pytestmark = pytest.mark.unit
@@ -325,3 +326,56 @@ def test_the_context_reading_says_tokens_and_the_window_it_knows():
     for none in (None, {}, {"tokens": 0}, {"tokens": "x"}, "231k"):
         assert context_reading({"context": none}) == ""
     assert context_reading({}) == ""
+
+
+# A token count's short shape (§4.4 *Tokens beside every figure*, TD-929): one table, read by `tokens_short`
+# and by `app.js`'s `tokShort`, each with its own tie rule (half to even in both, on its own arithmetic). A unit
+# promotes where its rounding reaches the next: never *1000k* or *1000M*.
+TOKEN_SHAPES = {
+    0: "0", 999: "999", 1_000: "1k", 1_500: "2k", 2_500: "2k", 231_203: "231k", 999_499: "999k",
+    999_500: "1M", 1_000_000: "1M", 1_234_567: "1.2M", 1_250_000: "1.2M", 1_350_000: "1.4M", 22_000_000: "22M",
+    95_200_000: "95.2M", 117_300_000: "117.3M", 999_949_999: "999.9M", 999_950_000: "1B", 1_000_000_000: "1B",
+    2_100_000_000: "2.1B", 2_250_000_000: "2.2B",
+}  # fmt: skip
+
+
+def test_a_token_count_reads_short_and_promotes_where_its_rounding_reaches_the_next_unit():
+    assert {n: tokens_short(n) for n in TOKEN_SHAPES} == TOKEN_SHAPES
+
+
+def test_tokshort_in_app_js_reads_the_same_table(tmp_path):
+    """The page draws counts it is pushed (the usage chip, the disconnect card) with `tokShort`, so the shape
+    lives twice and is held to one table here."""
+    import pathlib
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript too, and nothing else runs it")
+    probe = tmp_path / "tok_probe.js"
+    probe.write_text(TOK_PROBE)
+    app_js = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js"
+    out = subprocess.run([node, str(probe), str(app_js), json.dumps(list(TOKEN_SHAPES))],
+                         capture_output=True, text=True, timeout=30)  # fmt: skip
+    assert out.returncode == 0, out.stderr
+    assert dict(zip(TOKEN_SHAPES, json.loads(out.stdout), strict=True)) == TOKEN_SHAPES
+
+
+TOK_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false });
+global.window = {};
+global.document = { documentElement: el(), body: el(), activeElement: null,
+  querySelector: () => null, querySelectorAll: () => [], addEventListener: noop, createElement: el };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+console.log(JSON.stringify(JSON.parse(process.argv[3]).map((n) => window.AO.tokShort(n))));
+"""

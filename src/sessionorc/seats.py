@@ -345,12 +345,16 @@ def prune(ledger: dict[str, Any], today: date) -> None:
 def _blank() -> dict[str, Any]:
     return {
         "figure": 0.0, "turns": 0, "between": 0.0, "past_200k": 0.0, "past_300k": 0.0, "unweighed": 0,
-        "unweighed_tokens": 0, "metered": True,
+        "unweighed_tokens": 0, "metered": True, "tokens": dict.fromkeys(KINDS, 0),
     }  # fmt: skip
 
 
 def _add_row(acc: dict[str, Any], row: dict[str, Any]) -> None:
+    """A row's figure, turns, marks and tokens by kind (`KINDS`), summed over its models, into `acc`: the one
+    place a row's tokens are summed (§4.4 *Tokens beside every figure*)."""
     for m in (row.get("models") or {}).values():
+        for k in KINDS:
+            acc["tokens"][k] += int(m.get(k) or 0)
         acc["figure"] += float(m.get("figure") or 0.0)
         acc["turns"] += int(m.get("turns") or 0)
         acc["past_200k"] += float(m.get("past_200k") or 0.0)
@@ -363,15 +367,12 @@ def _add_row(acc: dict[str, Any], row: dict[str, Any]) -> None:
     acc["metered"] = acc["metered"] and bool(row.get("metered"))
 
 
-def _add_tokens(into: dict[str, int], row: dict[str, Any]) -> None:
-    """A row's tokens by kind (`KINDS`), summed over its models, into `into`."""
-    for m in (row.get("models") or {}).values():
-        for k in KINDS:
-            into[k] += int(m.get(k) or 0)
-
-
 def _rounded(acc: dict[str, Any], whole: float | None = None) -> dict[str, Any]:
-    out = {k: round(v, 4) if isinstance(v, float) else v for k, v in acc.items() if k != "metered"}
+    out = {
+        k: round(v, 4) if isinstance(v, float) else dict(v) if isinstance(v, dict) else v
+        for k, v in acc.items()
+        if k != "metered"
+    }  # a copy of `tokens`, so a reply never shares the accumulator
     fig = acc["figure"]
     for k in ("past_200k", "past_300k"):
         out[f"{k}_share"] = round(acc[k] / fig, 4) if fig else 0.0
@@ -506,7 +507,6 @@ def reading(
             if rid not in s["records"]:
                 s["records"].append(rid)
             _add_row(s, row)
-            _add_tokens(s.setdefault("tokens", dict.fromkeys(KINDS, 0)), row)
         for group, value in (("roles", role), ("teams", t), ("repos", repo)):
             _add_row(groups[group].setdefault(value, _blank()), row)
     if by != "record":
@@ -523,7 +523,6 @@ def reading(
         return {
             **{f: s[f] for f in ("seat", "team", "role", "repo", "records")},
             **_rounded({f: s[f] for f in _blank()}, whole_of),
-            "tokens": dict(s["tokens"]),
             "finished": _finished(spent[keyed].get(k) or {}),
         }
 
