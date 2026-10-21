@@ -17494,3 +17494,22 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-20 — PR #2213: every row of the `seats` reading carries `tokens` by kind, summed once in `_add_row`; `figure(…, count=…)` writes the count after the figure; `ao spend` prints it and the team's head line (the page's and `--team`'s) spells *tokens*; `tokens_short` and `tokShort` promote a unit at its rounding and read *B* past a billion, held to one table (`tests/test_models.py::TOKEN_SHAPES`); the UI check's shot `docs/mockups/reviews/2026-10-20-td929-spend-team-line.png`.
 
 ---
+## TD-933: The Sessions page can stop counting the flat page's sessions in its rollup and no test notices (test audit of #2204)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-20 (test audit of #2204, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/app.py` (`rollup(groups, vs)` at the delta path's `render(ro=rollup(groups, vs))` and the `org` route's `"rollup": rollup(groups, vs)`); `tests/test_ui_team_summary.py`
+
+**Why:** #2204 makes the rollup's Agents and *answer needed* count `vs`, the sessions the page draws, and on the flat page (`groups` is `None`) `vs` is the only source. The tests call `ui.rollup(None, vs)` directly, but nothing runs the two call sites. Probe on `origin/main` 69d778064: change both to `rollup(groups)` and `pytest tests -k "ui or rollup or org"` passes (1263 tests, `test_ui_team_summary.py` alone 38), though the flat page then shows `quiet` with no Agents pills and no *answer needed* whatever sessions it holds. The rest of the PR's change holds: reverting the `command` skip, the `g.get("live")` test, the all-teams *asked you* sum, its oldest-ask key, the `if live` guard on the phases loop, the filter clear in `AO.rollupGo` or `data-open-team` fails a test.
+
+**Fix:** One test through the app on a host with sessions and no team defined or badged (the flat page): the page's `#rollup` and the delta's `rollup` html carry `Agents (n)` and, for a session waiting on a permission, a `data-open-card` link. Revert both call sites and see it fail.
+
+**Done when** the probe above fails a test.
+
+**Resolved:** 2026-10-20 — PR #2214: `tests/test_ui_team_summary.py::test_the_flat_pages_rollup_counts_its_sessions_on_load_and_on_a_delta` drives the app on a host with no team; reverting either call site to `rollup(groups)` fails it (the page or the delta reads `rollup quiet`).
+
+---

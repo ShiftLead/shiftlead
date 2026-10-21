@@ -81,7 +81,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-930 | Build TD-927 (2): the Spend page's tokens column, the totals' tokens and the bar's hover | Medium | Open |
 | TD-931 | The top bar's pages look like three different kinds of control, and its one number says nothing about where to go | Medium | Designed — built by TD-932 |
 | TD-932 | Build TD-931: the top bar's three groups, a number on each of the Inbox and Queue tabs, Settings as a gear, `3` for the Queue | Medium | Open |
-| TD-933 | The Sessions page can stop counting the flat page's sessions in its rollup and no test notices (test audit of #2204) | Low | Open |
 
 ---
 
@@ -1688,20 +1687,3 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-933: The Sessions page can stop counting the flat page's sessions in its rollup and no test notices (test audit of #2204)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-20 (test audit of #2204, test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`rollup(groups, vs)` at the delta path's `render(ro=rollup(groups, vs))` and the `org` route's `"rollup": rollup(groups, vs)`); `tests/test_ui_team_summary.py`
-
-**Why:** #2204 makes the rollup's Agents and *answer needed* count `vs`, the sessions the page draws, and on the flat page (`groups` is `None`) `vs` is the only source. The tests call `ui.rollup(None, vs)` directly, but nothing runs the two call sites. Probe on `origin/main` 69d778064: change both to `rollup(groups)` and `pytest tests -k "ui or rollup or org"` passes (1263 tests, `test_ui_team_summary.py` alone 38), though the flat page then shows `quiet` with no Agents pills and no *answer needed* whatever sessions it holds. The rest of the PR's change holds: reverting the `command` skip, the `g.get("live")` test, the all-teams *asked you* sum, its oldest-ask key, the `if live` guard on the phases loop, the filter clear in `AO.rollupGo` or `data-open-team` fails a test.
-
-**Fix:** One test through the app on a host with sessions and no team defined or badged (the flat page): the page's `#rollup` and the delta's `rollup` html carry `Agents (n)` and, for a session waiting on a permission, a `data-open-card` link. Revert both call sites and see it fail.
-
-**Done when** the probe above fails a test.
-
----
