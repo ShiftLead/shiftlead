@@ -77,6 +77,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-935 | Design §4.5 screen 8 still says Settings is *a tab, last, until TD-932 builds it*; TD-932 built a gear among the tools (docs audit) | Low | Open |
+| TD-936 | The Spend page's three tokens cells can each go from the template and no test notices (test audit of #2215) | Low | Open |
 
 ---
 
@@ -1598,5 +1599,20 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** In `docs/design/4.5-ui.md` screen 8, drop `; a tab, last, until TD-932 builds it` so the item reads *… (§4.5a *Sessions top bar: Settings*, TD-931).* Add a line to `docs/design-history.md` under §4.5 above the section's newest lines saying the clause went with TD-932's build. Grep `docs/design/` once more for `until TD-93` and `builds it`.
 
 **Done when** `grep -rn "until TD-93" docs/design/` finds nothing and the Settings item says only what is true now.
+## TD-936: The Spend page's three tokens cells can each go from `spend_part.html` and no test notices (test audit of #2215)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-21 (test audit of #2215, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/templates/spend_part.html` (the `<td class="spfold mono"…>{{ r.tok }}` / `{{ s.tok }}` cell in By team, Top sessions and By seat); `tests/test_ui_spend.py::test_the_three_tables_draw_a_tokens_cell_and_the_totals_and_bars_carry_tokens`
+
+**Why:** #2215 adds a **tokens** column to three tables. The test holds the view's `tok` and `tok_title` values, but the page is checked by two lines only: `'<th class="spfold">tokens</th>' in html` and one `re.search` for a tokens `<td>` anywhere. Probe on `origin/main` 091b11e5c: delete, one at a time, each of the three `<td class="spfold mono" …>` lines from `spend_part.html`; `pytest tests/test_ui_spend.py tests/test_ao_spend.py` passes (28 passed) each time, though that table then has a *tokens* header over no cells and every later column shifts left. The other two tables still satisfy the regex, and the By seat table is not fetched at all (`/spend?team=…` is never read as html). The rest of the PR holds: reverting the `count=` words at the CLI's outside line, the seat line and `figure`'s wholly-unweighed branch fails a test.
+
+**Fix:** In that test, fetch `/spend` and `/spend?team=ao-grind` and count per table: every body row has as many `<td>` as the header has `<th>`, and the tokens cell holds the view's `tok`.
+
+**Done when** deleting any one of the three cells fails a test.
 
 ---
