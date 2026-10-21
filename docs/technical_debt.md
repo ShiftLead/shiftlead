@@ -78,8 +78,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-927 | Token counts on the Spend page, beside every figure: by team, Top sessions, a team's seats, the head's total and the bar's hover | Medium | Designed — built by TD-929, TD-930 |
-| TD-929 | Build TD-927 (1): the Spend reading carries tokens beside every figure, and `ao spend` prints them (a held path) | Medium | Open |
-| TD-930 | Build TD-927 (2): the Spend page's tokens column, the totals' tokens and the bar's hover | Medium | Open — blocked by TD-929 |
+| TD-930 | Build TD-927 (2): the Spend page's tokens column, the totals' tokens and the bar's hover | Medium | Open |
 | TD-931 | The top bar's pages look like three different kinds of control, and its one number says nothing about where to go | Medium | Designed — built by TD-932 |
 | TD-932 | Build TD-931: the top bar's three groups, a number on each of the Inbox and Queue tabs, Settings as a gear, `3` for the Queue | Medium | Open |
 
