@@ -19,12 +19,12 @@ MANIFEST = json.loads((FIXTURES / "manifest.json").read_text(encoding="utf-8"))
 
 
 def _tail(name: str) -> list[str]:
-    return (FIXTURES / "panes" / name).read_text(encoding="utf-8").splitlines()
+    return (FIXTURES / ("panes/" + name if "/" not in name else name)).read_text(encoding="utf-8").splitlines()
 
 
 @pytest.mark.parametrize("pane", MANIFEST["panes"], ids=lambda p: p["file"])
 def test_the_composer_reads_what_was_painted(pane):
-    assert GeminiAdapter().composer(_tail(Path(pane["file"]).name)) == pane["composer"]
+    assert GeminiAdapter().composer(_tail(pane["file"])) == pane["composer"]
 
 
 def test_the_placeholder_is_grey_not_faint_so_it_is_read_by_its_words():

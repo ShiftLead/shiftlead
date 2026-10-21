@@ -1,13 +1,108 @@
 {
  "panes": [
-  {"file": "panes/idle-empty.txt", "state": null, "composer": ""},
-  {"file": "panes/idle-typed.txt", "state": null, "composer": "hello there"},
-  {"file": "panes/idle-pasted.txt", "state": null, "composer": "line one"},
-  {"file": "panes/working-empty.txt", "state": null, "composer": ""},
-  {"file": "panes/working-typed.txt", "state": null, "composer": "a queued prompt"},
-  {"file": "panes/working-queued.txt", "state": null, "composer": ""}
+  {
+   "file": "panes/idle-empty.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "panes/idle-typed.txt",
+   "state": null,
+   "composer": "hello there"
+  },
+  {
+   "file": "panes/idle-pasted.txt",
+   "state": null,
+   "composer": "line one"
+  },
+  {
+   "file": "panes/working-empty.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "panes/working-typed.txt",
+   "state": null,
+   "composer": "a queued prompt"
+  },
+  {
+   "file": "panes/working-queued.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/1-launch.txt",
+   "state": null,
+   "composer": null
+  },
+  {
+   "file": "captured/panes/2-first-hook.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/3-a-short-prompt.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/4-a-permission-needs-you.txt",
+   "state": null,
+   "composer": null
+  },
+  {
+   "file": "captured/panes/5-a-permission.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/6-a-doorbell.txt",
+   "state": null,
+   "composer": null
+  }
  ],
  "titles": [
-  {"file": "captured/titles.json", "names": ["probe", "probe"]}
+  {
+   "file": "captured/titles.json",
+   "names": [
+    "conformance-walk"
+   ]
+  }
+ ],
+ "hooks": [
+  {
+   "file": "captured/hooks.jsonl",
+   "at_composer": true,
+   "reads": [
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "working"
+    }
+   ]
+  }
  ]
 }

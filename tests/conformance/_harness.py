@@ -243,4 +243,29 @@ class ClaudeCodeHarness:
         return cwd
 
 
-HARNESSES: dict[str, Any] = {"claude-code": ClaudeCodeHarness()}
+class GeminiHarness:
+    """Gemini CLI hands each hook payload to `shiftlead-hook --adapter gemini`, whose `translate` makes the
+    host agent's `hook` params; it reads no transcript yet (TD-786), so a transcript is placed nowhere."""
+
+    tool_fields: frozenset[str] = frozenset()
+
+    def profile(self, tmp_path: Path, monkeypatch: Any) -> str:
+        home = tmp_path / "home"
+        home.mkdir()
+        monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+        (home / "profiles.yml").write_text(
+            f"default: t\nprofiles:\n  t: {{adapter: gemini, account: t, config_dir: {tmp_path / 'gm'}}}\n",
+            encoding="utf-8",
+        )
+        return "t"
+
+    def hook_params(self, payload: dict[str, Any], *, at_composer: bool) -> dict[str, Any] | None:
+        from shiftlead.adapters.gemini.hook import translate
+
+        return translate(payload)  # every Gemini launch lands at the composer: no `at_composer` to pass
+
+    def place_transcript(self, tmp_path: Path, src: Path, session_id: str) -> Path:
+        raise NotImplementedError("the Gemini adapter reads no transcript yet (TD-786)")
+
+
+HARNESSES: dict[str, Any] = {"claude-code": ClaudeCodeHarness(), "gemini": GeminiHarness()}

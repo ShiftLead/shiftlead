@@ -51,7 +51,7 @@ def _lines(name: str, rel: str) -> list[dict]:
 
 def test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness():
     """A new agent adapter is tested from its first registration: without fixtures and a harness it fails here."""
-    assert "claude-code" in AGENTS
+    assert "claude-code" in AGENTS and "gemini" in AGENTS
     assert "shell" not in AGENTS and "command" not in AGENTS
     for name in AGENTS:
         assert name in HARNESSES, f"{name} has no harness in tests/conformance/_harness.py"
