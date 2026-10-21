@@ -1975,6 +1975,7 @@
     el.dataset.usage = JSON.stringify(ev.usage);
     drawUsage(el, c);
     fitUsage();
+    if (AO.focusUsage) AO.focusUsage();  // a Focus keeps it for its disconnect card (TD-923)
   }
   function drawUsage(el, c) {
     el.dataset.pct = c.pct;
@@ -2796,6 +2797,114 @@
       return { kind: "silent", text: `no output for ${n}s`, title: "the session reads working and the pane has drawn nothing — Transcript or `ao tail` say whether it is thinking or stuck" };
     }
     return null;
+  };
+
+  // **The disconnect card** (design §4.6 *The disconnect card*, §4.5a; TD-923): while the mark reads
+  // *reconnecting…*, the spend the page last held. `held` is what `AO.dropRead` kept under
+  // `ao.drop.<id>`: the Spend readings (`team` and `all`, each `day` and `week`), the chips' usage per
+  // account, and `at`, when they were read. A row's figures are its seats' summed by `unit`, so a
+  // subscription's `≈$` and a metered profile's `$` stay two figures where the Spend page folds a mixed
+  // sum to `≈$`; *unweighed* tokens beside, as the page draws them (`figure` in spend.py); every kind of
+  // token summed, the kinds on the hover. A reading the page never got is *no reading*.
+  AO.DROP_KINDS = [["input", "input"], ["output", "output"], ["cache_read", "cache read"], ["cache_write", "cache write"]];
+  AO.dropSum = function (reading, keep) {
+    if (!reading || !Array.isArray(reading.seats)) return null;
+    const out = { money: {}, unweighed: 0, tokens: {} };
+    for (const [k] of AO.DROP_KINDS) out.tokens[k] = 0;
+    for (const s of reading.seats) {
+      if (!s || typeof s !== "object" || (keep && !keep(s))) continue;
+      const unit = s.unit === "$" ? "$" : "≈$", fig = Number(s.figure) || 0;
+      if (fig) out.money[unit] = (out.money[unit] || 0) + fig;
+      out.unweighed += Number(s.unweighed_tokens) || 0;
+      const t = s.tokens && typeof s.tokens === "object" ? s.tokens : {};
+      for (const [k] of AO.DROP_KINDS) out.tokens[k] += Number(t[k]) || 0;
+    }
+    return out;
+  };
+  // A sum as the card writes it: `{money, tok, kinds}`, or null for *no reading*.
+  AO.dropSays = function (sum) {
+    if (!sum) return null;
+    const cash = (unit, v) => unit + Number(v).toLocaleString("en-US", Math.abs(v) >= 100
+      ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const parts = ["≈$", "$"].filter((u) => sum.money[u]).map((u) => cash(u, sum.money[u]));
+    let money = parts.join(" · ");
+    if (sum.unweighed) money = parts.length ? `${money} + ${tokShort(sum.unweighed)} tok unweighed` : `unweighed · ${tokShort(sum.unweighed)} tok`;
+    if (!money) money = cash("≈$", 0);
+    const total = AO.DROP_KINDS.reduce((n, [k]) => n + sum.tokens[k], 0);
+    const kinds = AO.DROP_KINDS.map(([k, word]) => `${word} ${sum.tokens[k].toLocaleString("en-US")}`).join(" · ");
+    return { money, tok: `${tokShort(total)} tok`, kinds };
+  };
+  AO.dropCard = function (held, id, team, now) {
+    held = held && typeof held === "object" ? held : {};
+    now = typeof now === "number" ? now : Date.now();
+    const read = (scope, w) => ((held[scope] || {})[w]) || null;
+    const mine = (s) => Array.isArray(s.records) && s.records.includes(id);
+    const row = (label, scope, keep) => ({
+      label,
+      day: AO.dropSays(AO.dropSum(read(scope, "day"), keep)),
+      week: AO.dropSays(AO.dropSum(read(scope, "week"), keep)),
+    });
+    const rows = [row("this session", team ? "team" : "all", mine)];
+    if (team) rows.push(row(`team ${team}`, "team", null));
+    rows.push(row("all teams", "all", null));
+    // the account's windows as the chip's hover reads them: label, percentage and reset, one a line
+    const usage = held.usage && typeof held.usage === "object" ? held.usage : {};
+    const names = Object.keys(usage), windows = [];
+    for (const name of names) {
+      const ws = Array.isArray((usage[name] || {}).windows) ? usage[name].windows : [];
+      for (const w of ws) {
+        if (!w || typeof w !== "object" || !w.label) continue;
+        let line = names.length > 1 ? `${name} · ${w.label}` : String(w.label);
+        if (Number.isFinite(w.pct)) line += ` ${w.pct}%`;
+        const r = instant(w.resets);
+        if (r !== null) {
+          const d = new Date(r), pad = (n) => String(n).padStart(2, "0");
+          line += ` · resets ${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+        windows.push(line);
+      }
+    }
+    const at = Number.isFinite(held.at) ? usageClock(held.at, now) : null;
+    return { rows, windows, asof: at };
+  };
+  // The reading the card draws, taken at the Focus's load and at each reconnect's open — never while
+  // the link is down — and kept in `sessionStorage` under the session's id, so the page the one reload
+  // brings back draws it before its attach answers. A seat keeps only what the card sums.
+  const dropKey = (id) => `ao.drop.${id}`;
+  AO.dropHeld = function (id) {
+    try { const h = JSON.parse(sessionStorage.getItem(dropKey(id)) || "null"); return h && typeof h === "object" ? h : null; } catch (e) { return null; }
+  };
+  const dropKeep = (id, held) => { try { sessionStorage.setItem(dropKey(id), JSON.stringify(held)); } catch (e) { /* no storage: the card reads no reading after a reload */ } };
+  function chipUsage() {
+    const out = {};
+    for (const el of document.querySelectorAll("#usagechip [data-usage]")) {
+      try { out[el.dataset.account] = JSON.parse(el.dataset.usage); } catch (e) { /* a chip with no reading */ }
+    }
+    return out;
+  }
+  AO.dropUsage = function (id) { const h = AO.dropHeld(id) || {}; h.usage = chipUsage(); dropKeep(id, h); };
+  AO.dropRead = function (id, team) {
+    const got = {};
+    const one = (scope, t, w) => fetch(`/api/spend?window=${w}&top=all${t ? `&team=${encodeURIComponent(t)}` : ""}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j) => {
+        if (!j || !Array.isArray(j.seats)) return;
+        const seats = j.seats.map((s) => ({ records: s.records, unit: s.unit, figure: s.figure, unweighed_tokens: s.unweighed_tokens, tokens: s.tokens }));
+        (got[scope] = got[scope] || {})[w] = { seats };
+      }, () => { /* this one stays as the page last held it */ });
+    const reads = [];
+    for (const w of ["day", "week"]) {
+      if (team) reads.push(one("team", team, w));
+      reads.push(one("all", "", w));
+    }
+    return Promise.all(reads).then(() => {
+      const h = AO.dropHeld(id) || {};
+      for (const scope of Object.keys(got)) h[scope] = { ...(h[scope] || {}), ...got[scope] };
+      if (Object.keys(got).length) h.at = Date.now();
+      h.usage = chipUsage();
+      dropKeep(id, h);
+      return h;
+    });
   };
 
   // Deny's optional reason (design §4.5a, TD-117): one line beside Deny that goes back with the
@@ -5127,13 +5236,47 @@
     const mk = { retryAt: null, clients: 0, window: null, grid: null, open: false, state: s.state, lastByte: null };
     const markEl = $("#ftermmark");
     const tlog = (...a) => console.info("[shiftlead] terminal", ...a, new Date().toISOString());
+    // The disconnect card (`AO.dropCard`, above): drawn with the mark while it reads *reconnecting…*,
+    // gone with it on the first pane byte; never over the pane, and the retry line is the terminal's.
+    const dropEl = $("#fdrop");
+    let dropShown = false;
+    const drawDrop = (on) => {
+      if (!dropEl || (!on && !dropShown)) return;
+      dropShown = on;
+      dropEl.classList.toggle("hidden", !on);
+      if (!on) return;
+      const c = AO.dropCard(AO.dropHeld(id), id, s.team || "", Date.now());
+      const node = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+      const head = node("div", "dchead");
+      head.append(node("b", "", "Disconnected — reconnecting"), node("span", "dim", "the spend this page last held"));
+      const kids = [head];
+      const fig = (says, word) => {
+        const span = node("span", "dcfig");
+        if (!says) { span.append(node("span", "dim", "no reading"), ` ${word}`); return span; }
+        const tok = node("span", "", says.tok); tok.title = says.kinds;
+        span.append(says.money, node("span", "dim", " · "), tok, ` ${word}`);
+        return span;
+      };
+      for (const r of c.rows) {
+        const val = node("div", "dcval");
+        val.append(fig(r.day, "today"), node("span", "dim", " · "), fig(r.week, "this week"));
+        kids.push(node("div", "dclab", r.label), val);
+      }
+      const wins = node("div", "dcwin");
+      for (const w of c.windows) wins.append(node("span", "", w));
+      if (c.windows.length) kids.push(wins);
+      kids.push(node("div", "dcfoot dim", c.asof ? `as of ${c.asof}` : "as of — no reading"));
+      dropEl.replaceChildren(...kids);
+    };
     const drawMark = () => {
       if (!markEl) return;
       mk.grid = [term.cols, term.rows];
       const m = AO.termMark(mk, Date.now());
       markEl.classList.toggle("hidden", !m);
       if (m && (markEl.textContent !== m.text || markEl.title !== m.title)) { markEl.textContent = m.text; markEl.title = m.title; }
+      if (!!(m && m.kind === "reconnecting") !== dropShown) drawDrop(!!(m && m.kind === "reconnecting"));
     };
+    AO.focusUsage = () => AO.dropUsage(id);
     setInterval(drawMark, 1000);
     // design §4.5 *Focus watches* (TD-096): an unattended session's attach is read-only. The server
     // decides and drops the keys (§4.6); the page learns it from the attach's first frame and only
@@ -5161,6 +5304,7 @@
         ws.send(JSON.stringify({ resize: grid }));
         sendGrid.mark(...grid);
         mk.open = true; mk.lastByte = Date.now(); tlog("open");
+        AO.dropRead(id, s.team || "");  // the disconnect card's reading, at load and at each reconnect
         if (pathLinks) pathLinks.clear();  // a re-attach asks the host again (TD-501)
       };
       // The backoff resets on pane output, never on open (TD-029): a connection the server accepts

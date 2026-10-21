@@ -546,6 +546,16 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .composerbar .cbtext:hover { color: var(--fg); } .composerbar .cbtext.draft { color: var(--fg); } .composerbar .cbtext.off { cursor: default; }
 .composer textarea { width: 100%; height: 72px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); line-height: var(--lh); font-family: inherit; resize: vertical; }
 .termro { margin: 0 0 4px; }
+/* §4.6 *The disconnect card* (TD-923): between the header and the pane while the terminal reconnects */
+.dropcard { margin: 0 0 8px; padding: 10px 14px; display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; align-items: baseline; }
+.dropcard .dchead { grid-column: 1 / -1; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.dropcard .dchead b { font-weight: 600; }
+.dropcard .dchead .dim, .dropcard .dcfoot { font-size: var(--t-small); }
+.dropcard .dclab { color: var(--muted); font-size: var(--t-small); text-transform: uppercase; letter-spacing: .04em; }
+.dropcard .dcval { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono); }
+.dropcard .dcfig { white-space: nowrap; }
+.dropcard .dcwin { grid-column: 1 / -1; display: flex; gap: 4px 16px; flex-wrap: wrap; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono-s); padding-top: 4px; border-top: 1px dashed var(--line); }
+.dropcard .dcfoot { grid-column: 1 / -1; }
 .inline-banner { padding: 8px 10px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-fg); font-size: var(--t-body); }
 .kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: var(--t-body); margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
 .gitfiles { line-height: 1.7; margin-top: 6px; } .gitpick { margin-top: 8px; flex-wrap: nowrap; } .gitpick select { flex: 1; min-width: 0; width: auto; height: 26px; padding: 0 6px; font-size: var(--t-small); text-overflow: ellipsis; } .gitpickline { margin-top: 6px; overflow-wrap: anywhere; } .recentfiles { line-height: 1.7; overflow-wrap: anywhere; } .recentfiles .fmark { font-weight: 600; } .recentlinks { line-height: 1.7; min-width: 0; } .recentlinks div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }

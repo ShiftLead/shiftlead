@@ -228,6 +228,18 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "disconnect-card",
+        "disconnect card",
+        "Focus",
+        (
+            "While the terminal reconnects, the spend the page last held: this session, its team and all teams, "
+            "today and this week, as money and as tokens, a subscription's API-equivalent (≈$) apart from a "
+            "metered profile's bill ($), the account's windows under them with their resets, and when the figures "
+            "were read. It fetches nothing while the link is down and goes when the terminal paints; the Spend "
+            "page has the live figures."
+        ),
+    ),
+    Help(
         "restart",
         "Restart",
         "the Inbox restart row, a card's *more ▾*",
@@ -717,7 +729,11 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "switch-profile",
         ),
     ),
-    ("focus", "Focus", ("wrap-up", "kill", "resume", "side-panel", "pane-link", "pane-hyperlink", "pane-path")),
+    (
+        "focus",
+        "Focus",
+        ("wrap-up", "kill", "resume", "side-panel", "pane-link", "pane-hyperlink", "pane-path", "disconnect-card"),
+    ),
     (
         "inbox",
         "Inbox",

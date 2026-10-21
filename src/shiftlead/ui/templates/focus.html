@@ -164,6 +164,9 @@
     {#- §4.5 screen 2 *Focus watches* (TD-096, TD-296 #11): the read-only line sits over the terminal,
         not in it — tmux's attach switches xterm to its alternate buffer, which hid a line written there -#}
     <div class="note termro hidden" id="termro">watching: this session is unattended, so the terminal is read-only — Take over (above) to type.</div>
+    {#- design §4.6 *The disconnect card*, §4.5a (TD-923): between the header and the pane, never over it —
+        drawn by `app.js` while the terminal mark reads *reconnecting…*, from the spend the page last held -#}
+    <div class="card dropcard hidden" id="fdrop" title="the terminal dropped and retries on its own — these are the last figures the page held; the Spend page has the live ones"></div>
     {#- design §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): with `person.composer` folded,
         the default, the composer is one bar under the terminal and opens **over the terminal's foot** —
         never by resizing it, so the pane is not made to repaint — and the terminal takes the page's
