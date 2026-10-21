@@ -14,6 +14,8 @@ from datetime import date, datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
 
+from sessionorc.models import tokens_short
+
 WINDOWS = ("day", "week", "month")
 WINDOW_LABEL = {"day": "Day", "week": "Week", "month": "Month"}
 INTERACTIVE = "interactive"  # sessionorc.seats' team for the records in no team: the person's own
@@ -79,21 +81,30 @@ def money(value: Any, unit: str = "≈$") -> str:
 
 
 def tokens(n: Any) -> str:
-    """A token count in the chip's short shape: *4.1M tok*, *812k tok*."""
-    v = int(n or 0)
-    if v >= 1_000_000:
-        return f"{v / 1_000_000:.1f}M tok"
-    return f"{v / 1000:.0f}k tok" if v >= 1000 else f"{v} tok"
+    """A token count in the chip's short shape (`tokens_short`): *4.1M tok*, *812k tok*, *22M tok*."""
+    return f"{tokens_short(int(n or 0))} tok"
 
 
-def figure(acc: Mapping[str, Any], unit: str | None = None) -> str:
+def figure(acc: Mapping[str, Any], unit: str | None = None, *, count: str | bool | None = None) -> str:
     """A figure with its *unweighed* part named beside it, never in it (§4.4 *Spend per seat*):
-    *unweighed · 4.1M tok* where nothing was weighed, else the figure and *+ 4.1M tok unweighed*."""
+    *unweighed · 4.1M tok* where nothing was weighed, else the figure and *+ 4.1M tok unweighed*.
+    `count` a word (*tok*, *tokens*): the row's tokens, every kind summed, after the figure in that word —
+    *≈$426 · 95.2M tok*, *≈$38.20 + 4.1M tok unweighed · 8.4M tok*, wholly unweighed the count once
+    (§4.4 *Tokens beside every figure*); `False`: a table's figure cell, its count in the cell beside it, so
+    wholly unweighed reads *unweighed* alone. A row whose reading carries no `tokens` reads as `None`'s."""
     u = unit or str(acc.get("unit") or "≈$")
     unweighed = int(acc.get("unweighed_tokens") or 0)
-    if unweighed and not float(acc.get("figure") or 0.0):
-        return f"unweighed · {tokens(unweighed)}"
-    return money(acc.get("figure"), u) + (f" + {tokens(unweighed)} unweighed" if unweighed else "")
+    wholly = bool(unweighed) and not float(acc.get("figure") or 0.0)
+    kinds = acc.get("tokens")
+    if not isinstance(kinds, Mapping):
+        count = None
+    if wholly:
+        head = "unweighed" if count is not None else f"unweighed · {tokens(unweighed)}"
+    else:
+        head = money(acc.get("figure"), u) + (f" + {tokens(unweighed)} unweighed" if unweighed else "")
+    if not count or not isinstance(kinds, Mapping):
+        return head
+    return f"{head} · {tokens_short(sum(int(kinds.get(k) or 0) for k in TOKEN_KINDS))} {count}"
 
 
 def team_figure(team: str, row: Mapping[str, Any] | None) -> dict[str, str] | None:
@@ -483,7 +494,7 @@ def _team_line(t: Mapping[str, Any], window: str, start: date, current: bool, un
     if not current:
         now_word, prev_word = period_label(window, start, today), period_label(window, _step(window, start, -1), today)
     u = str(t.get("unit") or unit)
-    parts = [f"{figure(t, u)} {now_word}" + (" (so far)" if current else "")]
+    parts = [f"{figure(t, u, count='tokens')} {now_word}" + (" (so far)" if current else "")]
     parts.append(f"{prev_word} {money((t.get('previous') or {}).get('figure'), u)}")
     if not (window == "week" and current) and window != "month":
         parts.append(f"this week {money(t.get('week'), u)}")

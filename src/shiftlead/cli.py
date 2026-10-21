@@ -2301,7 +2301,7 @@ def spend_lines(got: dict[str, Any], team: str | None, today: date | None = None
 
     def seat_line(s: dict[str, Any], alone: bool) -> str:
         parts = [spend._seat_name(s)] + ([str(s["role"])] if s.get("role") not in (None, "", spend.OTHER) else [])
-        parts += [spend.figure(s), spend.pct(s.get("share")), f"{int(s.get('turns') or 0):,} turns"]
+        parts += [spend.figure(s, count="tok"), spend.pct(s.get("share")), f"{int(s.get('turns') or 0):,} turns"]
         per = finished.get(str(s.get("role") or "")) or {}
         if alone and per.get("entries"):  # the reading counts finished entries per role, not per seat
             parts.append(f"{per['entries']} done, median {spend.money(per.get('median'), unit)}")
@@ -2327,10 +2327,11 @@ def spend_lines(got: dict[str, Any], team: str | None, today: date | None = None
         out.append(f"{spend.TEAM_WORD.get(team, team)} · {head}")
         out += block(team)
     else:
-        out.append(f"By team · {spend.period_label(window, start, today)} · {spend.figure(got.get('whole') or {})}")
+        whole = spend.figure(got.get("whole") or {}, count="tok")
+        out.append(f"By team · {spend.period_label(window, start, today)} · {whole}")
         for t in got.get("teams") or []:
             name, u = str(t.get("team")), str(t.get("unit") or unit)
-            parts = [spend.TEAM_WORD.get(name, name), spend.figure(t), spend.pct(t.get("share"))]
+            parts = [spend.TEAM_WORD.get(name, name), spend.figure(t, count="tok"), spend.pct(t.get("share"))]
             if "to_date" in (p := t.get("previous") or {}):
                 was, now = float(p.get("to_date") or 0.0), float(t.get("figure") or 0.0)
                 parts.append(
@@ -2348,7 +2349,7 @@ def spend_lines(got: dict[str, Any], team: str | None, today: date | None = None
         outside = got.get("outside") or {}
         if int(outside.get("turns") or 0):
             out.append(
-                f"outside shiftlead · {spend.figure(outside)} · {spend.pct(outside.get('share'))}"
+                f"outside shiftlead · {spend.figure(outside, count='tok')} · {spend.pct(outside.get('share'))}"
                 f" · {int(outside.get('turns') or 0):,} turns"
             )
     return out

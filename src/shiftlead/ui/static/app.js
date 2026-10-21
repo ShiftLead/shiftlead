@@ -1842,10 +1842,15 @@
     }
     return parts.length ? `profiles on this account:\n${parts.join("\n")}` : "";  // one per line (TD-270)
   }
-  // A token count as the server says it (`tokens_short`): `231k`, `1.2M`; under a thousand, as it is.
+  // A token count as the server says it (`tokens_short`): `231k`, `1.2M`, `2.1B`; under a thousand, as it is;
+  // a unit promotes where its rounding reaches the next (999,500 is `1M`, never `1000k`).
   // Half to even, as Python's `round` and format are, so a tie reads the same in both homes.
   const halfEven = (x) => { const f = Math.floor(x), d = x - f; return d > 0.5 || (d === 0.5 && f % 2 !== 0) ? f + 1 : f; };
-  const tokShort = (n) => n >= 1e6 ? String(halfEven(n / 1e5) / 10) + "M" : n >= 1e3 ? `${halfEven(n / 1e3)}k` : String(n);
+  const tokShort = (n) => {
+    if (n < 1e3) return String(n);
+    const k = halfEven(n / 1e3), m = halfEven(n / 1e5);
+    return k < 1e3 ? `${k}k` : m < 1e4 ? String(m / 10) + "M" : String(halfEven(n / 1e8) / 10) + "B";
+  };
   const money = (v) => "$" + Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\.00$/, "");
   // A metered profile's amount for a window as the chip writes it — `_amount_says` in common.py.
   function amountSays(a) {
@@ -1918,6 +1923,7 @@
     const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     return now - t >= 86400e3 ? `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getDay()]} ${hm}` : hm;
   }
+  AO.tokShort = tokShort;  // read by tests/test_models.py's edge cases, held to `tokens_short`
   AO.usageChip = function (profile, u, now) {
     if (!u || typeof u !== "object") return null;
     const spent = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w === "object" && w.spent && typeof w.spent === "object" && !Array.isArray(w.spent));

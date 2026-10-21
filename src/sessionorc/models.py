@@ -852,12 +852,15 @@ def report_ref(session: dict[str, Any], prs: Mapping[int, str] | None = None) ->
 
 
 def tokens_short(n: int) -> str:
-    """A token count as a reading says it: `231k`, `1M`, `1.2M`; under a thousand, as it is."""
-    if n >= 1_000_000:
-        return f"{n / 1_000_000:.1f}".removesuffix(".0") + "M"
-    if n >= 1_000:
-        return f"{round(n / 1_000)}k"
-    return str(n)
+    """A token count as a reading says it: `231k`, `1M`, `1.2M`, `2.1B`; under a thousand, as it is. A unit
+    promotes where its rounding reaches the next (999,500 is `1M`, never `1000k`)."""
+    if n < 1_000:
+        return str(n)
+    if (k := round(n / 1_000)) < 1_000:
+        return f"{k}k"
+    if float(m := f"{n / 1_000_000:.1f}") < 1_000:
+        return m.removesuffix(".0") + "M"
+    return f"{n / 1_000_000_000:.1f}".removesuffix(".0") + "B"
 
 
 def context_reading(session: dict[str, Any], *, of_window: bool = True) -> str:

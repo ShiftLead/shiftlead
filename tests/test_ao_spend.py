@@ -56,28 +56,32 @@ def got(window="day", team=None, by=None, led=None):
 
 def test_by_team_then_each_teams_seats_then_interactive_then_outside():
     lines = cli.spend_lines(got(), None, TODAY)
-    assert lines[0] == "By team · Sat 17 Oct · ≈$160"
+    assert lines[0] == "By team · Sat 17 Oct · ≈$160 · 6k tok"
     by_team = [ln for ln in lines if ln.startswith("  ao-grind ·")][0]
     # the head's figure, its share of the whole, its turns, the week's and month's so far, the seat that spent most
-    assert by_team.startswith("  ao-grind · ≈$138 · 87% · 1,563 turns · week ≈$158 · month ≈$158 · most grinder-ao-1")
-    assert "  interactive sessions · ≈$9.45 · 6% · 147 turns" in "\n".join(lines)
+    assert by_team.startswith(
+        "  ao-grind · ≈$138 · 3k tok · 87% · 1,563 turns · week ≈$158 · month ≈$158 · most grinder-ao-1"
+    )
+    assert "  interactive sessions · ≈$9.45 · 1k tok · 6% · 147 turns" in "\n".join(lines)
     heads = [ln for ln in lines if not ln.startswith(" ")]
-    assert heads == ["By team · Sat 17 Oct · ≈$160", "ao-grind", "dc-grind", "interactive sessions"] + [
-        "outside shiftlead · ≈$1.90 · 1% · 21 turns"
+    assert heads == ["By team · Sat 17 Oct · ≈$160 · 6k tok", "ao-grind", "dc-grind", "interactive sessions"] + [
+        "outside shiftlead · ≈$1.90 · 1k tok · 1% · 21 turns"
     ]
     grind = lines[lines.index("ao-grind") + 1 : lines.index("dc-grind")]
     assert (
-        grind[0]
-        == "  grinder-ao-1 · grinder · ≈$52.30 · 38% · 611 turns · between ≈$0.00 · past 200k 12% · past 300k 0%"
+        grind[0] == "  grinder-ao-1 · grinder · ≈$52.30 · 1k tok · 38% · 611 turns · between ≈$0.00 · past 200k 12%"
+        " · past 300k 0%"
     )
-    assert "  grinder-ao-2 · grinder · ≈$47.90 · 35% · 540 turns · between ≈$6.10" in grind[1]
+    assert "  grinder-ao-2 · grinder · ≈$47.90 · 1k tok · 35% · 540 turns · between ≈$6.10" in grind[1]
     # a role of one seat carries its finished entries; a role of two does not split them
-    assert grind[2].startswith("  designer-ao-1 · designer · ≈$38.20 · 28% · 412 turns · 1 done, median ≈$54.70 ·")
+    assert grind[2].startswith(
+        "  designer-ao-1 · designer · ≈$38.20 · 1k tok · 28% · 412 turns · 1 done, median ≈$54.70 ·"
+    )
     assert " done" not in grind[0] + grind[1]
     # dc-grind's grinder is not the reading's one grinder, so the grinders' finished entry is on no seat's line
     assert " done" not in lines[lines.index("dc-grind") + 1]
     assert lines[lines.index("interactive sessions") + 1].startswith(
-        "  ao-paul · shiftlead · ≈$9.45 · 100% · 147 turns"
+        "  ao-paul · shiftlead · ≈$9.45 · 1k tok · 100% · 147 turns"
     )
 
 
@@ -89,9 +93,9 @@ def test_by_team_marks_each_team_against_the_previous_period_to_date():
     led["days"]["2026-10-06"] = {"g1": _row(100.0, 50, "grinder-ao-1")}  # last week, by Saturday: ≈$100
     led["days"]["2026-10-07"] = {"c1": _row(80.0, 50, "dc-grinder", team="dc-grind")}  # ≈$80
     by_team = {ln.split(" · ")[0].strip(): ln for ln in cli.spend_lines(got("week", led=led), None, TODAY)[1:5]}
-    assert by_team["ao-grind"].startswith("  ao-grind · ≈$158 · 72% · ▲ 58% · 1,663 turns")
-    assert by_team["dc-grind"].startswith("  dc-grind · ≈$50.00 · 23% · ▼ 38% · 150 turns")
-    assert by_team["interactive sessions"].startswith("  interactive sessions · ≈$9.45 · 4% · — · 147 turns")
+    assert by_team["ao-grind"].startswith("  ao-grind · ≈$158 · 4k tok · 72% · ▲ 58% · 1,663 turns")
+    assert by_team["dc-grind"].startswith("  dc-grind · ≈$50.00 · 2k tok · 23% · ▼ 38% · 150 turns")
+    assert by_team["interactive sessions"].startswith("  interactive sessions · ≈$9.45 · 1k tok · 4% · — · 147 turns")
 
 
 def test_a_reading_with_no_outside_turns_prints_no_outside_line():
@@ -103,12 +107,14 @@ def test_a_reading_with_no_outside_turns_prints_no_outside_line():
 
 def test_a_teams_head_line_then_its_block_alone_and_interactive_the_same():
     lines = cli.spend_lines(got(team="ao-grind"), "ao-grind", TODAY)
-    assert lines[0] == "ao-grind · ≈$138 today (so far) · yesterday ≈$20.00 · this week ≈$158 · October ≈$158"
+    assert (
+        lines[0] == "ao-grind · ≈$138 · 3k tokens today (so far) · yesterday ≈$20.00 · this week ≈$158 · October ≈$158"
+    )
     assert [ln.split(" · ")[0].strip() for ln in lines[1:]] == ["grinder-ao-1", "grinder-ao-2", "designer-ao-1"]
     mine = cli.spend_lines(got(team="interactive"), "interactive", TODAY)
-    assert mine[0].startswith("interactive sessions · ≈$9.45 today (so far)")
+    assert mine[0].startswith("interactive sessions · ≈$9.45 · 1k tokens today (so far)")
     assert mine[1:] == [
-        "  ao-paul · shiftlead · ≈$9.45 · 100% · 147 turns · between ≈$0.00 · past 200k 0% · past 300k 0%"
+        "  ao-paul · shiftlead · ≈$9.45 · 1k tok · 100% · 147 turns · between ≈$0.00 · past 200k 0% · past 300k 0%"
     ]
 
 
@@ -120,8 +126,18 @@ def test_a_metered_figure_reads_dollars_and_an_unweighed_one_its_tokens():
     }
     led["days"].pop("2026-10-16")
     lines = cli.spend_lines(got(team="ao-grind", led=led), "ao-grind", TODAY)
-    assert lines[1].startswith("  grinder-ao-1 · grinder · $3.20 ·")
-    assert lines[2].startswith("  grinder-ao-2 · grinder · unweighed · 1k tok ·")
+    assert lines[1].startswith("  grinder-ao-1 · grinder · $3.20 · 1k tok ·")
+    assert lines[2].startswith("  grinder-ao-2 · grinder · unweighed · 1k tok · ")  # the count once
+    assert "1k tok · 1k tok" not in lines[2]
+
+
+def test_a_part_unweighed_figure_names_its_note_then_the_whole_count():
+    """§4.7 `ao spend` (TD-929): a figure part unweighed keeps its note beside it, then the row's every kind
+    summed — *≈$38.20 + 4.1M tok unweighed · 8.4M tok*."""
+    led = ledger()
+    led["days"] = {"2026-10-17": {"g1": _row(3.2, 4, "grinder-ao-1", unweighed=2, input=8_200_000, output=200_000)}}
+    line = cli.spend_lines(got(team="ao-grind", led=led), "ao-grind", TODAY)[1]
+    assert line.startswith("  grinder-ao-1 · grinder · ≈$3.20 + 4.2M tok unweighed · 8.4M tok · 100% ·")
 
 
 def test_the_finished_entries_their_roles_and_the_partial_mark():
@@ -139,7 +155,7 @@ def test_the_finished_entries_their_roles_and_the_partial_mark():
 def test_an_empty_ledger_prints_nothing_spent_and_raises_nowhere():
     empty = {"began": None, "days": {}, "refs": {}}
     for window in ("day", "week", "month"):
-        assert cli.spend_lines(got(window, led=empty), None, TODAY)[0].endswith(" · ≈$0.00")
+        assert cli.spend_lines(got(window, led=empty), None, TODAY)[0].endswith(" · ≈$0.00 · 0 tok")
         alone = cli.spend_lines(got(window, "ao-grind", led=empty), "ao-grind", TODAY)
         assert len(alone) == 1 and alone[0].startswith("ao-grind · ≈$0.00 ")  # the head line, and no seat
     assert cli.record_spend([{"id": "g1"}], lambda method, **kw: got(kw["window"], by="record", led=empty)) == {}

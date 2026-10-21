@@ -586,3 +586,31 @@ def test_a_record_in_no_team_reads_as_an_interactive_seat_by_name_and_repo_with_
     ]
     (row,) = seats.reading(ledger, "day", NOW, team="interactive", weights=W)["teams"]
     assert row["team"] == "interactive" and row["turns"] == 3
+
+
+def test_every_row_carries_its_tokens_by_kind_summed_once_from_its_seats():
+    """§4.4 *Tokens beside every figure* (TD-929): the team, role, repo, whole and series rows carry `tokens` by
+    kind beside their figure, each the sum of its seats'; a seat on two models sums them once; no reply shares
+    another's dict."""
+    two = {"models": {"m": {"input": 100, "output": 10, "cache_read": 1000, "cache_write": 5, "turns": 1,
+                            "figure": 1.0}, "n": {"input": 50, "output": 5, "cache_read": 500, "cache_write": 0,
+                                                  "turns": 1, "figure": 2.0}}}  # fmt: skip
+    ledger = _ledger(
+        d2026_10_17={
+            "a": _day(1.0, name="g1") | two,
+            "b": _day(4.0, name="d1", role="designer", output=20, cache_read=7, cache_write=3),
+        }
+    )
+    got = seats.reading(ledger, "day", NOW, weights=W)
+    g1, d1 = sorted(got["seats"], key=lambda s: s["seat"], reverse=True)
+    assert g1["tokens"] == {"input": 150, "output": 15, "cache_read": 1500, "cache_write": 5}  # once, not twice
+    assert d1["tokens"] == {"input": 1000, "output": 20, "cache_read": 7, "cache_write": 3}
+    both = {"input": 1150, "output": 35, "cache_read": 1507, "cache_write": 8}
+    assert got["whole"]["tokens"] == got["teams"][0]["tokens"] == got["repos"]["r"]["tokens"] == both
+    assert got["roles"]["grinder"]["tokens"] == g1["tokens"] and got["roles"]["designer"]["tokens"] == d1["tokens"]
+    assert got["outside"]["tokens"] == dict.fromkeys(seats.KINDS, 0)
+    assert "tokens" not in got["teams"][0]["previous"]  # the previous period, week and month: figures alone
+    bucket = got["series"][-1]
+    assert bucket["tokens"] == both and bucket["by"]["t"]["tokens"] == both
+    got["whole"]["tokens"]["input"] = 0
+    assert got["teams"][0]["tokens"]["input"] == 1150 and g1["tokens"] is not got["top"][0]["tokens"]
