@@ -1599,6 +1599,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** In `docs/design/4.5-ui.md` screen 8, drop `; a tab, last, until TD-932 builds it` so the item reads *… (§4.5a *Sessions top bar: Settings*, TD-931).* Add a line to `docs/design-history.md` under §4.5 above the section's newest lines saying the clause went with TD-932's build. Grep `docs/design/` once more for `until TD-93` and `builds it`.
 
 **Done when** `grep -rn "until TD-93" docs/design/` finds nothing and the Settings item says only what is true now.
+---
+
 ## TD-936: The Spend page's three tokens cells can each go from `spend_part.html` and no test notices (test audit of #2215)
 
 **Priority:** Low
