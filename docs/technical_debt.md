@@ -75,7 +75,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-912 | Build TD-909 (3): Start session once per card, the road widened, the prompt's third key (a held path) | High | Built — live check #2186 |
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
-| TD-922 | #2188's Queue card answer row draws a look's `Works` / `Not right…` pair, and no test has a look on a card (test audit) | Low | Open |
 
 ---
 
@@ -1554,20 +1553,3 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-922: #2188's Queue card answer row draws a look's `Works` / `Not right…` pair, and no test puts a look on a card
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-20 (test audit of #2188, test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/inbox_row.html` (`answer_row`: `{% set form = pair and i == 1 %}`, the `Not right…` button and the `pair` label); `tests/test_queue_card_verbs.py`, `tests/test_queue_item_shape.py`
-
-**Why:** `answer_row` gives a card's Decide item a look's pair (`Works` / `Not right…`, the second opening a composer, `data-begun="Not right: "`), for a mail look and a board line's `pair`. Probe on `origin/main` cc1035d47: change `{% set form = pair and i == 1 %}` to `{% set form = false %}` and `tests/test_queue_card_verbs.py`, `test_queue_item_shape.py`, `test_ui_inbox.py`, `test_ui_queue.py`, `test_ui_queue_cards.py`, `test_attach.py`, `test_ui_look_row.py`, `test_ui_board.py`, `test_mail.py` and `test_handed_entry.py` all pass (479 tests). No test in #2188 has a pair item on a card (`grep -n "Not right\|Works" tests/test_queue_card_verbs.py tests/test_queue_item_shape.py` finds nothing), so a card could lose the composer and send `Not right…` as a plain answer. Also unproven: the guard `mode != 'card'` on `reply_btn` survives deletion with the suite green (the card path may not reach it, so it may only be dead).
-
-**Fix:** One test: a card whose item is a look (mail) and one whose item is a board line with `pair`: the row reads `Works` and `Not right…`, `Not right…` carries `data-act="reply"` / `board_notright` and `data-begun`, and no caption or `rec` outline is drawn. Revert the `form` line and see it fail.
-
-**Done when** the probe above fails a test.
-
----
