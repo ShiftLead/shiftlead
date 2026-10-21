@@ -27,10 +27,10 @@
 {%- endif %}{% endmacro %}
 
 {# the ⋯ (design §4.5 screen 12 *Three verbs: ⋯*, §4.5a *Queue card: ⋯*; TD-909, built by TD-914): the team's
-   controls behind one mark, always drawn, at narrow width too; the names it holds drawn beside it on hover or focus
-   of its header, row or item (`.qdotsnames`, by the page's CSS; never at narrow width), and in its label. A control of its own: `Enter` opens it, the arrows move, `Esc` closes and
+   controls behind one mark, always drawn, bare at every width: the names it holds are in its `title` and its label,
+   never drawn beside it on hover (§4.5 *A hover changes colour, never layout*, TD-926). A control of its own: `Enter` opens it, the arrows move, `Esc` closes and
    puts focus back on the mark (`AO.qDots`). Its menu is the page's `details.more`, placed by the same script. #}
-{% macro dots(names) %}<details class="more qdots"><summary class="qdotsbtn" role="button" aria-haspopup="menu" title="{{ names | join(' · ') }}" aria-label="the team's controls: {{ names | join(', ') }}">⋯<span class="qdotsnames" aria-hidden="true">{{ names | join(' · ') }}</span></summary><div class="menu" role="menu" title="{{ help_title('card-dots') }}">{{ caller() }}</div></details>{% endmacro %}
+{% macro dots(names) %}<details class="more qdots"><summary class="qdotsbtn" role="button" aria-haspopup="menu" title="{{ names | join(' · ') }}" aria-label="the team's controls: {{ names | join(', ') }}">⋯</summary><div class="menu" role="menu" title="{{ help_title('card-dots') }}">{{ caller() }}</div></details>{% endmacro %}
 
 {# a Queue row's ⋯, and the card header's on its top entry (§4.5 screen 12 *Three verbs: ⋯*): the row's controls
    (`controls`, the Inbox's ledger row draws them inline), **Release** on a row the person holds, and **Open**, the
