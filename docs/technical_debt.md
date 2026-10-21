@@ -82,6 +82,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-930 | Build TD-927 (2): the Spend page's tokens column, the totals' tokens and the bar's hover | Medium | Open — blocked by TD-929 |
 | TD-931 | The top bar's pages look like three different kinds of control, and its one number says nothing about where to go | Medium | Designed — built by TD-932 |
 | TD-932 | Build TD-931: the top bar's three groups, a number on each of the Inbox and Queue tabs, Settings as a gear, `3` for the Queue | Medium | Open |
+| TD-933 | The Sessions page can stop counting the flat page's sessions in its rollup and no test notices (test audit of #2204) | Low | Open |
 
 ---
 
@@ -1703,5 +1704,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** `base.html`: after the wordmark, `.tabs` holds Sessions, Inbox (`#personinbox`, its `#personneeds` badge the `home: inbox` total, no `data-href`; `#personfyi` stays) and Queue (`#queuetab`, a `#queueneeds` badge the `home: queue` total; each badge shows only above zero and keeps its last number while the counts are `null`, as `#personneeds` does); then `.grow`; then one `.readings` strip — `#usagechip`, `#buildchip`, `#hostchip` as today's spans with a hairline divider between and no button border; then `.tools` — `#settingstab` as a gear `svg` with `aria-label="Settings"` and the word in its `title`, `.on` on the Settings page, then `#theme`, then `#keyhelpbtn`, then `#newmenu`. `app.css`: the `.tab` rule carries the badges; `.readings > * + *` the divider; the tools one ghost size; the bar wraps the readings and tools under the tabs, and the 720 px rule puts `.readings` on a row of its own with `#hostchip` hidden, as today (the hollow dot while unreachable, `#hostdot.down`, unchanged). `app.js`: the key table gains `{ keys: ["3"], page: "all", control: "Queue", sel: "#queuetab" }`, and the Inbox ring's answer-keys row says *1 Sessions, 2 Inbox, 3 Queue* for a row without any; the `#personneeds` `data-href` follower goes; the `counts` handler draws both badges from the payload's `needs` and `queue_n`; the Inbox anchor's `title` moves to its badge. The Sessions rollup's *in the Inbox* facet is the Inbox tab's number (§4.5 screen 1): `person_needs` at the first-paint sites becomes `count - queue_n`, `rollup.html` reads it, `syncSummaries` keeps copying `#personneeds`, now Inbox-only, and `overdue_n` is left as it is (both homes). `inbox_sections` already tags each row's home and returns `queue_n`, the `home: queue` total, which `counts` (the stream and `/api/person/inbox?counts=1`, `INBOX_COUNTS`, `counts_of`) already carries beside `needs`: the Queue tab's number is `queue_n`, the Inbox tab's `needs - queue_n`, one computation and no new field; `_counts_line` in `cli.py` is the print to change; the rail's `#railqueue` line and the Queue's `#qininbox` go; the hover titles on the two badges say what each counts and that the other holds the rest, the Queue's that its filter counts cards; the rail's *Needs you* hover says it is the Inbox tab's number. `ao inbox --counts` prints *needs you n (inbox n · queue n) · …*. Tests: the three tabs in order inside `.tabs`, the badges' totals from a fixture with a question about an open card and a state row (one on each tab, summing to `needs`), no `data-href` on `#personneeds`, no `#railqueue` and no `#qininbox`, `3` in the key table and the overlay (and yielding on a ringed Inbox row with answers), the gear's accessible name, the two hovers, `.on` on Settings, and a headless-Chromium look at the bar at 1440 and 900 px in both themes kept under `docs/mockups/reviews/` beside the shapes.
 
 **Done when** every page's bar draws the three groups as the design says, both numbers move with the stream and sum to what `ao inbox --counts` prints as *needs you*, `3` opens the Queue, the bar wraps and narrows as the design says, the rollup's *in the Inbox* reads the Inbox number with an overdue count that exceeds it in a fixture holding a card question and a due board line, and the tests above hold.
+
+---
+
+## TD-933: The Sessions page can stop counting the flat page's sessions in its rollup and no test notices (test audit of #2204)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-20 (test audit of #2204, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (`rollup(groups, vs)` at the delta path's `render(ro=rollup(groups, vs))` and the `org` route's `"rollup": rollup(groups, vs)`); `tests/test_ui_team_summary.py`
+
+**Why:** #2204 makes the rollup's Agents and *answer needed* count `vs`, the sessions the page draws, and on the flat page (`groups` is `None`) `vs` is the only source. The tests call `ui.rollup(None, vs)` directly, but nothing runs the two call sites. Probe on `origin/main` 69d778064: change both to `rollup(groups)` and `pytest tests -k "ui or rollup or org"` passes (1263 tests, `test_ui_team_summary.py` alone 38), though the flat page then shows `quiet` with no Agents pills and no *answer needed* whatever sessions it holds. The rest of the PR's change holds: reverting the `command` skip, the `g.get("live")` test, the all-teams *asked you* sum, its oldest-ask key, the `if live` guard on the phases loop, the filter clear in `AO.rollupGo` or `data-open-team` fails a test.
+
+**Fix:** One test through the app on a host with sessions and no team defined or badged (the flat page): the page's `#rollup` and the delta's `rollup` html carry `Agents (n)` and, for a session waiting on a permission, a `data-open-card` link. Revert both call sites and see it fail.
+
+**Done when** the probe above fails a test.
 
 ---
