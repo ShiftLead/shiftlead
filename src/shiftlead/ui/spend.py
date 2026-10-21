@@ -107,6 +107,27 @@ def figure(acc: Mapping[str, Any], unit: str | None = None, *, count: str | bool
     return f"{head} · {tokens_short(sum(int(kinds.get(k) or 0) for k in TOKEN_KINDS))} {count}"
 
 
+def kinds_line(kinds: Mapping[str, Any]) -> str:
+    """The four kinds of a row's tokens in the short shape, without *tok* — *input 1.2M · output 310k · cache
+    read 88M · cache write 5.4M*: a tokens cell's hover, and the first line of a seat's (§4.5a *Spend page*)."""
+    return " · ".join(f"{k.replace('_', ' ')} {tokens_short(int(kinds.get(k) or 0))}" for k in TOKEN_KINDS)
+
+
+def tok_cell(row: Mapping[str, Any]) -> dict[str, str]:
+    """A **tokens** cell (§4.5 screen 13 *Tokens*): the row's every kind summed in the short shape without *tok*,
+    the four kinds on its hover; empty where the reading carries no `tokens` (one from before them), never *0*."""
+    kinds = row.get("tokens")
+    if not isinstance(kinds, Mapping):
+        return {"tok": "", "tok_title": ""}
+    return {"tok": tokens_short(sum(int(kinds.get(k) or 0) for k in TOKEN_KINDS)), "tok_title": kinds_line(kinds)}
+
+
+def _summed(rows: list[Mapping[str, Any]]) -> dict[str, int] | None:
+    """The rows' `tokens` by kind summed, `None` where none of them carries any."""
+    held = [r["tokens"] for r in rows if isinstance(r.get("tokens"), Mapping)]
+    return {k: sum(int(t.get(k) or 0) for t in held) for k in TOKEN_KINDS} if held else None
+
+
 def team_figure(team: str, row: Mapping[str, Any] | None) -> dict[str, str] | None:
     """A team card's **spend** figure (§4.5 screen 1, §4.5a *team card: spend*; TD-832): today's figure from
     the team's `seats` row, a link to this page on the team, the week's figure and the seat that spent most
@@ -269,8 +290,10 @@ def _chart(got: Mapping[str, Any], picks: Mapping[str, Any], team: str, today: d
             for k in order
             if (v := (b.get("by") or {}).get(k)) and float(v.get("figure") or 0.0) > 0
         ]
-        lines = [f"{period_label(window, first, today)}: {figure(b)}"]
-        lines += [f"{_team_word(k) if not team else k}: {figure(v)}" for k, v in (b.get("by") or {}).items()]
+        lines = [f"{period_label(window, first, today)}: {figure(b, count='tok')}"]
+        lines += [
+            f"{_team_word(k) if not team else k}: {figure(v, count='tok')}" for k, v in (b.get("by") or {}).items()
+        ]
         if b.get("partial"):
             lines.append(f"partial: the ledger begins {begins}")
         bars.append(
@@ -349,7 +372,8 @@ def spend_view(
                     "name": _team_word(name),
                     "href": "" if name in (INTERACTIVE, OUTSIDE) else spend_query(picks, team=name),
                     "colour": colours.get(name, GREY),
-                    "figure": figure(t),
+                    "figure": figure(t, count=False),
+                    **tok_cell(t),
                     "share": float(t.get("share") or 0.0),
                     "pct": pct(t.get("share")),
                     "change": change,
@@ -362,7 +386,7 @@ def spend_view(
             )
         top = list(got.get("top") or [])
         out |= {
-            "whole": figure(whole),
+            "whole": figure(whole, count="tokens"),
             "by_team": rows,
             "top": [
                 {
@@ -371,7 +395,8 @@ def spend_view(
                     "team": "interactive" if s.get("team") == INTERACTIVE else str(s.get("team")),
                     "colour": colours.get(str(s.get("team")), GREY),
                     "role": str(s.get("role") or OTHER),
-                    "figure": figure(s),
+                    "figure": figure(s, count=False),
+                    **tok_cell(s),
                     "unknown": _unknown(s, records, unknown),
                     "share": float(s.get("share") or 0.0),
                     "pct": pct(s.get("share")),
@@ -390,7 +415,10 @@ def spend_view(
     out |= {"team": team, "line": _team_line(mine, window, start, current, unit, today), "seats": [], "entries": []}
     seats = [s for s in got.get("seats") or [] if s.get("team") == team]
     total = sum(float(s.get("figure") or 0.0) for s in seats)
-    out["total"] = money(total, unit)
+    whole_of = {"figure": total, "unweighed_tokens": sum(int(s.get("unweighed_tokens") or 0) for s in seats)}
+    if (kinds := _summed(seats)) is not None:
+        whole_of["tokens"] = kinds
+    out["total"] = figure(whole_of, unit, count="tokens")
     out["turns"] = sum(int(s.get("turns") or 0) for s in seats)
     finished = got.get("finished") or {}
     entries = sorted(got.get("entries") or [], key=lambda e: -float(e.get("figure") or 0.0))
@@ -410,7 +438,8 @@ def spend_view(
                     "name": _seat_name(s),
                     "href": _seat_link(s, records),
                     "role": role,
-                    "figure": figure(s),
+                    "figure": figure(s, count=False),
+                    **tok_cell(s),
                     "unknown": _unknown(s, records, unknown),
                     "share": float(s.get("share") or 0.0),
                     "pct": pct(s.get("share")),
@@ -436,6 +465,7 @@ def spend_view(
                     "subtotal": True,
                     "name": f"{role}s",
                     "figure": money(fig, unit),
+                    **tok_cell({"tokens": _summed(group)}),
                     "share": fig / total if total else 0.0,
                     "pct": pct(fig / total if total else 0.0),
                     "turns": sum(int(s.get("turns") or 0) for s in group),
@@ -470,7 +500,7 @@ def _weights_title(s: Mapping[str, Any], got: Mapping[str, Any]) -> str:
     it was weighed at: its tokens by kind, turns and context marks."""
     got_tokens = s.get("tokens") or {}
     bits = [
-        " · ".join(f"{k.replace('_', ' ')} {tokens(got_tokens.get(k))}" for k in TOKEN_KINDS) if got_tokens else "",
+        kinds_line(got_tokens) if got_tokens else "",
         f"{int(s.get('turns') or 0):,} turns",
         f"past 200k {pct(s.get('past_200k_share'))}",
     ]
