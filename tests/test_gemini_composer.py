@@ -40,6 +40,14 @@ def test_a_box_without_the_cursor_is_a_history_prompt_and_reads_as_no_composer()
     assert GeminiAdapter().composer(tail) is None
 
 
+def test_a_cursor_below_the_box_is_not_the_boxs():
+    """Only the box's own rows are read for the cursor: a reverse-video cell in a footer below a history
+    prompt's box never makes it a composer."""
+    tail = [r.replace(gemini.CURSOR, "") for r in _tail("idle-typed.txt")]
+    tail.append(gemini.CURSOR + " a footer cell")
+    assert GeminiAdapter().composer(tail) is None
+
+
 def test_no_box_on_screen_reads_as_no_composer():
     tail = [r for r in _tail("idle-typed.txt") if not gemini._border(gemini.painted_text(r))]
     assert GeminiAdapter().composer(tail) is None

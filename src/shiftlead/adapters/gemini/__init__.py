@@ -69,7 +69,7 @@ TITLE_NAME = re.compile(r"^\S+\s+[^(]*\((.+)\)$")
 # The composer (design §4.3 `composer`, read 2026-10-21 on 0.64.0): an input box whose top border is a row
 # of `▄`, its first row the prompt glyph (`>`, `*` under yolo, `!` in shell mode). A submitted prompt is
 # drawn in the same box in the history above, without the reverse-video cursor the composer holds.
-COMPOSER_TOP = "▄"
+COMPOSER_TOP, COMPOSER_BOTTOM = "▄", "▀"
 COMPOSER_ROW = re.compile(r"^\s*[>*!] ")
 CURSOR = "\x1b[7m"
 # painted grey, not faint, so read as empty by its words
@@ -290,9 +290,12 @@ class GeminiAdapter:
         *Queued* lines above the box — is not counted. A multi-line text reads as its first row."""
         rows = [painted_text(r) for r in tail_raw]
         top = next((i for i in range(len(rows) - 1, -1, -1) if _border(rows[i])), None)
-        if top is None or not any(CURSOR in r for r in tail_raw[top + 1 :]):
+        if top is None:
             return None
-        for row in rows[top + 1 :]:
+        end = next((i for i in range(top + 1, len(rows)) if _border(rows[i], COMPOSER_BOTTOM)), len(rows))
+        if not any(CURSOR in r for r in tail_raw[top + 1 : end]):
+            return None
+        for row in rows[top + 1 : end]:
             if m := COMPOSER_ROW.match(row):
                 text = row[m.end() :].strip("\xa0 ")
                 return "" if text == PLACEHOLDER else text
@@ -390,9 +393,9 @@ class GeminiAdapter:
         return prof.account or prof.name
 
 
-def _border(row: str) -> bool:
+def _border(row: str, glyph: str = COMPOSER_TOP) -> bool:
     text = row.strip()
-    return bool(text) and set(text) == {COMPOSER_TOP}
+    return bool(text) and set(text) == {glyph}
 
 
 def _without_yolo(args: list[str]) -> list[str]:
