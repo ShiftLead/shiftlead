@@ -17731,3 +17731,80 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-21 (grinder-ao-1) — `test_the_three_tables_draw_a_tokens_cell_and_the_totals_and_bars_carry_tokens` fetches `/spend` and `/spend?team=ao-grind`, reads each table by its heading (`_tables`), and holds every body row to as many cells as the header, the **tokens** column to the view's `tok` values and each tokens cell's hover to the four kinds. Deleting any one of the three cells from `spend_part.html` fails it.
 
 ---
+## TD-685: Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-681's design)
+**Owner:** grinder
+**Kind:** live-check #1775
+**Status:** **Read 2026-10-21 13:25 MDT (grinder-ao-1): the live check holds.** dev-cadence `4453db4`'s sync opened shiftlead #2198 (`cadence-sync-4453db4`, 6 files) at 2026-10-20T14:57Z, pushed by the home's login; the home posted `cadence-review: SHIP · sync-check · code · 0 findings` at 15:10:54Z and merged it at 15:11:01Z, nobody by hand. The repo reading's `sync` (`ao repo --json`) holds `2198: {verdict: merged, posted: true, tries: 0, commit: 4453db4, files: 6, at: 15:11:03Z}`; the person inbox holds the `system` note *merged shiftlead #2198 — sync of dev-cadence 4453db4, 6 files* (a headless GET of `/inbox`, 200); and the Settings page's Repos card (a headless GET of `/settings`, 200) reads *sync on: the home merges a mechanical dev-cadence sync PR · merged #2198 1d ago*. The refused half (a non-lock file, a self-made lock, a fork, red, gate failing) is held by `tests/test_sync_check.py` and `tests/test_sync_pass.py`; no refused sync has happened live. **Read 2026-10-15 (the anchor): the sync it waited on was merged by hand before the home judged it, so it still waits.** dev-cadence `1145d97`'s `sync-all.sh` ran from the person's dev-cadence session (`ao-dev-cadence-dc-paul`) at 03:30Z, after the 03:29Z promote, and opened shiftlead #1788 and ledgerboard #12. That session merged all six sync PRs itself at 03:45Z, on Paul's *merge the PRs when green* (its transcript). Neither PR carries a `cadence-review: SHIP · sync-check` comment. The reading's `sync` is `{}` for both repos (`~/.shiftlead/repos.json`, read only), and the home's tree exists only for ledgerboard (`~/.shiftlead/sync/ledgerboard/tree`, 03:40Z), so its judge had begun there and no verdict was written before the merge. The mechanical half is unread: it waits for a sync PR that nobody merges by hand within its first reading or two. **Waits for the next sync PR (grinder-ao-2, 2026-10-14):** #1775 is live (`ao promote status`: live 179f7f1, #1775 itself, read 2026-10-15T02:10Z). No `cadence-sync-*` PR has been opened in any ShiftLead repo since it went live: the last are shiftlead #1728 (closed) and ledgerboard #11 (merged), both at 2026-10-14T15:26Z from dev-cadence `517a2b5`, before the build. dev-cadence's main has moved on since (`1145d97`), so the next `sync-all.sh` run makes one. Nobody in ao-grind's lanes can cause it, so the Owner is `anchor` until that PR exists; whoever reads it then reads it as below. Built — slices 1 (#1769), 2 (#1771) and 3 (#1775, the Repos card's **sync** switch with the last verdict beside it; `sync.prune` keeps the newest *merged* entry for it). The live check, once #1775 is live (`ao promote status`), is read only: the next dev-cadence sync PR on a registered repo (`cadence-sync-*`, pushed by the home's `gh` login). Read the repo reading's `sync` entry for it (`ao repo --json`, or the Settings page's Repos card). Mechanical and gated: verdict *merged*, the PR carrying the `cadence-review: SHIP · sync-check` comment and merged by the home, a `system` note in the person inbox, and the card saying *merged #<n> <age> ago*. Not mechanical: *refused* with its reason, and the team's order carrying it as Context. The scenarios themselves are covered by `tests/test_sync_check.py` and `tests/test_sync_pass.py` against a fake `gh`.
+**Location:** design §6 *Sync: a mechanical sync PR is merged at the home*, §4.4 *A sync PR is the team's at once*, §5 `repos.<repo>.sync`, §4.5a *Settings page: Repos*; a new `src/sessionorc/sync.py`, the promote's pass in `src/sessionorc/agent_tick.py`, `set_settings`, `src/sessionorc/workorders.py` (the order narrowed to what the home does not merge), the Settings page's Repos card (`src/shiftlead/ui/`)
+
+**Why:** TD-681's design. Paul (2026-10-14): *if it's mechanical and post_sync would handle it that's even better*. A sync PR changes only dev-cadence's files, so a mechanical one needs no session.
+
+**Fix:** three slices, the first two in `src/sessionorc/**` (the techlead reads them, §4.9b).
+1. **The check** (`sessionorc.sync`). `check(root, pr) -> {verdict, why}` runs §6 *Sync* steps 1 and 2.
+   - **Step 1, the files.** The head lock's `source:` must equal the merge base's. The dev-cadence clone is the registry checkout whose origin is that `source:`. `files_commit` must not be `+dirty` and must be on the clone's `origin/<default>` (`git merge-base --is-ancestor`). For each lock-listed path the PR changes, the head's blob must match its lock line (sha256 and mode). Every lock line that differs from the base lock's must match the blob at `files/<path>` at `files_commit`. A deleted path the base lock never listed is refused.
+   - **Step 2, the replay.** It runs in `~/.shiftlead/sync/<repo>/tree`, a detached worktree made as the board's is, set to the merge base of the PR's head and `origin/<default>`. The PR's paths come from `git diff --name-status`. The lock-listed paths, and the lock itself, are checked out from the head, and the PR's deletions that the lock dropped are removed.
+   - **`post_sync`.** A string read from the merge base's `docs/cadence.toml`, run by the shell in the tree's root under `SYNC_BOUND` (5 min), its process killed at the bound. Its environment holds `PATH`, `HOME` and `LANG` alone.
+   - **The comparison.** `git add -A` and `git diff --cached --quiet <head>`, then the held globs over the changed paths.
+   - The check returns the first reason, worded as §6 words it.
+   - **Tests**, with a fixture dev-cadence and a fixture repo: a clean sync; a non-lock file; an edited SYNC file; a lock the PR wrote for itself (its hashes its own files', not dev-cadence's); an honest lock line beside different bytes; a SYNC file edited with its line left alone; a changed `source:`; a `+dirty` `files_commit`; a `files_commit` off dev-cadence's default; a `post_sync` that reproduces the PR and one that does not; a `post_sync` that cannot see `GH_TOKEN`; a held path.
+2. **The pass.** It sits in the promote's pass, on its cadence, detached, over every registry checkout with `repos.<repo>.sync.auto` not `false`. It takes up each unheld green sync PR that is not a draft, not conflicting, and has no `sync` entry with a verdict at its head. Three kinds get verdict *refused* with their reason and nothing else: a `fork` one; one not authored by the home's `gh` login (`gh api user`, read once); and one in a repo with no gate (`sessionorc.cadence`'s lookup, done first). Every other one goes on to the steps below.
+
+   For each one:
+   - **The check.** If it is mechanical, the SHIP comment (body as §6 step 3), posted once per head (`posted`).
+   - **The gate**, run in the registry checkout as rule 10 runs it (`sessionorc.cadence`), never in the replay tree.
+   - **Exit 0.** The head and holders are re-read. A moved head or a new holder drops the merge and writes no verdict. Otherwise `gh pr merge <n> --squash --match-head-commit <head>`, then the `system` note.
+   - **A fail** (exit 1, or a `gate:` non-zero): the BLOCK comment with the gate's line, verdict *gate*.
+   - **No reading** (exit 2 or 3, a timeout, the home's own error): nothing is posted and `tries` is counted. At `SYNC_TRIES` (3) at one head the verdict is *error*.
+   - Every comment goes through `--body-file`. The outcome is written to the repo reading as `sync: {<n>: {head, verdict, why, tries, posted, at}}`, pruned to the open PRs, and pushed with `repos`. TD-684's order then excludes a PR whose verdict at its head is *merged*, and a green one with no verdict at its head while the switch is on; it takes its `Context` from `why`. `set_settings` accepts `repos.<repo>.sync.auto`, and a session's call is refused as today.
+3. **The switch.** The Repos card's **sync** switch, on when absent, with the last verdict beside it as §4.5a words it.
+
+**Done when** in a scratch home, a sync PR is merged by the home with the SHIP comment and the note when:
+- its lock and files match a fixture dev-cadence's `files/` at `files_commit`;
+- it is green and gated by `check_cadence.py`;
+- it is pushed by the home's login.
+
+It is not merged, and is the team's order with its reason, when:
+- it has a non-lock file;
+- its lock is self-made;
+- it is forked;
+- it touches a held path;
+- it is authored by another login, or its repo has no gate (verdict *refused* at once, with no comment, so the order follows).
+
+The other cases:
+- A failed gate leaves the BLOCK comment and the order.
+- A gate exit 3 posts nothing and is tried again.
+- A head pushed between the check and the merge is not merged. `sync: {auto: false}` merges nothing. The switch shows the verdict.
+
+**Related:** TD-681 (the design), TD-684 (the order), dev-cadence#TD-113 (`post_sync`), §6 *Promote* and *Pull* (the pass it shares).
+
+**Resolved:** 2026-10-21 (grinder-ao-1) — built in #1769, #1771 and #1775; the live check holds on #2198, merged by the home with its SHIP evidence, its note and the Repos card's line (Status, the 2026-10-21 read).
+
+---
+## TD-681: A green sync PR has no owner: in a repo with no session running, it waits for nobody
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the session `ao-dc-decouple`, lessons from the ledgerboard split; Paul agreed the lesson the same day)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-14 (the designer; no mockup: the one drawn change is a switch and a line of text on the Settings page's Repos card) — §4.4 *A sync PR is the team's at once, unless the home merges it*: a `cadence-sync-*` PR whose diff touches the lock, and which the home does not merge, is a `pr:<n>` order (`sync: true`) from the first reading, with no `ORPHAN_AFTER`, green or red (only *pending*, and a green one not yet checked at its head, waits). Its lane is the red PR's, it is first in the pick order, and the anchor's and grinder's briefs say so. A repo no team services has the *Inbox row: red PR*, not a board line: §4.4 *Board write-back* says no policy adds one. §6 *Sync*: the home merges a mechanical sync PR. The replay at the merge base takes the lock's files from the head and runs the repo's `post_sync` (dev-cadence#TD-113); the tree must equal the head and each file match its lock hash. Before that, the PR must not be forked, its author must be the home's own login, and its repo must have a gate; a PR failing any of these three is *refused* before any comment. Its lock must also check against dev-cadence's `files/` at `files_commit` (every lock line that differs from the base's, and each changed file's bytes), it must delete no path the base lock never listed, and it must touch no held path. The replay runs `post_sync` with a scrubbed environment. Then a `cadence-review: SHIP · sync-check` comment, the gate in the registry checkout, and `gh pr merge --squash --match-head-commit` after re-reading the head and the holders, then a `system` note. A failed gate gets a BLOCK comment and goes to the team; a check with no reading is tried `SYNC_TRIES` times, then goes to the team. `repos.<repo>.sync.auto` (on when absent, §5) is the Repos card's **sync** switch (§4.5a). The manager brief needs no change: the order reaches a member's lane as any order does. Built by TD-684 and TD-685. Was: Open.
+**Blocked by:** TD-684, TD-685
+**Location:** design §4.4 (*A red PR nobody holds is a work order*), §6 (the home's policies), §4.8 (role presets); `src/shiftlead/briefs/` (grinder, manager)
+
+**Why:** `sync-all.sh` from dev-cadence 517a2b5 opened six sync PRs. Only ledgerboard's merged that day, by the session that ran the sync. The PRs for pneuma-ops (#20) and guardians-devenv (#19) were green, but no session ran in either repo to merge them. samscrape's (#1097) and contractmatch's (#175) waited on their own sessions. ShiftLead's (#1728) failed its tests until a session added a step by hand (dev-cadence#TD-113). A sync PR changes only files dev-cadence owns, which may go in directly (Paul, 2026-09-12). Nothing needs the repo's judgement except its tests and its gate. Design §4.4 already gives a **red** sync PR an owner (*its owner is never nobody*), as a work order once it has been red for `ORPHAN_AFTER`. A **green** one is never an order, so nobody is assigned to merge it.
+
+**Fix:** design first, in two parts (Paul, 2026-10-14: *each team should pick up those PRs and run them to ground, but if it's mechanical and post_sync would handle it that's even better*):
+1. **A team runs its repo's sync PRs to ground.** The built-in grinder and manager briefs say that an open sync PR (`cadence-sync-*`) in the team's repo is the team's next pick, ahead of the lane. The mechanical review checks that the files are only SYNC files plus what the repo's `post_sync` wrote. Then the gate runs and the PR merges. A red one goes to the team like any red PR.
+2. **With no team running, the home merges it by policy** when every file it touches is a SYNC file or `post_sync` output, its CI is green and the repo's gate passes. Otherwise the policy raises it as a board line for the repo. This is like the promote policy (§6): `auto` on the Settings page, per repo.
+
+**Done when** a sync into a repo with no session running merges without a person, a red one in such a repo is a board line, and a team's member picks up its repo's sync PR before its lane.
+
+**Related:** dev-cadence#TD-113 (`post_sync`), dev-cadence#TD-114 (a PR with nothing left to merge), TD-682.
+
+**Resolved:** 2026-10-21 (grinder-ao-1) — both builds merged: TD-684 (#1762) and TD-685 (#1769, #1771, #1775; its live check read 2026-10-21 on #2198, a sync PR the home merged by itself).
+
+---
