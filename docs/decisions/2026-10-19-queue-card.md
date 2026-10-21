@@ -168,7 +168,9 @@ Whatever the item's kind, the person does one of three things, and the words are
   on the Repo page (§4.5 screen 12 *any open row*); on an item, **Delete** on an ask (the decline),
   **Pause** / **Resume** on a steer, **Send to reviewer** on a look that is an open ask (§4.5a *Inbox row: a
   look*), and **Done** on a decided board line under *waiting on them*. The names inside are drawn on hover or focus of the header, row or
-  item; **the ⋯ itself is always drawn**, at narrow width too, where there is no hover. It is a control
+  item; **the ⋯ itself is always drawn**, at narrow width too, where there is no hover (superseded 2026-10-20 by TD-926: the ⋯ is bare at every width, its names in its `title`, its
+  `aria-label` and its menu, since names drawn on hover rewrapped the title, so narrow width no longer
+  differs — design §4.5 *A hover changes colour, never layout*). It is a control
   class of its own with a keyboard model (`Enter` opens, arrows move, `Esc` closes) and gets its own §4.5a
   row.
 
