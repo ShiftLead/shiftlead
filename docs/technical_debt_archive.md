@@ -17653,3 +17653,22 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-21 (grinder-ao-1) — the live check holds. `journalctl --user -u shiftlead-agent` (read only), the week from #1684's promote (`bc43060`, 2026-10-13 23:07 MDT) to 2026-10-20 23:07: 246 *a seat with nothing due* closes, two of them a manager's — `ao-shiftlead-manager-ao-1` at 2026-10-15 01:04:49, after *the seat is due (stalled) — filling it* at 01:02:26, and at 14:43:14, after *the seat is due (asks) — filling it* at 14:38:27; every other is a techlead or an anchor. Every manager written in the week (ao-grind's and dc-grind's, 12 times from 2026-10-14 to 2026-10-20, across 13 rule 8 starts) was written *closed with no pane: rule 3 fills it*, and none was superseded live but by those two fills, so TD-654's replay holds too; contractmatch's manager closes on its own linked home, outside this journal. The held create of `ao team start` was read 2026-10-09 (above). Built in PR #1287 (all three slices) and PR #1684 (TD-660, rule 8's start); TD-410 is archived with it.
 
 ---
+## TD-922: #2188's Queue card answer row draws a look's `Works` / `Not right…` pair, and no test puts a look on a card
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-20 (test audit of #2188, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/templates/inbox_row.html` (`answer_row`: `{% set form = pair and i == 1 %}`, the `Not right…` button and the `pair` label); `tests/test_queue_card_verbs.py`, `tests/test_queue_item_shape.py`
+
+**Why:** `answer_row` gives a card's Decide item a look's pair (`Works` / `Not right…`, the second opening a composer, `data-begun="Not right: "`), for a mail look and a board line's `pair`. Probe on `origin/main` cc1035d47: change `{% set form = pair and i == 1 %}` to `{% set form = false %}` and `tests/test_queue_card_verbs.py`, `test_queue_item_shape.py`, `test_ui_inbox.py`, `test_ui_queue.py`, `test_ui_queue_cards.py`, `test_attach.py`, `test_ui_look_row.py`, `test_ui_board.py`, `test_mail.py` and `test_handed_entry.py` all pass (479 tests). No test in #2188 has a pair item on a card (`grep -n "Not right\|Works" tests/test_queue_card_verbs.py tests/test_queue_item_shape.py` finds nothing), so a card could lose the composer and send `Not right…` as a plain answer. Also unproven: the guard `mode != 'card'` on `reply_btn` survives deletion with the suite green (the card path may not reach it, so it may only be dead).
+
+**Fix:** One test: a card whose item is a look (mail) and one whose item is a board line with `pair`: the row reads `Works` and `Not right…`, `Not right…` carries `data-act="reply"` / `board_notright` and `data-begun`, and no caption or `rec` outline is drawn. Revert the `form` line and see it fail.
+
+**Done when** the probe above fails a test.
+
+**Resolved:** 2026-10-21 — PR #2217: `tests/test_queue_card_verbs.py::test_a_look_on_a_card_draws_works_and_not_right_and_not_right_opens_the_composer` puts a mail look (`ask` with `shots`) and a board `watch` line with `pair` on a card: **Works** and **Not right…**, no `rec` outline or caption, the second `reply` with `data-begun` / `board_notright`. The `form` probe fails it (`['Works', 'Works']`), as does dropping `and not pair` from the outline. The `mode != 'card'` guard on `reply_btn` was not in the Fix and is left as it is.
+
+---

@@ -124,6 +124,39 @@ def test_a_board_line_answers_on_its_line_and_checks_off_behind_its_dots(tmp_pat
     assert ">Reply</button>" in page and "qdots" not in page
 
 
+def test_a_look_on_a_card_draws_works_and_not_right_and_not_right_opens_the_composer(tmp_path, monkeypatch):
+    """§4.5a **Works** / **Not right…** on a card (TD-922): a look — a mail `ask` with `shots`, or a board line with
+    the pair — draws its two answers as the pair, **Not right…** opening the composer rather than answering, with no
+    `rec` outline and no caption on either."""
+    from test_ui_board import host, look_item, report
+
+    from shiftlead.ui.app import board_rows
+
+    def pair(html):
+        row = html[html.index('class="row gap wrap sugg qanswers"') :]
+        btns = re.findall(
+            r'<button class="btn sm answer([^"]*)" type="button"([^>]*)><span class="alabel">(.*?)</span>', row
+        )
+        assert [label for _, _, label in btns] == ["Works", "Not right…"]
+        assert all(not cls for cls, _, _ in btns)  # no outline on either
+        assert "default</span>" not in html and "suggested by" not in html
+        return btns[0][1], btns[1][1]
+
+    e = entry("m-4", "ask", text="Does the ring read right?", answers=["Works", "Not right: <what>"], recommended=0)
+    works, form = pair(card({**e, "shots": ["a.png"]}, "decide"))
+    assert 'data-act="answer"' in works and 'data-index="0"' in works
+    assert 'data-act="reply"' in form and 'data-begun="Not right: "' in form and 'data-msg="m-4"' in form
+    assert "data-index" not in form
+
+    host(tmp_path, monkeypatch)
+    (b,) = board_rows(report(tmp_path / "samscrape", look_item()))
+    assert b["pair"]
+    works, form = pair(card(b, "decide"))
+    assert 'data-act="board"' in works and 'data-answer="Works"' in works
+    assert 'data-act="board_notright"' in form and 'data-head="One look at the ring"' in form
+    assert "data-answer=" not in form and "data-board-act" not in form
+
+
 def test_a_red_pr_item_has_no_answer_row_and_no_dots():
     src = (UI / "templates" / "inbox_row.html").read_text(encoding="utf-8")
     red = src[src.index("{% macro red_pr_row(e, section) -%}") :]
