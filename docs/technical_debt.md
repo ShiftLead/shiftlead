@@ -72,9 +72,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-916 | Build TD-909 (7): `ao msg`'s one-sentence warning, and the briefs' rule and `--about` | Medium | Open — blocked by TD-772 |
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
-| TD-937 | The top bar's Settings glyph is a sun (eight rays), read as a brightness control beside ◐; draw a cog | Low | Open |
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
-| TD-939 | TD-937's cog is on main (#2225) and its entry still reads Open, owner paul, *the glyph is a sun* (docs audit) | Low | Open |
 
 ---
 
@@ -1464,24 +1462,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-937: The top bar's Settings glyph reads as a brightness control; draw a cog
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-21 (Paul, with the ao-paul session)
-**Owner:** paul
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/base.html` (the `topbar` block, `#settingstab`'s `svg`); `tests/test_ui_queue.py` (`test_the_bar_draws_three_tabs_in_their_keys_order_then_the_readings_and_the_tools`)
-
-**Why:** Design §4.5a *Sessions top bar: Settings* says *a gear glyph before ◐ and ?*. TD-932 (#2212) drew a hub with eight rays — a sun — which is the common brightness icon, and it stands next to ◐, the theme toggle, so the two read as one brightness pair. Paul, 2026-10-21: *our settings icon looks like a brightness icon*.
-
-**Fix:** The `svg` draws a toothed ring round a hub (a cog with eight teeth, Feather's *settings* outline, MIT) at the same 15 px and stroke. The test asserts the glyph is the cog, not rays. No design change: the row already says gear.
-
-**Done when** the bar's Settings glyph is a cog at every width and on `/settings` lit, and the test holds.
-
----
-
 ## TD-938: The top bar's readings and tools past one developer — the build chip's audience, the host reading across nodes, + New's place under a director
 
 **Priority:** Medium
@@ -1506,20 +1486,3 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 
 ---
 
-## TD-939: TD-937's cog is on main and its entry still reads Open, owner paul, "the glyph is a sun"
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-21 (docs audit of #2218–#2227)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/technical_debt.md` (TD-937's summary row and entry); `src/shiftlead/ui/templates/base.html` (`#settingstab`)
-
-**Why:** #2225 (merge `9bfca332c`) both filed TD-937 and carried its fix: `base.html`'s `#settingstab` is now `<svg class="gear" viewBox="0 0 24 24" …>` and `tests/test_ui_queue.py` asserts `svg.count("a1.65") >= 8 and "v2M" not in svg`. On `origin/main` at `91ea67dd4` the entry still reads `**Status:** Open` with `**Owner:** paul`, its **Fix** says *The `svg` draws a toothed ring* in the future tense, and the summary row says *The top bar's Settings glyph is a sun (eight rays)*, so a session picking work, or Paul on the board, reads a built change as undone.
-
-**Fix:** Say what #2225 did in TD-937: **Status** `Built (#2225)`, and a live check or an archive with a `**Resolved:**` line naming #2225 and the test, whichever the cadence wants for a UI-only glyph; the row follows the entry.
-
-**Done when** TD-937's row and entry say the cog is built, or the entry is archived with its `**Resolved:**` naming #2225.
-
----
