@@ -17712,3 +17712,22 @@ Then file the build entry and name it in `Blocked by:`.
 **Resolved:** 2026-10-21 (grinder-ao-2) — PR #2222: screen 8's Settings item reads *… (§4.5a *Sessions top bar: Settings*, TD-931).*, a dated line under §4.5 in the design history; `grep -rn "until TD-93" docs/design/` finds nothing.
 
 ---
+## TD-936: The Spend page's three tokens cells can each go from `spend_part.html` and no test notices (test audit of #2215)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-21 (test audit of #2215, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/templates/spend_part.html` (the `<td class="spfold mono"…>{{ r.tok }}` / `{{ s.tok }}` cell in By team, Top sessions and By seat); `tests/test_ui_spend.py::test_the_three_tables_draw_a_tokens_cell_and_the_totals_and_bars_carry_tokens`
+
+**Why:** #2215 adds a **tokens** column to three tables. The test holds the view's `tok` and `tok_title` values, but the page is checked by two lines only: `'<th class="spfold">tokens</th>' in html` and one `re.search` for a tokens `<td>` anywhere. Probe on `origin/main` 091b11e5c: delete, one at a time, each of the three `<td class="spfold mono" …>` lines from `spend_part.html`; `pytest tests/test_ui_spend.py tests/test_ao_spend.py` passes (28 passed) each time, though that table then has a *tokens* header over no cells and every later column shifts left. The other two tables still satisfy the regex, and the By seat table is not fetched at all (`/spend?team=…` is never read as html). The rest of the PR holds: reverting the `count=` words at the CLI's outside line, the seat line and `figure`'s wholly-unweighed branch fails a test.
+
+**Fix:** In that test, fetch `/spend` and `/spend?team=ao-grind` and count per table: every body row has as many `<td>` as the header has `<th>`, and the tokens cell holds the view's `tok`.
+
+**Done when** deleting any one of the three cells fails a test.
+
+**Resolved:** 2026-10-21 (grinder-ao-1) — `test_the_three_tables_draw_a_tokens_cell_and_the_totals_and_bars_carry_tokens` fetches `/spend` and `/spend?team=ao-grind`, reads each table by its heading (`_tables`), and holds every body row to as many cells as the header, the **tokens** column to the view's `tok` values and each tokens cell's hover to the four kinds. Deleting any one of the three cells from `spend_part.html` fails it.
+
+---
