@@ -233,9 +233,34 @@ def test_the_three_tables_draw_a_tokens_cell_and_the_totals_and_bars_carry_token
     assert {r["name"]: r["tok"] for r in quiet["by_team"]}["old-grind"] == "0"
 
     c = client(monkeypatch, tmp_path, fake())
-    html = c.get("/spend").text
-    assert '<th class="spfold">tokens</th>' in html
-    assert re.search(r'<td class="spfold mono" title="input [^"]+ · cache write [^"]+">\d', html)
+    whole = spend_view(reading(), spend_picks({}), today=TODAY)
+    team = spend_view(reading(team="ao-grind"), spend_picks({"team": "ao-grind"}), today=TODAY)
+    tables = _tables(c.get("/spend").text) | _tables(c.get("/spend?team=ao-grind").text)
+    for name, rows in (("By team", whole["by_team"]), ("Top sessions", whole["top"]), ("By seat", team["seats"])):
+        head, body = tables[name]
+        assert body and all(len(cells) == len(head) for cells in body), name  # no cell lost, none shifted left
+        at = head.index("tokens")
+        assert sorted(cells[at] for cells in body) == sorted(r["tok"] for r in rows), name
+        titles = tables[name + " titles"]
+        assert titles and all(re.fullmatch(r"input .+ · cache write .+", t) for t in titles), name
+
+
+def _tables(html: str) -> dict[str, object]:
+    """Each Spend table by its heading: its header cells and its body rows' cells as text, and the tokens
+    cells' hover titles under `<heading> titles` — so a cell gone from one table is seen in that table."""
+    out: dict[str, object] = {}
+    for m in re.finditer(
+        r'<span class="h2">([^<]+)</span>(?:(?!<span class="h2">).)*?<table>(.*?)</table>', html, re.S
+    ):
+        head = [re.sub(r"<[^>]+>", "", h).strip() for h in re.findall(r"<th[^>]*>(.*?)</th>", m[2], re.S)]
+        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", m[2].split("</thead>", 1)[-1], re.S)
+        rows = [r for r in rows if "colspan" not in r]  # an empty table's one note row
+        out[m[1]] = (
+            head,
+            [[re.sub(r"<[^>]+>", "", c).strip() for c in re.findall(r"<td[^>]*>(.*?)</td>", r, re.S)] for r in rows],
+        )
+        out[m[1] + " titles"] = re.findall(r'<td class="spfold mono" title="([^"]+)">', m[2])
+    return out
 
 
 def test_an_unweighed_figure_is_named_beside_never_in_it():
