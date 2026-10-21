@@ -9,7 +9,7 @@
 {% else %}
 
 {# the filter row's numbers, which the page copies into the row it keeps outside these lists (TD-771) #}
-<span id="qcounts" hidden data-needs="{{ q.n.needs_you }}" data-ininbox="{{ in_inbox or 0 }}"></span>
+<span id="qcounts" hidden data-needs="{{ q.n.needs_you }}"></span>
 {% if q.find_miss %}<div class="qnote qfindmiss" id="qfindmiss" data-for="{{ q.picks.find if q.picks else '' }}">{{ q.find_miss.id }} is on no open card{% if q.find_miss.repos %} — in the archive: {% for r in q.find_miss.repos %}{% if not loop.first %} · {% endif %}<a href="{{ r.url }}">{{ q.find_miss.id }} on {{ r.name }}'s Repo page</a>{% endfor %}{% endif %}</div>{% endif %}
 <div class="qnote" id="qnone"{% if not (q.filtered and not q.shown) %} hidden{% endif %}>no open card fits these picks</div>
 

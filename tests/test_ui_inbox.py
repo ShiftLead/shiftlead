@@ -360,7 +360,7 @@ def test_the_page_renders_its_three_sections_the_count_and_the_snoozed_affordanc
     assert " open" not in fold[: fold.index(">")]  # closed by default
     fyi = html[html.index('id="sec-fyi"') : html.index('id="sec-fyi"') + 40]
     assert " open" not in fyi  # folded by default; the browser remembers what the person did
-    assert 'class="btn light on" href="/inbox"' in html  # the top bar's control is this page's nav item
+    assert 'class="tab on" href="/inbox"' in html  # the top bar's tab is this page's, lit
 
 
 @pytest.mark.unit
@@ -563,7 +563,7 @@ def test_ao_inbox_counts_prints_the_top_bars_numbers_and_marks_nothing(client, t
     assert {k: got[k] for k in INBOX_COUNTS} == {k: ui[k] for k in INBOX_COUNTS}
     assert got["needs"] == 1 and got["fyi_n"] == 1
     assert cli.main(["inbox", "--counts"]) == 0
-    assert capsys.readouterr().out.strip() == "needs you 1 · FYI 1 · overdue 0 · answered 0"
+    assert capsys.readouterr().out.strip() == "needs you 1 (inbox 1 · queue 0) · FYI 1 · overdue 0 · answered 0"
     assert all(e["read_at"] is None for e in client.get("/api/person/inbox").json()["entries"])
     assert _unread_of(client, sender) == [None]  # nothing marked in any inbox (TD-634)
 
@@ -639,13 +639,13 @@ def test_ao_inbox_counts_from_a_session_asks_the_ui_and_marks_nothing(client, tm
 
     sender = sender_session(client, tmp_path)
     _mail_to(sender, "the session's own mail")
-    body = {"needs": 7, "fyi_n": 44, "overdue_n": 2, "answered_marks": [{}], "snoozed_n": 0, "rev": 3}
+    body = {"needs": 7, "fyi_n": 44, "overdue_n": 2, "queue_n": 3, "answered_marks": [{}], "snoozed_n": 0, "rev": 3}
     ui = _FakeUI(body)
     try:
         monkeypatch.setenv("SHIFTLEAD_SESSION", sender)
         capsys.readouterr()
         assert cli.main(["inbox", "--counts", "--ui", ui.url]) == 0
-        assert capsys.readouterr().out.strip() == "needs you 7 · FYI 44 · overdue 2 · answered 1"
+        assert capsys.readouterr().out.strip() == "needs you 7 (inbox 4 · queue 3) · FYI 44 · overdue 2 · answered 1"
         assert cli.main(["--json", "inbox", "--counts", "--ui", ui.url]) == 0
         assert json.loads(capsys.readouterr().out)["fyi_n"] == 44
         assert ui.hits == ["/api/person/inbox?counts=1"] * 2
@@ -1213,8 +1213,12 @@ def test_the_two_counts_say_how_they_differ(tmp_path, monkeypatch):
         "anything snoozed",
     ):
         assert text in html, text
-    base = (UI / "templates" / "base.html").read_text()
-    assert "the session states the Sessions page counts too" in base and "the states alone" in base
+    from shiftlead.ui.common import TOPBAR_TITLES  # the Inbox tab's number's hover (TD-932)
+
+    inbox = TOPBAR_TITLES["inbox"]
+    assert "the session states the Sessions page counts too" in inbox and "the states alone" in inbox
+    assert "the Queue tab's number" in inbox and "the Inbox tab's number" in TOPBAR_TITLES["queue"]  # the other's rest
+    assert "filter counts cards" in TOPBAR_TITLES["queue"]
 
 
 # -- the routes, against a live agent -------------------------------------------------------------

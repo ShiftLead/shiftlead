@@ -3865,8 +3865,12 @@ def _ui_counts(base: str) -> dict[str, Any] | None:
 def _counts_line(args: argparse.Namespace, got: dict[str, Any]) -> int:
     if got.get("agent_down"):
         return fail(args, str(got.get("why") or "host agent unreachable"), 3)
+    # the top bar's two tabs' numbers (§4.5a *the bar's three groups*, TD-932): the Queue's is `queue_n`, the
+    # Inbox's the rest of `needs`
+    queue_n = got.get("queue_n") or 0
     line = (
-        f"needs you {got['needs']} · FYI {got['fyi_n']} · overdue {got['overdue_n']}"
+        f"needs you {got['needs']} (inbox {got['needs'] - queue_n} · queue {queue_n})"
+        f" · FYI {got['fyi_n']} · overdue {got['overdue_n']}"
         f" · answered {len(got.get('answered_marks') or [])}"
     )
     return emit(args, got, lambda: print(line))
