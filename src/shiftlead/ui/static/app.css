@@ -114,7 +114,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--strong); }
-.btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; }
+.btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; background: var(--topfg); color: var(--top); border-color: var(--topfg); }  /* + New ▾, the bar's one filled button in both themes (§4.5a *the bar's three groups*) */
 .btn.sm { height: 26px; font-size: var(--t-small); padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
 .btn.on { background: var(--ended-bg); color: var(--fg); }
 /* §4.5a **a control's look** (§4.5 screen 6 *A control answers the press*, TD-340): one hover, one
