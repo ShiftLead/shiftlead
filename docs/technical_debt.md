@@ -1558,7 +1558,11 @@ and role directories it names, at `<dir>` in place of the registered checkout wh
 `profiles.yml` lacks prints that lack and exits 1, the same file unmerged; the teams at `<dir>` pair
 with the registered checkout's ledger reading under its name and path (a `Team` declaration on main
 that names a team only the branch defines reads clean); a directory outside every registered repo is
-refused with exit 2; a test holds each; the recipe's paragraph and its agent checklist say to run it.
+refused with exit 2, and so is a directory that is not a git one; `--root` at the registered checkout
+itself reads as without it but for the header; the first line and `--json`'s `root` name the repo and
+`<dir>`; a test holds each. The recipe's paragraph says to run `ao org check --root <worktree>` before
+the PR, and its agent checklist's item 2 says *`ao org check --root <worktree>` before the PR,
+`ao team list` after the merge*.
 
 **Related:** TD-623, guardians-devenv TD-028.
 

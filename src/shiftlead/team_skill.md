@@ -55,7 +55,8 @@ never its prose (design §6 rule 6), so the ledger's entries carry them first:
 - **`**Blocked by:**`** — *pickable* is derived from it and never written: an entry with none, or
   whose every blocker is archived, is pickable. `decision (paul)` there keeps the entry from every
   lane until the person decides.
-- **`**Kind:**`** — `build`, or none, is a `free-pick` lane's; `design-first` is a designer's.
+- **`**Kind:**`** — `build`, or none, is a `free-pick` lane's (and a `live-check` once its build is
+  live); `design-first` is a designer's.
 - **`**Owner:**`** — the word a lane's `owner:` matches (*What a lane takes*, step 3). `paul` is the
   person's owner word (`PERSON_OWNER` in `sessionorc/ledger.py`, as `ao repo init`'s `Fields:` line
   declares it), and keeps an entry from every lane that carries an `owner:` word. **To keep an
@@ -242,8 +243,9 @@ One function reads the lane words against each entry's header lines (`lane_match
 - **A named lane** (`lane: [TD-041, TD-054]`) matches nothing in code: the member's brief reads it
   as `{lane}` and works it in order, and nothing else holds the member to it.
 - **Work orders are in every `free-pick` lane, whatever its `owner:` words**: every open
-  **decided** line on the board (`board:<key>`) and every red or sync PR nobody holds (`pr:<n>`).
-  Nothing on the board marks a line *not for a team*, so where a repo has work a team must never
+  **decided** line on the board that is not `fyi` (`board:<key>`) and every red or sync PR nobody
+  holds (`pr:<n>`). `fyi` is the board's one mark that keeps a line from a team, and it is not a
+  decision; nothing marks a decided line *not for a team*, so where a repo has work a team must never
   touch (a private repo, a person's own area), **the briefs are the only fence** for those lines:
   say so under *The lane* in the worker's brief.
 - **An entry can sit in a lane and still not be taken**: one **settling** (new, inside its Kind's
