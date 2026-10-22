@@ -19,7 +19,7 @@ from shiftlead.ui import cards
 pytestmark = pytest.mark.integration
 
 BRIEF = "You are a grinder. Read the ledger, then pick one entry."
-# the home's line, typed as keys, then the brief as the paste: one prompt (§4.1, TD-347)
+# the fixed line in the person's voice, typed as keys, then the brief as the paste: one prompt (§4.1, TD-347)
 TYPED = f"{mail.BRIEF_LINE} {BRIEF}"
 
 
@@ -125,11 +125,11 @@ async def test_a_paste_refused_after_the_line_pastes_the_brief_after_it_on_the_n
         paste(name, text)
 
     monkeypatch.setattr(agent.tmux, "paste", once)
-    # the real tool paints the 111-character line over two rows of an 80-column pane, and the composer
-    # read returns the first alone: the recovery cannot read the line back (review of PR #1158)
+    # the real tool can paint the line over two rows of a narrow pane (the 111-character line of PR #1158
+    # did on 80 columns), and the composer read returns the first alone: the recovery cannot read the line back
     stub = adapters.get("brief0")
     whole = stub.composer
-    monkeypatch.setattr(stub, "composer", lambda tail: None if (t := whole(tail)) is None else t[:78])
+    monkeypatch.setattr(stub, "composer", lambda tail: None if (t := whole(tail)) is None else t[:40])
     async with LocalClient() as c:
         w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
         await agent.rpc_hook(w, state="idle")
