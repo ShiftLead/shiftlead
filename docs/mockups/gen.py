@@ -2439,11 +2439,7 @@ def focus_ended():
       <span class="btn sm link" title="A closed record is forgotten by itself a day after the close; its run log and transcript stay readable until then. Resume starts it again under its own name, attended." style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>
     </div>
     {ending_card()}
-    <div class="card" style="padding: 6px 10px; display: flex; align-items: center; gap: 10px; opacity: .7;">
-      <span class="meta" style="flex-grow: 1; padding-left: 6px;" title="the composer's bar on an ended record (TD-942)">Ended. Resume to type here.</span>
-      <span class="btn sm" style="opacity: .5;">{ICON["clip"]}Attach</span><span class="btn primary sm" style="opacity: .5;">{ICON["send"]}Send</span>
-    </div>
-    <div class="note">Was: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> and a dead terminal. The cause's guess stays only where the record names none (a pane found gone, a close with no closer). A team member's banner adds <b>Restart</b> after Resume.</div>
+    <div class="note">Was: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> a dead terminal and a composer with nothing to type to; the composer is not drawn now. The cause's guess stays only where the record names none (a pane found gone, a close with no closer). A team member's banner adds <b>Restart</b> after Resume.</div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
     {PUT_AWAY}
