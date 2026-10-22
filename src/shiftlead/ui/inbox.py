@@ -342,6 +342,8 @@ def state_rows(
             "deadline": v.get("deadline") or "" if row == "permission" else "",
             # a subagent's prompt names its asker and, while held, says the pane shows nothing (TD-950)
             "held": subagent_held(v.get("pending")) if row in ("permission", "question") else None,
+            # the entry the row's Allow / Deny answer, so a newer one pushed meanwhile is never answered unseen
+            "call": str((v.get("pending") or {}).get("tool_use_id") or "") if row == "permission" else "",
             # §4.5 screen 6 *Layout* (TD-082): the countdown is rendered in words here, not left as
             # `…` for the client's first tick. The words are `fmtLeft`'s, so nothing jumps.
             "left": _countdown(v.get("deadline") if row == "permission" else None, now),

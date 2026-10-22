@@ -70,7 +70,7 @@ def test_the_card_draws_a_line_per_entry_each_answering_its_own_call(tmp_path, m
     assert d["others"][0]["answerable"] and d["others"][0]["held"]["name"] == "general-purpose"
     html = templates.get_template("card.html").render(s=d)
     assert html.count('data-act="allow"') == 2
-    assert 'data-call="tu-m">Allow' in html and 'data-call="tu-s">Allow' in html
+    assert 'data-call="tu-m">Allow' in html and 'data-call="tu-s" data-line>Allow' in html
     assert "the pane shows nothing until" in html
 
     d = view(_rec(HELD, ASK))  # a question on top: its Focus, and the permission's buttons under it
@@ -99,6 +99,8 @@ def test_focus_draws_the_others_with_their_calls():
     js = (Path(cli.__file__).parent / "ui" / "static" / "app.js").read_text()
     assert "(v.others || []).map(" in js and 'data-call="${esc(o.call)}"' in js
     assert "b.dataset.call) body.call = b.dataset.call" in js
+    # the card's `a` / `d` keys answer the slot's prompt, never a line beneath it (review of 4b)
+    assert js.count(""":not([data-line])' },""") == 2
 
 
 @pytest.mark.unit
@@ -116,8 +118,20 @@ def test_the_facet_draws_a_block_per_entry_and_counts_members(tmp_path, monkeypa
     ]
     assert blocks[1]["text"] == "Bash: ls" and blocks[1]["held"]["name"] == "general-purpose"
     assert answer_members(blocks) == 2
-    [row] = inbox.state_rows([view(_rec(HELD, MAIN))])  # the Inbox row keeps the newest
-    assert row["text"] == "Bash: rm x"
+    [row] = inbox.state_rows([view(_rec(HELD, MAIN))])  # the Inbox row keeps the newest, and names its call
+    assert row["text"] == "Bash: rm x" and row["call"] == "tu-m"
+    from shiftlead.ui.app import templates
+
+    html = templates.get_template("inbox_rows.html").render(rows=[row], section="now")
+    assert 'data-call="tu-m">Allow' in html
+
+    from shiftlead.ui.org import rollup, team_summary
+
+    members = [view(_rec(HELD, MAIN)), view({**_rec(ASK), "id": "ao-v", "name": "v"})]
+    summ = team_summary("t", members, {}, {})
+    assert len(summ["answers"]) == 3 and summ["n_answer"] == 2
+    assert "ao-w:permission:tu-s" in summ["answer_key"]
+    assert rollup(None, members)["answer_needed"] == 2
 
 
 @pytest.mark.unit
@@ -187,6 +201,7 @@ async def test_an_idle_thread_held_by_a_subagent_is_rung_on_the_restore(agent, h
         await task
         s = agent.sessions[sid]
         assert s.state == "idle" and s.told and agent._bell_blocked(s, now) != "not hook-confirmed idle"
+        assert not mail.read_when(s, "note", now).startswith("rung on the restore")
 
         task, tid = await _ask(agent, c, sid, "two")  # a main-thread prompt reads as it did
         assert mail.read_when(agent.sessions[sid], "note", now).startswith("read once its permission")

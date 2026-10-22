@@ -5546,7 +5546,7 @@
       // the open prompts beneath the newest, each answerable on its own line (§4.2 *Every entry is
       // answerable where it is drawn*, TD-950): `held_line.html`'s `prompt_line`, its buttons naming the call
       const others = v.state === "needs-you" ? (v.others || []).map((o) => `<div class="row gap wrap pline"><span class="meta">${esc(o.text)}</span>${o.answerable
-        ? ` <span class="meta countdown" data-deadline="${esc(o.deadline)}"></span> <button class="btn sm" data-act="allow" data-id="${id}" data-call="${esc(o.call)}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}" data-call="${esc(o.call)}">Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">`
+        ? ` <span class="meta countdown" data-deadline="${esc(o.deadline)}"></span> <button class="btn sm" data-act="allow" data-id="${id}" data-call="${esc(o.call)}" data-line>Allow</button> <button class="btn sm" data-act="deny" data-id="${id}" data-call="${esc(o.call)}" data-line>Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">`
         : ""}${heldSpan(o.held)}</div>`).join("") : "";
       // Allow / Deny only for a tool with a permission channel (§4.3, §4.5a, TD-785): else the terminal's
       if (v.state === "needs-you" && p && p.kind === "permission" && v.permission_channel !== false) {
@@ -6027,8 +6027,8 @@
     // no `data-focus` — `markPopped` would relabel it and the pop-out click would claim it
     { keys: ["Enter", "o"], page: "org", ring: true, control: "Focus (Details, or Focus window); on a team's + card, New session on that team", sel: "a[data-focus], a.plusgo" },
     { keys: ["Shift+Enter"], page: "org", ring: true, control: "Pop out", sel: '[data-act="popout"]' },
-    { keys: ["a"], page: "org", ring: true, control: "Allow its permission", sel: '[data-act="allow"]' },
-    { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]' },
+    { keys: ["a"], page: "org", ring: true, control: "Allow its permission", sel: '[data-act="allow"]:not([data-line])' },
+    { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]:not([data-line])' },
     // the fold (§4.5a *team card: fold*, TD-194): on a card it folds the card's team and the ring
     // goes to the header; on a folded team's header, as `Enter` there, it opens it
     { keys: ["f"], page: "org", ring: true, control: "fold its team (on a folded team's header, open it)", sel: "[data-fold]", fold: true },
