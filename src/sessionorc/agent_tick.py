@@ -4308,9 +4308,10 @@ class TickMixin:
                 continue
             self._observe(s, pane, tails.get(sid, []), now)
         # tmux sessions with our prefix that we have no record of (created by hand, or the
-        # store was lost): adopt them minimally as shells so they appear in the Org.
+        # store was lost): adopt them minimally as shells so they appear in the Org. A pane whose
+        # create is still starting it is that create's, not a stranger's (TD-952).
         for name, pane in panes.items():
-            if name not in self.sessions and not self._is_removed_pane(name, pane):
+            if name not in self.sessions and name not in self._starting and not self._is_removed_pane(name, pane):
                 s = Session(
                     id=name,
                     name=name[len(naming.PREFIX) :],

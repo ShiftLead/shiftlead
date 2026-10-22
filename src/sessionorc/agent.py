@@ -797,6 +797,11 @@ class HostAgent(
         # re-adopt a dead pane and a hand-made session that reuses the name is adopted at once
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
+        # Ids whose create is starting their tmux session in a thread: the pane exists before the
+        # record does, and a tick between the two must not adopt it as a nameless shell — on a node
+        # that adoption reaches the home first, which then refuses the real record as another
+        # session (TD-952). The create's own record goes in on the loop, before its next await.
+        self._starting: set[str] = set()
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
         self._oversize: set[str] = set()  # ids whose view is past the line limit, logged once each
         self._backed_up = ""  # the local date of the last nightly tarball tried (a home only)
@@ -1322,11 +1327,14 @@ class HostAgent(
                     **model_env,
                 }
                 run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
+                self._starting.add(sid)
                 try:
                     await asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log)
                     break
                 except DuplicateSession:
                     taken.add(sid)  # design §4.1: handle tmux's own verdict, not just our check
+                finally:
+                    self._starting.discard(sid)  # nothing awaits between here and `self.sessions[sid] = s`
             else:
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
             s = Session(

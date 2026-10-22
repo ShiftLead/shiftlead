@@ -76,7 +76,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Open |
-| TD-952 | `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home | Low | Open |
 | TD-953 | `ao pr wait <n> --fresh` called just after a push can answer the old head's word: nothing makes it wait for the caller's commit | Medium | Open |
 
 ---
@@ -1746,23 +1745,6 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-947, TD-629 (a waiter ended by another call's event), TD-734 (subagent events), TD-201.
 
 ---
-
-## TD-952: `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-21 (grinder-ao-1, reading main's red run under #2248)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_link.py` ~L1310 (`test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home`, the read at ~L1340); the home's launch-record write for a node's supervised create (TD-103 slice 1)
-
-**Why:** main's CI on 20e7283 (#2248, a ledger-only commit; run 39716427084, test (3.12)) failed this one test with `FileNotFoundError: …/kmaster/launch/ao-x-hookstub@laptop.json` at `named = json.loads((launch / f"{auto['id']}.json").read_text())`: the second, unnamed `create` on the node returned its id but the home held no launch record under it when the test read it. The first, named create's record was there. The same test passed on the runs before and after, so it is a race — either the test reads before the write lands, or the home writes the unnamed create's record under another address — and a red main holds the promote (`ao promote status`: *checks on main are failed*).
-
-**Fix:** reproduce under load (`pytest tests/test_link.py -k supervised_create_on_a_node --count`/a loop) and find which: if the record is written after `create` replies, the test waits for it (`wait_for`) and the design says whether a supervised create's launch record is written before its reply (§6 *Keeping a team running*); if it lands under another id, that is the bug.
-
-**Done when** the cause is named in this entry and the test passes a few hundred runs in a loop.
-
 
 ## TD-953: `ao pr wait <n> --fresh` called just after a push can answer the old head's word: nothing makes it wait for the caller's commit
 
