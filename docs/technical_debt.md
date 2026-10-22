@@ -457,8 +457,16 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Status:** Open. Standing up guardians' team (2026-10-09) needed facts spread across design §4.4a,
 §4.9, §4.9b, §4.9c, `docs/briefs/README.md`, the package role templates, two working examples
 (contractmatch's and dev-cadence's repo config and briefs) and TD-299's step list. A session
-in the new repo had to be handed a brief written from all of them.
-**Blocked by:** decision (paul) — when guardians-devenv TD-028's *doc gaps* list (a first run to learn from) is enough to write from
+in the new repo had to be handed a brief written from all of them. **Decided 2026-10-21** (Paul, on the
+board's line *No document says how a repo gets its first ShiftLead team*): the list is enough to write
+from — *See TD-028 on guardians-devenv*, its **agentorc doc gaps** list, measured against `ao team --skill`
+(`src/shiftlead/team_skill.md`). Paul's three: nothing covers an umbrella repo whose work lands in other
+repos; lanes are under-documented (the `owner:` lane word, and that a `free-pick` lane also takes every
+decided board line and every red or sync PR, so a board line cannot be kept from a team and for dnsguard
+the briefs are the only fence); nothing says what goes in a container node's `env` file or which command
+does the logins. The list adds: keeping an entry from workers (`Owner: paul`), a TD-id lane matching
+nothing in code, what a node does to the devcontainer, a token's scope as the fence, and the
+`settling`/`held`/`waiting`/`needs_team` marks an empty first lane is read through.
 **Location:** a new how-to (where it lives is part of the fix: the README's *Run it*, a
 `docs/` page, or `ao`'s skill text), `docs/briefs/README.md`, design §4.9.
 
