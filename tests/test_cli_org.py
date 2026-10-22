@@ -501,12 +501,14 @@ def test_root_at_the_registered_checkout_reads_as_without_it_but_for_the_header_
     assert [w for w in plain["warnings"] if str(alpha) not in w] == got["warnings"] and len(got["warnings"]) == 1
 
 
-@pytest.mark.parametrize("where", ["sub", "outside", "plain"])
+@pytest.mark.parametrize("where", ["sub", "dotgit", "outside", "plain"])
 def test_a_dir_that_is_no_checkout_of_a_registered_repo_is_refused_exit_2(world, capsys, where):
     tmp_path, _, _ = world
     if where == "sub":
         d = branch(world) / "docs"
         d.mkdir()
+    elif where == "dotgit":
+        d = tmp_path / "alpha" / ".git"
     elif where == "outside":
         d = repo(tmp_path / "stranger")
     else:
@@ -531,3 +533,14 @@ def test_a_team_placed_on_another_host_warns_its_briefs_are_read_there(world, ca
     assert not [w for w in plain["warnings"] if "briefs read on" in w]
     _, got = check_at(capsys, wt)
     assert f"alpha-grind: briefs read on devenv's checkout, not at {wt.resolve()}" in got["warnings"]
+
+
+def test_a_role_directory_only_the_branch_holds_is_read_at_dir(world, capsys):
+    """The role directories are read at `<dir>`: one the branch adds that is not whole is named with `--root` alone."""
+    wt = branch(world)
+    (wt / ".shiftlead" / "roles" / "scout").mkdir(parents=True)
+    (wt / ".shiftlead" / "roles" / "scout" / "role.yml").write_text("kind: worker\n")
+    _, plain = check(capsys)
+    assert not [x for x in plain["lacks"] if "role scout" in x]
+    code, got = check_at(capsys, wt)
+    assert code == 1 and [x for x in got["lacks"] if x.startswith("role scout (")], got
