@@ -82,6 +82,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     flow_mark,  # noqa: F401
     gated_view,  # noqa: F401
     group_place,  # noqa: F401
+    held_words,  # noqa: F401
     host_volatile,  # noqa: F401
     next_act,  # noqa: F401
     pill_title,  # noqa: F401
@@ -95,6 +96,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     shell_cmd,  # noqa: F401
     shells_of,  # noqa: F401
     state_counts,  # noqa: F401
+    subagent_held,  # noqa: F401
     suspended_note,  # noqa: F401
     terminal_only,  # noqa: F401
     view,  # noqa: F401

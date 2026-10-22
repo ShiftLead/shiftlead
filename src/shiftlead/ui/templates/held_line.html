@@ -1,0 +1,7 @@
+{#- A subagent's prompt (§4.2 *A subagent's dialog is held back*, §4.5a **Allow / Deny**, TD-950): from
+    `subagent_held`'s `{name, deadline}` — *from the <name> subagent*, and while the pane draws nothing
+    for it *· the pane shows nothing until <deadline>*, the deadline in the reader's clock (`.localtime`).
+    The card, the Inbox row and the team facet draw it here; Focus draws the same words in `app.js`. -#}
+{% macro held_line(h) -%}
+<div class="meta held">from the {{ h.name }} subagent{% if h.deadline %} · the pane shows nothing until <span class="localtime" data-at="{{ h.deadline }}" title="{{ h.deadline }}">{{ h.deadline }}</span>{% endif %}</div>
+{%- endmacro %}

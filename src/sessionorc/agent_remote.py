@@ -627,7 +627,8 @@ class RemoteMixin:
         behavior, prompt, rule = (str(params.get(k) or "") for k in ("behavior", "prompt", "rule"))
         if s is None or behavior not in ("allow", "deny") or not prompt or not rule:
             raise link.LinkError(f"answered_by_rule names no record of {host}, or no answer")
-        self._answered_by_rule(s, prompt, behavior, rule, asker=f"{rid}@{host}")
+        name = str(params.get("subagent_name") or "") or None  # a subagent's prompt names it (TD-950)
+        self._answered_by_rule(s, prompt, behavior, rule, asker=f"{rid}@{host}", subagent_name=name)
         await self._push_changes()
         return {"filed": True}
 

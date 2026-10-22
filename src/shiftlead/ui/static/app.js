@@ -5537,12 +5537,16 @@
       // the pill's hover (§4.5a **state pill hover**, TD-490): the card's one text, from the view
       let head = `<span class="pill s-${cls}${scraped}" title="${esc(v.pill_title || "")}"><span class="dot"></span>${v.state_label}</span>`;
       const p = v.pending;
+      // a subagent's prompt names its asker, and says the pane draws nothing until the deadline (§4.2,
+      // §4.5a **Allow / Deny**, TD-950): `held_line.html`'s words, the deadline in the reader's clock
+      const h = v.state === "needs-you" ? v.held : null;
+      const held = h ? ` <span class="meta held">from the ${esc(h.name)} subagent${h.deadline ? ` · the pane shows nothing until <span class="localtime" data-at="${esc(h.deadline)}" title="${esc(h.deadline)}">${esc(h.deadline)}</span>` : ""}</span>` : "";
       // Allow / Deny only for a tool with a permission channel (§4.3, §4.5a, TD-785): else the terminal's
       if (v.state === "needs-you" && p && p.kind === "permission" && v.permission_channel !== false) {
-        head += ` <button class="btn sm primary" data-act="allow" data-id="${id}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}">Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"> <span class="meta">${esc(p.text)}</span> <span class="meta countdown" data-deadline="${p.deadline || ""}"></span>`;
+        head += ` <button class="btn sm primary" data-act="allow" data-id="${id}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}">Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"> <span class="meta">${esc(p.text)}</span> <span class="meta countdown" data-deadline="${p.deadline || ""}"></span>${held}`;
         compose.disabled = true; $("#composehint").textContent = "a permission is pending: answer above";
       } else if (v.state === "needs-you" && p) {
-        head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>`;
+        head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>${held}`;
         compose.disabled = true; $("#composehint").textContent = "answer in the terminal above";
       } else if (v.state === "unreachable" && p && p.host_unreachable) {
         // design §4.4a: the hook still blocks on its node, and an answer from here cannot reach it

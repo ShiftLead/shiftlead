@@ -639,6 +639,7 @@
 {#- a row that names pull requests draws each `#n` as a link (§4.5a, TD-258): the words are the
     record's fields, and `e.text` is the same words unlinked, which Find reads -#}
 <div class="body">{% if e.parts %}{% for p in e.parts %}{% if p.url %}<a class="ref" href="{{ p.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">{{ p.text }}</a>{% else %}{{ p.text }}{% endif %}{% endfor %}{% else %}{{ e.text }}{% endif %}</div>
+{%- if e.held %}{% from "held_line.html" import held_line %}{{ held_line(e.held) }}{% endif %}
 {{ doing_line(e) }}
 {%- if section == 'snoozed' %}<div class="row">{{ snoozed_says(e) }}<span class="st">&nbsp;— the state itself is untouched</span></div>{% endif %}
 <div class="row gap wrap mfoot">
