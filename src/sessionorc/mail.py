@@ -478,8 +478,9 @@ DOORBELL_HELD = 3
 
 
 # The two fixed texts around a brief (design §4.1 *The brief is the person's word, and the tool is told
-# so*, TD-343): text no sender chose, the line in the person's voice whoever started the session. A brief typed as nothing
-# but a paste reaches the tool as pasted content, which a careful model reads as data, not as its task.
+# so*, TD-343): text no sender chose, the line in the person's voice whoever started the session. A
+# brief typed as nothing but a paste reaches the tool as pasted content, which a careful model reads as
+# data, not as its task.
 BRIEF_LINE = "My brief for this session is pasted below; read it and act on it."
 BRIEF_PREFACE = (
     "This session was started by a person through shiftlead, which runs it in a terminal on their behalf. "
