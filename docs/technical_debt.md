@@ -1501,7 +1501,7 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 **Priority:** Medium
 **Type:** debt
 **Added:** 2026-10-21 (grinder-ao-2, TD-785's live walk)
-**Owner:** grinder
+**Owner:** designer
 **Kind:** design-first
 **Status:** Open — found 2026-10-21 by TD-785's walk on `gemini-conformance` (0.64.0, an API-key home): the free tier's quota ran out mid-turn and the tool drew its own dialog — *Usage limit reached for gemini-3.8-flash … ● 1. Keep trying  2. Stop* — while the title still read `✦  Working… (conformance-walk)` and no hook fired, so the record stayed `working` (hook) for the rest of the step's 300 s (`tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`). Design §4.3 maps `✦` to working and gives Gemini's `usage` only a Google-login home's quota endpoint (TD-786); an API-key home reports none, so nothing marks the session `limited`, and a dialog that waits on a choice is not `needs-you` either.
 **Location:** design §4.3 *The second adapter: Gemini CLI* (*Two gaps*, `usage`), §4.2 (`limited`); `src/shiftlead/adapters/gemini/`
