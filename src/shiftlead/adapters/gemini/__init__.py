@@ -26,13 +26,14 @@ import sys
 import uuid
 from pathlib import Path
 
-from sessionorc import paths
+from sessionorc import identity, paths
 from sessionorc.adapters import LaunchSpec, Link, MailDelivery, Transcript
+from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
-from shiftlead.adapters.claude_code import _resolves, write_context_file
+from shiftlead.adapters.claude_code import SHELL_CMD_LEN, SHELL_WALK_NODES, _resolves, write_context_file
 from shiftlead.adapters.gemini import transcript as transcript_mod
 from shiftlead.adapters.gemini.hook import START_CONTEXT_ENV
 from shiftlead.profiles import Profile
@@ -80,6 +81,9 @@ COMPOSER_ROW = re.compile(r"^\s*[>*!] ")
 CURSOR = "\x1b[7m"
 # painted grey, not faint, so read as empty by its words
 PLACEHOLDER = "Type your message or @path/to/file"
+# The tool's shell wrapper (design §4.3 `background`, read 2026-10-22 on 0.64.0): every command, the model's
+# and shell mode's alike, runs as `bash -c "shopt -u …; {\n<command>\n}\n__code=$?; pwd > …; exit $__code"`
+SHELL_WRAPPER = "\n}\n__code=$?"
 
 
 def home(profile: Profile) -> Path:
@@ -235,7 +239,7 @@ class GeminiAdapter:
     start_context = True
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the rest come
     # with TD-786's later slices
-    implements: frozenset[str] = frozenset({"composer", "context", "links", "mail", "spend", "title"})
+    implements: frozenset[str] = frozenset({"background", "composer", "context", "links", "mail", "spend", "title"})
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
         self._binary = binary
@@ -341,6 +345,36 @@ class GeminiAdapter:
         which is `CLI_TITLE`; None for a title with none (a shell's, the tool's before it mounts)."""
         m = TITLE_NAME.match((pane_title or "").strip())
         return (m.group(1).strip() or None) if m else None
+
+    def background(self, pid: int, proc: ProcReader) -> list[dict] | None:
+        """The tool's live shell tasks under the pane's process `pid` (design §4.3 `background`, §4.2 *A
+        background shell task*): `[{pid, start, cmd}]`. From `pid`, its own included, down to the first
+        `node` — the pane's own for an ao launch, a descendant under a hand-started shell — bounded as
+        Claude Code's walk is; then the children of it and of its `node` children (the tool relaunches
+        itself as one; a launch that does not keeps its shells, beside any node MCP server) that are the
+        tool's shell wrapper (`SHELL_WRAPPER`), `cmd` the
+        argv of the wrapper's first child, joined and cut to `SHELL_CMD_LEN`. Read only while the session
+        is idle, so each is a command moved to the background. None when no `node` is found."""
+        level, seen, tool = [int(pid)], 0, None
+        for _ in range(identity.WALK_LIMIT):
+            tool = next((p for p in level if proc.comm(p) == "node"), None)
+            if tool is not None or not level or seen > SHELL_WALK_NODES:
+                break
+            seen += len(level)
+            level = [c for p in level for c in proc.children(p) or ()]
+        if tool is None:
+            return None
+        parents = [tool, *(c for c in proc.children(tool) or () if proc.comm(c) == "node")]
+        out = []
+        for child in (c for p in parents for c in proc.children(p) or ()):
+            argv = proc.cmdline(child) or []
+            st = proc.stat(child)
+            if st is None or len(argv) < 3 or argv[1] != "-c" or SHELL_WRAPPER not in argv[2]:
+                continue
+            kids = [(k.start, k.pid) for c in proc.children(child) or () if (k := proc.stat(c)) is not None]
+            first = proc.cmdline(min(kids)[1]) if kids else None
+            out.append({"pid": child, "start": st.start, "cmd": " ".join(first or [])[:SHELL_CMD_LEN]})
+        return out
 
     # -- account ---------------------------------------------------------------------------------
 
