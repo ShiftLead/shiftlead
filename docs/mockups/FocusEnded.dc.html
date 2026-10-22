@@ -156,7 +156,7 @@
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 1440px; min-height: 1000px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 1440px; min-height: 940px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Sessions</span><span class="tab">Inbox 4 · 2</span><span class="tab">Queue</span></div>
@@ -174,48 +174,43 @@
     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
       <span class="btn sm link">✉ Message</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h5l3 3v9H4z"></path><path d="M9 2v3h3M6 8h4M6 10.5h4"></path></svg>Transcript</span><span class="btn sm link">‹› VS Code</span>
       <span style="flex-grow: 1;"></span><span class="btn sm link">more ▾</span>
-      <span class="meta" style="font-size: 12px;">a closed record: nothing that acts on a process is drawn (§4.5 row 6)</span>
     </div>
-    <div class="card" style="padding: 10px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #fff7ed; border-color: #fdba74;" title="the ending banner (design §4.5a, TD-942)">
-      <b style="color: #9a3412;">closed by you · 18:42</b>
+    <div style="padding: 12px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #7c3d00; border-radius: 6px;" title="the ending banner (design §4.5a, TD-942)">
+      <span style="font-size: 15px; font-weight: 600; color: #7c3d00;">Closed by you at 18:42</span>
+      <span style="display: flex; gap: 6px; flex-wrap: wrap;"><span class="btn sm primary">Resume</span><span class="btn sm">Resume with changes…</span><span class="btn sm">New session here</span><span class="btn sm ghost" title="forget the record now — it is forgotten by itself a day after the close">Forget</span></span>
       <span style="flex-grow: 1;"></span>
-      <span class="btn sm primary">Resume</span><span class="btn sm">Resume with changes…</span><span class="btn sm">New session here</span><span class="btn sm ghost" title="forgets the record now; forgotten by itself a day after the close">Forget</span>
-      <span class="btn sm link" title="Closed records are forgotten by itself a day after the close; the run log and the transcript stay readable until then. Resume starts it again under its own name, attended." style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>
+      <span class="btn sm link" title="A closed record is forgotten by itself a day after the close; its run log and transcript stay readable until then. Resume starts it again under its own name, attended." style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>
     </div>
-    <div class="note">Before: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> The guess is drawn only when the record does not name the ending (<i>pane gone · found 12:31</i>, a bare <i>closed</i>). A team member's banner adds <b>Restart</b>, the card's own, where the sentence explaining it stood.</div>
-    <div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;" title="what this session cost, read once when it ended — the Spend page has the live figures (design §4.5a, TD-942)">
-      <div style="display: flex; align-items: baseline; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">What dc-paul cost</span><span class="meta">since 10-19 · 2 runs · this run 16:28 → 18:42, 2h 14m</span></div>
-      <div style="display: flex; gap: 28px; align-items: baseline;">
-        <div><div class="mono" style="font-size: 26px; font-weight: 500;" title="API-equivalent at your weights — a subscription's turns, never a bill (design §4.4 Spend per seat)">≈$41.80</div><div class="meta">API-equivalent · subscription</div></div>
-        <div><div class="mono" style="font-size: 26px; font-weight: 500;" title="input 0.9M · output 0.3M · cache read 10.6M · cache write 0.6M">12.4M tok</div><div class="meta">every kind summed · 312 turns</div></div>
+    <div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost, read once when it ended — the Spend page has the live figures (design §4.5a, TD-942)">
+      <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
+        <span class="mono" style="font-size: 28px; font-weight: 500; line-height: 1;" title="API-equivalent at your weights: a subscription's turns, never a bill (design §4.4 Spend per seat)">≈$41.80</span>
+        <span style="font-size: 14px;">spent by dc-paul since Oct 19, over 2 runs</span>
+        <span class="meta" title="input 0.9M · output 0.3M · cache read 10.6M · cache write 0.6M">12.4M tokens in 312 turns; this run 16:28 to 18:42 (2h 14m)</span>
       </div>
-      <div style="display: flex; flex-direction: column; gap: 5px;">
-        <div class="meta" style="font-size: 11px; text-transform: uppercase; letter-spacing: .04em;">by entry</div>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span class="mono" style="width: 120px;">TD-156</span><span style="height: 8px; width: 150px; background: #9db8dd; border-radius: 2px;"></span><span class="mono">≈$18.20</span><span class="meta">5.4M tok</span></div>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span class="mono" style="width: 120px;">TD-942</span><span style="height: 8px; width: 123px; background: #9db8dd; border-radius: 2px;"></span><span class="mono">≈$14.90</span><span class="meta">4.4M tok</span></div>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span class="mono" style="width: 120px;">TD-623</span><span style="height: 8px; width: 34px; background: #9db8dd; border-radius: 2px;"></span><span class="mono">≈$4.10</span><span class="meta">1.2M tok</span></div>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span class="mono" style="width: 120px;">between entries</span><span style="height: 8px; width: 38px; background: #9db8dd; border-radius: 2px;"></span><span class="mono">≈$4.60</span><span class="meta">1.4M tok</span></div>
+      <div style="display: flex; flex-direction: column; gap: 7px;">
+        <div style="font-size: 13px; font-weight: 600;">By entry</div>
+        <div style="display: grid; grid-template-columns: 140px 420px 80px 80px; align-items: center; gap: 12px; font-size: 13px;"><a href="#" class="mono">TD-156</a><span style="height: 10px; width: 100%; background: #1e40af; opacity: .45; border-radius: 2px;"></span><span class="mono" style="text-align: right;">≈$18.20</span><span class="meta mono" style="text-align: right;">5.4M tok</span></div><div style="display: grid; grid-template-columns: 140px 420px 80px 80px; align-items: center; gap: 12px; font-size: 13px;"><a href="#" class="mono">TD-942</a><span style="height: 10px; width: 82%; background: #1e40af; opacity: .45; border-radius: 2px;"></span><span class="mono" style="text-align: right;">≈$14.90</span><span class="meta mono" style="text-align: right;">4.4M tok</span></div><div style="display: grid; grid-template-columns: 140px 420px 80px 80px; align-items: center; gap: 12px; font-size: 13px;"><a href="#" class="mono">TD-623</a><span style="height: 10px; width: 23%; background: #1e40af; opacity: .45; border-radius: 2px;"></span><span class="mono" style="text-align: right;">≈$4.10</span><span class="meta mono" style="text-align: right;">1.2M tok</span></div><div style="display: grid; grid-template-columns: 140px 420px 80px 80px; align-items: center; gap: 12px; font-size: 13px;"><span class="meta">between entries</span><span style="height: 10px; width: 25%; background: #1e40af; opacity: .45; border-radius: 2px;"></span><span class="mono" style="text-align: right;">≈$4.60</span><span class="meta mono" style="text-align: right;">1.4M tok</span></div>
       </div>
-      <div style="border-top: 1px solid #eceef1; padding-top: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
-        <div style="display: flex; gap: 10px; align-items: baseline;"><span class="meta" style="width: 170px; flex-shrink: 0;">today · dc-grind</span><span style="min-width: 0;"><span class="mono">≈$63.10</span> <span class="meta">· 19.0M tok</span></span></div>
-        <div style="display: flex; gap: 10px; align-items: baseline;" title="≈$ and $ apart, never summed (design §4.6 The disconnect card)"><span class="meta" style="width: 170px; flex-shrink: 0;">today · all teams</span><span style="min-width: 0;"><span class="mono">≈$212.40</span> <span class="meta">·</span> <span class="mono">$8.75</span> <span class="meta">metered · 66.2M tok</span></span></div>
-        <div style="display: flex; gap: 10px; align-items: baseline;"><span class="meta" style="width: 170px; flex-shrink: 0;">week</span><span style="min-width: 0;">Claude · paul <span class="mono">9%</span> <span class="meta">· resets Mon 09:00</span></span></div>
-        <div style="display: flex; gap: 10px; align-items: baseline;"><span class="meta" style="width: 170px; flex-shrink: 0;">5 h</span><span style="min-width: 0;">Claude · paul <span class="mono">25%</span> <span class="meta">· resets 21:10</span></span></div>
+      <div style="border-top: 1px solid #eceef1; padding-top: 12px; display: flex; flex-direction: column; gap: 5px;">
+        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 13px;"><span class="meta">dc-grind today</span><span><span class="mono">≈$63.10</span> <span class="meta">19.0M tokens</span></span></div>
+        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 13px;" title="≈$ and $ apart, never summed (design §4.6 The disconnect card)"><span class="meta">All teams today</span><span><span class="mono">≈$212.40</span> <span class="meta">and</span> <span class="mono">$8.75</span> <span class="meta">metered, 66.2M tokens</span></span></div>
+        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 13px;"><span class="meta">Claude, paul</span><span><span class="mono">9%</span> <span class="meta">of the week, resets Mon 09:00;</span> <span class="mono">25%</span> <span class="meta">of 5 hours, resets 21:10</span></span></div>
       </div>
-      <div class="meta" style="font-size: 12px;">as of 18:43 · <a href="#">Spend for dc-paul →</a></div>
+      <div class="meta" style="font-size: 12px;">Read at 18:43. <a href="#">Open dc-paul in Spend</a></div>
     </div>
-    <div class="card" style="padding: 6px 10px; display: flex; align-items: center; gap: 10px; opacity: .8;">
-      <span class="btn sm" style="flex-grow: 1; justify-content: flex-start; text-align: left; font-weight: 400;" title="the composer's bar on an ended record (TD-942)">ended — Resume above to type here</span>
+    <div class="card" style="padding: 6px 10px; display: flex; align-items: center; gap: 10px; opacity: .7;">
+      <span class="meta" style="flex-grow: 1; padding-left: 6px;" title="the composer's bar on an ended record (TD-942)">Ended. Resume to type here.</span>
       <span class="btn sm" style="opacity: .5;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</span><span class="btn primary sm" style="opacity: .5;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8h10M8.5 3.5L13 8l-4.5 4.5"></path></svg>Send</span>
     </div>
+    <div class="note">Was: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> and a dead terminal. The cause's guess stays only where the record names none (a pane found gone, a close with no closer). A team member's banner adds <b>Restart</b> after Resume.</div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
     <div style="display: flex; justify-content: flex-end;"><span class="btn sm ghost" style="height: 22px; padding: 0 6px;" title="Put the panel away — the terminal takes its width (s); remembered in this browser (design §4.5a, TD-408)">» put away</span></div>
     <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Git</span><span style="flex-grow: 1;"></span><span class="mono muted" style="font-size: 12px;">dc-paul · 13 behind</span></div><div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div></div>
-    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Reports</span><span style="flex-grow: 1;"></span><span class="meta mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">2 done · 1 filed</span></div></div>
+    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Reports</span><span style="flex-grow: 1;"></span><span class="meta mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">2 done, 1 filed</span></div></div>
+    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Inbox</span><span style="flex-grow: 1;"></span><span class="meta mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">6, all read</span></div></div>
     <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Sent</span><span style="flex-grow: 1;"></span><span class="meta mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">4 sent</span></div></div>
-    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Session</span><span style="flex-grow: 1;"></span><span class="meta mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="claude-code · paul · opus-5-5 — the model names the tool; the account is the profile row">opus-5-5</span><span class="btn sm link" style="margin-left: 8px; flex-shrink: 0;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span></div></div>
-    <div class="note">No <b>Ready to close</b>: the record has ended, nothing is left to close. Each folded card says what it holds on its summary line; <b>Session</b>'s value is the model (it names the tool too; tool · account · model on hover), and its heading never shrinks for it.</div>
+    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Session</span><span style="flex-grow: 1;"></span><span class="meta mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="claude-code · paul · opus-5-5">opus-5-5</span><span class="btn sm link" style="margin-left: 8px; flex-shrink: 0;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span></div></div>
   </div>
 </div>
 </div>

@@ -78,21 +78,21 @@
       "x": 0,
       "y": 12080,
       "w": 1440,
-      "h": 1000
+      "h": 940
     },
     {
       "file": "FocusHeld.dc.html",
       "title": "Focus \u2014 taken over: Hand back in Take over's place, Sent, the folds' values (TD-942)",
       "x": 0,
-      "y": 13180,
+      "y": 13120,
       "w": 1440,
-      "h": 1000
+      "h": 940
     },
     {
       "file": "Legend.dc.html",
       "title": "States & badges",
       "x": 0,
-      "y": 14280,
+      "y": 14160,
       "w": 900,
       "h": 1180
     },
@@ -100,7 +100,7 @@
       "file": "Resumable.dc.html",
       "title": "Resumable",
       "x": 0,
-      "y": 15560,
+      "y": 15440,
       "w": 1440,
       "h": 700
     },
@@ -108,7 +108,7 @@
       "file": "Members.dc.html",
       "title": "Members \u2014 the team card's dialog",
       "x": 0,
-      "y": 16360,
+      "y": 16240,
       "w": 1440,
       "h": 760
     },
@@ -116,7 +116,7 @@
       "file": "AddEntry.dc.html",
       "title": "Add entry \u2014 the form, and the composer it fills",
       "x": 0,
-      "y": 17220,
+      "y": 17100,
       "w": 1440,
       "h": 860
     },
@@ -124,7 +124,7 @@
       "file": "Help.dc.html",
       "title": "Help",
       "x": 0,
-      "y": 18180,
+      "y": 18060,
       "w": 1440,
       "h": 1500
     },
@@ -132,7 +132,7 @@
       "file": "Transcript.dc.html",
       "title": "Transcript",
       "x": 0,
-      "y": 19780,
+      "y": 19660,
       "w": 1440,
       "h": 1180
     },
@@ -140,7 +140,7 @@
       "file": "Message.dc.html",
       "title": "Message \u2014 when it is read",
       "x": 0,
-      "y": 21060,
+      "y": 20940,
       "w": 1440,
       "h": 1060
     },
@@ -241,10 +241,26 @@
       "h": 2320
     },
     {
+      "file": "FocusEndedDark.dc.html",
+      "title": "Focus \u2014 ended, dark (TD-942)",
+      "x": 3120,
+      "y": 2420,
+      "w": 1440,
+      "h": 940
+    },
+    {
+      "file": "FocusHeldDark.dc.html",
+      "title": "Focus \u2014 taken over, dark (TD-942)",
+      "x": 3120,
+      "y": 3460,
+      "w": 1440,
+      "h": 940
+    },
+    {
       "file": "MainDark.dc.html",
       "title": "Sessions \u2014 dark",
       "x": 3120,
-      "y": 2420,
+      "y": 4500,
       "w": 1440,
       "h": 1560
     },
@@ -252,7 +268,7 @@
       "file": "OrgTeamFirst.dc.html",
       "title": "Sessions \u2014 team-first (the design, 2026-09-26; checked in from the canvas)",
       "x": 3120,
-      "y": 4080,
+      "y": 6160,
       "w": 1440,
       "h": 900
     },
@@ -260,7 +276,7 @@
       "file": "RepoFacet.dc.html",
       "title": "Team card \u2014 Repo facet: the lanes line (TD-357, 2026-10-06)",
       "x": 3120,
-      "y": 5080,
+      "y": 7160,
       "w": 1440,
       "h": 520
     },
@@ -268,7 +284,7 @@
       "file": "Type.dc.html",
       "title": "Type scale",
       "x": 3120,
-      "y": 5700,
+      "y": 7780,
       "w": 1440,
       "h": 760
     },
@@ -276,7 +292,7 @@
       "file": "TypeDark.dc.html",
       "title": "Type scale \u2014 dark",
       "x": 3120,
-      "y": 6560,
+      "y": 8640,
       "w": 1440,
       "h": 760
     }
