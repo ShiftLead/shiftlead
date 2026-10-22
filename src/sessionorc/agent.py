@@ -913,7 +913,9 @@ class HostAgent(
 
     PR_WAIT_STEP = 2.0  # seconds between looks at the reading: it lives in memory, so a look is free
 
-    async def rpc_pr_wait(self, root: str, pr: int, timeout: float = 1800.0, fresh: bool = False) -> dict[str, Any]:
+    async def rpc_pr_wait(
+        self, root: str, pr: int, timeout: float = 1800.0, fresh: bool = False, head: str | None = None
+    ) -> dict[str, Any]:
         """`ao pr wait <n>` (design §4.7, TD-940): block until the home's reading of PR `pr` in the
         checkout `root` leaves *pending*, and return `{pr, word, checks, conflicting, failing, head,
         read_at, url}` — `word` one of `reports.PR_WAIT_EXIT`'s. The wake is the reading's refresh,
@@ -921,8 +923,10 @@ class HostAgent(
         only a reading taken after the call. A number the reading does not hold is *gone* once a
         reading taken after the call still lacks it (a PR opened a minute ago is not yet in the one
         before), and at `timeout` the word is *timeout* with the last row; `read_error` is the last
-        read's failure, if it failed. A read: it decides nothing
-        on its caller, and the client names the root (`ao` sends its record's repo). Its connection
+        read's failure, if it failed. `head` (`want_head` in the reply; a sha or a prefix of one, TD-953)
+        counts only a row of that commit: one of another head is *pending* whatever it says, so a reading
+        of the commit before a push never answers for it. A read: it decides nothing on its caller, and
+        the client names the root (`ao` sends its record's repo). Its connection
         is held as a `wait`'s is (`_serve_wait`), so a Ctrl-C ends it here too. The home's."""
         want = str(Path(root).resolve())
         key = next((r for r in self._repos if str(Path(r).resolve()) == want), None)
@@ -931,6 +935,7 @@ class HostAgent(
         loop = asyncio.get_running_loop()
         deadline = loop.time() + max(float(timeout), 0.0)
         began = datetime.now(UTC)
+        want_head = str(head or "").strip().lower()
         if fresh:
             self._repos_fresh = True  # the next tick reads every repo's PRs, this one's among them
         row: dict[str, Any] | None = None
@@ -951,7 +956,8 @@ class HostAgent(
                 if got is None and after:
                     word, row = "gone", None  # an earlier reading's row is not this one's
                     break
-                if got is not None and (word := reports.pr_wait_word(got)) != "pending":
+                ours = got is not None and str(got.get("head") or "").lower().startswith(want_head)
+                if ours and (word := reports.pr_wait_word(got)) != "pending":
                     break
             if loop.time() >= deadline:
                 word = "timeout"
@@ -965,6 +971,7 @@ class HostAgent(
             "conflicting": bool(row.get("conflicting")),
             "failing": list(row.get("failing") or []),
             "head": row.get("head"),
+            "want_head": want_head or None,  # the commit asked for, beside the one the reading is of
             "url": row.get("url"),
             "read_at": at or None,
             # the last read failed (`gh` offline, a lapsed token): the reading is the one before it
