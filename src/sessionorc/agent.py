@@ -101,6 +101,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     MODEL_FILE,  # noqa: F401
     NODE_ACTS,  # noqa: F401
     NODE_READS,  # noqa: F401
+    NOTICE_LAG,  # noqa: F401
     ORPHAN_AFTER,  # noqa: F401
     OWED_NAMED,  # noqa: F401
     PASTE_SHOW_SECONDS,  # noqa: F401
@@ -556,6 +557,8 @@ class HostAgent(
             if s.pending and s.pending.kind == "prompt":
                 s.set_state("idle", confidence="hook")
                 self.store.save(s)
+            if self._sweep_prompts(s):  # no waiter outlives the host agent (§4.2, TD-950)
+                self.store.save(s)
             if not s.host:  # a record written before TD-057 step 1: it ran here, so it is this host's
                 s.host = self.host
                 self.store.save(s)
@@ -600,6 +603,13 @@ class HostAgent(
         # session id → thread (a subagent's id, or None) → its open calls, `(tool_use_id, call_sig)` oldest
         # first: what a permission, which names no call, is matched to (§4.2, TD-950). In memory only.
         self._open_calls: dict[str, dict[str | None, list[tuple[str, str]]]] = {}
+        # session id → when its last open prompt had a sure end (`time.monotonic()`): a decision, the asked
+        # call's own event, or an event naming no call; the tool's notice inside `NOTICE_LAG` of it is that
+        # prompt's (§4.2 *Open prompts are a stack*, TD-950). In memory only: a restart lets one notice through.
+        self._sure_end: dict[str, float] = {}
+        # records whose emptied stack restored a screen rule's `needs-you`: the next tick asks the rules once,
+        # whatever the hook's freshness (§4.2, TD-950)
+        self._recheck: set[str] = set()
         self._git_checked: dict[str, datetime] = {}
         # the status each record's recent files were last read at (§4.2, TD-538): `(oid, dirty, porcelain)`
         self._files_read: dict[str, tuple[Any, ...]] = {}
