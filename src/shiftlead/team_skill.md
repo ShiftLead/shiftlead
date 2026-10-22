@@ -49,6 +49,21 @@ worktree setup — `ok`, or a `warning` naming what is missing. A repo with no l
 written on the branch you are on and committed by nobody — commit them as any other change. A repo
 the doctor does not list is not registered on this host; that is the person's to fix, not yours.
 
+**What the repo needs before a team can pick anything.** A worker picks by an entry's header lines,
+never its prose (design §6 rule 6), so the ledger's entries carry them first:
+
+- **`**Blocked by:**`** — *pickable* is derived from it and never written: an entry with none, or
+  whose every blocker is archived, is pickable. `decision (paul)` there keeps the entry from every
+  lane until the person decides.
+- **`**Kind:**`** — `build`, or none, is a `free-pick` lane's; `design-first` is a designer's.
+- **`**Owner:**`** — the word a lane's `owner:` matches (*What a lane takes*, step 3). `paul` is the
+  person's owner word (`PERSON_OWNER` in `sessionorc/ledger.py`, as `ao repo init`'s `Fields:` line
+  declares it), and keeps an entry from every lane that carries an `owner:` word. **To keep an
+  entry from every worker, whatever its lanes**, block it: `**Blocked by:** decision (paul)`.
+- **The rules a PR lands by**, written down — dev-cadence's review and merge rules (its §4) where the repo
+  uses them (branch → PR → independent review → the gate → merge), else in the briefs (step 4). A team
+  merges its own PRs by what is written, never by a person's habit.
+
 ## 1. Decide where the team runs
 
 A team runs on the machine you start it from, unless its definition carries `host:` — then every
@@ -69,9 +84,29 @@ ao host status contractmatch
 ```
 
 `ao host` takes `up`, `rebuild`, `forget` and `status`, and the name must be a `nodes:` entry with
-a `container:` block. **The one-time human steps are not `ao`'s**: the node's `env` file and a
-`claude` login inside it for each profile the team uses. A node whose link is down is not a team
-you can start — `ao team start` refuses before it creates anything.
+a `container:` block. A node whose link is down is not a team you can start — `ao team start`
+refuses before it creates anything.
+
+**The one-time human steps are not `ao`'s**, and both come before the first start:
+
+- **The node's `env` file**, `~/.shiftlead/nodes/<name>/env`, mode `0600`, one `KEY=value` a line
+  and **unquoted** (`docker --env-file` keeps quotes as part of the value): `GH_TOKEN`, a
+  fine-grained GitHub token (`gh auth setup-git` at provisioning makes `git push` use it);
+  `GIT_AUTHOR_NAME` and `GIT_AUTHOR_EMAIL`; and whatever the repo's own briefs say a worker needs
+  (contractmatch's is a Doppler service token). Never the person's own token.
+- **The token is the fence.** It names the repos the team pushes to and nothing else: a repo the
+  node can see but the team must not change (a sibling clone, a symlink's target) is left out of
+  it, so a push there fails whatever a brief says.
+- **One `claude` login per profile** the team's roles name, inside the node:
+  `docker exec -u <the image's user> -it <container> env CLAUDE_CONFIG_DIR=/shiftlead/profiles/<profile> claude`,
+  the container's id from `ao host status <name>`.
+
+**What a node does to the repo's devcontainer** (design §4.4a): the image, its `features`,
+`remoteUser` and the lifecycle commands are kept; `mounts`, `customizations` and `containerEnv` are
+dropped, each dropped mount an empty tmpfs at its target; and the checkout is mounted at **its host
+path**, never `/workspaces/<x>`. A lifecycle script or Dockerfile line written for `/workspaces/<x>`
+does nothing there, or fails: point it at the checkout's path, and pin the image user's uid to the
+person's (`useradd --uid 1000`), before `ao host up`.
 
 ## 2. Say where the repo is
 
@@ -97,7 +132,19 @@ start` refuses on.
 
 ## 3. Say what the team is
 
-Beside `projects:` in the same file:
+**A repo's own team goes in its `.shiftlead.yml`** (*Which file*, below), the same keys with no
+`repo:` and no `host:`:
+
+```yaml
+teams:
+  cm-grind:
+    manager: {role: manager, name: manager-cm}
+    members:
+      - {role: grinder, count: 2, name: grinder-cm, lane: [free-pick, owner:grinder]}
+```
+
+and `org.yml` places it on a node with `place: {cm-grind: contractmatch}`. The `org.yml` form,
+beside `projects:`, takes `repo:` and `host:` as well:
 
 ```yaml
 teams:
@@ -174,6 +221,50 @@ nested checkouts that a `git add -A` in the main checkout stages as gitlinks.
 disk, but each session's worktree is cut from `origin/HEAD` after a fetch, so a `.shiftlead.yml`,
 a `.gitignore` line or a brief that is only in the main checkout's working tree is missing from
 every member's worktree.
+
+**A definition on a branch is not checked yet.** `ao team list` and `ao org check` read each
+registered checkout as it stands, so a `.shiftlead.yml` written on a branch — where a repo's review
+rules want it — is invisible to both until it merges. Run `ao org check` once it has, and fix what
+it names in a follow-up PR (TD-942 builds `ao org check --root <worktree>`).
+
+### What a lane takes
+
+One function reads the lane words against each entry's header lines (`lane_matches` in
+`sessionorc/ledger.py`, design §6 rule 6). What it does, and what it leaves to a brief:
+
+- **`free-pick`** takes a pickable entry whose `Kind:` is `build` or unwritten; **`design-first`**
+  a pickable `Kind: design-first` entry, and any entry blocked by `decision (designer)`.
+- **`owner:<word>` narrows the other words** and matches nothing alone: under
+  `[free-pick, owner:grinder]` an entry's `Owner:` must be `grinder` **or absent** — an entry with
+  no `Owner:` passes. To keep one out, give it an Owner the lane does not name: `paul` (step 0b),
+  or any word of the repo's own. **A bare `free-pick` reads no Owner at all**, `paul`'s included:
+  only a `Blocked by:` keeps an entry from it.
+- **A named lane** (`lane: [TD-041, TD-054]`) matches nothing in code: the member's brief reads it
+  as `{lane}` and works it in order, and nothing else holds the member to it.
+- **Work orders are in every `free-pick` lane, whatever its `owner:` words**: every open
+  **decided** line on the board (`board:<key>`) and every red or sync PR nobody holds (`pr:<n>`).
+  Nothing on the board marks a line *not for a team*, so where a repo has work a team must never
+  touch (a private repo, a person's own area), **the briefs are the only fence** for those lines:
+  say so under *The lane* in the worker's brief.
+- **An entry can sit in a lane and still not be taken**: one **settling** (new, inside its Kind's
+  `settle:` window) or **held** there by the person (design §4.4 *A new entry settles before it is
+  pickable*), one **waiting** (a `**Waits:**` line naming a date or an event, §4.4 *An entry says
+  what it waits for*), and one that **needs a team** (`needs_team`: its `Team:` line missing or
+  naming no team the repo holds, §4.4 *An entry names its team*) match no lane. `ao repo` says
+  each, so a first start whose lane reads empty is read there first.
+
+### A repo over sibling repos
+
+A team is on **one repo**, and every reading of a PR is that repo's: `ao progress done --pr <n>` is
+read with `gh` in the team's checkout, `held:` globs match that repo's paths, and the red-PR and
+sync-PR work orders and the PR and Doing facets read that repo alone. An umbrella whose work lands
+in sibling repos with their own remotes (dev-cadence's `docs/nested-repos.txt`) gives each member
+its own worktree or link of each sibling, as `hydrate_worktree.sh` sets them up — and **none of
+the siblings' PRs is seen**: a sibling's PR number given to `--pr` is read as the umbrella's PR of
+that number. Until ShiftLead reads them (TD-943), such a team lands a sibling change as **paired
+PRs**, written into its briefs: the sibling PR carries the change and its review, then an umbrella
+PR moves the ledger entry and links the sibling PR by its URL, and the umbrella PR is the one
+`--pr` names and the flow reads. The siblings have no gate there but the review the brief asks for.
 
 ## 4. Say what the roles are
 
