@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
-| TD-965 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
 | TD-966 | `ao td next` becomes a front end over dev-cadence's ledger-id counter on origin: one counter, with or without the home | High | Open — design-first, waits on dev-cadence#TD-124 |
 
 ---
@@ -1408,26 +1407,6 @@ builds are in the ledger.
 **Done when** Paul, closing an own session from Focus, reads one line saying how it ended, the buttons, and what it cost, with no guessed cause; a member taken over shows Hand back where Take over was; the side panel opens folded with a value on each summary and the Session heading level with its chevron; a session that has sent mail shows it under Sent.
 
 **Related:** TD-156 (the first round, archived), TD-923 (the disconnect card, whose frame the ending card reuses), TD-818 / TD-830–833 (Spend per seat, the figures), TD-490 (the ending's words), TD-096 (Take over / Hand back), TD-075 (`ao inbox --sent`), TD-029 (the reconnect contract), TD-266 (*forgotten by itself a day after the close*).
-
----
-
-## TD-965: The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-21 (found by TD-964's review, round 1: the ending card's total would miss the closed session's last turns)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — designed in TD-964's PR (#2240): design §4.4 *Spend per seat*, *What is read*.
-**Location:** `src/sessionorc/agent_spend.py` (the seat pass, `SEAT_EVERY`), `src/sessionorc/agent_tick.py` (where the pass is started)
-
-**Why:** the seat pass runs once a minute for every (adapter, profile) pair its **live** sessions run under. A session that ends between two passes has its last turns unread, and when it was the profile's last live session nothing reads that profile again until another session runs on it — the seat ledger, the Spend page and the Focus's ending card (TD-964) all read short for that session in the meantime, and the turns land later charged by cursor.
-
-**Fix:** the pass keeps the pairs it read last time; a pair whose last live session ended since then is read once more on the next pass, then dropped. A test: a session ends with turns past the cursor, no other session on its profile, and the next pass charges them to its record.
-
-**Done when** a session's turns up to its ending are in the seat ledger within one pass of the ending, whether or not another session runs on its profile.
-
-**Related:** TD-964 (the ending card, which reads the ledger at the ending), TD-818 / TD-830 (Spend per seat).
 
 ---
 

@@ -378,6 +378,37 @@ async def test_a_subscription_profiles_turns_reach_the_seat_ledger_and_nothing_t
         await person.call("remove", id=w["id"])
 
 
+async def test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped(agent, hookstub, tmp_path, monkeypatch):
+    """TD-965 (§4.4 *Spend per seat*, *What is read*): a session that ends with turns past the cursor,
+    the last live one on its profile, has them charged to its record by the next pass; the pass after
+    reads that profile no more."""
+    await park_ticks(agent)
+    hookstub.billing, hookstub.accounts, hookstub.spend_turns = {}, {}, []
+    asked: list = []
+    spend = type(hookstub).spend
+    monkeypatch.setattr(
+        type(hookstub), "spend", lambda self, prof, cursors=None: asked.append(prof) or spend(self, prof, cursors)
+    )
+    async with LocalClient() as person:
+        w = await person.call("create", name="w", dir=str(tmp_path), adapter="hookstub", profile="sub")
+        rid = w["id"]
+        agent.sessions[rid].adapter_id = "cv"
+        await agent._refresh_seats_inner()  # the backfill: nothing yet
+        now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        hookstub.spend_turns = [_t("u1", 0, source="t1", conv="cv", at=now)]
+        await person.call("kill", id=rid)
+        assert agent.sessions[rid].state in ("exited", "closed") and not agent._usage_live()
+        asked.clear()
+        await agent._refresh_seats_inner()  # its last minute, though nothing else runs on "sub"
+        assert asked == ["sub"]
+        day = next(iter(agent._seats["days"].values()))
+        assert day[rid]["models"]["claude-sonnet-4-6"]["turns"] == 1
+        asked.clear()
+        await agent._refresh_seats_inner()
+        assert asked == []  # read once more, then dropped
+        await person.call("remove", id=rid)
+
+
 async def test_the_home_charges_a_nodes_seat_turns_once_and_its_seeding_charges_nothing(agent):
     """`seat_spend` at the home (TD-833): a read answers the cursors and whether the profile is
     seeded; the seeding takes a new transcript's end and charges nothing; a turn is owned among the
