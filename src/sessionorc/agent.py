@@ -594,8 +594,12 @@ class HostAgent(
         # every open client connection: a stop closes them, or `Server.wait_closed()` waits on the
         # UI's subscription and each blocked `wait` forever (TD-058)
         self._conns: set[asyncio.StreamWriter] = set()
-        # (session id, tool_use_id) → the hook's pending decision
-        self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
+        # (session id, tool_use_id) → the hook's pending decision and the thread that asked it: a
+        # subagent's id, or None for the main thread (design §4.2 *A waiter is keyed by its call*, TD-950)
+        self._waiters: dict[tuple[str, str], tuple[asyncio.Future[dict[str, Any]], str | None]] = {}
+        # session id → thread (a subagent's id, or None) → its open calls, `(tool_use_id, call_sig)` oldest
+        # first: what a permission, which names no call, is matched to (§4.2, TD-950). In memory only.
+        self._open_calls: dict[str, dict[str | None, list[tuple[str, str]]]] = {}
         self._git_checked: dict[str, datetime] = {}
         # the status each record's recent files were last read at (§4.2, TD-538): `(oid, dirty, porcelain)`
         self._files_read: dict[str, tuple[Any, ...]] = {}

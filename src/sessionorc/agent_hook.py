@@ -59,19 +59,31 @@ class HookMixin:
             return ruled
         wait = float(event.get("wait_seconds") or 600)
         deadline = (datetime.now(UTC) + timedelta(seconds=wait)).replace(microsecond=0)
-        tool_use_id = event.get("tool_use_id") or f"{session}:{now_iso()}"
+        # keyed by its call (design §4.2 *A waiter is keyed by its call*, TD-950): the event's own id where
+        # it names one (a stub's; Claude Code's names none), else the oldest open call of its thread with
+        # the same `call_sig`, else its time — which any event of its thread ends
+        subagent = event.get("subagent") or None
+        tool_use_id = (
+            event.get("tool_use_id")
+            or self._take_call(session, subagent, event.get("call_sig"))
+            or f"{session}:{now_iso()}"
+        )
+        # a subagent's dialog is held back while the hook blocks (§4.2): the pane shows nothing for it
+        held = {"subagent": subagent, "subagent_name": event.get("subagent_name") or "subagent"} if subagent else {}
         pending = Pending(
             kind="permission",
             text=event.get("text", ""),
             deadline=deadline.isoformat().replace("+00:00", "Z"),
             tool_use_id=tool_use_id,
+            pane_held=bool(subagent),
+            **held,
         )
         s.set_state("needs-you", confidence="hook", pending=pending)
         self.store.save(s)
         # Register the waiter BEFORE the first await: a client reacting to the push must find it.
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
         key = (session, tool_use_id)
-        self._waiters[key] = fut
+        self._waiters[key] = (fut, subagent)
         await self._push_changes()
         try:
             decision = await asyncio.wait_for(fut, timeout=wait)
@@ -81,7 +93,8 @@ class HookMixin:
             s = self.sessions.get(session)
             if s is None or s.pending is None or s.pending.tool_use_id != tool_use_id:
                 return None
-            s.set_state("needs-you", confidence="hook", pending=Pending(kind="question", text=pending.text))
+            # the dialog is in the pane now, a subagent's too: it keeps its asker, no longer held
+            s.set_state("needs-you", confidence="hook", pending=Pending(kind="question", text=pending.text, **held))
             self.store.save(s)
             await self._push_changes()
             return None
@@ -185,7 +198,7 @@ class HookMixin:
         if not adapters.permission_channel(s.adapter):
             # the backstop to `ao allow`/`ao deny` and the page (§4.3 *Permissions: no channel*, TD-785)
             raise RpcError(f"{s.name}'s tool has no permission channel: answer it in the terminal")
-        fut = self._waiters.get((id, tool_use_id))
+        fut = (self._waiters.get((id, tool_use_id)) or (None, None))[0]
         if fut is None or fut.done():
             raise RpcError("no pending permission with that id (answered, timed out, or in the terminal)")
         if behavior not in ("allow", "deny"):
