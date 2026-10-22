@@ -33,7 +33,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Live check #993 — waits on a look from a node (TD-299) |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
+| TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — decided 2026-10-21 (TD-028's list is enough); the designer's |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
 | TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644, TD-645 build it |
