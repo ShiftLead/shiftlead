@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Open |
+| TD-955 | #2254's modal-limit `read_when` is untested for a handed entry and for the Reply composer's refill line | Low | Open |
 | TD-956 | #2250's `blocking_rpc` changed what a call with no time left does, and no test would notice going back | Low | Open |
 
 ---
@@ -1646,6 +1647,22 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-947, TD-629 (a waiter ended by another call's event), TD-734 (subagent events), TD-201.
 
 ---
+
+## TD-955: #2254's modal-limit `read_when` is untested for a handed entry and for the Reply composer's refill line
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_inbox.py` (`_entry_read_when` ~L469), `src/sessionorc/agent_serve.py` (`_view` ~L80); `tests/test_gemini_title.py`, `tests/test_handed_entry.py`
+
+**Why:** Found auditing the tests of #2254 (TD-944 slice 3). The PR passes `modal_limit=` to `mail.read_when` at four sites; the new tests (`test_gemini_title.py`, `test_read_when.py`) reach two (`msg` and the `note` view). Probes: removing `modal_limit=modal` from `_entry_read_when` in `src/sessionorc/agent_inbox.py` (the handed entry's ask sentence) and from the `refill` call in `_view` in `src/sessionorc/agent_serve.py` (the Reply composer's line), together, leaves `tests/test_gemini_title.py test_read_when.py test_held_missed.py test_cache_restart.py test_title_reading.py test_handed_entry.py test_start_time.py test_ui_entry.py test_cli_teams.py test_cadence_policy.py` green (241 passed). A person handing an entry to a seat sitting at Gemini's limit dialog would be told it is rung after a reset that does not exist.
+
+**Fix:** Add to the Gemini box test (or `test_handed_entry.py`) a handed entry to the record at the box asserting the modal sentence in the handed reply's `read_when`, and `view['read_when']['refill']` starting with it. Confirm each fails with its argument removed.
+
+**Done when** removing `modal_limit=` from either site fails a test.
 
 ## TD-956: #2250's `blocking_rpc` changed what a call with no time left does, and no test would notice going back
 
