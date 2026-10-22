@@ -118,6 +118,12 @@ def test_the_facet_draws_a_block_per_entry_and_counts_members(tmp_path, monkeypa
     ]
     assert blocks[1]["text"] == "Bash: ls" and blocks[1]["held"]["name"] == "general-purpose"
     assert answer_members(blocks) == 2
+    # a beneath permission with no call to name, or on a tool with no channel, is drawn as Focus alone:
+    # its Allow would post no call and answer the newest permission instead (review of #2268)
+    nocall = {k: v for k, v in HELD.items() if k != "tool_use_id"}
+    assert [(b["kind"], b["call"]) for b in answer_blocks([_rec(nocall, MAIN)])][1] == ("question", "")
+    [_, beneath] = answer_blocks([_rec(HELD, MAIN, permission_channel=False)])
+    assert beneath["kind"] == "question" and beneath["text"] == "Bash: ls — answer it in the terminal"
     [row] = inbox.state_rows([view(_rec(HELD, MAIN))])  # the Inbox row keeps the newest, and names its call
     assert row["text"] == "Bash: rm x" and row["call"] == "tu-m"
     from shiftlead.ui.app import templates

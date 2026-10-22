@@ -449,7 +449,9 @@ def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
             line = prompt_line(p, m)
             kind = "permission" if line["answerable"] else "question"
             text = str(p.get("text") or "") + terminal_only({**m, "pending": p})
-            out.append({"id": m["id"], "name": name, "kind": kind, **line, "text": text})
+            # the block's kind is what it can answer, never the entry's own: Allow / Deny is drawn only
+            # for a call the page can name, on a tool with a permission channel (§4.5a, review of #2268)
+            out.append({"id": m["id"], "name": name, **line, "kind": kind, "text": text})
     return out
 
 
