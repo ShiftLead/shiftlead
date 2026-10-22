@@ -2368,6 +2368,141 @@ def focus_git_pick():
 ''' + TAIL
 
 
+def summary_meta(text, title=""):
+    """A folded side card's value on its summary line (TD-942): what it holds, cut with … before the
+    heading ever shrinks for it."""
+    t = f' title="{title}"' if title else ""
+    return f'<span class="meta mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"{t}>{text}</span>'
+
+
+def ending_card(full):
+    """The ending card (§4.5 *The Focus screen's anatomy* item 3, §4.5a *Focus: ending card*, TD-942):
+    the disconnect card's frame with the session's own total first — every day the seat ledger holds
+    for the record, its turns, the run's length — then by entry, its team's and all teams' day, and the
+    account's windows. In the pane's place when the pane is gone."""
+    row = lambda k, v, t="": f'<div style="display: flex; gap: 10px; align-items: baseline;"{f" title={chr(34)}{t}{chr(34)}" if t else ""}><span class="meta" style="width: 170px; flex-shrink: 0;">{k}</span><span style="min-width: 0;">{v}</span></div>'
+    entry = lambda ref, fig, tok, w: (f'<div style="display: flex; align-items: center; gap: 8px; font-size: 12px;"><span class="mono" style="width: 120px;">{ref}</span>'
+                                      f'<span style="height: 8px; width: {w}px; background: #9db8dd; border-radius: 2px;"></span><span class="mono">{fig}</span><span class="meta">{tok}</span></div>')
+    return f'''<div class="card" style="padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;" title="what this session cost, read once when it ended — the Spend page has the live figures (design §4.5a, TD-942)">
+      <div style="display: flex; align-items: baseline; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">What dc-paul cost</span><span class="meta">since 10-19 · 2 runs · this run 16:28 → 18:42, 2h 14m</span></div>
+      <div style="display: flex; gap: 28px; align-items: baseline;">
+        <div><div class="mono" style="font-size: 26px; font-weight: 500;" title="API-equivalent at your weights — a subscription's turns, never a bill (design §4.4 Spend per seat)">≈$41.80</div><div class="meta">API-equivalent · subscription</div></div>
+        <div><div class="mono" style="font-size: 26px; font-weight: 500;" title="input 0.9M · output 0.3M · cache read 10.6M · cache write 0.6M">12.4M tok</div><div class="meta">every kind summed · 312 turns</div></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <div class="meta" style="font-size: 11px; text-transform: uppercase; letter-spacing: .04em;">by entry</div>
+        {entry("TD-156", "≈$18.20", "5.4M tok", 150)}
+        {entry("TD-942", "≈$14.90", "4.4M tok", 123)}
+        {entry("TD-623", "≈$4.10", "1.2M tok", 34)}
+        {entry("between entries", "≈$4.60", "1.4M tok", 38)}
+      </div>
+      <div style="border-top: 1px solid #eceef1; padding-top: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+        {row("today · dc-grind", '<span class="mono">≈$63.10</span> <span class="meta">· 19.0M tok</span>')}
+        {row("today · all teams", '<span class="mono">≈$212.40</span> <span class="meta">·</span> <span class="mono">$8.75</span> <span class="meta">metered · 66.2M tok</span>', "≈$ and $ apart, never summed (design §4.6 The disconnect card)")}
+        {row("week", 'Claude · paul <span class="mono">9%</span> <span class="meta">· resets Mon 09:00</span>')}
+        {row("5 h", 'Claude · paul <span class="mono">25%</span> <span class="meta">· resets 21:10</span>')}
+      </div>
+      <div class="meta" style="font-size: 12px;">as of 18:43 · <a href="#">Spend for dc-paul →</a></div>
+    </div>'''
+
+
+def focus_ended():
+    """A person's own session after **Close session** (TD-942, from Paul's screenshot of dc-paul,
+    2026-10-21): the banner is the ending's words and its buttons — no guessed cause, since the
+    record says the person closed it; the grey text behind its i; Restart where a member would need
+    it. The ending card stands where the pane was. The side panel: Git open, the rest folded with a
+    value on each summary; no Ready to close, since nothing is left to close."""
+    return head("Focus — ended") + f'''<div style="width: 1440px; min-height: 1000px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Sessions")}
+<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <a href="#" class="muted">← Sessions</a>
+      <span class="mono" style="font-size: 15px; font-weight: 500;">dc-paul</span>
+      {pill("done")}
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <span class="btn sm link">✉ Message</span><span class="btn sm link">{ICON["doc"]}Transcript</span><span class="btn sm link">‹› VS Code</span>
+      <span style="flex-grow: 1;"></span><span class="btn sm link">more ▾</span>
+      <span class="meta" style="font-size: 12px;">a closed record: nothing that acts on a process is drawn (§4.5 row 6)</span>
+    </div>
+    <div class="card" style="padding: 10px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #fff7ed; border-color: #fdba74;" title="the ending banner (design §4.5a, TD-942)">
+      <b style="color: #9a3412;">closed by you · 18:42</b>
+      <span style="flex-grow: 1;"></span>
+      <span class="btn sm primary">Resume</span><span class="btn sm">Resume with changes…</span><span class="btn sm">New session here</span><span class="btn sm ghost" title="forgets the record now; forgotten by itself a day after the close">Forget</span>
+      <span class="btn sm link" title="Closed records are forgotten by itself a day after the close; the run log and the transcript stay readable until then. Resume starts it again under its own name, attended." style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>
+    </div>
+    <div class="note">Before: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> The guess is drawn only when the record does not name the ending (<i>pane gone · found 12:31</i>, a bare <i>closed</i>). A team member's banner adds <b>Restart</b>, the card's own, where the sentence explaining it stood.</div>
+    {ending_card(True)}
+    <div class="card" style="padding: 6px 10px; display: flex; align-items: center; gap: 10px; opacity: .8;">
+      <span class="btn sm" style="flex-grow: 1; justify-content: flex-start; text-align: left; font-weight: 400;" title="the composer's bar on an ended record (TD-942)">ended — Resume above to type here</span>
+      <span class="btn sm" style="opacity: .5;">{ICON["clip"]}Attach</span><span class="btn primary sm" style="opacity: .5;">{ICON["send"]}Send</span>
+    </div>
+  </div>
+  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    {PUT_AWAY}
+    {side_card("Git", '<span class="mono muted" style="font-size: 12px;">dc-paul · 13 behind</span>', '<div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div>')}
+    {side_card("Reports", summary_meta("2 done · 1 filed"), open_=False)}
+    {side_card("Sent", summary_meta("4 sent"), open_=False)}
+    {side_card("Session", summary_meta("opus-5-5", "claude-code · paul · opus-5-5 — the model names the tool; the account is the profile row") + f'<span class="btn sm link" style="margin-left: 8px; flex-shrink: 0;">{ICON["code"]}VS Code</span>', open_=False)}
+    <div class="note">No <b>Ready to close</b>: the record has ended, nothing is left to close. Each folded card says what it holds on its summary line; <b>Session</b>'s value is the model (it names the tool too; tool · account · model on hover), and its heading never shrinks for it.</div>
+  </div>
+</div>
+</div>
+''' + TAIL
+
+
+def focus_held():
+    """A team member the person has taken over (TD-942): **Hand back** in the slot Take over had,
+    plain, since Send is the next act while they hold it; the side panel's folds each with a value —
+    Ready to close ✗ with the first failing check, Session the tool and model — and the new **Sent**
+    card unfolded, the Inbox's other half."""
+    term = '''<span class="d">● tdgrind-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/tdgrind-1</span>
+
+<span class="d">⏺</span> Bash(pdm run test tests/test_scripts/test_recover_stuck_notices.py)
+  <span class="g">412 passed in 38.2s</span>
+<span class="d">⏺</span> Bash(ao msg --kind ask --about TD-301 techlead "Merge #811 now, or hold for the USACE run?")
+  <span class="g">sent · m-8f21</span>
+
+<span class="p">&gt;</span> Paul: keep #811 open until the USACE run lands.
+<span class="d">▌</span>'''
+    sent = lambda to, kind, subj, at, state, about="": (f'<div style="display: flex; flex-direction: column; gap: 2px; font-size: 12px; padding: 5px 0; border-top: 1px solid #eceef1;">'
+        f'<div style="display: flex; align-items: center; gap: 6px;"><span class="meta">→</span><span class="mono">{to}</span><span class="badge">{kind}</span>'
+        f'{f"<span class={chr(34)}mono meta{chr(34)}>{about}</span>" if about else ""}<span style="flex-grow: 1;"></span><span class="meta">{at}</span></div>'
+        f'<div style="display: flex; gap: 6px;"><span style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{subj}</span><span style="flex-grow: 1;"></span>{state}</div></div>')
+    return head("Focus — taken over") + f'''<div style="width: 1440px; min-height: 1000px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Sessions")}
+<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+    {focus_head("tdgrind-1", pill("working"), '<span class="meta">DIU fetcher</span>',
+                next_act='<span class="btn sm" title="switch it back to unattended: the terminal goes read-only and its manager and the policies pick it up again (design §4.5a, TD-942)">Hand back</span>', member=True).replace("Pop out · Copy · Paste · Hand back · ", "Pop out · Copy · Paste · ")}
+    <div class="note">Taken over: <b>Hand back</b> stands where <b>Take over</b> stood, plain — Send is the next act while you hold it. more ▾ no longer carries it.</div>
+    <div class="term" style="height: 560px;">{term}</div>
+    <div class="card" style="padding: 6px 10px; display: flex; align-items: center; gap: 10px;">
+      <span class="btn sm" style="flex-grow: 1; justify-content: flex-start; text-align: left; opacity: .75; font-weight: 400;">✎ Compose a prompt… <span class="meta" style="margin-left: 8px;">(c · or paste / drop a file)</span></span>
+      <span class="btn sm">{ICON["clip"]}Attach</span><span class="btn primary sm">{ICON["send"]}Send</span>
+    </div>
+  </div>
+  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    {PUT_AWAY}
+    {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 1m ago</span>', '<div style="font-size: 12px; margin-top: 8px;">TD-301: waiting on the techlead about #811</div>')}
+    {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td301-fix · 2 unpushed</span>', '<div class="mono" style="font-size: 12px; margin-top: 8px;"><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>')}
+    {side_card("Reports", summary_meta("0/1 done · 2 filed"), open_=False)}
+    {side_card("Inbox", '<span class="meta">1 unread</span>', '<div style="font-size: 12px; margin-top: 8px;"><span class="mono">manager-sam</span> <span class="badge">note</span> <span class="meta">19:58</span><div>USACE run starts 21:00; hold merges on samscrape until then.</div></div>')}
+    {side_card("Sent", summary_meta("3 sent · 1 unanswered"), '<div style="margin-top: 6px;">'
+        + sent("techlead", "ask", "Merge #811 now, or hold for the USACE run?", "20:12", '<span class="badge" style="background: #fef3c7; color: #92400e;">waiting</span>', "TD-301")
+        + sent("manager-sam", "note", "TD-301: PR #811 open, CI green", "20:04", "")
+        + sent("techlead", "ask", "Is the stuck-notice re-read in scope for TD-301?", "19:31", '<span class="meta">answered by techlead</span>', "TD-301")
+        + '</div>')}
+    {side_card("Ready to close", summary_meta("✗ branch pushed +1", "✗ branch pushed · ✗ outcomes reported (1 owed) — the first failing check, +1 for each more"), open_=False)}
+    {side_card("Session", summary_meta("sonnet-5-5", "claude-code · grind (pro) · sonnet-5-5 — the model names the tool; the account is the profile row") + f'<span class="btn sm link" style="margin-left: 8px; flex-shrink: 0;">{ICON["code"]}VS Code</span>', open_=False)}
+    <div class="note">Folded at first: Reports, Sent, Ready to close, Session (and Told at start). Sent is unfolded here to show it: newest first, an ask's answer or <i>waiting</i>; no Reply or Delete — the copy is the recipient's.</div>
+  </div>
+</div>
+</div>
+''' + TAIL
+
+
 files = {
     "Main.dc.html": team_desktop(),
     "MainDark.dc.html": darken(team_desktop()),
@@ -2377,6 +2512,8 @@ files = {
     "FocusReady.dc.html": focus_ready(),
     "FocusRail.dc.html": focus_rail(),
     "FocusGitPick.dc.html": focus_git_pick(),
+    "FocusEnded.dc.html": focus_ended(),
+    "FocusHeld.dc.html": focus_held(),
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
@@ -2419,6 +2556,8 @@ LAYOUT = [
     ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("FocusRail.dc.html", "Focus — the side panel put away (TD-408, 2026-10-08)", 0),
     ("FocusGitPick.dc.html", "Focus — the Git card's pick: Working tree, a commit, Session (TD-856)", 0),
+    ("FocusEnded.dc.html", "Focus — ended: the banner, the ending card, the folds (TD-942)", 0),
+    ("FocusHeld.dc.html", "Focus — taken over: Hand back in Take over's place, Sent, the folds' values (TD-942)", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
     ("Members.dc.html", "Members — the team card's dialog", 0),
