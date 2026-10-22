@@ -2574,7 +2574,12 @@ class HostAgent(
             title = pane.title if pane else ""
             m = explain(tail, title=title)
             out["title"], out["match"] = title, m.to_dict() if m else None
-            out["reason"] = self._title_reading(s, m, now)[1]
+            if m is not None and not m.title:  # the adapter's manifest, asked first (§4.3)
+                out["reason"] = (
+                    f"rule {m.rule} matched — a title adapter's screen rule is not applied by the tick yet (TD-944)"
+                )
+            else:
+                out["reason"] = self._title_reading(s, m, now)[1]
             return out
         m = explain(tail)
         out["match"] = m.to_dict() if m else None

@@ -9,6 +9,7 @@ import json
 import os
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from conftest import wait_for
@@ -16,7 +17,7 @@ from conftest import wait_for
 from sessionorc import adapters, agent_tick
 from sessionorc.client import LocalClient
 from sessionorc.models import Pending, Session, now_iso
-from sessionorc.screen import Match
+from sessionorc.screen import Match, painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import cli
 from shiftlead.adapters.gemini import GeminiAdapter
@@ -195,3 +196,39 @@ def test_explain_file_takes_a_title(gem, tmp_path, capsys):
     assert cli.main(["explain", "--file", str(screen), "-a", "gemini"]) == 0
     out = capsys.readouterr().out
     assert "title: \n" in out and "no screen rule matched" in out
+
+
+# ── the limit dialog (design §4.3 *The limit dialog is read off the screen*, TD-944 slice 1) ─────
+
+BOX = (
+    (Path(__file__).parent / "conformance" / "fixtures" / "gemini" / "captured" / "panes" / "6-a-doorbell.txt")
+    .read_text(encoding="utf-8")
+    .splitlines()
+)
+
+
+def test_the_limit_box_reads_limited_over_the_titles_working():
+    """The manifest is asked first, on the raw pane's painted text: its verdict stands over `✦`, modal."""
+    ad = GeminiAdapter(binary="gemini")
+    m = ad.explain(BOX, title=WORKING)
+    assert (m.rule, m.state, m.modal) == ("gemini-usage-limit", "limited", True)
+    assert m.pending == Pending(kind="limit", text="Gemini's usage limit reached — answer its dialog in the terminal")
+    assert m.to_dict()["modal"] is True and ad.explain(BOX).state == "limited"  # with no title, the manifest alone
+    painted = [painted_text(r) for r in BOX]
+    on_stop = [r.replace("● 1. Keep trying", "  1. Keep trying").replace("  2. Stop", "● 2. Stop") for r in painted]
+    assert on_stop != painted and ad.explain(on_stop, title=WORKING).rule == "gemini-usage-limit"
+    # the title's own verdict is not modal; prose quoting the dialog outside a box matches nothing
+    assert ad.explain([], title=WORKING).modal is False
+    # core tells a title verdict from a rule's by the Match's `title`, never by the rule id (§4.3)
+    assert ad.explain([], title=WORKING).title is True and m.title is False
+    prose = ["✦ The tool says: Usage limit reached for gemini-3.8-flash.", "  2. Stop"]
+    assert ad.explain(prose, title=WORKING).rule == "title ✦"
+
+
+async def test_the_tick_does_not_read_the_box_as_the_title(agent, gem, tmp_path):
+    """Until the screen road takes a title adapter's rule, the box's verdict is never written as the title's."""
+    s = _rec(tmp_path, state="working")
+    now = datetime.now(UTC)
+    agent._last_hook[s.id] = now - timedelta(seconds=60)
+    agent._observe(s, PaneInfo(s.id, 0, "node", 1, dead=False, dead_status=None, title=WORKING), BOX, now)
+    assert (s.state, s.confidence) == ("working", "hook")

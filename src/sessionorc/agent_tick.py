@@ -4410,7 +4410,10 @@ class TickMixin:
         It is not held for its screen: what it replaced is dropped, as a hook's report drops it."""
         if not getattr(adapter, "state_in_title", False):
             return False
-        m, _why = self._title_reading(s, adapter.explain(s.tail, title=pane.title), now)
+        m = adapter.explain(s.tail, title=pane.title)
+        if m is not None and not m.title:
+            return False  # the adapter's manifest matched: a screen rule's verdict, not the title's (§4.3)
+        m, _why = self._title_reading(s, m, now)
         if m is None:
             return False
         pending = m.pending

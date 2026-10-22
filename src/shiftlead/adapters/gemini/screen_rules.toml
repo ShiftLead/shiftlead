@@ -1,0 +1,20 @@
+# Gemini CLI's screen rules (design §4.3 *The limit dialog is read off the screen*, TD-944): what neither
+# its hooks nor its title say. Read by core's `Manifest`, as Claude Code's are (§4.2); `explain` reduces
+# the tail to its painted text first, and asks these before the title.
+tool = "gemini"
+version = 1
+
+[[rules]]
+# The tool's own box over the composer when a turn meets the quota: *Usage limit reached for <model>.*
+# above *1. Keep trying* and *2. Stop*. It fires no hook and leaves the title at `✦  Working…`. Captured
+# 2026-10-21 (tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt): the box is 12 rows, its
+# limit line the 11th from the bottom, one blank row under it. Each pattern is a box row, led by its `│`
+# border (the right one is not required, so a pane narrower than the box still matches), so prose
+# about the dialog in the transcript never fires it; the choice may carry the selection marker.
+# `modal`: a dialog drawn over the composer, gone once answered — the usage poll never lifts it (§4.2).
+id = "gemini-usage-limit"
+state = "limited"
+region = 15
+modal = true
+all = ["^\\s*│\\s*Usage limit reached for\\b", "^\\s*│\\s*\\S?\\s*2\\.\\s*Stop\\b"]
+pending = { kind = "limit", text = "Gemini's usage limit reached — answer its dialog in the terminal" }
