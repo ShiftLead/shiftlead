@@ -18368,3 +18368,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Resolved:** 2026-10-22 (grinder-ao-1, PR #2273) — `test_a_wait_out_of_time_in_a_restarts_gap_returns_expired_and_a_first_call_is_always_made` in `tests/test_pr_wait.py`: `expired` in a restart's gap, and a call with `timeout` 0 or −5 on a live home answered by the home; it fails with `if left <= 0:` restored.
 
 ---
+
+## TD-955: #2254's modal-limit `read_when` is untested for a handed entry and for the Reply composer's refill line
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_inbox.py` (`_entry_read_when` ~L469), `src/sessionorc/agent_serve.py` (`_view` ~L80); `tests/test_gemini_title.py`, `tests/test_handed_entry.py`
+
+**Why:** Found auditing the tests of #2254 (TD-944 slice 3). The PR passes `modal_limit=` to `mail.read_when` at four sites; the new tests (`test_gemini_title.py`, `test_read_when.py`) reach two (`msg` and the `note` view). Probes: removing `modal_limit=modal` from `_entry_read_when` in `src/sessionorc/agent_inbox.py` (the handed entry's ask sentence) and from the `refill` call in `_view` in `src/sessionorc/agent_serve.py` (the Reply composer's line), together, leaves `tests/test_gemini_title.py test_read_when.py test_held_missed.py test_cache_restart.py test_title_reading.py test_handed_entry.py test_start_time.py test_ui_entry.py test_cli_teams.py test_cadence_policy.py` green (241 passed). A person handing an entry to a seat sitting at Gemini's limit dialog would be told it is rung after a reset that does not exist.
+
+**Fix:** Add to the Gemini box test (or `test_handed_entry.py`) a handed entry to the record at the box asserting the modal sentence in the handed reply's `read_when`, and `view['read_when']['refill']` starting with it. Confirm each fails with its argument removed.
+
+**Done when** removing `modal_limit=` from either site fails a test.
+
+**Resolved:** 2026-10-22 (grinder-ao-2, PR #2270) — `test_explain_on_a_live_record_at_the_box_gives_the_rules_reason` (`tests/test_gemini_title.py`) asserts the modal sentence on the view's `read_when.refill` and on an `entry_add` handed to the record at the box; removing `modal_limit=` from either site alone fails it.
+
+---
