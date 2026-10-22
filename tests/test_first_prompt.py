@@ -19,7 +19,7 @@ from shiftlead.ui import cards
 pytestmark = pytest.mark.integration
 
 BRIEF = "You are a grinder. Read the ledger, then pick one entry."
-# the home's line, typed as keys, then the brief as the paste: one prompt (§4.1, TD-347)
+# the fixed line in the person's voice, typed as keys, then the brief as the paste: one prompt (§4.1, TD-347)
 TYPED = f"{mail.BRIEF_LINE} {BRIEF}"
 
 

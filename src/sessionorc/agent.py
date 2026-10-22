@@ -2464,9 +2464,10 @@ class HostAgent(
         capture — `capture_tail` returns [] then) counts as emptied: no evidence is not evidence of a
         stuck prompt.
 
-        `lead` is a line of the home's typed as literal keys before the paste, in the same prompt —
-        the brief's line (§4.1 *The brief is the person's word*, TD-347). A paste refused while that
-        line is in the composer — typed now, or by an earlier try (`lead_in`) — raises `LeadTyped`."""
+        `lead` is the fixed line in the person's voice (`mail.BRIEF_LINE`), typed as literal keys
+        before the paste, in the same prompt (§4.1 *The brief is the person's word*, TD-347). A paste
+        refused while that line is in the composer — typed now, or by an earlier try (`lead_in`) —
+        raises `LeadTyped`."""
         reader = getattr(adapter, "composer", None)
         # A pane scrolled back is in copy mode, where the Enter would be the mode's (§4.3, TD-667).
         await asyncio.to_thread(self.tmux.leave_copy_mode, sid)
