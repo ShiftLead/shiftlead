@@ -70,9 +70,9 @@ class RemoteMixin:
         if mux is None:
             raise RpcError(f"{self.home} (home) is unreachable from {self.host}; refused, not queued (design §4.4a)")
         token = secrets.token_hex(8)
-        # A `wait` is bounded by its own timeout at the home; everything else within ACT_TIMEOUT —
+        # A `wait` (and `pr_wait`) is bounded by its own timeout at the home; everything else within ACT_TIMEOUT —
         # pings keep a link up past a dispatch that hangs (review of PR #217)
-        timeout = None if name == "wait" else ACT_TIMEOUT
+        timeout = None if name in modes.BLOCKING else ACT_TIMEOUT
         try:
             reply = await mux.request("forward", timeout=timeout, rpc=name, params=params, caller=caller, token=token)
         except asyncio.CancelledError:

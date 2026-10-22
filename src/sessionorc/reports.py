@@ -350,6 +350,22 @@ def fold_checks(rollup: Any) -> tuple[str, list[str]]:
     return ("red" if items else "pending" if pending else "green"), [i["name"] for i in items]
 
 
+# `ao pr wait`'s words and exit codes (design §4.7 *ao pr wait*, TD-940): `pending` is no word it
+# returns, `gone` a number the reading does not hold
+PR_WAIT_EXIT = {"green": 0, "red": 1, "conflicting": 2, "none": 3, "timeout": 4, "gone": 5}
+
+
+def pr_wait_word(row: dict[str, Any]) -> str:
+    """An open PR's row of the `prs` reading as one of `ao pr wait`'s words (TD-940): *conflicting*
+    first — a PR that conflicts with its base gets no `pull_request` run, so its checks say nothing
+    a wait could outlast — then *red* (a `not_run` one too: its CI never started), *green*, *none*,
+    and *pending* while any check runs."""
+    if row.get("conflicting"):
+        return "conflicting"
+    checks = str(row.get("checks") or "none")
+    return "red" if checks in ("red", "not_run") else checks if checks in ("green", "pending") else "none"
+
+
 def job_verdict(directory: Path | str, job: int, timeout: float) -> dict[str, Any] | None:
     """Whether Actions job `job` ever started (design §4.4 *CI that never started is the person's*,
     TD-686): `{started: False, reason, kind}` for a `completed` job with no steps, no runner and an
