@@ -1859,6 +1859,37 @@ async def test_a_pane_list_taken_before_a_kill_does_not_revive_the_record(agent,
         assert sid not in agent._killed_at  # no key outlives the record
 
 
+async def test_a_tick_inside_a_create_does_not_adopt_the_pane_it_is_starting(agent, tmp_path, monkeypatch):
+    """TD-952: `create` starts the tmux session in a thread and puts the record in after, so a tick
+    between the two listed a pane nobody had a record of and adopted it as a nameless `shell`. On a
+    node that adoption reached the home before the create's reply, and the home refused the real
+    record as another session — the launch record of a supervised create was never written (main's
+    CI, 2026-10-21). The tick that lands in the gap is handed here, inside the start's thread."""
+    started, release, seen = asyncio.Event(), asyncio.Event(), {}
+    loop, start = asyncio.get_running_loop(), agent._start
+
+    def held_start(sid, *args):
+        start(sid, *args)
+        seen["sid"] = sid
+        loop.call_soon_threadsafe(started.set)
+        asyncio.run_coroutine_threadsafe(release.wait(), loop).result(timeout=10)
+
+    monkeypatch.setattr(agent, "_start", held_start)
+    async with LocalClient() as person:
+        making = asyncio.ensure_future(
+            person.call("create", name="gap", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
+        )
+        await asyncio.wait_for(started.wait(), timeout=10)
+        panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+        assert seen["sid"] in panes and seen["sid"] not in agent.sessions  # the gap, as the tick sees it
+        agent._reconcile(panes, {}, datetime.now(UTC))
+        assert seen["sid"] not in agent.sessions  # the create's pane, not a stranger's
+        release.set()
+        made = await making
+        assert made["id"] == seen["sid"] and agent.sessions[made["id"]].adapter == "agentshell"
+        assert not agent._starting
+
+
 async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_up_twice(agent, tmp_path):
     """Found in the review of PR #147, which put a button in front of this.
 
