@@ -209,3 +209,156 @@ def test_ao_pr_wait_refuses_a_number_the_home_does_not_hold_and_an_old_home(monk
     monkeypatch.setattr(cli, "call_sync", old)
     assert cli.cmd_pr(_args(json=True)) == 5
     assert "predates ao pr wait" in capsys.readouterr().out
+
+
+# -- the fold per forge (slice 2) -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("remote", "want"),
+    [
+        ("git@github.com:ShiftLead/shiftlead.git", ("github", "")),
+        ("https://github.com/ShiftLead/shiftlead", ("github", "")),
+        ("/home/k/repo", ("github", "")),
+        ("file:///tmp/r.git", ("github", "")),
+        ("", ("github", "")),
+        ("git@gitlab.com:group/sub/repo.git", ("gitlab", "gitlab.com/group/sub/repo")),
+        ("https://gitlab.corp.example/team/repo", ("gitlab", "gitlab.corp.example/team/repo")),
+        ("https://gitlab.com/onlygroup", ("other", "gitlab.com")),
+        ("https://gitea.example/a/b", ("other", "gitea.example")),
+    ],
+)
+def test_the_forge_is_picked_by_the_origins_host(remote, want):
+    assert reports.forge_of(remote) == want
+
+
+def _mr(iid=3, status: str | None = "running", merge="mergeable", conflicts=False):
+    return {
+        "iid": iid,
+        "title": "t",
+        "web_url": f"https://gitlab.com/g/r/-/merge_requests/{iid}",
+        "source_branch": "b",
+        "target_branch": "main",
+        "sha": "fed0987",
+        "author": {"username": "u"},
+        "created_at": "2026-10-21T00:00:00Z",
+        "source_project_id": 1,
+        "target_project_id": 1,
+        "has_conflicts": conflicts,
+        "detailed_merge_status": merge,
+        **({"head_pipeline": {"id": 77, "status": status}} if status else {"head_pipeline": None}),
+    }
+
+
+# one fixture per word, on both forges: a GitHub rollup and a GitLab merge request
+FOLDS = [
+    ("green", [{"__typename": "CheckRun", "status": "COMPLETED", "conclusion": "SUCCESS", "name": "t"}], "success"),
+    ("red", [{"__typename": "CheckRun", "status": "COMPLETED", "conclusion": "FAILURE", "name": "t"}], "failed"),
+    (
+        "red",
+        [{"__typename": "CheckRun", "status": "COMPLETED", "conclusion": "ACTION_REQUIRED", "name": "t"}],
+        "manual",
+    ),
+    ("pending", [{"__typename": "CheckRun", "status": "IN_PROGRESS", "name": "t"}], "running"),
+    ("pending", [{"__typename": "StatusContext", "state": "PENDING", "context": "t"}], "a status not yet known"),
+    ("none", [], None),
+]
+
+
+@pytest.mark.parametrize(("word", "rollup", "status"), FOLDS)
+def test_each_forges_fold_gives_the_same_word(word, rollup, status):
+    gh, _ = reports.fold_checks(rollup)
+    gl, failing = reports.fold_pipeline(_mr(status=status))
+    assert gh == gl == word
+    assert failing == (["pipeline 77"] if word == "red" else [])
+    for checks in (gh, gl):
+        assert reports.pr_wait_word({"checks": checks, "conflicting": False}) == word
+
+
+def _glab(monkeypatch, mrs, jobs=None, fail=None):
+    asked = []
+
+    def fake(directory, host, path, timeout):
+        asked.append((host, path))
+        if fail and fail in path:
+            return None, "glab: HTTP 401"
+        if path.endswith("per_page=100") and "/merge_requests?" in path:
+            return [{k: v for k, v in m.items() if k != "head_pipeline"} for m in mrs], None
+        if "/jobs" in path:
+            return jobs or [], None
+        iid = int(path.rsplit("/", 1)[1])
+        return next(m for m in mrs if m["iid"] == iid), None
+
+    monkeypatch.setattr(reports, "_glab_api", fake)
+    return asked
+
+
+def test_a_gitlab_origin_reads_its_open_mrs_with_the_fold_conflict_and_required(tmp_path, monkeypatch):
+    now = datetime.now(UTC)
+    jobs = [{"name": "test", "allow_failure": False}, {"name": "lint", "allow_failure": True}, {"name": "build"}]
+    asked = _glab(monkeypatch, [_mr(3, "failed"), _mr(4, None, merge="conflict"), _mr(5, "success")], jobs)
+    got = reports.pr_reading(tmp_path, now, remote="git@gitlab.com:g/sub/r.git")
+    assert asked[0] == (
+        "gitlab.com",
+        "projects/g%2Fsub%2Fr/merge_requests?state=opened&order_by=created_at&sort=asc&per_page=100",
+    )
+    rows = {p["number"]: p for p in got["open"]}
+    assert rows[3]["checks"] == "red" and rows[3]["failing"] == ["pipeline 77"] and rows[3]["red_since"]
+    assert rows[3]["required"] == ["build", "test"] and rows[3]["head"] == "fed0987" and rows[3]["base"] == "main"
+    assert rows[4]["checks"] == "none" and rows[4]["conflicting"] is True and "required" not in rows[4]
+    assert reports.pr_wait_word(rows[4]) == "conflicting" and reports.pr_wait_word(rows[5]) == "green"
+    assert "windows" not in got and "recent" not in got and "not read on GitLab" in got["unread"]
+    kept = reports.pr_reading(tmp_path, now + timedelta(minutes=5), remote="git@gitlab.com:g/sub/r.git", old=got)
+    assert kept["open"][0]["red_since"] == rows[3]["red_since"], "a red spell keeps its start"
+
+
+def test_a_gitlab_read_that_fails_is_an_error_and_another_forge_has_no_reading(tmp_path, monkeypatch):
+    _glab(monkeypatch, [_mr()], fail="merge_requests?")
+    assert reports.pr_reading(tmp_path, datetime.now(UTC), remote="https://gitlab.com/g/r") == {
+        "error": "glab: HTTP 401"
+    }
+    _glab(monkeypatch, [_mr()], fail="/jobs")
+    row = reports.pr_reading(tmp_path, datetime.now(UTC), remote="https://gitlab.com/g/r")["open"][0]
+    assert row["required_error"] == "glab: HTTP 401" and "required" not in row
+    many = [{"name": f"j{i}", "allow_failure": False} for i in range(100)]
+    _glab(monkeypatch, [_mr()], jobs=many)
+    row = reports.pr_reading(tmp_path, datetime.now(UTC), remote="https://gitlab.com/g/r")["open"][0]
+    assert row["required_cut"] is True and len(row["required"]) == 100
+
+
+async def test_ao_pr_wait_returns_a_gitlab_mrs_word(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    agent.PR_WAIT_STEP = 0.05
+    _glab(monkeypatch, [_mr(3, "failed")])
+    root = str(tmp_path)
+    prs = reports.pr_reading(tmp_path, datetime.now(UTC), remote="https://gitlab.com/g/r")
+    agent._repos[root] = {"name": "r", "root": root, "prs": prs, "at": prs["at"]}
+    async with LocalClient() as c:
+        got = await c.call("pr_wait", root=root, pr=3, timeout=5)
+    assert got["word"] == "red" and got["failing"] == ["pipeline 77"]
+    assert reports.PR_WAIT_EXIT[got["word"]] == 1
+
+
+async def test_a_repo_never_read_is_refused_with_the_readings_why(agent, tmp_path, monkeypatch, capsys):
+    await park_ticks(agent)
+    root = str(tmp_path)
+    why = "gh: none of the git remotes configured for this repository point to a known GitHub host (gitea.example)"
+    agent.PR_WAIT_STEP = 0.05
+    agent._repos[root] = {
+        "name": "r",
+        "root": root,
+        "remote": "https://github.com/a/b",
+        "prs": {"error": "gh: offline"},
+    }
+    async with LocalClient() as c:
+        got = await c.call("pr_wait", root=root, pr=3, timeout=0.3)
+        assert got["word"] == "timeout", "a GitHub repo whose first read failed is waited on, never refused"
+        agent._repos[root] = {"name": "r", "root": root, "remote": "https://gitea.example/a/b", "prs": {"error": why}}
+        got = await c.call("pr_wait", root=root, pr=3, timeout=5)
+    assert got["word"] == "gone" and got["read_error"] == why and got["read_at"] is None
+    from shiftlead import cli
+
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": root} if m == "get" else got)
+    assert cli.cmd_pr(_args(n=3)) == 5
+    assert "gitea.example" in capsys.readouterr().err

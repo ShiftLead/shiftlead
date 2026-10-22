@@ -780,6 +780,152 @@ def _gh_counts(directory: Path | str, now: datetime, timeout: float) -> dict[str
     return windows
 
 
+# The forge a checkout's origin names (design §4.4 *Repo facts*, TD-940), as the cadence's `forge.py`
+# picks it by host (TD-104): github.com is GitHub, gitlab.com or a host whose first label is `gitlab`
+# is GitLab; an origin with no host (a local path, `file://`: every test fixture) is read as GitHub,
+# as before; anything else is a forge with no reading
+_REMOTE_URL = re.compile(r"([A-Za-z][A-Za-z0-9+.-]*)://(?:[^@/]*@)?([^/:]*)(?::\d*)?(/.*)?")
+_REMOTE_SCP = re.compile(r"[^/@:]+@([^/:]+):(.*)")
+# a head pipeline's status as one of the fold's words (GitLab's `Ci::Pipeline` statuses): `manual` is a
+# pipeline stopped on a job a person must press, which GitHub's fold reads as red (`ACTION_REQUIRED`)
+PIPELINE_WORD = {
+    "success": "green",
+    "failed": "red",
+    "canceled": "red",
+    "manual": "red",
+    "skipped": "none",
+    **dict.fromkeys(
+        (
+            "created",
+            "waiting_for_resource",
+            "preparing",
+            "waiting_for_callback",
+            "pending",
+            "running",
+            "canceling",
+            "scheduled",
+        ),
+        "pending",
+    ),
+}
+GITLAB_UNREAD = "windows, recent and held are not read on GitLab: its open MRs alone, each with its required jobs"
+
+
+def forge_of(remote: str) -> tuple[str, str]:
+    """`(forge, where)` of an origin URL (TD-940): `("github", "")`; `("gitlab", "<host>/<group/…/repo>")`;
+    `("other", <host>)` for any other host, or a GitLab origin naming no project — read through `gh`,
+    which answers for a GitHub Enterprise host and fails in its own words for anything else."""
+    raw = (remote or "").strip()
+    if m := _REMOTE_URL.fullmatch(raw):
+        if m[1].lower() == "file":
+            return "github", ""
+        host, path = m[2].lower(), m[3] or ""
+    elif m := _REMOTE_SCP.fullmatch(raw):
+        host, path = m[1].lower(), m[2]
+    else:
+        return "github", ""  # a local path: `gh` answers or fails on its own, as before
+    if not host or host == "github.com":
+        return "github", ""
+    if host == "gitlab.com" or host.split(".", 1)[0] == "gitlab":
+        slug = re.sub(r"\.git$", "", path.strip("/"))
+        return ("gitlab", f"{host}/{slug}") if re.fullmatch(r"[^/]+(/[^/]+)+", slug) else ("other", host)
+    return "other", host
+
+
+def fold_pipeline(mr: dict[str, Any]) -> tuple[str, list[str]]:
+    """A merge request's head pipeline folded into `fold_checks`'s words (TD-940): *none* with no
+    pipeline, else `PIPELINE_WORD` of its status (an unknown status *pending*: a status GitLab adds
+    later is never read as settled), and a red one's failing name `pipeline <id>`."""
+    pipe = mr.get("head_pipeline")
+    if not isinstance(pipe, dict) or not pipe:
+        return "none", []
+    word = PIPELINE_WORD.get(str(pipe.get("status") or "").lower(), "pending")
+    return word, [f"pipeline {pipe.get('id')}"] if word == "red" else []
+
+
+def _glab_api(directory: Path | str, host: str, path: str, timeout: float) -> tuple[Any, str | None]:
+    """One `glab api --hostname <host> <path>` read as its JSON, or `(None, why)` — `_gh_api`'s shape."""
+    try:
+        cp = subprocess.run(
+            ["glab", "api", "--hostname", host, path],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+            env={**os.environ, "NO_PROMPT": "1", "GLAB_NO_PROMPT": "1"},
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, f"glab could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        return None, ((cp.stderr or "").strip().splitlines() or ["glab api failed"])[-1][:200]
+    try:
+        return json.loads(cp.stdout or "null"), None
+    except json.JSONDecodeError:
+        return None, "glab api printed something that is not JSON"
+
+
+def _gitlab_reading(directory: Path | str, where: str, now: datetime, timeout: float, old: dict[str, Any] | None):
+    """A GitLab origin's PR reading (TD-940): its open merge requests, oldest first, each one GET for
+    its head pipeline (`fold_pipeline`) and merge status — `conflicting` when `has_conflicts` or
+    `detailed_merge_status` is *conflict* — in GitHub's row shape, `red_since` kept as `pr_reading`
+    keeps it, and `required` on the row: the head pipeline's jobs with `allow_failure` false
+    (`required_error` when they could not be read); `unread` says what else is not read here. A read
+    that could not be made is `{"error"}`."""
+    host, _, path = where.partition("/")
+    project = f"projects/{quote(path, safe='')}"
+    got, why = _glab_api(
+        directory, host, f"{project}/merge_requests?state=opened&order_by=created_at&sort=asc&per_page=100", timeout
+    )
+    if why is not None:
+        return {"error": why}
+    if not isinstance(got, list):
+        return {"error": "glab api printed something that is not a list"}
+    olds = {p.get("number"): p for p in (old or {}).get("open") or [] if isinstance(p, dict)}
+    open_: list[dict[str, Any]] = []
+    for m in got:
+        if not isinstance(m, dict) or not isinstance(m.get("iid"), int):
+            continue
+        one, why = _glab_api(directory, host, f"{project}/merge_requests/{m['iid']}", timeout)
+        if why is not None:
+            return {"error": why}
+        mr = {**m, **one} if isinstance(one, dict) else m
+        author = mr.get("author")
+        row: dict[str, Any] = {
+            "number": mr["iid"],
+            "title": str(mr.get("title") or ""),
+            "url": str(mr.get("web_url") or ""),
+            "state": "open",
+            "branch": str(mr.get("source_branch") or ""),
+            "head": str(mr.get("sha") or ""),
+            "base": str(mr.get("target_branch") or ""),
+            "author": str(author.get("username") or "") if isinstance(author, dict) else "",
+            "draft": bool(mr.get("draft") or mr.get("work_in_progress")),
+            "created": mr.get("created_at") or None,
+            "closed": None,
+            "fork": mr.get("source_project_id") not in (None, mr.get("target_project_id")),
+        }
+        row["checks"], row["failing"] = fold_pipeline(mr)
+        pipe = mr.get("head_pipeline")
+        if isinstance(pipe, dict) and pipe.get("id") is not None:
+            # GitLab's required checks are the head pipeline's jobs that may not fail: per MR, not per base
+            jobs, why = _glab_api(directory, host, f"{project}/pipelines/{pipe['id']}/jobs?per_page=100", timeout)
+            if why is None and isinstance(jobs, list):
+                if len(jobs) >= 100:  # one page: a pipeline of more jobs may require one past it
+                    row["required_cut"] = True
+                row["required"] = sorted(
+                    {
+                        str(j.get("name"))
+                        for j in jobs
+                        if isinstance(j, dict) and j.get("name") and not j.get("allow_failure")
+                    }
+                )
+            else:
+                row["required_error"] = why or "glab api printed something that is not a list"
+        row["conflicting"] = bool(mr.get("has_conflicts")) or str(mr.get("detailed_merge_status") or "") == "conflict"
+        if row["checks"] == "red" or row["conflicting"]:
+            was = olds.get(row["number"]) or {}
+            row["red_since"] = was.get("red_since") or now.isoformat()
+        open_.append(row)
+    return {"open": open_, "forge": "gitlab", "unread": GITLAB_UNREAD, "at": now.isoformat()}
+
+
 def pr_reading(
     directory: Path | str,
     now: datetime,
@@ -787,6 +933,7 @@ def pr_reading(
     timeout: float = 30.0,
     old: dict[str, Any] | None = None,
     held: list[str] | None = None,
+    remote: str = "",
 ) -> dict[str, Any]:
     """The repo's pull requests as the Repo facet counts them (design §4.4 *Repo facts*, TD-176): three
     `gh` reads — the open PRs, every PR updated in the longest window, and the windows' counts — kept as `open` (oldest
@@ -805,9 +952,15 @@ def pr_reading(
     that never started reads `checks: not_run` with `not_run: {reason, kind, runs}`, and every red one
     keeps its jobs' verdicts as `jobs` (`classify_failing`, TD-686). `held` is the repo's held key
     (`held.repo_key`): each open PR but a sync PR carries `held`, the paths of it the key names, read
-    once per head and key (`_held_flags`, TD-789)."""
+    once per head and key (`_held_flags`, TD-789). `remote` is the checkout's origin URL: on GitLab
+    the reading is `_gitlab_reading`'s, on another forge an error (`forge_of`, TD-940)."""
     if not Path(directory).is_dir():
         return {"error": f"{directory} is not a directory here"}
+    forge, where = forge_of(remote)  # the origin the caller read; none given reads as GitHub
+    if forge == "gitlab":  # the fold per forge (TD-940): a GitLab origin's open MRs, nothing more yet
+        return _gitlab_reading(directory, where, now, timeout, old)
+    # another host is read through `gh` as before: a GitHub Enterprise origin answers, any other fails in
+    # gh's own words (the cadence's `forge` setting is not read here: forge.py is the cadence's)
     since = now - PR_WINDOWS["month"]
     open_ = _gh_prs(directory, ["--state", "open", "--limit", "200"], timeout, OPEN_PR_FIELDS)
     if isinstance(open_, str):

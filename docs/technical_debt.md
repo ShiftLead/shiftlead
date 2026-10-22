@@ -73,7 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
-| TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Open — slice 1 built (#2241); the GitLab fold, the procedure pair and the live check left |
+| TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Open — slices 1 (#2241) and 2 (#2244) built; the procedure pair, the memory and the live check left |
 | TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Open |
 | TD-942 | `ao org check --root <worktree>`: check a team definition on the branch it is written on, before it merges | Medium | Open |
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
@@ -1522,8 +1522,13 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — slice 1 built (#2241, grinder-ao-1): `ao pr wait <n>` on the GitHub reading, the
-`pr_wait` RPC, design §4.7. Left: (2) the fold per forge — GitLab's head pipeline and `required`, every fold
-test on both forges' fixtures, §4.4's sentence; (3) the pair in `docs/procedures/cadence.md`, a dev-cadence
+`pr_wait` RPC, design §4.7. Slice 2 built (#2244, grinder-ao-1; scope steered with the techlead,
+m-eb7127cfc157): the reading per forge — a GitLab origin's open MRs with the head pipeline's fold,
+`conflicting` and `required` on the row, windows/`recent`/held unread there; another host read through `gh` as
+before, and one `gh` never read refused by the wait (5); §4.4's per-forge sentence. Nothing reads the row's
+`required` yet: a `done` naming a GitLab MR still reads `gh pr view` and the by-base `required` (`_pr_checks`),
+and the cadence's `forge` setting (GitHub Enterprise, a GitLab host not named `gitlab.*`) is not read by the
+home — both are for an entry when a GitLab repo joins. Left: (3) the pair in `docs/procedures/cadence.md`, a dev-cadence
 SYNCED file, so it is written in dev-cadence and synced here, and the *no checks
 means conflicting* memory retired with a `MEMORY.md` line pointing at the command; (4) the live check.
 **Location:** design §4.7 (a new `ao pr wait <n>` paragraph beside `ao pr held <n>`), §4.4 *Repos* (the `prs` reading's `checks` and `conflicting` fold); `docs/procedures/cadence.md` and `docs/claude-memory/no-checks-means-conflicting.md` (the pair to write and the memory to retire); `src/shiftlead/cli.py` (`ao pr`, ~L4467 `ao wait` for the blocking shape), `src/sessionorc/agent_serve.py` (the `wait` RPC, `_serve_wait` ~L229) and `src/sessionorc/agent_remote.py` (its client side), `src/sessionorc/reports.py` (`_gh_prs` ~L617, `fold_checks` ~L342, `failing_items` ~L314, the `gh pr view` read ~L573 — GitHub-only today); `tests/test_cli.py` and the tests of `fold_checks`
