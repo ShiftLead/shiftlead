@@ -73,13 +73,13 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
 | TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Built — live check on #2244 (`ao pr wait` on a real PR, then the cadence check); the procedure pair is TD-946 |
 | TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Designed — a screen rule reads the dialog as `limited`; builds TD-944 |
-| TD-942 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed 2026-10-21 with Paul — review rounds under way (held) |
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-944 | Gemini's screen-rule manifest: the *Usage limit reached* dialog reads `limited` (`gemini-usage-limit`), over the title's `✦` | Medium | Open |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Open |
 | TD-948 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
 | TD-949 | No test would catch the tick dropping `remote=` from its `pr_reading` call: a GitLab repo would be read through `gh` again with the whole suite green | Medium | Open |
+| TD-951 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed 2026-10-21 with Paul — review rounds under way (held) |
 
 ---
 
@@ -1452,6 +1452,9 @@ the word and exit code are read against `gh pr checks <n>`.
 - Design: the §4.7 paragraph, and §4.4's reading sentence gains *per forge* with the GitLab fold's rules beside GitHub's. A history line under §4.7.
 
 **Done when** `ao pr wait` returns the word and exit code for a GitHub PR and a GitLab merge request in tests, and the live check waits out one real PR's CI on kmaster and the cadence check follows it (the procedure and memory: TD-946).
+
+---
+
 ## TD-941: A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read
 
 **Priority:** Medium
@@ -1475,43 +1478,6 @@ on an API-key home); the card and Inbox draw it as Claude Code's limit. Built by
 **Done when** a Gemini session at the *Usage limit reached* dialog reads as the design says, from a fixture captured from the tool.
 
 **Related:** TD-785, TD-786, TD-112.
-
-## TD-942: The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-21 (Paul, in the td-156 session, from his screenshot of his own `dc-paul` closed from Focus — the shot is at `~/.shiftlead/attachments/ao-shiftlead-td-156/paste-20261021-184736.png`, after his live look closed TD-156)
-**Owner:** paul
-**Kind:** design-first
-**Status:** Designed 2026-10-21 with Paul (design §4.5 *The Focus screen's anatomy* items 2–4; §4.4 *Spend per seat*'s *One record's reading* (the seat pass's last read of an ended session's profile is TD-948's); §4.5a *Focus: Take over*, *Hand back*, *more ▾*, the ending banner's row, *Focus: ending card*, *Focus side panel: Sent*, the side panel's row, *Reports*; mockups `FocusEnded` and `FocusHeld`, shots `docs/mockups/reviews/2026-10-21-td942-*.png`). **Reviewed 2026-10-21**: seven rounds, Sonnet and Fable alternating, after Paul agreed the layout; READY at round 6 (Fable) and confirmed at round 7 (Sonnet); the ending card cut to the session's own story between rounds 4 and 5 at Paul's word, the seat pass's last read split out as TD-948. **Held** until Paul lifts it; the build is sliced by the Fix's five parts then.
-**Blocked by:** decision (paul)
-**Location:** `src/shiftlead/ui/static/app.js` (the `#fexited` banner, the terminal's gone-pane lines, the composer bar's ended text, `AO.dropCard`), `src/shiftlead/ui/templates/focus.html` (the acts line's mode slot, the side cards), `src/shiftlead/ui/cards.py` (`mode_act`), the host agent's record view (`agent_serve`, the `list` view: `sent` and `sent_open` beside `unread` and `mail`), the `seats` RPC (`sessionorc/agent_spend.py` `rpc_seats`: a `record` pick), `/api/spend`, `docs/mockups/gen.py`
-
-**Why:** at the end of an own session Focus still talks past the person. The banner guesses at a cause the record names (*This session's process has closed. Its pane is gone (killed, or the tmux server restarted)* under *closed by you · 18:42*), its grey text and a member's paragraph about where Restart lives crowd the buttons, and the pane below is a dead terminal with a retry line, when the moment is the one where the person decides what next and could read what the session cost. Elsewhere on the same screen: a closed record still draws Ready to close with its Close; the Session card's heading drops below its chevron because the summary's value squeezes it; Reports, Ready to close and Session start open with nothing on their summaries; after Take over, Hand back hides in more ▾ while the slot that held Take over goes empty; and what a session sent is nowhere on its page, though its Inbox is.
-
-**Fix:** design first — done on this entry's branch; the build, sliced when the hold lifts: (1) the ending banner: the ending's words first, the cause's guess only where `ended` names none or the closer is not recorded, *read its transcript* dropped, the grey text and the member's note behind the **i** (the help text's wording goes in with `help.py`, never in a design PR), **Restart** on a supervised member as the card has it; no composer drawn on an ended record; no retry line written for a pane the page knows is gone. (2) the ending card: the `seats` reading's `record` pick (every kept day for one record, by model and by reference) and `/api/spend?record=`, `AO.dropCard`'s frame drawn with the record's own total and by entry, nothing else; in the pane's place on a gone pane, between banner and pane on a kept one; read when the page draws the ending and on a reload. (3) the folds: Reports, Inbox, Sent, Ready to close, Session and Told at start folded by default under a new remembered-fold key; each summary's value (Reports' counts, Inbox *n unread of m* in blue, Sent *n sent, m waiting* in amber, Ready to close ✓ / ✗ first failing check +n in amber, Session the model with tool · account · model on hover); the Session summary's heading `flex: none` and its value cut with an ellipsis; no Ready to close card on a `closed` record (an `exited` one keeps it). (4) Take over / Hand back in one slot, Hand back plain; *Switch to unattended* alone in more ▾. (5) the Sent card: the record view's `sent` and `sent_open`, bodies through `inbox` with `sent` as a person's read on unfold, an ask's answer or *waiting*.
-
-**Done when** Paul, closing an own session from Focus, reads one line saying how it ended, the buttons, and what it cost, with no guessed cause; a member taken over shows Hand back where Take over was; the side panel opens folded with a value on each summary and the Session heading level with its chevron; a session that has sent mail shows it under Sent.
-
-**Related:** TD-156 (the first round, archived), TD-923 (the disconnect card, whose frame the ending card reuses), TD-818 / TD-830–833 (Spend per seat, the figures), TD-490 (the ending's words), TD-096 (Take over / Hand back), TD-075 (`ao inbox --sent`), TD-029 (the reconnect contract), TD-266 (*forgotten by itself a day after the close*).
-
-## TD-948: The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-21 (found by TD-942's review, round 1: the ending card's total would miss the closed session's last turns)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — designed in TD-942's PR (#2240): design §4.4 *Spend per seat*, *What is read*.
-**Location:** `src/sessionorc/agent_spend.py` (the seat pass, `SEAT_EVERY`), `src/sessionorc/agent_tick.py` (where the pass is started)
-
-**Why:** the seat pass runs once a minute for every (adapter, profile) pair its **live** sessions run under. A session that ends between two passes has its last turns unread, and when it was the profile's last live session nothing reads that profile again until another session runs on it — the seat ledger, the Spend page and the Focus's ending card (TD-942) all read short for that session in the meantime, and the turns land later charged by cursor.
-
-**Fix:** the pass keeps the pairs it read last time; a pair whose last live session ended since then is read once more on the next pass, then dropped. A test: a session ends with turns past the cursor, no other session on its profile, and the next pass charges them to its record.
-
-**Done when** a session's turns up to its ending are in the seat ledger within one pass of the ending, whether or not another session runs on its profile.
-
-**Related:** TD-942 (the ending card, which reads the ledger at the ending), TD-818 / TD-830 (Spend per seat).
 
 ---
 
@@ -1677,6 +1643,8 @@ transcript quotes *Usage limit reached for* outside a box matches nothing.
 
 **Done when** the synced procedure names the pair and neither memory tells a session to read `gh pr checks` itself.
 
+---
+
 ## TD-947: A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so
 
 **Priority:** Medium
@@ -1697,6 +1665,28 @@ transcript quotes *Usage limit reached for* outside a box matches nothing.
 
 **Done when** a background subagent's permission on a scratch home shows a *Needs you* that names the subagent and says the pane will not show the prompt, the design says what the session's state is meanwhile, and §4.2 says when the pane draws a subagent's dialog, as the capture found.
 
+---
+
+## TD-948: The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (found by TD-951's review, round 1: the ending card's total would miss the closed session's last turns)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — designed in TD-951's PR (#2240): design §4.4 *Spend per seat*, *What is read*.
+**Location:** `src/sessionorc/agent_spend.py` (the seat pass, `SEAT_EVERY`), `src/sessionorc/agent_tick.py` (where the pass is started)
+
+**Why:** the seat pass runs once a minute for every (adapter, profile) pair its **live** sessions run under. A session that ends between two passes has its last turns unread, and when it was the profile's last live session nothing reads that profile again until another session runs on it — the seat ledger, the Spend page and the Focus's ending card (TD-951) all read short for that session in the meantime, and the turns land later charged by cursor.
+
+**Fix:** the pass keeps the pairs it read last time; a pair whose last live session ended since then is read once more on the next pass, then dropped. A test: a session ends with turns past the cursor, no other session on its profile, and the next pass charges them to its record.
+
+**Done when** a session's turns up to its ending are in the seat ledger within one pass of the ending, whether or not another session runs on its profile.
+
+**Related:** TD-951 (the ending card, which reads the ledger at the ending), TD-818 / TD-830 (Spend per seat).
+
+---
+
 ## TD-949: No test would catch `_read_repo` dropping `remote=` from its `reports.pr_reading` call: a GitLab repo would be read through `gh` again with the suite green
 
 **Priority:** Medium
@@ -1712,3 +1702,24 @@ transcript quotes *Usage limit reached for* outside a box matches nothing.
 **Fix:** a test that runs the tick's `_read_repo` (or a tick pass) on a checkout whose origin is a GitLab URL, with `reports._glab_api` faked, and asserts the repo's `prs` carries `forge: gitlab`; it fails with the `remote=` argument removed.
 
 **Done when** that test exists and fails when the `remote=remote` argument is removed from `_read_repo`.
+
+---
+
+## TD-951: The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-21 (Paul, in the td-156 session, from his screenshot of his own `dc-paul` closed from Focus — the shot is at `~/.shiftlead/attachments/ao-shiftlead-td-156/paste-20261021-184736.png`, after his live look closed TD-156)
+**Owner:** paul
+**Kind:** design-first
+**Status:** Designed 2026-10-21 with Paul (design §4.5 *The Focus screen's anatomy* items 2–4; §4.4 *Spend per seat*'s *One record's reading* (the seat pass's last read of an ended session's profile is TD-948's); §4.5a *Focus: Take over*, *Hand back*, *more ▾*, the ending banner's row, *Focus: ending card*, *Focus side panel: Sent*, the side panel's row, *Reports*; mockups `FocusEnded` and `FocusHeld`, shots `docs/mockups/reviews/2026-10-21-td951-*.png`). **Reviewed 2026-10-21**: seven rounds, Sonnet and Fable alternating, after Paul agreed the layout; READY at round 6 (Fable) and confirmed at round 7 (Sonnet); the ending card cut to the session's own story between rounds 4 and 5 at Paul's word, the seat pass's last read split out as TD-948. **Held** until Paul lifts it; the build is sliced by the Fix's five parts then.
+**Blocked by:** decision (paul)
+**Location:** `src/shiftlead/ui/static/app.js` (the `#fexited` banner, the terminal's gone-pane lines, the composer bar's ended text, `AO.dropCard`), `src/shiftlead/ui/templates/focus.html` (the acts line's mode slot, the side cards), `src/shiftlead/ui/cards.py` (`mode_act`), the host agent's record view (`agent_serve`, the `list` view: `sent` and `sent_open` beside `unread` and `mail`), the `seats` RPC (`sessionorc/agent_spend.py` `rpc_seats`: a `record` pick), `/api/spend`, `docs/mockups/gen.py`
+
+**Why:** at the end of an own session Focus still talks past the person. The banner guesses at a cause the record names (*This session's process has closed. Its pane is gone (killed, or the tmux server restarted)* under *closed by you · 18:42*), its grey text and a member's paragraph about where Restart lives crowd the buttons, and the pane below is a dead terminal with a retry line, when the moment is the one where the person decides what next and could read what the session cost. Elsewhere on the same screen: a closed record still draws Ready to close with its Close; the Session card's heading drops below its chevron because the summary's value squeezes it; Reports, Ready to close and Session start open with nothing on their summaries; after Take over, Hand back hides in more ▾ while the slot that held Take over goes empty; and what a session sent is nowhere on its page, though its Inbox is.
+
+**Fix:** design first — done on this entry's branch; the build, sliced when the hold lifts: (1) the ending banner: the ending's words first, the cause's guess only where `ended` names none or the closer is not recorded, *read its transcript* dropped, the grey text and the member's note behind the **i** (the help text's wording goes in with `help.py`, never in a design PR), **Restart** on a supervised member as the card has it; no composer drawn on an ended record; no retry line written for a pane the page knows is gone. (2) the ending card: the `seats` reading's `record` pick (every kept day for one record, by model and by reference) and `/api/spend?record=`, `AO.dropCard`'s frame drawn with the record's own total and by entry, nothing else; in the pane's place on a gone pane, between banner and pane on a kept one; read when the page draws the ending and on a reload. (3) the folds: Reports, Inbox, Sent, Ready to close, Session and Told at start folded by default under a new remembered-fold key; each summary's value (Reports' counts, Inbox *n unread of m* in blue, Sent *n sent, m waiting* in amber, Ready to close ✓ / ✗ first failing check +n in amber, Session the model with tool · account · model on hover); the Session summary's heading `flex: none` and its value cut with an ellipsis; no Ready to close card on a `closed` record (an `exited` one keeps it). (4) Take over / Hand back in one slot, Hand back plain; *Switch to unattended* alone in more ▾. (5) the Sent card: the record view's `sent` and `sent_open`, bodies through `inbox` with `sent` as a person's read on unfold, an ask's answer or *waiting*.
+
+**Done when** Paul, closing an own session from Focus, reads one line saying how it ended, the buttons, and what it cost, with no guessed cause; a member taken over shows Hand back where Take over was; the side panel opens folded with a value on each summary and the Session heading level with its chevron; a session that has sent mail shows it under Sent.
+
+**Related:** TD-156 (the first round, archived), TD-923 (the disconnect card, whose frame the ending card reuses), TD-818 / TD-830–833 (Spend per seat, the figures), TD-490 (the ending's words), TD-096 (Take over / Hand back), TD-075 (`ao inbox --sent`), TD-029 (the reconnect contract), TD-266 (*forgotten by itself a day after the close*).

@@ -7,7 +7,7 @@ metadata:
 
 In an interactive UI design round with Paul, iterate the layout with him on the mockups first;
 start the Sonnet / Fable review rounds only once he and the session agree on it (Paul, 2026-10-21,
-TD-942: *no need for the reviews with fable/sonnet until you and i agree on the layout*).
+TD-951: *no need for the reviews with fable/sonnet until you and i agree on the layout*).
 
 **Why:** the model rounds check the design text's consistency and buildability; run before the
 layout settles, they review text that is about to change and spend tokens on it.
