@@ -1559,7 +1559,7 @@ and role directories it names, at `<dir>` in place of the registered checkout wh
 with the registered checkout's ledger reading under its name and path (a `Team` declaration on main
 that names a team only the branch defines reads clean); a directory outside every registered repo is
 refused with exit 2, and so is a directory that is not a git one; `--root` at the registered checkout
-itself reads as without it but for the header; the first line and `--json`'s `root` name the repo and
+itself reads as without it but for the header and the checkout-state warnings; the first line and `--json`'s `root` name the repo and
 `<dir>`; a test holds each. The recipe's paragraph says to run `ao org check --root <worktree>` before
 the PR, and its agent checklist's item 2 says *`ao org check --root <worktree>` before the PR,
 `ao team list` after the merge*.

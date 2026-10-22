@@ -256,9 +256,10 @@ One function reads the lane words against each entry's header lines (`lane_match
   ledger's `Fields:` line declares, or it names none where that line declares two or more, §4.4
   *An entry names its team*) match no lane. `ao repo` says each, so a first start whose lane reads
   empty is read there first.
-- **The pages leave the person's entries out; a lane does not.** The team card, the Repo page and
-  `ao repo` count an `Owner: paul` entry, or one blocked by `decision (paul)`, as the person's and in
-  no lane — but a bare `free-pick` member's own pick still takes an `Owner: paul` build that is
+- **The team's sums leave the person's entries out; a lane does not.** The team card's lane
+  lists, the Repo page and `ao repo` count an `Owner: paul` entry, or one blocked by
+  `decision (paul)`, as the person's and in none of the team's kinds — but a bare `free-pick`
+  member's own pick, and its own count on the card, still take an `Owner: paul` build that is
   pickable. What the pages show is not the fence: block the entry (step 0b).
 
 ### A repo over sibling repos
