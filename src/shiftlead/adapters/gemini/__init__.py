@@ -27,13 +27,14 @@ import uuid
 from pathlib import Path
 
 from sessionorc import paths
-from sessionorc.adapters import LaunchSpec, Link, Transcript
+from sessionorc.adapters import LaunchSpec, Link, MailDelivery, Transcript
 from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
-from shiftlead.adapters.claude_code import _resolves
+from shiftlead.adapters.claude_code import _resolves, write_context_file
 from shiftlead.adapters.gemini import transcript as transcript_mod
+from shiftlead.adapters.gemini.hook import START_CONTEXT_ENV
 from shiftlead.profiles import Profile
 
 log = logging.getLogger("shiftlead.adapters.gemini")
@@ -42,7 +43,10 @@ NAME = "gemini"
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")  # its screen-rule manifest (§4.3, TD-944)
 ADAPTER_FLAG = "--adapter"  # `shiftlead-hook --adapter gemini`: read from argv before any import (§4.1)
 HOOK_EVENTS = ("SessionStart", "SessionEnd", "BeforeAgent", "AfterAgent", "BeforeTool", "AfterTool", "Notification")
-HOOK_TIMEOUT_MS = 10_000  # the tool's `timeout` is in milliseconds; every hook here is fire-and-forget
+HOOK_TIMEOUT_MS = 10_000  # the tool's `timeout` is in milliseconds; every hook here but the start is fire-and-forget
+# `SessionStart` runs the repo's start hooks itself (design §4.3 *The repo's start hooks*): at or above
+# the runner's own bound, `hook.START_HOOKS_TIMEOUT`, so the tool never cancels it first
+START_TIMEOUT_MS = 180_000  # the runner, its `git` read (10 s) and the report (3 s)
 # where the tool sits when it was installed with npm's user prefix: off `PATH` outside a login shell
 NPM_BINARY = Path("~/.npm-global/bin/gemini")
 YOLO = ["--approval-mode", "yolo"]  # an unattended launch under `permission_prompts: skip` (§4.2a)
@@ -110,8 +114,12 @@ def layer_settings(hook_cmd: str = "shiftlead-hook") -> dict:
     """The settings layer a launch names in `GEMINI_CLI_SYSTEM_SETTINGS_PATH` (design §4.3 `launch`): a
     hook on each of `HOOK_EVENTS` calling `<hook_cmd> --adapter gemini`, and `LAYER_SETTINGS`."""
     command = f"{shlex.quote(hook_cmd)} {ADAPTER_FLAG} {NAME}"
-    hook = {"type": "command", "command": command, "timeout": HOOK_TIMEOUT_MS}
-    return {"hooks": {ev: [{"hooks": [dict(hook)]}] for ev in HOOK_EVENTS}, **json.loads(json.dumps(LAYER_SETTINGS))}
+    hooks = {ev: [{"hooks": [{"type": "command", "command": command, "timeout": _timeout(ev)}]}] for ev in HOOK_EVENTS}
+    return {"hooks": hooks, **json.loads(json.dumps(LAYER_SETTINGS))}
+
+
+def _timeout(event: str) -> int:
+    return START_TIMEOUT_MS if event == "SessionStart" else HOOK_TIMEOUT_MS
 
 
 def layer_text(hook: str) -> str:
@@ -223,9 +231,11 @@ class GeminiAdapter:
     state_in_title = True
     # no hook answers a confirmation: a pending permission is answered in the terminal (§4.3, §4.5a)
     permission_channel = False
+    # held from its start, through `SessionStart`'s `additionalContext` (design §4.3 `start_context`)
+    start_context = True
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the rest come
     # with TD-786's later slices
-    implements: frozenset[str] = frozenset({"composer", "context", "links", "spend", "title"})
+    implements: frozenset[str] = frozenset({"composer", "context", "links", "mail", "spend", "title"})
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
         self._binary = binary
@@ -241,7 +251,15 @@ class GeminiAdapter:
         return self._binary
 
     def launch(
-        self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""
+        self,
+        *,
+        profile: str,
+        resume: str | None,
+        prompt: str | None,
+        unattended: bool,
+        cwd: Path,
+        name: str = "",
+        start_context: str | None = None,
     ) -> LaunchSpec:
         prof = profiles_mod.get(profile or None)
         adapter_id = resume or str(uuid.uuid4())
@@ -271,8 +289,16 @@ class GeminiAdapter:
             env["GEMINI_CLI_HOME"] = str(prof.config_dir)
         if name:
             env["CLI_TITLE"] = name  # the session's name, which the tool puts in its title
+        if start_context:
+            # the hook reads it on every `SessionStart`, a resume's and a `/clear`'s too (design §4.3)
+            env[START_CONTEXT_ENV] = str(write_context_file(adapter_id, start_context))
         # the prompt is typed at the composer by the host agent once `SessionStart` reports (§4.1, TD-339)
         return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id, first_prompt=prompt or None, model=prof.model)
+
+    def mail(self) -> MailDelivery:
+        """An injection at the top of a turn (design §4.3 `mail`): `BeforeAgent`'s `additionalContext`
+        carries the unread line; an idle session is woken by the doorbell's pane write, as Claude Code's."""
+        return MailDelivery(how="turn", event="BeforeAgent")
 
     def classify(self, pane: PaneInfo | None, tail: list[str]) -> State | None:
         return None  # hook-fed: the screen has no opinion; the title's check is the tick's (§4.3)

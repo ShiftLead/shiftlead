@@ -41,9 +41,20 @@ class HookMixin:
         """Called by an adapter's hook script. A `permission` event blocks until answered or timed out."""
         if event.get("kind") == "permission":
             return await self._await_permission(session, event)
+        # `mail`: the hook hands the turn its mail line (an adapter whose `mail` is a turn's, design §4.3),
+        # so the reply carries the count, read after the event — never a sender's words
+        wants_mail = bool(event.pop("mail", False))
         self._apply_event(session, event)
         await self._push_changes()
-        return None
+        return {"unread": self._unread_of(session)} if wants_mail else None
+
+    def _unread_of(self, session: str) -> int:
+        """The record's unread mail: the inbox at the home, the count the home last pushed on a node
+        (§4.4a, as the line on every `ao` reply reads it there)."""
+        if self.mode == "node":
+            return self._mail_hints.get(session, (0, False, []))[0]
+        s = self.sessions.get(session)
+        return s.unread() if s is not None else 0
 
     async def _await_permission(self, session: str, event: dict[str, Any]) -> dict[str, Any] | None:
         s = self.sessions.get(session)
