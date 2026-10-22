@@ -137,8 +137,7 @@ def cmd_wait(args: argparse.Namespace) -> int:
         # time that is left, so a lead does not see a promote. The transport owns that, not this.
         got, remakes = await clientmod.wait_rpc(caller=caller, timeout=args.timeout, scope=args.scope)
         if remakes and not args.json:
-            times = "once" if remakes == 1 else f"{remakes} times"
-            print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {times}")
+            print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {_times(remakes)}")
         return got
 
     try:
@@ -2695,15 +2694,34 @@ def _pr_wait_root(args: argparse.Namespace) -> str | None:
     return str(pathlib.Path(out).parent) if common.returncode == 0 and out else None
 
 
+def _times(n: int) -> str:
+    return "once" if n == 1 else f"{n} times"
+
+
+def _pr_wait_call(root: str, n: int, timeout: float, fresh: bool, head: str | None = None) -> tuple[Any, int]:
+    """The `pr_wait` RPC, carried across a host-agent restart as `ao wait`'s is (`client.blocking_rpc`):
+    `(the reading's answer, or None at the timeout in a restart's gap; how many times it was remade)`."""
+    caller = os.environ.get("SHIFTLEAD_SESSION") or None
+    extra = {"head": head} if head else {}  # an older home knows no `head`: sent only when asked
+    go = clientmod.blocking_rpc(
+        "pr_wait", caller=caller, timeout=timeout, expired=None, root=root, pr=n, fresh=fresh, **extra
+    )
+    return asyncio.run(go)
+
+
 def _pr_wait(args: argparse.Namespace) -> int:
-    """`ao pr wait <n> [--timeout S] [--fresh]` (design §4.7, TD-940): block on the home's folded
-    reading of PR `n` until it leaves *pending*, print the word and exit by it — 0 green, 1 red, 2
-    conflicting, 3 none, 4 timeout, 5 refused (a number the reading does not hold, a checkout it
-    holds no reading of, a home that is down or predates the RPC) with the why. A call of its own
-    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake."""
+    """`ao pr wait <n> [--timeout S] [--fresh] [--head SHA]` (design §4.7, TD-940): block on the home's
+    folded reading of PR `n` — of commit `SHA` only, with `--head` (TD-953) — until it leaves *pending*,
+    print the word and exit by it — 0 green, 1 red, 2 conflicting, 3 none, 4 timeout, 5 refused (a number
+    the reading does not hold, a checkout it holds no reading of, a home that is down or predates the RPC,
+    a `--head` that is no sha) with the why. A call of its own
+    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake. A connection
+    the home drops under it (a promote's restart) is remade for the time left, as `ao wait`'s is."""
     from sessionorc import reports
 
     gone = reports.PR_WAIT_EXIT["gone"]
+    if args.head and not re.fullmatch(r"[0-9a-fA-F]{7,40}", args.head):
+        return fail(args, f"--head {args.head!r} is not a commit's sha: pass one, e.g. $(git rev-parse HEAD)", gone)
     try:
         root = _pr_wait_root(args)
     except AgentUnavailable as e:
@@ -2711,9 +2729,7 @@ def _pr_wait(args: argparse.Namespace) -> int:
     if not root:
         return fail(args, "no checkout to read: the record names no repo, and this directory is in none", gone)
     try:
-        got = call_sync(
-            "pr_wait", root=root, pr=args.n, timeout=args.timeout, fresh=args.fresh, _timeout=args.timeout + 30.0
-        )
+        got, remakes = _pr_wait_call(root, args.n, args.timeout, args.fresh, args.head)
     except AgentUnavailable as e:
         return fail(args, str(e), gone)
     except AgentError as e:
@@ -2722,6 +2738,11 @@ def _pr_wait(args: argparse.Namespace) -> int:
         return fail(args, str(e), gone)
     except Exception as e:  # noqa: BLE001 — anything else is no word: 1 or 2 would read as red or conflicting
         return fail(args, f"the wait could not be made: {type(e).__name__}: {e}", gone)
+    if got is None:  # the time ran out while the home restarted: no reading came back
+        got = {"pr": args.n, "word": "timeout", "checks": None, "conflicting": False, "failing": [], "head": None}
+        got["want_head"] = (args.head or "").lower() or None
+    if remakes and not args.json:
+        print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {_times(remakes)}")
     word = str(got.get("word") or "")
     if word == "gone":
         return fail(
@@ -2740,6 +2761,8 @@ def _pr_wait(args: argparse.Namespace) -> int:
             tail += ": " + ", ".join(got["failing"])
         elif word == "timeout":
             tail = f" after {args.timeout:g}s, still {got.get('checks') or 'unread'}" + (f" on {head}" if head else "")
+            if (want := str(got.get("want_head") or "")) and not str(got.get("head") or "").startswith(want):
+                tail += f", not yet {want[:7]}"  # the reading never reached the commit asked for
         print(f"PR #{args.n} {word}{tail}")
         if got.get("read_error"):
             print(f"the home's last read of the PRs failed: {got['read_error']}")
@@ -4951,6 +4974,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--id", help="another session's record (default: this session's own)")
     p.add_argument("--timeout", type=float, default=1800.0, help="wait: seconds before it gives up, exit 4 (1800)")
     p.add_argument("--fresh", action="store_true", help="wait: have the home re-read the PRs, and count only that read")
+    p.add_argument("--head", metavar="SHA", help="wait: count only a reading of this commit (after a push: HEAD's)")
     p.set_defaults(fn=cmd_pr)
 
     p = add("migrate", help="once, with no session running: move ~/.agentorc and the old units to shiftlead's names")

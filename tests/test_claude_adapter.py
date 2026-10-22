@@ -31,7 +31,9 @@ from shiftlead.adapters.claude_code import (
     repo_wires_cadence,
     write_hooks_file,
 )
-from shiftlead.adapters.claude_code.hook import translate
+from shiftlead.adapters.claude_code.hook import call_sig, translate
+
+CAPTURED = Path(__file__).parent / "conformance/fixtures/claude-code/captured"
 
 pytestmark = pytest.mark.integration  # the hook-script tests spawn processes; split later if wanted
 
@@ -109,12 +111,32 @@ def test_a_subagents_tool_events_leave_the_state_alone():
     they carry the session id and no state. The main thread's own tool events name themselves in
     `event`, which the host agent logs when one wakes a hook-confirmed idle session."""
     ev = {"hook_event_name": "PreToolUse", "session_id": "u1", "tool_name": "Bash", "tool_input": {}}
-    assert translate(ev) == {"adapter_id": "u1", "state": "working", "pending": None, "event": "PreToolUse:Bash"}
+    sig = call_sig(ev)
+    assert translate(ev) == {
+        "adapter_id": "u1",
+        "state": "working",
+        "pending": None,
+        "event": "PreToolUse:Bash",
+        "call": "start",  # TD-950: a call's first event, in the core's words
+        "call_sig": sig,
+    }
     assert translate({**ev, "hook_event_name": "PostToolUse"})["event"] == "PostToolUse:Bash"
     assert translate({"hook_event_name": "PostToolUse"})["event"] == "PostToolUse"  # no tool name: the event's own
-    # and say only that a subagent is alive (TD-734), which the core reads as `subagent_seen`
-    assert translate({**ev, "agent_id": "a97a5f"}) == {"adapter_id": "u1", "subagent_seen": True}
-    assert translate({"hook_event_name": "PostToolUse", "agent_id": "a97a5f"}) == {"subagent_seen": True}
+    # and say only that a subagent is alive (TD-734), which the core reads as `subagent_seen` — with its
+    # call, which is that subagent's thread's (TD-950), and still no state
+    assert translate({**ev, "agent_id": "a97a5f", "tool_use_id": "tu1"}) == {
+        "adapter_id": "u1",
+        "subagent": "a97a5f",
+        "subagent_seen": True,
+        "call": "start",
+        "tool_use_id": "tu1",
+        "call_sig": sig,
+    }
+    assert translate({"hook_event_name": "PostToolUse", "agent_id": "a97a5f"}) == {
+        "subagent": "a97a5f",
+        "subagent_seen": True,
+        "call": "end",
+    }
     assert "event" not in translate({"hook_event_name": "UserPromptSubmit"})  # a turn's start is not named
     # a question asked from inside a subagent still stops the session for the person
     ask = {**ev, "agent_id": "a1", "tool_name": "AskUserQuestion", "tool_input": {"questions": [{"question": "q?"}]}}
@@ -137,6 +159,7 @@ def test_translate_permission_and_questions():
         # the tool and its input, for the person's permissions: rules (TD-641)
         "tool": "Bash",
         "input": {"command": "git push origin td-301"},
+        "call_sig": call_sig({"tool_name": "Bash", "tool_input": {"command": "git push origin td-301"}}),
     }
     # a question that reaches the PermissionRequest hook is a question, as the PreToolUse road reports
     # it: its text, never its JSON (TD-629), and no permission, so nothing waits on Allow / Deny (TD-674)
@@ -151,7 +174,13 @@ def test_translate_permission_and_questions():
     assert a == {"state": "needs-you", "pending": {"kind": "question", "text": "Which db?"}}
     # a tool event names its call, which ends that call's waiter if its dialog was answered in the terminal
     done = translate({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_use_id": "tu9"})
-    assert done == {"state": "working", "pending": None, "event": "PostToolUse:Bash", "tool_use_id": "tu9"}
+    assert done == {
+        "state": "working",
+        "pending": None,
+        "event": "PostToolUse:Bash",
+        "call": "end",
+        "tool_use_id": "tu9",
+    }
     q = translate(
         {
             "hook_event_name": "PreToolUse",
@@ -162,9 +191,30 @@ def test_translate_permission_and_questions():
     assert q["state"] == "needs-you" and q["pending"] == {"kind": "question", "text": "Which db?"}
     n = translate({"hook_event_name": "Notification", "notification_type": "permission_prompt", "message": "m"})
     assert n["pending"]["kind"] == "question"  # dialog is in the terminal now
+    assert n["notice"] == "permission_prompt"  # the dialog's own notice, weighed against an open prompt (TD-950)
     assert translate({"hook_event_name": "Notification", "notification_type": "auth_success"}) is None
     assert translate({"hook_event_name": "Notification", "notification_type": "idle_prompt", "message": "w"}) is None
     assert translate({"hook_event_name": "SubagentStart"}) == {"subagent_delta": 1, "subagent_seen": True}
+
+
+def test_a_subagents_permission_names_its_subagent_and_its_call():
+    """TD-950 (design §4.2 *A subagent's dialog is held back*, *A waiter is keyed by its call*), from the
+    captured `subagent-permission/background/`: the subagent's `PermissionRequest` names no call, so it
+    carries the subagent's id and name and a `call_sig` equal to its own `PreToolUse`'s, which names the
+    call. Every event from inside the subagent carries `subagent`, its `SubagentStart` too."""
+    events = [json.loads(line) for line in (CAPTURED / "subagent-permission/background/hooks.jsonl").open()]
+    asked = next(e for e in events if e["hook_event_name"] == "PermissionRequest")
+    pre = next(e for e in events if e["hook_event_name"] == "PreToolUse" and e.get("agent_id") == asked["agent_id"])
+    p, t = translate(asked), translate(pre)
+    assert p["kind"] == "permission" and p["tool_use_id"] is None
+    assert (p["subagent"], p["subagent_name"]) == (asked["agent_id"], "general-purpose")
+    assert p["call_sig"] == t["call_sig"] and t["tool_use_id"] == pre["tool_use_id"]
+    assert (t["subagent"], t["call"]) == (asked["agent_id"], "start") and "state" not in t
+    start = next(e for e in events if e["hook_event_name"] == "SubagentStart")
+    assert translate(start)["subagent"] == start["agent_id"]
+    # a main-thread prompt names no subagent; a subagent with no type is shown as one
+    assert "subagent_name" not in translate({**asked, "agent_id": None})
+    assert translate({**asked, "agent_type": None})["subagent_name"] == "subagent"
 
 
 def test_a_fresh_conversation_resets_the_subagent_count():
@@ -637,6 +687,166 @@ async def test_a_question_at_the_permission_hook_waits_on_nothing(agent, hookstu
     html = templates.get_template("inbox_rows.html").render(rows=state_rows([v]), section="needs")
     assert "Press does?" in html and ">Open<" in html and 'data-act="allow"' not in html
     assert [(a["kind"], a["text"]) for a in org.answer_blocks([rec])] == [("question", "Press does?")]
+
+
+def _captured(name: str) -> list[dict]:
+    """A capture's hook events in order, through `translate()`, each with its payload as `raw`."""
+    out = []
+    for line in (CAPTURED / f"subagent-permission/{name}/hooks.jsonl").open():
+        raw = json.loads(line)
+        if (ev := translate(raw)) is not None:
+            out.append({**ev, "raw": raw})
+    return out
+
+
+async def _feed(agent, c, sid, events, wait=10):
+    """Each event to the host agent as the hook script sends it; a permission blocks, so it runs as a
+    task, returned once its waiter is registered."""
+    task = None
+    for e in events:
+        ev = {k: v for k, v in e.items() if k != "raw"}
+        if ev.get("kind") == "permission":
+            n = len(agent._waiters)
+
+            async def ask(ev=ev):
+                async with LocalClient() as h:
+                    return await h.call("hook", session=sid, wait_seconds=wait, **ev)
+
+            task = asyncio.create_task(ask())
+
+            async def registered(n=n):
+                return len(agent._waiters) > n
+
+            assert await wait_for(registered)
+        else:
+            async with LocalClient() as h:
+                await h.call("hook", session=sid, **ev)
+    return task
+
+
+async def test_a_subagents_waiter_is_keyed_by_its_call_and_ended_only_by_its_own_thread(agent, hookstub, tmp_path):
+    """TD-950, design §4.2 *A waiter is keyed by its call* and *The thread scopes it*, from the captured
+    `subagent-permission/foreground/`: the subagent's permission, which names no call, is keyed by its
+    own `PreToolUse`'s `tool_use_id`, and its pending says the pane shows nothing for it. The main
+    thread's `Stop` a second later, the dialog's notice and an unknown subagent's tool event end
+    nothing — the record stays `needs-you` with its buttons — and **Allow** still answers the hook. In
+    place of the Allow, the subagent's event for another call ends nothing, and the asked call's own
+    `PostToolUse` ends it as answered in the terminal."""
+    events = _captured("foreground")
+    i = next(n for n, e in enumerate(events) if e.get("kind") == "permission")
+    asked = events[i]
+    pre = next(e for e in events[:i] if e.get("call") == "start" and e.get("subagent") == asked["subagent"])
+    tid = pre["tool_use_id"]
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="f", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        task = await _feed(agent, c, sid, events[: i + 1])
+        assert agent._waiters[(sid, tid)][1] == asked["subagent"]
+        rec = await c.call("get", id=sid)
+        assert rec["state"] == "needs-you" and rec["pending"]["tool_use_id"] == tid
+        assert rec["pending"]["pane_held"] is True and rec["pending"]["subagent_name"] == "general-purpose"
+        rest = events[i + 1 :]
+        assert [e["raw"]["hook_event_name"] for e in rest] == ["Stop", "Notification", "PreToolUse"]
+        assert rest[2]["subagent"] != asked["subagent"]  # the tool's own id, which had no SubagentStart
+        await _feed(agent, c, sid, rest)
+        assert not task.done() and agent._permission_waiting(sid, asked["subagent"])
+        rec = await c.call("get", id=sid)
+        assert rec["state"] == "needs-you" and rec["pending"]["kind"] == "permission"
+        # an event from inside the subagent ends no main-thread waiter, nor the main thread's its
+        assert not agent._permission_waiting(sid, None)
+        await c.call("decide", id=sid, tool_use_id=tid, behavior="allow", reason="ok")
+        assert await task == {"behavior": "allow", "reason": "ok"}
+
+        # the same prompt again, answered in the terminal this time
+        task = await _feed(agent, c, sid, [pre, asked])
+        own = {"subagent": asked["subagent"], "subagent_seen": True}
+        await _feed(agent, c, sid, [{**own, "call": "end", "tool_use_id": "toolu_other"}, rest[0]])
+        assert not task.done()
+        await _feed(agent, c, sid, [{**own, "call": "end", "tool_use_id": tid}])
+        assert await task is None and not agent._permission_waiting(sid)
+
+
+async def test_a_main_thread_waiter_is_keyed_by_its_call(agent, hookstub, tmp_path):
+    """TD-950, design §4.2 *A waiter is keyed by its call*, from the captured `subagent-permission/main/`:
+    the main thread's permission is keyed by its `PreToolUse`'s `tool_use_id`, and the dialog's own
+    notice leaves the waiter live and the buttons up. Its call's `PostToolUse` ends it as answered in
+    the terminal; so does a new main-thread call's `PreToolUse` (a pane Deny gives the asked call no
+    end), while a parallel call's end and a subagent's event end nothing."""
+    events = _captured("main")
+    i = next(n for n, e in enumerate(events) if e.get("kind") == "permission")
+    tid = events[i - 1]["tool_use_id"]
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="m", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        task = await _feed(agent, c, sid, events)
+        assert events[-1].get("notice") == "permission_prompt"
+        assert (sid, tid) in agent._waiters and agent._waiters[(sid, tid)][1] is None
+        rec = await c.call("get", id=sid)
+        assert rec["state"] == "needs-you" and rec["pending"]["kind"] == "permission"
+        assert "pane_held" not in rec["pending"] and not task.done()
+        await _feed(agent, c, sid, [{"subagent": "a1", "subagent_seen": True, "call": "end", "tool_use_id": "x"}])
+        await _feed(agent, c, sid, [{"state": "working", "pending": None, "call": "end", "tool_use_id": "tu-par"}])
+        assert not task.done()
+        await _feed(agent, c, sid, [{"state": "working", "pending": None, "call": "end", "tool_use_id": tid}])
+        assert await task is None
+        # again, and a pane Deny: the turn's next call starts, and the asked one never ends
+        task = await _feed(agent, c, sid, events[i - 1 : i + 1])
+        assert (sid, tid) in agent._waiters
+        nxt = {"state": "working", "pending": None, "call": "start", "tool_use_id": "tu-next", "call_sig": "0" * 16}
+        await _feed(agent, c, sid, [nxt])
+        assert await task is None and (await c.call("get", id=sid))["state"] == "working"
+
+
+def test_a_permission_takes_the_oldest_open_call_of_its_signature(agent):
+    """TD-950, design §4.2 *A waiter is keyed by its call*: each thread's open calls, matched in order by
+    `call_sig`, a call leaving at its own end or once taken; the threads apart; a `SubagentStop` drops
+    its thread, a reset every subagent's, the session's end all."""
+
+    def ev(edge, tid, sig="", sub=None, **kw):
+        return {"call": edge, "tool_use_id": tid, "call_sig": sig, **({"subagent": sub} if sub else {}), **kw}
+
+    agent._track_call("s", ev("start", "A", "a"))
+    agent._track_call("s", ev("start", "B", "b"))
+    assert agent._take_call("s", None, "b") == "B" and agent._take_call("s", None, "b") is None
+    agent._track_call("s", ev("end", "A"))
+    agent._track_call("s", ev("start", "A2", "a"))
+    assert agent._take_call("s", None, "a") == "A2"
+    agent._track_call("s", ev("start", "C", "c", "x"))
+    assert agent._take_call("s", None, "c") is None  # another thread's call
+    agent._track_call("s", ev("start", "D", "d", "x"))
+    agent._track_call("s", {"subagent": "x", "subagent_delta": -1})
+    assert agent._take_call("s", "x", "d") is None
+    for n in range(10):
+        agent._track_call("s", ev("start", f"E{n}", "e"))
+    assert agent._take_call("s", None, "e") == "E2"  # the last eight are kept
+    for n in range(20):
+        agent._track_call("s", ev("start", f"T{n}", "t", f"sub{n}"))
+    assert len(agent._open_calls["s"]) == 16 and agent._take_call("s", None, "e") is None
+    agent._track_call("s", {"subagents_reset": True})
+    assert list(agent._open_calls["s"]) == []
+    agent._track_call("s", ev("start", "F", "f"))
+    agent._track_call("s", {"state": "exited"})
+    assert "s" not in agent._open_calls
+
+
+async def test_a_subagents_waiter_ends_with_its_subagent(agent, hookstub, tmp_path):
+    """TD-950, design §4.2 *The thread scopes it*: a `SubagentStart` ends nothing; the asking subagent's
+    `SubagentStop` ends its waiter, and so do the session's end and `subagents` reaching 0."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="s", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        perm = {"kind": "permission", "text": "Bash: x", "subagent": "s1", "subagent_name": "general-purpose"}
+        task = await _feed(agent, c, sid, [perm])
+        await _feed(agent, c, sid, [{"subagent": "s2", "subagent_delta": 1, "subagent_seen": True}])
+        await _feed(agent, c, sid, [{"subagent": "s1", "subagent_delta": 1, "subagent_seen": True}])
+        assert not task.done()
+        await _feed(agent, c, sid, [{"subagent": "s1", "subagent_delta": -1, "subagent_seen": True}])
+        assert await task is None
+        task = await _feed(agent, c, sid, [{**perm, "subagent": "s2"}])
+        await _feed(agent, c, sid, [{"state": "idle", "pending": None}])  # the main thread's Stop
+        assert not task.done()
+        await _feed(agent, c, sid, [{"subagent_delta": -1, "subagent_seen": True}])  # the last subagent gone
+        assert await task is None
+        task = await _feed(agent, c, sid, [{**perm, "subagent": "s3"}])
+        await _feed(agent, c, sid, [{"state": "exited", "pending": None}])
+        assert await task is None
 
 
 def test_hook_script_without_session_is_noop():

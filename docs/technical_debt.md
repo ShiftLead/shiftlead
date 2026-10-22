@@ -53,7 +53,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Designed — built by TD-769, TD-770, TD-771 (on dev-cadence#TD-119); trial TD-772 |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
-| TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Building — slice 1 #2014 |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | In progress (slice 1 #2129) |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 (done) |
@@ -61,8 +60,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
-| TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
-| TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check, blocked by TD-785 (the composer) |
 | TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-902, TD-901, TD-903, TD-904, TD-905, TD-907 |
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
@@ -71,14 +68,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
-| TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Built — live check on #2244 (`ao pr wait` on a real PR, then the cadence check); the procedure pair is TD-946 |
-| TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Designed — a screen rule reads the dialog as `limited`; builds TD-944 |
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
-| TD-944 | Gemini's screen-rule manifest: the *Usage limit reached* dialog reads `limited` (`gemini-usage-limit`), over the title's `✦` | Medium | Open |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
-| TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Open |
+| TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-948 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
-| TD-949 | No test would catch the tick dropping `remote=` from its `pr_reading` call: a GitLab repo would be read through `gh` again with the whole suite green | Medium | Open |
+| TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Open |
 | TD-951 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed 2026-10-21 with Paul — review rounds under way (held) |
 
 ---
@@ -239,7 +233,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed (2026-10-16, the designer) — §4.3 *The second adapter: Gemini CLI* and *The conformance suite*, read from Gemini CLI 0.64.0's installed package (no run): **hook-fed, not scraped** — `GEMINI_CLI_HOME` per profile, `--session-id` chosen at launch, the per-launch layer through `GEMINI_CLI_SYSTEM_SETTINGS_PATH` (its hooks concatenate), per-process trust (`GEMINI_CLI_TRUST_WORKSPACE=true`) since no hook runs in an untrusted folder; `BeforeAgent`/`AfterAgent`/`Notification` for the state, the terminal title (`CLI_TITLE`) covering a cancelled or failed turn; the contract's new `permission_channel` False — no hook answers a Gemini confirmation, so no Allow / Deny, the terminal is the answer (§4.5a); start context and mail through `SessionStart`/`BeforeAgent` `additionalContext`. The suite: offline fixtures in CI, a live walk by hand on a profile set aside for it. §4.2a, §4.5a, §7 phase 5. Built by TD-784 (the suite, first), TD-785, TD-786. Was: **Paul, 2026-10-16 (the board, line `board:fbc6ebd9`): file it design-first for the designer.** Of the three answers put to him — he runs the spike now with ao-paul, file it design-first for the designer, or leave it for evaluation — Paul chose the designer: the design decides the scraped Gemini adapter's shape (which §4.3 contract methods it implements and which are Claude Code's alone, `state_source: scraped`, what `send` and the doorbell do without a readable composer, whether the record assumes a tool session id) and the adapter conformance suite, and lands them as build entries naming this one in `**Blocked by:**`; the 2026-10-10 note that the spike is an interactive session's is superseded by this decision. Was: **Paul, 2026-10-10 (with ao-paul): agreed, a spike, and integration tests with it.** Run as an interactive session, not a member's lane: a second tool must be installed and signed in (neither `codex` nor `gemini` is on kmaster on 2026-10-10; the sign-in is Paul's account or key), the work is judgement (which of the contract's methods are neutral), and its result is an ADR, not a merge. **Paul, 2026-10-13 (the lessons ADR, `docs/decisions/2026-10-13-agent-product-lessons.md` lesson 10):** Gemini CLI is *"a definite fit"*, so it is the spike's tool; Hermes Agent, Muse Code and Grok Bot are not wanted as tools for now. The lasting product is an **adapter conformance suite**: one set of tests every adapter passes against its real tool (launch, the state it reports, `send`, `composer()`, the doorbell and mail, `title()`), so neutrality is checked on every change and not once by the spike. The spike says which of those a scraped adapter can pass and which belong to Claude Code alone. **2026-10-15 (grinder-ao-2, answering Paul's board question *does the recently added Gemini CLI fit the bill?*):** in part. What was added is dev-cadence's TD-109 (dev-cadence #259, 2026-10-14): Gemini CLI installed on kmaster (`~/.npm-global/bin/gemini`, 0.64.0) and signed in with Paul's Google account, and a Gemini backend for dev-cadence's session *introspection* (`agent_sessions.py`: lists Gemini sessions, their cwd and `gemini --resume <uuid>`). That removes the spike's blocker (a second tool installed and signed in) and gives facts read off a real install (`docs/plans/2026-10-12-session-introspection-adapter.md` in dev-cadence: chats under `~/.gemini/tmp/<slug>/chats/`, a `sessionId` in the first record, no live registry). It is not a ShiftLead adapter: `src/shiftlead/adapters/` still holds only `claude_code/`, and the spike, its ADR and the conformance suite are all unbuilt. Who runs the spike, and when, is put back to Paul on the board. Open — for evaluation. The design's stated moat is one neutral view across tools, and only one agent adapter exists. Since phase 1 the contract (§4.3) gained `composer()`, `title()`, `mail()`, a session id chosen at launch, the doorbell, the trust pre-seed and screen rules, each shaped by Claude Code. Phase 5 puts the second adapter last. Recommendation: a scraped spike now — Codex CLI or Gemini CLI, `state_source: scraped`, no hooks — to see which of the contract's methods are really neutral, what `send` and the doorbell do without a readable composer, and whether the record's fields assume a tool session id. The spike is a branch and an ADR, not a shipped adapter.
-**Blocked by:** TD-784, TD-785, TD-786
+**Blocked by:** TD-784, TD-786
 **Location:** design §4.3, §7 phase 5, `src/shiftlead/adapters/`
 
 **Why:** every Claude-shaped feature built before a second adapter exists is a feature that may have to be unbuilt, and the claim the product is sold on has not been tested.
@@ -941,37 +935,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 ---
 
-## TD-785: Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-16 (TD-112's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Building — slice 1 #2014 (2026-10-17, grinder-ao-2): `confidence: title` read through `Session.told`, `permission_channel` on the view and every reader, `decide` and `ao allow`/`ao deny` refusing a tool without one, the kill guard at `shiftlead/kill_guard.py`. Slice 2 #2021 (2026-10-17): `shiftlead/adapters/gemini/` — the launch (binary, `--session-id`/`--resume`, `--model`, yolo under `skip`, the env and trust), the settings layer, `credentials_ok`, `doctor_profiles`, `title_state` (the glyph map), and the hook module (each event to its state, a confirmation as `needs-you` with no waiting call, the kill guard's exit 2); `shiftlead-hook --adapter gemini` dispatches to it. The entry point is not registered yet: the conformance suite tests every registered agent adapter against captured fixtures. Slice 3 #2024 (2026-10-17): the title verdict in the tick — `state_in_title` on the adapter, `explain(tail, title=…)` mapping the glyph, `_title_verdict` in `agent_tick._observe` (once `hook_seen_at`, past one tick since the last hook, `✋`'s text by the state it replaces, equal states no event, `stalled?` ended by `◇`/`✋` alone, nothing held), `ao explain` showing the title and `ao explain --file --title`. `ao doctor --probe` needs nothing more: its scratch launch is a `create` with the row's adapter, so it goes through that adapter's `launch` (read 2026-10-17). `SessionStart`'s and `BeforeAgent`'s `additionalContext` (`start_context`, mail, the repo's start hooks) are TD-786's Fix, left to it. Next, each needing fixtures captured from a real Gemini session (never written by hand, §4.3 *The conformance suite*): composer/title, the fixtures with the entry point, and the live walk — the Gemini profile for them asked of the techlead 2026-10-17 (m-322900fd26e2), passed up to Paul, who answered *Wait: Paul will set aside a separate profile home* — a signed-in `gemini-conformance` home (m-cad4683629b5); read 2026-10-17: no such home or profile yet (outcome `blocked`, m-8470dada41bc). Once it exists, the block below goes and the fixtures are captured from it. **Unblocked 2026-10-17 (Paul, in session `gemini-support`):** the home is `~/.gemini-conformance`, signed in with Paul's free-tier AI Studio key (`selectedType: gemini-api-key`, the same as his own `~/.gemini`), and `~/.shiftlead/profiles.yml` names it `gemini-conformance: {adapter: gemini, account: paul-gemini, config_dir: ~/.gemini-conformance}`; `credentials_ok` reads True and `doctor_profiles` lists it. The fixtures, the entry point and the live walk run on it: `pdm run conformance gemini --profile gemini-conformance`. Its quota is the free tier's, so the walk runs few turns and a refusal for quota is the tier, not the adapter. The techlead's note on merging #2024: a title `◇` over a hook-written `limited` would read `idle` by the letter of §4.3 — weigh it once Gemini's `limited` is built (TD-786's `usage`). **Blocked 2026-10-17 (grinder-ao-2):** the walk on `gemini-conformance` found the tool skips the launch layer — `GEMINI_CLI_SYSTEM_SETTINGS_PATH` is read only from a root-owned file — so no hook reaches the session and nothing can be captured until the design says where the hooks come from (TD-871). **Unblocked 2026-10-21 (Paul, in session `td-875`):** `/etc/shiftlead/gemini-settings.json` is installed (root-owned, the same bytes as the wanted copy, `layer_reading` *ok*), so the block on TD-875 is dropped. That day's walk (`gemini` registered by a scratch `dist-info`, `--capture`) passed *launch* and *first hook* and failed *a short prompt*: `prompt-stalled`, the prompt left in the composer. A probe the same day on a private tmux server (the same layer and home): the prompt pasted, then Enter at once, stays in the composer, and so does the prompt typed as keys then Enter at once; pasted, then Enter after 0.15 s or 0.5 s, it is submitted, and so it is with a second Enter 1.5 s after the first. An adapter with no `composer` gets `agent.py`'s `_type` blind (paste, Enter at once, no retry), so a Gemini prompt never leaves the composer. Slice 4 (2026-10-21, grinder-ao-2): `composer` and `title`, declared in `implements`, read from panes and titles captured from 0.64.0 (`tests/conformance/fixtures/gemini/`, its `manifest.json` already in the suite's shape); the placeholder is grey, not faint (matched by its words), and the composer is the last `▄` box's prompt row read only while it holds the drawn cursor (a history prompt shares the box). Read live the same day on a private tmux server: the host agent's `_type` with the reader submitted in 0.24 s; a blind paste and Enter left the prompt in the composer. Slice 5 (2026-10-21, grinder-ao-2): `gemini` registered under the `shiftlead.adapters` entry points, with a `GeminiHarness` and the walk's `--capture` (hook payloads, titles, each step's pane) named in its `manifest.json`, so the offline suite runs for it. The walk that day (`pdm run conformance gemini --profile gemini-conformance --capture`): launch, first hook, a short prompt (the send confirmed) and the permission held; at the doorbell the free tier's daily quota ran out (the tool's *Usage limit reached* dialog, filed as TD-941), so the doorbell, resume and transcript steps were not reached. **Next:** the walk again once the quota resets, to its resume step, with screenshots of a Gemini card from a scratch home (`scripts/look_home.py`) in the PR; then this entry is done and TD-875's live check unblocked.
-**Waits:** until 2026-10-22 — the free tier's daily quota on `gemini-conformance` resets before the walk can reach its resume step
-**Location:** design §4.3 *The second adapter: Gemini CLI*, §4.2 *A title the tool writes its state into*, §4.2a, §4.5a **Allow / Deny**, §4.9b, §6 rule 3; new `src/shiftlead/adapters/gemini/` (`__init__.py`, `hook.py`); `src/sessionorc/agent_serve.py` (`_view`'s `permission_channel`); `src/sessionorc/agent_tick.py` (the `title` confidence, the screen-rule call with the title); `src/sessionorc/agent_hook.py` and the `decide` RPC; `src/shiftlead/hook_entry.py` (dispatch by an argv flag, `shiftlead-hook --adapter gemini`, as `--statusline` is read: a Gemini payload names no adapter and shares event names with Claude Code's; the adapter imported inside the `try`); `src/shiftlead/adapters/claude_code/guard.py` moved to `src/shiftlead/kill_guard.py`, both adapters importing it; `src/shiftlead/profiles.py` (`adapter: gemini`, its `config_dir`); the card's and Focus's Allow / Deny (`src/shiftlead/ui/templates/`, gated on `permission_channel`); `tests/conformance/fixtures/gemini/`
-
-**Why:** TD-112: the second adapter, so the product's one-view claim is tested by a second tool.
-
-**Fix:**
-- **Profile**: `adapter: gemini`; its `config_dir` is the tool's home (`GEMINI_CLI_HOME`), default `~` (the tool's own `~/.gemini`); `credentials_ok` reads the home's `security.auth.selectedType` and `<home>/.gemini/gemini-credentials.json` (or `oauth_creds.json`), or `GEMINI_API_KEY` for a metered profile, whose launch also clears `GOOGLE_API_KEY` as a precaution (read only under Vertex auth or as a fallback). Signing a home in stays the person's.
-- **`ao doctor`**: `doctor_profiles` reports the home, its credential, a metered key, a `GOOGLE_API_KEY` in the host agent's environment (a precaution's note), and the layer with whether `shiftlead-hook --adapter gemini` resolves; `--probe`'s scratch launch goes through the adapter's `launch` (`cli.py` ~L2646, `agent_doctor.py` ~L126–137).
-- **Launch**: the binary by absolute path (`~/.npm-global/bin/gemini` found once and kept); `--session-id <uuid>` / `--resume <uuid>`; `--model`; `--approval-mode yolo` under `permission_prompts: skip`; env `GEMINI_CLI_HOME`, `GEMINI_FORCE_FILE_STORAGE=true`, `CLI_TITLE`, `SHIFTLEAD_SESSION`, `CADENCE_ATTENTION_SCOPE`, `GEMINI_CLI_SYSTEM_SETTINGS_PATH` → the layer file written per launch (hooks for BeforeAgent, AfterAgent, BeforeTool, AfterTool, Notification, SessionStart, SessionEnd calling `shiftlead-hook`; `hooksConfig.notifications: false`; `ui.hideTips`, `ui.hideBanner`; `general.enableAutoUpdate: false`; `ui.dynamicWindowTitle: true`, `ui.hideWindowTitle: false`, `ui.showStatusInTitle: false`). A resume launches from the record's directory.
-- **Trust**: `GEMINI_CLI_TRUST_WORKSPACE=true` in every launch's environment; no trust file is written.
-- **State**: the hook module (`shiftlead-hook --adapter gemini`) maps SessionStart → idle (the first hook the first prompt waits for), SessionEnd `exit` → exited (`clear` never), SessionStart `clear` adopting the payload's `session_id` as `adapter_id` and re-pointing the transcript, BeforeAgent → working with `prompt: true`, BeforeTool/AfterTool → working, AfterAgent → idle, Notification `ToolPermission` → needs-you, `kind` permission for `details.type` exec/edit/mcp/info and question otherwise; the record's transcript from the first non-empty `transcript_path`. The adapter's `explain` gets the pane's title (`PaneInfo`) and maps the leading glyph alone, with `confidence: title`: `◇` → idle, `✦`/`⏲` → working, `✋` → needs-you `{kind: question}` with no text; the tick writes the text by the state it replaces (*the tool's shell waits for input* over working or `stalled?`, *the tool waits for a confirmation* over idle). The tick replaces the record's state when the verdict's differs and the last hook is older than a tick, only once a hook has reached the record (`hook_seen_at`); a verdict whose state equals the record's never replaces its `pending`.
-- **`confidence: title`** (§4.2): a fourth value of `Confidence` (`models.py` ~L22). Every check that reads `confidence == "hook"` reads `in ("hook", "title")` through one helper — `agent_tick.py` ~L1073, 1203, 1257, 1280, 1412, 1552, 2635 (`_team_causes`' `pending`), 2831, 4214 (a log line only); `agent_common.py` ~L1095, 1132; `agent_wake.py` ~L122, 254; `mail.py` ~L569, 571; `agent.py` ~L644; `doctor.py` ~L175 (grep `confidence` in `src/` for any added since). The screen-rule path (`agent_tick.py` ~L4109–4147): `_screen_verdict` asks the adapter's `explain` with the title inside `STALL_AFTER` for an adapter whose title carries its state (a hook older than one tick is the title's to overrule), and a title verdict whose state equals the record's never replaces its `pending` (a `✋` verdict over a `needs-you` record never replaces its `pending`: a Notification's permission stands); a verdict is compared with the record's hook-confirmed state only, never `exited`, `closed` or `stalled?` (a `stalled?` record ended by `◇` or `✋`, a `working` verdict over it no event), and a Match that changes nothing falls through to the stall check (the branch order at ~L4109–4127); a `title` verdict is **not held** — `_screen_held`/`_hook_state` never take it back to the state it replaced, which it drops as a hook report does. `ao explain --file` takes a title. The `scraped` badge (`cli.py` ~L244, `ui/cards.py` ~L233) stays scraped-only.
-- **Kill guard**: BeforeTool of `run_shell_command` refused by `guard.refuse` exits 2 with the reason.
-- **`permission_channel`**: on the adapter protocol (True where unset; Gemini False), carried on the record's view by `agent_serve._view` as `agent` is; `ao allow`/`ao deny` (`cli.py` ~L3441–3447) read it off the view and refuse in words (*answer it in the terminal*) before any call, rather than *has no pending permission* from a missing `tool_use_id`; the `decide` RPC refuses the same as the backstop; the person's rules (`agent_hook.py` ~L94–155) are never asked (no Gemini hook waits); rule 3's director `prompt` trigger and the manager's `pending` cause (`agent_tick.py` `_team_causes` ~L2633–2637) skip such a session; the readers that key on `tool_use_id` today — the state kind (`models.py` ~L290), `ui/inbox.py` ~L135, `ui/cards.py` ~L1052, 1084 — key on `pending.kind` and `permission_channel`; the card, Focus, the Inbox state row and the team card's **Answer needed** facet draw the text and *answer it in the terminal* with the Focus link, no Allow / Deny.
-- **`composer`** (the `[>*!] ` row, the dim placeholder empty; a send to a working session is queued for the next turn) and **`title`** (`CLI_TITLE`'s bracket).
-- **Tests**: fixtures captured from a scratch Gemini session (panes: idle, working, a confirmation; payloads of each event; titles); the offline suite passes for `gemini`; the trust env var (an untrusted fixture asserts the approval mode fell to `default`, not an exit); the layer's content; a needs-you cleared by a Working title; the guard's block; the Allow / Deny absence. Live: `pdm run conformance gemini --profile <p>` passes launch, state, send, permission and resume, output in the PR, on a profile Paul sets aside (ask him for it through the techlead before the live run).
-
-**Done when** a Gemini CLI session started from ShiftLead reports working, idle and needs-you from its hooks, a cancelled turn reads idle from its title, `send` is confirmed, its permission shows no Allow / Deny, the offline suite passes for it, and the live walk's launch-to-resume steps pass with screenshots of its card in the PR (design §4.9b).
-
-**Related:** TD-112, TD-784, TD-786.
-
----
-
 ## TD-786: Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live
 
 **Priority:** Medium
@@ -980,7 +943,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-785
 **Location:** design §4.3 *The second adapter: Gemini CLI*; `src/shiftlead/adapters/gemini/` (a `transcript.py`); `tests/conformance/fixtures/gemini/`
 
 **Why:** TD-112, slice 3: what the pages and the policies read from a session, so a Gemini session's card, transcript page and rule 5 (the context bound) works as a Claude Code one's does.
@@ -1183,70 +1145,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 ---
 
-## TD-871: Gemini CLI skips a `GEMINI_CLI_SYSTEM_SETTINGS_PATH` file that root does not own, so the launch layer is never read and no hook reaches a Gemini session
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (grinder-ao-2, TD-785's live walk on `gemini-conformance`)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-17, PR #2094; Paul's answer m-1868eab7648f to the ask m-9604f86b5c60) — the layer is the machine's, `/etc/shiftlead/gemini-settings.json`, installed once by the person with the `sudo install` line `ao doctor` prints from the wanted copy ShiftLead writes; a launch is refused without it, a stale one launches and doctor says so; the conformance walk answers a channel-less adapter's permission in the terminal and captures each step's pane. Built by TD-875.
-**Blocked by:** TD-875
-**Location:** design §4.3 *The second adapter: Gemini CLI* (`launch`, the layer) and *The conformance suite* (the walk's permission step); `src/shiftlead/adapters/gemini/__init__.py` (`write_layer`, `layer_file`, `launch`'s env); `scripts/conformance.py` (`Walk.permission`, `Walk.doorbell`)
-
-**Why:** The design hands every Gemini launch its hooks as a per-launch settings layer named by `GEMINI_CLI_SYSTEM_SETTINGS_PATH`, written under `~/.shiftlead/gemini-settings/`. Gemini CLI 0.64.0 loads a system settings file (and the system defaults file, `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`) only when the file and its directory are owned by root and not writable by group or others (`loadSystemFile` → `isFileAndDirectorySecureSync`, `checkPosixStatsSecurity`, in the bundle's `chunk-FLKY6NH5.js`); otherwise it shows *⚠ Security Warning: Skipping system settings file '…': Parent directory '…' is insecure: Directory '…' is not owned by root (uid 0)* and runs with no layer at all. The host agent runs as the person, so no file it writes can pass: a Gemini session launched by ShiftLead runs no hook, sits at its launch state, and its first prompt waits for a `SessionStart` that never comes. Read 2026-10-17 (grinder-ao-2): `pdm run conformance gemini --profile gemini-conformance --capture` (with `gemini` registered on a scratch branch) launched and passed *launch*, then failed *first hook* — *no hook-confirmed idle within 120s*, the title `◇  Ready (conformance-walk)`; a hand launch on a private tmux server showed the warning above. The same layer, put as a scratch directory's **workspace** settings (`<dir>/.gemini/settings.json`), is read: `SessionStart` reached the hook with `session_id`, `transcript_path` and `source: startup`, and the title read `◇  Ready (gt)` — so the layer's content is right (its `hooksConfig: {notifications: false}` leaves hooks on) and only its path is refused. The tool has no other per-process settings path: `--extensions` names extensions installed in the home, and the user settings are `<GEMINI_CLI_HOME>/.gemini/settings.json`.
-
-**Fix:** the design chooses where a Gemini session's hooks come from, in §4.3 and its history line. What was weighed on the way, none chosen:
-- **A root-owned layer, installed once per machine by the person** (a `sudo` step, say a file under `/etc/gemini-cli/`, root-owned to the top): the layer's content varies by nothing per launch — the hook command by absolute path and `LAYER_SETTINGS` — so one static file serves every launch. It costs a privileged step the install has never had, and a promote that moves the hook's path rewrites it.
-- **The profile home's own user settings** (`<config_dir>/.gemini/settings.json`), written by ShiftLead for a home set aside for it: the hooks no longer concatenate with the person's (it is that home's only user file), it is a settings file the person signed in with (memory *Agent settings are the person's*), and it is no road for a profile on the tool's default home (`~/.gemini`).
-- **The workspace's settings** (`<dir>/.gemini/settings.json`): a file in the person's repo — not ShiftLead's to write.
-- **A ShiftLead extension** (the designer, 2026-10-17): the bundle's `docs/extensions/reference.md` lets an extension carry hooks in its `hooks/hooks.json`. It installs into the profile home (`<config_dir>/.gemini/extensions/`), so it too writes into a home the person signed in with; it fires in the person's own hand-started sessions there, and it cannot carry the title or update settings the layer forces.
-Also for the design, once hooks run: the conformance walk's permission step allows *through the hook channel* (§4.3 *The conformance suite*), which a Gemini session has none of (`permission_channel = False`). The walk needs a terminal answer for a channel-less adapter, the walk acting as the person (§9 invariant 6 is the host agent's): what was tried, and never reached, was the `keys` RPC pressing Enter on the dialog's first choice (*Allow once*), the same for the doorbell's `ao inbox` permission, and under `--capture` each step's pane (`capture-pane -e`, so the composer's dim placeholder tells from typed text) and title recorded, since a Gemini state is in its title.
-
-**Done when** the design names where a Gemini launch's hooks come from, a launch with it delivers `SessionStart` to the record on kmaster, and TD-785's capture is unblocked.
-
-**Related:** TD-112, TD-785, TD-786.
-
----
-
-## TD-875: Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (TD-871's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2115
-**Status:** Built (grinder-ao-2): slice 1 #2110 (merged 2026-10-17) the layer, the launch's check, `ao doctor` hooks and README's step; slice 2 #2113 (merged 2026-10-18) the host agent's note (`setup_note`, `setup_notes.json`, read hourly too) and the container node's root stage; slice 3 #2115 (2026-10-18) the walk's terminal answer to a permission (`Walk.allow`: an Enter by the `keys` RPC) and `--capture`'s pane and title per step, the dialog snapped before it is answered. A live check once #2115 is live (`ao promote status`): it needs the person to have run `ao doctor`'s sudo line on kmaster first (`ao doctor` reads the layer *ok*; until then it waits on that, and the host agent's setup note has told them); then `pdm run conformance gemini --profile gemini-conformance --capture` passes *first hook* and *a permission*, and the captured panes are what TD-785 needs. Read 2026-10-18 (grinder-ao-2, #2115 live in 970dbe8): `/etc/shiftlead/` does not exist and `~/.shiftlead/gemini-settings/layer.json` is not written; `ao doctor hooks` reads *ok* and lists no Gemini profile, because the `gemini` adapter is not yet an entry point (`pyproject.toml`'s `shiftlead.adapters` holds `claude-code` alone, which TD-785 adds) — so on the live home `doctor_profiles`, the setup note and `write_layer` never run, and the note this Status assumed was never sent. TD-785 is blocked by this check, so the person breaks the cycle by hand: the board line of 2026-10-18 gives `write_layer`'s one-liner and the sudo line. Once `/etc/shiftlead/gemini-settings.json` exists, the walk runs as above, with `gemini` registered on a scratch branch as on 2026-10-17. Hold lifted 2026-10-18 (grinder-ao-1, board:0460805d, Paul's *go ahead* on the Queue): `decision (paul)` dropped. Read 2026-10-18 13:31 MDT: `/etc/shiftlead/` still does not exist and `~/.shiftlead/gemini-settings/layer.json` is not written, though the act line *Install the Gemini layer on kmaster by hand* was closed the same minute with no word of what was done — so the walk still cannot pass *first hook*. The **Owner** is `paul` until the layer is in, so it is not picked each run; the new act line of 2026-10-18, *The Gemini layer is still not installed*, asks for it, and whoever reads `/etc/shiftlead/gemini-settings.json` present sets the **Owner** back to `grinder`. **Layer installed 2026-10-21 (Paul, in session `td-875`):** `/etc/shiftlead/gemini-settings.json` and its directory are root-owned, 0644 and 0755, the same bytes as `write_layer`'s copy; `insecure` reads nothing and `layer_reading` *ok*, so the **Owner** is `grinder` again. The walk (`gemini` registered by a scratch `dist-info`) passed *launch* and *first hook* (the `SessionStart` hook reached the scratch home) and stopped at *a short prompt*, `prompt-stalled`, before the permission step: the Gemini adapter has no `composer`, and the tool drops an Enter sent at once after the prompt (the probe is in TD-785's Status). TD-785 builds the `composer`; then the walk runs again for the permission step.
-**Blocked by:** TD-785
-**Location:** design §4.3 *The second adapter: Gemini CLI* (`launch`: the machine's layer) and *The conformance suite* (the walk's permission step and doorbell, `--capture`), §4.7 `ao doctor` (*hooks*); `src/shiftlead/adapters/gemini/__init__.py` (`layer_file`, `write_layer`, `layer_reading`, `launch`'s env, `doctor_profiles`), `scripts/conformance.py` (`Walk.permission`, `Walk.doorbell`, the capture), `src/sessionorc/containers.py` (`dockerfile_text`), the host agent's start and its profile reload (the note), `README.md` (the install steps); `tests/test_gemini_adapter.py`, `tests/test_doctor.py`, `tests/test_cli_doctor.py`, `tests/test_conformance_walk.py`
-
-**Why:** TD-871: Gemini CLI 0.64.0 skips a system settings file root does not own, so the per-launch layer under `~/.shiftlead/gemini-settings/` is never read and no hook reaches a Gemini session. Paul chose a root-owned layer the person installs once per machine (m-1868eab7648f).
-
-**Fix:**
-- **The layer.** `MACHINE_LAYER = /etc/shiftlead/gemini-settings.json`. `write_layer` writes the wanted copy, `~/.shiftlead/gemini-settings/layer.json` — `layer_settings(hook_command())`, one file for every profile and launch shape — and the per-profile files go. `launch` sets `GEMINI_CLI_SYSTEM_SETTINGS_PATH` to `MACHINE_LAYER`.
-- **The launch's check.** Before the argv: `MACHINE_LAYER` missing, not secure by the tool's own test (root owns the file and every directory above it to `/`, symlinks followed, none group- or other-writable), or naming no hook command that resolves → the launch is refused in words, *the Gemini layer is not installed — run the line `ao doctor` prints*. Differing from the wanted copy otherwise → it launches.
-- **`ao doctor` hooks.** For a Gemini profile, the machine's layer against the wanted copy: *lacking* (not installed, not root-owned, no hook command that resolves) or *warning* (*stale*), each with the line `sudo install -d -o root -g root -m 0755 /etc/shiftlead && sudo install -o root -g root -m 0644 ~/.shiftlead/gemini-settings/layer.json /etc/shiftlead/gemini-settings.json`. `layer_reading` reads `MACHINE_LAYER` against `layer.json` in place of the per-profile glob, and `doctor_profiles`' `layers` names that one file for every Gemini profile. Printed, never run; nothing in ShiftLead calls `sudo`.
-- **Met at setup.** README's install steps gain the Gemini layer's line, for a machine with a Gemini profile. The host agent, on its start and when `profiles.yml` gains a Gemini profile, reads `MACHINE_LAYER` against the wanted copy and, where it is missing, insecure or stale, sends the person one system note with the line, once per wanted copy and reading (the bytes' hash and *missing* / *insecure* / *stale* kept, so a layer installed and later gone notes again). The wanted copy's hook is `bin/shiftlead-hook` beside the host agent's interpreter (`sys.executable`'s directory), never `shutil.which`'s, so the file does not move with a unit's `PATH`.
-- **A container node.** `containers.dockerfile_text` takes the layer file and the node's hook path as inputs; `write_node` writes the node's wanted copy (the hook at `/shiftlead/venv/bin/shiftlead-hook`, never the home's) into the build context beside `install-tmux.sh`, and the `USER root` stage copies it to `/etc/shiftlead/gemini-settings.json`, the directory 0755 and the file 0644, root-owned.
-- **The walk.** For an adapter with `permission_channel = False`: once the record reads `needs-you`, `keys` presses Enter (the dialog's first choice, *Allow once*) and the walk waits for the state to leave `needs-you`; the doorbell's read of `ao inbox` is allowed the same way. Under `--capture`, each step's pane (`capture-pane -e`) and title are saved beside the hooks.
-
-**Tests:**
-- `write_layer` writes one wanted copy whatever the profile; `launch`'s env names `MACHINE_LAYER` (patched to a temp path);
-- a launch is refused for a missing layer, one owned by the user or group-writable, one under a directory not root's (the check patched to read a stat), and one naming an unresolvable hook; a layer differing only in a setting launches;
-- `ao doctor` reads *lacking* with the sudo line for each of the three, *warning: stale* for a differing one, *ok* for the same bytes;
-- the host agent's start with a Gemini profile and no layer sends one note with the line, and a second start with the same wanted copy sends none; a changed wanted copy notes again, and so does the same copy once the installed layer goes missing after an *ok*;
-- the wanted copy names the hook beside the interpreter even with another `shiftlead-hook` first on `PATH`;
-- `dockerfile_text` installs the layer root-owned in its root stage;
-- the walk, against a fake host agent: a channel-less adapter's permission is answered by a `keys` Enter and a channel adapter's by `allow`; `--capture` writes a pane and a title per step.
-
-**Done when** on kmaster, after the person runs the printed line once, `pdm run conformance gemini --profile gemini-conformance --capture` passes *first hook* and the permission step, and TD-785's capture can run.
-
-**Related:** TD-871 (the design, amended 2026-10-17 on gemini-support's review), TD-785 (blocked by this), TD-112, TD-786.
-
----
-
----
-
 ## TD-900: The Repo page is a board by stage, the Org page is Sessions, the Queue numbers Up next per repo and marks what is live
 
 **Priority:** Medium
@@ -1422,65 +1320,6 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 
 ---
 
-## TD-940: `ao pr wait <n>` — block on the home's folded reading of a PR's checks, so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab alike
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-21 (Paul, with the ao-paul session)
-**Owner:** grinder
-**Kind:** live-check #2244
-**Status:** Built — slice 1 built (#2241, grinder-ao-1): `ao pr wait <n>` on the GitHub reading, the
-`pr_wait` RPC, design §4.7. Slice 2 built (#2244, grinder-ao-1; scope steered with the techlead,
-m-eb7127cfc157): the reading per forge — a GitLab origin's open MRs with the head pipeline's fold,
-`conflicting` and `required` on the row, windows/`recent`/held unread there; another host read through `gh` as
-before, and one `gh` never read refused by the wait (5); §4.4's per-forge sentence. Nothing reads the row's
-`required` yet: a `done` naming a GitLab MR still reads `gh pr view` and the by-base `required` (`_pr_checks`),
-and the cadence's `forge` setting (GitHub Enterprise, a GitLab host not named `gitlab.*`) is not read by the
-home — both are for an entry when a GitLab repo joins. Slice 2 merged by the techlead (m-71833f63987e). The
-procedure's pair and the memory's retirement are TD-946 (dev-cadence's: `docs/procedures/cadence.md` is its SYNCED
-file). Left: the live check — once #2244 is live (`ao promote status`), a kmaster session waits out one real PR's CI
-with `ao pr wait <n>` (a read of the home, nothing pressed) and runs `scripts/check_cadence.py --pr <n>` after it;
-the word and exit code are read against `gh pr checks <n>`.
-**Location:** design §4.7 (a new `ao pr wait <n>` paragraph beside `ao pr held <n>`), §4.4 *Repos* (the `prs` reading's `checks` and `conflicting` fold); `docs/procedures/cadence.md` and `docs/claude-memory/no-checks-means-conflicting.md` (the pair to write and the memory to retire); `src/shiftlead/cli.py` (`ao pr`, ~L4467 `ao wait` for the blocking shape), `src/sessionorc/agent_serve.py` (the `wait` RPC, `_serve_wait` ~L229) and `src/sessionorc/agent_remote.py` (its client side), `src/sessionorc/reports.py` (`_gh_prs` ~L617, `fold_checks` ~L342, `failing_items` ~L314, the `gh pr view` read ~L573 — GitHub-only today); `tests/test_cli.py` and the tests of `fold_checks`
-
-**Why:** Every session that opens a PR waits for its checks before `scripts/check_cadence.py --pr N`, and each writes its own `gh pr checks` loop. Two went wrong on 2026-10-21 alone in the ao-paul session: one read an empty check list as "no CI" (the PR was conflicting, the memory *no checks means conflicting*), one tested a rollup field that never reported and sat until Paul asked whether something was broken. The home already makes the judgement once, on its tick: the `prs` reading folds every open PR's `statusCheckRollup` into *green*, *red*, *pending* or *none* and reads `conflicting` from the merge state, with the fold's rules in §4.4 (`fold_checks`), and `ao wait` is already a thin blocking RPC on the host agent. Paul, 2026-10-21: standardise the background wait as an `ao` call, and *make sure it will work for GitLab/other as well as GitHub* — the fold reads `gh` today, so a GitLab remote has no reading at all.
-
-**Fix:**
-- **`ao pr wait <n> [--timeout S] [--json]`**: blocks until the home's reading of PR `n` in the session's repo leaves *pending*, then prints the word and exits by it — `0` green, `1` red, `2` conflicting, `3` none (no CI on the base), `4` timeout. `--json` prints the folded reading: `checks`, `conflicting`, `failing` (the names), `head` (the sha the reading is of) and `read_at`, so a caller can see the wait was on its own commit. Shape as `ao wait`: a call to the host agent, its own connection, Ctrl-C ends it; the wake is the reading's refresh, so the latency is the tick, and `--fresh` asks the home to re-read that repo's PRs first. A number the reading does not hold (closed, merged, another repo) is refused in words, exit `5`.
-- **One fold per forge, the wait names none.** The reading's fold moves behind a forge seam in `reports.py`: the GitHub fold is the one that exists (`gh pr view` and `statusCheckRollup`); a **GitLab** fold beside it reads the merge request's head pipeline (`glab mr view <iid> --json` or the API's `merge_requests/<iid>` with `head_pipeline.status` and `detailed_merge_status` / `has_conflicts`) into the same four words and the same `conflicting`, *none* for a project with no pipeline. The forge is picked from the repo's remote host, as the cadence's `scripts/forge.py` does (GitHub by `gh`, GitLab by `glab`, picked by the remote's host, TD-104), and a remote on no known forge gives the reading `error` and the wait exit `5` with the why. `required` (§4.4, the base's required check names) gets the same seam — GitLab's are the pipeline's jobs that `allow_failure: false`. Every test of the fold runs on both forges' fixtures.
-- **The cadence says the pair** (now TD-946, dev-cadence's). `docs/procedures/cadence.md`: `ao pr wait N && scripts/check_cadence.py --pr N` is how a kmaster session waits; a cloud session has no `ao` to call (ADR 2026-09-24: `ao` has nothing to talk to there), so its CI wait stays the GitHub MCP tools' and the cadence check runs from kmaster on its PR's number, as the ADR says. The *no checks means conflicting* memory is retired (the wait says *conflicting*), with a line in `MEMORY.md` pointing at the command.
-- Design: the §4.7 paragraph, and §4.4's reading sentence gains *per forge* with the GitLab fold's rules beside GitHub's. A history line under §4.7.
-
-**Done when** `ao pr wait` returns the word and exit code for a GitHub PR and a GitLab merge request in tests, and the live check waits out one real PR's CI on kmaster and the cadence check follows it (the procedure and memory: TD-946).
-
----
-
-## TD-941: A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-21 (grinder-ao-2, TD-785's live walk)
-**Owner:** designer
-**Kind:** design-first
-**Blocked by:** TD-944
-**Status:** Designed 2026-10-21 (the designer; design §4.3 *The limit dialog is read off the screen*, §4.2): read
-from the screen, as §4.2 already gives `limited` from a tool's own limit message — no hook fires and the title
-is stale, and choosing *Stop* for an unattended launch would type into a dialog on a guess, the race §4.2
-refuses. The adapter gains its own screen-rule manifest, one rule `gemini-usage-limit` → `limited` with
-`pending: {kind: limit}`, asked before the title and written `scraped`; no reset time (none named, no endpoint
-on an API-key home); the card and Inbox draw it as Claude Code's limit. Built by TD-944. Was: Open — found 2026-10-21 by TD-785's walk on `gemini-conformance` (0.64.0, an API-key home): the free tier's quota ran out mid-turn and the tool drew its own dialog — *Usage limit reached for gemini-3.8-flash … ● 1. Keep trying  2. Stop* — while the title still read `✦  Working… (conformance-walk)` and no hook fired, so the record stayed `working` (hook) for the rest of the step's 300 s (`tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`). Design §4.3 maps `✦` to working and gives Gemini's `usage` only a Google-login home's quota endpoint (TD-786); an API-key home reports none, so nothing marks the session `limited`, and a dialog that waits on a choice is not `needs-you` either.
-**Location:** design §4.3 *The second adapter: Gemini CLI* (*Two gaps*, `usage`), §4.2 (`limited`); `src/shiftlead/adapters/gemini/`
-
-**Why:** an unattended Gemini member that hits its quota sits `working` at a dialog nobody is asked about: no doorbell, no rule 5, no `limited` chip, until the stall check (if its spinner stops) — the state the product exists to show is wrong at the moment it matters.
-
-**Fix:** design first: whether the dialog is read from the screen (a screen rule for a title adapter, which today reads only its title), from a hook the tool fires on the limit (none was seen: `hooks.jsonl` ends at the doorbell's `BeforeAgent`), or by the layer choosing *Stop* for an unattended launch; and what state it is (`limited` with no reset time, or `needs-you` as a question).
-
-**Done when** a Gemini session at the *Usage limit reached* dialog reads as the design says, from a fixture captured from the tool.
-
-**Related:** TD-785, TD-786, TD-112.
-
----
-
 ## TD-943: A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's
 
 **Priority:** Medium
@@ -1512,119 +1351,6 @@ builds are in the ledger.
 
 ---
 
-## TD-944: Gemini's screen-rule manifest: the *Usage limit reached* dialog reads `limited` (`gemini-usage-limit`), over the title's `✦`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-21 (the designer, from TD-941)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `src/shiftlead/adapters/gemini/` (`__init__.py` `explain`, a new `screen_rules.toml`), the tick's title verdict (`agent_tick._title_verdict`), `sessionorc/agent.py` `rpc_explain`'s `state_in_title` branch
-(a non-`title` match gets its own reason, *rule gemini-usage-limit matched, applied as scraped; held for
-its screen*, never `_title_reading`'s), `tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`; design §4.3 *The limit dialog is read off the screen*, §4.2
-
-**Why:** an unattended Gemini member that meets its quota sits `working` at a dialog nobody is asked about (TD-941).
-
-**Fix:** as design §4.3 says: `adapters/gemini/screen_rules.toml`, loaded with `sessionorc.screen.Manifest`
-as Claude Code's is, holding one rule `gemini-usage-limit` — `state = "limited"`, region 15, `all` the box row
-*Usage limit reached for* and the box row *2. Stop*, each led by a `│` border (the right one not required, as §4.3 says),
-`pending = {kind = "limit", text = "Gemini's usage limit reached — answer its dialog in the terminal"}`; the
-*2. Stop* pattern allows the selection marker before the number (`│\s*\S?\s*2\.\s*Stop`). `GeminiAdapter.explain`
-reduces the tail with `painted_text`, then asks the manifest first and the title second. In the tick
-(`agent_tick.py`), three gates change for a title adapter, so the hold §4.2 already describes works:
-`_screen_verdict` no longer returns None for every `state_in_title` adapter — it asks the manifest, with
-`_hook_fresh` (the stall window) replaced for a title adapter by the one-tick test `_title_reading` uses, in
-`_screen_gone` as well (a working Gemini fires hooks, so the stall window would hold a cleared box for 20
-minutes) — and a match takes the screen road, written `scraped` with the
-replaced state saved in `_hook_state`, where `_title_verdict` pops it; `_screen_gone` reads *the manifest
-matches nothing*, not *`_screen_verdict` was None*; and the restored state keeps its saved confidence (`hook` or `title`, both told; `agent_tick.py` restores
-`saved[2]` already, unchanged), so
-`_title_reading` compares the title's next verdict with it on the following tick. The screen road writes nothing over a poll-marked `limited` (`hook` confidence: it keeps its reset, state,
-pending and confidence, and is not saved as `_hook_state`) — the guard is on an equal-state verdict only, one that
-would change the pending alone; a verdict naming another state (Claude Code's `needs-you` rules, `held-peer-message`
-among them) takes the screen road over it as today, saving the poll's `(limited, pending, hook)` in
-`_hook_state` as any replaced state, restored when that screen goes (a `stalled?` verdict such as
-`remote-control-standdown` is not `_screen_held`, so its screen never restores it: the poll's next reading
-re-marks it `limited`, `_pre_limited` then `stalled?`, as today) — a restore the poll has since lifted is
-stale until its next poll lifts it again, accepted. The guard is what keeps a scraped limit message from
-overwriting the poll's reset (Claude Code's `usage-limit` text over the endpoint's cap today); a `scraped` `limited` is the screen road's as today, so
-Claude Code's limit message still updates its pending and yields to a later rule's verdict. §4.10's no-reset send text is the reply to a send
-to a `limited` record that holds a modal rule's verdict — the same test `_usage_limits` uses (`scraped`, and
-`adapter.explain(s.tail)` modal) — since `Pending` carries no reset field (`mail.py`'s `limited` reply prints
-`pending.text` as the cap today). In `_observe`, for a title
-adapter, the chain is `_screen_verdict` → `_screen_gone` → `_title_verdict` (today the title runs first), so the
-box-gone tick restores the replaced state and the title is compared with it on the tick after;
-`_screen_gone` is False when nothing is saved in `_hook_state` and the record already reads `idle` — a
-general condition, not gated on `state_in_title`, and behaviour-neutral for a hook-fed adapter (it re-wrote
-`idle`, `scraped` over the same, and the stall check it skipped reads `working` alone) —
-(nothing to restore, so the chain goes on to the title's compare on the same tick, and the no-saved fallback
-below is the title's to overrule rather than re-written every tick); `_title_verdict` ignores a match whose
-`rule` is not `title …` (the manifest's verdict is the screen road's), and a `scraped` record whose manifest still matches is never
-compared with the title; `_title_reading`'s `elif not s.told` gains one exception, a `scraped` record whose manifest
-matches nothing (the no-saved fallback below), compared as a told one — never the whole `_screen_held` set.
-`_title_reading` sees only the one `Match`: since `explain` asks the manifest first, a title-rule `m` (`rule`
-starting `title `) on a `scraped` record is the no-match case, and no second `explain` is asked (`rpc_explain`'s
-title branch calls it with the same `m`). For that case the no-event guard (`m.state == s.state`) gives way too:
-an equal verdict is taken as a confidence upgrade, re-written `title` with the same state (`set_state` keeps
-`since` and `rev` for an unchanged state), so the fallback `idle` under `◇` becomes told and the doorbell, the
-nudge and the wrap-up read it; `rpc_explain`'s reason says so. Its tests: a `scraped` `idle` under `◇` reads
-`idle` (`title`) with `since` and `rev` unchanged; under `✦` it reads `working` (`title`); a Claude Code `scraped`
-`idle` is untouched. A manifest rule gains `modal = true` (`sessionorc.screen.Rule.modal`, false where unset), set on
-`gemini-usage-limit` alone; `Match` carries it. `Manifest.load` reads it as `bool(raw.get("modal", False))`, `Manifest.explain` passes `rule.modal` into the
-`Match` it builds, and `Match.to_dict` carries it, so `ao explain` prints it
-(check the tests that assert that dict's keys). One helper answers *is this record's `limited` a modal rule's* — `agent_common.limit_is_modal(s, adapter)`:
-False for no record (`agent_inbox.py` passes `s` None for a seat nobody fills), else `scraped`, and `adapter.explain(s.tail)` a modal match — read by `_usage_limits` and by the three callers that
-compute `mail.read_when`'s adapter-dependent flags (`agent_inbox.py` ~474, `agent_mail.py` ~771,
-`agent_serve.py` ~81/84), which pass it as a new `read_when(…, modal_limit=…)` flag, computed for a record of this host only, as
-`agent_mail` and `agent_serve` compute `cache` (`records[sid].host == self.host`: a node's record's tail is the
-node's); a record on another host
-gets the cap form. On a `scraped` `limited` record `_usage_limits` asks
-`adapter.explain(s.tail)` (`getattr`-guarded: no `explain`, or no match, is not modal; a title adapter is asked
-without a title, which reads the manifest alone) and never
-lifts it while the match is `modal` (the record's own tail is the authority, so a host-agent restart forgets
-nothing; no tick-side dict) — it never lifts a `limited` a modal rule set (today `not cap` lifts every kind-`limit` record, so an
-API-key home's was lifted on every poll); every other lift is as today (Claude Code's limit message is not
-modal; a lift of it lasts until its rule next matches, as today — that flap is Claude Code's and not this entry's), and a lifted scraped record
-goes back to its `_hook_state`, dropped then, not to `_pre_limited`'s `working`; with none saved (a restart,
-or nothing the screen road replaced) it reads `idle`, `scraped`, as `_screen_gone` does with nothing saved —
-or where the saved state is a hook's and no hook has reported since the restart
-(`_screen_gone`'s second guard) — and for a title adapter that `idle` is the title's to overrule:
-`_title_reading` compares a `scraped` record whose manifest matches nothing as it does a told one, so the next
-title verdict takes it. `_screen_held` is unchanged (`_screen_gone` needs it as it stands). The lift's restore is chosen by the record: a `scraped` `limited` goes back to its
-`_hook_state` (else the `idle` above); a poll-marked one (`hook`) to `_pre_limited`'s state, `working` where none,
-as today — `_pre_limited` stays. For Claude Code's scraped limit message that is a change: its lift went to
-`working` (`hook`), and now to the state the verdict replaced. Pending text is the literal
-*Gemini's usage limit reached — answer its dialog in the terminal* (`$line` substitutes only bare).
-`tests/conformance/fixtures/gemini/manifest.json` declares `6-a-doorbell.txt` `limited` (it reads `null` today,
-and `test_every_pane_reads_as_a_state` asks `explain` with no title).
-
-**Done when** `ao explain --file tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt -a gemini --title
-'✦  Working… (conformance-walk)'` (without `-a gemini` it runs Claude Code's rules, whose `usage-limit` also matches) names `gemini-usage-limit` and `limited`; a test feeds the tick a hook-fed
-`working` Gemini record older than one tick with that pane and title and reads `limited`, `scraped`, its
-`pending.kind` `limit`, its replaced `working` kept; then the same record with the box gone and `◇` reads the
-kept `working` (`hook`) on the next tick and `idle` (`title`) on the one after; the conformance suite passes
-with the pane declared `limited`; a usage poll on a profile with no reading leaves the `scraped` record
-`limited` while the box is up, and a hook 2 minutes old does not keep a cleared box's `limited`; `conformance`
-reads the raw pane through `explain`'s `painted_text`; a record lifted to the no-saved
-fallback (`idle`, `scraped`) with no box up reads `idle` (`title`) under `◇` and `working` (`title`) under `✦` on
-the next tick; Claude Code's scraped `limited` takes a changed pending from its rule, and a Claude Code record at
-`idle`, `scraped` with nothing saved stays so across ticks, a Claude Code `usage-limit` pane over a poll-marked
-`limited` keeps the poll's pending, and a `held-peer-message` pane over one reads `needs-you`, `scraped`, with
-`(limited, pending, hook)` saved, and with the pane gone reads `limited` (`hook`) with the poll's pending back (the test seeds
-`_last_hook[s.id]` older than `STALL_AFTER`, the hook the record had before the poll marked it: `_screen_gone`'s
-restore reads `_last_hook`, never `hook_seen_at`, and a fresher hook keeps the pane's rule from firing) (a regression test of each); a record whose replaced state was told (`hook` or `title`) reads `limited` with the box up; a box over a
-`title` state (`◇`) restores that state with `title` confidence and the title's next verdict is compared with it; a pane with the marker
-on *Stop* still matches; a record the poll marked `limited` keeps its pending and `hook` confidence when the
-box appears; `ao explain --json` prints `modal`; a send to the box's record replies with §4.10's no-reset text;
-`explain` on the box returns
-`modal` true; `ao explain` on a live record at the box gives the rule's reason; a pane whose
-transcript quotes *Usage limit reached for* outside a box matches nothing.
-
-**Related:** TD-941, TD-785, TD-786.
-
----
-
 ## TD-946: The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part)
 
 **Priority:** Low
@@ -1643,8 +1369,6 @@ transcript quotes *Usage limit reached for* outside a box matches nothing.
 
 **Done when** the synced procedure names the pair and neither memory tells a session to read `gh pr checks` itself.
 
----
-
 ## TD-947: A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so
 
 **Priority:** Medium
@@ -1652,7 +1376,8 @@ transcript quotes *Usage limit reached for* outside a box matches nothing.
 **Added:** 2026-10-21 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed (2026-10-21, design §4.2 *Permissions are answered through the hook*, the event table's subagent rows, §4.5a card **Allow / Deny**; captured in `tests/conformance/fixtures/claude-code/captured/subagent-permission/`).
+**Blocked by:** TD-950
 **Location:** design §4.2 *Permissions are answered through the hook, not through keystrokes* (*the terminal dialog is not held back*) and the event table's subagent row (`docs/design/4.2-state-feed.md`); `src/shiftlead/adapters/claude_code/hook.py` `translate()` (the `PermissionRequest` branch runs before the `agent_id` one, so a subagent's request reads as the main thread's) and `main()` (blocks up to the profile's `permission_wait`); `src/sessionorc/agent_hook.py` ~L62 (a payload with no `tool_use_id` gets `<session>:<time>`, so the call's own `PostToolUse` cannot end the waiter); the card's and Focus's *Needs you* (`pending.text`), §4.5a
 
 **Why:** Paul saw *Needs you* on td-156 (2026-10-21 20:36 MDT) and took it for a false positive: the pane was in auto mode, the main thread had ended its turn, and the only thing running was a background *Sonnet design review* subagent, drawn as `general-purpose  Grepping code for mode_act`. No dialog was on screen. The record says it was a real wait. `pending` was `Bash: grep -rn "mode_act\|…" src … | head -40` with a synthesized `tool_use_id` (`ao-shiftlead-td-156:2026-10-22T02:36:26Z`), and `subagent_at` stayed at 02:36:21Z through the whole 10-minute wait, so the subagent's grep did not run: it waited on shiftlead's hook. The pane showed no dialog at 20:39 MDT, three minutes into the hook's wait, which ended at 02:46:26Z (20:46 MDT). Paul's later screenshot shows one at 20:48, as *Bash command · from the general-purpose agent · 1 of 2*. It carried Claude Code's reason: *Auto mode classifier requires confirmation for this command. 3 consecutive actions were blocked … Latest blocked action: [Irreversible Local Destruction]*. So auto mode can send a read-only grep to the person: here its classifier had blocked three actions in a row and labelled this one destructive. Why a grep was labelled that way is Claude Code's, not shiftlead's. §4.2 says the terminal dialog appears a few seconds into the hook's wait, so both channels work. Seen once, on a background subagent, it did not: Claude Code appears to hold a subagent's dialog back while the hook blocks. Then **Allow** / **Deny** is the only channel for the wait, and nothing on the card or Focus says so. Two costs follow. A person who reads the pane as the truth dismisses a real prompt, as here, and the subagent sits blocked for the full `permission_wait`. And an idle main thread reads `needs-you`, so mail does not ring it.
@@ -1687,21 +1412,220 @@ transcript quotes *Usage limit reached for* outside a box matches nothing.
 
 ---
 
-## TD-949: No test would catch `_read_repo` dropping `remote=` from its `reports.pr_reading` call: a GitLab repo would be read through `gh` again with the suite green
+## TD-950: A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state
 
 **Priority:** Medium
 **Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1, auditing #2244)
+**Added:** 2026-10-21 (the designer, from TD-947)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` `_read_repo` (~L3474, `reports.pr_reading(root, now, old=prs, held=held, remote=remote)`); `tests/test_pr_wait.py` (the slice-2 tests call `reports.pr_reading(..., remote=...)` directly and put `_repos[root]["prs"]` in by hand)
+**Status:** In progress (grinder-ao-2). Slice 1 (#2261): the adapter's fields — `call_sig` on `PreToolUse` and `PermissionRequest`, `subagent` on every event with `agent_id` (and `subagent_name` on its `PermissionRequest`), a subagent's tool events carrying their `tool_use_id`, `call: start|end` on every tool event (`PostToolUseFailure` is not hooked, so `end` is `PostToolUse`'s alone), `notice: permission_prompt` — and `Pending`'s `subagent`, `subagent_name`, `pane_held` (written by `to_dict` only for a subagent's prompt); the core reads none yet. Slice 2 (#2262): the call key and waiter scope — `_open_calls` (`_track_call`, `_take_call`), `_await_permission`'s match and its pending's `subagent`, `subagent_name`, `pane_held` (the fall-through keeps the first two), the waiter map's thread, `_permission_waiting`'s thread, `_end_waiters` by thread with `call` and questions, the session's end, a reset and `subagents` reaching 0, `_apply_event` for a subagent event with no state; the record has no stack yet, so a subagent's Allow still sets `working`. Slice 3a (#2263): the record's `pendings` and `kept`, persisted, in `NODE_OWNED`, dropped at `exited`/`closed`, and `set_state(since=)`; nothing writes them yet. Left: (3b) the stack's logic (every `needs-you` entry pushed, `kept` set at the first push with `_hook_state` popped; a main-thread event's state written into `kept` before `_end_waiters` runs; an ending removing its entry synchronously inside `_end_waiters` and `rpc_decide`, so the record is right when the hook call returns; the restore with `kept`'s `since`; `NOTICE_LAG`, the startup sweep, a restart's question form, `rpc_decide`, the screen and title skips); (4) the words and controls (cards, Inbox row, Focus, `answer_blocks`, `ao allow --call`, `rpc_send`'s refusal, `ao status`/`explain`, *Answered for you*, the node's `answered_by_rule`, §4.10's read-when).
+**Location:** `src/shiftlead/adapters/claude_code/hook.py` `translate()` (the `PermissionRequest` branch, the `PreToolUse`
+branch, the `agent_id` branch for tool events, `SubagentStop`); `src/sessionorc/models.py` `Pending`; `src/sessionorc/agent_hook.py`
+`_await_permission`, `rpc_decide`; `src/sessionorc/agent_tick.py` `_apply_event`, `_permission_waiting`, `_end_waiters`;
+`src/sessionorc/agent.py` the startup sweep and `rpc_send`'s pending refusal; the card's, the Inbox row's and Focus's
+permission line (`src/shiftlead/ui/`, `cards.py` `answerable`); design §4.2 *Permissions are answered through the hook, not
+through keystrokes* and its event table's `Stop` and subagent rows, §4.4a *Permission prompts*, §4.5a card **Allow / Deny**.
+The field is `subagent` (a subagent's id), not `asker`, which already names the member in mail's `answered.asker`.
 
-**Why:** PR #2244 (TD-940 slice 2) makes the per-forge reading depend on one changed line: the tick passes the checkout's origin to `pr_reading`. Without it `forge_of("")` reads as GitHub and every GitLab repo is read through `gh`, which is the behaviour the PR removed. Probe on `origin/main` (c323b3386): change that line to `reports.pr_reading(root, now, old=prs, held=held)` and run the whole suite (`PYTHONPATH=$PWD/src pdm run pytest -q tests`): 3877 passed, and the only failure is `tests/conformance/test_conformance.py::test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness`, which does not touch the reading. The line was restored afterwards. The new tests all call `pr_reading(remote=...)` themselves, and `test_ao_pr_wait_returns_a_gitlab_mrs_word` seeds `agent._repos` by hand, so no test goes through `_read_repo` with a GitLab origin.
+**Why:** a subagent's dialog is not drawn while the hook blocks, so **Allow** / **Deny** are its one channel until
+the deadline and nothing says so (TD-947: Paul read a real wait as a false *Needs you*). The main thread's `Stop`
+also ends a subagent's waiter within a second, because Claude Code's `PermissionRequest` names no call and a
+waiter keyed by its time is ended by any event. The record then reads `idle`, the buttons go, and the subagent
+waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-permission/foreground/`; the tool backgrounds every subagent).
 
-**Fix:** a test that runs the tick's `_read_repo` (or a tick pass) on a checkout whose origin is a GitLab URL, with `reports._glab_api` faked, and asserts the repo's `prs` carries `forge: gitlab`; it fails with the `remote=` argument removed.
+**Fix:** as design §4.2 says.
+- **The adapter.**
+  - `PreToolUse` and `PermissionRequest` gain `call_sig`, a digest of `tool_name` and `tool_input` (the first
+    16 hex of SHA-256 over `json.dumps({"tool_name": …, "tool_input": …}, sort_keys=True, separators=(",", ":"))`),
+    on both roads.
+  - Every event with `agent_id` adds `subagent` (the `agent_id`): a tool event and a `SubagentStop` beside
+    `subagent_seen`, and a `PermissionRequest` beside `subagent_name` (the `agent_type`, else *subagent*).
+  - The `agent_id` branch for tool events carries the call's `tool_use_id` (and on `PreToolUse` its `call_sig`),
+    still with no state.
+  - Every tool event, on either thread, adds the neutral `call`: `start` on `PreToolUse`, `end` on
+    `PostToolUse` (and `PostToolUseFailure` where the tool sends it).
+  - A `permission_prompt` notification adds `notice: permission_prompt`.
+  - The core reads no tool field.
+- **The call key.**
+  - The core keeps each thread's open `PreToolUse` calls, as `tool_use_id` and `call_sig`, the last eight per
+    `(session, subagent or None)`, in memory, as the host agent's `_open_calls`. A queued (replayed) event
+    touches no list.
+  - A call's own `PostToolUse` removes it. At most sixteen threads per session are kept, the oldest dropped,
+    and a thread's list goes at its `SubagentStop`, a `subagents_reset` or the session's end.
+  - `_await_permission` keys by the event's own `tool_use_id` first, as today (a stub's; Claude Code sends
+    none). Else it takes the oldest with the permission's `call_sig`, keys the waiter by its `tool_use_id`, and
+    consumes it.
+  - With no match, it keys by `<session>:<time>` as today.
+- **The waiter map** goes from `(session, tool_use_id) → future` to `(session, tool_use_id) → (future, subagent)`.
+  `_permission_waiting` gains a thread argument: *any main-thread waiter* and *any waiter of subagent X*.
+- **`Pending`** gains `subagent: str | None`, `subagent_name: str | None` and `pane_held: bool` (False where
+  unset), in `to_dict` and `from_dict`.
+- **The record** gains `pendings: list[Pending]` (oldest first) and `kept: dict | None` (state, pending,
+  confidence, `since`), both persisted and both in `NODE_OWNED`. Its `pending` is the newest of `pendings`.
+- **`_end_waiters(sid, tool_use_id, subagent)`.**
+  - A waiter is ended only by an event from its own thread: a subagent's by the same `subagent`, a main
+    thread's by an event with none.
+  - Within the thread: the asked call's own tool event, or an event naming no call (a `Stop`, a prompt, a
+    `SubagentStop`), ends it. An event naming another call ends a time-keyed waiter, but not one keyed by its
+    call, with one exception: a main-thread waiter keyed by its call is ended by any main-thread
+    `call: start` event or question (a pane Deny gives no `PostToolUse`, so the turn's next call is the first
+    sign; no snapshot of `_open_calls` is kept). `_end_waiters` gains the event's `call` to tell them apart;
+    the core reads `call`, never the tool's event name. `_apply_event`'s gate (`state != "needs-you"`,
+    `agent_tick.py` ~L4528) changes so it calls `_end_waiters` for a main-thread question too. This makes
+    TD-629's parallel-call rule live for `call: end`: before this build Claude Code's permission names no call,
+    so every real main-thread waiter is time-keyed. `tests/test_agent.py`
+    `test_a_permission_answered_in_the_terminal_ends_its_waiter` passes `tool_use_id` on the permission
+    itself, so it is call-keyed already; its parallel `PostToolUse:Read` event gains `call: end`, and a parallel
+    `PreToolUse` case ends the waiter.
+  - A `SubagentStart` ends nothing. A `notice`-marked event never reaches `_end_waiters`, whatever state it
+    carries (a `Notification` translates to a `needs-you` question): the notice rule handles it first.
+    `tests/test_agent.py` `test_permission_roundtrip`'s stub notice gains `notice: permission_prompt`, and its
+    buttons still stay.
+  - The session's end, a `subagents_reset` and `subagents` reaching 0 end every subagent waiter.
+  - `_apply_event` calls it for an event with a `subagent` even when the event has no state.
+  - A fallen-through question (an entry with no live waiter) is removed by *any* event of its `subagent`, or
+    its `SubagentStop`. The call-keyed rule holds only while a waiter is live.
+- **The stack.**
+  - Every `needs-you` entry is in `pendings`. A new prompt, or a main-thread `needs-you` question, is pushed,
+    and the first push sets `kept`, whatever the record reads (a screen or title road's `needs-you` too), and
+    pops `_hook_state[sid]`. A `kept` screen-road `needs-you` is restored `scraped` and marked (in memory)
+    for a recheck: the next tick runs the adapter's rules once on the tail whatever the hook's freshness,
+    keeps it while one matches, else sets `idle` at `tick`. The restore itself captures no pane. A title-road
+    one is restored. A main-thread question replaces an
+    older main-thread question entry, and writes nothing more into `kept`.
+  - A `notice: permission_prompt` event is dropped while a permission or fallen-through question is open, or
+    within `NOTICE_LAG` (10 s, a new constant in `agent_common`) of the session's last sure end; the captures
+    show it about six seconds after the dialog. A sure end (a decision, the asked call's own event, an event
+    naming no call) sets the time; any other end (another call's `call: start` or a question on the main
+    thread, another call's event ending a time-keyed waiter) clears it. Otherwise it is pushed as a question.
+  - A main-thread event with no pending, while `pendings` is open, first writes its state into `kept` (a fresh
+    `since` where the state changed, `kept`'s own where not). With nothing open it sets the record as today
+    and leaves `kept` unset. Then, while a main-thread waiter is live, it ends that waiter's entry (through
+    `_end_waiters`, by the rule above) and no subagent's. With no main-thread waiter live, it removes the main-thread questions.
+  - The startup sweep first moves a saved `pending` of confidence `hook` with no `pendings` into `pendings`,
+    with `kept` = `idle`, `tick`, its own `since`. A screen or title `pending` stays where it is.
+  - The last sure end, for `NOTICE_LAG`, is kept in memory per session.
+  - Each entry keeps its own `Pending.deadline`.
+  - `_screen_verdict`, `_screen_gone` and `_title_verdict` skip a record whose `pendings` is open.
+  - `exited` and `closed` drop `pendings` and `kept`.
+  - An ending removes its entry wherever it sits. A fall-through rewrites its entry in place, and the
+    timeout guard looks the entry up by `tool_use_id` in `pendings`, not only on top.
+  - When `pendings` empties, the record takes `kept`'s state, pending and confidence (its own, never `hook`
+    by default), with `since` set back
+    to `kept`'s (`set_state` gains `since=`). `rev` is bumped as for any change.
+  - `rpc_decide` ends its own entry. On a main-thread waiter it then sets `working` when the stack is empty,
+    or writes `working` with `pending: None` into `kept` when entries remain. On a subagent waiter it only
+    ends the entry.
+- **The fall-through's entry** keeps the text, `subagent` and `subagent_name`, with `pane_held: false`. A
+  `permission_prompt` notification does not replace its text.
+- **A restart.** At the host agent's start, every `pendings` entry that is a permission with no live waiter turns
+  into the question form (`pane_held: false`, no buttons): `answerable()` would otherwise draw buttons that
+  `rpc_decide` refuses.
+- **The rules.** `_by_rule`'s matching is unchanged. Its *Answered for you* names the subagent where the prompt
+  has one. On a node, the `answered_by_rule` request carries `subagent_name`, and the home's handler
+  (`agent_remote.py`) reads it.
+- **The Inbox** keeps one row per record, drawn from `pending`, and the trail keeps the last answer's word.
+- **The card and Focus** draw a line per entry, newest first, each permission with its own **Allow** / **Deny**
+  (`answerable` per entry) and each question with **Focus**.
+- **`ao allow` / `ao deny <id>`** (`cli.py` `cmd_decide`) answer the newest permission entry, and gain
+  `--call <tool_use_id>` for another. §4.5a's card row says so.
+- **The team card's Answer needed facet** (`shiftlead/ui/org.py` `answer_blocks`) draws a block per `pendings` entry,
+  newest first. *n* counts members.
+- **§4.10's read-when** for a subagent-held idle record: rung on the restore to `idle`.
+- **The words.**
+  - While `pane_held`, the card, the Inbox row and Focus draw *from the <subagent_name> subagent · the pane
+    shows nothing until <deadline>* beside **Allow** / **Deny**, the deadline in the reader's clock.
+  - After the fall-through they draw *from the <subagent_name> subagent* with **Focus**.
+  - `rpc_send` on a `pane_held` record refuses with *a subagent's permission is pending: press Allow / Deny
+    (the pane shows nothing until <deadline>)*.
+  - `ao status` and `ao explain` print the subagent's name on the pending line.
+  - A main-thread prompt draws as today.
 
-**Done when** that test exists and fails when the `remote=remote` argument is removed from `_read_repo`.
+**Done when**
+- **Payload tests.**
+  - Through `translate()`, the captured `subagent-permission/background/hooks.jsonl` gives the
+    `PermissionRequest` its `subagent`, `subagent_name` *general-purpose*, and a `call_sig` equal to its
+    `PreToolUse`'s.
+  - A test drives the host agent with that file's events in order:
+    - the waiter is keyed by the subagent's `PreToolUse` `tool_use_id`;
+    - through the hook's wait the record reads `needs-you`, with `pane_held` and the subagent's name;
+    - the tool's own unknown-id tool event ends nothing;
+    - at the timeout the record reads the question, its entry keeping `subagent` and `subagent_name`;
+    - the `permission_prompt` notification after it keeps the text.
+  - The `answered/` file's events, after the same fall-through, end the question at the subagent's
+    `PostToolUse`. Its main-thread `Stop` lands before the request, so `kept` is that `Stop`'s `idle`: the
+    record reads `idle`, `hook`, with the `Stop`'s `since`. The `SubagentStop`'s `subagent` is the request's.
+- **Waiter-scope tests.** The `main/` capture's events in order, its notice included, leave the main-thread
+  waiter live and the buttons up until the hook's answer.
+
+  The `foreground/` capture (the request mid-turn, the main thread's `Stop` a second later), its events in order, keep the waiter live across the `Stop`: the record stays `needs-you` with its
+  buttons, and `kept` becomes `idle`. Then:
+  - the subagent's **Allow** restores `idle` (`hook`, `kept`'s own), not `working`;
+  - a subagent tool event for the asked call, in place of the Allow, restores `idle` and ends the waiter
+    as answered in the terminal;
+  - that subagent's event for another call ends nothing;
+  - an event from inside a subagent ends no main-thread waiter;
+  - a main-thread permission's **Allow** still sets `working`;
+  - the `main/` capture's waiter is keyed by its `PreToolUse` `tool_use_id`, its asked call's `PostToolUse`
+    ends it as answered in the terminal, and so does a new main-thread call's `PreToolUse` (a pane Deny).
+- **Stack tests.**
+  - Two subagents ask at once: both are in `pendings`, each **Allow** ends its own, and `kept` comes back
+    only after the second.
+  - A main-thread `AskUserQuestion` meanwhile goes on top and is drawn, and the subagent's prompt is drawn
+    again once it ends.
+  - The older of two prompts falls through under the newer: its entry becomes the question, and the newer
+    stays on top.
+  - `exited` drops the stack.
+  - A main-thread waiter keyed by its call: a parallel call's `PostToolUse` (open before the permission)
+    ends nothing and the buttons stay; another call's `PreToolUse` ends it as answered in the terminal, and
+    the subagent's entry and buttons stay. A notice 6 s after that end is pushed.
+  - A main-thread `AskUserQuestion` over a main-thread waiter keyed by its call ends that waiter and goes on
+    top as a question.
+  - A notice 6 s after a `Stop` ended a main-thread waiter is dropped; one 6 s after a fall-through
+    question's `SubagentStop` is dropped.
+  - A first push over a screen-road `needs-you` sets `kept` to it and pops `_hook_state`; the emptied stack
+    restores it at `scraped`, and the next tick keeps it while its rule still matches the tail and sets `idle`
+    (`tick`) when it no longer does.
+  - A record saved with a `hook` `pending` and no `pendings` reads, after the startup sweep, one question
+    entry over `kept` `idle` (`tick`); a saved screen-road `pending` is left as it was.
+  - A notice 6 s after the last prompt's end by an Allow, a Deny, or the asked call's own event is dropped;
+    one 11 s after is pushed.
+  - A main-thread Allow with a subagent's entry left writes `working` into `kept`, and the record reads the
+    subagent's entry.
+  - A screen rule matching the pane while `pendings` is open writes nothing.
+  - A main-thread permission answered in the dialog, then the turn's `Stop`, leaves the record `idle` (its own
+    state), not `kept`'s earlier `working`.
+  - A `kept` of `stalled?` (`tick`) comes back with `tick` confidence.
+  - With nothing open, a `Stop` sets the record `idle` and `kept` stays None.
+  - A second main-thread question replaces the first's entry.
+  - After the fall-through, the subagent's `PreToolUse` for another call (a pane **Deny**) ends the question.
+  - With a main-thread question on top of a subagent's permission, the card draws both lines, and `ao allow
+    <id>` answers the permission.
+  - `exited` drops `kept` as well as `pendings`.
+- **Reading tests.**
+  - A rule-answered subagent prompt's *Answered for you* names the subagent, and a node's `answered_by_rule`
+    request carries `subagent_name`.
+  - `ao status` and `ao explain` print the subagent's name.
+  - An idle record held by a subagent's prompt is rung when it restores to `idle` with mail unread (§4.10).
+  - A `permission_prompt` notice within `NOTICE_LAG` of an Allow pushes nothing.
+  - **Call matching.**
+    - `Pre A, Pre B, Permission(sig B)` keys B.
+    - `Pre A, Post A, Pre A', Permission(sig A)` keys A', since A finished.
+  - **The notice.** The fall-through's `permission_prompt` notice pushes no second entry. With nothing open,
+    it is pushed as a question.
+- **Restart and send tests.**
+  - A record saved with a pending permission and no waiter reads the question form after a host-agent
+    start.
+  - A send to a `pane_held` record is refused with its words.
+- **Page tests.** The card, the Inbox row and Focus draw the held line with the deadline, and the
+  fall-through's line with **Focus**. The team facet (`answer_blocks`) draws two blocks for a member with two entries, and the Inbox row draws the
+  newest.
+- **Live check.** On a scratch home, a background subagent's permission shows a *Needs you* that names the
+  subagent and says the pane will not show the prompt. `probe.py --mode background` in the captured directory
+  drives one.
+
+**Related:** TD-947, TD-629 (a waiter ended by another call's event), TD-734 (subagent events), TD-201.
 
 ---
 

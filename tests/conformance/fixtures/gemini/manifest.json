@@ -57,7 +57,7 @@
   },
   {
    "file": "captured/panes/6-a-doorbell.txt",
-   "state": null,
+   "state": "limited",
    "composer": null
   }
  ],

@@ -74,7 +74,9 @@ class Adapter(Protocol):
     #                                                      `explain(tail, title=…)` reads it, and the tick
     #                                                      writes the verdict as `confidence: title` (design
     #                                                      §4.2 *A title the tool writes its state into*,
-    #                                                      TD-785); False where unset
+    #                                                      TD-785); False where unset. A verdict read off
+    #                                                      the title is a `Match` with `title=True`; any
+    #                                                      other `explain` returns is a screen rule's (§4.3)
     #   title(pane_title: str) -> str | None              the session's name as the tool holds it, read from
     #                                                      the terminal title the tool set (tmux `#{pane_title}`,
     #                                                      carried on `PaneInfo.title`) with the tool's own

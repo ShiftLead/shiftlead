@@ -72,6 +72,8 @@ NODE_OWNED = frozenset(
         "state",
         "since",
         "pending",
+        "pendings",
+        "kept",
         "confidence",
         "pane",
         "tail",
@@ -195,13 +197,31 @@ class Pending:
     text: str
     deadline: str | None = None  # ISO time the hook falls through to the terminal (permission only)
     tool_use_id: str | None = None
+    # A prompt from inside a subagent (design §4.2 *A subagent's dialog is held back*, TD-950): the
+    # subagent's own id and the name it is shown by, from the adapter's neutral fields; `pane_held`
+    # while the pane draws nothing for it, so Allow / Deny are its one channel until the deadline.
+    subagent: str | None = None
+    subagent_name: str | None = None
+    pane_held: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        if not self.subagent:  # a main-thread prompt's shape is as it was: the three are a subagent's
+            for k in ("subagent", "subagent_name", "pane_held"):
+                d.pop(k)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Pending:
-        return cls(kind=d["kind"], text=d.get("text", ""), deadline=d.get("deadline"), tool_use_id=d.get("tool_use_id"))
+        return cls(
+            kind=d["kind"],
+            text=d.get("text", ""),
+            deadline=d.get("deadline"),
+            tool_use_id=d.get("tool_use_id"),
+            subagent=d.get("subagent"),
+            subagent_name=d.get("subagent_name"),
+            pane_held=bool(d.get("pane_held")),
+        )
 
 
 @dataclass
@@ -938,6 +958,12 @@ class Session:
     state: State = "working"
     since: str = field(default_factory=now_iso)
     pending: Pending | None = None
+    # Open prompts are a stack (design §4.2 *Open prompts are a stack; the main thread's state is kept
+    # beneath it*, TD-950): every open prompt, oldest first, `pending` being the newest; and `kept`, the
+    # state the first one replaced — `state`, `pending` (a dict), `confidence`, `since` — which the record
+    # takes back once the last ends. Both empty while nothing is open.
+    pendings: list[Pending] = field(default_factory=list)
+    kept: dict[str, Any] | None = None
     confidence: Confidence = "scraped"
     unattended: bool = False
     created: str = field(default_factory=now_iso)
@@ -1288,6 +1314,7 @@ class Session:
         d = asdict(self)
         d.pop("rev")
         d["pending"] = self.pending.to_dict() if self.pending else None
+        d["pendings"] = [p.to_dict() for p in self.pendings]
         d["inbox"] = [e.to_dict() for e in self.inbox]
         d["outbox"] = [e.to_dict() for e in self.outbox]
         d["threads"] = {k: t.to_dict() for k, t in self.threads.items()}
@@ -1431,6 +1458,7 @@ class Session:
     def from_dict(cls, d: dict[str, Any]) -> Session:
         d = dict(d)
         pending = d.pop("pending", None)
+        pendings = d.pop("pendings", None) or []
         progress = d.pop("progress", None) or []
         findings = d.pop("findings", None) or []
         inbox = d.pop("inbox", None) or []
@@ -1440,6 +1468,7 @@ class Session:
         known = {f for f in cls.__dataclass_fields__}
         obj = cls(**{k: v for k, v in d.items() if k in known})
         obj.pending = Pending.from_dict(pending) if pending else None
+        obj.pendings = [Pending.from_dict(p) for p in pendings]
         obj.progress = [ProgressEntry.from_dict(p) for p in progress]
         obj.findings = [FindingEntry.from_dict(f) for f in findings]
         obj.inbox = [MailEntry.from_dict(e) for e in inbox]
@@ -1457,9 +1486,13 @@ class Session:
         """The state is the tool's own word — a hook's or its title's — not a parse of the screen (§4.2)."""
         return self.confidence in TOLD
 
-    def set_state(self, state: State, *, confidence: Confidence, pending: Pending | None = None) -> None:
-        if state != self.state:
-            self.since = now_iso()
+    def set_state(
+        self, state: State, *, confidence: Confidence, pending: Pending | None = None, since: str | None = None
+    ) -> None:
+        """`since`: the time to read the state from instead of now, where it is one taken back — a
+        `kept` state restored once the last open prompt ends (§4.2, TD-950) — and so not new."""
+        if state != self.state or (since is not None and since != self.since):
+            self.since = since or now_iso()
             self.rev += 1
         self.state = state
         self.confidence = confidence
@@ -1469,6 +1502,7 @@ class Session:
         else:
             self.subagents, self.subagent_at = 0, None  # no subagent outlives its process (§4.2, TD-734)
             self.shells, self.shells_at = [], None  # nor a shell task (§4.2 *A background shell task*, TD-766)
+            self.pendings, self.kept = [], None  # nor a prompt, nor the state beneath one (TD-950)
 
     def report_progress(self, entry: ProgressEntry) -> bool:
         """Upsert a `progress` entry by reference, in place so the lane order the session declared

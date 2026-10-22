@@ -366,6 +366,18 @@ def model_env(adapter: str, model: str | None, directory: Path) -> dict[str, str
     return env
 
 
+def limit_is_modal(s: Session | None, adapter: Any) -> bool:
+    """Whether a record's `limited` is a modal screen rule's (design §4.3 *The limit dialog is read off the
+    screen*): `scraped`, and the adapter's `explain` on the record's own tail a `modal` match. A title
+    adapter is asked without a title, so its manifest alone answers. No record, no `explain`, or no match
+    is not modal."""
+    if s is None or s.state != "limited" or s.confidence != "scraped":
+        return False  # asked of every view and every send: only a scraped `limited` reads its tail
+    explain = getattr(adapter, "explain", None)
+    m = explain(s.tail) if explain is not None else None
+    return bool(m is not None and m.modal)
+
+
 def write_model_file(s: Session) -> None:
     """`<adapter>/<model>` into the record's `AGENT_MODEL_FILE`, called where `model` is set or changes
     (§4.2, TD-638). A write that fails is logged, never the caller's."""

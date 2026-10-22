@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -104,6 +105,33 @@ async def test_a_number_the_reading_does_not_hold_is_gone_only_after_a_later_rea
             await c.call("pr_wait", root=str(tmp_path / "elsewhere"), pr=7, timeout=1)
 
 
+async def test_a_wait_given_a_head_answers_only_a_reading_of_that_commit(agent, tmp_path):
+    """TD-953: `--fresh` 30 s after a push answered the head before it (#2252's live read); with `head`
+    a row of another commit is *pending* whatever it says, and the reply names both commits."""
+    await park_ticks(agent)
+    agent.PR_WAIT_STEP = 0.05
+    root = str(tmp_path)
+    old = {**_row(checks="green"), "head": "0ld0000aaaa"}
+    agent._repos[root] = _reading(root, [old], datetime.now(UTC))
+    async with LocalClient() as c:
+        call = asyncio.create_task(c.call("pr_wait", root=root, pr=7, timeout=10, fresh=True, head="ABC1234"))
+        await asyncio.sleep(0.15)
+        agent._repos[root] = _reading(root, [old], datetime.now(UTC))  # a fresh read, still of the old head
+        await asyncio.sleep(0.15)
+        assert not call.done(), "the old head's green is not this commit's"
+        agent._repos[root] = _reading(root, [_row(checks="pending")], datetime.now(UTC))
+        await asyncio.sleep(0.15)
+        assert not call.done(), "the new head, still pending"
+        agent._repos[root] = _reading(root, [_row(checks="green")], datetime.now(UTC))
+        got = await asyncio.wait_for(call, 5)
+        assert got["word"] == "green" and got["head"] == "abc1234def" and got["want_head"] == "abc1234"
+        agent._repos[root] = _reading(root, [old], datetime.now(UTC))
+        got = await c.call("pr_wait", root=root, pr=7, timeout=0.2, head="abc1234")
+        assert got["word"] == "timeout" and got["head"] == "0ld0000aaaa" and got["want_head"] == "abc1234"
+        got = await c.call("pr_wait", root=root, pr=7, timeout=1)
+        assert got["word"] == "green" and got["want_head"] is None, "no head: the first settled word, as before"
+
+
 async def test_a_closed_client_ends_the_wait_at_the_home(agent, tmp_path, monkeypatch):
     await park_ticks(agent)
     agent.PR_WAIT_STEP = 0.05
@@ -156,7 +184,7 @@ async def test_a_fresh_asked_while_a_pass_runs_gets_the_pass_after_it(agent, tmp
 
 
 def _args(**kw) -> argparse.Namespace:
-    base = {"action": "wait", "n": 7, "id": None, "timeout": 60.0, "fresh": False, "json": False}
+    base = {"action": "wait", "n": 7, "id": None, "timeout": 60.0, "fresh": False, "head": None, "json": False}
     return argparse.Namespace(**{**base, **kw})
 
 
@@ -175,40 +203,70 @@ def test_ao_pr_wait_says_the_word_and_exits_by_it(monkeypatch, capsys, word, cod
 
     calls = []
 
-    def fake(method, **kw):
-        calls.append((method, kw))
-        if method == "get":
-            return {"id": kw["id"], "repo": "/r"}
+    def fake(root, n, timeout, fresh, head=None):
+        calls.append((root, n, timeout, fresh, head))
         row = _row(checks="pending" if word == "timeout" else word, failing=["test (3.12)"] if word == "red" else [])
-        return {**row, "pr": 7, "word": word, "read_at": "2026-10-21T00:00:00+00:00"}
+        return {**row, "pr": 7, "word": word, "read_at": "2026-10-21T00:00:00+00:00"}, 0
 
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
-    monkeypatch.setattr(cli, "call_sync", fake)
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"id": kw["id"], "repo": "/r"})
+    monkeypatch.setattr(cli, "_pr_wait_call", fake)
     assert cli.cmd_pr(_args()) == code
     assert capsys.readouterr().out.strip() == said
-    method, kw = calls[-1]
-    assert method == "pr_wait" and kw["root"] == "/r" and kw["pr"] == 7 and kw["fresh"] is False
-    assert kw["_timeout"] > kw["timeout"], "the client outlasts the wait it asked for"
+    assert calls == [("/r", 7, 60.0, False, None)]
 
 
 def test_ao_pr_wait_refuses_a_number_the_home_does_not_hold_and_an_old_home(monkeypatch, capsys):
     from shiftlead import cli
 
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
-    monkeypatch.setattr(
-        cli, "call_sync", lambda m, **kw: {"repo": "/r"} if m == "get" else {"pr": 7, "word": "gone", "head": None}
-    )
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": "/r"})
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a: ({"pr": 7, "word": "gone", "head": None}, 0))
     assert cli.cmd_pr(_args()) == 5
     assert "not open in the home's reading of /r" in capsys.readouterr().err
 
-    def old(m, **kw):
-        if m == "get":
-            return {"repo": "/r"}
+    def old(*a):
         raise AgentError("unknown method 'pr_wait'")
 
-    monkeypatch.setattr(cli, "call_sync", old)
+    monkeypatch.setattr(cli, "_pr_wait_call", old)
     assert cli.cmd_pr(_args(json=True)) == 5
     assert "predates ao pr wait" in capsys.readouterr().out
+
+
+def test_ao_pr_wait_sends_a_head_says_a_reading_that_never_reached_it_and_refuses_no_sha(monkeypatch, capsys):
+    from shiftlead import cli
+
+    calls = []
+
+    def fake(root, n, timeout, fresh, head=None):
+        calls.append(head)
+        row = {**_row(checks="green"), "head": "0ld0000aaaa"}
+        return {**row, "pr": 7, "word": "timeout", "want_head": head, "read_at": "2026-10-21T00:00:00+00:00"}, 0
+
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": "/r"})
+    monkeypatch.setattr(cli, "_pr_wait_call", fake)
+    assert cli.cmd_pr(_args(head="abc1234def")) == 4
+    assert capsys.readouterr().out.strip() == "PR #7 timeout after 60s, still green on 0ld0000, not yet abc1234"
+    assert cli.cmd_pr(_args(head="HEAD")) == 5
+    assert "is not a commit's sha" in capsys.readouterr().err
+    assert calls == ["abc1234def"], "a --head that is no sha never reaches the home"
+
+
+def test_pr_wait_call_sends_head_only_when_asked(monkeypatch):
+    """An older home's `rpc_pr_wait` takes no `head`: the client leaves it out unless it is asked for."""
+    from shiftlead import cli
+
+    seen = []
+
+    async def fake(method, **kw):
+        seen.append(kw)
+        return {"word": "green"}, 0
+
+    monkeypatch.setattr(cli.clientmod, "blocking_rpc", fake)
+    cli._pr_wait_call("/r", 7, 5.0, False)
+    cli._pr_wait_call("/r", 7, 5.0, True, "abc1234")
+    assert "head" not in seen[0] and seen[1]["head"] == "abc1234"
 
 
 # -- the fold per forge (slice 2) -------------------------------------------------------------------
@@ -312,6 +370,25 @@ def test_a_gitlab_origin_reads_its_open_mrs_with_the_fold_conflict_and_required(
     assert kept["open"][0]["red_since"] == rows[3]["red_since"], "a red spell keeps its start"
 
 
+def test_the_tick_reads_a_gitlab_checkout_through_glab(tmp_path, monkeypatch):
+    """TD-949: the reading per forge hangs on `_read_repo` passing the checkout's origin to
+    `pr_reading` — without it `forge_of("")` reads GitHub and a GitLab repo goes through `gh` again."""
+    import subprocess
+
+    from sessionorc.agent_tick import TickMixin
+
+    r = tmp_path / "r"
+    r.mkdir()
+    for argv in (["init", "-q", "-b", "main"], ["remote", "add", "origin", "git@gitlab.com:g/sub/r.git"]):
+        subprocess.run(["git", "-C", str(r), *argv], check=True, capture_output=True)
+    asked = _glab(monkeypatch, [_mr(3, "success")])
+    monkeypatch.setattr(reports, "_gh_prs", lambda *a, **kw: pytest.fail("a GitLab checkout was read through gh"))
+    got = TickMixin._read_repos([str(r)], {}, {str(r)})[str(r)]
+    assert got["remote"] == "git@gitlab.com:g/sub/r.git"
+    assert got["prs"]["forge"] == "gitlab" and [p["number"] for p in got["prs"]["open"]] == [3]
+    assert asked and all(host == "gitlab.com" for host, _ in asked)
+
+
 def test_a_gitlab_read_that_fails_is_an_error_and_another_forge_has_no_reading(tmp_path, monkeypatch):
     _glab(monkeypatch, [_mr()], fail="merge_requests?")
     assert reports.pr_reading(tmp_path, datetime.now(UTC), remote="https://gitlab.com/g/r") == {
@@ -359,6 +436,63 @@ async def test_a_repo_never_read_is_refused_with_the_readings_why(agent, tmp_pat
     from shiftlead import cli
 
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
-    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": root} if m == "get" else got)
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": root})
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a: (got, 0))
     assert cli.cmd_pr(_args(n=3)) == 5
     assert "gitea.example" in capsys.readouterr().err
+
+
+def test_ao_pr_wait_says_a_restart_and_a_timeout_in_its_gap(monkeypatch, capsys):
+    """A promote restarts the unit under the wait (TD-940's live check, 2026-10-22): `blocking_rpc`
+    remakes it; the CLI says so, and a timeout that ran out in the gap is still exit 4."""
+    from shiftlead import cli
+
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": "/r"})
+    green = {**_row(checks="green"), "pr": 7, "word": "green", "read_at": "2026-10-22T00:00:00+00:00"}
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a: (green, 1))
+    assert cli.cmd_pr(_args()) == 0
+    out = capsys.readouterr().out
+    assert "the wait was remade once" in out and "PR #7 green on abc1234" in out
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a: (None, 2))
+    assert cli.cmd_pr(_args()) == 4
+    assert "PR #7 timeout after 60s, still unread" in capsys.readouterr().out
+
+
+async def test_a_pr_wait_is_remade_across_a_drop_and_a_home_never_up_is_refused_at_once(tmp_path):
+    """`client.blocking_rpc` carries `pr_wait` as it carries `wait`: a connection that dropped is
+    remade with the time left, and a socket nothing answers is refused on the first try."""
+    import time
+
+    from sessionorc import client as clientmod
+
+    sock = tmp_path / "home.sock"
+    asked = []
+
+    async def home(reader, writer):
+        req = json.loads(await reader.readline())
+        asked.append(req["params"])
+        if len(asked) == 1:  # the promote: the unit goes under the first wait
+            writer.close()
+            return
+        writer.write((json.dumps({"id": req["id"], "result": {"pr": 7, "word": "green"}}) + "\n").encode())
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_unix_server(home, path=str(sock))
+    try:
+        got, remakes = await clientmod.blocking_rpc(
+            "pr_wait", caller="ao-x", timeout=30.0, expired=None, sock=sock, root="/r", pr=7, fresh=True
+        )
+    finally:
+        server.close()
+    assert got == {"pr": 7, "word": "green"} and remakes == 1
+    assert [a["pr"] for a in asked] == [7, 7] and all(a["fresh"] for a in asked)
+    assert asked[1]["timeout"] < asked[0]["timeout"], "asked again for the time left"
+
+    began = time.monotonic()
+    with pytest.raises(clientmod.AgentUnavailable, match="not reachable"):
+        await clientmod.blocking_rpc(
+            "pr_wait", caller="ao-x", timeout=30.0, expired=None, sock=tmp_path / "none.sock", pr=7
+        )
+    assert time.monotonic() - began < 1.0, "a home that was never up is not given the restart's grace"
