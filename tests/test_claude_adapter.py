@@ -31,7 +31,9 @@ from shiftlead.adapters.claude_code import (
     repo_wires_cadence,
     write_hooks_file,
 )
-from shiftlead.adapters.claude_code.hook import translate
+from shiftlead.adapters.claude_code.hook import call_sig, translate
+
+CAPTURED = Path(__file__).parent / "conformance/fixtures/claude-code/captured"
 
 pytestmark = pytest.mark.integration  # the hook-script tests spawn processes; split later if wanted
 
@@ -109,12 +111,32 @@ def test_a_subagents_tool_events_leave_the_state_alone():
     they carry the session id and no state. The main thread's own tool events name themselves in
     `event`, which the host agent logs when one wakes a hook-confirmed idle session."""
     ev = {"hook_event_name": "PreToolUse", "session_id": "u1", "tool_name": "Bash", "tool_input": {}}
-    assert translate(ev) == {"adapter_id": "u1", "state": "working", "pending": None, "event": "PreToolUse:Bash"}
+    sig = call_sig(ev)
+    assert translate(ev) == {
+        "adapter_id": "u1",
+        "state": "working",
+        "pending": None,
+        "event": "PreToolUse:Bash",
+        "call": "start",  # TD-950: a call's first event, in the core's words
+        "call_sig": sig,
+    }
     assert translate({**ev, "hook_event_name": "PostToolUse"})["event"] == "PostToolUse:Bash"
     assert translate({"hook_event_name": "PostToolUse"})["event"] == "PostToolUse"  # no tool name: the event's own
-    # and say only that a subagent is alive (TD-734), which the core reads as `subagent_seen`
-    assert translate({**ev, "agent_id": "a97a5f"}) == {"adapter_id": "u1", "subagent_seen": True}
-    assert translate({"hook_event_name": "PostToolUse", "agent_id": "a97a5f"}) == {"subagent_seen": True}
+    # and say only that a subagent is alive (TD-734), which the core reads as `subagent_seen` — with its
+    # call, which is that subagent's thread's (TD-950), and still no state
+    assert translate({**ev, "agent_id": "a97a5f", "tool_use_id": "tu1"}) == {
+        "adapter_id": "u1",
+        "subagent": "a97a5f",
+        "subagent_seen": True,
+        "call": "start",
+        "tool_use_id": "tu1",
+        "call_sig": sig,
+    }
+    assert translate({"hook_event_name": "PostToolUse", "agent_id": "a97a5f"}) == {
+        "subagent": "a97a5f",
+        "subagent_seen": True,
+        "call": "end",
+    }
     assert "event" not in translate({"hook_event_name": "UserPromptSubmit"})  # a turn's start is not named
     # a question asked from inside a subagent still stops the session for the person
     ask = {**ev, "agent_id": "a1", "tool_name": "AskUserQuestion", "tool_input": {"questions": [{"question": "q?"}]}}
@@ -137,6 +159,7 @@ def test_translate_permission_and_questions():
         # the tool and its input, for the person's permissions: rules (TD-641)
         "tool": "Bash",
         "input": {"command": "git push origin td-301"},
+        "call_sig": call_sig({"tool_name": "Bash", "tool_input": {"command": "git push origin td-301"}}),
     }
     # a question that reaches the PermissionRequest hook is a question, as the PreToolUse road reports
     # it: its text, never its JSON (TD-629), and no permission, so nothing waits on Allow / Deny (TD-674)
@@ -151,7 +174,13 @@ def test_translate_permission_and_questions():
     assert a == {"state": "needs-you", "pending": {"kind": "question", "text": "Which db?"}}
     # a tool event names its call, which ends that call's waiter if its dialog was answered in the terminal
     done = translate({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_use_id": "tu9"})
-    assert done == {"state": "working", "pending": None, "event": "PostToolUse:Bash", "tool_use_id": "tu9"}
+    assert done == {
+        "state": "working",
+        "pending": None,
+        "event": "PostToolUse:Bash",
+        "call": "end",
+        "tool_use_id": "tu9",
+    }
     q = translate(
         {
             "hook_event_name": "PreToolUse",
@@ -162,9 +191,30 @@ def test_translate_permission_and_questions():
     assert q["state"] == "needs-you" and q["pending"] == {"kind": "question", "text": "Which db?"}
     n = translate({"hook_event_name": "Notification", "notification_type": "permission_prompt", "message": "m"})
     assert n["pending"]["kind"] == "question"  # dialog is in the terminal now
+    assert n["notice"] == "permission_prompt"  # the dialog's own notice, weighed against an open prompt (TD-950)
     assert translate({"hook_event_name": "Notification", "notification_type": "auth_success"}) is None
     assert translate({"hook_event_name": "Notification", "notification_type": "idle_prompt", "message": "w"}) is None
     assert translate({"hook_event_name": "SubagentStart"}) == {"subagent_delta": 1, "subagent_seen": True}
+
+
+def test_a_subagents_permission_names_its_subagent_and_its_call():
+    """TD-950 (design §4.2 *A subagent's dialog is held back*, *A waiter is keyed by its call*), from the
+    captured `subagent-permission/background/`: the subagent's `PermissionRequest` names no call, so it
+    carries the subagent's id and name and a `call_sig` equal to its own `PreToolUse`'s, which names the
+    call. Every event from inside the subagent carries `subagent`, its `SubagentStart` too."""
+    events = [json.loads(line) for line in (CAPTURED / "subagent-permission/background/hooks.jsonl").open()]
+    asked = next(e for e in events if e["hook_event_name"] == "PermissionRequest")
+    pre = next(e for e in events if e["hook_event_name"] == "PreToolUse" and e.get("agent_id") == asked["agent_id"])
+    p, t = translate(asked), translate(pre)
+    assert p["kind"] == "permission" and p["tool_use_id"] is None
+    assert (p["subagent"], p["subagent_name"]) == (asked["agent_id"], "general-purpose")
+    assert p["call_sig"] == t["call_sig"] and t["tool_use_id"] == pre["tool_use_id"]
+    assert (t["subagent"], t["call"]) == (asked["agent_id"], "start") and "state" not in t
+    start = next(e for e in events if e["hook_event_name"] == "SubagentStart")
+    assert translate(start)["subagent"] == start["agent_id"]
+    # a main-thread prompt names no subagent; a subagent with no type is shown as one
+    assert "subagent_name" not in translate({**asked, "agent_id": None})
+    assert translate({**asked, "agent_type": None})["subagent_name"] == "subagent"
 
 
 def test_a_fresh_conversation_resets_the_subagent_count():
