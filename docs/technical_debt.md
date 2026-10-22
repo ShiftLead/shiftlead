@@ -33,7 +33,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Live check #993 — waits on a look from a node (TD-299) |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — decided 2026-10-21 (TD-028's list is enough); the designer's |
+| TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Designed — the page is `ao team --skill`; builds TD-942 |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
 | TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644, TD-645 build it |
@@ -75,6 +75,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
 | TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Open |
 | TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Open |
+| TD-942 | `ao org check --root <worktree>`: check a team definition on the branch it is written on, before it merges | Medium | Open |
+| TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 
 ---
 
@@ -455,7 +457,22 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-09 (Paul, while starting guardians' team)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open. Standing up guardians' team (2026-10-09) needed facts spread across design §4.4a,
+**Blocked by:** TD-942
+**Status:** Designed 2026-10-21 (the designer). The page is `ao team --skill` (`src/shiftlead/team_skill.md`),
+the recipe TD-028's list was measured against, so it lives where a session in any repo already reads it and
+no copy drifts under `docs/` (design §4.7 *Skills*). Every gap on TD-028's list is folded in, each read
+against the code first: step 0b *What the repo needs before a team can pick anything* (`Blocked by:`,
+`Kind:`, `Owner:`, the PR rules written down; `Owner: paul` keeps an entry only from a lane with an
+`owner:` word, `Blocked by: decision (paul)` from every lane — `_word_matches` reads no Owner, so TD-028's
+*Owner: paul keeps it from workers* holds only beside `owner:`); step 1's `env` file (keys, `0600`,
+unquoted), the token as the fence, the per-profile login and what a node does to the devcontainer; step
+3 leading with the repo's `.shiftlead.yml` form and `place:`; *What a lane takes* (`owner:` lets an
+absent Owner through, a named lane is the brief's alone, work orders in every `free-pick` lane so the
+briefs are the only fence, the settling / held / waiting / needs-a-team marks); *A repo over sibling
+repos* (one repo's PRs only; paired PRs until TD-943); and that a definition on a branch is not checked
+until it merges. Two gaps are tool changes: checking a branch's definition is TD-942 (design §4.7
+`ao org check --root`, built here); reading sibling PRs is TD-943, its own design. Was, before:
+Standing up guardians' team (2026-10-09) needed facts spread across design §4.4a,
 §4.9, §4.9b, §4.9c, `docs/briefs/README.md`, the package role templates, two working examples
 (contractmatch's and dev-cadence's repo config and briefs) and TD-299's step list. A session
 in the new repo had to be handed a brief written from all of them. **Decided 2026-10-21** (Paul, on the
@@ -1533,5 +1550,75 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 **Done when** a Gemini session at the *Usage limit reached* dialog reads as the design says, from a fixture captured from the tool.
 
 **Related:** TD-785, TD-786, TD-112.
+
+---
+
+## TD-942: `ao org check --root <worktree>`: check a team definition on the branch it is written on, before it merges
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (the designer, from TD-623; guardians-devenv TD-028's *How to check a definition before it merges*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open.
+**Location:** `src/shiftlead/orgcheck.py`, `src/shiftlead/cli.py` (`ao org`), `src/shiftlead/team_skill.md` (step 3's *A definition on a branch is not checked yet* and the agent checklist's item 2, so no copy of *check after the merge* survives); design §4.7 *`ao org check --root <dir>`*
+
+**Why:** `ao org check` and `ao team list` read each registered checkout as it stands, so a `.shiftlead.yml`
+written on a branch — where a repo's review rules want it — is invisible to both until it merges; the only
+check guardians found was importing `shiftlead.repoconfig` and `shiftlead.org` by hand.
+
+**Fix:** as design §4.7 says: `--root <dir>` on `ao org check` reads the repo file, and the briefs, primer
+and role directories it names, at `<dir>` in place of the registered checkout whose git common directory
+`<dir>`'s, through the one `{<registered root>: <dir>}` mapping the design names, readers by readers; every other repo as
+without it; a `<dir>` that is no worktree of a registered checkout, nor that checkout itself, refused,
+*`<dir>` is not a checkout of a registered repo*, exit 2; no off-branch or changes warning for `<dir>`. Then
+`team_skill.md`'s *A definition on a branch is not checked yet* paragraph says to run
+`ao org check --root <worktree>` before the PR, in place of after the merge, and drops its *TD-942 builds* clause.
+
+**Done when** `ao org check --root <worktree>` on a branch whose `.shiftlead.yml` names a profile
+`profiles.yml` lacks prints that lack and exits 1, the same file unmerged; the teams at `<dir>` pair
+with the registered checkout's ledger reading under its name and path (a `Team` declaration on main
+that names a team only the branch defines reads clean, and a branch that drops a team the ledger still
+declares reads that lack; a repo whose `org.yml` heading gives a path on this host reads the branch's
+briefs all the same; a subdirectory of a worktree is refused with exit 2; a branch that renames
+`.agentorc.yml` to `.shiftlead.yml` reads no TD-553 lack; no *held only on a node* warning appears that the run without `--root` does not give); a directory outside every registered repo is
+refused with exit 2, and so is a directory that is not a git one; `--root` at the registered checkout
+itself reads as without it but for the header and the checkout-state warnings; the first line and `--json`'s `root` name the repo and
+`<dir>`; a test holds each. The recipe's paragraph says to run `ao org check --root <worktree>` before
+the PR, and its agent checklist's item 2 says *`ao org check --root <worktree>` before the PR,
+`ao team list` after the merge*.
+
+**Related:** TD-623, guardians-devenv TD-028.
+
+---
+
+## TD-943: A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (the designer, from TD-623; guardians-devenv TD-028 step 4)
+**Owner:** designer
+**Kind:** design-first
+**Waits:** event — Paul's answer on guardians-devenv's board line *Should the new guardians team land docs and demo changes as paired PRs*, which names this change as its third answer. On that answer the entry is designed; on *Paired PRs* (the default) or *Umbrella-only* it drops to Low and its wait becomes `event — a second umbrella team`, since paired PRs work and only a second constellation would show the cost
+**Status:** Open. A team is on one repo (design §4.9 *Teams*): `ao progress done --pr <n>` is an integer read
+with `gh` in the record's checkout, `held:` globs match that repo's paths, and the red-PR and sync-PR work
+orders and the PR and Doing facets read that repo alone, so in an umbrella over sibling repos
+(dev-cadence's `docs/nested-repos.txt`) a sibling's PR number is read as the umbrella's PR of that
+number, a sibling path can never be held, and an open sibling PR is strandable with no page showing it.
+`ao team --skill` (TD-623) tells such a team to land paired PRs meanwhile.
+**Location:** design §4.9 *Teams*, §4.9c (`held:`), §4.8 (`ao progress`); `src/sessionorc/agent.py`
+(`_pr_checks`), `src/sessionorc/held.py`, `src/sessionorc/workorders.py`
+
+**Why:** an umbrella is dev-cadence's own shape, so ShiftLead meets it on every constellation; paired PRs
+work, but the sibling half has no gate and no page.
+
+**Fix:** design first: a repo-qualified PR reference (`owner/repo#n` or a URL) on `--pr` and the record;
+whether `held:` and the PR readings follow the umbrella's hydrated siblings; and whether a sibling PR is
+gated, and by whose `gate:`.
+
+**Done when** the design says how a team over an umbrella names, reads and gates a sibling PR, and the
+builds are in the ledger.
+
+**Related:** TD-623, guardians-devenv TD-028.
 
 ---
