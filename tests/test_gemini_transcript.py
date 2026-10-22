@@ -6,6 +6,7 @@ The captured chats are the conformance suite's; these are the record shapes no c
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -245,3 +246,58 @@ def test_a_malformed_record_is_skipped_not_raised(tmp_path):
     tr = t.read(path)
     tool = next(e for e in tr.entries if e.kind == "tool")
     assert tool.name == "ls" and tool.result is None  # a response that names no call answers none
+
+
+def test_a_patch_ordering_some_messages_leaves_the_rest_first():
+    recs = [_meta(), _user("u1", "a"), _gemini("g1", "b"), _user("u2", "c"), {"$patch": {"orderIds": ["u1"]}}]
+    messages, _ = t.replay("".join(json.dumps(r) + "\n" for r in recs).encode())
+    assert list(messages) == ["g1", "u2", "u1"]
+
+
+def test_of_two_chats_for_one_id_the_newer_is_read(tmp_path):
+    chats = _chats(tmp_path)
+    old = _write(chats / f"session-2026-10-22T07-05-{SID[:8]}.jsonl", [_meta()])
+    new = _write(chats / f"session-2026-10-22T07-09-{SID[:8]}.jsonl", [_meta()])
+    os.utime(old, (2_000_000_000, 2_000_000_000))
+    os.utime(new, (1_000_000_000, 1_000_000_000))
+    assert t.find(chats.parent.parent, SID) == old  # by its mtime, not its name
+    os.utime(new, (3_000_000_000, 3_000_000_000))
+    assert t.find(chats.parent.parent, SID) == new
+
+
+def test_an_id_with_a_glob_character_finds_nothing_even_where_a_file_would_match(tmp_path):
+    chats = _chats(tmp_path)
+    _write(chats / "session-2026-10-22T07-05-abc?.jsonl", [_meta("abc?")])
+    assert t.find(chats.parent.parent, "abc?") is None
+
+
+def test_spend_drops_a_cursor_that_is_not_a_whole_number():
+    got = GeminiAdapter().spend("unknown-profile", {"x": 3, "neg": -1, "text": "4", "none": None})
+    assert got == {"turns": [], "cursors": {"x": 3}, "reason": "no_profile"}
+
+
+def test_spend_keeps_the_cursor_of_a_chat_it_cannot_read(tmp_path, profile, monkeypatch):
+    chats = _chats(tmp_path)
+    chat = _write(chats / f"session-2026-10-22T07-05-{SID[:8]}.jsonl", [_meta(), _gemini("g1", "a")])
+    other = _write(chats / "session-2026-10-22T07-06-bbbbbbbb.jsonl", [_meta("other"), _gemini("g2", "b")])
+
+    def turns(path, *a, **kw):
+        raise OSError("gone")
+
+    monkeypatch.setattr(t, "turns", turns)
+    got = GeminiAdapter().spend(profile, {str(chat): 5})
+    # the one it had read keeps its place, so its turns are not counted again; the new one is read next time
+    assert got == {"turns": [], "cursors": {str(chat): 5}, "reason": "ok"}
+    assert str(other) not in got["cursors"]
+
+
+def test_spend_says_an_unreadable_root_and_keeps_its_cursors(tmp_path, profile, monkeypatch):
+    _chats(tmp_path)
+
+    def glob(self, pattern):
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(Path, "glob", glob)
+    got = GeminiAdapter().spend(profile, {"x": 3})
+    assert got["turns"] == [] and got["cursors"] == {"x": 3}
+    assert got["reason"].startswith("unreadable: ") and got["reason"].endswith(": PermissionError")
