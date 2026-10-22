@@ -328,4 +328,15 @@ async def test_explain_on_a_live_record_at_the_box_gives_the_rules_reason(agent,
         assert got["read_when"][s["id"]].startswith(no_reset)
         view = next(v for v in await c.call("list") if v["id"] == s["id"])
         assert view["read_when"]["note"].startswith(no_reset)
+        assert view["read_when"]["refill"].startswith(no_reset)  # the Reply composer's line on a handed thread
+        # an entry handed to a seat at the box: its reply's sentence names no reset either (TD-955)
+        repo = tmp_path / "shiftlead"
+        repo.mkdir()
+        home = tmp_path / "home"
+        home.mkdir(exist_ok=True)
+        (home / "repos.txt").write_text(f"{repo}\n")
+        (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+        teams = [{"team": "ao-grind", "seat": s["id"]}]
+        handed = await c.call("entry_add", repo="shiftlead", type="debt", text="the parser drops a line", teams=teams)
+        assert handed["to"] == s["id"] and handed["read_when"].startswith(no_reset)
         await c.call("kill", id=s["id"])
