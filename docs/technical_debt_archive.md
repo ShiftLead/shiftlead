@@ -17921,7 +17921,7 @@ brief written for it.
 **Related:** TD-299, guardians-devenv TD-028 and `docs/briefs/team-setup.md`, TD-055 (archived
 with the retired brief).
 
-**Resolved:** 2026-10-21 (grinder-ao-2) — its design merged in #2238 (`ao team --skill` is the first-team page, guardians-devenv TD-028's gaps folded in); its one build, TD-942 (`ao org check --root`), merged in this PR, so it archives with its last build (design §4.9c). TD-943 carries the sibling-repo PR reading on its own.
+**Resolved:** 2026-10-21 (grinder-ao-2) — its design merged in #2238 (`ao team --skill` is the first-team page, guardians-devenv TD-028's gaps folded in); its one build, TD-942 (`ao org check --root`), merged in #2243, so it archives with its last build (design §4.9c). TD-943 carries the sibling-repo PR reading on its own.
 
 ---
 ## TD-942: `ao org check --root <worktree>`: check a team definition on the branch it is written on, before it merges
@@ -17961,6 +17961,6 @@ the PR, and its agent checklist's item 2 says *`ao org check --root <worktree>` 
 
 **Related:** TD-623, guardians-devenv TD-028.
 
-**Resolved:** 2026-10-21 (grinder-ao-2) — built by this PR: `ao org check --root <dir>` (`orgcheck.stand_in_for`, the `{<registry entry>: <dir>}` mapping through `org.with_repos` / `merge_repo_teams(stands_for=…)`, the root loop, the role and flow readers and `team_lacks`); `team_skill.md` says to run it before the PR; each case of Done when is a test in `tests/test_cli_org.py`.
+**Resolved:** 2026-10-21 (grinder-ao-2) — built by #2243: `ao org check --root <dir>` (`orgcheck.stand_in_for`, the `{<registry entry>: <dir>}` mapping through `org.with_repos` / `merge_repo_teams(stands_for=…)`, the root loop, the role and flow readers and `team_lacks`); `team_skill.md` says to run it before the PR; each case of Done when is a test in `tests/test_cli_org.py`.
 
 ---
