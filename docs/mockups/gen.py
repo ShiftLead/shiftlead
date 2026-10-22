@@ -2383,7 +2383,7 @@ def ending_card():
     """The ending card (§4.5 *The Focus screen's anatomy* item 3, §4.5a *Focus: ending card*, TD-942),
     full width where the pane was: one heading line that reads as a sentence — the money the only large
     figure — then what each entry cost, bars scaled to the largest with the figures in one right-aligned
-    column, then the day around it and the account's windows. Quiet on purpose: the banner above is
+    column, then *as of* and the Spend link. Quiet on purpose: the banner above is
     the page's one loud thing."""
     entries = (("TD-156", 18.20), ("TD-942", 14.90), ("TD-623", 4.10), ("between entries", 4.60))
     top = max(f for _, f in entries)
