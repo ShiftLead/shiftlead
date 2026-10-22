@@ -325,7 +325,8 @@ async def test_explain_on_a_live_record_at_the_box_gives_the_rules_reason(agent,
         # a hook within a tick outranks the rule; the poll's limited at `hook` is kept (TD-954)
         agent._last_hook[s["id"]] = datetime.now(UTC) + timedelta(seconds=5)  # within a tick however slow the call
         ex = await c.call("explain", id=s["id"])
-        assert ex["reason"] == "rule gemini-usage-limit matched, but a hook reported within a tick — the hook state wins"
+        wins = "rule gemini-usage-limit matched, but a hook reported within a tick — the hook state wins"
+        assert ex["reason"] == wins
         del agent._last_hook[s["id"]]
         rec = agent._get(s["id"])
         rec.confidence = "hook"
