@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Open |
+| TD-956 | #2250's `blocking_rpc` changed what a call with no time left does, and no test would notice going back | Low | Open |
 
 ---
 
@@ -1643,3 +1644,21 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
   drives one.
 
 **Related:** TD-947, TD-629 (a waiter ended by another call's event), TD-734 (subagent events), TD-201.
+
+---
+
+## TD-956: #2250's `blocking_rpc` changed what a call with no time left does, and no test would notice going back
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/client.py` (`blocking_rpc` ~L220); `tests/test_pr_wait.py`
+
+**Why:** Found auditing the tests of #2250 (TD-940 live check). `client.blocking_rpc` changed `if left <= 0:` to `if left <= 0 and lost_at is not None:`, so a first call with no time left is now made (not answered with `expired`), and `expired` is returned only when time runs out in a restart's gap; the line's comment says *a first call is always made*. Probe: restore `if left <= 0:` in `src/sessionorc/client.py`; `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_pr_wait.py tests/test_client.py tests/test_agent_restart.py tests/test_cli.py` passes (139). The new tests cover a drop remade and a never-up socket, but not the `expired` return in a gap (`test_ao_pr_wait_says_a_restart_and_a_timeout_in_its_gap` mocks `_pr_wait_call`, so it never reaches `blocking_rpc`) and not a zero or negative `timeout` on a live home.
+
+**Fix:** In `tests/test_pr_wait.py` (or `test_agent_restart.py`): a server that drops the first connection, then is gone past a short timeout — assert `blocking_rpc` returns `(expired, 1)`; and a call with `timeout=0` on a live socket reaches the server. Confirm both fail with the old condition.
+
+**Done when** restoring `if left <= 0:` fails a test.
