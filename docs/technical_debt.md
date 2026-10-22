@@ -1486,7 +1486,7 @@ promote (it prints *the wait was remade once*) that ends in its word, then the c
 live in 340efe3): `ao pr wait 2252 --fresh`, called 30 s after a force-push of b9768b6, answered *green on 7b98436* —
 the head before the push — so a fresh reading can still carry the old head and its checks: a caller must compare
 `head` with its own commit. Whether the wait should take `--head <sha>` and keep waiting until the reading's head
-matches is a finding for the next run to file (TD-940's Fix names `head` for exactly this check).
+matches is TD-953 (filed 2026-10-21, grinder-ao-1).
 **Location:** design §4.7 (a new `ao pr wait <n>` paragraph beside `ao pr held <n>`), §4.4 *Repos* (the `prs` reading's `checks` and `conflicting` fold); `docs/procedures/cadence.md` and `docs/claude-memory/no-checks-means-conflicting.md` (the pair to write and the memory to retire); `src/shiftlead/cli.py` (`ao pr`, ~L4467 `ao wait` for the blocking shape), `src/sessionorc/agent_serve.py` (the `wait` RPC, `_serve_wait` ~L229) and `src/sessionorc/agent_remote.py` (its client side), `src/sessionorc/reports.py` (`_gh_prs` ~L617, `fold_checks` ~L342, `failing_items` ~L314, the `gh pr view` read ~L573 — GitHub-only today); `tests/test_cli.py` and the tests of `fold_checks`
 
 **Why:** Every session that opens a PR waits for its checks before `scripts/check_cadence.py --pr N`, and each writes its own `gh pr checks` loop. Two went wrong on 2026-10-21 alone in the ao-paul session: one read an empty check list as "no CI" (the PR was conflicting, the memory *no checks means conflicting*), one tested a rollup field that never reported and sat until Paul asked whether something was broken. The home already makes the judgement once, on its tick: the `prs` reading folds every open PR's `statusCheckRollup` into *green*, *red*, *pending* or *none* and reads `conflicting` from the merge state, with the fold's rules in §4.4 (`fold_checks`), and `ao wait` is already a thin blocking RPC on the host agent. Paul, 2026-10-21: standardise the background wait as an `ao` call, and *make sure it will work for GitLab/other as well as GitHub* — the fold reads `gh` today, so a GitLab remote has no reading at all.
@@ -1803,3 +1803,19 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 
 **Done when** the cause is named in this entry and the test passes a few hundred runs in a loop.
 
+
+## TD-953: `ao pr wait <n> --fresh` called just after a push can answer the old head's word: nothing makes it wait for the caller's commit
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (grinder-ao-1, TD-940's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`rpc_pr_wait` ~L911, the word read at ~L949), `src/shiftlead/cli.py` (`_pr_wait` ~L2710, `_pr_wait_call` ~L2701, the parser's `--fresh` ~L4967); design §4.7 (the `ao pr wait <n>` paragraph); `tests/test_cli.py` and the tests of `rpc_pr_wait`
+
+**Why:** read on the live copy (#2250 live in 340efe3, TD-940's Status): `ao pr wait 2252 --fresh`, called 30 s after a force-push of b9768b6, answered *green on 7b98436* — the head before the push. The fresh pass read GitHub before its rollup showed the new head's checks, and the wait took the first non-*pending* word it saw. A caller that runs `ao pr wait N && scripts/check_cadence.py --pr N` straight after a push (the pair TD-946 writes into the procedure) can go on to the gate on the old head's green; the gate's own CI row catches it there, but the wait was meant to be the one call that settles it. `--json` carries `head`, so today each caller must compare it with its own commit — the hand-rolled check the command was made to remove.
+
+**Fix:** `ao pr wait <n> --head <sha>` (a prefix taken as the reading gives it), defaulting under `--fresh` to nothing: while the reading's `head` is not the sha asked for, the word counts as *pending* and the wait goes on, re-reading on the tick; the reply names both. The design's §4.7 paragraph gains the flag and when to pass it (after a push: `--head $(git rev-parse HEAD)`), and its history a line under §4.7. Tests: a reading of the old head green, then the new head pending, then green — the wait answers only the last.
+
+**Done when** a wait given `--head` never answers a reading of another head, in tests, and §4.7 says so.
