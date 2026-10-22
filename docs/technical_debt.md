@@ -1555,8 +1555,10 @@ and role directories it names, at `<dir>` in place of the registered checkout wh
 `ao org check --root <worktree>` before the PR, in place of after the merge.
 
 **Done when** `ao org check --root <worktree>` on a branch whose `.shiftlead.yml` names a profile
-`profiles.yml` lacks prints that lack and exits 1, the same file unmerged; a directory outside every
-registered repo is refused with exit 2; a test holds both; the recipe's paragraph says to run it.
+`profiles.yml` lacks prints that lack and exits 1, the same file unmerged; the teams at `<dir>` pair
+with the registered checkout's ledger reading under its name and path (a `Team` declaration on main
+that names a team only the branch defines reads clean); a directory outside every registered repo is
+refused with exit 2; a test holds each; the recipe's paragraph and its agent checklist say to run it.
 
 **Related:** TD-623, guardians-devenv TD-028.
 
@@ -1569,7 +1571,7 @@ registered repo is refused with exit 2; a test holds both; the recipe's paragrap
 **Added:** 2026-10-21 (the designer, from TD-623; guardians-devenv TD-028 step 4)
 **Owner:** designer
 **Kind:** design-first
-**Waits:** event — Paul's answer on guardians-devenv's board line *Should the new guardians team land docs and demo changes as paired PRs*, which names this change as its third answer
+**Waits:** event — Paul's answer on guardians-devenv's board line *Should the new guardians team land docs and demo changes as paired PRs*, which names this change as its third answer. On that answer the entry is designed; on *Paired PRs* (the default) or *Umbrella-only* it drops to Low and its wait becomes `event — a second umbrella team`, since paired PRs work and only a second constellation would show the cost
 **Status:** Open. A team is on one repo (design §4.9 *Teams*): `ao progress done --pr <n>` is an integer read
 with `gh` in the record's checkout, `held:` globs match that repo's paths, and the red-PR and sync-PR work
 orders and the PR and Doing facets read that repo alone, so in an umbrella over sibling repos

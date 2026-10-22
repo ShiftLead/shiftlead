@@ -104,8 +104,8 @@ refuses before it creates anything.
 **What a node does to the repo's devcontainer** (design §4.4a): the image, its `features`,
 `remoteUser` and the lifecycle commands are kept; `mounts`, `customizations` and `containerEnv` are
 dropped, each dropped mount an empty tmpfs at its target; and the checkout is mounted at **its host
-path**, never `/workspaces/<x>`. A lifecycle script or Dockerfile line written for `/workspaces/<x>`
-does nothing there, or fails: point it at the checkout's path, and pin the image user's uid to the
+path**, never `/workspaces/<x>`. A lifecycle script written for `/workspaces/<x>` does nothing
+there, or fails `ao host up`, which names the cause: point it at the checkout's path, and pin the image user's uid to the
 person's (`useradd --uid 1000`), before `ao host up`.
 
 ## 2. Say where the repo is
@@ -247,11 +247,17 @@ One function reads the lane words against each entry's header lines (`lane_match
   touch (a private repo, a person's own area), **the briefs are the only fence** for those lines:
   say so under *The lane* in the worker's brief.
 - **An entry can sit in a lane and still not be taken**: one **settling** (new, inside its Kind's
-  `settle:` window) or **held** there by the person (design §4.4 *A new entry settles before it is
+  `settle:` window — by default only `design-first`, 5m; a Kind no layer lists settles not at all)
+  or **held** there by the person (design §4.4 *A new entry settles before it is
   pickable*), one **waiting** (a `**Waits:**` line naming a date or an event, §4.4 *An entry says
-  what it waits for*), and one that **needs a team** (`needs_team`: its `Team:` line missing or
-  naming no team the repo holds, §4.4 *An entry names its team*) match no lane. `ao repo` says
-  each, so a first start whose lane reads empty is read there first.
+  what it waits for*), and one that **needs a team** (`needs_team`: its `Team:` names no team the
+  ledger's `Fields:` line declares, or it names none where that line declares two or more, §4.4
+  *An entry names its team*) match no lane. `ao repo` says each, so a first start whose lane reads
+  empty is read there first.
+- **The pages leave the person's entries out; a lane does not.** The team card, the Repo page and
+  `ao repo` count an `Owner: paul` entry, or one blocked by `decision (paul)`, as the person's and in
+  no lane — but a bare `free-pick` member's own pick still takes an `Owner: paul` build that is
+  pickable. What the pages show is not the fence: block the entry (step 0b).
 
 ### A repo over sibling repos
 
@@ -441,7 +447,9 @@ they are about behaving inside a session; these are about setting one up.
 1. **Read before you write.** `ao team list` and `ao roles` say what already exists. A team that is
    already defined is edited, not re-added under a second name.
 2. **Write the definition, then check it, then start it.** `ao team list` fails loudly on a
-   malformed file and names the key; fix it there rather than at `start`.
+   malformed file and names the key; fix it there rather than at `start`. Both read the merged
+   checkout, not your branch (*A definition on a branch is not checked yet*, step 3): check after
+   the merge, before the start.
 3. **Never invent a host, a repo path or a profile.** A repo with no checkout on the host the team runs
    on — in its registry or under its `projects:` heading — is a refusal, not a guess — ask the person for the path.
 4. **Check the profile before you name it.** A `profile:` in a role or a member must be a key in
