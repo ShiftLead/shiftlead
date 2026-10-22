@@ -162,6 +162,12 @@ SHELLS_SAVE_EVERY = timedelta(minutes=1)
 # How long after a `kill` an `exited` hook on a record a new run has taken is the killed run's own
 # `SessionEnd` (TD-822): the walk saw it land within a second or two; fifteen is the walk's own wait.
 KILLED_END_GRACE = 15.0
+# A thread's open calls (design §4.2 *A waiter is keyed by its call*, TD-950): the last eight per thread, at
+# most sixteen threads per session; a call that never ends (the tool's own id, every subagent capture) ages out.
+OPEN_CALLS = 8
+OPEN_THREADS = 16
+# `_permission_waiting`'s thread when any thread's waiter counts
+ANY_THREAD = object()
 # A title's `needs-you` (§4.3 *Two gaps*), written by the state it replaces: over a turn, the tool's
 # embedded shell gone quiet waiting for input; over `idle`, a confirmation shown with no turn.
 TITLE_SHELL_WAITS = "the tool's shell waits for input"
@@ -4551,7 +4557,10 @@ class TickMixin:
         if (model := event.get("model")) and str(model) != s.model:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
             agent_common.write_model_file(s)  # the commit hook's trailer follows it (§4.2, TD-638)
+        running = s.subagents
         self._apply_subagents(s, event, at)
+        if not queued:
+            self._track_call(sid, event)  # a replayed event touches no list: no waiter outlived the outage
         if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):
             # a prompt went in (the tool's UserPromptSubmit, §4.1 *No prose in the argv*): the brief
             # typed by the tick, or a person's or a manager's send that cures *brief not sent*
@@ -4560,8 +4569,18 @@ class TickMixin:
         if not stale:
             self._bell_answered(s, event)  # a ring's turn, judged at its Stop (§4.10, TD-347)
         state = None if stale else event.get("state")
-        if state and state != "needs-you":
-            self._end_waiters(sid, event.get("tool_use_id"))
+        thread = event.get("subagent") or None
+        if state in ("exited", "closed"):
+            self._end_waiters(sid, every=True)  # the session's end ends every thread's waiter
+        elif event.get("subagents_reset") or (running and not s.subagents):
+            self._end_waiters(sid, every=True, subagents=True)  # no subagent is left to ask
+        pending_kind = (event.get("pending") or {}).get("kind")
+        if stale or event.get("notice") or (thread is not None and (event.get("subagent_delta") or 0) > 0):
+            pass  # a notice announces the dialog its waiter is for; a `SubagentStart` ends nothing (§4.2)
+        elif thread is not None or (state and state != "needs-you") or pending_kind == "question":
+            self._end_waiters(
+                sid, event.get("tool_use_id"), thread, event.get("call"), question=pending_kind == "question"
+            )
         if state:
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else None
             if self._permission_waiting(sid):
@@ -4604,22 +4623,94 @@ class TickMixin:
         if event.get("subagent_seen") and (last is None or when > last):
             s.subagent_at = when.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
-    def _permission_waiting(self, sid: str) -> bool:
-        return any(k[0] == sid and not f.done() for k, f in self._waiters.items())
+    def _permission_waiting(self, sid: str, thread: Any = ANY_THREAD) -> bool:
+        """Whether a waiter of the session is live: of any thread, or of the one named (a subagent's
+        id, or None for the main thread)."""
+        return any(
+            k[0] == sid and not f.done() and (thread is ANY_THREAD or t == thread)
+            for k, (f, t) in self._waiters.items()
+        )
 
-    def _end_waiters(self, sid: str, tool_use_id: Any = None) -> None:
+    def _end_waiters(
+        self,
+        sid: str,
+        tool_use_id: Any = None,
+        subagent: str | None = None,
+        call: Any = None,
+        *,
+        question: bool = False,
+        every: bool = False,
+        subagents: bool = False,
+    ) -> None:
         """A later hook event of a session whose permission is still waiting was answered in the
-        terminal (design §4.2, TD-629): the tool has moved past the dialog, and the waiter left live
-        timed out ten minutes later into a false *needs you*. A tool event names its call, so it ends
-        only the waiter of that call — a parallel tool's event says nothing about this one; an event
-        with no call (a turn's end, a prompt, the session's end) ends every waiter of the session, and
-        so does any event for a waiter whose permission named no call (`_await_permission` keyed it
-        `<session>:<time>`), since nothing could match it."""
-        for (k_sid, k_tid), fut in list(self._waiters.items()):
+        terminal (design §4.2, TD-629, TD-950): the tool has moved past the dialog, and the waiter left
+        live timed out ten minutes later into a false *needs you*. **The thread scopes it**: a waiter
+        is ended only by an event of its own thread — a subagent's by an event carrying the same
+        `subagent`, a main thread's by one carrying none. Within it, a tool event names its call, so
+        it ends that call's waiter and not another's — a parallel call's event says nothing about
+        this one; an event with no call (a turn's end, a prompt, a `SubagentStop`) ends every waiter
+        of the thread, and so does any event for a waiter whose permission matched no call
+        (`_await_permission` keyed it `<session>:<time>`). A main-thread waiter keyed by its call is
+        also ended by any main-thread `call: start` or question: its dialog is drawn, and a pane Deny
+        gives the asked call no end, so the turn's next call is the first sign. `every` ends the
+        session's waiters whatever the event (its end), or with `subagents` every subagent's."""
+        for (k_sid, k_tid), (fut, k_thread) in list(self._waiters.items()):
             if k_sid != sid or fut.done():
                 continue
-            if tool_use_id is None or k_tid == tool_use_id or k_tid.startswith(f"{sid}:"):
+            if every:
+                if not subagents or k_thread is not None:
+                    fut.set_result({"terminal": True})
+                continue
+            if k_thread != subagent:
+                continue
+            if (
+                tool_use_id is None
+                or k_tid == tool_use_id
+                or k_tid.startswith(f"{sid}:")
+                or (subagent is None and (call == "start" or question))
+            ):
                 fut.set_result({"terminal": True})
+
+    def _track_call(self, sid: str, event: dict[str, Any]) -> None:
+        """Each thread's open calls, what `_await_permission` matches a permission to (design §4.2 *A
+        waiter is keyed by its call*, TD-950): a `call: start` with its `call_sig` joins its thread's
+        list, its own `call: end` leaves it. A thread's list goes at its `SubagentStop`, every
+        subagent's at a `subagents_reset`, and the session's at its end."""
+        threads = self._open_calls.get(sid)
+        if event.get("state") in ("exited", "closed"):
+            self._open_calls.pop(sid, None)
+            return
+        thread = event.get("subagent") or None
+        if threads is not None:
+            if event.get("subagents_reset"):
+                for k in [k for k in threads if k is not None]:
+                    del threads[k]
+            if thread is not None and (event.get("subagent_delta") or 0) < 0:
+                threads.pop(thread, None)
+        tid, edge = event.get("tool_use_id"), event.get("call")
+        if not isinstance(tid, str) or not tid:
+            return
+        if edge == "start" and (sig := event.get("call_sig")):
+            threads = self._open_calls.setdefault(sid, {})
+            calls = threads.pop(thread, [])  # re-inserted: the thread heard from last is the newest
+            calls = [c for c in calls if c[0] != tid] + [(tid, str(sig))]
+            threads[thread] = calls[-OPEN_CALLS:]
+            while len(threads) > OPEN_THREADS:
+                del threads[next(iter(threads))]
+        elif edge == "end" and threads is not None and (calls := threads.get(thread)):
+            threads[thread] = [c for c in calls if c[0] != tid]
+
+    def _take_call(self, sid: str, subagent: str | None, sig: Any) -> str | None:
+        """The oldest open call of the thread with the permission's `call_sig`, consumed: its
+        `tool_use_id` keys the waiter, and two parallel calls of one signature are matched in order."""
+        calls = (self._open_calls.get(sid) or {}).get(subagent)
+        if not sig or not calls:
+            return None
+        for i, (tid, s) in enumerate(calls):
+            if s == sig:
+                del calls[i]
+                return tid
+        return None
 
     def _scrub(self, sid: str) -> None:
         """No cadence or hook key outlives the session it was about — whether the record is
@@ -4636,6 +4727,7 @@ class TickMixin:
             self._last_hook,
             self._hook_state,
             self._live_hook_at,
+            self._open_calls,
             self._killed_at,
             self._mail_hints,
             self._asks_hints,
