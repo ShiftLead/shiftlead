@@ -49,6 +49,9 @@ PUSH_OPEN = b'{"event": "session", "session": '  # a pushed view's envelope, mea
 TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
+# How long after a prompt's sure end the tool's `permission_prompt` notice is still that prompt's (design §4.2
+# *Open prompts are a stack*, TD-950): it lands about six seconds after the dialog is drawn (every subagent capture).
+NOTICE_LAG = 10.0
 # How long a declared claim holds its reference (design §4.8 "A claim is a lease", TD-056): kept in
 # `sessionorc.mail` since TD-216, where the Inbox's standing of an orphaned question reads it too.
 LEASE_TTL = mail.LEASE_TTL
@@ -364,6 +367,18 @@ def model_env(adapter: str, model: str | None, directory: Path) -> dict[str, str
         except OSError as e:
             log.warning("could not remove %s: %s", env["AGENT_MODEL_FILE"], e)
     return env
+
+
+def limit_is_modal(s: Session | None, adapter: Any) -> bool:
+    """Whether a record's `limited` is a modal screen rule's (design §4.3 *The limit dialog is read off the
+    screen*): `scraped`, and the adapter's `explain` on the record's own tail a `modal` match. A title
+    adapter is asked without a title, so its manifest alone answers. No record, no `explain`, or no match
+    is not modal."""
+    if s is None or s.state != "limited" or s.confidence != "scraped":
+        return False  # asked of every view and every send: only a scraped `limited` reads its tail
+    explain = getattr(adapter, "explain", None)
+    m = explain(s.tail) if explain is not None else None
+    return bool(m is not None and m.modal)
 
 
 def write_model_file(s: Session) -> None:

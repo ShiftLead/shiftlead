@@ -38,6 +38,7 @@ from sessionorc.models import (
     Session,
     context_over,
     context_reading,
+    permission_entry,
     pr_marks,
     report_line,
     start_note,
@@ -137,8 +138,7 @@ def cmd_wait(args: argparse.Namespace) -> int:
         # time that is left, so a lead does not see a promote. The transport owns that, not this.
         got, remakes = await clientmod.wait_rpc(caller=caller, timeout=args.timeout, scope=args.scope)
         if remakes and not args.json:
-            times = "once" if remakes == 1 else f"{remakes} times"
-            print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {times}")
+            print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {_times(remakes)}")
         return got
 
     try:
@@ -238,11 +238,20 @@ def _node_status_line() -> str:
     return f"offline — {where}, which is unreachable: this host's sessions only; no mail, no org"
 
 
+def pending_words(p: Any) -> str:
+    """A record's pending as `ao status`, `ao send --wait` and `ao explain` print it: *← kind: text*, and a
+    subagent's prompt names its asker (§4.2 *A subagent's dialog is held back*, TD-950); "" with none."""
+    if not isinstance(p, dict) or not p:
+        return ""
+    who = f" (from the {p['subagent_name']} subagent)" if p.get("subagent_name") else ""
+    return f"  ← {p['kind']}: {p['text']}{who}"
+
+
 def status_line(s: dict[str, Any], w: int = 0) -> str:
     """A record's one line as `ao status` prints it: id, state (`~` when scraped), age, adapter, mode
     and what is pending. `ao restart` prints the new record with it (design §4.7)."""
     conf = " ~" if s["confidence"] == "scraped" else ""  # a guess alone; a `tick` state is observed (TD-490)
-    pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
+    pend = pending_words(s.get("pending"))
     mode = " [unattended]" if s.get("unattended") else ""
     return f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}"
 
@@ -1225,7 +1234,7 @@ def cmd_send(args: argparse.Namespace) -> int:
     text = " ".join(args.text) if args.text else sys.stdin.read()
     s = call_sync("send", id=args.id, text=text, wait=args.wait, timeout=args.timeout)
     if s:  # --wait: the settled record
-        pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
+        pend = pending_words(s.get("pending"))
         return emit(args, s, lambda: print(f"{s['id']}: {s['state']}{pend}"))
     return emit(args, {"ok": True, "id": args.id}, lambda: None)  # without --wait the RPC returns nothing
 
@@ -1243,8 +1252,7 @@ def _print_explanation(x: dict[str, Any]) -> None:
         if x.get("id")
         else f"{x.get('file', 'fixture')}  ({x['adapter']} rules)"
     )
-    if x.get("pending"):
-        head += f"  ← {x['pending']['kind']}: {x['pending']['text']}"
+    head += pending_words(x.get("pending"))
     print(head)
     if "title" in x:
         print(f"title: {x['title']}")
@@ -2695,15 +2703,34 @@ def _pr_wait_root(args: argparse.Namespace) -> str | None:
     return str(pathlib.Path(out).parent) if common.returncode == 0 and out else None
 
 
+def _times(n: int) -> str:
+    return "once" if n == 1 else f"{n} times"
+
+
+def _pr_wait_call(root: str, n: int, timeout: float, fresh: bool, head: str | None = None) -> tuple[Any, int]:
+    """The `pr_wait` RPC, carried across a host-agent restart as `ao wait`'s is (`client.blocking_rpc`):
+    `(the reading's answer, or None at the timeout in a restart's gap; how many times it was remade)`."""
+    caller = os.environ.get("SHIFTLEAD_SESSION") or None
+    extra = {"head": head} if head else {}  # an older home knows no `head`: sent only when asked
+    go = clientmod.blocking_rpc(
+        "pr_wait", caller=caller, timeout=timeout, expired=None, root=root, pr=n, fresh=fresh, **extra
+    )
+    return asyncio.run(go)
+
+
 def _pr_wait(args: argparse.Namespace) -> int:
-    """`ao pr wait <n> [--timeout S] [--fresh]` (design §4.7, TD-940): block on the home's folded
-    reading of PR `n` until it leaves *pending*, print the word and exit by it — 0 green, 1 red, 2
-    conflicting, 3 none, 4 timeout, 5 refused (a number the reading does not hold, a checkout it
-    holds no reading of, a home that is down or predates the RPC) with the why. A call of its own
-    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake."""
+    """`ao pr wait <n> [--timeout S] [--fresh] [--head SHA]` (design §4.7, TD-940): block on the home's
+    folded reading of PR `n` — of commit `SHA` only, with `--head` (TD-953) — until it leaves *pending*,
+    print the word and exit by it — 0 green, 1 red, 2 conflicting, 3 none, 4 timeout, 5 refused (a number
+    the reading does not hold, a checkout it holds no reading of, a home that is down or predates the RPC,
+    a `--head` that is no sha) with the why. A call of its own
+    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake. A connection
+    the home drops under it (a promote's restart) is remade for the time left, as `ao wait`'s is."""
     from sessionorc import reports
 
     gone = reports.PR_WAIT_EXIT["gone"]
+    if args.head and not re.fullmatch(r"[0-9a-fA-F]{7,40}", args.head):
+        return fail(args, f"--head {args.head!r} is not a commit's sha: pass one, e.g. $(git rev-parse HEAD)", gone)
     try:
         root = _pr_wait_root(args)
     except AgentUnavailable as e:
@@ -2711,9 +2738,7 @@ def _pr_wait(args: argparse.Namespace) -> int:
     if not root:
         return fail(args, "no checkout to read: the record names no repo, and this directory is in none", gone)
     try:
-        got = call_sync(
-            "pr_wait", root=root, pr=args.n, timeout=args.timeout, fresh=args.fresh, _timeout=args.timeout + 30.0
-        )
+        got, remakes = _pr_wait_call(root, args.n, args.timeout, args.fresh, args.head)
     except AgentUnavailable as e:
         return fail(args, str(e), gone)
     except AgentError as e:
@@ -2722,6 +2747,11 @@ def _pr_wait(args: argparse.Namespace) -> int:
         return fail(args, str(e), gone)
     except Exception as e:  # noqa: BLE001 — anything else is no word: 1 or 2 would read as red or conflicting
         return fail(args, f"the wait could not be made: {type(e).__name__}: {e}", gone)
+    if got is None:  # the time ran out while the home restarted: no reading came back
+        got = {"pr": args.n, "word": "timeout", "checks": None, "conflicting": False, "failing": [], "head": None}
+        got["want_head"] = (args.head or "").lower() or None
+    if remakes and not args.json:
+        print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {_times(remakes)}")
     word = str(got.get("word") or "")
     if word == "gone":
         return fail(
@@ -2740,6 +2770,8 @@ def _pr_wait(args: argparse.Namespace) -> int:
             tail += ": " + ", ".join(got["failing"])
         elif word == "timeout":
             tail = f" after {args.timeout:g}s, still {got.get('checks') or 'unread'}" + (f" on {head}" if head else "")
+            if (want := str(got.get("want_head") or "")) and not str(got.get("head") or "").startswith(want):
+                tail += f", not yet {want[:7]}"  # the reading never reached the commit asked for
         print(f"PR #{args.n} {word}{tail}")
         if got.get("read_error"):
             print(f"the home's last read of the PRs failed: {got['read_error']}")
@@ -3999,13 +4031,16 @@ def _counts(args: argparse.Namespace) -> int:
 
 def cmd_decide(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)
-    pend = s.get("pending") or {}
     if s.get("permission_channel") is False:
         # no hook answers this tool's permission (§4.3 *Permissions: no channel*, TD-785): said before any call
         msg = f"{args.id}'s tool has no permission channel: answer it in the terminal"
         return fail(args, msg, 1, prose=msg)
-    if pend.get("kind") != "permission" or not pend.get("tool_use_id"):
-        msg = f"{args.id} has no pending permission"
+    # the newest *permission* entry, or the one `--call` names (§4.2 *Every entry is answerable where it
+    # is drawn*, TD-950): a question on top of it is the terminal's
+    call = getattr(args, "call", None)
+    pend = permission_entry(s, call)
+    if pend is None:
+        msg = f"{args.id} has no pending permission" + (f" with call {call}" if call else "")
         return fail(args, msg, 1, prose=msg)  # no "error:" prefix: the line main printed before --json
     call_sync("decide", id=args.id, tool_use_id=pend["tool_use_id"], behavior=args.behavior, reason=args.reason)
     result = {"ok": True, "id": args.id, "behavior": args.behavior, "tool_use_id": pend["tool_use_id"]}
@@ -4951,6 +4986,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--id", help="another session's record (default: this session's own)")
     p.add_argument("--timeout", type=float, default=1800.0, help="wait: seconds before it gives up, exit 4 (1800)")
     p.add_argument("--fresh", action="store_true", help="wait: have the home re-read the PRs, and count only that read")
+    p.add_argument("--head", metavar="SHA", help="wait: count only a reading of this commit (after a push: HEAD's)")
     p.set_defaults(fn=cmd_pr)
 
     p = add("migrate", help="once, with no session running: move ~/.agentorc and the old units to shiftlead's names")
@@ -4986,6 +5022,9 @@ def build_parser() -> argparse.ArgumentParser:
         p = add(behavior, help=f"{behavior} the pending permission")
         p.add_argument("id")
         p.add_argument("reason", nargs="?")
+        p.add_argument(
+            "--call", metavar="TOOL_USE_ID", help="the entry to answer, where several are open (default: the newest)"
+        )
         p.set_defaults(fn=cmd_decide, behavior=behavior)
     return ap
 

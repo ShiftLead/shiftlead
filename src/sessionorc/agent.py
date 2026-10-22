@@ -101,6 +101,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     MODEL_FILE,  # noqa: F401
     NODE_ACTS,  # noqa: F401
     NODE_READS,  # noqa: F401
+    NOTICE_LAG,  # noqa: F401
     ORPHAN_AFTER,  # noqa: F401
     OWED_NAMED,  # noqa: F401
     PASTE_SHOW_SECONDS,  # noqa: F401
@@ -192,6 +193,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     draft_folder,  # noqa: F401
     idle_from,  # noqa: F401
     launch_params,  # noqa: F401
+    limit_is_modal,  # noqa: F401
     log,  # noqa: F401
     model_env,  # noqa: F401
     on_its_own,  # noqa: F401
@@ -372,6 +374,17 @@ def _mib(n: int) -> str:
     if n >= 1 << 30 and n % (1 << 30) == 0:
         return f"{n >> 30} GiB"
     return f"{-(-n // (1 << 20))} MiB"
+
+
+def _clock_words(iso: str | None) -> str:
+    """A stored instant in this host's clock, *14:05*, for a refusal's words; the instant itself where
+    it does not parse, and *its deadline* with none."""
+    if not iso:
+        return "its deadline"
+    try:
+        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().strftime("%H:%M")
+    except ValueError:
+        return iso
 
 
 def _bound(path: Path) -> socket.socket:
@@ -555,6 +568,8 @@ class HostAgent(
             if s.pending and s.pending.kind == "prompt":
                 s.set_state("idle", confidence="hook")
                 self.store.save(s)
+            if self._sweep_prompts(s):  # no waiter outlives the host agent (§4.2, TD-950)
+                self.store.save(s)
             if not s.host:  # a record written before TD-057 step 1: it ran here, so it is this host's
                 s.host = self.host
                 self.store.save(s)
@@ -593,8 +608,19 @@ class HostAgent(
         # every open client connection: a stop closes them, or `Server.wait_closed()` waits on the
         # UI's subscription and each blocked `wait` forever (TD-058)
         self._conns: set[asyncio.StreamWriter] = set()
-        # (session id, tool_use_id) → the hook's pending decision
-        self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
+        # (session id, tool_use_id) → the hook's pending decision and the thread that asked it: a
+        # subagent's id, or None for the main thread (design §4.2 *A waiter is keyed by its call*, TD-950)
+        self._waiters: dict[tuple[str, str], tuple[asyncio.Future[dict[str, Any]], str | None]] = {}
+        # session id → thread (a subagent's id, or None) → its open calls, `(tool_use_id, call_sig)` oldest
+        # first: what a permission, which names no call, is matched to (§4.2, TD-950). In memory only.
+        self._open_calls: dict[str, dict[str | None, list[tuple[str, str]]]] = {}
+        # session id → when its last open prompt had a sure end (`time.monotonic()`): a decision, the asked
+        # call's own event, or an event naming no call; the tool's notice inside `NOTICE_LAG` of it is that
+        # prompt's (§4.2 *Open prompts are a stack*, TD-950). In memory only: a restart lets one notice through.
+        self._sure_end: dict[str, float] = {}
+        # records whose emptied stack restored a screen rule's `needs-you`: the next tick asks the rules once,
+        # whatever the hook's freshness (§4.2, TD-950)
+        self._recheck: set[str] = set()
         self._git_checked: dict[str, datetime] = {}
         # the status each record's recent files were last read at (§4.2, TD-538): `(oid, dirty, porcelain)`
         self._files_read: dict[str, tuple[Any, ...]] = {}
@@ -796,6 +822,11 @@ class HostAgent(
         # re-adopt a dead pane and a hand-made session that reuses the name is adopted at once
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
+        # Ids whose create is starting their tmux session in a thread: the pane exists before the
+        # record does, and a tick between the two must not adopt it as a nameless shell — on a node
+        # that adoption reaches the home first, which then refuses the real record as another
+        # session (TD-952). The create's own record goes in on the loop, before its next await.
+        self._starting: set[str] = set()
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
         self._oversize: set[str] = set()  # ids whose view is past the line limit, logged once each
         self._backed_up = ""  # the local date of the last nightly tarball tried (a home only)
@@ -907,7 +938,9 @@ class HostAgent(
 
     PR_WAIT_STEP = 2.0  # seconds between looks at the reading: it lives in memory, so a look is free
 
-    async def rpc_pr_wait(self, root: str, pr: int, timeout: float = 1800.0, fresh: bool = False) -> dict[str, Any]:
+    async def rpc_pr_wait(
+        self, root: str, pr: int, timeout: float = 1800.0, fresh: bool = False, head: str | None = None
+    ) -> dict[str, Any]:
         """`ao pr wait <n>` (design §4.7, TD-940): block until the home's reading of PR `pr` in the
         checkout `root` leaves *pending*, and return `{pr, word, checks, conflicting, failing, head,
         read_at, url}` — `word` one of `reports.PR_WAIT_EXIT`'s. The wake is the reading's refresh,
@@ -915,8 +948,10 @@ class HostAgent(
         only a reading taken after the call. A number the reading does not hold is *gone* once a
         reading taken after the call still lacks it (a PR opened a minute ago is not yet in the one
         before), and at `timeout` the word is *timeout* with the last row; `read_error` is the last
-        read's failure, if it failed. A read: it decides nothing
-        on its caller, and the client names the root (`ao` sends its record's repo). Its connection
+        read's failure, if it failed. `head` (`want_head` in the reply; a sha or a prefix of one, TD-953)
+        counts only a row of that commit: one of another head is *pending* whatever it says, so a reading
+        of the commit before a push never answers for it. A read: it decides nothing on its caller, and
+        the client names the root (`ao` sends its record's repo). Its connection
         is held as a `wait`'s is (`_serve_wait`), so a Ctrl-C ends it here too. The home's."""
         want = str(Path(root).resolve())
         key = next((r for r in self._repos if str(Path(r).resolve()) == want), None)
@@ -925,6 +960,7 @@ class HostAgent(
         loop = asyncio.get_running_loop()
         deadline = loop.time() + max(float(timeout), 0.0)
         began = datetime.now(UTC)
+        want_head = str(head or "").strip().lower()
         if fresh:
             self._repos_fresh = True  # the next tick reads every repo's PRs, this one's among them
         row: dict[str, Any] | None = None
@@ -945,7 +981,8 @@ class HostAgent(
                 if got is None and after:
                     word, row = "gone", None  # an earlier reading's row is not this one's
                     break
-                if got is not None and (word := reports.pr_wait_word(got)) != "pending":
+                ours = got is not None and str(got.get("head") or "").lower().startswith(want_head)
+                if ours and (word := reports.pr_wait_word(got)) != "pending":
                     break
             if loop.time() >= deadline:
                 word = "timeout"
@@ -959,6 +996,7 @@ class HostAgent(
             "conflicting": bool(row.get("conflicting")),
             "failing": list(row.get("failing") or []),
             "head": row.get("head"),
+            "want_head": want_head or None,  # the commit asked for, beside the one the reading is of
             "url": row.get("url"),
             "read_at": at or None,
             # the last read failed (`gh` offline, a lapsed token): the reading is the one before it
@@ -1321,11 +1359,14 @@ class HostAgent(
                     **model_env,
                 }
                 run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
+                self._starting.add(sid)
                 try:
                     await asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log)
                     break
                 except DuplicateSession:
                     taken.add(sid)  # design §4.1: handle tmux's own verdict, not just our check
+                finally:
+                    self._starting.discard(sid)  # nothing awaits between here and `self.sessions[sid] = s`
             else:
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
             s = Session(
@@ -2319,6 +2360,12 @@ class HostAgent(
             if first is not None:
                 return await first
         self._refuse_gone(s)
+        if s.pending and s.pending.pane_held:
+            # a subagent's dialog is not drawn while the hook blocks (§4.2 *A subagent's dialog is held
+            # back*, TD-950): the buttons are its one channel until the deadline, never the terminal
+            until = _clock_words(s.pending.deadline)
+            msg = f"a subagent's permission is pending: press Allow / Deny (the pane shows nothing until {until})"
+            raise RpcError(msg)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
         if wrapup and not adapters.has_agent(s.adapter):
@@ -2464,9 +2511,10 @@ class HostAgent(
         capture — `capture_tail` returns [] then) counts as emptied: no evidence is not evidence of a
         stuck prompt.
 
-        `lead` is a line of the home's typed as literal keys before the paste, in the same prompt —
-        the brief's line (§4.1 *The brief is the person's word*, TD-347). A paste refused while that
-        line is in the composer — typed now, or by an earlier try (`lead_in`) — raises `LeadTyped`."""
+        `lead` is the fixed line in the person's voice (`mail.BRIEF_LINE`), typed as literal keys
+        before the paste, in the same prompt (§4.1 *The brief is the person's word*, TD-347). A paste
+        refused while that line is in the composer — typed now, or by an earlier try (`lead_in`) —
+        raises `LeadTyped`."""
         reader = getattr(adapter, "composer", None)
         # A pane scrolled back is in copy mode, where the Enter would be the mode's (§4.3, TD-667).
         await asyncio.to_thread(self.tmux.leave_copy_mode, sid)
@@ -2573,7 +2621,15 @@ class HostAgent(
             title = pane.title if pane else ""
             m = explain(tail, title=title)
             out["title"], out["match"] = title, m.to_dict() if m else None
-            out["reason"] = self._title_reading(s, m, now)[1]
+            if m is not None and not m.title:  # the adapter's manifest, asked first (§4.3)
+                if self._hook_within(s, adapter, now):
+                    out["reason"] = f"rule {m.rule} matched, but a hook reported within a tick — the hook state wins"
+                elif s.state == m.state == "limited" and s.confidence == "hook":
+                    out["reason"] = f"rule {m.rule} matched, but the usage poll's limited stands — its reading kept"
+                else:
+                    out["reason"] = f"rule {m.rule} matched, applied as scraped; held for its screen"
+            else:
+                out["reason"] = self._title_reading(s, m, now)[1]
             return out
         m = explain(tail)
         out["match"] = m.to_dict() if m else None

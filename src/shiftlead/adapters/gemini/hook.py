@@ -8,7 +8,13 @@ reported as `needs-you` and answered in the terminal (§4.3 *Permissions: no cha
 `run_shell_command` whose command the kill guard refuses exits 2 with the reason on stderr, the tool's
 own block, with no call to the host agent: the tool never runs, and its turn's `AfterAgent` reports.
 
-Exits 0 otherwise, printing nothing: the tool parses a hook's stdout as JSON.
+Two events hand the tool context as `additionalContext`, the one stdout the tool reads as context
+rather than an on-screen message: `SessionStart` the launch's start context and the repo's start hooks'
+output (§4.3 `start_context`, *The repo's start hooks*), read before it reports, since the host agent
+types the first prompt once that report lands; `BeforeAgent` the unread line, the host agent's words for
+the session's mail (§4.3 `mail`), never at a doorbell's own prompt, which is that line already.
+
+Exits 0 otherwise, printing nothing but that JSON.
 """
 
 from __future__ import annotations
@@ -16,10 +22,13 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
+from sessionorc.mail import unread_line
 from sessionorc.store import EventQueue
 from shiftlead.adapters.claude_code.hook import Refused, call_agent, capture
 from shiftlead.kill_guard import refuse
@@ -32,6 +41,12 @@ PERMISSION_TYPES = {"exec", "edit", "mcp", "info"}
 # each confirmation's own detail, read after the tool's message: what is run, edited, called or fetched
 DETAIL_KEYS = ("command", "filePath", "toolName", "prompt")
 BLOCK = 2  # the exit code that blocks the tool's action, its stderr the reason
+# the launch's start-context file (design §4.3 `start_context`), which `SessionStart` hands the tool as
+# `additionalContext`: a path in the environment, never the text in the argv (§4.1, TD-339)
+START_CONTEXT_ENV = "SHIFTLEAD_START_CONTEXT_FILE"
+# dev-cadence's runner (design §4.3 *A repo's start hooks are every adapter's to run*), the main checkout's
+START_HOOKS = ("scripts", "cadence_hooks.sh")
+START_HOOKS_TIMEOUT = 150  # seconds: the runner's own bound, > 5 children × its 25 s child timeout
 
 
 def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -81,6 +96,69 @@ def refused_command(payload: dict[str, Any]) -> str | None:
     return refuse(command) if isinstance(command, str) else None
 
 
+def start_context(payload: dict[str, Any]) -> str:
+    """`SessionStart`'s context: the launch's start-context file, then what the repo's start hooks printed."""
+    told = ""
+    if where := os.environ.get(START_CONTEXT_ENV):
+        with contextlib.suppress(OSError, ValueError):  # read as the launch wrote it (`write_context_file`)
+            told = Path(where).read_text(encoding="utf-8", errors="surrogateescape").strip()
+    return "\n\n".join(x for x in (told, start_hooks(payload).strip()) if x)
+
+
+def start_hooks(payload: dict[str, Any]) -> str:
+    """Run the repo's start hooks, as Claude Code's layer line does (`CADENCE_HOOK_LINE`): the main
+    checkout's runner — the first entry of `git worktree list` — else the project's own copy, only where
+    it is executable; its stdout, or "" when there is none or it failed."""
+    cwd = Path(str(payload.get("cwd") or os.getcwd()))
+    project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or cwd)
+    try:
+        listed = subprocess.run(
+            ["git", "-C", str(project), "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout
+    except (OSError, subprocess.SubprocessError, ValueError):
+        listed = ""
+    first = listed.splitlines()[0] if listed else ""
+    root = Path(first.removeprefix("worktree ")) if first.startswith("worktree ") else project
+    runner = root.joinpath(*START_HOOKS)
+    if not (runner.is_file() and os.access(runner, os.X_OK)):
+        return ""
+    try:
+        done = subprocess.run(
+            [str(runner), "--session-start"],
+            capture_output=True,
+            text=True,
+            cwd=cwd if cwd.is_dir() else None,
+            timeout=START_HOOKS_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return ""
+    return done.stdout
+
+
+def mail_context(payload: dict[str, Any], reply: Any) -> str:
+    """`BeforeAgent`'s context: the unread line while mail is unread, never at the doorbell's own prompt."""
+    n = reply.get("unread") if isinstance(reply, dict) else None
+    if not isinstance(n, int) or n <= 0 or str(payload.get("prompt") or "").strip() == unread_line(n):
+        return ""
+    return unread_line(n)
+
+
+def report(params: dict[str, Any], session: str) -> Any:
+    """Tell the host agent, queued when it is down; its reply, None when it gave none."""
+    try:
+        return call_agent(params, timeout=3)
+    except Refused as e:
+        print(f"shiftlead-hook: {session}: the host agent refused the event: {e}", file=sys.stderr)
+    except Exception:  # noqa: BLE001
+        queued = {k: v for k, v in params.items() if k not in ("session", "mail")}
+        with contextlib.suppress(OSError):
+            EventQueue().append(session, {**queued, "at": time.time()})
+    return None
+
+
 def main() -> int:
     session = os.environ.get("SHIFTLEAD_SESSION")
     if not session:
@@ -100,14 +178,17 @@ def main() -> int:
     params = translate(payload)
     if params is None:
         return 0
+    ev = payload.get("hook_event_name")
+    # read before the report: the host agent types the first prompt once `SessionStart` reports
+    context = start_context(payload) if ev == "SessionStart" else ""
     params["session"] = session
-    try:
-        call_agent(params, timeout=3)
-    except Refused as e:
-        print(f"shiftlead-hook: {session}: the host agent refused the event: {e}", file=sys.stderr)
-    except Exception:  # noqa: BLE001
-        with contextlib.suppress(OSError):
-            EventQueue().append(session, {**{k: v for k, v in params.items() if k != "session"}, "at": time.time()})
+    if ev == "BeforeAgent":
+        params["mail"] = True
+    reply = report(params, session)
+    if ev == "BeforeAgent":
+        context = mail_context(payload, reply)
+    if context:
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": ev, "additionalContext": context}}))
     return 0
 
 

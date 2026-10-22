@@ -975,6 +975,8 @@
       if (action === "wrapup") body = { key: AO.mintKey() };  // one per press: a repeat types it once (TD-806)
       // design §4.5a **Deny** (TD-117): the reason box beside this Deny, if one was filled
       if (action === "deny") { const w = b.parentElement && b.parentElement.querySelector("input.denywhy"); body = AO.denyBody(w && w.value); }
+      // a line per open prompt answers its own entry (§4.2 *Every entry is answerable where it is drawn*, TD-950)
+      if ((action === "allow" || action === "deny") && b.dataset.call) body.call = b.dataset.call;
       if (action === "grants") body = b.classList.contains("off") ? { add: [b.dataset.grant] } : { remove: [b.dataset.grant] };
       // design §4.5a Focus **controllers** chip (§4.8, TD-036): remove one by clicking it, add one
       // by id. The agent decides what is allowed; a refusal comes back as the toast below.
@@ -5537,12 +5539,21 @@
       // the pill's hover (§4.5a **state pill hover**, TD-490): the card's one text, from the view
       let head = `<span class="pill s-${cls}${scraped}" title="${esc(v.pill_title || "")}"><span class="dot"></span>${v.state_label}</span>`;
       const p = v.pending;
+      // a subagent's prompt names its asker, and says the pane draws nothing until the deadline (§4.2,
+      // §4.5a **Allow / Deny**, TD-950): `held_line.html`'s words, the deadline in the reader's clock
+      const heldSpan = (h) => h ? ` <span class="meta held">from the ${esc(h.name)} subagent${h.deadline ? ` · the pane shows nothing until <span class="localtime" data-at="${esc(h.deadline)}" title="${esc(h.deadline)}">${esc(h.deadline)}</span>` : ""}</span>` : "";
+      const held = heldSpan(v.state === "needs-you" ? v.held : null);
+      // the open prompts beneath the newest, each answerable on its own line (§4.2 *Every entry is
+      // answerable where it is drawn*, TD-950): `held_line.html`'s `prompt_line`, its buttons naming the call
+      const others = v.state === "needs-you" ? (v.others || []).map((o) => `<div class="row gap wrap pline"><span class="meta">${esc(o.text)}</span>${o.answerable
+        ? ` <span class="meta countdown" data-deadline="${esc(o.deadline)}"></span> <button class="btn sm" data-act="allow" data-id="${id}" data-call="${esc(o.call)}" data-line>Allow</button> <button class="btn sm" data-act="deny" data-id="${id}" data-call="${esc(o.call)}" data-line>Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">`
+        : ""}${heldSpan(o.held)}</div>`).join("") : "";
       // Allow / Deny only for a tool with a permission channel (§4.3, §4.5a, TD-785): else the terminal's
       if (v.state === "needs-you" && p && p.kind === "permission" && v.permission_channel !== false) {
-        head += ` <button class="btn sm primary" data-act="allow" data-id="${id}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}">Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"> <span class="meta">${esc(p.text)}</span> <span class="meta countdown" data-deadline="${p.deadline || ""}"></span>`;
+        head += ` <button class="btn sm primary" data-act="allow" data-id="${id}" data-call="${esc(p.tool_use_id || "")}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}" data-call="${esc(p.tool_use_id || "")}">Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"> <span class="meta">${esc(p.text)}</span> <span class="meta countdown" data-deadline="${p.deadline || ""}"></span>${held}${others}`;
         compose.disabled = true; $("#composehint").textContent = "a permission is pending: answer above";
       } else if (v.state === "needs-you" && p) {
-        head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>`;
+        head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>${held}${others}`;
         compose.disabled = true; $("#composehint").textContent = "answer in the terminal above";
       } else if (v.state === "unreachable" && p && p.host_unreachable) {
         // design §4.4a: the hook still blocks on its node, and an answer from here cannot reach it
@@ -6016,8 +6027,8 @@
     // no `data-focus` — `markPopped` would relabel it and the pop-out click would claim it
     { keys: ["Enter", "o"], page: "org", ring: true, control: "Focus (Details, or Focus window); on a team's + card, New session on that team", sel: "a[data-focus], a.plusgo" },
     { keys: ["Shift+Enter"], page: "org", ring: true, control: "Pop out", sel: '[data-act="popout"]' },
-    { keys: ["a"], page: "org", ring: true, control: "Allow its permission", sel: '[data-act="allow"]' },
-    { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]' },
+    { keys: ["a"], page: "org", ring: true, control: "Allow its permission", sel: '[data-act="allow"]:not([data-line])' },
+    { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]:not([data-line])' },
     // the fold (§4.5a *team card: fold*, TD-194): on a card it folds the card's team and the ring
     // goes to the header; on a folded team's header, as `Enter` there, it opens it
     { keys: ["f"], page: "org", ring: true, control: "fold its team (on a folded team's header, open it)", sel: "[data-fold]", fold: true },

@@ -74,7 +74,9 @@ class Adapter(Protocol):
     #                                                      `explain(tail, title=…)` reads it, and the tick
     #                                                      writes the verdict as `confidence: title` (design
     #                                                      §4.2 *A title the tool writes its state into*,
-    #                                                      TD-785); False where unset
+    #                                                      TD-785); False where unset. A verdict read off
+    #                                                      the title is a `Match` with `title=True`; any
+    #                                                      other `explain` returns is a screen rule's (§4.3)
     #   title(pane_title: str) -> str | None              the session's name as the tool holds it, read from
     #                                                      the terminal title the tool set (tmux `#{pane_title}`,
     #                                                      carried on `PaneInfo.title`) with the tool's own
@@ -188,6 +190,20 @@ def implements(adapter: object) -> frozenset[str]:
 # -- the transcript's neutral shape (design §4.5 screen 9 *The adapter renders, the core draws*) --
 
 ENTRY_KINDS = ("prompt", "text", "thought", "tool", "compaction", "sidechain")
+
+
+MAIL_HOWS = ("command", "turn", "tool", "hook")
+
+
+@dataclass(frozen=True)
+class MailDelivery:
+    """What an adapter's `mail()` returns (design §4.3, §4.10): how a session of its tool learns it has
+    mail — `how` is one of `MAIL_HOWS`, a command it runs, an injection at the top of a turn, a tool call
+    or a hook — and the tool's event that carries it (`event`), for the record. The words are always the
+    host agent's (`mail.unread_line`), never a sender's."""
+
+    how: str
+    event: str = ""
 
 
 @dataclass

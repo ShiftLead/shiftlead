@@ -72,6 +72,8 @@ NODE_OWNED = frozenset(
         "state",
         "since",
         "pending",
+        "pendings",
+        "kept",
         "confidence",
         "pane",
         "tail",
@@ -83,6 +85,7 @@ NODE_OWNED = frozenset(
         "model",
         "context",
         "subagents",
+        "subagent_ids",
         "subagent_at",
         "shells",
         "shells_at",
@@ -195,13 +198,31 @@ class Pending:
     text: str
     deadline: str | None = None  # ISO time the hook falls through to the terminal (permission only)
     tool_use_id: str | None = None
+    # A prompt from inside a subagent (design §4.2 *A subagent's dialog is held back*, TD-950): the
+    # subagent's own id and the name it is shown by, from the adapter's neutral fields; `pane_held`
+    # while the pane draws nothing for it, so Allow / Deny are its one channel until the deadline.
+    subagent: str | None = None
+    subagent_name: str | None = None
+    pane_held: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        if not self.subagent:  # a main-thread prompt's shape is as it was: the three are a subagent's
+            for k in ("subagent", "subagent_name", "pane_held"):
+                d.pop(k)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Pending:
-        return cls(kind=d["kind"], text=d.get("text", ""), deadline=d.get("deadline"), tool_use_id=d.get("tool_use_id"))
+        return cls(
+            kind=d["kind"],
+            text=d.get("text", ""),
+            deadline=d.get("deadline"),
+            tool_use_id=d.get("tool_use_id"),
+            subagent=d.get("subagent"),
+            subagent_name=d.get("subagent_name"),
+            pane_held=bool(d.get("pane_held")),
+        )
 
 
 @dataclass
@@ -271,6 +292,25 @@ class FindingEntry:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> FindingEntry:
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+def open_prompts(rec: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """A record's open prompts as dicts, **newest first** (design §4.2 *Open prompts are a stack*,
+    TD-950): its `pendings`, else its one `pending` (a record of an older build, or a screen road's)."""
+    pends = [p for p in rec.get("pendings") or () if isinstance(p, dict)]
+    if not pends and isinstance(rec.get("pending"), dict) and rec["pending"]:
+        pends = [rec["pending"]]
+    return pends[::-1]
+
+
+def permission_entry(rec: Mapping[str, Any], call: str | None = None) -> dict[str, Any] | None:
+    """The permission **Allow / Deny** answer (§4.2 *Every entry is answerable where it is drawn*,
+    TD-950): the entry whose `tool_use_id` is `call`, else the newest permission entry — never a
+    question on top of it; None where there is none to answer."""
+    perms = [p for p in open_prompts(rec) if p.get("kind") == "permission" and p.get("tool_use_id")]
+    if call:
+        return next((p for p in perms if p["tool_use_id"] == call), None)
+    return perms[0] if perms else None
 
 
 ATTENTION_KINDS = ("permission", "question", "needs", "stalled", "limited", "unpushed")
@@ -938,6 +978,12 @@ class Session:
     state: State = "working"
     since: str = field(default_factory=now_iso)
     pending: Pending | None = None
+    # Open prompts are a stack (design §4.2 *Open prompts are a stack; the main thread's state is kept
+    # beneath it*, TD-950): every open prompt, oldest first, `pending` being the newest; and `kept`, the
+    # state the first one replaced — `state`, `pending` (a dict), `confidence`, `since` — which the record
+    # takes back once the last ends. Both empty while nothing is open.
+    pendings: list[Pending] = field(default_factory=list)
+    kept: dict[str, Any] | None = None
     confidence: Confidence = "scraped"
     unattended: bool = False
     created: str = field(default_factory=now_iso)
@@ -965,6 +1011,10 @@ class Session:
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).
     pane: bool = True
     subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
+    # The live subagents' ids, as their `SubagentStart`s named them (§4.2, TD-960): a `SubagentStop` for an
+    # id none announced (the tool's own) moves no count. A count above their number is an id-less start's,
+    # or a record of an older build, and an unannounced stop still takes it down.
+    subagent_ids: list[str] = field(default_factory=list)
     # When a subagent last said anything (design §4.2 *Working on its own*, TD-734): the time of the last
     # event the adapter marked `subagent_seen`, never moved back, so a replay never revives a stale
     # pill. `subagents_live` reads it with `subagents`; both are reset on a fresh conversation and on exit.
@@ -1288,6 +1338,7 @@ class Session:
         d = asdict(self)
         d.pop("rev")
         d["pending"] = self.pending.to_dict() if self.pending else None
+        d["pendings"] = [p.to_dict() for p in self.pendings]
         d["inbox"] = [e.to_dict() for e in self.inbox]
         d["outbox"] = [e.to_dict() for e in self.outbox]
         d["threads"] = {k: t.to_dict() for k, t in self.threads.items()}
@@ -1431,6 +1482,7 @@ class Session:
     def from_dict(cls, d: dict[str, Any]) -> Session:
         d = dict(d)
         pending = d.pop("pending", None)
+        pendings = d.pop("pendings", None) or []
         progress = d.pop("progress", None) or []
         findings = d.pop("findings", None) or []
         inbox = d.pop("inbox", None) or []
@@ -1440,6 +1492,7 @@ class Session:
         known = {f for f in cls.__dataclass_fields__}
         obj = cls(**{k: v for k, v in d.items() if k in known})
         obj.pending = Pending.from_dict(pending) if pending else None
+        obj.pendings = [Pending.from_dict(p) for p in pendings]
         obj.progress = [ProgressEntry.from_dict(p) for p in progress]
         obj.findings = [FindingEntry.from_dict(f) for f in findings]
         obj.inbox = [MailEntry.from_dict(e) for e in inbox]
@@ -1457,9 +1510,13 @@ class Session:
         """The state is the tool's own word — a hook's or its title's — not a parse of the screen (§4.2)."""
         return self.confidence in TOLD
 
-    def set_state(self, state: State, *, confidence: Confidence, pending: Pending | None = None) -> None:
-        if state != self.state:
-            self.since = now_iso()
+    def set_state(
+        self, state: State, *, confidence: Confidence, pending: Pending | None = None, since: str | None = None
+    ) -> None:
+        """`since`: the time to read the state from instead of now, where it is one taken back — a
+        `kept` state restored once the last open prompt ends (§4.2, TD-950) — and so not new."""
+        if state != self.state or (since is not None and since != self.since):
+            self.since = since or now_iso()
             self.rev += 1
         self.state = state
         self.confidence = confidence
@@ -1468,7 +1525,9 @@ class Session:
             self.ended = None  # a run that came back has not ended
         else:
             self.subagents, self.subagent_at = 0, None  # no subagent outlives its process (§4.2, TD-734)
+            self.subagent_ids = []
             self.shells, self.shells_at = [], None  # nor a shell task (§4.2 *A background shell task*, TD-766)
+            self.pendings, self.kept = [], None  # nor a prompt, nor the state beneath one (TD-950)
 
     def report_progress(self, entry: ProgressEntry) -> bool:
         """Upsert a `progress` entry by reference, in place so the lane order the session declared

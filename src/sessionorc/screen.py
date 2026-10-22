@@ -55,6 +55,7 @@ class Rule:
     priority: int = 0
     pending_kind: str | None = None
     pending_text: str | None = None  # "$line" → the first line that matched
+    modal: bool = False  # a dialog the tool draws over its composer: the usage poll never lifts it (§4.3)
 
     def __post_init__(self) -> None:
         flags = re.IGNORECASE
@@ -91,6 +92,8 @@ class Match:
     state: State
     evidence: list[str]
     pending: Pending | None = None
+    modal: bool = False  # the rule's `modal` (design §4.3 *The limit dialog is read off the screen*)
+    title: bool = False  # a title verdict, not a screen rule's: core writes it `title`, a rule's `scraped` (§4.3)
 
     def to_dict(self) -> dict:
         return {
@@ -98,6 +101,7 @@ class Match:
             "state": self.state,
             "evidence": self.evidence,
             "pending": self.pending.to_dict() if self.pending else None,
+            "modal": self.modal,
         }
 
 
@@ -124,6 +128,7 @@ class Manifest:
                     priority=int(raw.get("priority", 0)),
                     pending_kind=pend.get("kind"),
                     pending_text=pend.get("text"),
+                    modal=bool(raw.get("modal", False)),
                 )
             )
         rules.sort(key=lambda r: -r.priority)
@@ -140,5 +145,5 @@ class Manifest:
                 if text == "$line":
                     text = hits[0].strip()
                 pending = Pending(kind=rule.pending_kind, text=text[:200])
-            return Match(rule=rule.id, state=rule.state, evidence=hits, pending=pending)
+            return Match(rule=rule.id, state=rule.state, evidence=hits, pending=pending, modal=rule.modal)
         return None

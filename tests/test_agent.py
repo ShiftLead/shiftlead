@@ -107,6 +107,7 @@ async def test_permission_roundtrip(agent, hookstub, tmp_path):
                 session=sid,
                 state="needs-you",
                 pending={"kind": "question", "text": "Claude needs your permission"},
+                notice="permission_prompt",
             )
         st = await c.call("get", id=sid)
         assert st["pending"]["kind"] == "permission" and st["pending"]["tool_use_id"] == "tu1"
@@ -192,8 +193,9 @@ async def test_a_permission_answered_in_the_terminal_ends_its_waiter(agent, hook
     timeout — the waiter stayed live and its timeout set *needs you* over the record's later `idle`.
     A later event of the same call (its `PostToolUse`), or one with no call (a `Stop`), ends it: the
     hook returns no decision, and past the wait the record still reads `idle` with no pending, the
-    trail *answered in the terminal*. A parallel tool's event, naming another call, ends nothing and
-    leaves the buttons up; a permission that named no call is ended by any later event."""
+    trail *answered in the terminal*. A parallel tool's end, naming another call, ends nothing and
+    leaves the buttons up, but another call's start does (a pane Deny gives the asked call no end,
+    TD-950); a permission that named no call is ended by any later event."""
     async with LocalClient() as c:
         sid = (await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
 
@@ -208,7 +210,7 @@ async def test_a_permission_answered_in_the_terminal_ends_its_waiter(agent, hook
         await agent.tick()
         agent._attention[f"{sid}|state"] = ("permission", "2026-09-20T00:00:00Z", "Bash: git push")
         async with LocalClient() as h:
-            await h.call("hook", session=sid, state="working", event="PostToolUse:Read", tool_use_id="tu0")
+            await h.call("hook", session=sid, state="working", event="PostToolUse:Read", tool_use_id="tu0", call="end")
             assert not task.done() and (await c.call("get", id=sid))["pending"]["tool_use_id"] == "tu1"
             await h.call("hook", session=sid, state="working", event="PostToolUse:Bash", tool_use_id="tu1")
         assert await task is None
@@ -227,6 +229,12 @@ async def test_a_permission_answered_in_the_terminal_ends_its_waiter(agent, hook
         st = await c.call("get", id=sid)
         assert st["state"] == "idle" and st["pending"] is None
         assert not agent._permission_waiting(sid)
+        # another call starting on the main thread: the dialog was answered in the pane (TD-950)
+        task = asyncio.create_task(hook("tu4"))
+        await wait_state(c, sid, "needs-you")
+        async with LocalClient() as h:
+            await h.call("hook", session=sid, state="working", event="PreToolUse:Read", tool_use_id="tu5", call="start")
+        assert await task is None
         async with LocalClient() as h:
             task = asyncio.create_task(h.call("hook", session=sid, kind="permission", text="Edit: x", wait_seconds=1))
             await wait_state(c, sid, "needs-you")
@@ -1857,6 +1865,39 @@ async def test_a_pane_list_taken_before_a_kill_does_not_revive_the_record(agent,
         assert (s["state"], s["pane"]) == ("exited", False)
         await person.call("remove", id=sid)  # and so `remove` is not refused
         assert sid not in agent._killed_at  # no key outlives the record
+
+
+async def test_a_tick_inside_a_create_does_not_adopt_the_pane_it_is_starting(agent, tmp_path, monkeypatch):
+    """TD-952: `create` starts the tmux session in a thread and puts the record in after, so a tick
+    between the two listed a pane nobody had a record of and adopted it as a nameless `shell`. On a
+    node that adoption reached the home before the create's reply, and the home refused the real
+    record as another session — the launch record of a supervised create was never written (main's
+    CI, 2026-10-21). The tick that lands in the gap is handed here, inside the start's thread."""
+    started, release, seen = asyncio.Event(), asyncio.Event(), {}
+    loop, start = asyncio.get_running_loop(), agent._start
+
+    def held_start(sid, *args):
+        start(sid, *args)
+        seen["sid"] = sid
+        loop.call_soon_threadsafe(started.set)
+        asyncio.run_coroutine_threadsafe(release.wait(), loop).result(timeout=10)
+
+    monkeypatch.setattr(agent, "_start", held_start)
+    async with LocalClient() as person:
+        making = asyncio.ensure_future(
+            person.call("create", name="gap", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
+        )
+        try:
+            await asyncio.wait_for(started.wait(), timeout=10)
+            panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+            assert seen["sid"] in panes and seen["sid"] not in agent.sessions  # the gap, as the tick sees it
+            agent._reconcile(panes, {}, datetime.now(UTC))
+            assert seen["sid"] not in agent.sessions  # the create's pane, not a stranger's
+        finally:
+            release.set()  # a failed assertion still lets the start's thread go
+        made = await making
+        assert made["id"] == seen["sid"] and agent.sessions[made["id"]].adapter == "agentshell"
+        assert not agent._starting
 
 
 async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_up_twice(agent, tmp_path):

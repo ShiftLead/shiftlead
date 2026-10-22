@@ -57,7 +57,7 @@
   },
   {
    "file": "captured/panes/6-a-doorbell.txt",
-   "state": null,
+   "state": "limited",
    "composer": null
   }
  ],
@@ -104,5 +104,42 @@
     }
    ]
   }
+ ],
+ "transcripts": [
+  {
+   "file": "transcripts/walk-limit.jsonl",
+   "turns": 3,
+   "kinds": [
+    "prompt",
+    "text",
+    "thought",
+    "tool"
+   ],
+   "links": [],
+   "context": {
+    "tokens": 11737,
+    "window": 1048576
+   },
+   "spend_turns": 3
+  },
+  {
+   "file": "transcripts/walk-resume.jsonl",
+   "turns": 3,
+   "kinds": [
+    "prompt",
+    "text",
+    "thought",
+    "tool"
+   ],
+   "links": [],
+   "context": {
+    "tokens": 12286,
+    "window": 1048576
+   },
+   "spend_turns": 5
+  }
+ ],
+ "procs": [
+  {"file": "procs/two-tasks.json", "background": ["timeout 300 sleep 290", "python3 -c import time; time.sleep(280)"]}
  ]
 }

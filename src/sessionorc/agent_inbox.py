@@ -471,7 +471,11 @@ class InboxMixin:
         s = self._graph().get(self._addr(seat))
         down = s is not None and s.host != self.host and not (self.links.get(s.host) or {}).get("up")
         rings = s is not None and getattr(adapters.get(s.adapter), "composer", None) is not None
-        return mail.read_when(s, "ask", datetime.now(UTC), seat=s is None, unreachable=down, rings=rings, lapses=False)
+        # a modal limit has no reset to name (§4.3, TD-944): read off a record of this host alone
+        modal = s is not None and s.host == self.host and agent_common.limit_is_modal(s, adapters.get(s.adapter))
+        return mail.read_when(
+            s, "ask", datetime.now(UTC), seat=s is None, unreachable=down, rings=rings, lapses=False, modal_limit=modal
+        )
 
     async def rpc_board_reply(
         self,

@@ -20,6 +20,7 @@ from sessionorc.models import (
     context_over,
     context_reading,
     has_control,
+    open_prompts,
     pr_marks,
     report_head,
     report_line,
@@ -335,6 +336,12 @@ def view(
     pend = pend if isinstance(pend, dict) else {}
     d["pending"] = pend
     d["deadline"] = pend.get("deadline") or ""
+    # a subagent's prompt names its asker, and says the pane draws nothing until the deadline (§4.2 *A
+    # subagent's dialog is held back*, TD-950): one reading the card, the Inbox row and the facet draw
+    d["held"] = subagent_held(pend) if state == "needs-you" else None
+    # the open prompts beneath the newest, newest first, each answerable on its own line (§4.2 *Every
+    # entry is answerable where it is drawn*, TD-950): the slot draws the newest, these under it
+    d["others"] = [prompt_line(p, s) for p in open_prompts(s)[1:]] if state == "needs-you" else []
     # The report channels (design §4.8, §4.5a card **report line**, TD-028 step 4). One line, shown
     # only when a channel is non-empty: `report_line` is the same text `ao status -v` prints — one
     # formatter, so the card and the CLI cannot drift — and the findings count rides beside it. The
@@ -920,6 +927,8 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         kind = "needs"
         text = ptext if pend.get("kind") == "permission" else f"{pend.get('kind')}: {ptext}"
         text += terminal_only(d)
+        if held := d.get("held"):  # the subagent's line rides under the text; the hover says both (TD-950)
+            full = f"{text} — {held_words(held)}"
     elif state == "unreachable" and pend and pend.get("host_unreachable"):
         # design §4.4a "Permission prompts follow the same line": the waiter is on the node
         kind, text = "needs", f"{pend.get('kind')}: {ptext} — answer it at {d['host']}"
@@ -1073,6 +1082,44 @@ def answerable(v: Mapping[str, Any]) -> bool:
     return (
         pend.get("kind") == "permission" and bool(pend.get("tool_use_id")) and v.get("permission_channel") is not False
     )
+
+
+def subagent_held(pend: Mapping[str, Any] | None) -> dict[str, str] | None:
+    """A subagent's prompt (§4.2 *A subagent's dialog is held back*, §4.5a **Allow / Deny**, TD-950):
+    `name`, the name it is shown by, and `deadline` while the pane draws nothing for it (`pane_held`),
+    "" after the fall-through; None for a main-thread prompt, which draws as it did."""
+    if not isinstance(pend, Mapping) or not pend.get("subagent_name"):
+        return None
+    deadline = str(pend.get("deadline") or "") if pend.get("pane_held") else ""
+    return {"name": str(pend["subagent_name"]), "deadline": deadline}
+
+
+def prompt_line(p: Mapping[str, Any], rec: Mapping[str, Any]) -> dict[str, Any]:
+    """One open prompt as its own line (§4.2 *Every entry is answerable where it is drawn*, TD-950): its
+    text, the call its **Allow** / **Deny** name (`call`, answerable where the hook gave one and the
+    tool has a permission channel), and its subagent's line; a question's answer is Focus."""
+    v = {"pending": p, "permission_channel": rec.get("permission_channel")}
+    text = str(p.get("text") or "")
+    return {
+        "kind": str(p.get("kind") or ""),
+        "text": (text if p.get("kind") == "permission" else f"{p.get('kind')}: {text}") + terminal_only(v),
+        "call": str(p.get("tool_use_id") or ""),
+        "answerable": answerable(v),
+        "deadline": str(p.get("deadline") or ""),
+        "held": subagent_held(p),
+    }
+
+
+def held_words(held: Mapping[str, str] | None, until: str = "") -> str:
+    """The subagent line in plain words (§4.5a **Allow / Deny**): *from the <name> subagent*, and while
+    the pane is held *· the pane shows nothing until <until>* — `until` the deadline in the reader's
+    clock, else the stored instant. A page draws the deadline itself, through `.localtime`."""
+    if not held:
+        return ""
+    words = f"from the {held['name']} subagent"
+    if held.get("deadline"):
+        words += f" · the pane shows nothing until {until or held['deadline']}"
+    return words
 
 
 def terminal_only(v: Mapping[str, Any]) -> str:

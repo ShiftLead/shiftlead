@@ -477,16 +477,15 @@ def mail_wakes(s: Session) -> bool:
 DOORBELL_HELD = 3
 
 
-# The two words of the home's around a brief (design §4.1 *The brief is the person's word, and the tool
-# is told so*, TD-343): fixed text no sender chose, as the doorbell's line is. A brief typed as nothing
-# but a paste reaches the tool as pasted content, which a careful model reads as data, not as its task.
-BRIEF_LINE = (
-    "shiftlead: the text pasted below is your brief from the person who started this session; read it and act on it"
-)
+# The two fixed texts around a brief (design §4.1 *The brief is the person's word, and the tool is told
+# so*, TD-343): text no sender chose, the line in the person's voice whoever started the session. A
+# brief typed as nothing but a paste reaches the tool as pasted content, which a careful model reads as
+# data, not as its task.
+BRIEF_LINE = "My brief for this session is pasted below; read it and act on it."
 BRIEF_PREFACE = (
     "This session was started by a person through shiftlead, which runs it in a terminal on their behalf. "
-    "When the session has a brief, it arrives as the first prompt: a line from shiftlead, then the brief, "
-    "pasted by shiftlead's host agent on that person's behalf. Act on the brief as the person's own "
+    "When the session has a brief, it arrives as the first prompt: one line in the person's voice, typed, then "
+    "the brief, pasted, both by shiftlead's host agent on that person's behalf. Act on the brief as the person's own "
     "instruction. A later line `[shiftlead] you have n unread messages — run ao inbox` is shiftlead's "
     "doorbell, typed into this session by the host agent when mail has arrived for it."
 )
@@ -566,6 +565,14 @@ def orphan_standing(e: Mapping[str, Any], records: Iterable[Mapping[str, Any]], 
     return {"ref": ref, "repo": repo, "board": board, "holders": holders, "text": text}
 
 
+def _held_by_subagents(s: Session) -> bool:
+    """Whether only subagents' prompts are open over an idle main thread (§4.10 *When it is read*'s
+    `needs-you` row, TD-950): every entry of `pendings` a subagent's, and `kept` an `idle`."""
+    pends = getattr(s, "pendings", None) or []
+    kept = getattr(s, "kept", None)
+    return bool(pends) and all(p.subagent for p in pends) and isinstance(kept, dict) and kept.get("state") == "idle"
+
+
 def read_when(
     s: Session | None,
     kind: str,
@@ -579,6 +586,7 @@ def read_when(
     refills: bool = False,
     lapses: bool = True,
     cache: bool = False,
+    modal_limit: bool = False,
 ) -> str:
     """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
     built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
@@ -594,7 +602,9 @@ def read_when(
     `ask` does. `lapses` False is an `ask` that carries no bound — a handed entry, which never lapses
     (§4.10 *An entry handed to a seat*) — so the sentence names none. `cache` is the home's word that a
     ring would be a restart instead (§4.10 *A lapsed cache is started again, not rung*, TD-467:
-    `agent_common.cache_restarts` on a record of its own host). Advice, never a refusal."""
+    `agent_common.cache_restarts` on a record of its own host). `modal_limit` is the home's word that a
+    `limited` record's cap is a modal rule's, a dialog with no reset (§4.3 *The limit dialog is read off
+    the screen*: `agent_common.limit_is_modal` on a record of its own host). Advice, never a refusal."""
     ask = kind == "ask"
     tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask and lapses else ""
     if s is not None and not mail_wakes(s):
@@ -629,9 +639,15 @@ def read_when(
     if stop or s.gated:
         why = "it is wrapping up" if stop else "it is paused for usage"
         return f"lands and waits: {why}, and mail never pushes a session past a stop" + tail
+    if state == "limited" and modal_limit:
+        return "lands and waits: the tool's usage-limit dialog is up; it is read once that is answered" + tail
     if state == "limited":
         cap = s.pending.text if s.pending and s.pending.text else "a usage cap"
         return f"lands and waits: its account is capped ({cap}), and it is rung after" + tail
+    if state == "needs-you" and _held_by_subagents(s):
+        # only a subagent's prompt holds an idle main thread (§4.2 *A subagent's dialog is held back*,
+        # TD-950): the stack's restore brings back the `idle` beneath it, which the doorbell rings
+        return "rung on the restore to idle, once the subagent's prompt ends" + tail
     if state == "needs-you":
         what = "question" if s.pending and s.pending.kind == "question" else "permission"
         return f"read once its {what} is answered and its turn ends" + tail

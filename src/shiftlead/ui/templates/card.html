@@ -91,6 +91,8 @@
      it is doing, its last output — two lines, the whole on hover, and a caption (`card_slot`) #}
   <div class="sc-slot">
     <div class="status {{ s.slot.kind }}" title="{{ s.slot.full }}">{{ s.slot.text }}</div>
+    {% if s.held %}{% from "held_line.html" import held_line %}{{ held_line(s.held) }}{% endif %}
+    {% if s.others %}{% from "held_line.html" import prompt_line %}{% for e in s.others %}{{ prompt_line(s.id, e) }}{% endfor %}{% endif %}
     <div class="caption meta {{ s.slot.ccls }}"{% if s.slot.ccls == 'countdown' %} data-deadline="{{ s.deadline }}"{% endif %}>{{ s.slot.caption }}</div>
   </div>
   {% endif %}
@@ -106,8 +108,8 @@
     {% if next_act == 'allow' %}
       {# Allow / Deny only when the hook gave something to answer (`tool_use_id`) and the tool has a
          permission channel (§4.3, TD-785): the route 409s without either (review of PR #251) #}
-      <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>
-      <button class="btn sm next" data-act="deny" data-id="{{ s.id }}">Deny</button>
+      <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}" data-call="{{ s.pending.tool_use_id or '' }}">Allow</button>
+      <button class="btn sm next" data-act="deny" data-id="{{ s.id }}" data-call="{{ s.pending.tool_use_id or '' }}">Deny</button>
       {# Deny's optional reason (§4.5a, TD-117): one line the session reads with the refusal #}
       <input class="denywhy" type="text" maxlength="200" data-id="{{ s.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
     {% elif next_act == 'forget' %}

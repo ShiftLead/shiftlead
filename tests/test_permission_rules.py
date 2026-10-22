@@ -400,3 +400,65 @@ async def test_the_home_files_a_nodes_answer_by_rule(agent):
     with pytest.raises(link.LinkError):
         await agent._take_answered_by_rule("desk", params)
     assert len([e for e in agent.person_inbox if e.answered]) == 1
+
+
+@pytest.mark.integration
+async def test_a_subagents_prompt_answered_by_rule_names_the_subagent(agent, rulestub, tmp_path, monkeypatch):
+    """A subagent's prompt is matched as the main thread's, and its *Answered for you* names the asker
+    (§4.2 *A subagent's dialog is held back*, TD-950); on a node the `answered_by_rule` request carries
+    `subagent_name`, and the home's filing reads it."""
+    _rules("permissions:\n  grinder: {allow: ['Bash']}\n")
+    sub = {"subagent": "a1", "subagent_name": "general-purpose"}
+    async with LocalClient() as c:
+        w = (await c.call("create", name="w", dir=str(tmp_path), adapter="rulestub", unattended=True, role="grinder"))[
+            "id"
+        ]
+        async with LocalClient() as h:
+            got = await h.call(
+                "hook",
+                session=w,
+                kind="permission",
+                text="Bash: ls",
+                tool="Bash",
+                input={"command": "ls"},
+                wait_seconds=5,
+                **sub,
+            )
+        assert got == {"behavior": "allow", "reason": "rule: Bash"}
+        [fyi] = [e for e in agent.person_inbox if e.answered]
+        assert "from the general-purpose subagent" in fyi.text
+        assert await _hook(w, "Bash", "pwd", "m1") == {"behavior": "allow", "reason": "rule: Bash"}
+        assert "subagent" not in [e for e in agent.person_inbox if e.answered][-1].text  # the main thread's
+
+        asked: list[dict] = []
+
+        class Mux:
+            async def request(self, method, timeout=None, **params):
+                asked.append(params)
+                return {"filed": True}
+
+            async def notify(self, method, **params):
+                pass
+
+        monkeypatch.setattr(agent, "mode", "node")
+        monkeypatch.setattr(agent, "_home_mux", Mux())
+        monkeypatch.setattr(agent, "_snapshot_sent", True)
+        async with LocalClient() as h:
+            await h.call(
+                "hook", session=w, kind="permission", text="Bash: ls", tool="Bash", input={"command": "ls"}, **sub
+            )
+        assert asked[-1]["subagent_name"] == "general-purpose"
+
+
+async def test_the_home_files_a_nodes_subagent_answer_by_its_name(agent):
+    """The home's `answered_by_rule` handler reads the node's `subagent_name` into the FYI (TD-950)."""
+    from sessionorc.models import Session
+
+    rec = Session(
+        id="ao-x-w", name="w", kind="worker", adapter="hookstub", dir="/tmp/x", host="laptop", role="grinder"
+    ).to_dict()
+    agent._take_records("laptop", [rec], whole=True)
+    params = {"id": "ao-x-w", "prompt": "Bash: ls", "behavior": "deny", "rule": "Bash(ls)", "subagent_name": "Explore"}
+    assert await agent._take_answered_by_rule("laptop", params) == {"filed": True}
+    [fyi] = [e for e in agent.person_inbox if e.answered]
+    assert fyi.text.startswith("denied by your rule Bash(ls), from the Explore subagent")

@@ -1,0 +1,120 @@
+{
+ "pane_pid": 3302424,
+ "procs": {
+  "3302424": {
+   "comm": "node",
+   "children": [
+    3302473
+   ],
+   "cmdline": [
+    "node",
+    "/home/kmaster/.npm-global/bin/gemini"
+   ],
+   "stat": {
+    "ppid": 3302421,
+    "sid": 3302424,
+    "tty_nr": 34821,
+    "start": 532966291
+   }
+  },
+  "3302473": {
+   "comm": "node",
+   "children": [
+    3304190,
+    3306028
+   ],
+   "cmdline": [
+    "/home/kmaster/.local/bin/node",
+    "--max-old-space-size=15534",
+    "/home/kmaster/.npm-global/bin/gemini"
+   ],
+   "stat": {
+    "ppid": 3302424,
+    "sid": 3302424,
+    "tty_nr": 34821,
+    "start": 532966391
+   }
+  },
+  "3304190": {
+   "comm": "bash",
+   "children": [
+    3304192
+   ],
+   "cmdline": [
+    "/usr/bin/bash",
+    "-c",
+    "shopt -u promptvars nullglob extglob nocaseglob dotglob; {\ntimeout 300 sleep 290\n}\n__code=$?; pwd > /tmp/gemini-shell-O1EUdk/pwd.tmp; exit $__code"
+   ],
+   "stat": {
+    "ppid": 3302473,
+    "sid": 3304190,
+    "tty_nr": 34828,
+    "start": 532969670
+   }
+  },
+  "3306028": {
+   "comm": "bash",
+   "children": [
+    3306030
+   ],
+   "cmdline": [
+    "/usr/bin/bash",
+    "-c",
+    "shopt -u promptvars nullglob extglob nocaseglob dotglob; {\npython3 -c \"import time; time.sleep(280)\"\n}\n__code=$?; pwd > /tmp/gemini-shell-cdjePH/pwd.tmp; exit …"
+   ],
+   "stat": {
+    "ppid": 3302473,
+    "sid": 3306028,
+    "tty_nr": 34833,
+    "start": 532973980
+   }
+  },
+  "3304192": {
+   "comm": "timeout",
+   "children": [
+    3304193
+   ],
+   "cmdline": [
+    "timeout",
+    "300",
+    "sleep",
+    "290"
+   ],
+   "stat": {
+    "ppid": 3304190,
+    "sid": 3304190,
+    "tty_nr": 34828,
+    "start": 532969670
+   }
+  },
+  "3306030": {
+   "comm": "python3",
+   "children": [],
+   "cmdline": [
+    "python3",
+    "-c",
+    "import time; time.sleep(280)"
+   ],
+   "stat": {
+    "ppid": 3306028,
+    "sid": 3306028,
+    "tty_nr": 34833,
+    "start": 532973980
+   }
+  },
+  "3304193": {
+   "comm": "sleep",
+   "children": [],
+   "cmdline": [
+    "sleep",
+    "290"
+   ],
+   "stat": {
+    "ppid": 3304192,
+    "sid": 3304190,
+    "tty_nr": 34828,
+    "start": 532969670
+   }
+  }
+ }
+}

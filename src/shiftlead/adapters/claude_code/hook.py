@@ -20,6 +20,7 @@ Always exits 0. A hook that fails would break the session it is watching.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import socket
@@ -82,6 +83,20 @@ NOTIFICATION_KINDS = {
     "elicitation_url_dialog": "question",
     "agent_needs_input": "question",
 }
+# A tool event's place in its call, in the core's neutral words (design §4.2 *A waiter is keyed by its
+# call*, TD-950): the core tells a call's first event from its last without reading the tool's names.
+CALL_EDGE = {"PreToolUse": "start", "PostToolUse": "end"}
+
+
+def call_sig(payload: dict[str, Any]) -> str:
+    """A digest of the call's tool and input (TD-950): a `PermissionRequest` names no call, and its
+    `PreToolUse`, which does, carries the same two — so the core matches the one to the other by it."""
+    raw = json.dumps(
+        {"tool_name": payload.get("tool_name"), "tool_input": payload.get("tool_input")},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str, Any] | None:
@@ -99,6 +114,10 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
     # mid-session reports itself. Read both generically: an event without one says nothing about it.
     if model := payload.get("model"):
         out["model"] = model
+    # an event from inside a subagent names it (design §4.2 *A subagent's dialog is held back*, TD-950):
+    # its own pending, waiter and open calls are that subagent's thread, not the main one's
+    if agent := payload.get("agent_id"):
+        out["subagent"] = str(agent)
     if ev == "PostModelSwitch":
         return {**out, "model": payload["to_model"]} if payload.get("to_model") else None
     if ev == "PermissionRequest" and payload.get("tool_name") != "AskUserQuestion":
@@ -112,6 +131,9 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
             # the tool and its input, for the person's `permissions:` rules (§4.9b, TD-641)
             "tool": tool,
             "input": payload.get("tool_input") or {},
+            "call_sig": call_sig(payload),
+            # the name the subagent is shown by: Claude Code's `agent_type` (TD-950)
+            **({"subagent_name": str(payload.get("agent_type") or "subagent")} if "subagent" in out else {}),
         }
     if ev in ("PreToolUse", "PermissionRequest") and payload.get("tool_name") == "AskUserQuestion":
         # a question is a question on either road, never a permission: Allow / Deny cannot pick one of
@@ -124,8 +146,8 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         # an idle session unrung; mid-turn the session is `working` anyway, and a `PostToolUse` of
         # its own no longer clears the main thread's `needs-you` (TD-201). It does say a subagent is
         # alive, which `subagent_seen` carries: the core reads no tool's field (§4.2 *Working on its
-        # own*, §4.3, TD-734).
-        return {**out, "subagent_seen": True}
+        # own*, §4.3, TD-734). Its call, still with no state, is that subagent's thread's (TD-950).
+        return {**out, "subagent_seen": True, **_call(ev, payload)}
     if ev == "Notification":
         kind = NOTIFICATION_KINDS.get(payload.get("notification_type", ""))
         if kind is None:
@@ -134,7 +156,9 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
             # Our PermissionRequest hook already reported this one while it waited; the dialog
             # now lives in the terminal, so it is a question for the Focus screen (design §4.2).
             kind = "question"
-        return {**out, "state": "needs-you", "pending": {"kind": kind, "text": payload.get("message", "")}}
+        # `notice`: the dialog's own notice, which the core weighs against an open prompt (TD-950)
+        notice = {"notice": "permission_prompt"} if payload.get("notification_type") == "permission_prompt" else {}
+        return {**out, "state": "needs-you", "pending": {"kind": kind, "text": payload.get("message", "")}, **notice}
     if ev == "SessionEnd":
         reason = payload.get("reason") or payload.get("how_ended") or ""
         if reason in SESSION_END_STILL_RUNNING:
@@ -160,8 +184,13 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         tool = payload.get("tool_name")
         # the call it names (`tool_use_id`) ends only that call's permission waiter, if one is live:
         # its dialog was answered in the terminal (design §4.2, TD-629)
-        call = {"tool_use_id": tid} if (tid := payload.get("tool_use_id")) else {}
-        return {**out, "state": STATE_EVENTS[ev], "pending": None, "event": f"{ev}:{tool}" if tool else ev, **call}
+        return {
+            **out,
+            "state": STATE_EVENTS[ev],
+            "pending": None,
+            "event": f"{ev}:{tool}" if tool else ev,
+            **_call(ev, payload),
+        }
     if ev == "UserPromptSubmit":
         # `prompt`: a prompt went in, which is what the host agent's typed brief waits on (§4.1 *No
         # prose in the argv*, TD-339) — a word, not the prompt's text
@@ -169,6 +198,16 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
     if ev in STATE_EVENTS:
         return {**out, "state": STATE_EVENTS[ev], "pending": None}
     return None
+
+
+def _call(ev: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """A tool event's call: its `tool_use_id`, its edge (`call`), and on its first event its `call_sig`."""
+    call: dict[str, Any] = {"call": CALL_EDGE[ev]}
+    if tid := payload.get("tool_use_id"):
+        call["tool_use_id"] = tid
+    if ev == "PreToolUse":
+        call["call_sig"] = call_sig(payload)
+    return call
 
 
 def first_question(ti: dict[str, Any]) -> str:
