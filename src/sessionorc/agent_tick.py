@@ -4467,7 +4467,7 @@ class TickMixin:
             return None, f"title {m.state}, but {s.state} stands"
         # a scraped record the title reaches holds no rule's verdict: `explain` asks the manifest first,
         # so its screen is gone and nothing was saved to restore (§4.3, TD-944) — compared as told
-        fallback = s.confidence == "scraped" and m.title
+        fallback = s.confidence == "scraped" and getattr(m, "title", False)
         if m.state == s.state:
             if fallback:  # the same state, now the tool's own word: `since` and `rev` stand
                 return m, f"title {m.state}, as the record reads — taken as the tool's own word (confidence: title)"

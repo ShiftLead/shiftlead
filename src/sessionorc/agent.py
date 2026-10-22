@@ -192,6 +192,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     draft_folder,  # noqa: F401
     idle_from,  # noqa: F401
     launch_params,  # noqa: F401
+    limit_is_modal,  # noqa: F401
     log,  # noqa: F401
     model_env,  # noqa: F401
     on_its_own,  # noqa: F401
