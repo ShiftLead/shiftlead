@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Built (#2261–#2268) — live check, blocked by TD-960 |
-| TD-958 | `test_the_answered_capture_ends_the_question_at_the_subagents_own_end` fails when the Stop's `since` and the restore straddle a second | Low | Open |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-960 | The tool's own `SubagentStop`, for an id no `SubagentStart` announced, takes `subagents` to 0 and ends a live subagent's permission waiter: the record reads `idle` while the pane draws its dialog | Medium | Open |
 
@@ -1650,22 +1649,6 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-947, TD-629 (a waiter ended by another call's event), TD-734 (subagent events), TD-201.
 
 ---
-
-## TD-958: `test_the_answered_capture_ends_the_question_at_the_subagents_own_end` fails when the Stop's `since` and the restore straddle a second
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-22 (grinder-ao-2)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_prompt_stack.py` (~L95–L118); `src/sessionorc/` where the prompt stack restores `kept` (TD-950 slice 3b, #2265)
-
-**Why:** Seen on #2270's CI (run 39752588219, test (3.12), 2026-10-22 09:10Z), a PR that does not touch the stack: `assert (rec["state"], rec["confidence"], rec["since"]) == ("idle", "hook", stopped)` read `since` 09:10:43Z against the Stop's 09:10:42Z. It passed on 3.13 in the same run and in a local full suite. Either `stopped` is read before the Stop's `since` settles (the test's race), or the restore writes a fresh `since` in some path (the code's, and §4.2 *the main thread's state is kept beneath* says the restored state keeps its own `since`). Which one is not yet known.
-
-**Fix:** Find which: run the test in a loop (`--count` or a shell loop, bounded) with the clock at a second's edge, and read where `since` is set on the restore. If it is the test, read `stopped` from the record once the Stop's hook has been applied (the `kept` the fall-through stores carries it); if it is the code, the restore keeps `kept`'s `since`.
-
-**Done when** the test reads the Stop's own `since` deterministically, and a restore that wrote `now` would fail it.
 
 ## TD-959: A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file
 

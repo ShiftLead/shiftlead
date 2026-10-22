@@ -101,9 +101,13 @@ async def test_the_answered_capture_ends_the_question_at_the_subagents_own_end(a
     i = next(n for n, e in enumerate(events) if e.get("kind") == "permission")
     async with LocalClient() as c:
         sid = (await c.call("create", name="a", dir=str(tmp_path), adapter=hookstub.name))["id"]
-        task = await _feed(agent, c, sid, events[: i - 2])  # to the main thread's Stop
-        stopped = (await _rec(c, sid))["since"]
-        task = await _feed(agent, c, sid, events[i - 2 : i + 1], wait=1)
+        task = await _feed(agent, c, sid, events[: i - 1])  # through the main thread's Stop
+        stop = await _rec(c, sid)
+        assert stop["state"] == "idle"
+        stopped = stop["since"]
+        # the fall-through's second (wait=1) puts the restore in a later second than the Stop, so a restore
+        # that wrote a fresh `since` fails below every run, not only when the two straddle one (TD-958)
+        task = await _feed(agent, c, sid, events[i - 1 : i + 1], wait=1)
         assert await task is None
         rest = events[i + 1 :]
         assert [e["raw"]["hook_event_name"] for e in rest][:4] == [
