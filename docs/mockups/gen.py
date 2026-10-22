@@ -2394,7 +2394,7 @@ def ending_card():
         f'<span class="mono" style="text-align: right;">≈${fig:.2f}</span></div>')
     side = lambda k, v, t="": (f'<div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 13px;"{f" title={chr(34)}{t}{chr(34)}" if t else ""}>'
                                f'<span class="meta">{k}</span><span>{v}</span></div>')
-    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost: read when it ended and once more 75 s after, so the last minute's turns may still be on their way — the Spend page has the live figures (design §4.5a, TD-942)">
+    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost: read when the ending was drawn; the last minute's turns may not be in yet, reload to read again — the Spend page has the live figures (design §4.5a, TD-942)">
       <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
         <span class="mono" style="font-size: 28px; font-weight: 500; line-height: 1;" title="API-equivalent at your weights: a subscription's turns, never a bill (design §4.4 Spend per seat)">≈$41.80</span>
         <span style="font-size: 14px;">spent by dc-paul since Oct 19</span>
@@ -2403,11 +2403,6 @@ def ending_card():
       <div style="display: flex; flex-direction: column; gap: 7px;">
         <div style="font-size: 13px; font-weight: 600;">By entry</div>
         {"".join(erow(*e) for e in entries)}
-      </div>
-      <div style="border-top: 1px solid #eceef1; padding-top: 12px; display: flex; flex-direction: column; gap: 5px;">
-        {side("dc-grind today", '<span class="mono">≈$63.10</span> <span class="meta">19.0M tokens</span>')}
-        {side("All teams today", '<span class="mono">≈$212.40</span> <span class="meta">and</span> <span class="mono">$8.75</span> <span class="meta">metered, 66.2M tokens</span>', "≈$ and $ apart, never summed (design §4.6 The disconnect card)")}
-        {side("Claude, paul", '<span class="mono">9%</span> <span class="meta">of the week, resets Mon 09:00;</span> <span class="mono">25%</span> <span class="meta">of 5 hours, resets 21:10</span>')}
       </div>
       <div class="meta" style="font-size: 12px;">as of 18:43 · <a href="#">Open dc-paul in Spend</a></div>
     </div>'''
@@ -2438,7 +2433,7 @@ def focus_ended():
       <span class="btn sm link" title="A closed record is forgotten by itself a day after the close; its run log and transcript stay readable until then. Resume starts it again under its own name, attended." style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>
     </div>
     {ending_card()}
-    <div class="note">Was: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> a dead terminal and a composer with nothing to type to; the composer is not drawn now. The cause's guess stays only where the record names none (a pane found gone, a close with no closer). dc-paul is Paul's interactive session in dc-grind and not supervised, so no Restart and its team's line reads <i>dc-grind today</i>; a supervised member's banner adds <b>Restart</b> after Resume, and a session with no team reads <i>interactive sessions today</i>.</div>
+    <div class="note">Was: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> a dead terminal and a composer with nothing to type to; the composer is not drawn now. The cause's guess stays only where the record names none (a pane found gone, a close with no closer). dc-paul is Paul's interactive session in dc-grind and not supervised, so no Restart; a supervised member's banner adds <b>Restart</b> after Resume. The card is the session's own story: the day around it is the Spend page's, the windows the top bar's chip.</div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
     {PUT_AWAY}
