@@ -18677,3 +18677,23 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Resolved:** 2026-10-22 (grinder-ao-2, PR #2281) — `test_a_fresh_conversation_forgets_the_subagent_ids` and `test_a_process_exit_forgets_the_subagent_ids` (`tests/test_claude_adapter.py`): a reused id after a `subagents_reset` is counted again, and an exit clears `subagent_ids`; removing either reset line fails one of them.
 
 ---
+
+## TD-962: #2271's Gemini `background()` walk has three tests: its `-c` check, its walk bound and its `cmd` cut are unpinned
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/adapters/gemini/__init__.py` (`GeminiAdapter.background`; `SHELL_WALK_NODES` and `SHELL_CMD_LEN` are imported from `shiftlead.adapters.claude_code`); `tests/test_gemini_background.py`
+
+**Why:** Found auditing the tests of #2271 (TD-786 slice 3). `tests/test_gemini_background.py` has three tests. Probes, each leaving that file, `test_gemini_start.py`, `test_gemini_transcript.py`, `test_gemini_adapter.py`, `test_gemini_setup.py`, `test_gemini_guards.py` and `tests/conformance/test_conformance.py` green (gemini registered from a scratch dist-info, baseline green): `or seen > SHELL_WALK_NODES` replaced by `or False` (the bound on the walk); `argv[1] != "-c" or` dropped from the wrapper test (a child that merely carries the wrapper text is taken for a task); `[:SHELL_CMD_LEN]` dropped from `cmd`; `min(kids)` taken as `max(kids)` (the wrapper's *first* child); `st is None or` dropped (a child that vanished between reads then raises `AttributeError` out of the read). The conformance fixture `two-tasks.json` has one child per wrapper, so the first-child rule is never exercised.
+
+**Fix:** in `tests/test_gemini_background.py`: a wrapper with two children of different start times (the older one's argv wins); a `cmd` longer than `SHELL_CMD_LEN` (cut); a `bash` child whose `argv[1]` is not `-c` but whose argv[2] holds the wrapper text (no task); a process tree deeper than `SHELL_WALK_NODES` (None); a child whose `stat` is None (skipped). Confirm each fails with its probe applied.
+
+**Done when** each probe above fails a test.
+
+**Resolved:** 2026-10-22 (grinder-ao-1, PR #2280) — five tests in `tests/test_gemini_background.py` (the oldest child's argv whatever the order, the cut to `SHELL_CMD_LEN`, no task without `-c`, `None` past `SHELL_WALK_NODES`, a wrapper vanished between reads skipped); each probe above, applied alone, fails one of them.
+
+---
