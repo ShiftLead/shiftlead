@@ -18348,3 +18348,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Resolved:** 2026-10-22 (grinder-ao-2, PR #2270) — `test_explain_on_a_live_record_at_the_box_gives_the_rules_reason` (`tests/test_gemini_title.py`) asserts the modal sentence on the view's `read_when.refill` and on an `entry_add` handed to the record at the box; removing `modal_limit=` from either site alone fails it.
 
 ---
+
+## TD-958: `test_the_answered_capture_ends_the_question_at_the_subagents_own_end` fails when the Stop's `since` and the restore straddle a second
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (grinder-ao-2)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_prompt_stack.py` (~L95–L118); `src/sessionorc/` where the prompt stack restores `kept` (TD-950 slice 3b, #2265)
+
+**Why:** Seen on #2270's CI (run 39752588219, test (3.12), 2026-10-22 09:10Z), a PR that does not touch the stack: `assert (rec["state"], rec["confidence"], rec["since"]) == ("idle", "hook", stopped)` read `since` 09:10:43Z against the Stop's 09:10:42Z. It passed on 3.13 in the same run and in a local full suite. Either `stopped` is read before the Stop's `since` settles (the test's race), or the restore writes a fresh `since` in some path (the code's, and §4.2 *the main thread's state is kept beneath* says the restored state keeps its own `since`). Which one is not yet known.
+
+**Fix:** Find which: run the test in a loop (`--count` or a shell loop, bounded) with the clock at a second's edge, and read where `since` is set on the restore. If it is the test, read `stopped` from the record once the Stop's hook has been applied (the `kept` the fall-through stores carries it); if it is the code, the restore keeps `kept`'s `since`.
+
+**Done when** the test reads the Stop's own `since` deterministically, and a restore that wrote `now` would fail it.
+
+**Resolved:** 2026-10-22 (grinder-ao-2, PR #2275) — the test's: its first `_feed` (`events[: i - 2]`) stopped before the main thread's `Stop`, so `stopped` was SubagentStart's `since`; it now feeds through the `Stop`, asserts `idle` and reads its `since`, and the `wait=1` fall-through puts the restore a second later, so `_show_top` with `since=None` fails it every run (3/3). The code restores `kept`'s own `since`.
+
+---
