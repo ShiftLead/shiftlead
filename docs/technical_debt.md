@@ -76,7 +76,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Open |
-| TD-949 | No test would catch the tick dropping `remote=` from its `pr_reading` call: a GitLab repo would be read through `gh` again with the whole suite green | Medium | Open |
 
 ---
 
@@ -1561,19 +1560,3 @@ builds are in the ledger.
 - The card and Focus draw the decided words. §4.5a's row says what **Allow** / **Deny** answer there.
 
 **Done when** a background subagent's permission on a scratch home shows a *Needs you* that names the subagent and says the pane will not show the prompt, the design says what the session's state is meanwhile, and §4.2 says when the pane draws a subagent's dialog, as the capture found.
-
-## TD-949: No test would catch `_read_repo` dropping `remote=` from its `reports.pr_reading` call: a GitLab repo would be read through `gh` again with the suite green
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1, auditing #2244)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` `_read_repo` (~L3474, `reports.pr_reading(root, now, old=prs, held=held, remote=remote)`); `tests/test_pr_wait.py` (the slice-2 tests call `reports.pr_reading(..., remote=...)` directly and put `_repos[root]["prs"]` in by hand)
-
-**Why:** PR #2244 (TD-940 slice 2) makes the per-forge reading depend on one changed line: the tick passes the checkout's origin to `pr_reading`. Without it `forge_of("")` reads as GitHub and every GitLab repo is read through `gh`, which is the behaviour the PR removed. Probe on `origin/main` (c323b3386): change that line to `reports.pr_reading(root, now, old=prs, held=held)` and run the whole suite (`PYTHONPATH=$PWD/src pdm run pytest -q tests`): 3877 passed, and the only failure is `tests/conformance/test_conformance.py::test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness`, which does not touch the reading. The line was restored afterwards. The new tests all call `pr_reading(remote=...)` themselves, and `test_ao_pr_wait_returns_a_gitlab_mrs_word` seeds `agent._repos` by hand, so no test goes through `_read_repo` with a GitLab origin.
-
-**Fix:** a test that runs the tick's `_read_repo` (or a tick pass) on a checkout whose origin is a GitLab URL, with `reports._glab_api` faked, and asserts the repo's `prs` carries `forge: gitlab`; it fails with the `remote=` argument removed.
-
-**Done when** that test exists and fails when the `remote=remote` argument is removed from `_read_repo`.

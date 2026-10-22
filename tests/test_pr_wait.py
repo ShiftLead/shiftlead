@@ -307,7 +307,6 @@ def test_a_gitlab_origin_reads_its_open_mrs_with_the_fold_conflict_and_required(
     assert kept["open"][0]["red_since"] == rows[3]["red_since"], "a red spell keeps its start"
 
 
-
 def test_the_tick_reads_a_gitlab_checkout_through_glab(tmp_path, monkeypatch):
     """TD-949: the reading per forge hangs on `_read_repo` passing the checkout's origin to
     `pr_reading` — without it `forge_of("")` reads GitHub and a GitLab repo goes through `gh` again."""
@@ -325,6 +324,7 @@ def test_the_tick_reads_a_gitlab_checkout_through_glab(tmp_path, monkeypatch):
     assert got["remote"] == "git@gitlab.com:g/sub/r.git"
     assert got["prs"]["forge"] == "gitlab" and [p["number"] for p in got["prs"]["open"]] == [3]
     assert asked and all(host == "gitlab.com" for host, _ in asked)
+
 
 def test_a_gitlab_read_that_fails_is_an_error_and_another_forge_has_no_reading(tmp_path, monkeypatch):
     _glab(monkeypatch, [_mr()], fail="merge_requests?")
