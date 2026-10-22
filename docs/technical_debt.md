@@ -71,6 +71,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
+| TD-954 | #2253's two new `ao explain` reasons for a title adapter's screen rule have no test: reverting either branch leaves the suite green | Low | Open |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 
 ---
@@ -1405,6 +1406,22 @@ builds are in the ledger.
 - Once synced: `docs/claude-memory/no-checks-means-conflicting.md` retired, its `MEMORY.md` line pointing at `ao pr wait` instead (the wait says *conflicting*); the *wait for CI with gh pr checks --watch* memory likewise.
 
 **Done when** the synced procedure names the pair and neither memory tells a session to read `gh pr checks` itself.
+
+## TD-954: #2253's two new `ao explain` reasons for a title adapter's screen rule have no test: reverting either branch leaves the suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`rpc_explain` ~L2553, the reasons ~L2587); `tests/test_gemini_title.py`
+
+**Why:** Found auditing the tests of #2253 (TD-944 slice 2). `rpc_explain` gained two reasons — `rule X matched, but a hook reported within a tick — the hook state wins` and `rule X matched, but the usage poll's limited stands — its reading kept` — beside the existing `applied as scraped; held for its screen`. Probe: in `src/sessionorc/agent.py` `rpc_explain`, replace `if self._hook_within(s, adapter, now):` with `if False:`, and separately `elif s.state == m.state == "limited" and s.confidence == "hook":` with `elif False:`; `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gemini_title.py tests/test_screen_road.py tests/test_screen.py tests/test_read_when.py` passes (all green) both times (those four files only; the whole suite was not run). `grep -rn "limited stands\|hook reported within" tests` finds nothing; the one explain test (`test_explain_on_a_live_record_at_the_box_gives_the_rules_reason`) asserts only the third reason. `ao explain` is the operator's check on a wrong state, so a reason that names the wrong rule misleads exactly there.
+
+**Fix:** In `tests/test_gemini_title.py`'s explain test (or a sibling), explain a record at the box with a hook within a tick (`_last_hook` now) and assert the `hook state wins` reason, and one holding the poll's `limited` at `confidence: hook` and assert `the usage poll's limited stands`. Confirm each fails with its branch reverted.
+
+**Done when** reverting either branch fails a test.
 
 ## TD-959: A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file
 
