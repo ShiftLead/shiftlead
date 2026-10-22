@@ -192,6 +192,20 @@ def implements(adapter: object) -> frozenset[str]:
 ENTRY_KINDS = ("prompt", "text", "thought", "tool", "compaction", "sidechain")
 
 
+MAIL_HOWS = ("command", "turn", "tool", "hook")
+
+
+@dataclass(frozen=True)
+class MailDelivery:
+    """What an adapter's `mail()` returns (design §4.3, §4.10): how a session of its tool learns it has
+    mail — `how` is one of `MAIL_HOWS`, a command it runs, an injection at the top of a turn, a tool call
+    or a hook — and the tool's event that carries it (`event`), for the record. The words are always the
+    host agent's (`mail.unread_line`), never a sender's."""
+
+    how: str
+    event: str = ""
+
+
 @dataclass
 class Link:
     """A URL the session printed (design §4.2 *The record's `links`*, TD-543): the `url` as written, and
