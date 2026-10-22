@@ -12,7 +12,7 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import identity, modes, reports
-from sessionorc.client import AgentError, LocalClient
+from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 
 
 def _row(n: int = 7, checks: str = "pending", conflicting: bool = False, failing: list[str] | None = None):
@@ -362,3 +362,37 @@ async def test_a_repo_never_read_is_refused_with_the_readings_why(agent, tmp_pat
     monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": root} if m == "get" else got)
     assert cli.cmd_pr(_args(n=3)) == 5
     assert "gitea.example" in capsys.readouterr().err
+
+
+def test_ao_pr_wait_waits_again_across_a_restart_and_refuses_a_home_that_stays_down(monkeypatch, capsys):
+    """A promote restarts the unit under the wait (the live check of TD-940, 2026-10-22): the call is made
+    again for the time left, and only a home that does not answer again is a refusal."""
+    from shiftlead import cli
+
+    calls = []
+
+    def flaky(method, **kw):
+        if method == "get":
+            return {"repo": "/r"}
+        calls.append(kw)
+        if len(calls) == 1:
+            raise AgentUnavailable("host agent closed the connection")
+        return {**_row(checks="green"), "pr": 7, "word": "green", "read_at": "2026-10-22T00:00:00+00:00"}
+
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
+    monkeypatch.setattr(cli, "call_sync", flaky)
+    monkeypatch.setattr(cli, "_agent_answers", lambda: True)
+    assert cli.cmd_pr(_args()) == 0
+    assert len(calls) == 2 and calls[1]["timeout"] <= calls[0]["timeout"], "asked again for what was left"
+    assert capsys.readouterr().out.strip() == "PR #7 green on abc1234"
+
+    def down(method, **kw):
+        if method == "get":
+            return {"repo": "/r"}
+        raise AgentUnavailable("host agent closed the connection")
+
+    monkeypatch.setattr(cli, "call_sync", down)
+    monkeypatch.setattr(cli, "_agent_answers", lambda: False)
+    monkeypatch.setattr(cli, "PR_WAIT_GRACE", 0.0)
+    assert cli.cmd_pr(_args()) == 5
+    assert "did not answer again" in capsys.readouterr().err

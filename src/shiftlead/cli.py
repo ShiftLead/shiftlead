@@ -2695,12 +2695,30 @@ def _pr_wait_root(args: argparse.Namespace) -> str | None:
     return str(pathlib.Path(out).parent) if common.returncode == 0 and out else None
 
 
+PR_WAIT_GRACE = 60.0  # seconds `ao pr wait` gives a host agent that closed the connection to answer again
+
+
+def _agent_back(grace: float, step: float = 1.0) -> bool:
+    """Whether an agent answers within `grace` seconds — `_agent_answers` once a `step`, the restart's gap."""
+    import time
+
+    until = time.monotonic() + grace
+    while True:
+        if _agent_answers():
+            return True
+        if time.monotonic() + step > until:
+            return False
+        time.sleep(step)
+
+
 def _pr_wait(args: argparse.Namespace) -> int:
     """`ao pr wait <n> [--timeout S] [--fresh]` (design §4.7, TD-940): block on the home's folded
     reading of PR `n` until it leaves *pending*, print the word and exit by it — 0 green, 1 red, 2
     conflicting, 3 none, 4 timeout, 5 refused (a number the reading does not hold, a checkout it
     holds no reading of, a home that is down or predates the RPC) with the why. A call of its own
-    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake."""
+    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake. A home that
+    closes the connection and answers again within `PR_WAIT_GRACE` (a promote's restart) is asked again
+    for the time left."""
     from sessionorc import reports
 
     gone = reports.PR_WAIT_EXIT["gone"]
@@ -2710,12 +2728,20 @@ def _pr_wait(args: argparse.Namespace) -> int:
         return fail(args, str(e), gone)
     if not root:
         return fail(args, "no checkout to read: the record names no repo, and this directory is in none", gone)
+    import time
+
+    deadline = time.monotonic() + args.timeout
     try:
-        got = call_sync(
-            "pr_wait", root=root, pr=args.n, timeout=args.timeout, fresh=args.fresh, _timeout=args.timeout + 30.0
-        )
-    except AgentUnavailable as e:
-        return fail(args, str(e), gone)
+        while True:
+            left = max(deadline - time.monotonic(), 0.0)
+            try:
+                got = call_sync("pr_wait", root=root, pr=args.n, timeout=left, fresh=args.fresh, _timeout=left + 30.0)
+                break
+            except AgentUnavailable as e:
+                # a promote restarts the unit under the wait — the caller's own merge often causes one: a
+                # home that answers again within the grace is waited on again for what is left (TD-940)
+                if not _agent_back(min(PR_WAIT_GRACE, max(deadline - time.monotonic(), 0.0))):
+                    return fail(args, f"{e}, and it did not answer again", gone)
     except AgentError as e:
         if str(e).startswith("unknown method"):
             return fail(args, "the running host agent predates ao pr wait (TD-940): it waits for its promote", gone)
