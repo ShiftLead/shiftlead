@@ -13,12 +13,12 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import ledger, workorders
-from sessionorc.models import pr_marks, stop_note
+from sessionorc.models import open_prompts, pr_marks, stop_note
 from sessionorc.reports import branch_ref
 from shiftlead import teamrun
 
 from . import uiconf
-from .cards import DEAD, NO_TEAM, card_order, terminal_only
+from .cards import DEAD, NO_TEAM, card_order, prompt_line, subagent_held, terminal_only
 from .common import _age, _instant, _short_age, templates
 from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
@@ -424,23 +424,40 @@ def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
     """**Answer needed** (§4.5a *team card: Answer needed / Doing*): each member waiting on a
     permission or a question in its pane, and those alone (TD-353) — the permission with Allow /
     Deny when the hook gave something to answer (`tool_use_id`), a question as its text with Focus.
-    A member's open `ask` to the person is the facet's *asked you* line (`asked_line`), never here."""
+    A member's open `ask` to the person is the facet's *asked you* line (`asked_line`), never here.
+    A member with several open prompts draws a block per entry, newest first, each answering its own
+    `call` (§4.2 *Every entry is answerable where it is drawn*, TD-950); `answer_members` counts members."""
     out = []
     for m in members:
         kind = state_kind(m)
         if kind not in NEEDS_YOU_ROWS:
             continue
         pend = m.get("pending") if isinstance(m.get("pending"), dict) else {}
+        name = m.get("name") or m["id"]
         out.append(
             {
                 "id": m["id"],
-                "name": m.get("name") or m["id"],
+                "name": name,
                 "kind": kind,
                 "text": str(pend.get("text") or "") + terminal_only(m),
+                "call": str(pend.get("tool_use_id") or ""),
+                "held": subagent_held(pend),  # a subagent's prompt names its asker (§4.2, TD-950)
                 "deadline": m.get("deadline") or "",
             }
         )
+        for p in open_prompts(m)[1:] if m.get("state") == "needs-you" else ():
+            line = prompt_line(p, m)
+            kind = "permission" if line["answerable"] else "question"
+            text = str(p.get("text") or "") + terminal_only({**m, "pending": p})
+            # the block's kind is what it can answer, never the entry's own: Allow / Deny is drawn only
+            # for a call the page can name, on a tool with a permission channel (§4.5a, review of #2268)
+            out.append({"id": m["id"], "name": name, **line, "kind": kind, "text": text})
     return out
+
+
+def answer_members(answers: Collection[Mapping[str, Any]]) -> int:
+    """*Answer needed*'s *n*: the members the blocks are of, not the blocks (TD-950)."""
+    return len({a["id"] for a in answers})
 
 
 REF_WIDTH = 10  # *TDs in motion*'s reference column at most, in characters (§4.5a **Columns**, TD-252)
@@ -542,6 +559,7 @@ def team_summary(
         # …and the PR column's: *#811*, or *#712 merged*; 0 where no row has a PR, so the title takes the room
         "pr_w": max((len(f"#{x['pr']} {x['pr_state']}".rstrip()) for x in motion if x["pr"]), default=0),
         "answers": answers,
+        "n_answer": answer_members(answers),
         # the team's open asks to the person, one line under the facet's head in either face (TD-354)
         "asked": asked_line(members, needs, now),
         "doing": (drows := doing_rows(team, doing, {m["id"]: str(m.get("name") or m["id"]) for m in members}, now)),
@@ -659,7 +677,7 @@ def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]
         "prs_errors": errors,
         "has_repo": bool(repos),
         "waiting": sum(int((g.get("prs_waiting") or {}).get("n") or 0) for g in live),
-        "answer_needed": len(answers),
+        "answer_needed": answer_members(answers),
         "answer_team": team_of.get(first, ""),
         "answer_card": first if first and not team_of.get(first) else "",
         "asked": sum(a["n"] for _, a in asked),

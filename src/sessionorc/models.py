@@ -293,6 +293,25 @@ class FindingEntry:
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
+def open_prompts(rec: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """A record's open prompts as dicts, **newest first** (design §4.2 *Open prompts are a stack*,
+    TD-950): its `pendings`, else its one `pending` (a record of an older build, or a screen road's)."""
+    pends = [p for p in rec.get("pendings") or () if isinstance(p, dict)]
+    if not pends and isinstance(rec.get("pending"), dict) and rec["pending"]:
+        pends = [rec["pending"]]
+    return pends[::-1]
+
+
+def permission_entry(rec: Mapping[str, Any], call: str | None = None) -> dict[str, Any] | None:
+    """The permission **Allow / Deny** answer (§4.2 *Every entry is answerable where it is drawn*,
+    TD-950): the entry whose `tool_use_id` is `call`, else the newest permission entry — never a
+    question on top of it; None where there is none to answer."""
+    perms = [p for p in open_prompts(rec) if p.get("kind") == "permission" and p.get("tool_use_id")]
+    if call:
+        return next((p for p in perms if p["tool_use_id"] == call), None)
+    return perms[0] if perms else None
+
+
 ATTENTION_KINDS = ("permission", "question", "needs", "stalled", "limited", "unpushed")
 
 

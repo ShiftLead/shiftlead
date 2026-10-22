@@ -41,9 +41,20 @@ class HookMixin:
         """Called by an adapter's hook script. A `permission` event blocks until answered or timed out."""
         if event.get("kind") == "permission":
             return await self._await_permission(session, event)
+        # `mail`: the hook hands the turn its mail line (an adapter whose `mail` is a turn's, design §4.3),
+        # so the reply carries the count, read after the event — never a sender's words
+        wants_mail = bool(event.pop("mail", False))
         self._apply_event(session, event)
         await self._push_changes()
-        return None
+        return {"unread": self._unread_of(session)} if wants_mail else None
+
+    def _unread_of(self, session: str) -> int:
+        """The record's unread mail: the inbox at the home, the count the home last pushed on a node
+        (§4.4a, as the line on every `ao` reply reads it there)."""
+        if self.mode == "node":
+            return self._mail_hints.get(session, (0, False, []))[0]
+        s = self.sessions.get(session)
+        return s.unread() if s is not None else 0
 
     async def _await_permission(self, session: str, event: dict[str, Any]) -> dict[str, Any] | None:
         s = self.sessions.get(session)
@@ -55,6 +66,7 @@ class HookMixin:
             s.hook_seen_at = now_iso()
             self.store.save(s)
         if (ruled := await self._by_rule(s, event)) is not None:
+            self._sure_end[session] = time.monotonic()  # a decision: the notice that follows is its (§4.2)
             await self._push_changes()
             return ruled
         wait = float(event.get("wait_seconds") or 600)
@@ -78,7 +90,7 @@ class HookMixin:
             pane_held=bool(subagent),
             **held,
         )
-        s.set_state("needs-you", confidence="hook", pending=pending)
+        self._push_prompt(s, pending)  # on top of the record's open prompts (§4.2 *Open prompts are a stack*)
         self.store.save(s)
         # Register the waiter BEFORE the first await: a client reacting to the push must find it.
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
@@ -89,12 +101,14 @@ class HookMixin:
             decision = await asyncio.wait_for(fut, timeout=wait)
         except TimeoutError:
             # Fell through to the terminal dialog: the decision now lives there (design §4.2) — but
-            # only while the record still waits on this one. A later event already moved it on.
+            # only while the record still holds this one, top or not. A later event already ended it.
             s = self.sessions.get(session)
-            if s is None or s.pending is None or s.pending.tool_use_id != tool_use_id:
+            at = next((i for i, p in enumerate(s.pendings) if p.tool_use_id == tool_use_id), None) if s else None
+            if s is None or at is None:
                 return None
-            # the dialog is in the pane now, a subagent's too: it keeps its asker, no longer held
-            s.set_state("needs-you", confidence="hook", pending=Pending(kind="question", text=pending.text, **held))
+            # the dialog is in the pane now, a subagent's too: it keeps its asker and its call, no longer held
+            s.pendings[at] = Pending(kind="question", text=pending.text, tool_use_id=tool_use_id, **held)
+            self._show_top(s)
             self.store.save(s)
             await self._push_changes()
             return None
@@ -151,6 +165,8 @@ class HookMixin:
             return None
         reason = f"rule: {hit}"
         prompt = event.get("text") or tool
+        # a subagent's prompt is answered as the main thread's, and its FYI names the asker (§4.2, TD-950)
+        name = event.get("subagent_name") or ("subagent" if event.get("subagent") else None)
         if self.mode == "node":
             try:
                 await self._home_mux.request(
@@ -160,18 +176,28 @@ class HookMixin:
                     prompt=prompt,
                     behavior=behavior,
                     rule=hit,
+                    **({"subagent_name": name} if name else {}),
                 )
             except (link.LinkError, link.LinkClosed, TimeoutError, OSError) as e:
                 log.warning("%s: rule %s matched, but the home filed no FYI (%s): the person answers", s.id, hit, e)
                 return None
         else:
-            self._answered_by_rule(s, prompt, behavior, hit)
+            self._answered_by_rule(s, prompt, behavior, hit, subagent_name=name)
         return {"behavior": behavior, "reason": reason}
 
-    def _answered_by_rule(self, s: Any, prompt: str, behavior: str, rule: str, asker: str | None = None) -> None:
+    def _answered_by_rule(
+        self,
+        s: Any,
+        prompt: str,
+        behavior: str,
+        rule: str,
+        asker: str | None = None,
+        subagent_name: str | None = None,
+    ) -> None:
         """The *Answered for you* FYI for a prompt a rule answered (§4.9b, §4.5a): the `answered` shape a
         sourced reply's FYI has — the prompt as the question, the member as the asker, *rules* as the
-        answerer, the rule as the source. Written by the home, so it is no one's to reply to."""
+        answerer, the rule as the source. Written by the home, so it is no one's to reply to. A
+        subagent's prompt says *from the <name> subagent* (§4.2, TD-950)."""
         verdict = "allowed" if behavior == "allow" else "denied"
         role = s.role or ""
         source = f"settings.yml permissions: {role} {behavior} {rule}"[: mail.SOURCE_CAP]
@@ -181,7 +207,8 @@ class HookMixin:
             to=[PERSON],
             at=now_iso(),
             kind="note",
-            text=f"{verdict} by your rule {rule} — change it in settings.yml's permissions:",
+            text=f"{verdict} by your rule {rule}{f', from the {subagent_name} subagent' if subagent_name else ''}"
+            " — change it in settings.yml's permissions:",
         )
         note.team = getattr(s, "team", "") or None
         note.subject = mail.subject_of(f"{verdict}: {prompt}")
@@ -198,7 +225,7 @@ class HookMixin:
         if not adapters.permission_channel(s.adapter):
             # the backstop to `ao allow`/`ao deny` and the page (§4.3 *Permissions: no channel*, TD-785)
             raise RpcError(f"{s.name}'s tool has no permission channel: answer it in the terminal")
-        fut = (self._waiters.get((id, tool_use_id)) or (None, None))[0]
+        fut, thread = self._waiters.get((id, tool_use_id)) or (None, None)
         if fut is None or fut.done():
             raise RpcError("no pending permission with that id (answered, timed out, or in the terminal)")
         if behavior not in ("allow", "deny"):
@@ -208,7 +235,12 @@ class HookMixin:
         # says who answered — *you* for a person, the controller's name for a session — and a
         # person's answer is never too quick to record
         self._attention_ended(s.id, self._answered_by(behavior, caller))
-        s.set_state("working", confidence="hook")
+        # its own entry ends (§4.2 *Open prompts are a stack*): a main-thread prompt's asked call runs in the
+        # turn, so `working` goes beneath what is left; a subagent's says nothing of the main thread
+        if thread is None and s.pendings:
+            self._keep_beneath(s, "working")
+        if not self._end_entries(s, lambda p: p.tool_use_id == tool_use_id, sure=True) and thread is None:
+            s.set_state("working", confidence="hook")  # a record that held no entry for it, as before the stack
         if mail.as_person(caller, self._graph()):
             self._refill(s)  # a person's answer to its permission; a controller's refills nothing (§4.10)
         self.store.save(s)

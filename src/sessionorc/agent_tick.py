@@ -4388,6 +4388,13 @@ class TickMixin:
             st = adapter.classify(pane, tail)
             if st and st != s.state:
                 s.set_state(st, confidence="scraped")
+        elif s.id in self._recheck and not s.pendings:
+            # a screen rule's `needs-you` the emptied stack restored (§4.2 *Open prompts are a stack*, TD-950):
+            # the rules are asked once, whatever the hook's freshness — the stack's own hook just made one fresh
+            self._recheck.discard(s.id)
+            explain = getattr(adapter, "explain", None)
+            if s.state == "needs-you" and s.confidence == "scraped" and explain is not None and explain(s.tail) is None:
+                s.set_state("idle", confidence="tick")
         elif (m := self._screen_verdict(s, adapter, now)) is not None:
             # Hook-fed adapter, screen rule fired, no fresher hook state: the labelled fallback
             if s.state == m.state == "limited" and s.confidence == "hook":
@@ -4429,9 +4436,10 @@ class TickMixin:
     def _screen_verdict(self, s: Session, adapter: Any, now: datetime) -> Any:
         """The adapter's screen-rule match for the session's tail, or None when there is no rule
         set, nothing matched, or a hook state is fresher (design §4.2: scraped never outranks it).
-        A title adapter is asked without its title, so its manifest alone answers (§4.3)."""
+        A title adapter is asked without its title, so its manifest alone answers (§4.3). Nothing while
+        the record's stack is open: it is the one writer of `pending` (§4.2, TD-950)."""
         explain = getattr(adapter, "explain", None)
-        if explain is None or self._hook_within(s, adapter, now):
+        if explain is None or s.pendings or self._hook_within(s, adapter, now):
             return None
         return explain(s.tail)
 
@@ -4439,8 +4447,8 @@ class TickMixin:
         """Whether the title of a tool that writes its state there replaced the record's state (design
         §4.2 *A title the tool writes its state into*, §4.3 *Two gaps*, TD-785), by `_title_reading`.
         It is not held for its screen: what it replaced is dropped, as a hook's report drops it."""
-        if not getattr(adapter, "state_in_title", False):
-            return False
+        if not getattr(adapter, "state_in_title", False) or s.pendings:
+            return False  # no title, or the record's stack is open: it alone writes `pending` (§4.2, TD-950)
         m = adapter.explain(s.tail, title=pane.title)
         if m is not None and not m.title:
             return False  # the adapter's manifest matched: a screen rule's verdict, not the title's (§4.3)
@@ -4497,7 +4505,7 @@ class TickMixin:
         no hook is fresher and no rule matches the tail. An `idle` with nothing saved has nothing to
         restore, so it is not gone: the title (a title adapter's) overrules it instead (§4.3, TD-944)."""
         explain = getattr(adapter, "explain", None)
-        if explain is None or not self._screen_held(s) or self._hook_within(s, adapter, now):
+        if explain is None or s.pendings or not self._screen_held(s) or self._hook_within(s, adapter, now):
             return False
         if s.id not in self._hook_state and s.state == "idle":
             return False
@@ -4570,25 +4578,44 @@ class TickMixin:
             self._bell_answered(s, event)  # a ring's turn, judged at its Stop (§4.10, TD-347)
         state = None if stale else event.get("state")
         thread = event.get("subagent") or None
+        starting = thread is not None and (event.get("subagent_delta") or 0) > 0  # a `SubagentStart` ends nothing
+        if thread is None and state and state not in ("needs-you", "exited", "closed") and s.pendings:
+            # the main thread's own state goes beneath the open prompts, before any of them ends (§4.2
+            # *Open prompts are a stack*): the emptied stack restores it, and a `Stop` is not lost
+            self._keep_beneath(s, state)
         if state in ("exited", "closed"):
             self._end_waiters(sid, every=True)  # the session's end ends every thread's waiter
         elif event.get("subagents_reset") or (running and not s.subagents):
             self._end_waiters(sid, every=True, subagents=True)  # no subagent is left to ask
+            self._end_entries(s, lambda p: p.subagent is not None, sure=False)  # nor to answer in the pane
         pending_kind = (event.get("pending") or {}).get("kind")
-        if stale or event.get("notice") or (thread is not None and (event.get("subagent_delta") or 0) > 0):
-            pass  # a notice announces the dialog its waiter is for; a `SubagentStart` ends nothing (§4.2)
+        if stale or event.get("notice") or starting:
+            pass  # a notice announces the dialog its waiter is for: the notice rule below weighs it (§4.2)
         elif thread is not None or (state and state != "needs-you") or pending_kind == "question":
             self._end_waiters(
                 sid, event.get("tool_use_id"), thread, event.get("call"), question=pending_kind == "question"
             )
-        if state:
+        # a question in the pane (a fall-through, a question) has no waiter: any event of its thread means it
+        # was answered — the main thread's only once no waiter of its own is live (§4.2)
+        if (
+            not stale
+            and not starting
+            and (thread is not None or (state and state != "needs-you" and not self._permission_waiting(sid, None)))
+        ):
+            tid = event.get("tool_use_id")
+            self._end_entries(
+                s, lambda p: p.subagent == thread and p.kind != "permission", sure=not tid or None, tool_use_id=tid
+            )
+        if state == "needs-you":
+            pending = Pending.from_dict(event["pending"]) if event.get("pending") else Pending("question", "")
+            if thread is not None:
+                pending.subagent = thread
+            if not (event.get("notice") and self._notice_dropped(s)):
+                self._push_prompt(s, pending)
+        elif state:
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else None
-            if self._permission_waiting(sid):
-                # Claude Code draws its own dialog a few seconds into a PermissionRequest hook
-                # and fires a permission_prompt Notification for it; the hook is still blocking
-                # and its answer still wins (verified 2026-09-06). Keep Allow / Deny up — and over a
-                # parallel tool's event too, which `_end_waiters` left the waiter live for (TD-629).
-                pass
+            if s.pendings and state not in ("exited", "closed"):
+                pass  # written into `kept` above: the stack is the one writer of `pending` while it is open
             else:
                 if state == "working" and s.state == "idle" and s.told and event.get("event"):
                     # An event that is not a turn's start woke a session its Stop left idle: the
@@ -4604,6 +4631,100 @@ class TickMixin:
                 s.set_state(state, confidence="hook", pending=pending)
                 self._hook_state.pop(sid, None)  # a hook's word: no screen's verdict to go back from
         self.store.save(s)
+
+    def _push_prompt(self, s: Session, entry: Pending) -> None:
+        """An open prompt goes on top of the record's stack (design §4.2 *Open prompts are a stack*, TD-950).
+        The first one keeps what the record read as `kept` — a screen or title road's `needs-you` too —
+        and takes over the screen road's saved state, so nothing restores an older state later. A
+        main-thread question replaces an older main-thread question, as it replaced the one pending."""
+        if not s.pendings:
+            s.kept = {
+                "state": s.state,
+                "pending": s.pending.to_dict() if s.pending else None,
+                "confidence": s.confidence,
+                "since": s.since,
+            }
+            self._hook_state.pop(s.id, None)
+            self._recheck.discard(s.id)
+        elif entry.subagent is None and entry.kind != "permission":
+            s.pendings = [p for p in s.pendings if p.subagent is not None or p.kind == "permission"]
+        s.pendings.append(entry)
+        s.set_state("needs-you", confidence="hook", pending=entry)
+
+    def _end_entries(self, s: Session, which: Any, *, sure: Any = None, tool_use_id: Any = None) -> bool:
+        """The open prompts `which` picks leave the stack, wherever they sit, and the record shows what is
+        left: the newest entry, or once none is, `kept` with its own confidence and `since` (§4.2). `sure`
+        sets the session's last sure end (True) or clears it (False) — None: sure when an entry ended is the
+        call `tool_use_id` names, cleared otherwise. True when an entry ended."""
+        ended = [p for p in s.pendings if which(p)]
+        if not ended:
+            return False
+        if sure is None:
+            sure = any(p.tool_use_id == tool_use_id for p in ended)
+        if sure:
+            self._sure_end[s.id] = time.monotonic()
+        else:
+            self._sure_end.pop(s.id, None)
+        s.pendings = [p for p in s.pendings if not which(p)]
+        self._show_top(s)
+        return True
+
+    def _show_top(self, s: Session) -> None:
+        """The record reads the newest open prompt, or with none left goes back to `kept`. A `kept` screen
+        rule's `needs-you` comes back `scraped` and is rechecked by the next tick (§4.2)."""
+        if s.pendings:
+            s.set_state("needs-you", confidence="hook", pending=s.pendings[-1])
+            return
+        kept = s.kept or {"state": "idle", "pending": None, "confidence": "tick", "since": None}
+        s.kept = None
+        pending = Pending.from_dict(kept["pending"]) if kept.get("pending") else None
+        s.set_state(kept["state"], confidence=kept["confidence"], pending=pending, since=kept.get("since"))
+        if kept["state"] == "needs-you" and kept["confidence"] == "scraped":
+            self._recheck.add(s.id)
+
+    @staticmethod
+    def _keep_beneath(s: Session, state: Any, confidence: Any = "hook") -> None:
+        """The main thread's own state written beneath the open prompts: a fresh `since` where it changed,
+        `kept`'s own where it did not (§4.2 *Open prompts are a stack*)."""
+        kept = s.kept or {}
+        since = kept.get("since") if kept.get("state") == state and kept.get("since") else now_iso()
+        s.kept = {"state": state, "pending": None, "confidence": confidence, "since": since}
+
+    @staticmethod
+    def _sweep_prompts(s: Session) -> bool:
+        """At the host agent's start (design §4.2 *A waiter does not outlive the host agent*, TD-950): a hook
+        `pending` saved with no `pendings` (an older version's) moves into the stack, over `kept` `idle` at
+        `tick` with its own `since`; then every permission entry, its waiter gone with the last run, takes
+        the question form — the hook's call failed, so the tool drew its dialog. True when it changed."""
+        if s.state in ("exited", "closed"):
+            return False
+        changed = False
+        if not s.pendings and s.pending is not None and s.state == "needs-you" and s.confidence == "hook":
+            s.pendings = [s.pending]
+            s.kept = {"state": "idle", "pending": None, "confidence": "tick", "since": s.since}
+            changed = True
+        for i, p in enumerate(s.pendings):
+            if p.kind == "permission":
+                s.pendings[i] = Pending(
+                    kind="question",
+                    text=p.text,
+                    tool_use_id=p.tool_use_id,
+                    subagent=p.subagent,
+                    subagent_name=p.subagent_name,
+                )
+                changed = True
+        if changed and s.pendings:
+            s.set_state("needs-you", confidence="hook", pending=s.pendings[-1])
+        return changed
+
+    def _notice_dropped(self, s: Session) -> bool:
+        """Whether the tool's `permission_prompt` notice announces a prompt the stack already holds: one
+        is open (a permission, or a question that fell through from one), or one had a sure end within
+        `NOTICE_LAG` — the notice lands about six seconds after the dialog (§4.2)."""
+        if any(p.kind == "permission" or (p.kind == "question" and p.tool_use_id) for p in s.pendings):
+            return True
+        at = self._sure_end.get(s.id)
+        return at is not None and time.monotonic() - at < agent_common.NOTICE_LAG
 
     @staticmethod
     def _apply_subagents(s: Session, event: dict[str, Any], at: Any) -> None:
@@ -4653,13 +4774,18 @@ class TickMixin:
         (`_await_permission` keyed it `<session>:<time>`). A main-thread waiter keyed by its call is
         also ended by any main-thread `call: start` or question: its dialog is drawn, and a pane Deny
         gives the asked call no end, so the turn's next call is the first sign. `every` ends the
-        session's waiters whatever the event (its end), or with `subagents` every subagent's."""
+        session's waiters whatever the event (its end), or with `subagents` every subagent's.
+
+        An ended waiter's entry leaves the record's stack here, before the hook call returns (§4.2 *Open
+        prompts are a stack*): an end by the asked call's own event or by one naming no call is sure."""
+        ended: dict[str, bool] = {}
         for (k_sid, k_tid), (fut, k_thread) in list(self._waiters.items()):
             if k_sid != sid or fut.done():
                 continue
             if every:
                 if not subagents or k_thread is not None:
                     fut.set_result({"terminal": True})
+                    ended[k_tid] = True
                 continue
             if k_thread != subagent:
                 continue
@@ -4670,6 +4796,9 @@ class TickMixin:
                 or (subagent is None and (call == "start" or question))
             ):
                 fut.set_result({"terminal": True})
+                ended[k_tid] = tool_use_id is None or k_tid == tool_use_id
+        if ended and (s := self.sessions.get(sid)) is not None:
+            self._end_entries(s, lambda p: p.kind == "permission" and p.tool_use_id in ended, sure=any(ended.values()))
 
     def _track_call(self, sid: str, event: dict[str, Any]) -> None:
         """Each thread's open calls, what `_await_permission` matches a permission to (design §4.2 *A
@@ -4728,6 +4857,7 @@ class TickMixin:
             self._hook_state,
             self._live_hook_at,
             self._open_calls,
+            self._sure_end,
             self._killed_at,
             self._mail_hints,
             self._asks_hints,
@@ -4737,6 +4867,7 @@ class TickMixin:
         ):
             side.pop(sid, None)
         self._lead_typed.discard(sid)  # a reused id never starts with the old run's line in the composer (TD-347)
+        self._recheck.discard(sid)
         if not (lock := self._typing.get(sid)) or not lock.locked():
             self._typing.pop(sid, None)  # a held one stays: its typist is mid-paste, the name reused or not
         for key in [k for k in self._attention_how if k.split("|", 1)[0] == sid]:

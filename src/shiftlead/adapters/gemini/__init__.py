@@ -26,13 +26,16 @@ import sys
 import uuid
 from pathlib import Path
 
-from sessionorc import paths
-from sessionorc.adapters import LaunchSpec
+from sessionorc import identity, paths
+from sessionorc.adapters import LaunchSpec, Link, MailDelivery, Transcript
+from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
-from shiftlead.adapters.claude_code import _resolves
+from shiftlead.adapters.claude_code import SHELL_CMD_LEN, SHELL_WALK_NODES, _resolves, write_context_file
+from shiftlead.adapters.gemini import transcript as transcript_mod
+from shiftlead.adapters.gemini.hook import START_CONTEXT_ENV
 from shiftlead.profiles import Profile
 
 log = logging.getLogger("shiftlead.adapters.gemini")
@@ -41,7 +44,10 @@ NAME = "gemini"
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")  # its screen-rule manifest (§4.3, TD-944)
 ADAPTER_FLAG = "--adapter"  # `shiftlead-hook --adapter gemini`: read from argv before any import (§4.1)
 HOOK_EVENTS = ("SessionStart", "SessionEnd", "BeforeAgent", "AfterAgent", "BeforeTool", "AfterTool", "Notification")
-HOOK_TIMEOUT_MS = 10_000  # the tool's `timeout` is in milliseconds; every hook here is fire-and-forget
+HOOK_TIMEOUT_MS = 10_000  # the tool's `timeout` is in milliseconds; every hook here but the start is fire-and-forget
+# `SessionStart` runs the repo's start hooks itself (design §4.3 *The repo's start hooks*): at or above
+# the runner's own bound, `hook.START_HOOKS_TIMEOUT`, so the tool never cancels it first
+START_TIMEOUT_MS = 180_000  # the runner, its `git` read (10 s) and the report (3 s)
 # where the tool sits when it was installed with npm's user prefix: off `PATH` outside a login shell
 NPM_BINARY = Path("~/.npm-global/bin/gemini")
 YOLO = ["--approval-mode", "yolo"]  # an unattended launch under `permission_prompts: skip` (§4.2a)
@@ -75,6 +81,9 @@ COMPOSER_ROW = re.compile(r"^\s*[>*!] ")
 CURSOR = "\x1b[7m"
 # painted grey, not faint, so read as empty by its words
 PLACEHOLDER = "Type your message or @path/to/file"
+# The tool's shell wrapper (design §4.3 `background`, read 2026-10-22 on 0.64.0): every command, the model's
+# and shell mode's alike, runs as `bash -c "shopt -u …; {\n<command>\n}\n__code=$?; pwd > …; exit $__code"`
+SHELL_WRAPPER = "\n}\n__code=$?"
 
 
 def home(profile: Profile) -> Path:
@@ -109,8 +118,12 @@ def layer_settings(hook_cmd: str = "shiftlead-hook") -> dict:
     """The settings layer a launch names in `GEMINI_CLI_SYSTEM_SETTINGS_PATH` (design §4.3 `launch`): a
     hook on each of `HOOK_EVENTS` calling `<hook_cmd> --adapter gemini`, and `LAYER_SETTINGS`."""
     command = f"{shlex.quote(hook_cmd)} {ADAPTER_FLAG} {NAME}"
-    hook = {"type": "command", "command": command, "timeout": HOOK_TIMEOUT_MS}
-    return {"hooks": {ev: [{"hooks": [dict(hook)]}] for ev in HOOK_EVENTS}, **json.loads(json.dumps(LAYER_SETTINGS))}
+    hooks = {ev: [{"hooks": [{"type": "command", "command": command, "timeout": _timeout(ev)}]}] for ev in HOOK_EVENTS}
+    return {"hooks": hooks, **json.loads(json.dumps(LAYER_SETTINGS))}
+
+
+def _timeout(event: str) -> int:
+    return START_TIMEOUT_MS if event == "SessionStart" else HOOK_TIMEOUT_MS
 
 
 def layer_text(hook: str) -> str:
@@ -222,9 +235,11 @@ class GeminiAdapter:
     state_in_title = True
     # no hook answers a confirmation: a pending permission is answered in the terminal (§4.3, §4.5a)
     permission_channel = False
-    # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads and
-    # the rest come with TD-785's and TD-786's later slices
-    implements: frozenset[str] = frozenset({"composer", "title"})
+    # held from its start, through `SessionStart`'s `additionalContext` (design §4.3 `start_context`)
+    start_context = True
+    # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the rest come
+    # with TD-786's later slices
+    implements: frozenset[str] = frozenset({"background", "composer", "context", "links", "mail", "spend", "title"})
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
         self._binary = binary
@@ -240,7 +255,15 @@ class GeminiAdapter:
         return self._binary
 
     def launch(
-        self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""
+        self,
+        *,
+        profile: str,
+        resume: str | None,
+        prompt: str | None,
+        unattended: bool,
+        cwd: Path,
+        name: str = "",
+        start_context: str | None = None,
     ) -> LaunchSpec:
         prof = profiles_mod.get(profile or None)
         adapter_id = resume or str(uuid.uuid4())
@@ -270,8 +293,16 @@ class GeminiAdapter:
             env["GEMINI_CLI_HOME"] = str(prof.config_dir)
         if name:
             env["CLI_TITLE"] = name  # the session's name, which the tool puts in its title
+        if start_context:
+            # the hook reads it on every `SessionStart`, a resume's and a `/clear`'s too (design §4.3)
+            env[START_CONTEXT_ENV] = str(write_context_file(adapter_id, start_context))
         # the prompt is typed at the composer by the host agent once `SessionStart` reports (§4.1, TD-339)
         return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id, first_prompt=prompt or None, model=prof.model)
+
+    def mail(self) -> MailDelivery:
+        """An injection at the top of a turn (design §4.3 `mail`): `BeforeAgent`'s `additionalContext`
+        carries the unread line; an idle session is woken by the doorbell's pane write, as Claude Code's."""
+        return MailDelivery(how="turn", event="BeforeAgent")
 
     def classify(self, pane: PaneInfo | None, tail: list[str]) -> State | None:
         return None  # hook-fed: the screen has no opinion; the title's check is the tick's (§4.3)
@@ -314,6 +345,36 @@ class GeminiAdapter:
         which is `CLI_TITLE`; None for a title with none (a shell's, the tool's before it mounts)."""
         m = TITLE_NAME.match((pane_title or "").strip())
         return (m.group(1).strip() or None) if m else None
+
+    def background(self, pid: int, proc: ProcReader) -> list[dict] | None:
+        """The tool's live shell tasks under the pane's process `pid` (design §4.3 `background`, §4.2 *A
+        background shell task*): `[{pid, start, cmd}]`. From `pid`, its own included, down to the first
+        `node` — the pane's own for an ao launch, a descendant under a hand-started shell — bounded as
+        Claude Code's walk is; then the children of it and of its `node` children (the tool relaunches
+        itself as one; a launch that does not keeps its shells, beside any node MCP server) that are the
+        tool's shell wrapper (`SHELL_WRAPPER`), `cmd` the
+        argv of the wrapper's first child, joined and cut to `SHELL_CMD_LEN`. Read only while the session
+        is idle, so each is a command moved to the background. None when no `node` is found."""
+        level, seen, tool = [int(pid)], 0, None
+        for _ in range(identity.WALK_LIMIT):
+            tool = next((p for p in level if proc.comm(p) == "node"), None)
+            if tool is not None or not level or seen > SHELL_WALK_NODES:
+                break
+            seen += len(level)
+            level = [c for p in level for c in proc.children(p) or ()]
+        if tool is None:
+            return None
+        parents = [tool, *(c for c in proc.children(tool) or () if proc.comm(c) == "node")]
+        out = []
+        for child in (c for p in parents for c in proc.children(p) or ()):
+            argv = proc.cmdline(child) or []
+            st = proc.stat(child)
+            if st is None or len(argv) < 3 or argv[1] != "-c" or SHELL_WRAPPER not in argv[2]:
+                continue
+            kids = [(k.start, k.pid) for c in proc.children(child) or () if (k := proc.stat(c)) is not None]
+            first = proc.cmdline(min(kids)[1]) if kids else None
+            out.append({"pid": child, "start": st.start, "cmd": " ".join(first or [])[:SHELL_CMD_LEN]})
+        return out
 
     # -- account ---------------------------------------------------------------------------------
 
@@ -399,6 +460,112 @@ class GeminiAdapter:
         except (KeyError, ValueError):
             return None
         return prof.account or prof.name
+
+    def billing_for(self, profile: str) -> dict | None:
+        """How the profile is billed (design §4.2a, TD-151): `{billing, prices}` as `profiles.yml` declares
+        it. None for a profile that does not resolve."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        return {"billing": prof.billing, "prices": dict(prof.prices)}
+
+    # -- reads (design §4.3 *Reads*, TD-786) -----------------------------------------------------
+
+    def transcript_path(self, session_id: str, cwd: Path, profile: Profile | str | None = None) -> Path | None:
+        """The session's chat under the profile's home: the file of a project's `chats/` named for the id
+        whose first record names it (`transcript.find`); None when there is none."""
+        prof = _profile(profile)
+        return None if prof is None else transcript_mod.find(transcript_mod.chats_root(home(prof)), session_id)
+
+    def read_transcript(
+        self,
+        session_id: str,
+        cwd: Path,
+        profile: str = "",
+        *,
+        before: int | None = None,
+        turns: int = 20,
+        raw: bool = False,
+    ) -> Transcript | None:
+        """The session's chat as neutral entries (design §4.3 `read_transcript`). None when there is no
+        file, or the profile is unknown (never another account's home)."""
+        p = self.transcript_path(session_id, cwd, profile)
+        if p is None:
+            return None
+        try:
+            return transcript_mod.read(p, before=before, turns=turns, raw=raw)
+        except OSError:
+            return None
+
+    def context(self, session_id: str, cwd: Path, profile: str = "") -> dict | None:
+        """The session's context size now (design §4.3 `context`, §6 rule 5): the last turn's input, the
+        tool's window for its model. None when it cannot tell."""
+        p = self.transcript_path(session_id, cwd, profile)
+        return None if p is None else transcript_mod.context(p)
+
+    def model_in_use(self, session_id: str, cwd: Path, profile: str = "") -> str | None:
+        """The model the session's last turn ran on, None when it cannot tell."""
+        p = self.transcript_path(session_id, cwd, profile)
+        return None if p is None else transcript_mod.model(p)
+
+    def links(self, session_id: str, cwd: Path, profile: str = "", *, cursor: int = 0) -> tuple[list[Link], int] | None:
+        """The http/https URLs the session printed past byte `cursor` and the new cursor (design §4.3
+        `links`). None when there is no file, or the profile is unknown."""
+        p = self.transcript_path(session_id, cwd, profile)
+        if p is None:
+            return None
+        try:
+            return transcript_mod.links(p, cursor)
+        except OSError:
+            return None
+
+    def spend(self, profile: str, cursors: dict[str, int] | None = None) -> dict:
+        """Spend per turn for a profile (design §4.3 *Spend per turn*, *Reads*): `{turns, cursors, reason}`,
+        every chat under the profile's home read from its cursor — sessions shiftlead did not start and
+        subagents' chats (`chats/<parent id>/`) included, since both are billed. `conversation` is the
+        chat's session, a subagent's its parent's; `cwd` the project's directory. `reason` is `ok`, or why
+        nothing could be read, with the cursors unchanged."""
+        before = {str(k): int(v) for k, v in (cursors or {}).items() if isinstance(v, int) and v >= 0}
+        prof = _profile(profile)
+        if prof is None:
+            return {"turns": [], "cursors": before, "reason": "no_profile"}
+        root = transcript_mod.chats_root(home(prof))
+        if not root.is_dir():
+            return {"turns": [], "cursors": before, "reason": f"no chats under {root}"}
+        try:
+            files = sorted(root.glob("*/chats/**/*.jsonl"))
+        except OSError as e:
+            return {"turns": [], "cursors": before, "reason": f"unreadable: {root}: {type(e).__name__}"}
+        turns: list[dict] = []
+        after: dict[str, int] = {}
+        for p in files:
+            key = str(p)
+            subagent = p.parent.name != "chats"
+            try:
+                if p.stat().st_size == before.get(key, -1):
+                    after[key] = before[key]
+                    continue
+                conversation = p.parent.name if subagent else (transcript_mod.session_of(p) or p.stem)
+                got, after[key] = transcript_mod.turns(
+                    p, before.get(key, 0), conversation, transcript_mod.cwd_of(p), subagent
+                )
+            except OSError:
+                if key in before:
+                    after[key] = before[key]
+                continue
+            turns.extend(got)
+        return {"turns": turns, "cursors": after, "reason": "ok"}
+
+
+def _profile(profile: Profile | str | None) -> Profile | None:
+    """The profile itself, or by name; None for one that does not resolve (never another account's home)."""
+    if isinstance(profile, Profile):
+        return profile
+    try:
+        return profiles_mod.get(profile or None)
+    except (KeyError, ValueError):
+        return None
 
 
 def _border(row: str, glyph: str = COMPOSER_TOP) -> bool:

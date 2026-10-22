@@ -72,8 +72,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-948 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
-| TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Open |
+| TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Built (#2261–#2268) — live check, blocked by TD-960 |
 | TD-951 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed 2026-10-21 with Paul — review rounds under way (held) |
+| TD-955 | #2254's modal-limit `read_when` is untested for a handed entry and for the Reply composer's refill line | Low | Open |
+| TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
+| TD-960 | The tool's own `SubagentStop`, for an id no `SubagentStart` announced, takes `subagents` to 0 and ends a live subagent's permission waiter: the record reads `idle` while the pane draws its dialog | Medium | Open |
 
 ---
 
@@ -942,7 +945,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-16 (TD-112's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1, the reads (`transcript_path`, `read_transcript`, `context`, `model_in_use`, `links`, `spend`), in #2266; slice 2, start context, mail and the repo's start hooks (the layer's `SessionStart` timeout raised, so the installed layer reads *stale* until reinstalled), in #2269; slice 3, `background` (the relaunched `node`'s shell wrappers, a fixture captured from 0.64.0), in #2271; `usage` moved to TD-959 (it reads the person's Google token); the live walk is left, on the Gemini CLI version Paul picks (ask m-cd1f21682bb1: the tool updated itself to 0.65.0 during slice 3's probe).
+**Blocked by:** decision (paul) — keep Gemini CLI 0.65.0 or restore 0.64.0 (ask m-cd1f21682bb1)
 **Location:** design §4.3 *The second adapter: Gemini CLI*; `src/shiftlead/adapters/gemini/` (a `transcript.py`); `tests/conformance/fixtures/gemini/`
 
 **Why:** TD-112, slice 3: what the pages and the policies read from a session, so a Gemini session's card, transcript page and rule 5 (the context bound) works as a Claude Code one's does.
@@ -1418,8 +1422,9 @@ builds are in the ledger.
 **Type:** debt
 **Added:** 2026-10-21 (the designer, from TD-947)
 **Owner:** grinder
-**Kind:** build
-**Status:** In progress (grinder-ao-2). Slice 1 (#2261): the adapter's fields — `call_sig` on `PreToolUse` and `PermissionRequest`, `subagent` on every event with `agent_id` (and `subagent_name` on its `PermissionRequest`), a subagent's tool events carrying their `tool_use_id`, `call: start|end` on every tool event (`PostToolUseFailure` is not hooked, so `end` is `PostToolUse`'s alone), `notice: permission_prompt` — and `Pending`'s `subagent`, `subagent_name`, `pane_held` (written by `to_dict` only for a subagent's prompt); the core reads none yet. Slice 2 (#2262): the call key and waiter scope — `_open_calls` (`_track_call`, `_take_call`), `_await_permission`'s match and its pending's `subagent`, `subagent_name`, `pane_held` (the fall-through keeps the first two), the waiter map's thread, `_permission_waiting`'s thread, `_end_waiters` by thread with `call` and questions, the session's end, a reset and `subagents` reaching 0, `_apply_event` for a subagent event with no state; the record has no stack yet, so a subagent's Allow still sets `working`. Slice 3a (#2263): the record's `pendings` and `kept`, persisted, in `NODE_OWNED`, dropped at `exited`/`closed`, and `set_state(since=)`; nothing writes them yet. Left: (3b) the stack's logic (every `needs-you` entry pushed, `kept` set at the first push with `_hook_state` popped; a main-thread event's state written into `kept` before `_end_waiters` runs; an ending removing its entry synchronously inside `_end_waiters` and `rpc_decide`, so the record is right when the hook call returns; the restore with `kept`'s `since`; `NOTICE_LAG`, the startup sweep, a restart's question form, `rpc_decide`, the screen and title skips); (4) the words and controls (cards, Inbox row, Focus, `answer_blocks`, `ao allow --call`, `rpc_send`'s refusal, `ao status`/`explain`, *Answered for you*, the node's `answered_by_rule`, §4.10's read-when).
+**Kind:** live-check #2268
+**Status:** Built (#2261, #2262, #2263, #2265, #2267, #2268) — live check, read 2026-10-22 (grinder-ao-1, #2268 live in fb99f94) on a scratch home with `probe.py --mode background` (Claude Code on the `conformance` profile, `permission_wait: 90`): **it does not hold**. For its first 33 s it does — the record reads `needs-you` (`hook`) with `subagent_name` *general-purpose* and `pane_held`, `ao status` prints *← permission: Bash: touch probe-subagent.txt (from the general-purpose subagent)*, the held line reads *from the general-purpose subagent · the pane shows nothing until <deadline>*, and the pane draws nothing. Then a `SubagentStop` for another id (no `SubagentStart` named it: the tool's own, the one every capture holds) takes `subagents` from 1 to 0, which ends every subagent waiter: the record reads `idle` with no pending at 39 s, and the next pane read, at 51 s, draws the dialog — TD-947's symptom. What is wrong is TD-960. Slice 1 (#2261): the adapter's fields — `call_sig` on `PreToolUse` and `PermissionRequest`, `subagent` on every event with `agent_id` (and `subagent_name` on its `PermissionRequest`), a subagent's tool events carrying their `tool_use_id`, `call: start|end` on every tool event (`PostToolUseFailure` is not hooked, so `end` is `PostToolUse`'s alone), `notice: permission_prompt` — and `Pending`'s `subagent`, `subagent_name`, `pane_held` (written by `to_dict` only for a subagent's prompt); the core reads none yet. Slice 2 (#2262): the call key and waiter scope — `_open_calls` (`_track_call`, `_take_call`), `_await_permission`'s match and its pending's `subagent`, `subagent_name`, `pane_held` (the fall-through keeps the first two), the waiter map's thread, `_permission_waiting`'s thread, `_end_waiters` by thread with `call` and questions, the session's end, a reset and `subagents` reaching 0, `_apply_event` for a subagent event with no state; the record has no stack yet, so a subagent's Allow still sets `working`. Slice 3a (#2263): the record's `pendings` and `kept`, persisted, in `NODE_OWNED`, dropped at `exited`/`closed`, and `set_state(since=)`; nothing writes them yet. Slice 3b (#2265): the stack's logic — `_push_prompt` (`kept` at the first push, `_hook_state` popped, a main-thread question replacing the older), `_keep_beneath` (a main-thread event's state into `kept` before `_end_waiters`), `_end_entries`/`_show_top` (an ending removes its entry inside `_end_waiters` and `rpc_decide`; the restore with `kept`'s confidence and `since`; a kept screen verdict rechecked by the next tick), `_notice_dropped` with `NOTICE_LAG` and `_sure_end`, the screen and title skips, `_sweep_prompts` at start (a saved hook pending into the stack; the question form). Slice 4a (#2267): the words — `cards.subagent_held`/`held_words` and the view's `held`; `held_line.html` on the card, the Inbox row and the team facet, and Focus's header in `app.js` (the deadline a `.localtime`); `rpc_send`'s refusal for a `pane_held` record; `cli.pending_words` on `ao status`, `ao send --wait` and `ao explain`; *Answered for you* naming the subagent, and the node's `answered_by_rule` carrying `subagent_name`. Slice 4b (#2268): every entry answerable where it is drawn — `models.open_prompts`/`permission_entry` (the newest *permission* entry, or the one a call names); `cards.prompt_line` and the view's `others`, drawn under the card's slot and in Focus's header, each with **Allow** / **Deny** carrying `data-call` (the page's route takes `call`); `answer_blocks` a block per entry, *n* counting members (`answer_members`); `ao allow`/`ao deny --call`; `mail.read_when`'s *rung on the restore to idle* for an idle main thread held only by subagents' prompts (the restore itself is the doorbell's hook-confirmed idle).
+**Blocked by:** TD-960
 **Location:** `src/shiftlead/adapters/claude_code/hook.py` `translate()` (the `PermissionRequest` branch, the `PreToolUse`
 branch, the `agent_id` branch for tool events, `SubagentStop`); `src/sessionorc/models.py` `Pending`; `src/sessionorc/agent_hook.py`
 `_await_permission`, `rpc_decide`; `src/sessionorc/agent_tick.py` `_apply_event`, `_permission_waiting`, `_end_waiters`;
@@ -1579,7 +1584,7 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
   - `exited` drops the stack.
   - A main-thread waiter keyed by its call: a parallel call's `PostToolUse` (open before the permission)
     ends nothing and the buttons stay; another call's `PreToolUse` ends it as answered in the terminal, and
-    the subagent's entry and buttons stay. A notice 6 s after that end is pushed.
+    the subagent's entry and buttons stay. A notice 6 s after that end is dropped while the subagent's entry is open (§4.2: an unsure end clears the last sure end and overrides no open entry, m-489f14e45136), and pushed with nothing else open.
   - A main-thread `AskUserQuestion` over a main-thread waiter keyed by its call ends that waiter and goes on
     top as a question.
   - A notice 6 s after a `Stop` ended a main-thread waiter is dropped; one 6 s after a fall-through
@@ -1647,3 +1652,56 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Done when** Paul, closing an own session from Focus, reads one line saying how it ended, the buttons, and what it cost, with no guessed cause; a member taken over shows Hand back where Take over was; the side panel opens folded with a value on each summary and the Session heading level with its chevron; a session that has sent mail shows it under Sent.
 
 **Related:** TD-156 (the first round, archived), TD-923 (the disconnect card, whose frame the ending card reuses), TD-818 / TD-830–833 (Spend per seat, the figures), TD-490 (the ending's words), TD-096 (Take over / Hand back), TD-075 (`ao inbox --sent`), TD-029 (the reconnect contract), TD-266 (*forgotten by itself a day after the close*).
+
+## TD-955: #2254's modal-limit `read_when` is untested for a handed entry and for the Reply composer's refill line
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_inbox.py` (`_entry_read_when` ~L469), `src/sessionorc/agent_serve.py` (`_view` ~L80); `tests/test_gemini_title.py`, `tests/test_handed_entry.py`
+
+**Why:** Found auditing the tests of #2254 (TD-944 slice 3). The PR passes `modal_limit=` to `mail.read_when` at four sites; the new tests (`test_gemini_title.py`, `test_read_when.py`) reach two (`msg` and the `note` view). Probes: removing `modal_limit=modal` from `_entry_read_when` in `src/sessionorc/agent_inbox.py` (the handed entry's ask sentence) and from the `refill` call in `_view` in `src/sessionorc/agent_serve.py` (the Reply composer's line), together, leaves `tests/test_gemini_title.py test_read_when.py test_held_missed.py test_cache_restart.py test_title_reading.py test_handed_entry.py test_start_time.py test_ui_entry.py test_cli_teams.py test_cadence_policy.py` green (241 passed). A person handing an entry to a seat sitting at Gemini's limit dialog would be told it is rung after a reset that does not exist.
+
+**Fix:** Add to the Gemini box test (or `test_handed_entry.py`) a handed entry to the record at the box asserting the modal sentence in the handed reply's `read_when`, and `view['read_when']['refill']` starting with it. Confirm each fails with its argument removed.
+
+**Done when** removing `modal_limit=` from either site fails a test.
+
+## TD-959: A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-22 (grinder-ao-1, from TD-786)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — split from TD-786 at its slice 3 (#2271).
+**Blocked by:** decision (paul) — whether shiftlead may decrypt the tool's credential file and call Google with the person's token (ask m-0bc2ef3a6645)
+**Location:** design §4.3 *The second adapter: Gemini CLI* (`usage`); `src/shiftlead/adapters/gemini/__init__.py`
+
+**Why:** design §4.3 says a Google-login home's `usage` is the quota endpoint, so the card's chip and `limited` work as Claude Code's do. Gemini CLI keeps that home's OAuth token in `.gemini/gemini-credentials.json`, which is encrypted by the tool's file store (`GEMINI_FORCE_FILE_STORAGE`), not JSON; the quota (`retrieveUserQuota`, per-model `buckets` of `remainingFraction` and `resetTime`) is held only in the tool's memory (`lastRetrievedQuota`), never on disk. So the read decrypts the person's token, refreshes it with the tool's OAuth client, asks `loadCodeAssist` for the project, and calls Google — the person's credentials and the network, which an unattended grinder does not take on unasked.
+
+**Fix:** on *Build it*: `usage_for(profile)` / `usage(profile)` as Claude Code's (reasons `metered`, `no_credentials`, `rate_limited`, `error`): an API-key home (`selectedType: gemini-api-key`) has no quota endpoint and reports None, as the design says (no chip); a Google-login home with no credential reports `no_credentials`; one with a credential decrypts the file as the tool does, refreshes, calls `loadCodeAssist` then `retrieveUserQuota`, and maps each bucket with a `modelId` to a window labelled by the model, `pct` = 100 − 100·`remainingFraction`, `resets` = the bucket's `resetTime` where it carries one (to confirm on the captured response). A response captured on a signed-in home is the parse test's fixture. On *Leave Gemini without a chip*: the design's `usage` line says None for every home, and this entry archives.
+
+**Done when** a Google-login Gemini profile's card shows its chip, or the design says it has none.
+
+**Related:** TD-786, TD-112.
+
+## TD-960: The tool's own `SubagentStop`, for an id no `SubagentStart` announced, takes `subagents` to 0 and ends a live subagent's permission waiter: the record reads `idle` while the pane draws its dialog
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (grinder-ao-1, from TD-950's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.2 *Permissions are answered through the hook* (*The thread scopes it*) and its event table's `SubagentStart`, `SubagentStop` row; `src/sessionorc/agent_tick.py` `_apply_subagents`, `_apply_event` (`running and not s.subagents`); `src/sessionorc/models.py` (the record); `tests/conformance/fixtures/claude-code/captured/subagent-permission/`
+
+**Why:** TD-950's live check (2026-10-22, a scratch home, `probe.py --mode background`, Claude Code on the `conformance` profile): the background subagent `a666…` asks, and the record reads `needs-you` with its name and `pane_held` as designed. About thirty seconds later the hook feed carries a `SubagentStop` with `agent_id` `a2a9…`, an id no `SubagentStart` named — the tool's own, the stray event design §4.2 says every subagent capture holds (there a tool event; here a `SubagentStop`). The adapter turns it into `subagent_delta: -1`, `_apply_subagents` takes `subagents` from 1 to 0, and `_apply_event`'s `running and not s.subagents` ends every subagent waiter and drops their entries. The hook returns, the record reads `idle` with no pending at 39 s, and the next pane read, at 51 s, draws the dialog: the subagent waits on a prompt no card shows, which is TD-947's symptom. The count is wrong too: Ready to close and *Working on its own* read no subagent while one runs.
+
+**Fix:** design §4.2 first (the event table's row and *The thread scopes it*): a `SubagentStop` whose `subagent` no `SubagentStart` announced moves no count and ends nothing, as a tool event of such an id already ends nothing. The record keeps the live subagents' ids (persisted, `NODE_OWNED` as `subagents` is), a `SubagentStart` adds its id and its `SubagentStop` removes it, and `subagents` is their number; a `subagents_reset` clears them, under the same stale-reset guard as the count. A `SubagentStop` that names no subagent (an adapter with no per-subagent id) moves the count as today. A record saved before the build (a count, no ids) keeps its count until its next reset. Commit the probe's capture as `subagent-permission/stray-stop/` (`hooks.jsonl`, `timeline.jsonl`, the panes at the request, at 45 s into the wait and after the fall-through).
+
+**Done when** the stray-stop capture's events, in order, keep the subagent's waiter live and the record `needs-you` past the stray `SubagentStop`, with `subagents` 1, and the subagent's own `SubagentStop` takes it to 0; TD-950's live check holds on a scratch home.
+
+**Related:** TD-950, TD-947, TD-734.

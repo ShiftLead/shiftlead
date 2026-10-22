@@ -38,6 +38,7 @@ from sessionorc.models import (
     Session,
     context_over,
     context_reading,
+    permission_entry,
     pr_marks,
     report_line,
     start_note,
@@ -237,11 +238,20 @@ def _node_status_line() -> str:
     return f"offline — {where}, which is unreachable: this host's sessions only; no mail, no org"
 
 
+def pending_words(p: Any) -> str:
+    """A record's pending as `ao status`, `ao send --wait` and `ao explain` print it: *← kind: text*, and a
+    subagent's prompt names its asker (§4.2 *A subagent's dialog is held back*, TD-950); "" with none."""
+    if not isinstance(p, dict) or not p:
+        return ""
+    who = f" (from the {p['subagent_name']} subagent)" if p.get("subagent_name") else ""
+    return f"  ← {p['kind']}: {p['text']}{who}"
+
+
 def status_line(s: dict[str, Any], w: int = 0) -> str:
     """A record's one line as `ao status` prints it: id, state (`~` when scraped), age, adapter, mode
     and what is pending. `ao restart` prints the new record with it (design §4.7)."""
     conf = " ~" if s["confidence"] == "scraped" else ""  # a guess alone; a `tick` state is observed (TD-490)
-    pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
+    pend = pending_words(s.get("pending"))
     mode = " [unattended]" if s.get("unattended") else ""
     return f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}"
 
@@ -1224,7 +1234,7 @@ def cmd_send(args: argparse.Namespace) -> int:
     text = " ".join(args.text) if args.text else sys.stdin.read()
     s = call_sync("send", id=args.id, text=text, wait=args.wait, timeout=args.timeout)
     if s:  # --wait: the settled record
-        pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
+        pend = pending_words(s.get("pending"))
         return emit(args, s, lambda: print(f"{s['id']}: {s['state']}{pend}"))
     return emit(args, {"ok": True, "id": args.id}, lambda: None)  # without --wait the RPC returns nothing
 
@@ -1242,8 +1252,7 @@ def _print_explanation(x: dict[str, Any]) -> None:
         if x.get("id")
         else f"{x.get('file', 'fixture')}  ({x['adapter']} rules)"
     )
-    if x.get("pending"):
-        head += f"  ← {x['pending']['kind']}: {x['pending']['text']}"
+    head += pending_words(x.get("pending"))
     print(head)
     if "title" in x:
         print(f"title: {x['title']}")
@@ -4022,13 +4031,16 @@ def _counts(args: argparse.Namespace) -> int:
 
 def cmd_decide(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)
-    pend = s.get("pending") or {}
     if s.get("permission_channel") is False:
         # no hook answers this tool's permission (§4.3 *Permissions: no channel*, TD-785): said before any call
         msg = f"{args.id}'s tool has no permission channel: answer it in the terminal"
         return fail(args, msg, 1, prose=msg)
-    if pend.get("kind") != "permission" or not pend.get("tool_use_id"):
-        msg = f"{args.id} has no pending permission"
+    # the newest *permission* entry, or the one `--call` names (§4.2 *Every entry is answerable where it
+    # is drawn*, TD-950): a question on top of it is the terminal's
+    call = getattr(args, "call", None)
+    pend = permission_entry(s, call)
+    if pend is None:
+        msg = f"{args.id} has no pending permission" + (f" with call {call}" if call else "")
         return fail(args, msg, 1, prose=msg)  # no "error:" prefix: the line main printed before --json
     call_sync("decide", id=args.id, tool_use_id=pend["tool_use_id"], behavior=args.behavior, reason=args.reason)
     result = {"ok": True, "id": args.id, "behavior": args.behavior, "tool_use_id": pend["tool_use_id"]}
@@ -5010,6 +5022,9 @@ def build_parser() -> argparse.ArgumentParser:
         p = add(behavior, help=f"{behavior} the pending permission")
         p.add_argument("id")
         p.add_argument("reason", nargs="?")
+        p.add_argument(
+            "--call", metavar="TOOL_USE_ID", help="the entry to answer, where several are open (default: the newest)"
+        )
         p.set_defaults(fn=cmd_decide, behavior=behavior)
     return ap
 
