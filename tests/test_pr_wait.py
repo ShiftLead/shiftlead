@@ -518,7 +518,7 @@ async def test_a_wait_out_of_time_in_a_restarts_gap_returns_expired_and_a_first_
         call = asyncio.create_task(
             clientmod.blocking_rpc("pr_wait", caller="ao-x", timeout=0.6, expired="expired", sock=sock, grace=30.0)
         )
-        await gone.wait()
+        await asyncio.wait_for(gone.wait(), 5.0)
     finally:
         server.close()
         await server.wait_closed()
