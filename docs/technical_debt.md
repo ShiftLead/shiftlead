@@ -71,8 +71,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
-| TD-951 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed 2026-10-21 with Paul — review rounds under way (held) |
-| TD-948 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
+| TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed 2026-10-21 with Paul — review rounds under way (held) |
+| TD-965 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
 
 ---
 
@@ -1390,14 +1390,14 @@ builds are in the ledger.
 
 ---
 
-## TD-951: The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card
+## TD-964: The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card
 
 **Priority:** Medium
 **Type:** feature
 **Added:** 2026-10-21 (Paul, in the td-156 session, from his screenshot of his own `dc-paul` closed from Focus — the shot is at `~/.shiftlead/attachments/ao-shiftlead-td-156/paste-20261021-184736.png`, after his live look closed TD-156)
 **Owner:** paul
 **Kind:** design-first
-**Status:** Designed 2026-10-21 with Paul (design §4.5 *The Focus screen's anatomy* items 2–4; §4.4 *Spend per seat*'s *One record's reading* (the seat pass's last read of an ended session's profile is TD-948's); §4.5a *Focus: Take over*, *Hand back*, *more ▾*, the ending banner's row, *Focus: ending card*, *Focus side panel: Sent*, the side panel's row, *Reports*; mockups `FocusEnded` and `FocusHeld`, shots `docs/mockups/reviews/2026-10-21-td951-*.png`). **Reviewed 2026-10-21**: seven rounds, Sonnet and Fable alternating, after Paul agreed the layout; READY at round 6 (Fable) and confirmed at round 7 (Sonnet); the ending card cut to the session's own story between rounds 4 and 5 at Paul's word, the seat pass's last read split out as TD-948. **Held** until Paul lifts it; the build is sliced by the Fix's five parts then.
+**Status:** Designed 2026-10-21 with Paul (design §4.5 *The Focus screen's anatomy* items 2–4; §4.4 *Spend per seat*'s *One record's reading* (the seat pass's last read of an ended session's profile is TD-965's); §4.5a *Focus: Take over*, *Hand back*, *more ▾*, the ending banner's row, *Focus: ending card*, *Focus side panel: Sent*, the side panel's row, *Reports*; mockups `FocusEnded` and `FocusHeld`, shots `docs/mockups/reviews/2026-10-21-td964-*.png`). **Reviewed 2026-10-21**: seven rounds, Sonnet and Fable alternating, after Paul agreed the layout; READY at round 6 (Fable) and confirmed at round 7 (Sonnet); the ending card cut to the session's own story between rounds 4 and 5 at Paul's word, the seat pass's last read split out as TD-965. **Held** until Paul lifts it; the build is sliced by the Fix's five parts then.
 **Blocked by:** decision (paul)
 **Location:** `src/shiftlead/ui/static/app.js` (the `#fexited` banner, the terminal's gone-pane lines, the composer bar's ended text, `AO.dropCard`), `src/shiftlead/ui/templates/focus.html` (the acts line's mode slot, the side cards), `src/shiftlead/ui/cards.py` (`mode_act`), the host agent's record view (`agent_serve`, the `list` view: `sent` and `sent_open` beside `unread` and `mail`), the `seats` RPC (`sessionorc/agent_spend.py` `rpc_seats`: a `record` pick), `/api/spend`, `docs/mockups/gen.py`
 
@@ -1411,20 +1411,20 @@ builds are in the ledger.
 
 ---
 
-## TD-948: The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile
+## TD-965: The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile
 
 **Priority:** Medium
 **Type:** debt
-**Added:** 2026-10-21 (found by TD-951's review, round 1: the ending card's total would miss the closed session's last turns)
+**Added:** 2026-10-21 (found by TD-964's review, round 1: the ending card's total would miss the closed session's last turns)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — designed in TD-951's PR (#2240): design §4.4 *Spend per seat*, *What is read*.
+**Status:** Open — designed in TD-964's PR (#2240): design §4.4 *Spend per seat*, *What is read*.
 **Location:** `src/sessionorc/agent_spend.py` (the seat pass, `SEAT_EVERY`), `src/sessionorc/agent_tick.py` (where the pass is started)
 
-**Why:** the seat pass runs once a minute for every (adapter, profile) pair its **live** sessions run under. A session that ends between two passes has its last turns unread, and when it was the profile's last live session nothing reads that profile again until another session runs on it — the seat ledger, the Spend page and the Focus's ending card (TD-951) all read short for that session in the meantime, and the turns land later charged by cursor.
+**Why:** the seat pass runs once a minute for every (adapter, profile) pair its **live** sessions run under. A session that ends between two passes has its last turns unread, and when it was the profile's last live session nothing reads that profile again until another session runs on it — the seat ledger, the Spend page and the Focus's ending card (TD-964) all read short for that session in the meantime, and the turns land later charged by cursor.
 
 **Fix:** the pass keeps the pairs it read last time; a pair whose last live session ended since then is read once more on the next pass, then dropped. A test: a session ends with turns past the cursor, no other session on its profile, and the next pass charges them to its record.
 
 **Done when** a session's turns up to its ending are in the seat ledger within one pass of the ending, whether or not another session runs on its profile.
 
-**Related:** TD-951 (the ending card, which reads the ledger at the ending), TD-818 / TD-830 (Spend per seat).
+**Related:** TD-964 (the ending card, which reads the ledger at the ending), TD-818 / TD-830 (Spend per seat).

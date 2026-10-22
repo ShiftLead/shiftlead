@@ -2369,7 +2369,7 @@ def focus_git_pick():
 
 
 def summary_meta(text, title="", tone=""):
-    """A folded side card's value on its summary line (TD-951): what it holds, right-aligned, cut with …
+    """A folded side card's value on its summary line (TD-964): what it holds, right-aligned, cut with …
     before the heading ever shrinks for it. Colour only where it says something: `unread` blue as the
     rail's Inbox glyph, `warn` amber for a failing check or an ask still waiting."""
     t = f' title="{title}"' if title else ""
@@ -2380,12 +2380,12 @@ def summary_meta(text, title="", tone=""):
 
 
 def ending_card():
-    """The ending card (§4.5 *The Focus screen's anatomy* item 3, §4.5a *Focus: ending card*, TD-951),
+    """The ending card (§4.5 *The Focus screen's anatomy* item 3, §4.5a *Focus: ending card*, TD-964),
     full width where the pane was: one heading line that reads as a sentence — the money the only large
     figure — then what each entry cost, bars scaled to the largest with the figures in one right-aligned
     column, then *as of* and the Spend link. Quiet on purpose: the banner above is
     the page's one loud thing."""
-    entries = (("TD-156", 18.20), ("TD-951", 14.90), ("TD-623", 4.10), ("between entries", 4.60))
+    entries = (("TD-156", 18.20), ("TD-964", 14.90), ("TD-623", 4.10), ("between entries", 4.60))
     top = max(f for _, f in entries)
     erow = lambda ref, fig: (
         f'<div style="display: grid; grid-template-columns: 140px 420px 80px; align-items: center; gap: 12px; font-size: 13px;">'
@@ -2394,7 +2394,7 @@ def ending_card():
         f'<span class="mono" style="text-align: right;">≈${fig:.2f}</span></div>')
     side = lambda k, v, t="": (f'<div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 13px;"{f" title={chr(34)}{t}{chr(34)}" if t else ""}>'
                                f'<span class="meta">{k}</span><span>{v}</span></div>')
-    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost: read when the ending was drawn; the last minute's turns may not be in yet, reload to read again — the Spend page has the live figures (design §4.5a, TD-951)">
+    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost: read when the ending was drawn; the last minute's turns may not be in yet, reload to read again — the Spend page has the live figures (design §4.5a, TD-964)">
       <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
         <span class="mono" style="font-size: 28px; font-weight: 500; line-height: 1;" title="API-equivalent at your weights: a subscription's turns, never a bill (design §4.4 Spend per seat)">≈$41.80</span>
         <span style="font-size: 14px;">spent by dc-paul since Oct 19</span>
@@ -2409,7 +2409,7 @@ def ending_card():
 
 
 def focus_ended():
-    """A person's own session after **Close session** (TD-951, from Paul's screenshot of dc-paul,
+    """A person's own session after **Close session** (TD-964, from Paul's screenshot of dc-paul,
     2026-10-21): the banner is the page's one loud thing — how it ended, then the choices right after
     the words, Resume first — with no guessed cause, since the record says the person closed it, and the
     rest behind its i. The ending card fills the pane's place. The side panel folds, each with its value;
@@ -2426,7 +2426,7 @@ def focus_ended():
     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
       <span class="btn sm link">✉ Message</span><span class="btn sm link">{ICON["doc"]}Transcript</span><span class="btn sm link">‹› VS Code</span>
     </div>
-    <div style="padding: 12px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #7c3d00; border-radius: 6px;" title="the ending banner (design §4.5a, TD-951)">
+    <div style="padding: 12px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #7c3d00; border-radius: 6px;" title="the ending banner (design §4.5a, TD-964)">
       <span style="font-size: 15px; font-weight: 600; color: #7c3d00;">closed by you · 18:42</span>
       <span style="display: flex; gap: 6px; flex-wrap: wrap;"><span class="btn sm primary">Resume</span><span class="btn sm">Resume with changes…</span><span class="btn sm">New session here</span><span class="btn sm ghost" title="forget the record: it, its report line and its mail go; the worktree, run log and conversation stay&#10;forgotten by itself a day after the close">Forget</span></span>
       <span style="flex-grow: 1;"></span>
@@ -2449,7 +2449,7 @@ def focus_ended():
 
 
 def focus_held():
-    """A team member the person has taken over (TD-951): **Hand back** in the slot Take over had,
+    """A team member the person has taken over (TD-964): **Hand back** in the slot Take over had,
     plain, since Send is the next act while they hold it; every side card but Working and Git folded
     with its value — Inbox's unread in the rail's blue, Ready to close's first failing check and Sent's
     waiting ask in amber, the rest grey."""
@@ -2467,7 +2467,7 @@ def focus_held():
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     {focus_head("tdgrind-1", pill("working"), '<span class="meta">DIU fetcher</span>',
-                next_act='<span class="btn sm" title="switch it back to unattended: the terminal goes read-only and its manager and the policies pick it up again (design §4.5a, TD-951)">Hand back</span>', member=True).replace("Pop out · Copy · Paste · Hand back · ", "Pop out · Copy · Paste · ")}
+                next_act='<span class="btn sm" title="switch it back to unattended: the terminal goes read-only and its manager and the policies pick it up again (design §4.5a, TD-964)">Hand back</span>', member=True).replace("Pop out · Copy · Paste · Hand back · ", "Pop out · Copy · Paste · ")}
     <div class="term" style="height: 620px;">{term}</div>
     <div class="card" style="padding: 6px 10px; display: flex; align-items: center; gap: 10px;">
       <span class="btn sm" style="flex-grow: 1; justify-content: flex-start; text-align: left; opacity: .75; font-weight: 400;">✎ Compose a prompt… <span class="meta" style="margin-left: 8px;">(c · or paste / drop a file)</span></span>
@@ -2546,8 +2546,8 @@ LAYOUT = [
     ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("FocusRail.dc.html", "Focus — the side panel put away (TD-408, 2026-10-08)", 0),
     ("FocusGitPick.dc.html", "Focus — the Git card's pick: Working tree, a commit, Session (TD-856)", 0),
-    ("FocusEnded.dc.html", "Focus — ended: the banner, the ending card, the folds (TD-951)", 0),
-    ("FocusHeld.dc.html", "Focus — taken over: Hand back in Take over's place, Sent, the folds' values (TD-951)", 0),
+    ("FocusEnded.dc.html", "Focus — ended: the banner, the ending card, the folds (TD-964)", 0),
+    ("FocusHeld.dc.html", "Focus — taken over: Hand back in Take over's place, Sent, the folds' values (TD-964)", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
     ("Members.dc.html", "Members — the team card's dialog", 0),
@@ -2567,8 +2567,8 @@ LAYOUT = [
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
-    ("FocusEndedDark.dc.html", "Focus — ended, dark (TD-951)", 2),
-    ("FocusHeldDark.dc.html", "Focus — taken over, dark (TD-951)", 2),
+    ("FocusEndedDark.dc.html", "Focus — ended, dark (TD-964)", 2),
+    ("FocusHeldDark.dc.html", "Focus — taken over, dark (TD-964)", 2),
     ("MainDark.dc.html", "Sessions — dark", 2),
     ("OrgTeamFirst.dc.html", "Sessions — team-first (the design, 2026-09-26; checked in from the canvas)", 2),
     ("RepoFacet.dc.html", "Team card — Repo facet: the lanes line (TD-357, 2026-10-06)", 2),
