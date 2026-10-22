@@ -399,3 +399,135 @@ def test_entries_that_need_a_team_where_no_team_has_a_techlead_seat_are_lacking(
         "alpha: TD-003 need a team, and no team of the repo has a techlead seat to tag them — tag them by PR, "
         "or give a team a techlead (design §4.4 An entry names its team)"
     ]
+
+
+# ── `ao org check --root <dir>` (design §4.7, TD-942) ───────────────────────────────────────────
+
+
+def branch(world, teams: dict | None = None, name: str = "topic") -> Path:
+    """A worktree of `alpha` on a branch of its own, outside the checkout and named unlike it, its
+    `.shiftlead.yml` holding `teams` (as committed on the branch, never merged)."""
+    tmp_path = world[0]
+    wt = tmp_path / f"wt-{name}"
+    git(tmp_path / "alpha", "worktree", "add", "-q", "-b", name, str(wt))
+    if teams is not None:
+        (wt / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": teams}))
+        git(wt, "commit", "-qam", "teams on the branch")
+    return wt
+
+
+def check_at(capsys, wt: Path | str) -> tuple[int, dict]:
+    code = cli.main(["--json", "org", "check", "--root", str(wt)])
+    return code, json.loads(capsys.readouterr().out)
+
+
+def test_a_branch_naming_a_profile_not_held_lacks_it_before_it_merges(world, capsys):
+    """Done when: the profile `profiles.yml` lacks is named from the branch, the same file unmerged;
+    the first line and `--json`'s `root` name the repo (the checkout's name, not the worktree's) and `<dir>`."""
+    wt = branch(world, {"alpha-grind": {**TEAM, "members": [{"role": "hunter", "profile": "nope"}]}})
+    assert check(capsys) == (0, {"ok": True, "lacks": [], "warnings": []})  # main does not have it
+    code, got = check_at(capsys, wt)
+    assert code == 1 and got["root"] == {"repo": "alpha", "dir": str(wt.resolve())}
+    assert len(got["lacks"]) == 1 and "unknown profile 'nope'" in got["lacks"][0]
+    assert got["warnings"] == []  # no off-branch warning for `<dir>`, and nothing the plain run does not give
+    assert cli.main(["org", "check", "--root", str(wt)]) == 1
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == f"checking alpha at {wt.resolve()}" and out[-1] == "1 lacking"
+
+
+def test_without_root_the_json_carries_no_root_key(world, capsys):
+    _, got = check(capsys)
+    assert "root" not in got
+
+
+def test_a_brief_only_the_branch_holds_is_read_at_dir_over_the_org_files_path(world, capsys):
+    """The org file's heading gives alpha's path on this host; `--root` reads the branch's briefs all the same."""
+    teams_ = {"alpha-grind": {**TEAM, "members": [{"role": "hunter", "brief": "docs/briefs/new.md"}]}}
+    wt = branch(world)
+    (wt / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": teams_}))
+    (wt / "docs" / "briefs").mkdir(parents=True)
+    (wt / "docs" / "briefs" / "new.md").write_text("the brief\n")
+    git(wt, "add", "-A")
+    git(wt, "commit", "-qm", "a brief")
+    (world[0] / "alpha" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": teams_}))  # main lacks the brief
+    git(world[0] / "alpha", "commit", "-qam", "names the brief")
+    code, got = check(capsys)
+    assert code == 1 and any("new.md" in x for x in got["lacks"])
+    code, got = check_at(capsys, wt)
+    assert (code, got["lacks"]) == (0, []), got
+
+
+def test_the_ledger_as_merged_is_paired_with_the_branchs_teams(world, monkeypatch, capsys):
+    """A `Team` declaration on main naming a team only the branch defines reads clean with `--root`, a
+    lack without it; a branch that drops a team the ledger still declares reads that lack."""
+    _reading(world, monkeypatch, {"declared_teams": ["alpha-grind", "span", "fresh"], "entries": []})
+    wt = branch(world, {"alpha-grind": TEAM, "fresh": {**TEAM, "members": [{"role": "hunter", "name": "fresh-h"}]}})
+    code, got = check(capsys)
+    assert code == 1 and any("declares team fresh" in x for x in got["lacks"])
+    code, got = check_at(capsys, wt)
+    assert (code, got["lacks"]) == (0, []), got
+    dropped = branch(world, {"fresh": {**TEAM, "members": [{"role": "hunter", "name": "fresh-h"}]}}, "drop")
+    code, got = check_at(capsys, dropped)
+    assert code == 1 and [x for x in got["lacks"] if "declares team" in x] == [
+        "alpha: its ledger declares team alpha-grind, which no definition of the repo holds — drop it from the "
+        "Fields: line's Team, or add it back, by PR (design §4.4 A stale team)"
+    ]
+
+
+def test_a_branch_renaming_the_old_repo_file_reads_no_td553_lack(world, capsys):
+    tmp_path, _, _ = world
+    alpha = tmp_path / "alpha"
+    git(alpha, "mv", ".shiftlead.yml", ".agentorc.yml")
+    git(alpha, "commit", "-qm", "the old name")
+    wt = branch(world)
+    git(wt, "mv", ".agentorc.yml", ".shiftlead.yml")
+    git(wt, "commit", "-qm", "renamed")
+    _, got = check(capsys)
+    assert any(".agentorc.yml is read by nothing" in x for x in got["lacks"])
+    code, got = check_at(capsys, wt)
+    assert not [x for x in got["lacks"] if ".agentorc.yml" in x], got
+
+
+def test_root_at_the_registered_checkout_reads_as_without_it_but_for_the_header_and_its_state(world, capsys):
+    tmp_path, _, _ = world
+    alpha = tmp_path / "alpha"
+    (alpha / "scratch.txt").write_text("x")
+    git(tmp_path / "beta", "checkout", "-q", "-b", "elsewhere")
+    code, plain = check(capsys)
+    code_at, got = check_at(capsys, alpha)
+    assert code == code_at == 0 and got["root"] == {"repo": "alpha", "dir": str(alpha.resolve())}
+    assert got["lacks"] == plain["lacks"]
+    # alpha's change is not warned of with `--root`; beta, read as without it, still is
+    assert [w for w in plain["warnings"] if str(alpha) not in w] == got["warnings"] and len(got["warnings"]) == 1
+
+
+@pytest.mark.parametrize("where", ["sub", "outside", "plain"])
+def test_a_dir_that_is_no_checkout_of_a_registered_repo_is_refused_exit_2(world, capsys, where):
+    tmp_path, _, _ = world
+    if where == "sub":
+        d = branch(world) / "docs"
+        d.mkdir()
+    elif where == "outside":
+        d = repo(tmp_path / "stranger")
+    else:
+        d = tmp_path / "nogit"
+        d.mkdir()
+    assert cli.main(["--json", "org", "check", "--root", str(d)]) == 2
+    assert json.loads(capsys.readouterr().out) == {"error": f"{d} is not a checkout of a registered repo"}
+
+
+def test_only_check_takes_root(world, capsys):
+    assert cli.main(["org", "--root", str(world[0] / "alpha")]) == 2
+    assert "only `ao org check` takes --root" in capsys.readouterr().err
+
+
+def test_a_team_placed_on_another_host_warns_its_briefs_are_read_there(world, capsys, monkeypatch):
+    tmp_path, home, org = world
+    org["projects"]["both"] = {"repos": {"alpha": {HOST: str(tmp_path / "alpha"), "devenv": "/work/alpha"}}}
+    (home / "org.yml").write_text(yaml.safe_dump({**org, "place": {"alpha-grind": "devenv"}}))
+    monkeypatch.setattr(cli.teamrun, "files_via", lambda call: lambda host, d, paths: dict.fromkeys(paths, "x"))
+    wt = branch(world)
+    _, plain = check(capsys)
+    assert not [w for w in plain["warnings"] if "briefs read on" in w]
+    _, got = check_at(capsys, wt)
+    assert f"alpha-grind: briefs read on devenv's checkout, not at {wt.resolve()}" in got["warnings"]

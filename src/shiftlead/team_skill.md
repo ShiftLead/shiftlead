@@ -223,10 +223,12 @@ disk, but each session's worktree is cut from `origin/HEAD` after a fetch, so a 
 a `.gitignore` line or a brief that is only in the main checkout's working tree is missing from
 every member's worktree.
 
-**A definition on a branch is not checked yet.** `ao team list` and `ao org check` read each
-registered checkout as it stands, so a `.shiftlead.yml` written on a branch — where a repo's review
-rules want it — is invisible to both until it merges. Run `ao org check` once it has, and fix what
-it names in a follow-up PR (TD-942 builds `ao org check --root <worktree>`).
+**Check a definition on its branch.** `ao team list` and `ao org check` read each registered
+checkout as it stands, so a `.shiftlead.yml` written on a branch — where a repo's review rules want
+it — is invisible to both until it merges. Run `ao org check --root <worktree>` in the worktree
+before the PR: it reads the repo file, and the briefs, primer and role directories it names, at
+`<worktree>` in place of the registered checkout, and every other repo as it stands. Fix what it
+names on the branch.
 
 ### What a lane takes
 
@@ -449,10 +451,9 @@ they are about behaving inside a session; these are about setting one up.
 
 1. **Read before you write.** `ao team list` and `ao roles` say what already exists. A team that is
    already defined is edited, not re-added under a second name.
-2. **Write the definition, then check it, then start it.** `ao team list` fails loudly on a
-   malformed file and names the key; fix it there rather than at `start`. Both read the merged
-   checkout, not your branch (*A definition on a branch is not checked yet*, step 3): check after
-   the merge, before the start.
+2. **Write the definition, then check it, then start it.** `ao org check --root <worktree>` before
+   the PR, `ao team list` after the merge (*Check a definition on its branch*, step 3): each fails
+   loudly on a malformed file and names the key; fix it there rather than at `start`.
 3. **Never invent a host, a repo path or a profile.** A repo with no checkout on the host the team runs
    on — in its registry or under its `projects:` heading — is a refusal, not a guess — ask the person for the path.
 4. **Check the profile before you name it.** A `profile:` in a role or a member must be a key in

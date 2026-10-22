@@ -794,7 +794,7 @@ def cmd_roles(args: argparse.Namespace) -> int:
 # ── ao team (design §4.9) ─────────────────────────────────────────────────────────────────────
 
 
-def _org_notes(what: str = "ao team") -> tuple[orgmod.Org, list[str]]:
+def _org_notes(what: str = "ao team", stand_in: dict[str, pathlib.Path] | None = None) -> tuple[orgmod.Org, list[str]]:
     """The org as the clients aggregate it (design §4.9 *The org is an aggregate*, TD-229), and the
     aggregate's notes: `~/.shiftlead/org.yml` plus the `teams:` of every checkout in this host's
     repos registry — the one function the pages read too (`orgmod.with_repos`), so `ao team` gives
@@ -809,7 +809,9 @@ def _org_notes(what: str = "ao team") -> tuple[orgmod.Org, list[str]]:
             f"{hosts.local_host().name} is a node, and a node does not read the org from the home "
             "(design §4.4a: decided, not built)"
         )
-    org, notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync))
+    org, notes = orgmod.with_repos(
+        orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync), stand_in=stand_in
+    )
     return orgmod.with_home_settings(org), notes  # the flow each team runs now (§4.9c, `teams.<team>.flow`)
 
 
@@ -829,8 +831,17 @@ def cmd_org(args: argparse.Namespace) -> int:
     reading as a verdict, exit 1 when something is lacking. Reads and writes nothing; the reading
     itself is `shiftlead.orgcheck`."""
     what = "ao org check" if args.action == "check" else "ao org"
+    stand_in: dict[str, pathlib.Path] = {}
+    if args.root is not None:  # a definition checked on its branch, before it merges (§4.7, TD-942)
+        if args.action != "check":
+            return fail(args, "only `ao org check` takes --root", 2)
+        if not hosts.is_node():  # a node refuses below, naming the home
+            try:
+                stand_in = orgcheck.stand_in_for(args.root, hosts.local_host().repos())
+            except ValueError as e:
+                return fail(args, str(e), 2)
     try:
-        org, notes = _org_notes(what)
+        org, notes = _org_notes(what, stand_in)
     except ValueError as e:  # a node, or an org file that cannot be read: the one lack there is
         return fail(args, str(e), 1)
     here = hosts.local_host().name
@@ -845,9 +856,14 @@ def cmd_org(args: argparse.Namespace) -> int:
             settings=settings_mod.read(),
             repos_of=teamrun.repos_via(call_sync),
             readings=teamrun.readings_via(call_sync),
+            stand_in=stand_in,
         )
+        for root, at in stand_in.items():  # the checkout's directory name, never `<dir>`'s basename
+            got["root"] = {"repo": pathlib.Path(root).expanduser().resolve().name, "dir": str(at)}
 
         def verdict() -> None:
+            if "root" in got:
+                print(f"checking {got['root']['repo']} at {got['root']['dir']}")
             for line in got["lacks"]:
                 print(f"lacking: {line}")
             for line in got["warnings"]:
@@ -4410,6 +4426,12 @@ def build_parser() -> argparse.ArgumentParser:
         nargs="?",
         choices=("check",),
         help="check: the same reading as a verdict — each lack on a line, exit 1 when something is lacking",
+    )
+    p.add_argument(
+        "--root",
+        metavar="DIR",
+        help="check only: read the repo file at DIR, a worktree of a registered checkout on any branch, in place "
+        "of that checkout's own — a definition checked before it merges (§4.7)",
     )
     p.set_defaults(fn=cmd_org)
 
