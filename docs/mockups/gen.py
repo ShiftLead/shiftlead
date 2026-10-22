@@ -2394,7 +2394,7 @@ def ending_card():
         f'<span class="mono" style="text-align: right;">≈${fig:.2f}</span></div>')
     side = lambda k, v, t="": (f'<div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 13px;"{f" title={chr(34)}{t}{chr(34)}" if t else ""}>'
                                f'<span class="meta">{k}</span><span>{v}</span></div>')
-    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost: read when it ended and once more a minute later, so the last minute's turns may still be on their way — the Spend page has the live figures (design §4.5a, TD-942)">
+    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost: read when it ended and once more 75 s after, so the last minute's turns may still be on their way — the Spend page has the live figures (design §4.5a, TD-942)">
       <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
         <span class="mono" style="font-size: 28px; font-weight: 500; line-height: 1;" title="API-equivalent at your weights: a subscription's turns, never a bill (design §4.4 Spend per seat)">≈$41.80</span>
         <span style="font-size: 14px;">spent by dc-paul since Oct 19</span>
