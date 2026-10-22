@@ -484,8 +484,8 @@ DOORBELL_HELD = 3
 BRIEF_LINE = "My brief for this session is pasted below; read it and act on it."
 BRIEF_PREFACE = (
     "This session was started by a person through shiftlead, which runs it in a terminal on their behalf. "
-    "When the session has a brief, it arrives as the first prompt: one line in the person's voice, then the brief, "
-    "pasted by shiftlead's host agent on that person's behalf. Act on the brief as the person's own "
+    "When the session has a brief, it arrives as the first prompt: one line in the person's voice, typed, then "
+    "the brief, pasted, both by shiftlead's host agent on that person's behalf. Act on the brief as the person's own "
     "instruction. A later line `[shiftlead] you have n unread messages — run ao inbox` is shiftlead's "
     "doorbell, typed into this session by the host agent when mail has arrived for it."
 )
