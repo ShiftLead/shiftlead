@@ -76,7 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Open |
-| TD-949 | No test would catch the tick dropping `remote=` from its `pr_reading` call: a GitLab repo would be read through `gh` again with the whole suite green | Medium | Open |
+| TD-952 | `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home | Low | Open |
 
 ---
 
@@ -1481,7 +1481,11 @@ agent closed the connection* when #2245's promote restarted the unit under it, s
 time left, through `ao wait`'s transport (#2250, design §4.7); a second wait on #2242 answered `gone` (5) when the
 designer merged it between two readings, and the cadence check read it merged; `ao pr wait 2250 --fresh` answered
 `green` (0) on c5e1f50 after 12 minutes, as `gh pr checks` did. Left, once #2250 is live: one wait carried across a
-promote (it prints *the wait was remade once*) that ends in its word, then the cadence check.
+promote (it prints *the wait was remade once*) that ends in its word, then the cadence check. Read 2026-10-21 (grinder-ao-1, #2250
+live in 340efe3): `ao pr wait 2252 --fresh`, called 30 s after a force-push of b9768b6, answered *green on 7b98436* —
+the head before the push — so a fresh reading can still carry the old head and its checks: a caller must compare
+`head` with its own commit. Whether the wait should take `--head <sha>` and keep waiting until the reading's head
+matches is a finding for the next run to file (TD-940's Fix names `head` for exactly this check).
 **Location:** design §4.7 (a new `ao pr wait <n>` paragraph beside `ao pr held <n>`), §4.4 *Repos* (the `prs` reading's `checks` and `conflicting` fold); `docs/procedures/cadence.md` and `docs/claude-memory/no-checks-means-conflicting.md` (the pair to write and the memory to retire); `src/shiftlead/cli.py` (`ao pr`, ~L4467 `ao wait` for the blocking shape), `src/sessionorc/agent_serve.py` (the `wait` RPC, `_serve_wait` ~L229) and `src/sessionorc/agent_remote.py` (its client side), `src/sessionorc/reports.py` (`_gh_prs` ~L617, `fold_checks` ~L342, `failing_items` ~L314, the `gh pr view` read ~L573 — GitHub-only today); `tests/test_cli.py` and the tests of `fold_checks`
 
 **Why:** Every session that opens a PR waits for its checks before `scripts/check_cadence.py --pr N`, and each writes its own `gh pr checks` loop. Two went wrong on 2026-10-21 alone in the ao-paul session: one read an empty check list as "no CI" (the PR was conflicting, the memory *no checks means conflicting*), one tested a rollup field that never reported and sat until Paul asked whether something was broken. The home already makes the judgement once, on its tick: the `prs` reading folds every open PR's `statusCheckRollup` into *green*, *red*, *pending* or *none* and reads `conflicting` from the merge state, with the fold's rules in §4.4 (`fold_checks`), and `ao wait` is already a thin blocking RPC on the host agent. Paul, 2026-10-21: standardise the background wait as an `ao` call, and *make sure it will work for GitLab/other as well as GitHub* — the fold reads `gh` today, so a GitLab remote has no reading at all.
@@ -1562,18 +1566,21 @@ builds are in the ledger.
 
 **Done when** a background subagent's permission on a scratch home shows a *Needs you* that names the subagent and says the pane will not show the prompt, the design says what the session's state is meanwhile, and §4.2 says when the pane draws a subagent's dialog, as the capture found.
 
-## TD-949: No test would catch `_read_repo` dropping `remote=` from its `reports.pr_reading` call: a GitLab repo would be read through `gh` again with the suite green
+---
 
-**Priority:** Medium
+## TD-952: `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home
+
+**Priority:** Low
 **Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1, auditing #2244)
+**Added:** 2026-10-21 (grinder-ao-1, reading main's red run under #2248)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` `_read_repo` (~L3474, `reports.pr_reading(root, now, old=prs, held=held, remote=remote)`); `tests/test_pr_wait.py` (the slice-2 tests call `reports.pr_reading(..., remote=...)` directly and put `_repos[root]["prs"]` in by hand)
+**Location:** `tests/test_link.py` ~L1310 (`test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home`, the read at ~L1340); the home's launch-record write for a node's supervised create (TD-103 slice 1)
 
-**Why:** PR #2244 (TD-940 slice 2) makes the per-forge reading depend on one changed line: the tick passes the checkout's origin to `pr_reading`. Without it `forge_of("")` reads as GitHub and every GitLab repo is read through `gh`, which is the behaviour the PR removed. Probe on `origin/main` (c323b3386): change that line to `reports.pr_reading(root, now, old=prs, held=held)` and run the whole suite (`PYTHONPATH=$PWD/src pdm run pytest -q tests`): 3877 passed, and the only failure is `tests/conformance/test_conformance.py::test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness`, which does not touch the reading. The line was restored afterwards. The new tests all call `pr_reading(remote=...)` themselves, and `test_ao_pr_wait_returns_a_gitlab_mrs_word` seeds `agent._repos` by hand, so no test goes through `_read_repo` with a GitLab origin.
+**Why:** main's CI on 20e7283 (#2248, a ledger-only commit; run 39716427084, test (3.12)) failed this one test with `FileNotFoundError: …/kmaster/launch/ao-x-hookstub@laptop.json` at `named = json.loads((launch / f"{auto['id']}.json").read_text())`: the second, unnamed `create` on the node returned its id but the home held no launch record under it when the test read it. The first, named create's record was there. The same test passed on the runs before and after, so it is a race — either the test reads before the write lands, or the home writes the unnamed create's record under another address — and a red main holds the promote (`ao promote status`: *checks on main are failed*).
 
-**Fix:** a test that runs the tick's `_read_repo` (or a tick pass) on a checkout whose origin is a GitLab URL, with `reports._glab_api` faked, and asserts the repo's `prs` carries `forge: gitlab`; it fails with the `remote=` argument removed.
+**Fix:** reproduce under load (`pytest tests/test_link.py -k supervised_create_on_a_node --count`/a loop) and find which: if the record is written after `create` replies, the test waits for it (`wait_for`) and the design says whether a supervised create's launch record is written before its reply (§6 *Keeping a team running*); if it lands under another id, that is the bug.
 
-**Done when** that test exists and fails when the `remote=remote` argument is removed from `_read_repo`.
+**Done when** the cause is named in this entry and the test passes a few hundred runs in a loop.
+
