@@ -18,7 +18,7 @@ from sessionorc.reports import branch_ref
 from shiftlead import teamrun
 
 from . import uiconf
-from .cards import DEAD, NO_TEAM, card_order, terminal_only
+from .cards import DEAD, NO_TEAM, card_order, subagent_held, terminal_only
 from .common import _age, _instant, _short_age, templates
 from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
@@ -437,6 +437,7 @@ def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
                 "name": m.get("name") or m["id"],
                 "kind": kind,
                 "text": str(pend.get("text") or "") + terminal_only(m),
+                "held": subagent_held(pend),  # a subagent's prompt names its asker (§4.2, TD-950)
                 "deadline": m.get("deadline") or "",
             }
         )

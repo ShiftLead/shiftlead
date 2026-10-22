@@ -154,6 +154,8 @@ class HookMixin:
             return None
         reason = f"rule: {hit}"
         prompt = event.get("text") or tool
+        # a subagent's prompt is answered as the main thread's, and its FYI names the asker (§4.2, TD-950)
+        name = event.get("subagent_name") or ("subagent" if event.get("subagent") else None)
         if self.mode == "node":
             try:
                 await self._home_mux.request(
@@ -163,18 +165,28 @@ class HookMixin:
                     prompt=prompt,
                     behavior=behavior,
                     rule=hit,
+                    **({"subagent_name": name} if name else {}),
                 )
             except (link.LinkError, link.LinkClosed, TimeoutError, OSError) as e:
                 log.warning("%s: rule %s matched, but the home filed no FYI (%s): the person answers", s.id, hit, e)
                 return None
         else:
-            self._answered_by_rule(s, prompt, behavior, hit)
+            self._answered_by_rule(s, prompt, behavior, hit, subagent_name=name)
         return {"behavior": behavior, "reason": reason}
 
-    def _answered_by_rule(self, s: Any, prompt: str, behavior: str, rule: str, asker: str | None = None) -> None:
+    def _answered_by_rule(
+        self,
+        s: Any,
+        prompt: str,
+        behavior: str,
+        rule: str,
+        asker: str | None = None,
+        subagent_name: str | None = None,
+    ) -> None:
         """The *Answered for you* FYI for a prompt a rule answered (§4.9b, §4.5a): the `answered` shape a
         sourced reply's FYI has — the prompt as the question, the member as the asker, *rules* as the
-        answerer, the rule as the source. Written by the home, so it is no one's to reply to."""
+        answerer, the rule as the source. Written by the home, so it is no one's to reply to. A
+        subagent's prompt says *from the <name> subagent* (§4.2, TD-950)."""
         verdict = "allowed" if behavior == "allow" else "denied"
         role = s.role or ""
         source = f"settings.yml permissions: {role} {behavior} {rule}"[: mail.SOURCE_CAP]
@@ -184,7 +196,8 @@ class HookMixin:
             to=[PERSON],
             at=now_iso(),
             kind="note",
-            text=f"{verdict} by your rule {rule} — change it in settings.yml's permissions:",
+            text=f"{verdict} by your rule {rule}{f', from the {subagent_name} subagent' if subagent_name else ''}"
+            " — change it in settings.yml's permissions:",
         )
         note.team = getattr(s, "team", "") or None
         note.subject = mail.subject_of(f"{verdict}: {prompt}")

@@ -376,6 +376,17 @@ def _mib(n: int) -> str:
     return f"{-(-n // (1 << 20))} MiB"
 
 
+def _clock_words(iso: str | None) -> str:
+    """A stored instant in this host's clock, *14:05*, for a refusal's words; the instant itself where
+    it does not parse, and *its deadline* with none."""
+    if not iso:
+        return "its deadline"
+    try:
+        return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone().strftime("%H:%M")
+    except ValueError:
+        return iso
+
+
 def _bound(path: Path) -> socket.socket:
     """A unix socket bound at `path` and **born `0600`** (TD-260): made and bound by hand under a
     umask of `0177`, with no `await` inside, and handed to `start_unix_server(sock=…)`. Binding
@@ -2349,6 +2360,12 @@ class HostAgent(
             if first is not None:
                 return await first
         self._refuse_gone(s)
+        if s.pending and s.pending.pane_held:
+            # a subagent's dialog is not drawn while the hook blocks (§4.2 *A subagent's dialog is held
+            # back*, TD-950): the buttons are its one channel until the deadline, never the terminal
+            until = _clock_words(s.pending.deadline)
+            msg = f"a subagent's permission is pending: press Allow / Deny (the pane shows nothing until {until})"
+            raise RpcError(msg)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
         if wrapup and not adapters.has_agent(s.adapter):

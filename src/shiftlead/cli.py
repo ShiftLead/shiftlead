@@ -237,11 +237,20 @@ def _node_status_line() -> str:
     return f"offline — {where}, which is unreachable: this host's sessions only; no mail, no org"
 
 
+def pending_words(p: Any) -> str:
+    """A record's pending as `ao status`, `ao send --wait` and `ao explain` print it: *← kind: text*, and a
+    subagent's prompt names its asker (§4.2 *A subagent's dialog is held back*, TD-950); "" with none."""
+    if not isinstance(p, dict) or not p:
+        return ""
+    who = f" (from the {p['subagent_name']} subagent)" if p.get("subagent_name") else ""
+    return f"  ← {p['kind']}: {p['text']}{who}"
+
+
 def status_line(s: dict[str, Any], w: int = 0) -> str:
     """A record's one line as `ao status` prints it: id, state (`~` when scraped), age, adapter, mode
     and what is pending. `ao restart` prints the new record with it (design §4.7)."""
     conf = " ~" if s["confidence"] == "scraped" else ""  # a guess alone; a `tick` state is observed (TD-490)
-    pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
+    pend = pending_words(s.get("pending"))
     mode = " [unattended]" if s.get("unattended") else ""
     return f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}"
 
@@ -1224,7 +1233,7 @@ def cmd_send(args: argparse.Namespace) -> int:
     text = " ".join(args.text) if args.text else sys.stdin.read()
     s = call_sync("send", id=args.id, text=text, wait=args.wait, timeout=args.timeout)
     if s:  # --wait: the settled record
-        pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
+        pend = pending_words(s.get("pending"))
         return emit(args, s, lambda: print(f"{s['id']}: {s['state']}{pend}"))
     return emit(args, {"ok": True, "id": args.id}, lambda: None)  # without --wait the RPC returns nothing
 
@@ -1242,8 +1251,7 @@ def _print_explanation(x: dict[str, Any]) -> None:
         if x.get("id")
         else f"{x.get('file', 'fixture')}  ({x['adapter']} rules)"
     )
-    if x.get("pending"):
-        head += f"  ← {x['pending']['kind']}: {x['pending']['text']}"
+    head += pending_words(x.get("pending"))
     print(head)
     if "title" in x:
         print(f"title: {x['title']}")

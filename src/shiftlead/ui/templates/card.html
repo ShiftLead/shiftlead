@@ -91,6 +91,7 @@
      it is doing, its last output — two lines, the whole on hover, and a caption (`card_slot`) #}
   <div class="sc-slot">
     <div class="status {{ s.slot.kind }}" title="{{ s.slot.full }}">{{ s.slot.text }}</div>
+    {% if s.held %}{% from "held_line.html" import held_line %}{{ held_line(s.held) }}{% endif %}
     <div class="caption meta {{ s.slot.ccls }}"{% if s.slot.ccls == 'countdown' %} data-deadline="{{ s.deadline }}"{% endif %}>{{ s.slot.caption }}</div>
   </div>
   {% endif %}

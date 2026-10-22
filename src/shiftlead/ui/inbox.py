@@ -40,7 +40,7 @@ from shiftlead import teamrun
 
 from . import render as rendermod
 from . import uiconf
-from .cards import _clock, _first_line, alarm_note, alarm_to_view
+from .cards import _clock, _first_line, alarm_note, alarm_to_view, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
 from .queue import item_home
 
@@ -340,6 +340,8 @@ def state_rows(
             "host": v.get("host") or "",
             "text": text,
             "deadline": v.get("deadline") or "" if row == "permission" else "",
+            # a subagent's prompt names its asker and, while held, says the pane shows nothing (TD-950)
+            "held": subagent_held(v.get("pending")) if row in ("permission", "question") else None,
             # §4.5 screen 6 *Layout* (TD-082): the countdown is rendered in words here, not left as
             # `…` for the client's first tick. The words are `fmtLeft`'s, so nothing jumps.
             "left": _countdown(v.get("deadline") if row == "permission" else None, now),
