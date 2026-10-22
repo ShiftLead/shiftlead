@@ -76,7 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Open |
-| TD-951 | `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home | Low | Open |
+| TD-952 | `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home | Low | Open |
 
 ---
 
@@ -1564,7 +1564,7 @@ builds are in the ledger.
 
 ---
 
-## TD-951: `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home
+## TD-952: `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home
 
 **Priority:** Low
 **Type:** debt
