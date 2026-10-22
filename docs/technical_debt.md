@@ -78,6 +78,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Open |
 | TD-952 | `test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home` failed once on main: the unnamed create's launch record was not at the home | Low | Open |
+| TD-953 | `ao pr wait <n> --fresh` called just after a push can answer the old head's word: nothing makes it wait for the caller's commit | Medium | Open |
 
 ---
 
@@ -1816,6 +1817,6 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 
 **Why:** read on the live copy (#2250 live in 340efe3, TD-940's Status): `ao pr wait 2252 --fresh`, called 30 s after a force-push of b9768b6, answered *green on 7b98436* — the head before the push. The fresh pass read GitHub before its rollup showed the new head's checks, and the wait took the first non-*pending* word it saw. A caller that runs `ao pr wait N && scripts/check_cadence.py --pr N` straight after a push (the pair TD-946 writes into the procedure) can go on to the gate on the old head's green; the gate's own CI row catches it there, but the wait was meant to be the one call that settles it. `--json` carries `head`, so today each caller must compare it with its own commit — the hand-rolled check the command was made to remove.
 
-**Fix:** `ao pr wait <n> --head <sha>` (a prefix taken as the reading gives it), defaulting under `--fresh` to nothing: while the reading's `head` is not the sha asked for, the word counts as *pending* and the wait goes on, re-reading on the tick; the reply names both. The design's §4.7 paragraph gains the flag and when to pass it (after a push: `--head $(git rev-parse HEAD)`), and its history a line under §4.7. Tests: a reading of the old head green, then the new head pending, then green — the wait answers only the last.
+**Fix:** `ao pr wait <n> --head <sha>` (a prefix taken as the reading gives it), optional, and `--fresh` does not imply it: while the reading's `head` is not the sha asked for, the word counts as *pending* and the wait goes on, re-reading on the tick; the reply names both. The design's §4.7 paragraph gains the flag and when to pass it (after a push: `--head $(git rev-parse HEAD)`), and its history a line under §4.7. Tests: a reading of the old head green, then the new head pending, then green — the wait answers only the last.
 
 **Done when** a wait given `--head` never answers a reading of another head, in tests, and §4.7 says so.
