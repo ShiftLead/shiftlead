@@ -350,8 +350,9 @@ class GeminiAdapter:
         """The tool's live shell tasks under the pane's process `pid` (design §4.3 `background`, §4.2 *A
         background shell task*): `[{pid, start, cmd}]`. From `pid`, its own included, down to the first
         `node` — the pane's own for an ao launch, a descendant under a hand-started shell — bounded as
-        Claude Code's walk is; then its `node` child, which the tool relaunches itself as, where it has
-        one; then that process's children that are the tool's shell wrapper (`SHELL_WRAPPER`), `cmd` the
+        Claude Code's walk is; then the children of it and of its `node` children (the tool relaunches
+        itself as one; a launch that does not keeps its shells, beside any node MCP server) that are the
+        tool's shell wrapper (`SHELL_WRAPPER`), `cmd` the
         argv of the wrapper's first child, joined and cut to `SHELL_CMD_LEN`. Read only while the session
         is idle, so each is a command moved to the background. None when no `node` is found."""
         level, seen, tool = [int(pid)], 0, None
@@ -363,9 +364,9 @@ class GeminiAdapter:
             level = [c for p in level for c in proc.children(p) or ()]
         if tool is None:
             return None
-        tool = next((c for c in proc.children(tool) or () if proc.comm(c) == "node"), tool)
+        parents = [tool, *(c for c in proc.children(tool) or () if proc.comm(c) == "node")]
         out = []
-        for child in proc.children(tool) or ():
+        for child in (c for p in parents for c in proc.children(p) or ()):
             argv = proc.cmdline(child) or []
             st = proc.stat(child)
             if st is None or len(argv) < 3 or argv[1] != "-c" or SHELL_WRAPPER not in argv[2]:
