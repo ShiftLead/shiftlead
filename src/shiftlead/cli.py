@@ -2720,7 +2720,7 @@ def _pr_wait(args: argparse.Namespace) -> int:
     from sessionorc import reports
 
     gone = reports.PR_WAIT_EXIT["gone"]
-    if args.head and not re.fullmatch(r"[0-9a-fA-F]{4,40}", args.head):
+    if args.head and not re.fullmatch(r"[0-9a-fA-F]{7,40}", args.head):
         return fail(args, f"--head {args.head!r} is not a commit's sha: pass one, e.g. $(git rev-parse HEAD)", gone)
     try:
         root = _pr_wait_root(args)
@@ -2740,6 +2740,7 @@ def _pr_wait(args: argparse.Namespace) -> int:
         return fail(args, f"the wait could not be made: {type(e).__name__}: {e}", gone)
     if got is None:  # the time ran out while the home restarted: no reading came back
         got = {"pr": args.n, "word": "timeout", "checks": None, "conflicting": False, "failing": [], "head": None}
+        got["want_head"] = (args.head or "").lower() or None
     if remakes and not args.json:
         print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {_times(remakes)}")
     word = str(got.get("word") or "")
