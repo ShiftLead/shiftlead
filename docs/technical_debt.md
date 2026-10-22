@@ -1541,7 +1541,7 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 **Owner:** grinder
 **Kind:** build
 **Status:** Open.
-**Location:** `src/shiftlead/orgcheck.py`, `src/shiftlead/cli.py` (`ao org`), `src/shiftlead/team_skill.md`; design §4.7 *`ao org check --root <dir>`*
+**Location:** `src/shiftlead/orgcheck.py`, `src/shiftlead/cli.py` (`ao org`), `src/shiftlead/team_skill.md` (step 3's *A definition on a branch is not checked yet* and the agent checklist's item 2, so no copy of *check after the merge* survives); design §4.7 *`ao org check --root <dir>`*
 
 **Why:** `ao org check` and `ao team list` read each registered checkout as it stands, so a `.shiftlead.yml`
 written on a branch — where a repo's review rules want it — is invisible to both until it merges; the only
@@ -1560,7 +1560,8 @@ without it; a `<dir>` that is no worktree of a registered checkout, nor that che
 with the registered checkout's ledger reading under its name and path (a `Team` declaration on main
 that names a team only the branch defines reads clean, and a branch that drops a team the ledger still
 declares reads that lack; a repo whose `org.yml` heading gives a path on this host reads the branch's
-briefs all the same; no *held only on a node* warning appears that the run without `--root` does not give); a directory outside every registered repo is
+briefs all the same; a subdirectory of a worktree is refused with exit 2; a branch that renames
+`.agentorc.yml` to `.shiftlead.yml` reads no TD-553 lack; no *held only on a node* warning appears that the run without `--root` does not give); a directory outside every registered repo is
 refused with exit 2, and so is a directory that is not a git one; `--root` at the registered checkout
 itself reads as without it but for the header and the checkout-state warnings; the first line and `--json`'s `root` name the repo and
 `<dir>`; a test holds each. The recipe's paragraph says to run `ao org check --root <worktree>` before
