@@ -743,6 +743,7 @@ class HostAgent(
         self._seats_pruned = ""
         self._seat_reason: dict[str, str] = {}
         self._seat_live: set[tuple[str, str]] = set()  # the (adapter, profile) pairs live at the last seat pass
+        self._seat_ended: set[tuple[str, str]] = set()  # pairs whose last live session ended, not yet read since
         self._seat_link: dict[str, dict[str, Any]] = {}  # a node's: per profile, the home's seat cursors on this link
         # A node's side of the road (§4.4a, TD-151 slice 4): per profile, the cursors and seeding the
         # home answered on this link (cleared on each dial) and the last cursors it acknowledged (kept

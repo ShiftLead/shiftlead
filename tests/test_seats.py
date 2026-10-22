@@ -380,8 +380,8 @@ async def test_a_subscription_profiles_turns_reach_the_seat_ledger_and_nothing_t
 
 async def test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped(agent, hookstub, tmp_path, monkeypatch):
     """TD-965 (§4.4 *Spend per seat*, *What is read*): a session that ends with turns past the cursor,
-    the last live one on its profile, has them charged to its record by the next pass; the pass after
-    reads that profile no more."""
+    the last live one on its profile, has them charged to its record by the next pass that reads — a
+    pass cut short before its read loses nothing; the pass after reads that profile no more."""
     await park_ticks(agent)
     hookstub.billing, hookstub.accounts, hookstub.spend_turns = {}, {}, []
     asked: list = []
@@ -398,6 +398,15 @@ async def test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped(
         hookstub.spend_turns = [_t("u1", 0, source="t1", conv="cv", at=now)]
         await person.call("kill", id=rid)
         assert agent.sessions[rid].state in ("exited", "closed") and not agent._usage_live()
+        read = agent._read_seats
+
+        async def cut(*a):
+            raise RuntimeError("a pass cut short before its read")
+
+        monkeypatch.setattr(agent, "_read_seats", cut)
+        with pytest.raises(RuntimeError):
+            await agent._refresh_seats_inner()
+        monkeypatch.setattr(agent, "_read_seats", read)
         asked.clear()
         await agent._refresh_seats_inner()  # its last minute, though nothing else runs on "sub"
         assert asked == ["sub"]

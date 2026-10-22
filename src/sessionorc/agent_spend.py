@@ -355,11 +355,13 @@ class SpendMixin:
         host's `seeded`) is its backfill — the fortnight before it, to `between`. `seat_spend.json` is
         written only when a turn was charged, a cursor moved or a claim was first seen. A pair whose last
         live session ended since the pass before is read once more, so that session's last minute is
-        charged though nothing else runs on its profile (TD-965). A node's pass sends its turns home
-        instead (`_seats_to_home`)."""
+        charged though nothing else runs on its profile (TD-965); it stays in `_seat_ended` until a read
+        of it is made, so a node offline or a pass cut short does not lose it. A node's pass sends its
+        turns home instead (`_seats_to_home`)."""
         now_live = {(s.adapter, s.profile) for s in self._usage_live()}
-        live = now_live | self._seat_live
+        self._seat_ended = (self._seat_ended | (self._seat_live - now_live)) - now_live
         self._seat_live = now_live
+        live = now_live | self._seat_ended
         metered = await asyncio.to_thread(_metered_of, live)
         if self.mode == "node":
             await self._seats_to_home(live, metered)
@@ -383,6 +385,7 @@ class SpendMixin:
                 str(src): int(c["offset"]) for src, c in held.items() if isinstance((c or {}).get("offset"), int)
             }
             r = await self._read_seats(name, prof, cursors)
+            self._seat_ended.discard((name, prof))  # read: an adapter's reason is its answer, not a miss
             if r is None:
                 continue
             backfill = prof not in seeded  # a profile's first read is its backfill, whenever it first runs
@@ -451,15 +454,18 @@ class SpendMixin:
                 state = self._seat_link.get(prof) or await call([], {})
                 r = await self._read_seats(name, prof, state["cursors"])
                 if r is None:
+                    self._seat_ended.discard((name, prof))
                     continue
                 turns = [t for t in r.get("turns") or () if isinstance(t, dict)]
                 if not state["seeded"]:
                     turns = [t for t in turns if t.get("source") in state["cursors"]]
                 cursors = {s: o for s, o in (r.get("cursors") or {}).items() if isinstance(o, int)}
                 if not turns and state["seeded"] and cursors == state["cursors"]:
+                    self._seat_ended.discard((name, prof))
                     continue
                 for piece in spend_mod.pieces({"turns": turns, "cursors": cursors}):
                     await call(piece["turns"], piece["cursors"])
+                self._seat_ended.discard((name, prof))  # home: an ended pair's last read is charged
             except (link.LinkError, link.LinkClosed, TimeoutError) as e:
                 # the home drops what it already charged turn by turn: the next pass sends it again
                 log.warning("seat spend for %s did not reach %s: %s", prof, self.home, e)
