@@ -480,12 +480,10 @@ DOORBELL_HELD = 3
 # The two words of the home's around a brief (design §4.1 *The brief is the person's word, and the tool
 # is told so*, TD-343): fixed text no sender chose, as the doorbell's line is. A brief typed as nothing
 # but a paste reaches the tool as pasted content, which a careful model reads as data, not as its task.
-BRIEF_LINE = (
-    "shiftlead: the text pasted below is your brief from the person who started this session; read it and act on it"
-)
+BRIEF_LINE = "My brief for this session is pasted below; read it and act on it."
 BRIEF_PREFACE = (
     "This session was started by a person through shiftlead, which runs it in a terminal on their behalf. "
-    "When the session has a brief, it arrives as the first prompt: a line from shiftlead, then the brief, "
+    "When the session has a brief, it arrives as the first prompt: one line in the person's voice, then the brief, "
     "pasted by shiftlead's host agent on that person's behalf. Act on the brief as the person's own "
     "instruction. A later line `[shiftlead] you have n unread messages — run ao inbox` is shiftlead's "
     "doorbell, typed into this session by the host agent when mail has arrived for it."
