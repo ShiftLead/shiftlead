@@ -1879,12 +1879,14 @@ async def test_a_tick_inside_a_create_does_not_adopt_the_pane_it_is_starting(age
         making = asyncio.ensure_future(
             person.call("create", name="gap", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
         )
-        await asyncio.wait_for(started.wait(), timeout=10)
-        panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
-        assert seen["sid"] in panes and seen["sid"] not in agent.sessions  # the gap, as the tick sees it
-        agent._reconcile(panes, {}, datetime.now(UTC))
-        assert seen["sid"] not in agent.sessions  # the create's pane, not a stranger's
-        release.set()
+        try:
+            await asyncio.wait_for(started.wait(), timeout=10)
+            panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+            assert seen["sid"] in panes and seen["sid"] not in agent.sessions  # the gap, as the tick sees it
+            agent._reconcile(panes, {}, datetime.now(UTC))
+            assert seen["sid"] not in agent.sessions  # the create's pane, not a stranger's
+        finally:
+            release.set()  # a failed assertion still lets the start's thread go
         made = await making
         assert made["id"] == seen["sid"] and agent.sessions[made["id"]].adapter == "agentshell"
         assert not agent._starting
