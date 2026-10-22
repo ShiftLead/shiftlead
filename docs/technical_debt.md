@@ -74,7 +74,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Built (#2261–#2268) — live check |
 | TD-955 | #2254's modal-limit `read_when` is untested for a handed entry and for the Reply composer's refill line | Low | Open |
-| TD-956 | #2250's `blocking_rpc` changed what a call with no time left does, and no test would notice going back | Low | Open |
 
 ---
 
@@ -1663,19 +1662,3 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Fix:** Add to the Gemini box test (or `test_handed_entry.py`) a handed entry to the record at the box asserting the modal sentence in the handed reply's `read_when`, and `view['read_when']['refill']` starting with it. Confirm each fails with its argument removed.
 
 **Done when** removing `modal_limit=` from either site fails a test.
-
-## TD-956: #2250's `blocking_rpc` changed what a call with no time left does, and no test would notice going back
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/client.py` (`blocking_rpc` ~L220); `tests/test_pr_wait.py`
-
-**Why:** Found auditing the tests of #2250 (TD-940 live check). `client.blocking_rpc` changed `if left <= 0:` to `if left <= 0 and lost_at is not None:`, so a first call with no time left is now made (not answered with `expired`), and `expired` is returned only when time runs out in a restart's gap; the line's comment says *a first call is always made*. Probe: restore `if left <= 0:` in `src/sessionorc/client.py`; `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_pr_wait.py tests/test_client.py tests/test_agent_restart.py tests/test_cli.py` passes (139). The new tests cover a drop remade and a never-up socket, but not the `expired` return in a gap (`test_ao_pr_wait_says_a_restart_and_a_timeout_in_its_gap` mocks `_pr_wait_call`, so it never reaches `blocking_rpc`) and not a zero or negative `timeout` on a live home.
-
-**Fix:** In `tests/test_pr_wait.py` (or `test_agent_restart.py`): a server that drops the first connection, then is gone past a short timeout — assert `blocking_rpc` returns `(expired, 1)`; and a call with `timeout=0` on a live socket reaches the server. Confirm both fail with the old condition.
-
-**Done when** restoring `if left <= 0:` fails a test.
