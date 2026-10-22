@@ -17964,3 +17964,146 @@ the PR, and its agent checklist's item 2 says *`ao org check --root <worktree>` 
 **Resolved:** 2026-10-21 (grinder-ao-2) — built by #2243: `ao org check --root <dir>` (`orgcheck.stand_in_for`, the `{<registry entry>: <dir>}` mapping through `org.with_repos` / `merge_repo_teams(stands_for=…)`, the root loop, the role and flow readers and `team_lacks`); `team_skill.md` says to run it before the PR; each case of Done when is a test in `tests/test_cli_org.py`.
 
 ---
+
+## TD-944: Gemini's screen-rule manifest: the *Usage limit reached* dialog reads `limited` (`gemini-usage-limit`), over the title's `✦`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (the designer, from TD-941)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built in three slices (grinder-ao-2, 2026-10-21): #2247, #2253, #2254.
+**Location:** `src/shiftlead/adapters/gemini/` (`__init__.py` `explain`, a new `screen_rules.toml`), the tick's title verdict (`agent_tick._title_verdict`), `sessionorc/agent.py` `rpc_explain`'s `state_in_title` branch
+(a non-`title` match gets its own reason, *rule gemini-usage-limit matched, applied as scraped; held for
+its screen*, never `_title_reading`'s), `tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`; design §4.3 *The limit dialog is read off the screen*, §4.2
+
+**Why:** an unattended Gemini member that meets its quota sits `working` at a dialog nobody is asked about (TD-941).
+
+**Fix:** as design §4.3 says: `adapters/gemini/screen_rules.toml`, loaded with `sessionorc.screen.Manifest`
+as Claude Code's is, holding one rule `gemini-usage-limit` — `state = "limited"`, region 15, `all` the box row
+*Usage limit reached for* and the box row *2. Stop*, each led by a `│` border (the right one not required, as §4.3 says),
+`pending = {kind = "limit", text = "Gemini's usage limit reached — answer its dialog in the terminal"}`; the
+*2. Stop* pattern allows the selection marker before the number (`│\s*\S?\s*2\.\s*Stop`). `GeminiAdapter.explain`
+reduces the tail with `painted_text`, then asks the manifest first and the title second. In the tick
+(`agent_tick.py`), three gates change for a title adapter, so the hold §4.2 already describes works:
+`_screen_verdict` no longer returns None for every `state_in_title` adapter — it asks the manifest, with
+`_hook_fresh` (the stall window) replaced for a title adapter by the one-tick test `_title_reading` uses, in
+`_screen_gone` as well (a working Gemini fires hooks, so the stall window would hold a cleared box for 20
+minutes) — and a match takes the screen road, written `scraped` with the
+replaced state saved in `_hook_state`, where `_title_verdict` pops it; `_screen_gone` reads *the manifest
+matches nothing*, not *`_screen_verdict` was None*; and the restored state keeps its saved confidence (`hook` or `title`, both told; `agent_tick.py` restores
+`saved[2]` already, unchanged), so
+`_title_reading` compares the title's next verdict with it on the following tick. The screen road writes nothing over a poll-marked `limited` (`hook` confidence: it keeps its reset, state,
+pending and confidence, and is not saved as `_hook_state`) — the guard is on an equal-state verdict only, one that
+would change the pending alone; a verdict naming another state (Claude Code's `needs-you` rules, `held-peer-message`
+among them) takes the screen road over it as today, saving the poll's `(limited, pending, hook)` in
+`_hook_state` as any replaced state, restored when that screen goes (a `stalled?` verdict such as
+`remote-control-standdown` is not `_screen_held`, so its screen never restores it: the poll's next reading
+re-marks it `limited`, `_pre_limited` then `stalled?`, as today) — a restore the poll has since lifted is
+stale until its next poll lifts it again, accepted. The guard is what keeps a scraped limit message from
+overwriting the poll's reset (Claude Code's `usage-limit` text over the endpoint's cap today); a `scraped` `limited` is the screen road's as today, so
+Claude Code's limit message still updates its pending and yields to a later rule's verdict. §4.10's no-reset send text is the reply to a send
+to a `limited` record that holds a modal rule's verdict — the same test `_usage_limits` uses (`scraped`, and
+`adapter.explain(s.tail)` modal) — since `Pending` carries no reset field (`mail.py`'s `limited` reply prints
+`pending.text` as the cap today). In `_observe`, for a title
+adapter, the chain is `_screen_verdict` → `_screen_gone` → `_title_verdict` (today the title runs first), so the
+box-gone tick restores the replaced state and the title is compared with it on the tick after;
+`_screen_gone` is False when nothing is saved in `_hook_state` and the record already reads `idle` — a
+general condition, not gated on `state_in_title`, and behaviour-neutral for a hook-fed adapter (it re-wrote
+`idle`, `scraped` over the same, and the stall check it skipped reads `working` alone) —
+(nothing to restore, so the chain goes on to the title's compare on the same tick, and the no-saved fallback
+below is the title's to overrule rather than re-written every tick); `_title_verdict` ignores a match whose
+`rule` is not `title …` (the manifest's verdict is the screen road's), and a `scraped` record whose manifest still matches is never
+compared with the title; `_title_reading`'s `elif not s.told` gains one exception, a `scraped` record whose manifest
+matches nothing (the no-saved fallback below), compared as a told one — never the whole `_screen_held` set.
+`_title_reading` sees only the one `Match`: since `explain` asks the manifest first, a title-rule `m` (`rule`
+starting `title `) on a `scraped` record is the no-match case, and no second `explain` is asked (`rpc_explain`'s
+title branch calls it with the same `m`). For that case the no-event guard (`m.state == s.state`) gives way too:
+an equal verdict is taken as a confidence upgrade, re-written `title` with the same state (`set_state` keeps
+`since` and `rev` for an unchanged state), so the fallback `idle` under `◇` becomes told and the doorbell, the
+nudge and the wrap-up read it; `rpc_explain`'s reason says so. Its tests: a `scraped` `idle` under `◇` reads
+`idle` (`title`) with `since` and `rev` unchanged; under `✦` it reads `working` (`title`); a Claude Code `scraped`
+`idle` is untouched. A manifest rule gains `modal = true` (`sessionorc.screen.Rule.modal`, false where unset), set on
+`gemini-usage-limit` alone; `Match` carries it. `Manifest.load` reads it as `bool(raw.get("modal", False))`, `Manifest.explain` passes `rule.modal` into the
+`Match` it builds, and `Match.to_dict` carries it, so `ao explain` prints it
+(check the tests that assert that dict's keys). One helper answers *is this record's `limited` a modal rule's* — `agent_common.limit_is_modal(s, adapter)`:
+False for no record (`agent_inbox.py` passes `s` None for a seat nobody fills), else `scraped`, and `adapter.explain(s.tail)` a modal match — read by `_usage_limits` and by the three callers that
+compute `mail.read_when`'s adapter-dependent flags (`agent_inbox.py` ~474, `agent_mail.py` ~771,
+`agent_serve.py` ~81/84), which pass it as a new `read_when(…, modal_limit=…)` flag, computed for a record of this host only, as
+`agent_mail` and `agent_serve` compute `cache` (`records[sid].host == self.host`: a node's record's tail is the
+node's); a record on another host
+gets the cap form. On a `scraped` `limited` record `_usage_limits` asks
+`adapter.explain(s.tail)` (`getattr`-guarded: no `explain`, or no match, is not modal; a title adapter is asked
+without a title, which reads the manifest alone) and never
+lifts it while the match is `modal` (the record's own tail is the authority, so a host-agent restart forgets
+nothing; no tick-side dict) — it never lifts a `limited` a modal rule set (today `not cap` lifts every kind-`limit` record, so an
+API-key home's was lifted on every poll); every other lift is as today (Claude Code's limit message is not
+modal; a lift of it lasts until its rule next matches, as today — that flap is Claude Code's and not this entry's), and a lifted scraped record
+goes back to its `_hook_state`, dropped then, not to `_pre_limited`'s `working`; with none saved (a restart,
+or nothing the screen road replaced) it reads `idle`, `scraped`, as `_screen_gone` does with nothing saved —
+or where the saved state is a hook's and no hook has reported since the restart
+(`_screen_gone`'s second guard) — and for a title adapter that `idle` is the title's to overrule:
+`_title_reading` compares a `scraped` record whose manifest matches nothing as it does a told one, so the next
+title verdict takes it. `_screen_held` is unchanged (`_screen_gone` needs it as it stands). The lift's restore is chosen by the record: a `scraped` `limited` goes back to its
+`_hook_state` (else the `idle` above); a poll-marked one (`hook`) to `_pre_limited`'s state, `working` where none,
+as today — `_pre_limited` stays. For Claude Code's scraped limit message that is a change: its lift went to
+`working` (`hook`), and now to the state the verdict replaced. Pending text is the literal
+*Gemini's usage limit reached — answer its dialog in the terminal* (`$line` substitutes only bare).
+`tests/conformance/fixtures/gemini/manifest.json` declares `6-a-doorbell.txt` `limited` (it reads `null` today,
+and `test_every_pane_reads_as_a_state` asks `explain` with no title).
+
+**Done when** `ao explain --file tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt -a gemini --title
+'✦  Working… (conformance-walk)'` (without `-a gemini` it runs Claude Code's rules, whose `usage-limit` also matches) names `gemini-usage-limit` and `limited`; a test feeds the tick a hook-fed
+`working` Gemini record older than one tick with that pane and title and reads `limited`, `scraped`, its
+`pending.kind` `limit`, its replaced `working` kept; then the same record with the box gone and `◇` reads the
+kept `working` (`hook`) on the next tick and `idle` (`title`) on the one after; the conformance suite passes
+with the pane declared `limited`; a usage poll on a profile with no reading leaves the `scraped` record
+`limited` while the box is up, and a hook 2 minutes old does not keep a cleared box's `limited`; `conformance`
+reads the raw pane through `explain`'s `painted_text`; a record lifted to the no-saved
+fallback (`idle`, `scraped`) with no box up reads `idle` (`title`) under `◇` and `working` (`title`) under `✦` on
+the next tick; Claude Code's scraped `limited` takes a changed pending from its rule, and a Claude Code record at
+`idle`, `scraped` with nothing saved stays so across ticks, a Claude Code `usage-limit` pane over a poll-marked
+`limited` keeps the poll's pending, and a `held-peer-message` pane over one reads `needs-you`, `scraped`, with
+`(limited, pending, hook)` saved, and with the pane gone reads `limited` (`hook`) with the poll's pending back (the test seeds
+`_last_hook[s.id]` older than `STALL_AFTER`, the hook the record had before the poll marked it: `_screen_gone`'s
+restore reads `_last_hook`, never `hook_seen_at`, and a fresher hook keeps the pane's rule from firing) (a regression test of each); a record whose replaced state was told (`hook` or `title`) reads `limited` with the box up; a box over a
+`title` state (`◇`) restores that state with `title` confidence and the title's next verdict is compared with it; a pane with the marker
+on *Stop* still matches; a record the poll marked `limited` keeps its pending and `hook` confidence when the
+box appears; `ao explain --json` prints `modal`; a send to the box's record replies with §4.10's no-reset text;
+`explain` on the box returns
+`modal` true; `ao explain` on a live record at the box gives the rule's reason; a pane whose
+transcript quotes *Usage limit reached for* outside a box matches nothing.
+
+**Related:** TD-941, TD-785, TD-786.
+
+**Resolved:** 2026-10-21 (grinder-ao-2) — built in three slices: #2247 (the manifest, `gemini-usage-limit` `modal`; `Rule.modal`, `Match.modal`, and `Match.title`, by which core tells a title verdict from a rule's), #2253 (the tick's screen road for a title adapter; the poll never lifts a modal `limited`, `agent_common.limit_is_modal`) and #2254 (`read_when`'s `modal_limit`, §4.10's no-reset sentence).
+
+---
+
+## TD-941: A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (grinder-ao-2, TD-785's live walk)
+**Owner:** designer
+**Kind:** design-first
+**Blocked by:** TD-944
+**Status:** Designed 2026-10-21 (the designer; design §4.3 *The limit dialog is read off the screen*, §4.2): read
+from the screen, as §4.2 already gives `limited` from a tool's own limit message — no hook fires and the title
+is stale, and choosing *Stop* for an unattended launch would type into a dialog on a guess, the race §4.2
+refuses. The adapter gains its own screen-rule manifest, one rule `gemini-usage-limit` → `limited` with
+`pending: {kind: limit}`, asked before the title and written `scraped`; no reset time (none named, no endpoint
+on an API-key home); the card and Inbox draw it as Claude Code's limit. Built by TD-944. Was: Open — found 2026-10-21 by TD-785's walk on `gemini-conformance` (0.64.0, an API-key home): the free tier's quota ran out mid-turn and the tool drew its own dialog — *Usage limit reached for gemini-3.8-flash … ● 1. Keep trying  2. Stop* — while the title still read `✦  Working… (conformance-walk)` and no hook fired, so the record stayed `working` (hook) for the rest of the step's 300 s (`tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`). Design §4.3 maps `✦` to working and gives Gemini's `usage` only a Google-login home's quota endpoint (TD-786); an API-key home reports none, so nothing marks the session `limited`, and a dialog that waits on a choice is not `needs-you` either.
+**Location:** design §4.3 *The second adapter: Gemini CLI* (*Two gaps*, `usage`), §4.2 (`limited`); `src/shiftlead/adapters/gemini/`
+
+**Why:** an unattended Gemini member that hits its quota sits `working` at a dialog nobody is asked about: no doorbell, no rule 5, no `limited` chip, until the stall check (if its spinner stops) — the state the product exists to show is wrong at the moment it matters.
+
+**Fix:** design first: whether the dialog is read from the screen (a screen rule for a title adapter, which today reads only its title), from a hook the tool fires on the limit (none was seen: `hooks.jsonl` ends at the doorbell's `BeforeAgent`), or by the layer choosing *Stop* for an unattended launch; and what state it is (`limited` with no reset time, or `needs-you` as a question).
+
+**Done when** a Gemini session at the *Usage limit reached* dialog reads as the design says, from a fixture captured from the tool.
+
+**Related:** TD-785, TD-786, TD-112.
+
+**Resolved:** 2026-10-21 (grinder-ao-2) — its design merged in #2242; its one build, TD-944, merged in #2247, #2253 and #2254, so it archives with its last build (design §4.9c).
+
+---
