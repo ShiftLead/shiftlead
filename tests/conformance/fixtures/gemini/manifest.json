@@ -138,5 +138,8 @@
    },
    "spend_turns": 5
   }
+ ],
+ "procs": [
+  {"file": "procs/two-tasks.json", "background": ["timeout 300 sleep 290", "python3 -c import time; time.sleep(280)"]}
  ]
 }

@@ -25,3 +25,9 @@ person's session is in them. `manifest.json` names each fixture with what the ad
   doorbell) and `walk-resume` (2026-10-22, the same steps, then resumed: the tool's `$patch` at the
   resume, and each call's response written again as `<id>_response`). The harness puts each where the
   adapter looks, its session id replaced by the test's. Neither printed a link.
+
+- `procs/two-tasks.json`: `/proc` as `identity.LinuxProc` read it under the pane's process (0.64.0, 2026-10-22,
+  TD-786 slice 3), the tool on a private tmux server in a scratch directory on the `gemini-conformance` home
+  with two shell-mode commands (`!timeout 300 sleep 290`, `!python3 -c …`) each moved to the background with
+  Ctrl+B: the pane's `node`, the `node` it relaunches itself as, and each command's `bash -c` wrapper under
+  that; each `cmdline` value cut to 160 characters (`background`).
