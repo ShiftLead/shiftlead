@@ -84,6 +84,88 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-21 (TD-947, the designer; Paul saw *Needs you* on td-156 with nothing to answer in its pane, the only thing running a background subagent): a probe on a scratch home (Claude Code 2.1.307, `tests/conformance/fixtures/claude-code/captured/subagent-permission/`) found the main thread's dialog drawn as the hook starts waiting, as §4.2 said, and a subagent's held back until the hook returns; its `PermissionRequest` carries `agent_id` and `agent_type`, and neither road's carries `tool_use_id`. It found too that the main thread's `Stop` ended a subagent's waiter a second after its request (the waiter keyed by its time, ended by any event), so the record read `idle` and the buttons went. Designed: the pending names its asker and says the pane is held; only the asker's own events, its `SubagentStop` or the session's end end its waiter; the waiter keeps the main thread's state, and its Allow / Deny restore it rather than set `working`; the record stays `needs-you` while a subagent waits; the wait stays `permission_wait`; the card carries no tool reason line, since the payload has none. Built by TD-950.
+- 2026-10-21 (TD-947, steer m-eb7735f10367 to the techlead, answered m-1495cc38d7e4): the default stands. The record reads `needs-you` while only a subagent waits, and the subagent's Allow / Deny restore the main thread's kept state. Mail is held for at most `permission_wait`.
+- 2026-10-21 (TD-947, review round 1, Fable): 8 findings and a minor, all adopted:
+  - a waiter is keyed by its call through `call_sig`, since the asking tool's `PreToolUse` lands just before its `PermissionRequest`, so a parallel tool no longer ends it;
+  - the fallen-through question keeps the subagent and `kept`, persisted, and the subagent's next event restores it;
+  - a host-agent start turns a waiterless permission into the question form;
+  - §4.4a's dropped-link sentence has the held case;
+  - `rpc_send`'s refusal is worded for a held prompt;
+  - a `SubagentStop` with no id that brings the count to 0 ends subagent waiters, and its payload is captured at the live check;
+  - a main-thread `needs-you` takes the record over a subagent's pending;
+  - the field is `subagent`, not `asker`;
+  - the `Stop` row names the kept slot.
+- 2026-10-21 (TD-947, review round 1, Sonnet): 7 findings, all adopted:
+  - a probe that answers the fallen-through dialog in the pane (`subagent-permission/answered/`) found the subagent's own `PostToolUse` naming the call, then a `SubagentStop` that carries `agent_id`, so the question's end needs no fallback beyond `subagents` reaching 0;
+  - open prompts are a stack (`pendings`, persisted and node-owned) with the main thread's `kept` state beneath it, restored with its `since` when the stack empties;
+  - the waiter map carries its thread;
+  - `call_sig` matches the oldest unmatched call of the eight kept per thread;
+  - `exited` and `closed` drop the stack;
+  - `_by_rule` needs no field, and its FYI names the subagent;
+  - an older home's draw of a held prompt is accepted skew;
+  - the mid-turn capture is named as such.
+- 2026-10-21 (TD-947, review round 2, Fable): 7 findings (3 follow-ons, 4 new), all adopted:
+  - a call's own `PostToolUse` drops it from the open calls, so a repeated command is not keyed to a finished one;
+  - the tool's `permission_prompt` notification is marked (`notice`) and pushes no entry while a prompt is open;
+  - a subagent's tool events carry their `tool_use_id` and `call_sig`;
+  - the restore passes `since` through `set_state` and leaves `rev` bumped, a new doorbell stretch;
+  - a node's `answered_by_rule` request carries `subagent_name`;
+  - every `needs-you` entry is on the stack, and a main-thread event removes every main-thread entry;
+  - the Inbox keeps one row per record.
+- 2026-10-21 (TD-947, review round 2, Sonnet): 8 findings, all adopted:
+  - a main-thread event ends only its own live waiter's entry (a parallel tool's event is still ignored), and removes questions only when no main-thread waiter is live;
+  - Allow / Deny end their own entry, then set `working` only on an empty stack, else into `kept`;
+  - the team facet draws a block per entry;
+  - the screen and title roads write nothing while the stack is open;
+  - each entry keeps its own deadline;
+  - §4.10's `needs-you` row has the subagent-held case;
+  - a notice is dropped within a tick of the last prompt's end;
+  - the foreground capture is named for what it got.
+- 2026-10-21 (TD-947, review round 3, Fable): 3 findings and a minor (1 follow-on, 3 new), all adopted:
+  - a main-thread event writes its state into `kept` first, whatever is open, so an emptied stack restores the event's own state, not the one before the prompt;
+  - the restore keeps `kept`'s confidence, not `hook`;
+  - the fall-through's line is in §4.2 and §4.5a;
+  - the `Notification` row names the dropped notice.
+- 2026-10-21 (TD-947, review round 3, Sonnet): 5 findings, all adopted:
+  - the `kept` write holds only while the stack is open, and an event with nothing open sets the record as today;
+  - a main-thread question replaces an older one's entry and writes nothing more into `kept`;
+  - the Done-when names its fields and the capture's events;
+  - reading tests cover the rule's FYI, `ao status`, and the ring on the restore;
+  - the tick is `TICK_SECONDS`, and the restore's confidence is `kept`'s own.
+- 2026-10-21 (TD-947, review round 4, Fable): 4 findings, all new, all adopted:
+  - a fallen-through question is ended by any event of its thread (a pane Deny gives no `PostToolUse`), the call-keyed rule holding only while a waiter is live;
+  - the card and Focus draw a line per entry, and `ao allow` answers the newest permission entry, with `--call`;
+  - `answer_blocks` is `shiftlead/ui/org.py`'s;
+  - the open-call lists are capped at sixteen threads and dropped at a thread's end.
+- 2026-10-21 (TD-947, review round 4, Sonnet): READY, with 4 nits, all adopted:
+  - the tool's own unknown-id event lands during the wait, not just after the request;
+  - a queued, replayed event touches no open-call list;
+  - a test keys the main thread's waiter by its call, from the `main/` capture;
+  - the lists are the host agent's `_open_calls`, and `call_sig` is a named SHA-256 over sorted JSON.
+- 2026-10-21 (TD-947, review round 5, Fable): 4 findings (2 new, 2 follow-ons), all adopted:
+  - any main-thread event ends a main-thread waiter, as before: its dialog is drawn, and a pane Deny gives no `PostToolUse`; the call key scopes only a held thread;
+  - the `permission_prompt` notice lands about six seconds after the dialog, so it is dropped within `NOTICE_LAG` (10 s), not a tick;
+  - the first push sets `kept` whatever the record reads, and the startup sweep moves an older version's `pending` into `pendings`;
+  - the tool's own unknown-id event lands in every subagent capture about thirty seconds after the request, inside or outside the wait.
+- 2026-10-21 (TD-947, review round 5, Sonnet): 4 findings and 2 nits, all adopted:
+  - round 5's *any main-thread event ends it* is withdrawn: it would end a waiter on a parallel call while its dialog is up. A main-thread waiter keyed by its call is ended by its call's events, an event naming no call, or a *new* call's `PreToolUse` (a pane Deny's first sign), and TD-629's parallel rule is live for the first time;
+  - the startup sweep moves only a `hook` pending, over `kept` `idle` at `tick`;
+  - a restored screen or title `needs-you` keeps its road's confidence, and only hook-road entries live in `pendings`;
+  - the last *tick* for the notice is `NOTICE_LAG`, with an 11 s test; an event with no state and no call ends nothing, and the last end's time is in memory.
+- 2026-10-21 (TD-947, review round 6, Fable): 6 findings (4 new, 2 follow-ons), all adopted:
+  - the *new call* qualifier was vacuous: any main-thread `PreToolUse` or question ends a main-thread waiter, with no snapshot; a parallel batch's late sibling is the one wrong end;
+  - so the notice is dropped within `NOTICE_LAG` only after an end by a decision or the asked call's own event, and pushed after any other end, the backstop for that wrong end;
+  - TD-950's `main/` test names the `PreToolUse`, not *an event for another call*;
+  - a kept screen-road `needs-you` is checked against the tail at the restore, since `_screen_gone` waits on a fresh hook;
+  - an event's own `tool_use_id` keys first (the TD-629 test's stub), and that test is call-keyed already.
+- 2026-10-21 (TD-947, review round 6, Sonnet): 5 findings and 3 nits, all adopted:
+  - the adapter marks tool events with the neutral `call: start|end`, so the core never reads `PreToolUse`;
+  - a kept screen-road `needs-you` is restored and rechecked by the next tick, which owns the pane; the first push pops `_hook_state`;
+  - one rule for the notice: a *sure* end (a decision, the asked call's own event, an event naming no call) sets the time, any other end clears it;
+  - *a parallel call's event* reads *its `call: end` event*; `_apply_event`'s `needs-you` gate changes for a main-thread question, with a test.
+- 2026-10-21 (TD-947, review round 7, Fable): 1 finding, a follow-on of Sonnet round 6's question gate, adopted: a `notice`-marked event never reaches the waiters, since the tool's notification translates to a `needs-you` question and would end the waiter it announces; `test_permission_roundtrip`'s stub notice gains the mark.
+- 2026-10-21 (TD-947, review round 7, Sonnet): READY, with 3 nits; the event table's notice cell takes the stack rule's words, and the rest is formatting. The loop ends here: Sonnet said READY, and Fable round 7 had only a follow-on of the last adoption.
 - 2026-10-17 (TD-856, the designer; Paul, 2026-10-17: *add a picker to choose to show those files that have been edited in previous commits (e.g. HEAD~1, HEAD~2, plus one to show all for the session) and also add arrows for navigating them up or down*): **The Git card's pick** is new — the `git_files {id, pick}` read on the record's host, on a pick and never on the tick: the newest ten first-parent commits by git's own names (`HEAD` the newest, so the pick never renames git), and the files of the tree, of one commit against its first parent, or of the session since its base (the record's `files` read at a hundred, with codes); a path no longer in the tree marked `gone`. The ten are the line's whether or not the branch's own, since after a merge the person still asks what the last commit touched.
 - 2026-10-17 (TD-822, grinder-ao-1): a killed run's own `SessionEnd`, landing within `KILLED_END_GRACE` of the kill on a record a resume has taken under the same id, is dropped once. Until this date it was applied: Kill then Resume within a second read the resumed record `exited (hook)` while its new process started, as TD-784's live walk met on 2026-10-16; the walk waited for the late hook (`SESSION_END_WAIT`), which it still does.
 - 2026-10-16 (TD-766, the build): `Monitor`'s task is wrapped as a background shell task is — a `bash -c` child of `claude` sourcing a `shell-snapshots/` script, its command the wrapper's first child — so it is read and counted the same way. Was *which TD-766 verifies*.

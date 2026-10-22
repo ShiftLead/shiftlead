@@ -1,0 +1,25 @@
+title: ✳ probe
+[38;5;246m[48;5;237m❯ [38;5;231mUse the Agent tool with run_in_background set to true and subagent_type [39m
+  [38;5;231mgeneral-purpose. Give it this task: 'Use your Bash tool to run exactly this [39m
+  [38;5;231mcommand and nothing else, then stop: touch probe-subagent.txt'. After [39m
+  [38;5;231mlaunching it, end your turn at once without waiting for it.[39m
+[49m
+[38;5;114m●[39m [1mAgent[0m(Touch probe file)
+[38;5;246m  ⎿  [39mBackgrounded agent[38;5;246m (↓ to manage · ctrl+o to expand)[39m
+
+[38;5;231m●[39m I started a general-purpose subagent in the background to run [38;5;153mtouch [39m
+  [38;5;153mprobe-subagent.txt[39m. The Agent tool here has no [38;5;153mrun_in_background[39m setting, but
+  subagents run in the background anyway. It's still running, and I haven't
+  checked whether the file exists yet.
+
+[38;5;246m✻[39m [38;5;246mWaiting for [1m1[0m[38;5;246m background agent to finish[39m
+
+[38;5;244m──────────────────────────────────────────────────────────────────────── probe ─
+[39m❯ 
+[38;5;244m────────────────────────────────────────────────────────────────────────────────
+[39m  [38;5;246m⏸[39m [38;5;246mmanual[39m [38;5;246mmode[39m [38;5;246mon[39m
+
+[1m  ● main[0m
+[38;5;246m  ◯ general-purpose[39m  [38;5;246mTouch probe file[39m                     [38;5;246m24s · ↓ 26.6k tokens[39m
+
+
