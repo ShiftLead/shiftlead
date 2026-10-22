@@ -115,8 +115,11 @@ def replay(data: bytes) -> tuple[dict[str, tuple[int, dict]], dict]:
             if isinstance(d["$set"].get("messages"), list):
                 messages = {m["id"]: (at, m) for m in d["$set"]["messages"] if isinstance(m, dict) and _is_message(m)}
             meta.update({k: v for k, v in d["$set"].items() if k != "messages"})
-        elif isinstance(d.get("sessionId"), str):
+        elif isinstance(d.get("sessionId"), str) and isinstance(d.get("projectHash"), str):
             meta.update({k: v for k, v in d.items() if k != "messages"})
+            for m in d.get("messages") if isinstance(d.get("messages"), list) else []:
+                if isinstance(m, dict) and _is_message(m):
+                    messages[m["id"]] = (at, m)  # a header that carries messages: an older file, or one rewritten whole
     return messages, meta
 
 
@@ -125,7 +128,8 @@ def _is_message(d: dict) -> bool:
 
 
 def _patch(messages: dict[str, tuple[int, dict]], p: dict) -> None:
-    for update in [p, *(p.get("updates") or [])]:
+    updates = p.get("updates") if isinstance(p.get("updates"), list) else []
+    for update in [p, *updates]:
         if not isinstance(update, dict) or not isinstance(update.get("id"), str) or update["id"] not in messages:
             continue
         rec = messages[update["id"]][1]
@@ -133,10 +137,12 @@ def _patch(messages: dict[str, tuple[int, dict]], p: dict) -> None:
             rec["content"] = update["content"]
         if isinstance(update.get("toolCalls"), list) and isinstance(rec.get("toolCalls"), list):
             for tp in update["toolCalls"]:
-                tc = next((t for t in rec["toolCalls"] if isinstance(tp, dict) and t.get("id") == tp.get("id")), None)
+                if not isinstance(tp, dict):
+                    continue
+                tc = next((t for t in rec["toolCalls"] if isinstance(t, dict) and t.get("id") == tp.get("id")), None)
                 if tc is not None and "result" in tp:
                     tc["result"] = tp["result"]
-    for mid in p.get("removeIds") or []:
+    for mid in p.get("removeIds") if isinstance(p.get("removeIds"), list) else []:
         if isinstance(mid, str):
             messages.pop(mid, None)
     if isinstance(p.get("orderIds"), list):
@@ -145,6 +151,10 @@ def _patch(messages: dict[str, tuple[int, dict]], p: dict) -> None:
         reordered = {i: messages[i] for i in [*rest, *ordered]}
         messages.clear()
         messages.update(reordered)
+
+
+def _list(value: Any) -> list:
+    return value if isinstance(value, list) else []
 
 
 def _parts(content: Any) -> list[dict]:
@@ -202,7 +212,7 @@ def _entries(records: list[dict]) -> tuple[list[TranscriptEntry], int]:
             continue
         if kind != "gemini":
             continue
-        thoughts = [t for t in rec.get("thoughts") or [] if isinstance(t, dict)]
+        thoughts = [t for t in _list(rec.get("thoughts")) if isinstance(t, dict)]
         thought = "\n\n".join(
             "\n".join(s for s in (str(t.get("subject") or ""), str(t.get("description") or "")) if s) for t in thoughts
         ).strip()
@@ -211,14 +221,15 @@ def _entries(records: list[dict]) -> tuple[list[TranscriptEntry], int]:
         text = _text(rec.get("content"))
         if text.strip():
             out.append(TranscriptEntry(kind="text", at=at, text=text))
-        for tc in rec.get("toolCalls") or []:
+        for tc in _list(rec.get("toolCalls")):
             if not isinstance(tc, dict):
                 continue
             entry = TranscriptEntry(kind="tool", at=at, name=str(tc.get("name") or ""), call=_call_line(tc.get("args")))
             results = [p for p in _parts(tc.get("result")) if isinstance(p.get("functionResponse"), dict)]
             if results:
                 entry.result = "\n".join(_response_text(p) for p in results)
-            calls[str(tc.get("id") or "")] = entry
+            if tc.get("id"):
+                calls[str(tc["id"])] = entry  # a response names its call by id; one with none answers nothing
             out.append(entry)
     return out, prompts
 
@@ -247,7 +258,13 @@ def read(path: Path, *, before: int | None = None, turns: int = 20, raw: bool = 
             raw="\n".join(b.decode("utf-8", "replace").rstrip("\n") for _o, b in lines),
         )
     messages, meta = replay(data)
-    kept = [(off, rec) for off, rec in messages.values() if off < end]
+    # each message's offset made non-decreasing in the replayed order, so the messages before an offset are
+    # a prefix: a reorder or a `$set` of every message gives an earlier offset to a later message
+    ordered, floor = [], 0
+    for off, rec in messages.values():
+        floor = max(floor, off)
+        ordered.append((floor, rec))
+    kept = [(off, rec) for off, rec in ordered if off < end]
     start, seen = 0, 0
     for i in range(len(kept) - 1, -1, -1):
         if _is_prompt(kept[i][1]):
@@ -255,6 +272,8 @@ def read(path: Path, *, before: int | None = None, turns: int = 20, raw: bool = 
             start = i
             if seen >= turns:
                 break
+    while start > 0 and kept[start - 1][0] == kept[start][0]:
+        start -= 1  # messages sharing an offset (one `$set` wrote them) are read together, never split by a page
     if not any(_is_prompt(rec) for _off, rec in kept[:start]):
         start = 0  # nothing a person typed is earlier: the read reaches the file's start
     window = kept[start:]

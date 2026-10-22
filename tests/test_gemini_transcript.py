@@ -215,3 +215,33 @@ def test_spend_reads_every_chat_and_a_subagents_as_its_parents(tmp_path, profile
     assert again["turns"] == [] and again["cursors"] == got["cursors"]
     assert ad.spend("unknown-profile", {"x": 3}) == {"turns": [], "cursors": {"x": 3}, "reason": "no_profile"}
     assert ad.billing_for(profile) == {"billing": "subscription", "prices": {}}
+
+
+def test_a_header_with_messages_and_a_set_of_every_message_page_without_a_gap(tmp_path):
+    first = [_user("u0", "prompt 0"), _gemini("g0", "answer 0"), _user("u1", "prompt 1"), _gemini("g1", "answer 1")]
+    path = _write(
+        tmp_path / "c.jsonl",
+        [{**_meta(), "messages": first[:2]}, {"$set": {"messages": first}}, _user("u2", "prompt 2")],
+    )
+    messages, _ = t.replay(path.read_bytes())
+    assert list(messages) == ["u0", "g0", "u1", "g1", "u2"]
+    last = t.read(path, turns=2)
+    # the two prompts the `$set` wrote share its offset, so the page takes the whole of it
+    assert [e.text for e in last.entries] == ["prompt 0", "answer 0", "prompt 1", "answer 1", "prompt 2"]
+    assert last.before is None
+
+
+def test_a_malformed_record_is_skipped_not_raised(tmp_path):
+    path = _write(
+        tmp_path / "c.jsonl",
+        [
+            _meta(),
+            _user("u1", "a"),
+            _gemini("g1", "b", toolCalls=["x", {"name": "ls", "args": {}}], thoughts=7),
+            {"$patch": {"updates": 3, "removeIds": 4, "id": "g1", "toolCalls": ["y", {"id": None, "result": []}]}},
+            {"id": "r", "type": "user", "content": [{"functionResponse": {"response": {"output": "orphan"}}}]},
+        ],
+    )
+    tr = t.read(path)
+    tool = next(e for e in tr.entries if e.kind == "tool")
+    assert tool.name == "ls" and tool.result is None  # a response that names no call answers none
