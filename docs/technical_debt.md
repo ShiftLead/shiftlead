@@ -76,6 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Open |
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
+| TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Open |
 
 ---
 
@@ -1554,3 +1555,23 @@ builds are in the ledger.
 - Once synced: `docs/claude-memory/no-checks-means-conflicting.md` retired, its `MEMORY.md` line pointing at `ao pr wait` instead (the wait says *conflicting*); the *wait for CI with gh pr checks --watch* memory likewise.
 
 **Done when** the synced procedure names the pair and neither memory tells a session to read `gh pr checks` itself.
+
+## TD-947: A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.2 *Permissions are answered through the hook, not through keystrokes* (*the terminal dialog is not held back*) and the event table's subagent row (`docs/design/4.2-state-feed.md`); `src/shiftlead/adapters/claude_code/hook.py` `translate()` (the `PermissionRequest` branch runs before the `agent_id` one, so a subagent's request reads as the main thread's) and `main()` (blocks up to `permission_wait`); `src/sessionorc/agent_hook.py` ~L62 (a payload with no `tool_use_id` gets `<session>:<time>`, so the call's own `PostToolUse` cannot end the waiter); the card's and Focus's *Needs you* (`pending.text`), §4.5a
+
+**Why:** Paul saw *Needs you* on td-156 (2026-10-21 20:36 MDT) and took it for a false positive: the pane was in auto mode, the main thread had ended its turn, and the only thing running was a background *Sonnet design review* subagent, drawn as `general-purpose  Grepping code for mode_act`. No dialog was on screen. The record says it was a real wait. `pending` was `Bash: grep -rn "mode_act\|…" src … | head -40` with a synthesized `tool_use_id` (`ao-shiftlead-td-156:2026-10-22T02:36:26Z`), and `subagent_at` stayed at 02:36:21Z through the whole 10-minute wait, so the subagent's grep did not run: it waited on shiftlead's hook. §4.2 says the terminal dialog appears a few seconds into the hook's wait, so both channels work. For a background subagent no dialog is drawn in the pane, so **Allow** / **Deny** is the only channel, and nothing on the card or Focus says so. Two costs follow. A person who reads the pane as the truth dismisses a real prompt, as here, and the subagent is refused or stalls at the hook's timeout. And an idle main thread reads `needs-you`, so mail does not ring it. It is also unexplained why auto mode let a read-only grep reach `PermissionRequest` at all.
+
+**Fix:** design first, then build.
+- Read a captured `PermissionRequest` payload from a background subagent (`CAPTURE_ENV`, on a scratch home in auto mode and in default mode). Find out whether it carries `agent_id` and `tool_use_id`, whether auto mode's classifier runs before the hook, and what Claude Code does with the request when the hook answers nothing.
+- §4.2 states the subagent case: the request is held by the hook, no dialog is drawn in the pane, and the pending row names the asker (*a subagent's: Grepping code for mode_act*) and says the pane will not show it. If the payload has an `agent_id`, the adapter carries it as a neutral field. The core reads no tool's field (§4.3).
+- §4.2 decides what the main thread's state is while only a subagent waits: `needs-you` (as now) or idle with the subagent's prompt beside it. It also decides whether the timeout answers a subagent's prompt with a `deny` naming the timeout, rather than nothing.
+- The card and Focus draw the decided words. §4.5a's row says what **Allow** / **Deny** answer there.
+
+**Done when** a background subagent's permission on a scratch home shows a *Needs you* that names the subagent and says the pane will not show the prompt, the design says what the session's state is meanwhile, and §4.2 no longer says a dialog always appears.
