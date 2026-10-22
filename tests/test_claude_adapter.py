@@ -14,6 +14,7 @@ from conftest import run_hook, wait_for
 
 from sessionorc.adapters import short_model
 from sessionorc.client import LocalClient
+from sessionorc.models import Session
 from shiftlead import profiles
 from shiftlead.adapters.claude_code import (
     AT_COMPOSER_ENV,
@@ -812,6 +813,28 @@ async def test_an_unannounced_subagent_stop_still_takes_down_a_count_with_no_id(
         assert (await c.call("get", id=sid))["subagents"] == 1  # the tool's own: nothing left unnamed
         await c.call("hook", session=sid, subagent_delta=-1, subagent_seen=True)
         assert (await c.call("get", id=sid))["subagents"] == 0
+
+
+async def test_a_fresh_conversation_forgets_the_subagent_ids(agent, hookstub, tmp_path):
+    """TD-961: a `subagents_reset` (a `resume`'s or a `/clear`'s) clears `subagent_ids` with the count, so a
+    new subagent that reuses an old conversation's id is counted rather than read as one already running."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="r", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await c.call("hook", session=sid, subagent="a1", subagent_delta=1, subagent_seen=True)
+        await c.call("hook", session=sid, subagents_reset=True)
+        rec = await c.call("get", id=sid)
+        assert rec["subagents"] == 0 and rec["subagent_ids"] == []
+        await c.call("hook", session=sid, subagent="a1", subagent_delta=1, subagent_seen=True)
+        rec = await c.call("get", id=sid)
+        assert rec["subagents"] == 1 and rec["subagent_ids"] == ["a1"]
+
+
+def test_a_process_exit_forgets_the_subagent_ids(tmp_path):
+    """TD-961: no subagent outlives its process, so an exit clears `subagent_ids` with the count."""
+    s = Session(id="ao-x", name="x", kind="interactive", adapter="hookstub", dir=str(tmp_path))
+    s.subagents, s.subagent_ids = 1, ["a1"]
+    s.set_state("exited", confidence="hook")
+    assert s.subagents == 0 and s.subagent_ids == []
 
 
 async def test_a_main_thread_waiter_is_keyed_by_its_call(agent, hookstub, tmp_path):

@@ -18657,3 +18657,23 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Resolved:** 2026-10-22 (grinder-ao-1, PR #2278) — `test_explain_on_a_live_record_at_the_box_gives_the_rules_reason` (`tests/test_gemini_title.py`) explains the record at the Gemini usage box with a hook within a tick and with the poll's `limited` at `confidence: hook`, asserting each reason; replacing either branch with `False` fails it.
 
 ---
+
+## TD-961: #2276's two resets of `subagent_ids` (a fresh conversation, a process exit) have no test: removing either leaves the whole suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_apply_subagents`, the `subagents_reset` branch); `src/sessionorc/models.py` (`set_state`, the exit branch); `tests/test_claude_adapter.py`
+
+**Why:** Found auditing the tests of #2276 (TD-960). The PR adds `s.subagent_ids = []` where a `subagents_reset` event clears the count, and where `set_state` clears it on a process's exit. Probe: delete either line (both together too) and run the whole suite (`PYTHONPATH=$PWD/src:<scratch registering gemini> pdm run pytest -q tests`, with the node-mode and cursor probes of TD-963 also applied: 3973 passed, 2 skipped); `tests/test_claude_adapter.py` alone passes with each removed on its own. `grep -rn subagent_ids tests` finds only the two TD-960 tests, which never reset. Effect: after a `/clear` or `resume`, or a restart of the process, a stale id stays in the list, and a new subagent that reuses it is not counted (`if sub not in s.subagent_ids`), so `subagents` reads 0 while it runs.
+
+**Fix:** two tests in `tests/test_claude_adapter.py`: start a subagent (id `a1`), send a `subagents_reset` event (a resume's), then a `SubagentStart` for `a1` again and assert `subagents == 1`; and the same across `set_state` to an exited state, asserting `subagent_ids == []`. Confirm each fails with its line removed.
+
+**Done when** removing either reset line fails a test.
+
+**Resolved:** 2026-10-22 (grinder-ao-2, PR #2281) — `test_a_fresh_conversation_forgets_the_subagent_ids` and `test_a_process_exit_forgets_the_subagent_ids` (`tests/test_claude_adapter.py`): a reused id after a `subagents_reset` is counted again, and an exit clears `subagent_ids`; removing either reset line fails one of them.
+
+---
