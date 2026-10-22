@@ -14,6 +14,11 @@ Claude Code 2.1.307 on the walk's `conformance` profile, a scratch home, `permis
 - `answered/` (`permission_wait: 30`): the dialog drawn at the fall-through is answered in the pane (*1. Yes*,
   by an Enter). The subagent's own `PostToolUse` follows, with the same `agent_id` and the asked call's
   `tool_use_id`, then its `SubagentStop` (which carries `agent_id`), then the main thread's woken turn.
+- `stray-stop/` (2026-10-22, TD-950's live check, the same probe and mode as `background/`, #2268 live): the
+  tool's own event about thirty seconds after the request is a `SubagentStop` for an id no `SubagentStart`
+  named. Before TD-960 it took `subagents` to 0 and ended the subagent's waiter: the record read `idle` at
+  39 s (`timeline.jsonl`) and the dialog was drawn by 51 s (`pane-02-needs-45s.txt`), before the hook's own
+  deadline.
 - In every subagent capture (not `main/`), a `PreToolUse` from an `agent_id` with no `SubagentStart` lands
   about thirty seconds after the `PermissionRequest`, inside or outside the hook's wait. It is the tool's own, and no subagent's.
 - `main/`: the main thread's own permission is drawn as the hook starts waiting (`pane-01-needs-0s.txt`).
