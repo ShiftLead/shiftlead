@@ -4731,7 +4731,9 @@ class TickMixin:
         """The subagent count and its time (design §4.2 *Working on its own*, TD-734). An event the
         adapter marked `subagent_seen` sets `subagent_at` to the later of the record's and its own
         time — a queued event's `at`, else now — so a drained event never moves it back; a
-        `subagents_reset` older than the record's `subagent_at` is a stale start, and is not applied."""
+        `subagents_reset` older than the record's `subagent_at` is a stale start, and is not applied. A
+        `SubagentStop` for an id no `SubagentStart` announced — the tool's own, about thirty seconds into
+        a subagent's permission — moves no count, so it never reads as the last subagent's end (TD-960)."""
         when = datetime.fromtimestamp(at, UTC) if isinstance(at, int | float) else datetime.now(UTC)
         try:
             last = _parse(s.subagent_at) if s.subagent_at else None
@@ -4739,8 +4741,20 @@ class TickMixin:
             last = None
         if event.get("subagents_reset") and (last is None or when >= last):
             s.subagents, s.subagent_at, last = 0, None, None
+            s.subagent_ids = []
         if delta := event.get("subagent_delta"):
-            s.subagents = max(0, s.subagents + int(delta))
+            sub = event.get("subagent")
+            if not isinstance(sub, str) or not sub:
+                s.subagents = max(0, s.subagents + int(delta))  # an adapter with no per-subagent id
+            elif int(delta) > 0:
+                if sub not in s.subagent_ids:
+                    s.subagent_ids.append(sub)
+                    s.subagents += 1
+            elif sub in s.subagent_ids:
+                s.subagent_ids.remove(sub)
+                s.subagents = max(0, s.subagents - 1)
+            elif s.subagents > len(s.subagent_ids):
+                s.subagents -= 1  # a start with no id, or counted by an older build
         if event.get("subagent_seen") and (last is None or when > last):
             s.subagent_at = when.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 

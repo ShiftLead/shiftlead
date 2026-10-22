@@ -18408,3 +18408,312 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Resolved:** 2026-10-22 (grinder-ao-2, PR #2275) — the test's: its first `_feed` (`events[: i - 2]`) stopped before the main thread's `Stop`, so `stopped` was SubagentStart's `since`; it now feeds through the `Stop`, asserts `idle` and reads its `since`, and the `wait=1` fall-through puts the restore a second later, so `_show_top` with `since=None` fails it every run (3/3). The code restores `kept`'s own `since`.
 
 ---
+
+## TD-960: The tool's own `SubagentStop`, for an id no `SubagentStart` announced, takes `subagents` to 0 and ends a live subagent's permission waiter: the record reads `idle` while the pane draws its dialog
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (grinder-ao-1, from TD-950's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Resolved:** 2026-10-22 (#2276) — the record keeps `subagent_ids`; a `SubagentStop` for an id no `SubagentStart` named moves no count and ends no waiter; the `stray-stop/` capture is the test. Where the Fix said a record saved before the build keeps its count until its next reset, the build does otherwise and the design says so: a count above the ids (an older record, or an id-less start) is taken down by one by any `SubagentStop`.
+**Location:** design §4.2 *Permissions are answered through the hook* (*The thread scopes it*) and its event table's `SubagentStart`, `SubagentStop` row; `src/sessionorc/agent_tick.py` `_apply_subagents`, `_apply_event` (`running and not s.subagents`); `src/sessionorc/models.py` (the record); `tests/conformance/fixtures/claude-code/captured/subagent-permission/`
+
+**Why:** TD-950's live check (2026-10-22, a scratch home, `probe.py --mode background`, Claude Code on the `conformance` profile): the background subagent `a666…` asks, and the record reads `needs-you` with its name and `pane_held` as designed. About thirty seconds later the hook feed carries a `SubagentStop` with `agent_id` `a2a9…`, an id no `SubagentStart` named — the tool's own, the stray event design §4.2 says every subagent capture holds (there a tool event; here a `SubagentStop`). The adapter turns it into `subagent_delta: -1`, `_apply_subagents` takes `subagents` from 1 to 0, and `_apply_event`'s `running and not s.subagents` ends every subagent waiter and drops their entries. The hook returns, the record reads `idle` with no pending at 39 s, and the next pane read, at 51 s, draws the dialog: the subagent waits on a prompt no card shows, which is TD-947's symptom. The count is wrong too: Ready to close and *Working on its own* read no subagent while one runs.
+
+**Fix:** design §4.2 first (the event table's row and *The thread scopes it*): a `SubagentStop` whose `subagent` no `SubagentStart` announced moves no count and ends nothing, as a tool event of such an id already ends nothing. The record keeps the live subagents' ids (persisted, `NODE_OWNED` as `subagents` is), a `SubagentStart` adds its id and its `SubagentStop` removes it, and `subagents` is their number; a `subagents_reset` clears them, under the same stale-reset guard as the count. A `SubagentStop` that names no subagent (an adapter with no per-subagent id) moves the count as today. A record saved before the build (a count, no ids) keeps its count until its next reset. Commit the probe's capture as `subagent-permission/stray-stop/` (`hooks.jsonl`, `timeline.jsonl`, the panes at the request, at 45 s into the wait and after the fall-through).
+
+**Done when** the stray-stop capture's events, in order, keep the subagent's waiter live and the record `needs-you` past the stray `SubagentStop`, with `subagents` 1, and the subagent's own `SubagentStop` takes it to 0; TD-950's live check holds on a scratch home.
+
+**Related:** TD-950, TD-947, TD-734.
+
+---
+
+## TD-947: A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved — Designed (2026-10-21, design §4.2 *Permissions are answered through the hook*, the event table's subagent rows, §4.5a card **Allow / Deny**; captured in `tests/conformance/fixtures/claude-code/captured/subagent-permission/`).
+**Blocked by:** TD-950
+**Location:** design §4.2 *Permissions are answered through the hook, not through keystrokes* (*the terminal dialog is not held back*) and the event table's subagent row (`docs/design/4.2-state-feed.md`); `src/shiftlead/adapters/claude_code/hook.py` `translate()` (the `PermissionRequest` branch runs before the `agent_id` one, so a subagent's request reads as the main thread's) and `main()` (blocks up to the profile's `permission_wait`); `src/sessionorc/agent_hook.py` ~L62 (a payload with no `tool_use_id` gets `<session>:<time>`, so the call's own `PostToolUse` cannot end the waiter); the card's and Focus's *Needs you* (`pending.text`), §4.5a
+
+**Why:** Paul saw *Needs you* on td-156 (2026-10-21 20:36 MDT) and took it for a false positive: the pane was in auto mode, the main thread had ended its turn, and the only thing running was a background *Sonnet design review* subagent, drawn as `general-purpose  Grepping code for mode_act`. No dialog was on screen. The record says it was a real wait. `pending` was `Bash: grep -rn "mode_act\|…" src … | head -40` with a synthesized `tool_use_id` (`ao-shiftlead-td-156:2026-10-22T02:36:26Z`), and `subagent_at` stayed at 02:36:21Z through the whole 10-minute wait, so the subagent's grep did not run: it waited on shiftlead's hook. The pane showed no dialog at 20:39 MDT, three minutes into the hook's wait, which ended at 02:46:26Z (20:46 MDT). Paul's later screenshot shows one at 20:48, as *Bash command · from the general-purpose agent · 1 of 2*. It carried Claude Code's reason: *Auto mode classifier requires confirmation for this command. 3 consecutive actions were blocked … Latest blocked action: [Irreversible Local Destruction]*. So auto mode can send a read-only grep to the person: here its classifier had blocked three actions in a row and labelled this one destructive. Why a grep was labelled that way is Claude Code's, not shiftlead's. §4.2 says the terminal dialog appears a few seconds into the hook's wait, so both channels work. Seen once, on a background subagent, it did not: Claude Code appears to hold a subagent's dialog back while the hook blocks. Then **Allow** / **Deny** is the only channel for the wait, and nothing on the card or Focus says so. Two costs follow. A person who reads the pane as the truth dismisses a real prompt, as here, and the subagent sits blocked for the full `permission_wait`. And an idle main thread reads `needs-you`, so mail does not ring it.
+
+**Fix:** design first, then build.
+- Read a captured `PermissionRequest` payload from a background subagent (`CAPTURE_ENV`, on a scratch home). Find out whether it carries `agent_id` and `tool_use_id`. Confirm that a subagent's dialog waits for the hook, on a background subagent and on a foreground one (seen once, 2026-10-21, on a background one).
+- §4.2 states the subagent case as the capture finds it: where the pane draws no dialog while the hook blocks, the pending row names the asker (*a subagent's: Grepping code for mode_act*) and says the pane will not show it. If the payload has an `agent_id`, the adapter carries it as a neutral field. The core reads no tool's field (§4.2, §4.3).
+- §4.2 decides what the main thread's state is while only a subagent waits: `needs-you` (as now) or idle with the subagent's prompt beside it. It also decides whether a subagent's wait should be shorter than `permission_wait`, since the terminal cannot answer it meanwhile, and whether the card carries the tool's own reason line (here the auto-mode classifier's).
+- The card and Focus draw the decided words. §4.5a's row says what **Allow** / **Deny** answer there.
+
+**Done when** a background subagent's permission on a scratch home shows a *Needs you* that names the subagent and says the pane will not show the prompt, the design says what the session's state is meanwhile, and §4.2 says when the pane draws a subagent's dialog, as the capture found.
+
+---
+
+**Resolved:** 2026-10-22 (grinder-ao-2) — its one build, TD-950, merged in #2261, #2262, #2263, #2265, #2267 and #2268 (with TD-960's fix, #2276), and its live check holds on a scratch home (archived in this PR): a background subagent's permission shows *Needs you* naming the subagent, saying the pane shows nothing until the deadline.
+
+---
+
+## TD-950: A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (the designer, from TD-947)
+**Owner:** grinder
+**Kind:** live-check #2276
+**Status:** Resolved — Built (#2261, #2262, #2263, #2265, #2267, #2268) — live check, read 2026-10-22 (grinder-ao-1, #2268 live in fb99f94) on a scratch home with `probe.py --mode background` (Claude Code on the `conformance` profile, `permission_wait: 90`): **it does not hold**. For its first 33 s it does — the record reads `needs-you` (`hook`) with `subagent_name` *general-purpose* and `pane_held`, `ao status` prints *← permission: Bash: touch probe-subagent.txt (from the general-purpose subagent)*, the held line reads *from the general-purpose subagent · the pane shows nothing until <deadline>*, and the pane draws nothing. Then a `SubagentStop` for another id (no `SubagentStart` named it: the tool's own, the one every capture holds) takes `subagents` from 1 to 0, which ends every subagent waiter: the record reads `idle` with no pending at 39 s, and the next pane read, at 51 s, draws the dialog — TD-947's symptom. What is wrong is TD-960. #2276 builds TD-960's fix (the record keeps `subagent_ids`, and a stray `SubagentStop` moves no count): the live check is read again, on a scratch home with `probe.py --mode background`, once #2276 is live. Slice 1 (#2261): the adapter's fields — `call_sig` on `PreToolUse` and `PermissionRequest`, `subagent` on every event with `agent_id` (and `subagent_name` on its `PermissionRequest`), a subagent's tool events carrying their `tool_use_id`, `call: start|end` on every tool event (`PostToolUseFailure` is not hooked, so `end` is `PostToolUse`'s alone), `notice: permission_prompt` — and `Pending`'s `subagent`, `subagent_name`, `pane_held` (written by `to_dict` only for a subagent's prompt); the core reads none yet. Slice 2 (#2262): the call key and waiter scope — `_open_calls` (`_track_call`, `_take_call`), `_await_permission`'s match and its pending's `subagent`, `subagent_name`, `pane_held` (the fall-through keeps the first two), the waiter map's thread, `_permission_waiting`'s thread, `_end_waiters` by thread with `call` and questions, the session's end, a reset and `subagents` reaching 0, `_apply_event` for a subagent event with no state; the record has no stack yet, so a subagent's Allow still sets `working`. Slice 3a (#2263): the record's `pendings` and `kept`, persisted, in `NODE_OWNED`, dropped at `exited`/`closed`, and `set_state(since=)`; nothing writes them yet. Slice 3b (#2265): the stack's logic — `_push_prompt` (`kept` at the first push, `_hook_state` popped, a main-thread question replacing the older), `_keep_beneath` (a main-thread event's state into `kept` before `_end_waiters`), `_end_entries`/`_show_top` (an ending removes its entry inside `_end_waiters` and `rpc_decide`; the restore with `kept`'s confidence and `since`; a kept screen verdict rechecked by the next tick), `_notice_dropped` with `NOTICE_LAG` and `_sure_end`, the screen and title skips, `_sweep_prompts` at start (a saved hook pending into the stack; the question form). Slice 4a (#2267): the words — `cards.subagent_held`/`held_words` and the view's `held`; `held_line.html` on the card, the Inbox row and the team facet, and Focus's header in `app.js` (the deadline a `.localtime`); `rpc_send`'s refusal for a `pane_held` record; `cli.pending_words` on `ao status`, `ao send --wait` and `ao explain`; *Answered for you* naming the subagent, and the node's `answered_by_rule` carrying `subagent_name`. Slice 4b (#2268): every entry answerable where it is drawn — `models.open_prompts`/`permission_entry` (the newest *permission* entry, or the one a call names); `cards.prompt_line` and the view's `others`, drawn under the card's slot and in Focus's header, each with **Allow** / **Deny** carrying `data-call` (the page's route takes `call`); `answer_blocks` a block per entry, *n* counting members (`answer_members`); `ao allow`/`ao deny --call`; `mail.read_when`'s *rung on the restore to idle* for an idle main thread held only by subagents' prompts (the restore itself is the doorbell's hook-confirmed idle).
+**Location:** `src/shiftlead/adapters/claude_code/hook.py` `translate()` (the `PermissionRequest` branch, the `PreToolUse`
+branch, the `agent_id` branch for tool events, `SubagentStop`); `src/sessionorc/models.py` `Pending`; `src/sessionorc/agent_hook.py`
+`_await_permission`, `rpc_decide`; `src/sessionorc/agent_tick.py` `_apply_event`, `_permission_waiting`, `_end_waiters`;
+`src/sessionorc/agent.py` the startup sweep and `rpc_send`'s pending refusal; the card's, the Inbox row's and Focus's
+permission line (`src/shiftlead/ui/`, `cards.py` `answerable`); design §4.2 *Permissions are answered through the hook, not
+through keystrokes* and its event table's `Stop` and subagent rows, §4.4a *Permission prompts*, §4.5a card **Allow / Deny**.
+The field is `subagent` (a subagent's id), not `asker`, which already names the member in mail's `answered.asker`.
+
+**Why:** a subagent's dialog is not drawn while the hook blocks, so **Allow** / **Deny** are its one channel until
+the deadline and nothing says so (TD-947: Paul read a real wait as a false *Needs you*). The main thread's `Stop`
+also ends a subagent's waiter within a second, because Claude Code's `PermissionRequest` names no call and a
+waiter keyed by its time is ended by any event. The record then reads `idle`, the buttons go, and the subagent
+waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-permission/foreground/`; the tool backgrounds every subagent).
+
+**Fix:** as design §4.2 says.
+- **The adapter.**
+  - `PreToolUse` and `PermissionRequest` gain `call_sig`, a digest of `tool_name` and `tool_input` (the first
+    16 hex of SHA-256 over `json.dumps({"tool_name": …, "tool_input": …}, sort_keys=True, separators=(",", ":"))`),
+    on both roads.
+  - Every event with `agent_id` adds `subagent` (the `agent_id`): a tool event and a `SubagentStop` beside
+    `subagent_seen`, and a `PermissionRequest` beside `subagent_name` (the `agent_type`, else *subagent*).
+  - The `agent_id` branch for tool events carries the call's `tool_use_id` (and on `PreToolUse` its `call_sig`),
+    still with no state.
+  - Every tool event, on either thread, adds the neutral `call`: `start` on `PreToolUse`, `end` on
+    `PostToolUse` (and `PostToolUseFailure` where the tool sends it).
+  - A `permission_prompt` notification adds `notice: permission_prompt`.
+  - The core reads no tool field.
+- **The call key.**
+  - The core keeps each thread's open `PreToolUse` calls, as `tool_use_id` and `call_sig`, the last eight per
+    `(session, subagent or None)`, in memory, as the host agent's `_open_calls`. A queued (replayed) event
+    touches no list.
+  - A call's own `PostToolUse` removes it. At most sixteen threads per session are kept, the oldest dropped,
+    and a thread's list goes at its `SubagentStop`, a `subagents_reset` or the session's end.
+  - `_await_permission` keys by the event's own `tool_use_id` first, as today (a stub's; Claude Code sends
+    none). Else it takes the oldest with the permission's `call_sig`, keys the waiter by its `tool_use_id`, and
+    consumes it.
+  - With no match, it keys by `<session>:<time>` as today.
+- **The waiter map** goes from `(session, tool_use_id) → future` to `(session, tool_use_id) → (future, subagent)`.
+  `_permission_waiting` gains a thread argument: *any main-thread waiter* and *any waiter of subagent X*.
+- **`Pending`** gains `subagent: str | None`, `subagent_name: str | None` and `pane_held: bool` (False where
+  unset), in `to_dict` and `from_dict`.
+- **The record** gains `pendings: list[Pending]` (oldest first) and `kept: dict | None` (state, pending,
+  confidence, `since`), both persisted and both in `NODE_OWNED`. Its `pending` is the newest of `pendings`.
+- **`_end_waiters(sid, tool_use_id, subagent)`.**
+  - A waiter is ended only by an event from its own thread: a subagent's by the same `subagent`, a main
+    thread's by an event with none.
+  - Within the thread: the asked call's own tool event, or an event naming no call (a `Stop`, a prompt, a
+    `SubagentStop`), ends it. An event naming another call ends a time-keyed waiter, but not one keyed by its
+    call, with one exception: a main-thread waiter keyed by its call is ended by any main-thread
+    `call: start` event or question (a pane Deny gives no `PostToolUse`, so the turn's next call is the first
+    sign; no snapshot of `_open_calls` is kept). `_end_waiters` gains the event's `call` to tell them apart;
+    the core reads `call`, never the tool's event name. `_apply_event`'s gate (`state != "needs-you"`,
+    `agent_tick.py` ~L4528) changes so it calls `_end_waiters` for a main-thread question too. This makes
+    TD-629's parallel-call rule live for `call: end`: before this build Claude Code's permission names no call,
+    so every real main-thread waiter is time-keyed. `tests/test_agent.py`
+    `test_a_permission_answered_in_the_terminal_ends_its_waiter` passes `tool_use_id` on the permission
+    itself, so it is call-keyed already; its parallel `PostToolUse:Read` event gains `call: end`, and a parallel
+    `PreToolUse` case ends the waiter.
+  - A `SubagentStart` ends nothing. A `notice`-marked event never reaches `_end_waiters`, whatever state it
+    carries (a `Notification` translates to a `needs-you` question): the notice rule handles it first.
+    `tests/test_agent.py` `test_permission_roundtrip`'s stub notice gains `notice: permission_prompt`, and its
+    buttons still stay.
+  - The session's end, a `subagents_reset` and `subagents` reaching 0 end every subagent waiter.
+  - `_apply_event` calls it for an event with a `subagent` even when the event has no state.
+  - A fallen-through question (an entry with no live waiter) is removed by *any* event of its `subagent`, or
+    its `SubagentStop`. The call-keyed rule holds only while a waiter is live.
+- **The stack.**
+  - Every `needs-you` entry is in `pendings`. A new prompt, or a main-thread `needs-you` question, is pushed,
+    and the first push sets `kept`, whatever the record reads (a screen or title road's `needs-you` too), and
+    pops `_hook_state[sid]`. A `kept` screen-road `needs-you` is restored `scraped` and marked (in memory)
+    for a recheck: the next tick runs the adapter's rules once on the tail whatever the hook's freshness,
+    keeps it while one matches, else sets `idle` at `tick`. The restore itself captures no pane. A title-road
+    one is restored. A main-thread question replaces an
+    older main-thread question entry, and writes nothing more into `kept`.
+  - A `notice: permission_prompt` event is dropped while a permission or fallen-through question is open, or
+    within `NOTICE_LAG` (10 s, a new constant in `agent_common`) of the session's last sure end; the captures
+    show it about six seconds after the dialog. A sure end (a decision, the asked call's own event, an event
+    naming no call) sets the time; any other end (another call's `call: start` or a question on the main
+    thread, another call's event ending a time-keyed waiter) clears it. Otherwise it is pushed as a question.
+  - A main-thread event with no pending, while `pendings` is open, first writes its state into `kept` (a fresh
+    `since` where the state changed, `kept`'s own where not). With nothing open it sets the record as today
+    and leaves `kept` unset. Then, while a main-thread waiter is live, it ends that waiter's entry (through
+    `_end_waiters`, by the rule above) and no subagent's. With no main-thread waiter live, it removes the main-thread questions.
+  - The startup sweep first moves a saved `pending` of confidence `hook` with no `pendings` into `pendings`,
+    with `kept` = `idle`, `tick`, its own `since`. A screen or title `pending` stays where it is.
+  - The last sure end, for `NOTICE_LAG`, is kept in memory per session.
+  - Each entry keeps its own `Pending.deadline`.
+  - `_screen_verdict`, `_screen_gone` and `_title_verdict` skip a record whose `pendings` is open.
+  - `exited` and `closed` drop `pendings` and `kept`.
+  - An ending removes its entry wherever it sits. A fall-through rewrites its entry in place, and the
+    timeout guard looks the entry up by `tool_use_id` in `pendings`, not only on top.
+  - When `pendings` empties, the record takes `kept`'s state, pending and confidence (its own, never `hook`
+    by default), with `since` set back
+    to `kept`'s (`set_state` gains `since=`). `rev` is bumped as for any change.
+  - `rpc_decide` ends its own entry. On a main-thread waiter it then sets `working` when the stack is empty,
+    or writes `working` with `pending: None` into `kept` when entries remain. On a subagent waiter it only
+    ends the entry.
+- **The fall-through's entry** keeps the text, `subagent` and `subagent_name`, with `pane_held: false`. A
+  `permission_prompt` notification does not replace its text.
+- **A restart.** At the host agent's start, every `pendings` entry that is a permission with no live waiter turns
+  into the question form (`pane_held: false`, no buttons): `answerable()` would otherwise draw buttons that
+  `rpc_decide` refuses.
+- **The rules.** `_by_rule`'s matching is unchanged. Its *Answered for you* names the subagent where the prompt
+  has one. On a node, the `answered_by_rule` request carries `subagent_name`, and the home's handler
+  (`agent_remote.py`) reads it.
+- **The Inbox** keeps one row per record, drawn from `pending`, and the trail keeps the last answer's word.
+- **The card and Focus** draw a line per entry, newest first, each permission with its own **Allow** / **Deny**
+  (`answerable` per entry) and each question with **Focus**.
+- **`ao allow` / `ao deny <id>`** (`cli.py` `cmd_decide`) answer the newest permission entry, and gain
+  `--call <tool_use_id>` for another. §4.5a's card row says so.
+- **The team card's Answer needed facet** (`shiftlead/ui/org.py` `answer_blocks`) draws a block per `pendings` entry,
+  newest first. *n* counts members.
+- **§4.10's read-when** for a subagent-held idle record: rung on the restore to `idle`.
+- **The words.**
+  - While `pane_held`, the card, the Inbox row and Focus draw *from the <subagent_name> subagent · the pane
+    shows nothing until <deadline>* beside **Allow** / **Deny**, the deadline in the reader's clock.
+  - After the fall-through they draw *from the <subagent_name> subagent* with **Focus**.
+  - `rpc_send` on a `pane_held` record refuses with *a subagent's permission is pending: press Allow / Deny
+    (the pane shows nothing until <deadline>)*.
+  - `ao status` and `ao explain` print the subagent's name on the pending line.
+  - A main-thread prompt draws as today.
+
+**Done when**
+- **Payload tests.**
+  - Through `translate()`, the captured `subagent-permission/background/hooks.jsonl` gives the
+    `PermissionRequest` its `subagent`, `subagent_name` *general-purpose*, and a `call_sig` equal to its
+    `PreToolUse`'s.
+  - A test drives the host agent with that file's events in order:
+    - the waiter is keyed by the subagent's `PreToolUse` `tool_use_id`;
+    - through the hook's wait the record reads `needs-you`, with `pane_held` and the subagent's name;
+    - the tool's own unknown-id tool event ends nothing;
+    - at the timeout the record reads the question, its entry keeping `subagent` and `subagent_name`;
+    - the `permission_prompt` notification after it keeps the text.
+  - The `answered/` file's events, after the same fall-through, end the question at the subagent's
+    `PostToolUse`. Its main-thread `Stop` lands before the request, so `kept` is that `Stop`'s `idle`: the
+    record reads `idle`, `hook`, with the `Stop`'s `since`. The `SubagentStop`'s `subagent` is the request's.
+- **Waiter-scope tests.** The `main/` capture's events in order, its notice included, leave the main-thread
+  waiter live and the buttons up until the hook's answer.
+
+  The `foreground/` capture (the request mid-turn, the main thread's `Stop` a second later), its events in order, keep the waiter live across the `Stop`: the record stays `needs-you` with its
+  buttons, and `kept` becomes `idle`. Then:
+  - the subagent's **Allow** restores `idle` (`hook`, `kept`'s own), not `working`;
+  - a subagent tool event for the asked call, in place of the Allow, restores `idle` and ends the waiter
+    as answered in the terminal;
+  - that subagent's event for another call ends nothing;
+  - an event from inside a subagent ends no main-thread waiter;
+  - a main-thread permission's **Allow** still sets `working`;
+  - the `main/` capture's waiter is keyed by its `PreToolUse` `tool_use_id`, its asked call's `PostToolUse`
+    ends it as answered in the terminal, and so does a new main-thread call's `PreToolUse` (a pane Deny).
+- **Stack tests.**
+  - Two subagents ask at once: both are in `pendings`, each **Allow** ends its own, and `kept` comes back
+    only after the second.
+  - A main-thread `AskUserQuestion` meanwhile goes on top and is drawn, and the subagent's prompt is drawn
+    again once it ends.
+  - The older of two prompts falls through under the newer: its entry becomes the question, and the newer
+    stays on top.
+  - `exited` drops the stack.
+  - A main-thread waiter keyed by its call: a parallel call's `PostToolUse` (open before the permission)
+    ends nothing and the buttons stay; another call's `PreToolUse` ends it as answered in the terminal, and
+    the subagent's entry and buttons stay. A notice 6 s after that end is dropped while the subagent's entry is open (§4.2: an unsure end clears the last sure end and overrides no open entry, m-489f14e45136), and pushed with nothing else open.
+  - A main-thread `AskUserQuestion` over a main-thread waiter keyed by its call ends that waiter and goes on
+    top as a question.
+  - A notice 6 s after a `Stop` ended a main-thread waiter is dropped; one 6 s after a fall-through
+    question's `SubagentStop` is dropped.
+  - A first push over a screen-road `needs-you` sets `kept` to it and pops `_hook_state`; the emptied stack
+    restores it at `scraped`, and the next tick keeps it while its rule still matches the tail and sets `idle`
+    (`tick`) when it no longer does.
+  - A record saved with a `hook` `pending` and no `pendings` reads, after the startup sweep, one question
+    entry over `kept` `idle` (`tick`); a saved screen-road `pending` is left as it was.
+  - A notice 6 s after the last prompt's end by an Allow, a Deny, or the asked call's own event is dropped;
+    one 11 s after is pushed.
+  - A main-thread Allow with a subagent's entry left writes `working` into `kept`, and the record reads the
+    subagent's entry.
+  - A screen rule matching the pane while `pendings` is open writes nothing.
+  - A main-thread permission answered in the dialog, then the turn's `Stop`, leaves the record `idle` (its own
+    state), not `kept`'s earlier `working`.
+  - A `kept` of `stalled?` (`tick`) comes back with `tick` confidence.
+  - With nothing open, a `Stop` sets the record `idle` and `kept` stays None.
+  - A second main-thread question replaces the first's entry.
+  - After the fall-through, the subagent's `PreToolUse` for another call (a pane **Deny**) ends the question.
+  - With a main-thread question on top of a subagent's permission, the card draws both lines, and `ao allow
+    <id>` answers the permission.
+  - `exited` drops `kept` as well as `pendings`.
+- **Reading tests.**
+  - A rule-answered subagent prompt's *Answered for you* names the subagent, and a node's `answered_by_rule`
+    request carries `subagent_name`.
+  - `ao status` and `ao explain` print the subagent's name.
+  - An idle record held by a subagent's prompt is rung when it restores to `idle` with mail unread (§4.10).
+  - A `permission_prompt` notice within `NOTICE_LAG` of an Allow pushes nothing.
+  - **Call matching.**
+    - `Pre A, Pre B, Permission(sig B)` keys B.
+    - `Pre A, Post A, Pre A', Permission(sig A)` keys A', since A finished.
+  - **The notice.** The fall-through's `permission_prompt` notice pushes no second entry. With nothing open,
+    it is pushed as a question.
+- **Restart and send tests.**
+  - A record saved with a pending permission and no waiter reads the question form after a host-agent
+    start.
+  - A send to a `pane_held` record is refused with its words.
+- **Page tests.** The card, the Inbox row and Focus draw the held line with the deadline, and the
+  fall-through's line with **Focus**. The team facet (`answer_blocks`) draws two blocks for a member with two entries, and the Inbox row draws the
+  newest.
+- **Live check.** On a scratch home, a background subagent's permission shows a *Needs you* that names the
+  subagent and says the pane will not show the prompt. `probe.py --mode background` in the captured directory
+  drives one.
+
+**Related:** TD-947, TD-629 (a waiter ended by another call's event), TD-734 (subagent events), TD-201.
+
+---
+
+**Resolved:** 2026-10-22 (grinder-ao-2) — built in #2261, #2262, #2263, #2265, #2267 and #2268, with TD-960's fix in #2276. The live check holds, read on a scratch home with #2276 live (b0a4184), using `probe.py --mode background` (Claude Code on the `conformance` profile, `permission_wait: 90`). From 6 s to the fall-through at about 96 s, the record reads `needs-you` with a `permission` pending: *Bash: touch probe-subagent.txt*, with `subagent_name` *general-purpose*, `pane_held: true` and its deadline. The pane at 20 s and 45 s draws nothing but *Waiting for 1 background agent to finish*. At the fall-through the entry takes the question form (`pane_held: false`, no deadline) as the pane draws the tool's dialog. The answer ends it (`idle` at 112 s), and the subagent's own `SubagentStop` takes `subagents` from 1 to 0 at 114 s. A stray `PreToolUse` from an id no `SubagentStart` named (`a538…`) ended nothing. The stray `SubagentStop` of the first reading did not recur in this run; TD-960's tests (#2276) hold that case.
+
+---
+
+## TD-954: #2253's two new `ao explain` reasons for a title adapter's screen rule have no test: reverting either branch leaves the suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`rpc_explain` ~L2553, the reasons ~L2587); `tests/test_gemini_title.py`
+
+**Why:** Found auditing the tests of #2253 (TD-944 slice 2). `rpc_explain` gained two reasons — `rule X matched, but a hook reported within a tick — the hook state wins` and `rule X matched, but the usage poll's limited stands — its reading kept` — beside the existing `applied as scraped; held for its screen`. Probe: in `src/sessionorc/agent.py` `rpc_explain`, replace `if self._hook_within(s, adapter, now):` with `if False:`, and separately `elif s.state == m.state == "limited" and s.confidence == "hook":` with `elif False:`; `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gemini_title.py tests/test_screen_road.py tests/test_screen.py tests/test_read_when.py` passes (all green) both times (those four files only; the whole suite was not run). `grep -rn "limited stands\|hook reported within" tests` finds nothing; the one explain test (`test_explain_on_a_live_record_at_the_box_gives_the_rules_reason`) asserts only the third reason. `ao explain` is the operator's check on a wrong state, so a reason that names the wrong rule misleads exactly there.
+
+**Fix:** In `tests/test_gemini_title.py`'s explain test (or a sibling), explain a record at the box with a hook within a tick (`_last_hook` now) and assert the `hook state wins` reason, and one holding the poll's `limited` at `confidence: hook` and assert `the usage poll's limited stands`. Confirm each fails with its branch reverted.
+
+**Done when** reverting either branch fails a test.
+
+**Resolved:** 2026-10-22 (grinder-ao-1, PR #2278) — `test_explain_on_a_live_record_at_the_box_gives_the_rules_reason` (`tests/test_gemini_title.py`) explains the record at the Gemini usage box with a hook within a tick and with the poll's `limited` at `confidence: hook`, asserting each reason; replacing either branch with `False` fails it.
+
+---
+
+## TD-961: #2276's two resets of `subagent_ids` (a fresh conversation, a process exit) have no test: removing either leaves the whole suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_apply_subagents`, the `subagents_reset` branch); `src/sessionorc/models.py` (`set_state`, the exit branch); `tests/test_claude_adapter.py`
+
+**Why:** Found auditing the tests of #2276 (TD-960). The PR adds `s.subagent_ids = []` where a `subagents_reset` event clears the count, and where `set_state` clears it on a process's exit. Probe: delete either line (both together too) and run the whole suite (`PYTHONPATH=$PWD/src:<scratch registering gemini> pdm run pytest -q tests`, with the node-mode and cursor probes of TD-963 also applied: 3973 passed, 2 skipped); `tests/test_claude_adapter.py` alone passes with each removed on its own. `grep -rn subagent_ids tests` finds only the two TD-960 tests, which never reset. Effect: after a `/clear` or `resume`, or a restart of the process, a stale id stays in the list, and a new subagent that reuses it is not counted (`if sub not in s.subagent_ids`), so `subagents` reads 0 while it runs.
+
+**Fix:** two tests in `tests/test_claude_adapter.py`: start a subagent (id `a1`), send a `subagents_reset` event (a resume's), then a `SubagentStart` for `a1` again and assert `subagents == 1`; and the same across `set_state` to an exited state, asserting `subagent_ids == []`. Confirm each fails with its line removed.
+
+**Done when** removing either reset line fails a test.
+
+**Resolved:** 2026-10-22 (grinder-ao-2, PR #2281) — `test_a_fresh_conversation_forgets_the_subagent_ids` and `test_a_process_exit_forgets_the_subagent_ids` (`tests/test_claude_adapter.py`): a reused id after a `subagents_reset` is counted again, and an exit clears `subagent_ids`; removing either reset line fails one of them.
+
+---
