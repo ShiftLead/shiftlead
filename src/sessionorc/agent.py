@@ -2575,9 +2575,12 @@ class HostAgent(
             m = explain(tail, title=title)
             out["title"], out["match"] = title, m.to_dict() if m else None
             if m is not None and not m.title:  # the adapter's manifest, asked first (§4.3)
-                out["reason"] = (
-                    f"rule {m.rule} matched — a title adapter's screen rule is not applied by the tick yet (TD-944)"
-                )
+                if self._hook_within(s, adapter, now):
+                    out["reason"] = f"rule {m.rule} matched, but a hook reported within a tick — the hook state wins"
+                elif s.state == m.state == "limited" and s.confidence == "hook":
+                    out["reason"] = f"rule {m.rule} matched, but the usage poll's limited stands — its reading kept"
+                else:
+                    out["reason"] = f"rule {m.rule} matched, applied as scraped; held for its screen"
             else:
                 out["reason"] = self._title_reading(s, m, now)[1]
             return out

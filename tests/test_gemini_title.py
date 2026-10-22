@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from conftest import wait_for
 
-from sessionorc import adapters, agent_tick
+from sessionorc import adapters, agent_common, agent_tick
 from sessionorc.client import LocalClient
 from sessionorc.models import Pending, Session, now_iso
 from sessionorc.screen import Match, painted_text
@@ -108,7 +108,8 @@ async def test_explains_reason_is_the_ticks_own_rule(agent, gem, tmp_path):
     assert "stands" in why(_rec(tmp_path, state="exited"), READY)[1]
     assert "no event" in why(_rec(tmp_path), WORKING)[1]
     assert "does not end a stall" in why(_rec(tmp_path, state="stalled?", confidence="tick"), WORKING)[1]
-    assert "not compared" in why(_rec(tmp_path, state="idle", confidence="scraped"), WORKING)[1]
+    assert "not compared" in why(_rec(tmp_path, state="idle", confidence="tick"), WORKING)[1]
+    assert "taken as the tool's own word" in why(_rec(tmp_path, state="idle", confidence="scraped"), READY)[1]
     m, reason = why(_rec(tmp_path), READY)
     assert m.state == "idle" and "confidence: title" in reason
     agent._last_hook["ao-x-g"] = now
@@ -126,8 +127,8 @@ async def test_the_ticks_own_readings_stand_but_a_stall_ends_when_the_tool_moves
     assert _look(agent, s, READY).state == "idle" and s.confidence == "title"
     s = _look(agent, _rec(tmp_path, state="stalled?", confidence="tick"), ACTION)
     assert s.state == "needs-you" and s.pending.text == agent_tick.TITLE_SHELL_WAITS
-    # a scraped state is no hook's word: the title is not compared with it
-    assert _look(agent, _rec(tmp_path, state="idle", confidence="scraped"), WORKING).state == "idle"
+    # a scraped state with no rule's screen up is the fallback: the title is compared with it (TD-944)
+    assert _look(agent, _rec(tmp_path, state="idle", confidence="scraped"), WORKING).state == "working"
 
 
 async def test_an_equal_verdict_falls_through_to_the_stall_check(agent, gem, tmp_path):
@@ -140,21 +141,24 @@ async def test_an_equal_verdict_falls_through_to_the_stall_check(agent, gem, tmp
     assert _look(agent, s, WORKING).state == "stalled?" and s.confidence == "tick"
 
 
-async def test_a_title_adapters_screen_rule_is_never_read(agent, gem, tmp_path, monkeypatch):
-    # A title adapter whose `explain` also answers a bare tail: a title that says nothing leaves the
-    # record as it stands, rather than falling through to the screen rule (TD-844)
+async def test_a_title_adapters_bare_tail_answer_is_its_screen_rule(agent, gem, tmp_path, monkeypatch):
+    # A title adapter's `explain` asked without a title answers from its manifest (§4.3 *The limit dialog
+    # is read off the screen*, TD-944): that verdict takes the screen road; a title that says nothing and
+    # a tail no rule matches leave the record as it stands (TD-844)
     title_explain = gem.explain
 
     def explain(tail, title=None):
-        if title is None:  # the screen rule's call: the tail alone
+        if title is None and tail == ["Allow?"]:  # the screen rule's call: the tail alone
             return Match(rule="tail", state="needs-you", evidence=tail, pending=Pending(kind="question", text="?"))
         return title_explain(tail, title=title)
 
     monkeypatch.setattr(gem, "explain", explain)
     s = _rec(tmp_path, state="working")
     s.tail = ["Allow?"]
-    assert agent._screen_verdict(s, gem, datetime.now(UTC)) is None
-    assert _look(agent, s, "kmaster: ~/src", hook_age=None).state == "working"
+    agent._last_hook[s.id] = datetime.now(UTC) - timedelta(seconds=60)
+    assert agent._screen_verdict(s, gem, datetime.now(UTC)).rule == "tail"
+    assert _look(agent, _rec(tmp_path, state="working"), "kmaster: ~/src").state == "working"
+    s = _look(agent, _rec(tmp_path, state="working"), "kmaster: ~/src")
     assert s.confidence == "hook" and s.pending is None
 
 
@@ -225,10 +229,97 @@ def test_the_limit_box_reads_limited_over_the_titles_working():
     assert ad.explain(prose, title=WORKING).rule == "title ✦"
 
 
-async def test_the_tick_does_not_read_the_box_as_the_title(agent, gem, tmp_path):
-    """Until the screen road takes a title adapter's rule, the box's verdict is never written as the title's."""
-    s = _rec(tmp_path, state="working")
+def _box(agent, s: Session, title: str, hook_age: float | None = 60.0, tail: list[str] = BOX) -> Session:
     now = datetime.now(UTC)
-    agent._last_hook[s.id] = now - timedelta(seconds=60)
-    agent._observe(s, PaneInfo(s.id, 0, "node", 1, dead=False, dead_status=None, title=WORKING), BOX, now)
+    if hook_age is None:
+        agent._last_hook.pop(s.id, None)
+    else:
+        agent._last_hook[s.id] = now - timedelta(seconds=hook_age)
+    agent._observe(s, PaneInfo(s.id, 0, "node", 1, dead=False, dead_status=None, title=title), tail, now)
+    return s
+
+
+LIMIT = Pending(kind="limit", text="Gemini's usage limit reached — answer its dialog in the terminal")
+
+
+async def test_the_box_takes_the_screen_road_and_the_title_takes_over_once_it_goes(agent, gem, tmp_path):
+    """TD-944 slice 2: the box over `✦` reads `limited` (`scraped`) and keeps the `working` it replaced;
+    gone, the kept state comes back on the next tick and the title's verdict on the one after."""
+    s = _box(agent, _rec(tmp_path, state="working"), WORKING)
+    assert (s.state, s.confidence, s.pending) == ("limited", "scraped", LIMIT)
+    assert agent._hook_state[s.id] == ("working", None, "hook")
+    assert _box(agent, s, WORKING).state == "limited"  # the title is never compared while the box is up
+    assert _look(agent, s, READY).state == "working" and s.confidence == "hook"  # *Stop*: what it replaced
+    assert _look(agent, s, READY).state == "idle" and s.confidence == "title"
+    # a hook two minutes old does not keep a cleared box's `limited` (the stall window would, for 20)
+    s = _box(agent, _rec(tmp_path, state="working"), WORKING, hook_age=120.0)
+    assert _look(agent, s, WORKING, hook_age=120.0).state == "working" and s.confidence == "hook"
+    # a hook within the tick still outranks the box
+    s = _box(agent, _rec(tmp_path, state="working"), WORKING, hook_age=0.0)
     assert (s.state, s.confidence) == ("working", "hook")
+
+
+async def test_the_box_over_a_titles_state_restores_it_as_the_titles(agent, gem, tmp_path):
+    s = _box(agent, _rec(tmp_path, state="idle", confidence="title"), READY)
+    assert (s.state, s.confidence) == ("limited", "scraped")  # a told state is replaced either way
+    assert _look(agent, s, READY).state == "idle" and s.confidence == "title"
+    assert _look(agent, s, WORKING).state == "working" and s.confidence == "title"  # compared with it
+
+
+async def test_the_box_over_the_polls_limited_keeps_the_polls_reading(agent, gem, tmp_path):
+    cap = Pending(kind="limit", text="weekly limit — resets Fri 09:00")
+    s = _box(agent, _rec(tmp_path, state="limited", pending=cap), WORKING)
+    assert (s.state, s.confidence, s.pending) == ("limited", "hook", cap) and s.id not in agent._hook_state
+
+
+async def test_the_usage_poll_never_lifts_the_boxs_limited(agent, gem, tmp_path):
+    """A poll with no reading (an API-key home) lifted every kind-`limit` record; a modal rule's stands
+    while its box is up, and once the box is gone a lift goes back to what the verdict replaced."""
+    s = _box(agent, _rec(tmp_path, state="working"), WORKING)
+    agent._usage_limits([s], set())
+    assert (s.state, s.confidence, s.pending) == ("limited", "scraped", LIMIT)
+    assert agent_common.limit_is_modal(s, gem) and not agent_common.limit_is_modal(None, gem)
+    s.tail = []  # the box gone between two ticks: the poll's lift restores the kept `working`
+    assert not agent_common.limit_is_modal(s, gem)
+    agent._usage_limits([s], set())
+    assert (s.state, s.confidence) == ("working", "hook") and s.id not in agent._hook_state
+    # nothing kept (a host-agent restart): the no-saved fallback, the title's to overrule
+    s = _box(agent, _rec(tmp_path, state="working"), WORKING)
+    agent._hook_state.pop(s.id)
+    s.tail = []
+    agent._usage_limits([s], set())
+    assert (s.state, s.confidence) == ("idle", "scraped")
+    assert _look(agent, s, WORKING).state == "working" and s.confidence == "title"
+
+
+async def test_the_no_saved_fallback_is_the_titles_to_overrule(agent, gem, tmp_path):
+    """A `scraped` `idle` with nothing kept and no box up is compared as a told state: an equal verdict is
+    taken as the tool's own word, `since` and `rev` unchanged."""
+    s = _rec(tmp_path, state="idle", confidence="scraped")
+    since, rev = s.since, s.rev
+    assert _look(agent, s, READY).state == "idle" and s.confidence == "title"
+    assert (s.since, s.rev) == (since, rev)
+    s = _look(agent, _rec(tmp_path, state="idle", confidence="scraped"), WORKING)
+    assert (s.state, s.confidence) == ("working", "title")
+
+
+async def test_explain_on_a_live_record_at_the_box_gives_the_rules_reason(agent, hookstub, tmp_path, monkeypatch):
+    ad = GeminiAdapter(binary="gemini")
+    monkeypatch.setattr(type(hookstub), "state_in_title", True, raising=False)
+    monkeypatch.setattr(type(hookstub), "explain", lambda self, tail, title="": ad.explain(tail, title=title))
+    fixture = Path(__file__).parent / "conformance" / "fixtures" / "gemini" / "captured" / "panes" / "6-a-doorbell.txt"
+    async with LocalClient() as c:
+        s = await c.call("create", name="box", dir=str(tmp_path), adapter="hookstub")
+        await c.call("hook", session=s["id"], state="working")
+        agent.tmux.send_prompt(s["id"], f"clear; cat {fixture}")
+
+        async def limited():
+            return (await c.call("get", id=s["id"]))["state"] == "limited"
+
+        assert await wait_for(limited)
+        x = await c.call("get", id=s["id"])
+        assert x["confidence"] == "scraped" and x["pending"]["kind"] == "limit"
+        ex = await c.call("explain", id=s["id"])
+        assert ex["match"]["rule"] == "gemini-usage-limit" and ex["match"]["modal"] is True
+        assert ex["reason"] == "rule gemini-usage-limit matched, applied as scraped; held for its screen"
+        await c.call("kill", id=s["id"])

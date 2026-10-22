@@ -4124,7 +4124,7 @@ class TickMixin:
     def _usage_limits(self, live: list[Session], metered: set[str]) -> None:
         """The `limited` rule over the readings `_usage` holds (§4.2), for the poll and for a report
         between polls alike (TD-233 slice 2): a session's cap is marked when it is read, not on the
-        next poll."""
+        next poll. A `limited` a modal screen rule set is never lifted: only its screen ends it (§4.3)."""
         for s in live:
             cap = None if s.profile in metered else _cap(self._usage.get(s.profile))
             if cap and s.state not in ("limited", "needs-you"):
@@ -4133,8 +4133,20 @@ class TickMixin:
                 s.set_state("limited", confidence="hook", pending=Pending(kind="limit", text=cap))
                 self.store.save(s)
             elif not cap and s.state == "limited" and s.pending and s.pending.kind == "limit":
-                # back to what it was (idle stays idle: no hook will come to correct a wrong `working`)
-                s.set_state(self._pre_limited.pop(s.id, "working"), confidence="hook")
+                if agent_common.limit_is_modal(s, adapters.get(s.adapter)):
+                    continue  # the record's own tail is the authority: a restart forgets nothing
+                if s.confidence == "scraped":
+                    # a screen rule's `limited` goes back to what the verdict replaced, as `_screen_gone` does
+                    saved = self._hook_state.pop(s.id, None)
+                    if saved is None or saved[0] != "limited":
+                        self._pre_limited.pop(s.id, None)  # no poll's mark comes back with it: spent
+                    if saved is None or (saved[2] == "hook" and s.id not in self._last_hook):
+                        s.set_state("idle", confidence="scraped")
+                    else:
+                        s.set_state(saved[0], confidence=saved[2], pending=saved[1])
+                else:
+                    # back to what it was (idle stays idle: no hook will come to correct a wrong `working`)
+                    s.set_state(self._pre_limited.pop(s.id, "working"), confidence="hook")
                 self.store.save(s)
 
     def _usage_only_due(self, key: str, profs: list[str], whole: dict[str, Any]) -> bool:
@@ -4369,11 +4381,11 @@ class TickMixin:
             st = adapter.classify(pane, tail)
             if st and st != s.state:
                 s.set_state(st, confidence="scraped")
-        elif self._title_verdict(s, adapter, pane, now):
-            pass  # the tool's own title replaced the record's state (§4.2 *A title the tool writes its state into*)
         elif (m := self._screen_verdict(s, adapter, now)) is not None:
             # Hook-fed adapter, screen rule fired, no fresher hook state: the labelled fallback
-            if m.state != s.state or (m.pending and m.pending != s.pending):
+            if s.state == m.state == "limited" and s.confidence == "hook":
+                pass  # the poll's `limited` keeps its reset, pending and confidence (§4.3, TD-944)
+            elif m.state != s.state or (m.pending and m.pending != s.pending):
                 if not self._screen_held(s):  # what the verdict replaces, unless it is a verdict itself
                     self._hook_state[s.id] = (s.state, s.pending, s.confidence)
                 s.set_state(m.state, confidence="scraped", pending=m.pending)
@@ -4386,6 +4398,8 @@ class TickMixin:
                 s.set_state("idle", confidence="scraped")  # the launch's assumption is no hook's word
             else:
                 s.set_state(saved[0], confidence=saved[2], pending=saved[1])
+        elif self._title_verdict(s, adapter, pane, now):
+            pass  # the tool's own title replaced the record's state (§4.2 *A title the tool writes its state into*)
         elif s.state == "working" and s.last_output and now - _parse(s.last_output) > STALL_AFTER:
             # Hook-fed adapters: the liveness cross-check applies to `working` alone — a
             # `needs-you` or `idle` session is silent by design.
@@ -4396,12 +4410,22 @@ class TickMixin:
         last = self._last_hook.get(sid)
         return last is not None and now - last <= STALL_AFTER
 
+    def _hook_within(self, s: Session, adapter: Any, now: datetime) -> bool:
+        """Whether a hook is fresh enough that the screen yields to it: the stall window, or for a title
+        adapter one tick, as `_title_reading` reads it — a working Gemini fires hooks, so the stall
+        window would hold its screen rule's verdict off, and a cleared box's, for minutes (§4.3, TD-944)."""
+        if not getattr(adapter, "state_in_title", False):
+            return self._hook_fresh(s.id, now)
+        last = self._last_hook.get(s.id)
+        return last is not None and now - last <= timedelta(seconds=agent_common.TICK_SECONDS)
+
     def _screen_verdict(self, s: Session, adapter: Any, now: datetime) -> Any:
         """The adapter's screen-rule match for the session's tail, or None when there is no rule
-        set, nothing matched, or a hook state is fresher (design §4.2: scraped never outranks it)."""
+        set, nothing matched, or a hook state is fresher (design §4.2: scraped never outranks it).
+        A title adapter is asked without its title, so its manifest alone answers (§4.3)."""
         explain = getattr(adapter, "explain", None)
-        if explain is None or getattr(adapter, "state_in_title", False) or self._hook_fresh(s.id, now):
-            return None  # a title adapter's rule is the title's, read by `_title_verdict`
+        if explain is None or self._hook_within(s, adapter, now):
+            return None
         return explain(s.tail)
 
     def _title_verdict(self, s: Session, adapter: Any, pane: PaneInfo, now: datetime) -> bool:
@@ -4441,12 +4465,17 @@ class TickMixin:
             return None, f"title {m.state}, but a hook reported within a tick — the hook state wins"
         if s.state in ("exited", "closed"):
             return None, f"title {m.state}, but {s.state} stands"
+        # a scraped record the title reaches holds no rule's verdict: `explain` asks the manifest first,
+        # so its screen is gone and nothing was saved to restore (§4.3, TD-944) — compared as told
+        fallback = s.confidence == "scraped" and m.title
         if m.state == s.state:
+            if fallback:  # the same state, now the tool's own word: `since` and `rev` stand
+                return m, f"title {m.state}, as the record reads — taken as the tool's own word (confidence: title)"
             return None, f"title {m.state}, as the record reads — no event"
         if s.state == "stalled?":
             if m.state == "working":
                 return None, "title working, which does not end a stall"
-        elif not s.told:
+        elif not s.told and not fallback:
             return None, f"title {m.state}, but the record's {s.state} is no hook's word — not compared"
         return m, f"title {m.state}, read as the tool's own word (confidence: title)"
 
@@ -4458,9 +4487,14 @@ class TickMixin:
 
     def _screen_gone(self, s: Session, adapter: Any, now: datetime) -> bool:
         """Whether a hook-fed record holds a screen rule's verdict that its screen no longer shows:
-        no hook is fresher and no rule matches the tail (`_screen_verdict` was None)."""
-        has_rules = getattr(adapter, "explain", None) is not None
-        return self._screen_held(s) and has_rules and not self._hook_fresh(s.id, now)
+        no hook is fresher and no rule matches the tail. An `idle` with nothing saved has nothing to
+        restore, so it is not gone: the title (a title adapter's) overrules it instead (§4.3, TD-944)."""
+        explain = getattr(adapter, "explain", None)
+        if explain is None or not self._screen_held(s) or self._hook_within(s, adapter, now):
+            return False
+        if s.id not in self._hook_state and s.state == "idle":
+            return False
+        return explain(s.tail) is None
 
     def _apply_event(self, sid: str, event: dict[str, Any], queued: bool = False) -> None:
         """A hook-fed state transition (design §4.2 table). Adapters map hook names to these.
