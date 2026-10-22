@@ -72,6 +72,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
+| TD-966 | `ao td next` becomes a front end over dev-cadence's ledger-id counter on origin: one counter, with or without the home | High | Open — design-first, waits on dev-cadence#TD-124 |
 
 ---
 
@@ -1425,3 +1426,23 @@ builds are in the ledger.
 
 **Related:** TD-786, TD-112.
 
+---
+
+## TD-966: `ao td next` and the home's `ids.json` become a front end over dev-cadence's ledger-id counter on origin, so there is one counter whether or not the home runs
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-22 (Paul, in the td-156 session, after its PR #2240 collided twice: TD-942 was the home's to designer-ao-1 and merged first by #2238; the hand renumber to TD-951 took an id the home had given grinder-ao-1. Paul: *we do want it to work without shiftlead running*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — waits on dev-cadence's design of the counter.
+**Blocked by:** dev-cadence#TD-124
+**Location:** design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries* (`ao td next`); `src/sessionorc/` (the `td_next` RPC, `ids.json`), `src/shiftlead/cli.py` (`cmd_td_next`)
+
+**Why:** the home hands ids out under a lock (TD-693/696), but only to a session that asks it. Every session that cannot ask (a cloud session, another machine, a repo with no home) and every session that follows cadence §2.10's hand rule instead (TD-949 and TD-954–956 on 2026-10-22, none in `ids.json`, and #2240's own TD-942 and TD-948) numbers around it, and the home's record of what it gave is invisible to them until a PR is pushed. dev-cadence#TD-124 puts the counter on origin as a git ref that every session can advance, with or without a home. If the home keeps its own `ids.json` beside it, there are two counters that can disagree.
+
+**Fix:** design first, once dev-cadence#TD-124's design is agreed: (1) §4.4 rewritten so the home's `td_next` takes its ids from the counter on origin (the synced script or the same push), keeping what the home adds on top: the one lock per repo so its own callers do not race each other's retries, `by` as the envelope's verified caller, the 45-second budget, and the *open PRs not read* line; (2) `ids.json`: retired, or kept only for what the counter does not carry (`--held`, TD-731), and its `last` folded into the counter's first value so no id it gave is handed out again; (3) the build entries named, with `Blocked by` lines.
+
+**Done when** a session with no home running and a session asking `ao td next` take ids at the same moment and get different ones, and §4.4 says where the one counter lives.
+
+**Related:** dev-cadence#TD-124 (the counter, the §2.10 rewrite and the cadence-check row), TD-693 / TD-696 (the home's allocator), TD-731 (`--held`), TD-964 (whose PR collided).
