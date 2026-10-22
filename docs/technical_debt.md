@@ -74,6 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Designed — the pending names its subagent and says the pane is held; the waiter is the asker's; builds TD-950 |
 | TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Built (#2261–#2268) — live check |
 | TD-955 | #2254's modal-limit `read_when` is untested for a handed entry and for the Reply composer's refill line | Low | Open |
+| TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 
 ---
 
@@ -980,7 +981,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-16 (TD-112's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — slice 1, the reads (`transcript_path`, `read_transcript`, `context`, `model_in_use`, `links`, `spend`), in #2266; slice 2, start context, mail and the repo's start hooks (the layer's `SessionStart` timeout raised, so the installed layer reads *stale* until reinstalled), in #2269; slice 3, `background` (the relaunched `node`'s shell wrappers, a fixture captured from 0.64.0), in #2271; `usage` and the live walk are left.
+**Status:** Open — slice 1, the reads (`transcript_path`, `read_transcript`, `context`, `model_in_use`, `links`, `spend`), in #2266; slice 2, start context, mail and the repo's start hooks (the layer's `SessionStart` timeout raised, so the installed layer reads *stale* until reinstalled), in #2269; slice 3, `background` (the relaunched `node`'s shell wrappers, a fixture captured from 0.64.0), in #2271; `usage` moved to TD-959 (it reads the person's Google token); the live walk is left, on the Gemini CLI version Paul picks (ask m-cd1f21682bb1: the tool updated itself to 0.65.0 during slice 3's probe).
+**Blocked by:** decision (paul) — keep Gemini CLI 0.65.0 or restore 0.64.0 (ask m-cd1f21682bb1)
 **Location:** design §4.3 *The second adapter: Gemini CLI*; `src/shiftlead/adapters/gemini/` (a `transcript.py`); `tests/conformance/fixtures/gemini/`
 
 **Why:** TD-112, slice 3: what the pages and the policies read from a session, so a Gemini session's card, transcript page and rule 5 (the context bound) works as a Claude Code one's does.
@@ -1662,3 +1664,22 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Fix:** Add to the Gemini box test (or `test_handed_entry.py`) a handed entry to the record at the box asserting the modal sentence in the handed reply's `read_when`, and `view['read_when']['refill']` starting with it. Confirm each fails with its argument removed.
 
 **Done when** removing `modal_limit=` from either site fails a test.
+
+## TD-959: A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-22 (grinder-ao-1, from TD-786)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — split from TD-786 at its slice 3 (#2271).
+**Blocked by:** decision (paul) — whether shiftlead may decrypt the tool's credential file and call Google with the person's token (ask m-0bc2ef3a6645)
+**Location:** design §4.3 *The second adapter: Gemini CLI* (`usage`); `src/shiftlead/adapters/gemini/__init__.py`
+
+**Why:** design §4.3 says a Google-login home's `usage` is the quota endpoint, so the card's chip and `limited` work as Claude Code's do. Gemini CLI 0.64.0 keeps that home's OAuth token in `.gemini/gemini-credentials.json`, which is encrypted by the tool's file store (`GEMINI_FORCE_FILE_STORAGE`), not JSON; the quota (`retrieveUserQuota`, per-model `buckets` of `remainingFraction` and `resetTime`) is held only in the tool's memory (`lastRetrievedQuota`), never on disk. So the read decrypts the person's token, refreshes it with the tool's OAuth client, asks `loadCodeAssist` for the project, and calls Google — the person's credentials and the network, which an unattended grinder does not take on unasked.
+
+**Fix:** on *Build it*: `usage_for(profile)` / `usage(profile)` as Claude Code's (reasons `metered`, `no_credentials`, `rate_limited`, `error`): an API-key home (`selectedType: gemini-api-key`) reports `no_credentials` and draws no chip; a Google-login home decrypts the file as the tool does, refreshes, calls `loadCodeAssist` then `retrieveUserQuota`, and maps each bucket with a `modelId` to a window labelled by the model, `pct` = 100 − 100·`remainingFraction`, `resets` = `resetTime`. A response captured on a signed-in home is the parse test's fixture. On *Leave Gemini without a chip*: the design's `usage` line says None for every home, and this entry archives.
+
+**Done when** a Google-login Gemini profile's card shows its chip, or the design says it has none.
+
+**Related:** TD-786, TD-112.
