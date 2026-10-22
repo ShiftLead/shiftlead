@@ -43,7 +43,7 @@
   {%- endmacro %}
   <div class="facet fface{% if m.face == 'answer' %} answering{% endif %}">
     <div class="fv" data-fv="answer"{% if m.face != 'answer' %} hidden{% endif %}>
-      <div class="fhead"><span class="kind">Answer needed ({{ m.answers | length }})</span><span class="grow"></span>
+      <div class="fhead"><span class="kind">Answer needed ({{ m.n_answer }})</span><span class="grow"></span>
         <span class="seg" data-pick="face"><button type="button" data-v="answer">answer</button><button type="button" data-v="doing">doing</button></span></div>
       {{ asked_line(m.asked) }}
       {% for a in m.answers %}
@@ -51,7 +51,7 @@
         <div><a class="name" href="/focus/{{ a.id }}">{{ a.name }}</a> <span class="meta">{{ a.kind }}{% if a.deadline %} · <span class="countdown" data-deadline="{{ a.deadline }}"></span>{% endif %}</span></div>
         <div class="mono atext" title="{{ a.text }}">{{ a.text }}</div>
         {% if a.held %}{% from "held_line.html" import held_line %}{{ held_line(a.held) }}{% endif %}
-        {% if a.kind == 'permission' %}<div class="row gap"><button class="btn sm primary" data-act="allow" data-id="{{ a.id }}">Allow</button><button class="btn sm next" data-act="deny" data-id="{{ a.id }}">Deny</button><input class="denywhy" type="text" maxlength="200" data-id="{{ a.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"></div>
+        {% if a.kind == 'permission' %}<div class="row gap"><button class="btn sm primary" data-act="allow" data-id="{{ a.id }}" data-call="{{ a.call }}">Allow</button><button class="btn sm next" data-act="deny" data-id="{{ a.id }}" data-call="{{ a.call }}">Deny</button><input class="denywhy" type="text" maxlength="200" data-id="{{ a.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"></div>
         {% else %}<div><a class="btn sm next" href="/focus/{{ a.id }}">▣ Focus</a> <span class="meta">answered in the terminal</span></div>{% endif %}
       </div>
       {% else %}

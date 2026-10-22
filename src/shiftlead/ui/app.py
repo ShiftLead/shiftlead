@@ -37,6 +37,7 @@ from sessionorc.models import (
     GRANTS,
     PERSON,
     has_control,
+    permission_entry,
     start_note,
     stop_note,
 )
@@ -3090,10 +3091,11 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if action in ("allow", "deny"):
             s = await call("get", id=sid)
-            pend = s.get("pending") or {}
             if s.get("permission_channel") is False:  # §4.3 *Permissions: no channel* (TD-785)
                 raise HTTPException(409, "this tool has no permission channel: answer it in the terminal")
-            if pend.get("kind") != "permission" or not pend.get("tool_use_id"):
+            # the entry the pressed line names, else the newest permission entry (§4.2, TD-950)
+            pend = permission_entry(s, str(body.get("call") or "") or None)
+            if pend is None:
                 raise HTTPException(409, "no pending permission (answered, timed out, or in the terminal)")
             await call("decide", id=sid, tool_use_id=pend["tool_use_id"], behavior=action, reason=body.get("reason"))
         elif action == "kill":

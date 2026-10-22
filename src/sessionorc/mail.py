@@ -565,6 +565,14 @@ def orphan_standing(e: Mapping[str, Any], records: Iterable[Mapping[str, Any]], 
     return {"ref": ref, "repo": repo, "board": board, "holders": holders, "text": text}
 
 
+def _held_by_subagents(s: Session) -> bool:
+    """Whether only subagents' prompts are open over an idle main thread (§4.10 *When it is read*'s
+    `needs-you` row, TD-950): every entry of `pendings` a subagent's, and `kept` an `idle`."""
+    pends = getattr(s, "pendings", None) or []
+    kept = getattr(s, "kept", None)
+    return bool(pends) and all(p.subagent for p in pends) and isinstance(kept, dict) and kept.get("state") == "idle"
+
+
 def read_when(
     s: Session | None,
     kind: str,
@@ -636,6 +644,10 @@ def read_when(
     if state == "limited":
         cap = s.pending.text if s.pending and s.pending.text else "a usage cap"
         return f"lands and waits: its account is capped ({cap}), and it is rung after" + tail
+    if state == "needs-you" and _held_by_subagents(s):
+        # only a subagent's prompt holds an idle main thread (§4.2 *A subagent's dialog is held back*,
+        # TD-950): the stack's restore brings back the `idle` beneath it, which the doorbell rings
+        return "rung on the restore to idle, once the subagent's prompt ends" + tail
     if state == "needs-you":
         what = "question" if s.pending and s.pending.kind == "question" else "permission"
         return f"read once its {what} is answered and its turn ends" + tail
