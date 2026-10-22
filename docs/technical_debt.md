@@ -1559,7 +1559,8 @@ without it; a `<dir>` that is no worktree of a registered checkout, nor that che
 `profiles.yml` lacks prints that lack and exits 1, the same file unmerged; the teams at `<dir>` pair
 with the registered checkout's ledger reading under its name and path (a `Team` declaration on main
 that names a team only the branch defines reads clean, and a branch that drops a team the ledger still
-declares reads that lack; no *held only on a node* warning appears that the run without `--root` does not give); a directory outside every registered repo is
+declares reads that lack; a repo whose `org.yml` heading gives a path on this host reads the branch's
+briefs all the same; no *held only on a node* warning appears that the run without `--root` does not give); a directory outside every registered repo is
 refused with exit 2, and so is a directory that is not a git one; `--root` at the registered checkout
 itself reads as without it but for the header and the checkout-state warnings; the first line and `--json`'s `root` name the repo and
 `<dir>`; a test holds each. The recipe's paragraph says to run `ao org check --root <worktree>` before
