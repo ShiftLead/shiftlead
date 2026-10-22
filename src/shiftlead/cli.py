@@ -2599,6 +2599,8 @@ def cmd_pr(args: argparse.Namespace) -> int:
     a PR is held when the record has a `review` and one of its files is under `held:`."""
     from shiftlead import review as reviewmod
 
+    if args.action == "wait":
+        return _pr_wait(args)
     sid = _own_session(args)
     if sid is None:
         return 2
@@ -2659,6 +2661,69 @@ def cmd_pr(args: argparse.Namespace) -> int:
             print(out["repo_hold"])
 
     return emit(args, out, prose)
+
+
+def _pr_wait_root(args: argparse.Namespace) -> str | None:
+    """The checkout `ao pr wait` names to the home: the session's record's `repo` (`--id` another's),
+    else — a person at a terminal — the main checkout of the directory it runs in."""
+    if sid := getattr(args, "id", None) or os.environ.get("SHIFTLEAD_SESSION"):
+        return str(call_sync("get", id=sid).get("repo") or "") or None
+    try:
+        common = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True, timeout=10,
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    out = common.stdout.strip()
+    return str(pathlib.Path(out).parent) if common.returncode == 0 and out else None
+
+
+def _pr_wait(args: argparse.Namespace) -> int:
+    """`ao pr wait <n> [--timeout S] [--fresh]` (design §4.7, TD-940): block on the home's folded
+    reading of PR `n` until it leaves *pending*, print the word and exit by it — 0 green, 1 red, 2
+    conflicting, 3 none, 4 timeout, 5 refused (a number the reading does not hold, a checkout it
+    holds no reading of, a home that is down or predates the RPC) with the why. A call of its own
+    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake."""
+    from sessionorc import reports
+
+    gone = reports.PR_WAIT_EXIT["gone"]
+    try:
+        root = _pr_wait_root(args)
+    except AgentUnavailable as e:
+        return fail(args, str(e), gone)
+    if not root:
+        return fail(args, "no checkout to read: the record names no repo, and this directory is in none", gone)
+    try:
+        got = call_sync(
+            "pr_wait", root=root, pr=args.n, timeout=args.timeout, fresh=args.fresh, _timeout=args.timeout + 30.0
+        )
+    except AgentUnavailable as e:
+        return fail(args, str(e), gone)
+    except AgentError as e:
+        if str(e).startswith("unknown method"):
+            return fail(args, "the running host agent predates ao pr wait (TD-940): it waits for its promote", gone)
+        return fail(args, str(e), gone)
+    word = str(got.get("word") or "")
+    if word == "gone":
+        return fail(
+            args,
+            f"PR #{args.n} is not open in the home's reading of {root}: closed, merged, or another repo's",
+            gone,
+            **got,
+        )
+
+    def prose() -> None:
+        head = str(got.get("head") or "")[:7]
+        tail = f" on {head}" if head else ""
+        if word == "red" and got.get("failing"):
+            tail += ": " + ", ".join(got["failing"])
+        elif word == "timeout":
+            tail = f" after {args.timeout:g}s, still {got.get('checks') or 'unread'}" + (f" on {head}" if head else "")
+        print(f"PR #{args.n} {word}{tail}")
+
+    emit(args, got, prose)
+    return reports.PR_WAIT_EXIT.get(word, gone)
 
 
 def _link_state(row: dict[str, Any], walked: dict[str, Any]) -> str:
@@ -4848,10 +4913,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(fn=cmd_host)
 
-    p = add("pr", help="whether a PR waits for this session's reader (design §4.9b *The reader*)")
-    p.add_argument("action", choices=["held"])
+    p = add(
+        "pr",
+        help="held: whether a PR waits for this session's reader (design §4.9b *The reader*); "
+        "wait: block until its checks leave pending (§4.7)",
+    )
+    p.add_argument("action", choices=["held", "wait"])
     p.add_argument("n", type=int, metavar="N", help="the pull request's number")
     p.add_argument("--id", help="another session's record (default: this session's own)")
+    p.add_argument("--timeout", type=float, default=1800.0, help="wait: seconds before it gives up, exit 4 (1800)")
+    p.add_argument("--fresh", action="store_true", help="wait: have the home re-read the PRs, and count only that read")
     p.set_defaults(fn=cmd_pr)
 
     p = add("migrate", help="once, with no session running: move ~/.agentorc and the old units to shiftlead's names")
