@@ -73,7 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
-| TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Open — slices 1 (#2241) and 2 built; the procedure pair, the memory and the live check left |
+| TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Open — slices 1 (#2241) and 2 (#2244) built; the procedure pair, the memory and the live check left |
 | TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Open |
 | TD-942 | `ao org check --root <worktree>`: check a team definition on the branch it is written on, before it merges | Medium | Open |
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
@@ -1522,7 +1522,7 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — slice 1 built (#2241, grinder-ao-1): `ao pr wait <n>` on the GitHub reading, the
-`pr_wait` RPC, design §4.7. Slice 2 built (PR open, grinder-ao-1; scope steered with the techlead,
+`pr_wait` RPC, design §4.7. Slice 2 built (#2244, grinder-ao-1; scope steered with the techlead,
 m-eb7127cfc157): the reading per forge — a GitLab origin's open MRs with the head pipeline's fold,
 `conflicting` and `required` on the row, windows/`recent`/held unread there; another forge an error the
 wait refuses (5); §4.4's per-forge sentence. Left: (3) the pair in `docs/procedures/cadence.md`, a dev-cadence
