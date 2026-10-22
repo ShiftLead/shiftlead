@@ -2368,6 +2368,129 @@ def focus_git_pick():
 ''' + TAIL
 
 
+def summary_meta(text, title="", tone=""):
+    """A folded side card's value on its summary line (TD-964): what it holds, right-aligned, cut with …
+    before the heading ever shrinks for it. Colour only where it says something: `unread` blue as the
+    rail's Inbox glyph, `warn` amber for a failing check or an ask still waiting."""
+    t = f' title="{title}"' if title else ""
+    if tone == "unread":
+        return f'<span class="badge" style="background: #dbeafe; color: #1e40af; border-color: #dbeafe;"{t}>{text}</span>'
+    color = " color: #7c3d00;" if tone == "warn" else ""
+    return f'<span class="meta mono" style="font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;{color}"{t}>{text}</span>'
+
+
+def ending_card():
+    """The ending card (§4.5 *The Focus screen's anatomy* item 3, §4.5a *Focus: ending card*, TD-964),
+    full width where the pane was: one heading line that reads as a sentence — the money the only large
+    figure — then what each entry cost, bars scaled to the largest with the figures in one right-aligned
+    column, then *as of* and the Spend link. Quiet on purpose: the banner above is
+    the page's one loud thing."""
+    entries = (("TD-156", 18.20), ("TD-964", 14.90), ("TD-623", 4.10), ("between entries", 4.60))
+    top = max(f for _, f in entries)
+    erow = lambda ref, fig: (
+        f'<div style="display: grid; grid-template-columns: 140px 420px 80px; align-items: center; gap: 12px; font-size: 13px;">'
+        f'{f"<a href={chr(34)}#{chr(34)} class={chr(34)}mono{chr(34)}>{ref}</a>" if ref.startswith("TD-") else f"<span class={chr(34)}meta{chr(34)}>{ref}</span>"}'
+        f'<span style="height: 10px; width: {fig / top * 100:.0f}%; background: #1e40af; opacity: .45; border-radius: 2px;"></span>'
+        f'<span class="mono" style="text-align: right;">≈${fig:.2f}</span></div>')
+    side = lambda k, v, t="": (f'<div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 13px;"{f" title={chr(34)}{t}{chr(34)}" if t else ""}>'
+                               f'<span class="meta">{k}</span><span>{v}</span></div>')
+    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost: read when the ending was drawn; the last minute's turns may not be in yet, reload to read again — the Spend page has the live figures (design §4.5a, TD-964)">
+      <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
+        <span class="mono" style="font-size: 28px; font-weight: 500; line-height: 1;" title="API-equivalent at your weights: a subscription's turns, never a bill (design §4.4 Spend per seat)">≈$41.80</span>
+        <span style="font-size: 14px;">spent by dc-paul since Oct 19</span>
+        <span class="meta" title="input 0.9M · output 0.3M · cache read 10.6M · cache write 0.6M">12.4M tokens in 312 turns; this run 16:28 to 18:42 (2h 14m)</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 7px;">
+        <div style="font-size: 13px; font-weight: 600;">By entry</div>
+        {"".join(erow(*e) for e in entries)}
+      </div>
+      <div class="meta" style="font-size: 12px;">as of 18:43 · <a href="#">Open dc-paul in Spend</a></div>
+    </div>'''
+
+
+def focus_ended():
+    """A person's own session after **Close session** (TD-964, from Paul's screenshot of dc-paul,
+    2026-10-21): the banner is the page's one loud thing — how it ended, then the choices right after
+    the words, Resume first — with no guessed cause, since the record says the person closed it, and the
+    rest behind its i. The ending card fills the pane's place. The side panel folds, each with its value;
+    no Ready to close, since nothing is left to close."""
+    return head("Focus — ended") + f'''<div style="width: 1440px; min-height: 940px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Sessions")}
+<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <a href="#" class="muted">← Sessions</a>
+      <span class="mono" style="font-size: 15px; font-weight: 500;">dc-paul</span>
+      {pill("done")}
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      <span class="btn sm link">✉ Message</span><span class="btn sm link">{ICON["doc"]}Transcript</span><span class="btn sm link">‹› VS Code</span>
+    </div>
+    <div style="padding: 12px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #7c3d00; border-radius: 6px;" title="the ending banner (design §4.5a, TD-964)">
+      <span style="font-size: 15px; font-weight: 600; color: #7c3d00;">closed by you · 18:42</span>
+      <span style="display: flex; gap: 6px; flex-wrap: wrap;"><span class="btn sm primary">Resume</span><span class="btn sm">Resume with changes…</span><span class="btn sm">New session here</span><span class="btn sm ghost" title="forget the record: it, its report line and its mail go; the worktree, run log and conversation stay&#10;forgotten by itself a day after the close">Forget</span></span>
+      <span style="flex-grow: 1;"></span>
+      <span class="btn sm link" title="A closed record is forgotten by itself a day after the close; its run log and transcript stay readable until then. Resume starts it again under its own name, attended." style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>
+    </div>
+    {ending_card()}
+    <div class="note">Was: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> a dead terminal and a composer with nothing to type to; the composer is not drawn now. The cause's guess stays only where the record names none (a pane found gone, a close with no closer). dc-paul is Paul's interactive session in dc-grind and not supervised, so no Restart; a supervised member's banner adds <b>Restart</b> after Resume. The card is the session's own story: the day around it is the Spend page's, the windows the top bar's chip.</div>
+  </div>
+  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    {PUT_AWAY}
+    {side_card("Git", '<span class="mono muted" style="font-size: 12px;">dc-paul · 13 behind</span>', '<div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div>')}
+    {side_card("Reports", summary_meta("2 progress · 1 filed"), open_=False)}
+    {side_card("Inbox", summary_meta("6, all read"), open_=False)}
+    {side_card("Sent", summary_meta("4 sent"), open_=False)}
+    {side_card("Session", summary_meta("opus-5-5", "claude-code · paul · opus-5-5") + f'<span class="btn sm link" style="margin-left: 8px; flex-shrink: 0;">{ICON["code"]}VS Code</span>', open_=False)}
+  </div>
+</div>
+</div>
+''' + TAIL
+
+
+def focus_held():
+    """A team member the person has taken over (TD-964): **Hand back** in the slot Take over had,
+    plain, since Send is the next act while they hold it; every side card but Working and Git folded
+    with its value — Inbox's unread in the rail's blue, Ready to close's first failing check and Sent's
+    waiting ask in amber, the rest grey."""
+    term = '''<span class="d">● tdgrind-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/tdgrind-1</span>
+
+<span class="d">⏺</span> Bash(pdm run test tests/test_scripts/test_recover_stuck_notices.py)
+  <span class="g">412 passed in 38.2s</span>
+<span class="d">⏺</span> Bash(ao msg --kind ask --about TD-301 techlead "Merge #811 now, or hold for the USACE run?")
+  <span class="g">sent · m-8f21</span>
+
+<span class="p">&gt;</span> Paul: keep #811 open until the USACE run lands.
+<span class="d">▌</span>'''
+    return head("Focus — taken over") + f'''<div style="width: 1440px; min-height: 940px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Sessions")}
+<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+    {focus_head("tdgrind-1", pill("working"), '<span class="meta">DIU fetcher</span>',
+                next_act='<span class="btn sm" title="switch it back to unattended: the terminal goes read-only and its manager and the policies pick it up again (design §4.5a, TD-964)">Hand back</span>', member=True).replace("Pop out · Copy · Paste · Hand back · ", "Pop out · Copy · Paste · ")}
+    <div class="term" style="height: 620px;">{term}</div>
+    <div class="card" style="padding: 6px 10px; display: flex; align-items: center; gap: 10px;">
+      <span class="btn sm" style="flex-grow: 1; justify-content: flex-start; text-align: left; opacity: .75; font-weight: 400;">✎ Compose a prompt… <span class="meta" style="margin-left: 8px;">(c · or paste / drop a file)</span></span>
+      <span class="btn sm">{ICON["clip"]}Attach</span><span class="btn primary sm">{ICON["send"]}Send</span>
+    </div>
+    <div class="note">Taken over: <b>Hand back</b> stands where <b>Take over</b> stood, plain, since Send is the next act while you hold it; more ▾ no longer carries it.</div>
+  </div>
+  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    {PUT_AWAY}
+    {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 1m ago</span>', '<div style="font-size: 12px; margin-top: 8px;">TD-301: waiting on the techlead about #811</div>')}
+    {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td301-fix · 2 unpushed</span>', '<div class="mono" style="font-size: 12px; margin-top: 8px;"><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>')}
+    {side_card("Reports", summary_meta("1 progress · 2 filed"), open_=False)}
+    {side_card("Inbox", summary_meta("1 unread of 5", tone="unread"), open_=False)}
+    {side_card("Sent", summary_meta("3 sent, 1 waiting", "1 ask still waiting for its answer", tone="warn"), open_=False)}
+    {side_card("Ready to close", summary_meta("✗ branch pushed, +1", "✗ branch pushed · ✗ outcomes reported (1 owed): the first failing check, +1 for each more", tone="warn"), open_=False)}
+    {side_card("Session", summary_meta("sonnet-5-5", "claude-code · grind (pro) · sonnet-5-5") + f'<span class="btn sm link" style="margin-left: 8px; flex-shrink: 0;">{ICON["code"]}VS Code</span>', open_=False)}
+    <div class="note">Folded at first: Reports, Inbox, Sent, Ready to close, Session, and Told at start. Each says what it holds; colour only where it asks something of you.</div>
+  </div>
+</div>
+</div>
+''' + TAIL
+
+
 files = {
     "Main.dc.html": team_desktop(),
     "MainDark.dc.html": darken(team_desktop()),
@@ -2377,6 +2500,10 @@ files = {
     "FocusReady.dc.html": focus_ready(),
     "FocusRail.dc.html": focus_rail(),
     "FocusGitPick.dc.html": focus_git_pick(),
+    "FocusEnded.dc.html": focus_ended(),
+    "FocusHeld.dc.html": focus_held(),
+    "FocusEndedDark.dc.html": darken(focus_ended()),
+    "FocusHeldDark.dc.html": darken(focus_held()),
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
@@ -2419,6 +2546,8 @@ LAYOUT = [
     ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("FocusRail.dc.html", "Focus — the side panel put away (TD-408, 2026-10-08)", 0),
     ("FocusGitPick.dc.html", "Focus — the Git card's pick: Working tree, a commit, Session (TD-856)", 0),
+    ("FocusEnded.dc.html", "Focus — ended: the banner, the ending card, the folds (TD-964)", 0),
+    ("FocusHeld.dc.html", "Focus — taken over: Hand back in Take over's place, Sent, the folds' values (TD-964)", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
     ("Members.dc.html", "Members — the team card's dialog", 0),
@@ -2438,6 +2567,8 @@ LAYOUT = [
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
+    ("FocusEndedDark.dc.html", "Focus — ended, dark (TD-964)", 2),
+    ("FocusHeldDark.dc.html", "Focus — taken over, dark (TD-964)", 2),
     ("MainDark.dc.html", "Sessions — dark", 2),
     ("OrgTeamFirst.dc.html", "Sessions — team-first (the design, 2026-09-26; checked in from the canvas)", 2),
     ("RepoFacet.dc.html", "Team card — Repo facet: the lanes line (TD-357, 2026-10-06)", 2),

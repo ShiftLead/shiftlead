@@ -11,6 +11,7 @@
 - [Live system restart authorized 2026-09-13](live-system-restart-authorized.md) — stop all agents and the system; restart once teams (TD-040) exist; sweep worktrees first
 - [Design review loop with Sonnet](design-review-loop-with-sonnet.md) — Fable findings → adopt → Fable and Sonnet rounds both iterate until they agree → PR with fact-check; a mechanism that keeps failing rounds: ask if it is needed
 - [Alternate review rounds](alternate-review-rounds.md) — Sonnet, fix, Fable, fix; never both at once on the same text (Paul, 2026-10-19)
+- [Agree the layout before model reviews](agree-the-layout-before-model-reviews.md) — in a UI round with Paul, no Sonnet/Fable rounds until he and the session agree on the mockups (2026-10-21)
 - [Scratchpad too long for unix sockets](scratchpad-too-long-for-unix-sockets.md) — a scratch SHIFTLEAD_HOME needs a short path like ~/.cache/ao<topic>
 - [How a design round runs from a cloud session](cloud-design-round.md) — park on the board first, propose in chat, Sonnet rounds to READY, fact-check on the PR, one branch
 - [Check open PRs before a design round](check-open-prs-before-a-design-round.md) — the designer's stacked PRs may already hold the design (a restarted run's own too: `gh pr list` before the first claim); compare and reconcile, never design twice
