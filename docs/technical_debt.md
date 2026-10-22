@@ -981,7 +981,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-16 (TD-112's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — slice 1, the reads (`transcript_path`, `read_transcript`, `context`, `model_in_use`, `links`, `spend`), in #2266; slice 2, start context, mail and the repo's start hooks (the layer's `SessionStart` timeout raised, so the installed layer reads *stale* until reinstalled), in #2269; background, usage and the live walk are left.
+**Status:** Open — slice 1, the reads (`transcript_path`, `read_transcript`, `context`, `model_in_use`, `links`, `spend`), in #2266; slice 2, start context, mail and the repo's start hooks (the layer's `SessionStart` timeout raised, so the installed layer reads *stale* until reinstalled), in #2269; slice 3, `background` (the relaunched `node`'s shell wrappers, a fixture captured from 0.64.0), in #2271; `usage` and the live walk are left.
 **Location:** design §4.3 *The second adapter: Gemini CLI*; `src/shiftlead/adapters/gemini/` (a `transcript.py`); `tests/conformance/fixtures/gemini/`
 
 **Why:** TD-112, slice 3: what the pages and the policies read from a session, so a Gemini session's card, transcript page and rule 5 (the context bound) works as a Claude Code one's does.
