@@ -287,7 +287,9 @@ class GeminiAdapter:
         if state is None:
             return None
         pending = Pending(kind="question", text="") if state == "needs-you" else None
-        return Match(rule=f"title {title.lstrip()[0]}", state=state, evidence=[title.strip()], pending=pending)
+        return Match(
+            rule=f"title {title.lstrip()[0]}", state=state, evidence=[title.strip()], pending=pending, title=True
+        )
 
     def composer(self, tail_raw: list[str]) -> str | None:
         """The text in the composer (design §4.3 `composer`): the prompt row under the last input box's top

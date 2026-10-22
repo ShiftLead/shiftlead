@@ -166,7 +166,6 @@ KILLED_END_GRACE = 15.0
 # embedded shell gone quiet waiting for input; over `idle`, a confirmation shown with no turn.
 TITLE_SHELL_WAITS = "the tool's shell waits for input"
 TITLE_CONFIRMATION = "the tool waits for a confirmation"
-TITLE_RULE = "title "  # a title verdict's rule id leads with it (`title ◇`); any other is a screen rule's (§4.3)
 
 
 def _orders(r: dict[str, Any] | None) -> list[Any]:
@@ -4412,7 +4411,7 @@ class TickMixin:
         if not getattr(adapter, "state_in_title", False):
             return False
         m = adapter.explain(s.tail, title=pane.title)
-        if m is not None and not m.rule.startswith(TITLE_RULE):
+        if m is not None and not m.title:
             return False  # the adapter's manifest matched: a screen rule's verdict, not the title's (§4.3)
         m, _why = self._title_reading(s, m, now)
         if m is None:

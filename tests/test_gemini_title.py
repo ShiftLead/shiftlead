@@ -201,8 +201,10 @@ def test_explain_file_takes_a_title(gem, tmp_path, capsys):
 # ── the limit dialog (design §4.3 *The limit dialog is read off the screen*, TD-944 slice 1) ─────
 
 BOX = (
-    Path(__file__).parent / "conformance" / "fixtures" / "gemini" / "captured" / "panes" / "6-a-doorbell.txt"
-).read_text(encoding="utf-8").splitlines()
+    (Path(__file__).parent / "conformance" / "fixtures" / "gemini" / "captured" / "panes" / "6-a-doorbell.txt")
+    .read_text(encoding="utf-8")
+    .splitlines()
+)
 
 
 def test_the_limit_box_reads_limited_over_the_titles_working():
@@ -217,6 +219,8 @@ def test_the_limit_box_reads_limited_over_the_titles_working():
     assert on_stop != painted and ad.explain(on_stop, title=WORKING).rule == "gemini-usage-limit"
     # the title's own verdict is not modal; prose quoting the dialog outside a box matches nothing
     assert ad.explain([], title=WORKING).modal is False
+    # core tells a title verdict from a rule's by the Match's `title`, never by the rule id (§4.3)
+    assert ad.explain([], title=WORKING).title is True and m.title is False
     prose = ["✦ The tool says: Usage limit reached for gemini-3.8-flash.", "  2. Stop"]
     assert ad.explain(prose, title=WORKING).rule == "title ✦"
 

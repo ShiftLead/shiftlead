@@ -93,6 +93,7 @@ class Match:
     evidence: list[str]
     pending: Pending | None = None
     modal: bool = False  # the rule's `modal` (design §4.3 *The limit dialog is read off the screen*)
+    title: bool = False  # a title verdict, not a screen rule's: core writes it `title`, a rule's `scraped` (§4.3)
 
     def to_dict(self) -> dict:
         return {

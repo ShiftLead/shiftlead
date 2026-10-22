@@ -220,7 +220,7 @@ from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_shape import ShapeMixin
 from sessionorc.agent_spend import SpendMixin
 from sessionorc.agent_sync import SyncMixin
-from sessionorc.agent_tick import TITLE_RULE, TickMixin
+from sessionorc.agent_tick import TickMixin
 from sessionorc.agent_wake import WakeMixin
 from sessionorc.gitinfo import GitPickError, WorktreeError, ensure_worktree, git_info, pick_files, work_left
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
@@ -2573,7 +2573,7 @@ class HostAgent(
             title = pane.title if pane else ""
             m = explain(tail, title=title)
             out["title"], out["match"] = title, m.to_dict() if m else None
-            if m is not None and not m.rule.startswith(TITLE_RULE):  # the adapter's manifest, asked first (§4.3)
+            if m is not None and not m.title:  # the adapter's manifest, asked first (§4.3)
                 out["reason"] = (
                     f"rule {m.rule} matched — a title adapter's screen rule is not applied by the tick yet (TD-944)"
                 )
