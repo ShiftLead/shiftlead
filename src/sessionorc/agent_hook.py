@@ -55,6 +55,7 @@ class HookMixin:
             s.hook_seen_at = now_iso()
             self.store.save(s)
         if (ruled := await self._by_rule(s, event)) is not None:
+            self._sure_end[session] = time.monotonic()  # a decision: the notice that follows is its (§4.2)
             await self._push_changes()
             return ruled
         wait = float(event.get("wait_seconds") or 600)
@@ -78,7 +79,7 @@ class HookMixin:
             pane_held=bool(subagent),
             **held,
         )
-        s.set_state("needs-you", confidence="hook", pending=pending)
+        self._push_prompt(s, pending)  # on top of the record's open prompts (§4.2 *Open prompts are a stack*)
         self.store.save(s)
         # Register the waiter BEFORE the first await: a client reacting to the push must find it.
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
@@ -89,12 +90,14 @@ class HookMixin:
             decision = await asyncio.wait_for(fut, timeout=wait)
         except TimeoutError:
             # Fell through to the terminal dialog: the decision now lives there (design §4.2) — but
-            # only while the record still waits on this one. A later event already moved it on.
+            # only while the record still holds this one, top or not. A later event already ended it.
             s = self.sessions.get(session)
-            if s is None or s.pending is None or s.pending.tool_use_id != tool_use_id:
+            at = next((i for i, p in enumerate(s.pendings) if p.tool_use_id == tool_use_id), None) if s else None
+            if s is None or at is None:
                 return None
-            # the dialog is in the pane now, a subagent's too: it keeps its asker, no longer held
-            s.set_state("needs-you", confidence="hook", pending=Pending(kind="question", text=pending.text, **held))
+            # the dialog is in the pane now, a subagent's too: it keeps its asker and its call, no longer held
+            s.pendings[at] = Pending(kind="question", text=pending.text, tool_use_id=tool_use_id, **held)
+            self._show_top(s)
             self.store.save(s)
             await self._push_changes()
             return None
@@ -198,7 +201,7 @@ class HookMixin:
         if not adapters.permission_channel(s.adapter):
             # the backstop to `ao allow`/`ao deny` and the page (§4.3 *Permissions: no channel*, TD-785)
             raise RpcError(f"{s.name}'s tool has no permission channel: answer it in the terminal")
-        fut = (self._waiters.get((id, tool_use_id)) or (None, None))[0]
+        fut, thread = self._waiters.get((id, tool_use_id)) or (None, None)
         if fut is None or fut.done():
             raise RpcError("no pending permission with that id (answered, timed out, or in the terminal)")
         if behavior not in ("allow", "deny"):
@@ -208,7 +211,12 @@ class HookMixin:
         # says who answered — *you* for a person, the controller's name for a session — and a
         # person's answer is never too quick to record
         self._attention_ended(s.id, self._answered_by(behavior, caller))
-        s.set_state("working", confidence="hook")
+        # its own entry ends (§4.2 *Open prompts are a stack*): a main-thread prompt's asked call runs in the
+        # turn, so `working` goes beneath what is left; a subagent's says nothing of the main thread
+        if thread is None and s.pendings:
+            self._keep_beneath(s, "working")
+        if not self._end_entries(s, lambda p: p.tool_use_id == tool_use_id, sure=True) and thread is None:
+            s.set_state("working", confidence="hook")  # a record that held no entry for it, as before the stack
         if mail.as_person(caller, self._graph()):
             self._refill(s)  # a person's answer to its permission; a controller's refills nothing (§4.10)
         self.store.save(s)
