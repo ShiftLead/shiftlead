@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
-| TD-961 | #2276's two resets of `subagent_ids` (a fresh conversation, a process exit) have no test: removing either leaves the whole suite green | Low | Open |
 | TD-962 | #2271's Gemini `background()` walk has three tests: its `-c` check, its walk bound and its `cmd` cut are unpinned | Low | Open |
 | TD-963 | #2266 and #2269's Gemini branches no test pins: `spend`'s cursor handling and `find`'s newest-wins, and the node-mode unread count of the hook's mail reply | Low | Open |
 
@@ -1427,23 +1426,6 @@ builds are in the ledger.
 **Done when** a Google-login Gemini profile's card shows its chip, or the design says it has none.
 
 **Related:** TD-786, TD-112.
-
-## TD-961: #2276's two resets of `subagent_ids` (a fresh conversation, a process exit) have no test: removing either leaves the whole suite green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_apply_subagents`, the `subagents_reset` branch); `src/sessionorc/models.py` (`set_state`, the exit branch); `tests/test_claude_adapter.py`
-
-**Why:** Found auditing the tests of #2276 (TD-960). The PR adds `s.subagent_ids = []` where a `subagents_reset` event clears the count, and where `set_state` clears it on a process's exit. Probe: delete either line (both together too) and run the whole suite (`PYTHONPATH=$PWD/src:<scratch registering gemini> pdm run pytest -q tests`, with the node-mode and cursor probes of TD-963 also applied: 3973 passed, 2 skipped); `tests/test_claude_adapter.py` alone passes with each removed on its own. `grep -rn subagent_ids tests` finds only the two TD-960 tests, which never reset. Effect: after a `/clear` or `resume`, or a restart of the process, a stale id stays in the list, and a new subagent that reuses it is not counted (`if sub not in s.subagent_ids`), so `subagents` reads 0 while it runs.
-
-**Fix:** two tests in `tests/test_claude_adapter.py`: start a subagent (id `a1`), send a `subagents_reset` event (a resume's), then a `SubagentStart` for `a1` again and assert `subagents == 1`; and the same across `set_state` to an exited state, asserting `subagent_ids == []`. Confirm each fails with its line removed.
-
-**Done when** removing either reset line fails a test.
-
 
 ## TD-962: #2271's Gemini `background()` walk has three tests: its `-c` check, its walk bound and its `cmd` cut are unpinned
 
