@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
-| TD-963 | #2266 and #2269's Gemini branches no test pins: `spend`'s cursor handling and `find`'s newest-wins, and the node-mode unread count of the hook's mail reply | Low | Open |
 
 ---
 
@@ -1426,18 +1425,3 @@ builds are in the ledger.
 
 **Related:** TD-786, TD-112.
 
-## TD-963: #2266 and #2269's Gemini branches no test pins: `spend`'s cursor handling and `find`'s newest-wins, and the node-mode unread count of the hook's mail reply
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/adapters/gemini/__init__.py` (`spend`, `find` via `transcript.py`); `src/sessionorc/agent_hook.py` (`_unread_of`); `tests/test_gemini_transcript.py`, `tests/test_gemini_start.py`
-
-**Why:** Found auditing the tests of #2266 and #2269 (TD-786). Each probe leaves the whole suite green (3973 passed, 2 skipped, with the probes of TD-961 applied at once) and the gemini test files green on their own: (1) `agent_hook._unread_of`'s `if self.mode == "node": return self._mail_hints.get(...)[0]` replaced by `return 0` — a node's hook reply then never carries mail (the one test of the hook's `mail` reply, `test_the_hook_rpc_counts_unread_mail_only_when_asked` in `tests/test_gemini_start.py`, runs in home mode; no test sets `_mail_hints` for a hook call); (2) `spend`'s `except OSError: if key in before: after[key] = before[key]` replaced by `pass` (an unreadable chat loses its cursor and is re-read whole, double-counting its turns); (3) `spend`'s `before = {…if isinstance(v, int) and v >= 0}` replaced by `dict(cursors or {})` (a bad cursor reaches `turns`); (4) the `unreadable: …` reason branch replaced by `raise`; (5) `transcript.find`'s `max(found, key=lambda p: p.stat().st_mtime)` as `min` (no test calls `find` with two candidates) (the *older* of two chats for one id is read, not the newest), and its `"*?[]/"` guard dropped; (6) `_patch`'s `orderIds` with `[*ordered, *rest]` in place of `[*rest, *ordered]` — the one test orders every message, so `rest` is empty.
-
-**Fix:** in the same files: node-mode hook rpc (`mode="node"`, `_mail_hints[sid] = (2, …)`) returns `{"unread": 2}`; a `spend` whose chat raises on read keeps its cursor and returns `ok`; negative and non-int cursors are dropped; an unreadable root returns the `unreadable:` reason; two chats for one id return the newer; an `orderIds` that names one of three messages leaves the others first. Confirm each fails with its probe applied.
-
-**Done when** each probe above fails a test.

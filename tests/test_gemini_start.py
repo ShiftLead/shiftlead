@@ -169,3 +169,10 @@ async def test_the_hook_rpc_counts_unread_mail_only_when_asked(agent, composerst
         assert await agent.rpc_hook(sid, state="working", prompt=True, mail=True) == {"unread": 1}
         assert await agent.rpc_hook(sid, state="idle") is None
         assert await agent.rpc_hook("ao-nobody", state="idle", mail=True) == {"unread": 0}
+        # on a node the count is the one the home last pushed, not the node's own inbox (§4.4a, TD-963)
+        agent.mode = "node"
+        agent._mail_hints[sid] = (2, False, [])
+        try:
+            assert await agent.rpc_hook(sid, state="working", prompt=True, mail=True) == {"unread": 2}
+        finally:
+            agent.mode = "home"
