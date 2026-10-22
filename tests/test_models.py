@@ -12,6 +12,7 @@ from sessionorc.models import (
     ProgressEntry,
     Session,
     State,
+    apply_node,
     context_reading,
     normalize_ref,
     report_line,
@@ -45,6 +46,31 @@ def test_pending_roundtrip_and_defaults():
     held = Pending(kind="permission", text="Bash: ls", subagent="a1", subagent_name="general-purpose", pane_held=True)
     assert Pending.from_dict(held.to_dict()) == held
     assert {"subagent", "subagent_name", "pane_held"}.isdisjoint(p.to_dict())
+
+
+def test_a_records_open_prompts_and_kept_state_roundtrip_and_end_with_it():
+    """TD-950, design §4.2 *Open prompts are a stack*: `pendings` and `kept` are persisted and survive
+    a node's report; a restored state keeps its own `since`; `exited` and `closed` drop both."""
+    s = Session(id="a", name="a", kind="interactive", adapter="claude-code", dir="/")
+    s.set_state("idle", confidence="hook")
+    held = Pending(
+        kind="permission", text="Bash: ls", tool_use_id="t1", subagent="a1", subagent_name="g", pane_held=True
+    )
+    q = Pending(kind="question", text="which?")
+    s.kept = {"state": "idle", "pending": None, "confidence": "hook", "since": s.since}
+    s.pendings = [held, q]
+    s.set_state("needs-you", confidence="hook", pending=q)
+    back = Session.from_dict(s.to_dict())
+    assert back == s and back.pendings == [held, q] and back.kept == s.kept
+    assert apply_node(Session(id="a", name="a", kind="interactive", adapter="claude-code", dir="/"), s.to_dict()) == s
+    rev = s.rev
+    s.set_state("idle", confidence="hook", since="2026-10-22T06:00:00Z")
+    assert s.since == "2026-10-22T06:00:00Z" and s.rev == rev + 1
+    s.set_state("idle", confidence="hook", since="2026-10-22T06:00:00Z")
+    assert s.rev == rev + 1  # the same state and time: no change
+    s.pendings, s.kept = [q], {"state": "idle"}
+    s.set_state("exited", confidence="tick")
+    assert s.pendings == [] and s.kept is None
 
 
 def test_session_roundtrip_is_lossless():
