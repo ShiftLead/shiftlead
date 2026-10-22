@@ -100,8 +100,8 @@ def start_context(payload: dict[str, Any]) -> str:
     """`SessionStart`'s context: the launch's start-context file, then what the repo's start hooks printed."""
     told = ""
     if where := os.environ.get(START_CONTEXT_ENV):
-        with contextlib.suppress(OSError, UnicodeDecodeError):
-            told = Path(where).read_text(encoding="utf-8").strip()
+        with contextlib.suppress(OSError, ValueError):  # read as the launch wrote it (`write_context_file`)
+            told = Path(where).read_text(encoding="utf-8", errors="surrogateescape").strip()
     return "\n\n".join(x for x in (told, start_hooks(payload).strip()) if x)
 
 

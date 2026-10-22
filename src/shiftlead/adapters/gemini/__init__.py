@@ -114,9 +114,7 @@ def layer_settings(hook_cmd: str = "shiftlead-hook") -> dict:
     """The settings layer a launch names in `GEMINI_CLI_SYSTEM_SETTINGS_PATH` (design §4.3 `launch`): a
     hook on each of `HOOK_EVENTS` calling `<hook_cmd> --adapter gemini`, and `LAYER_SETTINGS`."""
     command = f"{shlex.quote(hook_cmd)} {ADAPTER_FLAG} {NAME}"
-    hooks = {
-        ev: [{"hooks": [{"type": "command", "command": command, "timeout": _timeout(ev)}]}] for ev in HOOK_EVENTS
-    }
+    hooks = {ev: [{"hooks": [{"type": "command", "command": command, "timeout": _timeout(ev)}]}] for ev in HOOK_EVENTS}
     return {"hooks": hooks, **json.loads(json.dumps(LAYER_SETTINGS))}
 
 

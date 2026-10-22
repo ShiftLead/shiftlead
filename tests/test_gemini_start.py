@@ -43,7 +43,9 @@ def test_the_start_hook_outlasts_the_runner_and_the_rest_stay_short():
 def test_a_launch_names_its_start_context_file_never_the_text(home):  # noqa: F811
     ad = GeminiAdapter(binary="/opt/gemini")
     assert ad.start_context is True
-    spec = ad.launch(profile="", resume=None, prompt=None, unattended=True, cwd=home, start_context="PREFACE\n\nbe brief")
+    spec = ad.launch(
+        profile="", resume=None, prompt=None, unattended=True, cwd=home, start_context="PREFACE\n\nbe brief"
+    )
     f = Path(spec.env[hook.START_CONTEXT_ENV])
     assert f.read_text() == "PREFACE\n\nbe brief" and stat.S_IMODE(f.stat().st_mode) == 0o600
     assert not any("be brief" in a for a in spec.argv)  # no prose in the argv (§4.1)
