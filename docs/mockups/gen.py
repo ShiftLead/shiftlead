@@ -2430,7 +2430,6 @@ def focus_ended():
     </div>
     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
       <span class="btn sm link">✉ Message</span><span class="btn sm link">{ICON["doc"]}Transcript</span><span class="btn sm link">‹› VS Code</span>
-      <span style="flex-grow: 1;"></span><span class="btn sm link">more ▾</span>
     </div>
     <div style="padding: 12px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #7c3d00; border-radius: 6px;" title="the ending banner (design §4.5a, TD-942)">
       <span style="font-size: 15px; font-weight: 600; color: #7c3d00;">closed by you · 18:42</span>
