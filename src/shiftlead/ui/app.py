@@ -88,6 +88,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     next_act,  # noqa: F401
     pill_title,  # noqa: F401
     pr_repo,  # noqa: F401
+    prompt_line,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401
     repo_pr_marks,
@@ -344,6 +345,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     _own_stop,  # noqa: F401
     _pr_states,  # noqa: F401
     answer_blocks,  # noqa: F401
+    answer_members,  # noqa: F401
     ask_blocks,  # noqa: F401
     asked_line,  # noqa: F401
     compact_line,  # noqa: F401

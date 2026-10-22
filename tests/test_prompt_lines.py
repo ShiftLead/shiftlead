@@ -130,7 +130,7 @@ def test_the_facet_draws_a_block_per_entry_and_counts_members(tmp_path, monkeypa
     members = [view(_rec(HELD, MAIN)), view({**_rec(ASK), "id": "ao-v", "name": "v"})]
     summ = team_summary("t", members, {}, {})
     assert len(summ["answers"]) == 3 and summ["n_answer"] == 2
-    assert "ao-w:permission:tu-s" in summ["answer_key"]
+    assert summ["answer_key"] == "ao-v:question ao-w:permission ao-w:permission"  # a block per entry
     assert rollup(None, members)["answer_needed"] == 2
 
 

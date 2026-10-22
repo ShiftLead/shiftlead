@@ -568,7 +568,7 @@ def team_summary(
         # for a team with nothing live (TD-418)
         "drawn": list(FACETS),
         # what the toggle's memory keys on: a person's flip holds until the pending set changes (§4.5a)
-        "answer_key": " ".join(sorted(f"{a['id']}:{a['kind']}:{a.get('call') or ''}" for a in answers)),
+        "answer_key": " ".join(sorted(f"{a['id']}:{a['kind']}" for a in answers)),
     }
 
 
