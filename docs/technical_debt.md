@@ -1587,7 +1587,7 @@ orders and the PR and Doing facets read that repo alone, so in an umbrella over 
 number, a sibling path can never be held, and an open sibling PR is strandable with no page showing it.
 `ao team --skill` (TD-623) tells such a team to land paired PRs meanwhile.
 **Location:** design §4.9 *Teams*, §4.9c (`held:`), §4.8 (`ao progress`); `src/sessionorc/agent.py`
-(`_pr_checks`), `src/shiftlead/held.py`, `src/sessionorc/workorders.py`
+(`_pr_checks`), `src/sessionorc/held.py`, `src/sessionorc/workorders.py`
 
 **Why:** an umbrella is dev-cadence's own shape, so ShiftLead meets it on every constellation; paired PRs
 work, but the sibling half has no gate and no page.
