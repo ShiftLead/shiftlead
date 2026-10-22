@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import park_ticks
 
 from sessionorc import identity, modes, reports
-from sessionorc.client import AgentError, AgentUnavailable, LocalClient
+from sessionorc.client import AgentError, LocalClient
 
 
 def _row(n: int = 7, checks: str = "pending", conflicting: bool = False, failing: list[str] | None = None):
@@ -175,38 +176,32 @@ def test_ao_pr_wait_says_the_word_and_exits_by_it(monkeypatch, capsys, word, cod
 
     calls = []
 
-    def fake(method, **kw):
-        calls.append((method, kw))
-        if method == "get":
-            return {"id": kw["id"], "repo": "/r"}
+    def fake(root, n, timeout, fresh):
+        calls.append((root, n, timeout, fresh))
         row = _row(checks="pending" if word == "timeout" else word, failing=["test (3.12)"] if word == "red" else [])
-        return {**row, "pr": 7, "word": word, "read_at": "2026-10-21T00:00:00+00:00"}
+        return {**row, "pr": 7, "word": word, "read_at": "2026-10-21T00:00:00+00:00"}, 0
 
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
-    monkeypatch.setattr(cli, "call_sync", fake)
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"id": kw["id"], "repo": "/r"})
+    monkeypatch.setattr(cli, "_pr_wait_call", fake)
     assert cli.cmd_pr(_args()) == code
     assert capsys.readouterr().out.strip() == said
-    method, kw = calls[-1]
-    assert method == "pr_wait" and kw["root"] == "/r" and kw["pr"] == 7 and kw["fresh"] is False
-    assert kw["_timeout"] > kw["timeout"], "the client outlasts the wait it asked for"
+    assert calls == [("/r", 7, 60.0, False)]
 
 
 def test_ao_pr_wait_refuses_a_number_the_home_does_not_hold_and_an_old_home(monkeypatch, capsys):
     from shiftlead import cli
 
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
-    monkeypatch.setattr(
-        cli, "call_sync", lambda m, **kw: {"repo": "/r"} if m == "get" else {"pr": 7, "word": "gone", "head": None}
-    )
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": "/r"})
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a: ({"pr": 7, "word": "gone", "head": None}, 0))
     assert cli.cmd_pr(_args()) == 5
     assert "not open in the home's reading of /r" in capsys.readouterr().err
 
-    def old(m, **kw):
-        if m == "get":
-            return {"repo": "/r"}
+    def old(*a):
         raise AgentError("unknown method 'pr_wait'")
 
-    monkeypatch.setattr(cli, "call_sync", old)
+    monkeypatch.setattr(cli, "_pr_wait_call", old)
     assert cli.cmd_pr(_args(json=True)) == 5
     assert "predates ao pr wait" in capsys.readouterr().out
 
@@ -359,40 +354,63 @@ async def test_a_repo_never_read_is_refused_with_the_readings_why(agent, tmp_pat
     from shiftlead import cli
 
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
-    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": root} if m == "get" else got)
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": root})
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a: (got, 0))
     assert cli.cmd_pr(_args(n=3)) == 5
     assert "gitea.example" in capsys.readouterr().err
 
 
-def test_ao_pr_wait_waits_again_across_a_restart_and_refuses_a_home_that_stays_down(monkeypatch, capsys):
-    """A promote restarts the unit under the wait (the live check of TD-940, 2026-10-22): the call is made
-    again for the time left, and only a home that does not answer again is a refusal."""
+def test_ao_pr_wait_says_a_restart_and_a_timeout_in_its_gap(monkeypatch, capsys):
+    """A promote restarts the unit under the wait (TD-940's live check, 2026-10-22): `blocking_rpc`
+    remakes it; the CLI says so, and a timeout that ran out in the gap is still exit 4."""
     from shiftlead import cli
 
-    calls = []
-
-    def flaky(method, **kw):
-        if method == "get":
-            return {"repo": "/r"}
-        calls.append(kw)
-        if len(calls) == 1:
-            raise AgentUnavailable("host agent closed the connection")
-        return {**_row(checks="green"), "pr": 7, "word": "green", "read_at": "2026-10-22T00:00:00+00:00"}
-
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
-    monkeypatch.setattr(cli, "call_sync", flaky)
-    monkeypatch.setattr(cli, "_agent_answers", lambda: True)
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"repo": "/r"})
+    green = {**_row(checks="green"), "pr": 7, "word": "green", "read_at": "2026-10-22T00:00:00+00:00"}
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a: (green, 1))
     assert cli.cmd_pr(_args()) == 0
-    assert len(calls) == 2 and calls[1]["timeout"] <= calls[0]["timeout"], "asked again for what was left"
-    assert capsys.readouterr().out.strip() == "PR #7 green on abc1234"
+    out = capsys.readouterr().out
+    assert "the wait was remade once" in out and "PR #7 green on abc1234" in out
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a: (None, 2))
+    assert cli.cmd_pr(_args()) == 4
+    assert "PR #7 timeout after 60s, still unread" in capsys.readouterr().out
 
-    def down(method, **kw):
-        if method == "get":
-            return {"repo": "/r"}
-        raise AgentUnavailable("host agent closed the connection")
 
-    monkeypatch.setattr(cli, "call_sync", down)
-    monkeypatch.setattr(cli, "_agent_answers", lambda: False)
-    monkeypatch.setattr(cli, "PR_WAIT_GRACE", 0.0)
-    assert cli.cmd_pr(_args()) == 5
-    assert "did not answer again" in capsys.readouterr().err
+async def test_a_pr_wait_is_remade_across_a_drop_and_a_home_never_up_is_refused_at_once(tmp_path):
+    """`client.blocking_rpc` carries `pr_wait` as it carries `wait`: a connection that dropped is
+    remade with the time left, and a socket nothing answers is refused on the first try."""
+    import time
+
+    from sessionorc import client as clientmod
+
+    sock = tmp_path / "home.sock"
+    asked = []
+
+    async def home(reader, writer):
+        req = json.loads(await reader.readline())
+        asked.append(req["params"])
+        if len(asked) == 1:  # the promote: the unit goes under the first wait
+            writer.close()
+            return
+        writer.write((json.dumps({"id": req["id"], "result": {"pr": 7, "word": "green"}}) + "\n").encode())
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_unix_server(home, path=str(sock))
+    try:
+        got, remakes = await clientmod.blocking_rpc(
+            "pr_wait", caller="ao-x", timeout=30.0, expired=None, sock=sock, root="/r", pr=7, fresh=True
+        )
+    finally:
+        server.close()
+    assert got == {"pr": 7, "word": "green"} and remakes == 1
+    assert [a["pr"] for a in asked] == [7, 7] and all(a["fresh"] for a in asked)
+    assert asked[1]["timeout"] < asked[0]["timeout"], "asked again for the time left"
+
+    began = time.monotonic()
+    with pytest.raises(clientmod.AgentUnavailable, match="not reachable"):
+        await clientmod.blocking_rpc(
+            "pr_wait", caller="ao-x", timeout=30.0, expired=None, sock=tmp_path / "none.sock", pr=7
+        )
+    assert time.monotonic() - began < 1.0, "a home that was never up is not given the restart's grace"

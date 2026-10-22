@@ -137,8 +137,7 @@ def cmd_wait(args: argparse.Namespace) -> int:
         # time that is left, so a lead does not see a promote. The transport owns that, not this.
         got, remakes = await clientmod.wait_rpc(caller=caller, timeout=args.timeout, scope=args.scope)
         if remakes and not args.json:
-            times = "once" if remakes == 1 else f"{remakes} times"
-            print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {times}")
+            print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {_times(remakes)}")
         return got
 
     try:
@@ -2695,20 +2694,16 @@ def _pr_wait_root(args: argparse.Namespace) -> str | None:
     return str(pathlib.Path(out).parent) if common.returncode == 0 and out else None
 
 
-PR_WAIT_GRACE = 60.0  # seconds `ao pr wait` gives a host agent that closed the connection to answer again
+def _times(n: int) -> str:
+    return "once" if n == 1 else f"{n} times"
 
 
-def _agent_back(grace: float, step: float = 1.0) -> bool:
-    """Whether an agent answers within `grace` seconds — `_agent_answers` once a `step`, the restart's gap."""
-    import time
-
-    until = time.monotonic() + grace
-    while True:
-        if _agent_answers():
-            return True
-        if time.monotonic() + step > until:
-            return False
-        time.sleep(step)
+def _pr_wait_call(root: str, n: int, timeout: float, fresh: bool) -> tuple[Any, int]:
+    """The `pr_wait` RPC, carried across a host-agent restart as `ao wait`'s is (`client.blocking_rpc`):
+    `(the reading's answer, or None at the timeout in a restart's gap; how many times it was remade)`."""
+    caller = os.environ.get("SHIFTLEAD_SESSION") or None
+    go = clientmod.blocking_rpc("pr_wait", caller=caller, timeout=timeout, expired=None, root=root, pr=n, fresh=fresh)
+    return asyncio.run(go)
 
 
 def _pr_wait(args: argparse.Namespace) -> int:
@@ -2716,9 +2711,8 @@ def _pr_wait(args: argparse.Namespace) -> int:
     reading of PR `n` until it leaves *pending*, print the word and exit by it — 0 green, 1 red, 2
     conflicting, 3 none, 4 timeout, 5 refused (a number the reading does not hold, a checkout it
     holds no reading of, a home that is down or predates the RPC) with the why. A call of its own
-    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake. A home that
-    closes the connection and answers again within `PR_WAIT_GRACE` (a promote's restart) is asked again
-    for the time left."""
+    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake. A connection
+    the home drops under it (a promote's restart) is remade for the time left, as `ao wait`'s is."""
     from sessionorc import reports
 
     gone = reports.PR_WAIT_EXIT["gone"]
@@ -2728,26 +2722,20 @@ def _pr_wait(args: argparse.Namespace) -> int:
         return fail(args, str(e), gone)
     if not root:
         return fail(args, "no checkout to read: the record names no repo, and this directory is in none", gone)
-    import time
-
-    deadline = time.monotonic() + args.timeout
     try:
-        while True:
-            left = max(deadline - time.monotonic(), 0.0)
-            try:
-                got = call_sync("pr_wait", root=root, pr=args.n, timeout=left, fresh=args.fresh, _timeout=left + 30.0)
-                break
-            except AgentUnavailable as e:
-                # a promote restarts the unit under the wait — the caller's own merge often causes one: a
-                # home that answers again within the grace is waited on again for what is left (TD-940)
-                if not _agent_back(min(PR_WAIT_GRACE, max(deadline - time.monotonic(), 0.0))):
-                    return fail(args, f"{e}, and it did not answer again", gone)
+        got, remakes = _pr_wait_call(root, args.n, args.timeout, args.fresh)
+    except AgentUnavailable as e:
+        return fail(args, str(e), gone)
     except AgentError as e:
         if str(e).startswith("unknown method"):
             return fail(args, "the running host agent predates ao pr wait (TD-940): it waits for its promote", gone)
         return fail(args, str(e), gone)
     except Exception as e:  # noqa: BLE001 — anything else is no word: 1 or 2 would read as red or conflicting
         return fail(args, f"the wait could not be made: {type(e).__name__}: {e}", gone)
+    if got is None:  # the time ran out while the home restarted: no reading came back
+        got = {"pr": args.n, "word": "timeout", "checks": None, "conflicting": False, "failing": [], "head": None}
+    if remakes and not args.json:
+        print(f"[shiftlead] the host agent restarted while waiting — the wait was remade {_times(remakes)}")
     word = str(got.get("word") or "")
     if word == "gone":
         return fail(
