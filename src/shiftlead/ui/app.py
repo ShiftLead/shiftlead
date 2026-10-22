@@ -37,6 +37,7 @@ from sessionorc.models import (
     GRANTS,
     PERSON,
     has_control,
+    permission_entry,
     start_note,
     stop_note,
 )
@@ -87,6 +88,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     next_act,  # noqa: F401
     pill_title,  # noqa: F401
     pr_repo,  # noqa: F401
+    prompt_line,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401
     repo_pr_marks,
@@ -343,6 +345,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     _own_stop,  # noqa: F401
     _pr_states,  # noqa: F401
     answer_blocks,  # noqa: F401
+    answer_members,  # noqa: F401
     ask_blocks,  # noqa: F401
     asked_line,  # noqa: F401
     compact_line,  # noqa: F401
@@ -3090,10 +3093,11 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if action in ("allow", "deny"):
             s = await call("get", id=sid)
-            pend = s.get("pending") or {}
             if s.get("permission_channel") is False:  # §4.3 *Permissions: no channel* (TD-785)
                 raise HTTPException(409, "this tool has no permission channel: answer it in the terminal")
-            if pend.get("kind") != "permission" or not pend.get("tool_use_id"):
+            # the entry the pressed line names, else the newest permission entry (§4.2, TD-950)
+            pend = permission_entry(s, str(body.get("call") or "") or None)
+            if pend is None:
                 raise HTTPException(409, "no pending permission (answered, timed out, or in the terminal)")
             await call("decide", id=sid, tool_use_id=pend["tool_use_id"], behavior=action, reason=body.get("reason"))
         elif action == "kill":

@@ -5,3 +5,22 @@
 {% macro held_line(h) -%}
 <div class="meta held">from the {{ h.name }} subagent{% if h.deadline %} · the pane shows nothing until <span class="localtime" data-at="{{ h.deadline }}" title="{{ h.deadline }}">{{ h.deadline }}</span>{% endif %}</div>
 {%- endmacro %}
+
+
+{#- One open prompt beneath the newest (§4.2 *Every entry is answerable where it is drawn*, TD-950), from
+    `prompt_line`: its text and subagent line, and its own **Allow** / **Deny** naming its call
+    (`data-call`; `data-line` keeps the card's `a` / `d` keys on the slot's prompt), or **Focus** for a question. The card draws these under its slot. -#}
+{% macro prompt_line(sid, e) -%}
+<div class="row gap wrap pline">
+  <span class="meta">{{ e.text }}</span>
+  {%- if e.answerable %}
+  <span class="meta countdown" data-deadline="{{ e.deadline }}"></span>
+  <button class="btn sm" data-act="allow" data-id="{{ sid }}" data-call="{{ e.call }}" data-line>Allow</button>
+  <button class="btn sm" data-act="deny" data-id="{{ sid }}" data-call="{{ e.call }}" data-line>Deny</button>
+  <input class="denywhy" type="text" maxlength="200" data-id="{{ sid }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
+  {%- else %}
+  <a class="btn sm ghost" href="/focus/{{ sid }}">Focus</a>
+  {%- endif %}
+</div>
+{%- if e.held %}{{ held_line(e.held) }}{% endif %}
+{%- endmacro %}

@@ -20,6 +20,7 @@ from sessionorc.models import (
     context_over,
     context_reading,
     has_control,
+    open_prompts,
     pr_marks,
     report_head,
     report_line,
@@ -338,6 +339,9 @@ def view(
     # a subagent's prompt names its asker, and says the pane draws nothing until the deadline (§4.2 *A
     # subagent's dialog is held back*, TD-950): one reading the card, the Inbox row and the facet draw
     d["held"] = subagent_held(pend) if state == "needs-you" else None
+    # the open prompts beneath the newest, newest first, each answerable on its own line (§4.2 *Every
+    # entry is answerable where it is drawn*, TD-950): the slot draws the newest, these under it
+    d["others"] = [prompt_line(p, s) for p in open_prompts(s)[1:]] if state == "needs-you" else []
     # The report channels (design §4.8, §4.5a card **report line**, TD-028 step 4). One line, shown
     # only when a channel is non-empty: `report_line` is the same text `ao status -v` prints — one
     # formatter, so the card and the CLI cannot drift — and the findings count rides beside it. The
@@ -1088,6 +1092,22 @@ def subagent_held(pend: Mapping[str, Any] | None) -> dict[str, str] | None:
         return None
     deadline = str(pend.get("deadline") or "") if pend.get("pane_held") else ""
     return {"name": str(pend["subagent_name"]), "deadline": deadline}
+
+
+def prompt_line(p: Mapping[str, Any], rec: Mapping[str, Any]) -> dict[str, Any]:
+    """One open prompt as its own line (§4.2 *Every entry is answerable where it is drawn*, TD-950): its
+    text, the call its **Allow** / **Deny** name (`call`, answerable where the hook gave one and the
+    tool has a permission channel), and its subagent's line; a question's answer is Focus."""
+    v = {"pending": p, "permission_channel": rec.get("permission_channel")}
+    text = str(p.get("text") or "")
+    return {
+        "kind": str(p.get("kind") or ""),
+        "text": (text if p.get("kind") == "permission" else f"{p.get('kind')}: {text}") + terminal_only(v),
+        "call": str(p.get("tool_use_id") or ""),
+        "answerable": answerable(v),
+        "deadline": str(p.get("deadline") or ""),
+        "held": subagent_held(p),
+    }
 
 
 def held_words(held: Mapping[str, str] | None, until: str = "") -> str:
