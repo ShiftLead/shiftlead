@@ -18778,6 +18778,6 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 
 **Related:** TD-964 (the ending card, which reads the ledger at the ending), TD-818 / TD-830 (Spend per seat).
 
-**Resolved:** 2026-10-22 (grinder-ao-2, PR #PRNUM) — `_refresh_seats_inner` (`src/sessionorc/agent_spend.py`) reads the pairs live now and those live at the pass before (`_seat_live`), so a pair whose last live session ended is read once more and then dropped; `test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped` (`tests/test_seats.py`) charges an ended session's last turn to its record with nothing else on its profile, and fails both with no extra read and with a read that is never dropped.
+**Resolved:** 2026-10-22 (grinder-ao-2, PR #2286) — `_refresh_seats_inner` (`src/sessionorc/agent_spend.py`) reads the pairs live now and those live at the pass before (`_seat_live`), so a pair whose last live session ended is read once more and then dropped; `test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped` (`tests/test_seats.py`) charges an ended session's last turn to its record with nothing else on its profile, and fails both with no extra read and with a read that is never dropped.
 
 ---
