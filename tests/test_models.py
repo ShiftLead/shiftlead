@@ -40,6 +40,11 @@ def test_pending_roundtrip_and_defaults():
     p = Pending(kind="permission", text="Bash: git push", deadline="2026-09-07T00:00:00Z", tool_use_id="tu")
     assert Pending.from_dict(p.to_dict()) == p
     assert Pending.from_dict({"kind": "question"}) == Pending(kind="question", text="")
+    # a subagent's prompt keeps its subagent, its name and whether the pane holds it (TD-950); a main
+    # thread's writes none of the three, so its shape is as it was
+    held = Pending(kind="permission", text="Bash: ls", subagent="a1", subagent_name="general-purpose", pane_held=True)
+    assert Pending.from_dict(held.to_dict()) == held
+    assert {"subagent", "subagent_name", "pane_held"}.isdisjoint(p.to_dict())
 
 
 def test_session_roundtrip_is_lossless():

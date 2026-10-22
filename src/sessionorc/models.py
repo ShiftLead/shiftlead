@@ -195,13 +195,31 @@ class Pending:
     text: str
     deadline: str | None = None  # ISO time the hook falls through to the terminal (permission only)
     tool_use_id: str | None = None
+    # A prompt from inside a subagent (design §4.2 *A subagent's dialog is held back*, TD-950): the
+    # subagent's own id and the name it is shown by, from the adapter's neutral fields; `pane_held`
+    # while the pane draws nothing for it, so Allow / Deny are its one channel until the deadline.
+    subagent: str | None = None
+    subagent_name: str | None = None
+    pane_held: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        if not self.subagent:  # a main-thread prompt's shape is as it was: the three are a subagent's
+            for k in ("subagent", "subagent_name", "pane_held"):
+                d.pop(k)
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Pending:
-        return cls(kind=d["kind"], text=d.get("text", ""), deadline=d.get("deadline"), tool_use_id=d.get("tool_use_id"))
+        return cls(
+            kind=d["kind"],
+            text=d.get("text", ""),
+            deadline=d.get("deadline"),
+            tool_use_id=d.get("tool_use_id"),
+            subagent=d.get("subagent"),
+            subagent_name=d.get("subagent_name"),
+            pane_held=bool(d.get("pane_held")),
+        )
 
 
 @dataclass
