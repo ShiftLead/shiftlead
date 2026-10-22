@@ -161,8 +161,27 @@ async def wait_rpc(
     sock: Path | None = None,
     grace: float = RECONNECT_GRACE,
 ) -> tuple[Any, int]:
-    """The `wait` RPC, **carried across a host-agent restart** (TD-086 item 1). Returns
-    `(what wait returned, how many times the connection was actually remade)` — remade, not
+    """The `wait` RPC through `blocking_rpc`: at the deadline, *nothing changed*."""
+    expired = {"changed": [], "mail": [], "wake": None}
+    return await blocking_rpc(
+        "wait", caller=caller, timeout=timeout, expired=expired, sock=sock, grace=grace, scope=scope
+    )
+
+
+async def blocking_rpc(
+    method: str,
+    *,
+    caller: str | None,
+    timeout: float,
+    expired: Any,
+    sock: Path | None = None,
+    grace: float = RECONNECT_GRACE,
+    **params: Any,
+) -> tuple[Any, int]:
+    """A blocking RPC (`wait`, and `pr_wait` since TD-940's live check), **carried across a host-agent
+    restart** (TD-086 item 1), its own `timeout` sent as the time left; `expired` is what it returns
+    when that runs out in a restart's gap. Returns
+    `(what the call returned, how many times the connection was actually remade)` — remade, not
     attempted: a restart takes a few tries at a quarter-second each, and counting those would
     report one promote as four (review of PR #303).
 
@@ -183,6 +202,8 @@ async def wait_rpc(
     the agent died between returning a result, which advances the cursor, and the bytes reaching
     the socket. That window is a write to a local socket wide and is inherent to a request and a
     reply without an ack; it is named here rather than papered over (review of PR #303).
+    A `pr_wait` misses nothing either: the PRs' reading is in the home's repos store, loaded at
+    start, so the reissued call reads it at once (with `fresh`, it waits for a pass after itself).
 
     **A drop is told apart from an agent that is not there.** The first connection is not retried:
     if nothing answers the socket, that is an agent which is down and the caller is told so, as
@@ -196,8 +217,8 @@ async def wait_rpc(
     lost_at: float | None = None  # when the socket went, so the grace is time and not attempts
     while True:
         left = deadline - loop.time()
-        if left <= 0:
-            return {"changed": [], "mail": [], "wake": None}, remakes
+        if left <= 0 and lost_at is not None:
+            return expired, remakes  # out of time in a restart's gap; a first call is always made
         try:
             async with LocalClient(sock=sock, caller=caller) as c:
                 if lost_at is not None:
@@ -205,7 +226,7 @@ async def wait_rpc(
                 connected, lost_at = True, None  # back: a later drop gets a grace of its own
                 # its own bound plus slack: a `wait` is meant to block, and the client must not
                 # give up on the very thing it is waiting for (TD-063)
-                return await c.call("wait", timeout=left, scope=scope, _timeout=left + CALL_TIMEOUT), remakes
+                return await c.call(method, timeout=left, _timeout=left + CALL_TIMEOUT, **params), remakes
         except AgentStuck:
             # the agent is there and did not answer: remaking the connection would hide a wedged
             # agent behind a *nothing changed* at the deadline, which is worse than the hang this
