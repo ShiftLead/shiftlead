@@ -109,7 +109,11 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # say *no PRs*, and the truth is *not known from here*.
 # `queue`: the Queue's reading (§4.4, TD-769); `shape`: the teams' shape (§4.4 *Team shape*, TD-834); `seats`: the
 # seat ledger's (§4.4 *Spend per seat*, TD-830)
-HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats"})
+# `pr_wait`: `ao pr wait`, a block on the PRs' reading (§4.7, TD-940)
+HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats", "pr_wait"})
+# The calls that mean to block (§4.10, §4.7 *ao pr wait*): each holds a connection of its own, which
+# a closed client cancels (`_serve_wait`), and a node forwards it with no bound but its own
+BLOCKING = frozenset({"wait", "pr_wait"})
 # The ledger ids the home gives (§4.4 *A ledger entry's id is handed out by the home*, TD-696): `ids.json` is the
 # home's alone, so `td_next` is forwarded while the link is up and refused offline — a person's call too, checked
 # before the person-is-served return, or a node would give its own ids and the counter would split per host. It is

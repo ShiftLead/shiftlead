@@ -32,7 +32,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Live check #993 — waits on a look from a node (TD-299) |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — decided 2026-10-21 (TD-028's list is enough); the designer's |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
 | TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644, TD-645 build it |
@@ -72,9 +71,15 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
-| TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Open |
+| TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Built — live check on #2244 (`ao pr wait` on a real PR, then the cadence check); the procedure pair is TD-946 |
+| TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Designed — a screen rule reads the dialog as `limited`; builds TD-944 |
 | TD-942 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed 2026-10-21 with Paul — review rounds under way (held) |
+| TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
+| TD-944 | Gemini's screen-rule manifest: the *Usage limit reached* dialog reads `limited` (`gemini-usage-limit`), over the title's `✦` | Medium | Open |
+| TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
+| TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Open |
 | TD-948 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
+| TD-949 | No test would catch the tick dropping `remote=` from its `pr_reading` call: a GitLab repo would be read through `gh` again with the whole suite green | Medium | Open |
 
 ---
 
@@ -409,48 +414,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-623: No document says how a repo gets its first ShiftLead team
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-09 (Paul, while starting guardians' team)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Open. Standing up guardians' team (2026-10-09) needed facts spread across design §4.4a,
-§4.9, §4.9b, §4.9c, `docs/briefs/README.md`, the package role templates, two working examples
-(contractmatch's and dev-cadence's repo config and briefs) and TD-299's step list. A session
-in the new repo had to be handed a brief written from all of them. **Decided 2026-10-21** (Paul, on the
-board's line *No document says how a repo gets its first ShiftLead team*): the list is enough to write
-from — *See TD-028 on guardians-devenv*, its **agentorc doc gaps** list, measured against `ao team --skill`
-(`src/shiftlead/team_skill.md`). Paul's three: nothing covers an umbrella repo whose work lands in other
-repos; lanes are under-documented (the `owner:` lane word, and that a `free-pick` lane also takes every
-decided board line and every red or sync PR, so a board line cannot be kept from a team and for dnsguard
-the briefs are the only fence); nothing says what goes in a container node's `env` file or which command
-does the logins. The list adds: keeping an entry from workers (`Owner: paul`), a TD-id lane matching
-nothing in code, what a node does to the devcontainer, a token's scope as the fence, and the
-`settling`/`held`/`waiting`/`needs_team` marks an empty first lane is read through.
-**Location:** a new how-to (where it lives is part of the fix: the README's *Run it*, a
-`docs/` page, or `ao`'s skill text), `docs/briefs/README.md`, design §4.9.
-
-**Why:** every repo that joins repeats the same search, and a brief written from memory goes stale
-(the retired `guardians-orchestrator.md` did: it said the repos were not on kmaster and the
-devcontainer question was open, both untrue by the time it would have run).
-
-**Fix:** one page, in order: what the repo must have first (the cadence, §4, a ledger whose entries
-carry `Blocked by:` so a worker can pick), `.shiftlead.yml` (teams, flows, `held:`), the briefs as
-supplements and the techlead primer, `ao org check`, `ao team start` on the host, then the
-container node (`hosts.yml`, the node's `env` and logins, `ao host up`, `place:`) — and which of
-those are the person's. Fold in each gap guardians-devenv TD-028 records, and say what a
-constellation (an umbrella ledger, PRs in sibling repos) does differently.
-
-**Done when:** a session in a repo with no team stands one up from that page alone, without a
-brief written for it.
-
-**Related:** TD-299, guardians-devenv TD-028 and `docs/briefs/team-setup.md`, TD-055 (archived
-with the retired brief).
-
----
 
 ## TD-636: A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated
 
@@ -1459,14 +1422,50 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 
 ---
 
+## TD-940: `ao pr wait <n>` — block on the home's folded reading of a PR's checks, so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab alike
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-21 (Paul, with the ao-paul session)
+**Owner:** grinder
+**Kind:** live-check #2244
+**Status:** Built — slice 1 built (#2241, grinder-ao-1): `ao pr wait <n>` on the GitHub reading, the
+`pr_wait` RPC, design §4.7. Slice 2 built (#2244, grinder-ao-1; scope steered with the techlead,
+m-eb7127cfc157): the reading per forge — a GitLab origin's open MRs with the head pipeline's fold,
+`conflicting` and `required` on the row, windows/`recent`/held unread there; another host read through `gh` as
+before, and one `gh` never read refused by the wait (5); §4.4's per-forge sentence. Nothing reads the row's
+`required` yet: a `done` naming a GitLab MR still reads `gh pr view` and the by-base `required` (`_pr_checks`),
+and the cadence's `forge` setting (GitHub Enterprise, a GitLab host not named `gitlab.*`) is not read by the
+home — both are for an entry when a GitLab repo joins. Slice 2 merged by the techlead (m-71833f63987e). The
+procedure's pair and the memory's retirement are TD-946 (dev-cadence's: `docs/procedures/cadence.md` is its SYNCED
+file). Left: the live check — once #2244 is live (`ao promote status`), a kmaster session waits out one real PR's CI
+with `ao pr wait <n>` (a read of the home, nothing pressed) and runs `scripts/check_cadence.py --pr <n>` after it;
+the word and exit code are read against `gh pr checks <n>`.
+**Location:** design §4.7 (a new `ao pr wait <n>` paragraph beside `ao pr held <n>`), §4.4 *Repos* (the `prs` reading's `checks` and `conflicting` fold); `docs/procedures/cadence.md` and `docs/claude-memory/no-checks-means-conflicting.md` (the pair to write and the memory to retire); `src/shiftlead/cli.py` (`ao pr`, ~L4467 `ao wait` for the blocking shape), `src/sessionorc/agent_serve.py` (the `wait` RPC, `_serve_wait` ~L229) and `src/sessionorc/agent_remote.py` (its client side), `src/sessionorc/reports.py` (`_gh_prs` ~L617, `fold_checks` ~L342, `failing_items` ~L314, the `gh pr view` read ~L573 — GitHub-only today); `tests/test_cli.py` and the tests of `fold_checks`
+
+**Why:** Every session that opens a PR waits for its checks before `scripts/check_cadence.py --pr N`, and each writes its own `gh pr checks` loop. Two went wrong on 2026-10-21 alone in the ao-paul session: one read an empty check list as "no CI" (the PR was conflicting, the memory *no checks means conflicting*), one tested a rollup field that never reported and sat until Paul asked whether something was broken. The home already makes the judgement once, on its tick: the `prs` reading folds every open PR's `statusCheckRollup` into *green*, *red*, *pending* or *none* and reads `conflicting` from the merge state, with the fold's rules in §4.4 (`fold_checks`), and `ao wait` is already a thin blocking RPC on the host agent. Paul, 2026-10-21: standardise the background wait as an `ao` call, and *make sure it will work for GitLab/other as well as GitHub* — the fold reads `gh` today, so a GitLab remote has no reading at all.
+
+**Fix:**
+- **`ao pr wait <n> [--timeout S] [--json]`**: blocks until the home's reading of PR `n` in the session's repo leaves *pending*, then prints the word and exits by it — `0` green, `1` red, `2` conflicting, `3` none (no CI on the base), `4` timeout. `--json` prints the folded reading: `checks`, `conflicting`, `failing` (the names), `head` (the sha the reading is of) and `read_at`, so a caller can see the wait was on its own commit. Shape as `ao wait`: a call to the host agent, its own connection, Ctrl-C ends it; the wake is the reading's refresh, so the latency is the tick, and `--fresh` asks the home to re-read that repo's PRs first. A number the reading does not hold (closed, merged, another repo) is refused in words, exit `5`.
+- **One fold per forge, the wait names none.** The reading's fold moves behind a forge seam in `reports.py`: the GitHub fold is the one that exists (`gh pr view` and `statusCheckRollup`); a **GitLab** fold beside it reads the merge request's head pipeline (`glab mr view <iid> --json` or the API's `merge_requests/<iid>` with `head_pipeline.status` and `detailed_merge_status` / `has_conflicts`) into the same four words and the same `conflicting`, *none* for a project with no pipeline. The forge is picked from the repo's remote host, as the cadence's `scripts/forge.py` does (GitHub by `gh`, GitLab by `glab`, picked by the remote's host, TD-104), and a remote on no known forge gives the reading `error` and the wait exit `5` with the why. `required` (§4.4, the base's required check names) gets the same seam — GitLab's are the pipeline's jobs that `allow_failure: false`. Every test of the fold runs on both forges' fixtures.
+- **The cadence says the pair** (now TD-946, dev-cadence's). `docs/procedures/cadence.md`: `ao pr wait N && scripts/check_cadence.py --pr N` is how a kmaster session waits; a cloud session has no `ao` to call (ADR 2026-09-24: `ao` has nothing to talk to there), so its CI wait stays the GitHub MCP tools' and the cadence check runs from kmaster on its PR's number, as the ADR says. The *no checks means conflicting* memory is retired (the wait says *conflicting*), with a line in `MEMORY.md` pointing at the command.
+- Design: the §4.7 paragraph, and §4.4's reading sentence gains *per forge* with the GitLab fold's rules beside GitHub's. A history line under §4.7.
+
+**Done when** `ao pr wait` returns the word and exit code for a GitHub PR and a GitLab merge request in tests, and the live check waits out one real PR's CI on kmaster and the cadence check follows it (the procedure and memory: TD-946).
 ## TD-941: A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read
 
 **Priority:** Medium
 **Type:** debt
 **Added:** 2026-10-21 (grinder-ao-2, TD-785's live walk)
-**Owner:** grinder
+**Owner:** designer
 **Kind:** design-first
-**Status:** Open — found 2026-10-21 by TD-785's walk on `gemini-conformance` (0.64.0, an API-key home): the free tier's quota ran out mid-turn and the tool drew its own dialog — *Usage limit reached for gemini-3.8-flash … ● 1. Keep trying  2. Stop* — while the title still read `✦  Working… (conformance-walk)` and no hook fired, so the record stayed `working` (hook) for the rest of the step's 300 s (`tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`). Design §4.3 maps `✦` to working and gives Gemini's `usage` only a Google-login home's quota endpoint (TD-786); an API-key home reports none, so nothing marks the session `limited`, and a dialog that waits on a choice is not `needs-you` either.
+**Blocked by:** TD-944
+**Status:** Designed 2026-10-21 (the designer; design §4.3 *The limit dialog is read off the screen*, §4.2): read
+from the screen, as §4.2 already gives `limited` from a tool's own limit message — no hook fires and the title
+is stale, and choosing *Stop* for an unattended launch would type into a dialog on a guess, the race §4.2
+refuses. The adapter gains its own screen-rule manifest, one rule `gemini-usage-limit` → `limited` with
+`pending: {kind: limit}`, asked before the title and written `scraped`; no reset time (none named, no endpoint
+on an API-key home); the card and Inbox draw it as Claude Code's limit. Built by TD-944. Was: Open — found 2026-10-21 by TD-785's walk on `gemini-conformance` (0.64.0, an API-key home): the free tier's quota ran out mid-turn and the tool drew its own dialog — *Usage limit reached for gemini-3.8-flash … ● 1. Keep trying  2. Stop* — while the title still read `✦  Working… (conformance-walk)` and no hook fired, so the record stayed `working` (hook) for the rest of the step's 300 s (`tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`). Design §4.3 maps `✦` to working and gives Gemini's `usage` only a Google-login home's quota endpoint (TD-786); an API-key home reports none, so nothing marks the session `limited`, and a dialog that waits on a choice is not `needs-you` either.
 **Location:** design §4.3 *The second adapter: Gemini CLI* (*Two gaps*, `usage`), §4.2 (`limited`); `src/shiftlead/adapters/gemini/`
 
 **Why:** an unattended Gemini member that hits its quota sits `working` at a dialog nobody is asked about: no doorbell, no rule 5, no `limited` chip, until the stall check (if its spinner stops) — the state the product exists to show is wrong at the moment it matters.
@@ -1515,3 +1514,201 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 **Related:** TD-942 (the ending card, which reads the ledger at the ending), TD-818 / TD-830 (Spend per seat).
 
 ---
+
+## TD-943: A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (the designer, from TD-623; guardians-devenv TD-028 step 4)
+**Owner:** designer
+**Kind:** design-first
+**Waits:** event — Paul's answer on guardians-devenv's board line *Should the new guardians team land docs and demo changes as paired PRs*, which names this change as its third answer. On that answer the entry is designed; on *Paired PRs* (the default) or *Umbrella-only* it drops to Low and its wait becomes `event — a second umbrella team`, since paired PRs work and only a second constellation would show the cost
+**Status:** Open. A team is on one repo (design §4.9 *Teams*): `ao progress done --pr <n>` is an integer read
+with `gh` in the record's checkout, `held:` globs match that repo's paths, and the red-PR and sync-PR work
+orders and the PR and Doing facets read that repo alone, so in an umbrella over sibling repos
+(dev-cadence's `docs/nested-repos.txt`) a sibling's PR number is read as the umbrella's PR of that
+number, a sibling path can never be held, and an open sibling PR is strandable with no page showing it.
+`ao team --skill` (TD-623) tells such a team to land paired PRs meanwhile.
+**Location:** design §4.9 *Teams*, §4.9c (`held:`), §4.8 (`ao progress`); `src/sessionorc/agent.py`
+(`_pr_checks`), `src/sessionorc/held.py`, `src/sessionorc/workorders.py`
+
+**Why:** an umbrella is dev-cadence's own shape, so ShiftLead meets it on every constellation; paired PRs
+work, but the sibling half has no gate and no page.
+
+**Fix:** design first: a repo-qualified PR reference (`owner/repo#n` or a URL) on `--pr` and the record;
+whether `held:` and the PR readings follow the umbrella's hydrated siblings; and whether a sibling PR is
+gated, and by whose `gate:`.
+
+**Done when** the design says how a team over an umbrella names, reads and gates a sibling PR, and the
+builds are in the ledger.
+
+**Related:** TD-623, guardians-devenv TD-028.
+
+---
+
+## TD-944: Gemini's screen-rule manifest: the *Usage limit reached* dialog reads `limited` (`gemini-usage-limit`), over the title's `✦`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (the designer, from TD-941)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open.
+**Location:** `src/shiftlead/adapters/gemini/` (`__init__.py` `explain`, a new `screen_rules.toml`), the tick's title verdict (`agent_tick._title_verdict`), `sessionorc/agent.py` `rpc_explain`'s `state_in_title` branch
+(a non-`title` match gets its own reason, *rule gemini-usage-limit matched, applied as scraped; held for
+its screen*, never `_title_reading`'s), `tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`; design §4.3 *The limit dialog is read off the screen*, §4.2
+
+**Why:** an unattended Gemini member that meets its quota sits `working` at a dialog nobody is asked about (TD-941).
+
+**Fix:** as design §4.3 says: `adapters/gemini/screen_rules.toml`, loaded with `sessionorc.screen.Manifest`
+as Claude Code's is, holding one rule `gemini-usage-limit` — `state = "limited"`, region 15, `all` the box row
+*Usage limit reached for* and the box row *2. Stop*, each led by a `│` border (the right one not required, as §4.3 says),
+`pending = {kind = "limit", text = "Gemini's usage limit reached — answer its dialog in the terminal"}`; the
+*2. Stop* pattern allows the selection marker before the number (`│\s*\S?\s*2\.\s*Stop`). `GeminiAdapter.explain`
+reduces the tail with `painted_text`, then asks the manifest first and the title second. In the tick
+(`agent_tick.py`), three gates change for a title adapter, so the hold §4.2 already describes works:
+`_screen_verdict` no longer returns None for every `state_in_title` adapter — it asks the manifest, with
+`_hook_fresh` (the stall window) replaced for a title adapter by the one-tick test `_title_reading` uses, in
+`_screen_gone` as well (a working Gemini fires hooks, so the stall window would hold a cleared box for 20
+minutes) — and a match takes the screen road, written `scraped` with the
+replaced state saved in `_hook_state`, where `_title_verdict` pops it; `_screen_gone` reads *the manifest
+matches nothing*, not *`_screen_verdict` was None*; and the restored state keeps its saved confidence (`hook` or `title`, both told; `agent_tick.py` restores
+`saved[2]` already, unchanged), so
+`_title_reading` compares the title's next verdict with it on the following tick. The screen road writes nothing over a poll-marked `limited` (`hook` confidence: it keeps its reset, state,
+pending and confidence, and is not saved as `_hook_state`) — the guard is on an equal-state verdict only, one that
+would change the pending alone; a verdict naming another state (Claude Code's `needs-you` rules, `held-peer-message`
+among them) takes the screen road over it as today, saving the poll's `(limited, pending, hook)` in
+`_hook_state` as any replaced state, restored when that screen goes (a `stalled?` verdict such as
+`remote-control-standdown` is not `_screen_held`, so its screen never restores it: the poll's next reading
+re-marks it `limited`, `_pre_limited` then `stalled?`, as today) — a restore the poll has since lifted is
+stale until its next poll lifts it again, accepted. The guard is what keeps a scraped limit message from
+overwriting the poll's reset (Claude Code's `usage-limit` text over the endpoint's cap today); a `scraped` `limited` is the screen road's as today, so
+Claude Code's limit message still updates its pending and yields to a later rule's verdict. §4.10's no-reset send text is the reply to a send
+to a `limited` record that holds a modal rule's verdict — the same test `_usage_limits` uses (`scraped`, and
+`adapter.explain(s.tail)` modal) — since `Pending` carries no reset field (`mail.py`'s `limited` reply prints
+`pending.text` as the cap today). In `_observe`, for a title
+adapter, the chain is `_screen_verdict` → `_screen_gone` → `_title_verdict` (today the title runs first), so the
+box-gone tick restores the replaced state and the title is compared with it on the tick after;
+`_screen_gone` is False when nothing is saved in `_hook_state` and the record already reads `idle` — a
+general condition, not gated on `state_in_title`, and behaviour-neutral for a hook-fed adapter (it re-wrote
+`idle`, `scraped` over the same, and the stall check it skipped reads `working` alone) —
+(nothing to restore, so the chain goes on to the title's compare on the same tick, and the no-saved fallback
+below is the title's to overrule rather than re-written every tick); `_title_verdict` ignores a match whose
+`rule` is not `title …` (the manifest's verdict is the screen road's), and a `scraped` record whose manifest still matches is never
+compared with the title; `_title_reading`'s `elif not s.told` gains one exception, a `scraped` record whose manifest
+matches nothing (the no-saved fallback below), compared as a told one — never the whole `_screen_held` set.
+`_title_reading` sees only the one `Match`: since `explain` asks the manifest first, a title-rule `m` (`rule`
+starting `title `) on a `scraped` record is the no-match case, and no second `explain` is asked (`rpc_explain`'s
+title branch calls it with the same `m`). For that case the no-event guard (`m.state == s.state`) gives way too:
+an equal verdict is taken as a confidence upgrade, re-written `title` with the same state (`set_state` keeps
+`since` and `rev` for an unchanged state), so the fallback `idle` under `◇` becomes told and the doorbell, the
+nudge and the wrap-up read it; `rpc_explain`'s reason says so. Its tests: a `scraped` `idle` under `◇` reads
+`idle` (`title`) with `since` and `rev` unchanged; under `✦` it reads `working` (`title`); a Claude Code `scraped`
+`idle` is untouched. A manifest rule gains `modal = true` (`sessionorc.screen.Rule.modal`, false where unset), set on
+`gemini-usage-limit` alone; `Match` carries it. `Manifest.load` reads it as `bool(raw.get("modal", False))`, `Manifest.explain` passes `rule.modal` into the
+`Match` it builds, and `Match.to_dict` carries it, so `ao explain` prints it
+(check the tests that assert that dict's keys). One helper answers *is this record's `limited` a modal rule's* — `agent_common.limit_is_modal(s, adapter)`:
+False for no record (`agent_inbox.py` passes `s` None for a seat nobody fills), else `scraped`, and `adapter.explain(s.tail)` a modal match — read by `_usage_limits` and by the three callers that
+compute `mail.read_when`'s adapter-dependent flags (`agent_inbox.py` ~474, `agent_mail.py` ~771,
+`agent_serve.py` ~81/84), which pass it as a new `read_when(…, modal_limit=…)` flag, computed for a record of this host only, as
+`agent_mail` and `agent_serve` compute `cache` (`records[sid].host == self.host`: a node's record's tail is the
+node's); a record on another host
+gets the cap form. On a `scraped` `limited` record `_usage_limits` asks
+`adapter.explain(s.tail)` (`getattr`-guarded: no `explain`, or no match, is not modal; a title adapter is asked
+without a title, which reads the manifest alone) and never
+lifts it while the match is `modal` (the record's own tail is the authority, so a host-agent restart forgets
+nothing; no tick-side dict) — it never lifts a `limited` a modal rule set (today `not cap` lifts every kind-`limit` record, so an
+API-key home's was lifted on every poll); every other lift is as today (Claude Code's limit message is not
+modal; a lift of it lasts until its rule next matches, as today — that flap is Claude Code's and not this entry's), and a lifted scraped record
+goes back to its `_hook_state`, dropped then, not to `_pre_limited`'s `working`; with none saved (a restart,
+or nothing the screen road replaced) it reads `idle`, `scraped`, as `_screen_gone` does with nothing saved —
+or where the saved state is a hook's and no hook has reported since the restart
+(`_screen_gone`'s second guard) — and for a title adapter that `idle` is the title's to overrule:
+`_title_reading` compares a `scraped` record whose manifest matches nothing as it does a told one, so the next
+title verdict takes it. `_screen_held` is unchanged (`_screen_gone` needs it as it stands). The lift's restore is chosen by the record: a `scraped` `limited` goes back to its
+`_hook_state` (else the `idle` above); a poll-marked one (`hook`) to `_pre_limited`'s state, `working` where none,
+as today — `_pre_limited` stays. For Claude Code's scraped limit message that is a change: its lift went to
+`working` (`hook`), and now to the state the verdict replaced. Pending text is the literal
+*Gemini's usage limit reached — answer its dialog in the terminal* (`$line` substitutes only bare).
+`tests/conformance/fixtures/gemini/manifest.json` declares `6-a-doorbell.txt` `limited` (it reads `null` today,
+and `test_every_pane_reads_as_a_state` asks `explain` with no title).
+
+**Done when** `ao explain --file tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt -a gemini --title
+'✦  Working… (conformance-walk)'` (without `-a gemini` it runs Claude Code's rules, whose `usage-limit` also matches) names `gemini-usage-limit` and `limited`; a test feeds the tick a hook-fed
+`working` Gemini record older than one tick with that pane and title and reads `limited`, `scraped`, its
+`pending.kind` `limit`, its replaced `working` kept; then the same record with the box gone and `◇` reads the
+kept `working` (`hook`) on the next tick and `idle` (`title`) on the one after; the conformance suite passes
+with the pane declared `limited`; a usage poll on a profile with no reading leaves the `scraped` record
+`limited` while the box is up, and a hook 2 minutes old does not keep a cleared box's `limited`; `conformance`
+reads the raw pane through `explain`'s `painted_text`; a record lifted to the no-saved
+fallback (`idle`, `scraped`) with no box up reads `idle` (`title`) under `◇` and `working` (`title`) under `✦` on
+the next tick; Claude Code's scraped `limited` takes a changed pending from its rule, and a Claude Code record at
+`idle`, `scraped` with nothing saved stays so across ticks, a Claude Code `usage-limit` pane over a poll-marked
+`limited` keeps the poll's pending, and a `held-peer-message` pane over one reads `needs-you`, `scraped`, with
+`(limited, pending, hook)` saved, and with the pane gone reads `limited` (`hook`) with the poll's pending back (the test seeds
+`_last_hook[s.id]` older than `STALL_AFTER`, the hook the record had before the poll marked it: `_screen_gone`'s
+restore reads `_last_hook`, never `hook_seen_at`, and a fresher hook keeps the pane's rule from firing) (a regression test of each); a record whose replaced state was told (`hook` or `title`) reads `limited` with the box up; a box over a
+`title` state (`◇`) restores that state with `title` confidence and the title's next verdict is compared with it; a pane with the marker
+on *Stop* still matches; a record the poll marked `limited` keeps its pending and `hook` confidence when the
+box appears; `ao explain --json` prints `modal`; a send to the box's record replies with §4.10's no-reset text;
+`explain` on the box returns
+`modal` true; `ao explain` on a live record at the box gives the rule's reason; a pane whose
+transcript quotes *Usage limit reached for* outside a box matches nothing.
+
+**Related:** TD-941, TD-785, TD-786.
+
+---
+
+## TD-946: The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-21 (grinder-ao-1, split from TD-940 once its build merged in #2244)
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Open
+**Location:** `docs/procedures/cadence.md` (a SYNCED FILE, dev-cadence's: the change is made there and synced); `docs/claude-memory/no-checks-means-conflicting.md` and its `MEMORY.md` line
+
+**Why:** TD-940 built `ao pr wait <n>` (#2241, #2244), which folds a PR's checks into one word and says *conflicting* where `gh pr checks` printed nothing. Its Fix had the cadence say the pair, so no session hand-rolls a CI poll, but the procedure is a dev-cadence SYNCED file a grinder here cannot edit.
+
+**Fix:**
+- `docs/procedures/cadence.md`: `ao pr wait N && scripts/check_cadence.py --pr N` is how a kmaster session waits for a PR's checks; a cloud session has no `ao` to call (ADR 2026-09-24), so its CI wait stays the GitHub MCP tools' and the cadence check runs from kmaster on its PR's number. Written in dev-cadence (where `ao` is shiftlead's and a repo without it keeps `gh pr checks --watch`) and synced here.
+- Once synced: `docs/claude-memory/no-checks-means-conflicting.md` retired, its `MEMORY.md` line pointing at `ao pr wait` instead (the wait says *conflicting*); the *wait for CI with gh pr checks --watch* memory likewise.
+
+**Done when** the synced procedure names the pair and neither memory tells a session to read `gh pr checks` itself.
+
+## TD-947: A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.2 *Permissions are answered through the hook, not through keystrokes* (*the terminal dialog is not held back*) and the event table's subagent row (`docs/design/4.2-state-feed.md`); `src/shiftlead/adapters/claude_code/hook.py` `translate()` (the `PermissionRequest` branch runs before the `agent_id` one, so a subagent's request reads as the main thread's) and `main()` (blocks up to the profile's `permission_wait`); `src/sessionorc/agent_hook.py` ~L62 (a payload with no `tool_use_id` gets `<session>:<time>`, so the call's own `PostToolUse` cannot end the waiter); the card's and Focus's *Needs you* (`pending.text`), §4.5a
+
+**Why:** Paul saw *Needs you* on td-156 (2026-10-21 20:36 MDT) and took it for a false positive: the pane was in auto mode, the main thread had ended its turn, and the only thing running was a background *Sonnet design review* subagent, drawn as `general-purpose  Grepping code for mode_act`. No dialog was on screen. The record says it was a real wait. `pending` was `Bash: grep -rn "mode_act\|…" src … | head -40` with a synthesized `tool_use_id` (`ao-shiftlead-td-156:2026-10-22T02:36:26Z`), and `subagent_at` stayed at 02:36:21Z through the whole 10-minute wait, so the subagent's grep did not run: it waited on shiftlead's hook. The pane showed no dialog at 20:39 MDT, three minutes into the hook's wait, which ended at 02:46:26Z (20:46 MDT). Paul's later screenshot shows one at 20:48, as *Bash command · from the general-purpose agent · 1 of 2*. It carried Claude Code's reason: *Auto mode classifier requires confirmation for this command. 3 consecutive actions were blocked … Latest blocked action: [Irreversible Local Destruction]*. So auto mode can send a read-only grep to the person: here its classifier had blocked three actions in a row and labelled this one destructive. Why a grep was labelled that way is Claude Code's, not shiftlead's. §4.2 says the terminal dialog appears a few seconds into the hook's wait, so both channels work. Seen once, on a background subagent, it did not: Claude Code appears to hold a subagent's dialog back while the hook blocks. Then **Allow** / **Deny** is the only channel for the wait, and nothing on the card or Focus says so. Two costs follow. A person who reads the pane as the truth dismisses a real prompt, as here, and the subagent sits blocked for the full `permission_wait`. And an idle main thread reads `needs-you`, so mail does not ring it.
+
+**Fix:** design first, then build.
+- Read a captured `PermissionRequest` payload from a background subagent (`CAPTURE_ENV`, on a scratch home). Find out whether it carries `agent_id` and `tool_use_id`. Confirm that a subagent's dialog waits for the hook, on a background subagent and on a foreground one (seen once, 2026-10-21, on a background one).
+- §4.2 states the subagent case as the capture finds it: where the pane draws no dialog while the hook blocks, the pending row names the asker (*a subagent's: Grepping code for mode_act*) and says the pane will not show it. If the payload has an `agent_id`, the adapter carries it as a neutral field. The core reads no tool's field (§4.2, §4.3).
+- §4.2 decides what the main thread's state is while only a subagent waits: `needs-you` (as now) or idle with the subagent's prompt beside it. It also decides whether a subagent's wait should be shorter than `permission_wait`, since the terminal cannot answer it meanwhile, and whether the card carries the tool's own reason line (here the auto-mode classifier's).
+- The card and Focus draw the decided words. §4.5a's row says what **Allow** / **Deny** answer there.
+
+**Done when** a background subagent's permission on a scratch home shows a *Needs you* that names the subagent and says the pane will not show the prompt, the design says what the session's state is meanwhile, and §4.2 says when the pane draws a subagent's dialog, as the capture found.
+
+## TD-949: No test would catch `_read_repo` dropping `remote=` from its `reports.pr_reading` call: a GitLab repo would be read through `gh` again with the suite green
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1, auditing #2244)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` `_read_repo` (~L3474, `reports.pr_reading(root, now, old=prs, held=held, remote=remote)`); `tests/test_pr_wait.py` (the slice-2 tests call `reports.pr_reading(..., remote=...)` directly and put `_repos[root]["prs"]` in by hand)
+
+**Why:** PR #2244 (TD-940 slice 2) makes the per-forge reading depend on one changed line: the tick passes the checkout's origin to `pr_reading`. Without it `forge_of("")` reads as GitHub and every GitLab repo is read through `gh`, which is the behaviour the PR removed. Probe on `origin/main` (c323b3386): change that line to `reports.pr_reading(root, now, old=prs, held=held)` and run the whole suite (`PYTHONPATH=$PWD/src pdm run pytest -q tests`): 3877 passed, and the only failure is `tests/conformance/test_conformance.py::test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness`, which does not touch the reading. The line was restored afterwards. The new tests all call `pr_reading(remote=...)` themselves, and `test_ao_pr_wait_returns_a_gitlab_mrs_word` seeds `agent._repos` by hand, so no test goes through `_read_repo` with a GitLab origin.
+
+**Fix:** a test that runs the tick's `_read_repo` (or a tick pass) on a checkout whose origin is a GitLab URL, with `reports._glab_api` faked, and asserts the repo's `prs` carries `forge: gitlab`; it fails with the `remote=` argument removed.
+
+**Done when** that test exists and fails when the `remote=remote` argument is removed from `_read_repo`.

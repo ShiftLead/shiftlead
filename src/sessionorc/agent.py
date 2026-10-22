@@ -732,6 +732,7 @@ class HostAgent(
         self.repos_store = RepoStore()
         self._repos: dict[str, dict[str, Any]] = self.repos_store.load()
         self._repos_read_at = float("-inf")  # monotonic: the first tick reads
+        self._repos_fresh = False  # `pr_wait --fresh` asked for the next tick's PR pass (TD-940)
         self._boards_read_at = float("-inf")  # monotonic: the boards' own clock, `BOARD_EVERY`
         # monotonic, by root: when a write-back last re-read that board (`_reread_board`), so a tick's
         # read that began before it does not put the board from before the press back
@@ -903,6 +904,66 @@ class HostAgent(
         what it never draws. The home's; a node forwards it (§4.4a)."""
         views = {root: v for root in self._repos if (v := self._repo_view(root)) is not None}
         return {root: reports.omitted(v, omit) for root, v in views.items()} if omit else views
+
+    PR_WAIT_STEP = 2.0  # seconds between looks at the reading: it lives in memory, so a look is free
+
+    async def rpc_pr_wait(self, root: str, pr: int, timeout: float = 1800.0, fresh: bool = False) -> dict[str, Any]:
+        """`ao pr wait <n>` (design §4.7, TD-940): block until the home's reading of PR `pr` in the
+        checkout `root` leaves *pending*, and return `{pr, word, checks, conflicting, failing, head,
+        read_at, url}` — `word` one of `reports.PR_WAIT_EXIT`'s. The wake is the reading's refresh,
+        so the latency is the tick's `REPOS_EVERY`; `fresh` makes the next tick's pass due and counts
+        only a reading taken after the call. A number the reading does not hold is *gone* once a
+        reading taken after the call still lacks it (a PR opened a minute ago is not yet in the one
+        before), and at `timeout` the word is *timeout* with the last row; `read_error` is the last
+        read's failure, if it failed. A read: it decides nothing
+        on its caller, and the client names the root (`ao` sends its record's repo). Its connection
+        is held as a `wait`'s is (`_serve_wait`), so a Ctrl-C ends it here too. The home's."""
+        want = str(Path(root).resolve())
+        key = next((r for r in self._repos if str(Path(r).resolve()) == want), None)
+        if key is None:
+            raise RpcError(f"the home holds no reading of {root}: it is not a checkout the repos registry lists")
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + max(float(timeout), 0.0)
+        began = datetime.now(UTC)
+        if fresh:
+            self._repos_fresh = True  # the next tick reads every repo's PRs, this one's among them
+        row: dict[str, Any] | None = None
+        at = ""
+        while True:
+            prs = (self._repos.get(key) or {}).get("prs") or {}
+            at = str(prs.get("at") or "")
+            taken = reports._when(at)
+            after = taken is not None and taken >= began
+            got = next((p for p in prs.get("open") or [] if isinstance(p, dict) and p.get("number") == int(pr)), None)
+            if got is not None:
+                row = got
+            other = reports.forge_of(str((self._repos.get(key) or {}).get("remote") or ""))[0] == "other"
+            if prs.get("error") and not at and other:  # a forge with no reading, never read: nothing to wait on
+                word = "gone"
+                break
+            if after or not fresh:
+                if got is None and after:
+                    word, row = "gone", None  # an earlier reading's row is not this one's
+                    break
+                if got is not None and (word := reports.pr_wait_word(got)) != "pending":
+                    break
+            if loop.time() >= deadline:
+                word = "timeout"
+                break
+            await asyncio.sleep(min(self.PR_WAIT_STEP, max(deadline - loop.time(), 0.0)))
+        row = row or {}
+        return {
+            "pr": int(pr),
+            "word": word,
+            "checks": row.get("checks"),
+            "conflicting": bool(row.get("conflicting")),
+            "failing": list(row.get("failing") or []),
+            "head": row.get("head"),
+            "url": row.get("url"),
+            "read_at": at or None,
+            # the last read failed (`gh` offline, a lapsed token): the reading is the one before it
+            "read_error": str(prs.get("error") or "") or None,
+        }
 
     async def rpc_queue(self, omit: list[str] | None = None) -> dict[str, Any]:
         """The Queue's reading (design §4.4 *The Queue: cards, and the rank that orders them*, TD-769):

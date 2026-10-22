@@ -194,7 +194,7 @@ class ServeMixin:
                     # here on this connection is a link, not a client.
                     await self._serve_link(req["link"], reader, writer)
                     return
-                if req.get("method") == "wait":
+                if req.get("method") in modes.BLOCKING:
                     if writer in self._subscribers:
                         writer.write(b'{"error": "a wait runs on its own connection, never a subscribed one"}\n')
                         continue

@@ -794,7 +794,7 @@ def cmd_roles(args: argparse.Namespace) -> int:
 # ── ao team (design §4.9) ─────────────────────────────────────────────────────────────────────
 
 
-def _org_notes(what: str = "ao team") -> tuple[orgmod.Org, list[str]]:
+def _org_notes(what: str = "ao team", stand_in: dict[str, pathlib.Path] | None = None) -> tuple[orgmod.Org, list[str]]:
     """The org as the clients aggregate it (design §4.9 *The org is an aggregate*, TD-229), and the
     aggregate's notes: `~/.shiftlead/org.yml` plus the `teams:` of every checkout in this host's
     repos registry — the one function the pages read too (`orgmod.with_repos`), so `ao team` gives
@@ -809,7 +809,9 @@ def _org_notes(what: str = "ao team") -> tuple[orgmod.Org, list[str]]:
             f"{hosts.local_host().name} is a node, and a node does not read the org from the home "
             "(design §4.4a: decided, not built)"
         )
-    org, notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync))
+    org, notes = orgmod.with_repos(
+        orgmod.load(), hosts.local_host().repos(), repos_of=teamrun.repos_via(call_sync), stand_in=stand_in
+    )
     return orgmod.with_home_settings(org), notes  # the flow each team runs now (§4.9c, `teams.<team>.flow`)
 
 
@@ -829,8 +831,17 @@ def cmd_org(args: argparse.Namespace) -> int:
     reading as a verdict, exit 1 when something is lacking. Reads and writes nothing; the reading
     itself is `shiftlead.orgcheck`."""
     what = "ao org check" if args.action == "check" else "ao org"
+    stand_in: dict[str, pathlib.Path] = {}
+    if args.root is not None:  # a definition checked on its branch, before it merges (§4.7, TD-942)
+        if args.action != "check":
+            return fail(args, "only `ao org check` takes --root", 2)
+        if not hosts.is_node():  # a node refuses below, naming the home
+            try:
+                stand_in = orgcheck.stand_in_for(args.root, hosts.local_host().repos())
+            except ValueError as e:
+                return fail(args, str(e), 2)
     try:
-        org, notes = _org_notes(what)
+        org, notes = _org_notes(what, stand_in)
     except ValueError as e:  # a node, or an org file that cannot be read: the one lack there is
         return fail(args, str(e), 1)
     here = hosts.local_host().name
@@ -845,9 +856,14 @@ def cmd_org(args: argparse.Namespace) -> int:
             settings=settings_mod.read(),
             repos_of=teamrun.repos_via(call_sync),
             readings=teamrun.readings_via(call_sync),
+            stand_in=stand_in,
         )
+        for root, at in stand_in.items():  # the checkout's directory name, never `<dir>`'s basename
+            got["root"] = {"repo": pathlib.Path(root).expanduser().resolve().name, "dir": str(at)}
 
         def verdict() -> None:
+            if "root" in got:
+                print(f"checking {got['root']['repo']} at {got['root']['dir']}")
             for line in got["lacks"]:
                 print(f"lacking: {line}")
             for line in got["warnings"]:
@@ -2599,6 +2615,8 @@ def cmd_pr(args: argparse.Namespace) -> int:
     a PR is held when the record has a `review` and one of its files is under `held:`."""
     from shiftlead import review as reviewmod
 
+    if args.action == "wait":
+        return _pr_wait(args)
     sid = _own_session(args)
     if sid is None:
         return 2
@@ -2659,6 +2677,75 @@ def cmd_pr(args: argparse.Namespace) -> int:
             print(out["repo_hold"])
 
     return emit(args, out, prose)
+
+
+def _pr_wait_root(args: argparse.Namespace) -> str | None:
+    """The checkout `ao pr wait` names to the home: the session's record's `repo` (`--id` another's),
+    else — a person at a terminal — the main checkout of the directory it runs in."""
+    if sid := getattr(args, "id", None) or os.environ.get("SHIFTLEAD_SESSION"):
+        return str(call_sync("get", id=sid).get("repo") or "") or None
+    try:
+        common = subprocess.run(
+            ["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True, timeout=10,
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    out = common.stdout.strip()
+    return str(pathlib.Path(out).parent) if common.returncode == 0 and out else None
+
+
+def _pr_wait(args: argparse.Namespace) -> int:
+    """`ao pr wait <n> [--timeout S] [--fresh]` (design §4.7, TD-940): block on the home's folded
+    reading of PR `n` until it leaves *pending*, print the word and exit by it — 0 green, 1 red, 2
+    conflicting, 3 none, 4 timeout, 5 refused (a number the reading does not hold, a checkout it
+    holds no reading of, a home that is down or predates the RPC) with the why. A call of its own
+    connection to the `pr_wait` RPC, which a Ctrl-C ends; the reading's refresh is the wake."""
+    from sessionorc import reports
+
+    gone = reports.PR_WAIT_EXIT["gone"]
+    try:
+        root = _pr_wait_root(args)
+    except AgentUnavailable as e:
+        return fail(args, str(e), gone)
+    if not root:
+        return fail(args, "no checkout to read: the record names no repo, and this directory is in none", gone)
+    try:
+        got = call_sync(
+            "pr_wait", root=root, pr=args.n, timeout=args.timeout, fresh=args.fresh, _timeout=args.timeout + 30.0
+        )
+    except AgentUnavailable as e:
+        return fail(args, str(e), gone)
+    except AgentError as e:
+        if str(e).startswith("unknown method"):
+            return fail(args, "the running host agent predates ao pr wait (TD-940): it waits for its promote", gone)
+        return fail(args, str(e), gone)
+    except Exception as e:  # noqa: BLE001 — anything else is no word: 1 or 2 would read as red or conflicting
+        return fail(args, f"the wait could not be made: {type(e).__name__}: {e}", gone)
+    word = str(got.get("word") or "")
+    if word == "gone":
+        return fail(
+            args,
+            f"the home has no reading of {root}'s PRs: {got['read_error']}"
+            if got.get("read_error") and not got.get("read_at")
+            else f"PR #{args.n} is not open in the home's reading of {root}: closed, merged, or another repo's",
+            gone,
+            **got,
+        )
+
+    def prose() -> None:
+        head = str(got.get("head") or "")[:7]
+        tail = f" on {head}" if head else ""
+        if word == "red" and got.get("failing"):
+            tail += ": " + ", ".join(got["failing"])
+        elif word == "timeout":
+            tail = f" after {args.timeout:g}s, still {got.get('checks') or 'unread'}" + (f" on {head}" if head else "")
+        print(f"PR #{args.n} {word}{tail}")
+        if got.get("read_error"):
+            print(f"the home's last read of the PRs failed: {got['read_error']}")
+
+    emit(args, got, prose)
+    return reports.PR_WAIT_EXIT.get(word, gone)
 
 
 def _link_state(row: dict[str, Any], walked: dict[str, Any]) -> str:
@@ -4342,6 +4429,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("check",),
         help="check: the same reading as a verdict — each lack on a line, exit 1 when something is lacking",
     )
+    p.add_argument(
+        "--root",
+        metavar="DIR",
+        help="check only: read the repo file at DIR, a worktree of a registered checkout on any branch, in place "
+        "of that checkout's own — a definition checked before it merges (§4.7)",
+    )
     p.set_defaults(fn=cmd_org)
 
     p = add("team", help="start, stop, inspect and list the team definitions of §4.9")
@@ -4848,10 +4941,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.set_defaults(fn=cmd_host)
 
-    p = add("pr", help="whether a PR waits for this session's reader (design §4.9b *The reader*)")
-    p.add_argument("action", choices=["held"])
+    p = add(
+        "pr",
+        help="held: whether a PR waits for this session's reader (design §4.9b *The reader*); "
+        "wait: block until its checks leave pending (§4.7)",
+    )
+    p.add_argument("action", choices=["held", "wait"])
     p.add_argument("n", type=int, metavar="N", help="the pull request's number")
     p.add_argument("--id", help="another session's record (default: this session's own)")
+    p.add_argument("--timeout", type=float, default=1800.0, help="wait: seconds before it gives up, exit 4 (1800)")
+    p.add_argument("--fresh", action="store_true", help="wait: have the home re-read the PRs, and count only that read")
     p.set_defaults(fn=cmd_pr)
 
     p = add("migrate", help="once, with no session running: move ~/.agentorc and the old units to shiftlead's names")

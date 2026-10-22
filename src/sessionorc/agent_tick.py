@@ -3080,7 +3080,9 @@ class TickMixin:
         `failed_at` beside it — an outage is never zero PRs. A changed reading is saved and pushed
         as a `repos` event; a checkout the registry no longer lists is dropped with `repo: null`."""
         try:
-            due = time.monotonic() - self._repos_read_at >= REPOS_EVERY
+            due = time.monotonic() - self._repos_read_at >= REPOS_EVERY or self._repos_fresh
+            if due:  # cleared before the read: a `pr_wait --fresh` asked while it runs gets the next pass (TD-940)
+                self._repos_fresh = False
             boards = due or time.monotonic() - self._boards_read_at >= BOARD_EVERY
             roots = hosts.local_host().repos()
             mtimes = await asyncio.to_thread(self._ledger_mtimes, roots)
@@ -3469,7 +3471,7 @@ class TickMixin:
             if remote and remote in by_remote:
                 prs = by_remote[remote]
             else:
-                fresh = reports.pr_reading(root, now, old=prs, held=held)
+                fresh = reports.pr_reading(root, now, old=prs, held=held, remote=remote)
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs
