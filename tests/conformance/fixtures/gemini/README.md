@@ -19,4 +19,9 @@ person's session is in them. `manifest.json` names each fixture with what the ad
   at the doorbell the free tier's daily quota ran out (*Usage limit reached for gemini-3.8-flash*, the
   tool's own dialog in `6-a-doorbell.txt`), so its resume and transcript steps were not reached.
 
-Transcripts (`read_transcript`, `context`, `spend`) come with TD-786's reads.
+- `transcripts/`: two chats the live walks wrote on the `gemini-conformance` home (0.64.0, TD-786 slice 1),
+  copied unchanged from its `.gemini/tmp/<slug>/chats/` (`read_transcript`, `context`, `links`, `spend`):
+  `walk-limit` (2026-10-21, the walk that met the quota at the doorbell: a prompt, a shell call, the
+  doorbell) and `walk-resume` (2026-10-22, the same steps, then resumed: the tool's `$patch` at the
+  resume, and each call's response written again as `<id>_response`). The harness puts each where the
+  adapter looks, its session id replaced by the test's. Neither printed a link.

@@ -244,10 +244,29 @@ class ClaudeCodeHarness:
 
 
 class GeminiHarness:
-    """Gemini CLI hands each hook payload to `shiftlead-hook --adapter gemini`, whose `translate` makes the
-    host agent's `hook` params; it reads no transcript yet (TD-786), so a transcript is placed nowhere."""
+    """Gemini CLI keeps a session's chat at `<home>/.gemini/tmp/<slug>/chats/session-<minute>-<id[:8]>.jsonl`,
+    its first record naming the session, and hands each hook payload to `shiftlead-hook --adapter gemini`,
+    whose `translate` makes the host agent's `hook` params."""
 
-    tool_fields: frozenset[str] = frozenset()
+    tool_fields = frozenset(
+        {
+            "type",
+            "content",
+            "thoughts",
+            "toolCalls",
+            "functionResponse",
+            "sessionId",
+            "projectHash",
+            "tokens",
+            "cached",
+            "resultDisplay",
+            "displayName",
+            "timestamp",
+            "$set",
+            "$patch",
+            "$rewindTo",
+        }
+    )
 
     def profile(self, tmp_path: Path, monkeypatch: Any) -> str:
         home = tmp_path / "home"
@@ -265,7 +284,17 @@ class GeminiHarness:
         return translate(payload)  # every Gemini launch lands at the composer: no `at_composer` to pass
 
     def place_transcript(self, tmp_path: Path, src: Path, session_id: str) -> Path:
-        raise NotImplementedError("the Gemini adapter reads no transcript yet (TD-786)")
+        """Put the fixture where the adapter looks for `session_id`'s chat — its captured session id
+        replaced by `session_id` throughout, since the file is found by the id it names; the session's cwd."""
+        cwd = tmp_path / "repo"
+        project = tmp_path / "gm" / ".gemini" / "tmp" / f"repo-{session_id}"
+        (project / "chats").mkdir(parents=True, exist_ok=True)
+        (project / ".project_root").write_text(str(cwd), encoding="utf-8")
+        data = src.read_bytes()
+        captured = json.loads(data.split(b"\n", 1)[0])["sessionId"].encode()
+        out = project / "chats" / f"session-2026-10-22T00-00-{session_id[:8]}.jsonl"
+        out.write_bytes(data.replace(captured, session_id.encode()))
+        return cwd
 
 
 HARNESSES: dict[str, Any] = {"claude-code": ClaudeCodeHarness(), "gemini": GeminiHarness()}

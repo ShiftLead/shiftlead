@@ -27,12 +27,13 @@ import uuid
 from pathlib import Path
 
 from sessionorc import paths
-from sessionorc.adapters import LaunchSpec
+from sessionorc.adapters import LaunchSpec, Link, Transcript
 from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
 from shiftlead.adapters.claude_code import _resolves
+from shiftlead.adapters.gemini import transcript as transcript_mod
 from shiftlead.profiles import Profile
 
 log = logging.getLogger("shiftlead.adapters.gemini")
@@ -222,9 +223,9 @@ class GeminiAdapter:
     state_in_title = True
     # no hook answers a confirmation: a pending permission is answered in the terminal (§4.3, §4.5a)
     permission_channel = False
-    # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the reads and
-    # the rest come with TD-785's and TD-786's later slices
-    implements: frozenset[str] = frozenset({"composer", "title"})
+    # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): the rest come
+    # with TD-786's later slices
+    implements: frozenset[str] = frozenset({"composer", "context", "links", "spend", "title"})
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
         self._binary = binary
@@ -399,6 +400,112 @@ class GeminiAdapter:
         except (KeyError, ValueError):
             return None
         return prof.account or prof.name
+
+    def billing_for(self, profile: str) -> dict | None:
+        """How the profile is billed (design §4.2a, TD-151): `{billing, prices}` as `profiles.yml` declares
+        it. None for a profile that does not resolve."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        return {"billing": prof.billing, "prices": dict(prof.prices)}
+
+    # -- reads (design §4.3 *Reads*, TD-786) -----------------------------------------------------
+
+    def transcript_path(self, session_id: str, cwd: Path, profile: Profile | str | None = None) -> Path | None:
+        """The session's chat under the profile's home: the file of a project's `chats/` named for the id
+        whose first record names it (`transcript.find`); None when there is none."""
+        prof = _profile(profile)
+        return None if prof is None else transcript_mod.find(transcript_mod.chats_root(home(prof)), session_id)
+
+    def read_transcript(
+        self,
+        session_id: str,
+        cwd: Path,
+        profile: str = "",
+        *,
+        before: int | None = None,
+        turns: int = 20,
+        raw: bool = False,
+    ) -> Transcript | None:
+        """The session's chat as neutral entries (design §4.3 `read_transcript`). None when there is no
+        file, or the profile is unknown (never another account's home)."""
+        p = self.transcript_path(session_id, cwd, profile)
+        if p is None:
+            return None
+        try:
+            return transcript_mod.read(p, before=before, turns=turns, raw=raw)
+        except OSError:
+            return None
+
+    def context(self, session_id: str, cwd: Path, profile: str = "") -> dict | None:
+        """The session's context size now (design §4.3 `context`, §6 rule 5): the last turn's input, the
+        tool's window for its model. None when it cannot tell."""
+        p = self.transcript_path(session_id, cwd, profile)
+        return None if p is None else transcript_mod.context(p)
+
+    def model_in_use(self, session_id: str, cwd: Path, profile: str = "") -> str | None:
+        """The model the session's last turn ran on, None when it cannot tell."""
+        p = self.transcript_path(session_id, cwd, profile)
+        return None if p is None else transcript_mod.model(p)
+
+    def links(self, session_id: str, cwd: Path, profile: str = "", *, cursor: int = 0) -> tuple[list[Link], int] | None:
+        """The http/https URLs the session printed past byte `cursor` and the new cursor (design §4.3
+        `links`). None when there is no file, or the profile is unknown."""
+        p = self.transcript_path(session_id, cwd, profile)
+        if p is None:
+            return None
+        try:
+            return transcript_mod.links(p, cursor)
+        except OSError:
+            return None
+
+    def spend(self, profile: str, cursors: dict[str, int] | None = None) -> dict:
+        """Spend per turn for a profile (design §4.3 *Spend per turn*, *Reads*): `{turns, cursors, reason}`,
+        every chat under the profile's home read from its cursor — sessions shiftlead did not start and
+        subagents' chats (`chats/<parent id>/`) included, since both are billed. `conversation` is the
+        chat's session, a subagent's its parent's; `cwd` the project's directory. `reason` is `ok`, or why
+        nothing could be read, with the cursors unchanged."""
+        before = {str(k): int(v) for k, v in (cursors or {}).items() if isinstance(v, int) and v >= 0}
+        prof = _profile(profile)
+        if prof is None:
+            return {"turns": [], "cursors": before, "reason": "no_profile"}
+        root = transcript_mod.chats_root(home(prof))
+        if not root.is_dir():
+            return {"turns": [], "cursors": before, "reason": f"no chats under {root}"}
+        try:
+            files = sorted(root.glob("*/chats/**/*.jsonl"))
+        except OSError as e:
+            return {"turns": [], "cursors": before, "reason": f"unreadable: {root}: {type(e).__name__}"}
+        turns: list[dict] = []
+        after: dict[str, int] = {}
+        for p in files:
+            key = str(p)
+            subagent = p.parent.name != "chats"
+            try:
+                if p.stat().st_size == before.get(key, -1):
+                    after[key] = before[key]
+                    continue
+                conversation = p.parent.name if subagent else (transcript_mod.session_of(p) or p.stem)
+                got, after[key] = transcript_mod.turns(
+                    p, before.get(key, 0), conversation, transcript_mod.cwd_of(p), subagent
+                )
+            except OSError:
+                if key in before:
+                    after[key] = before[key]
+                continue
+            turns.extend(got)
+        return {"turns": turns, "cursors": after, "reason": "ok"}
+
+
+def _profile(profile: Profile | str | None) -> Profile | None:
+    """The profile itself, or by name; None for one that does not resolve (never another account's home)."""
+    if isinstance(profile, Profile):
+        return profile
+    try:
+        return profiles_mod.get(profile or None)
+    except (KeyError, ValueError):
+        return None
 
 
 def _border(row: str, glyph: str = COMPOSER_TOP) -> bool:
