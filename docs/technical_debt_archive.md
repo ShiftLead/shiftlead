@@ -18637,3 +18637,23 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Resolved:** 2026-10-22 (grinder-ao-2) — built in #2261, #2262, #2263, #2265, #2267 and #2268, with TD-960's fix in #2276. The live check holds, read on a scratch home with #2276 live (b0a4184), using `probe.py --mode background` (Claude Code on the `conformance` profile, `permission_wait: 90`). From 6 s to the fall-through at about 96 s, the record reads `needs-you` with a `permission` pending: *Bash: touch probe-subagent.txt*, with `subagent_name` *general-purpose*, `pane_held: true` and its deadline. The pane at 20 s and 45 s draws nothing but *Waiting for 1 background agent to finish*. At the fall-through the entry takes the question form (`pane_held: false`, no deadline) as the pane draws the tool's dialog. The answer ends it (`idle` at 112 s), and the subagent's own `SubagentStop` takes `subagents` from 1 to 0 at 114 s. A stray `PreToolUse` from an id no `SubagentStart` named (`a538…`) ended nothing. The stray `SubagentStop` of the first reading did not recur in this run; TD-960's tests (#2276) hold that case.
 
 ---
+
+## TD-954: #2253's two new `ao explain` reasons for a title adapter's screen rule have no test: reverting either branch leaves the suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`rpc_explain` ~L2553, the reasons ~L2587); `tests/test_gemini_title.py`
+
+**Why:** Found auditing the tests of #2253 (TD-944 slice 2). `rpc_explain` gained two reasons — `rule X matched, but a hook reported within a tick — the hook state wins` and `rule X matched, but the usage poll's limited stands — its reading kept` — beside the existing `applied as scraped; held for its screen`. Probe: in `src/sessionorc/agent.py` `rpc_explain`, replace `if self._hook_within(s, adapter, now):` with `if False:`, and separately `elif s.state == m.state == "limited" and s.confidence == "hook":` with `elif False:`; `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gemini_title.py tests/test_screen_road.py tests/test_screen.py tests/test_read_when.py` passes (all green) both times (those four files only; the whole suite was not run). `grep -rn "limited stands\|hook reported within" tests` finds nothing; the one explain test (`test_explain_on_a_live_record_at_the_box_gives_the_rules_reason`) asserts only the third reason. `ao explain` is the operator's check on a wrong state, so a reason that names the wrong rule misleads exactly there.
+
+**Fix:** In `tests/test_gemini_title.py`'s explain test (or a sibling), explain a record at the box with a hook within a tick (`_last_hook` now) and assert the `hook state wins` reason, and one holding the poll's `limited` at `confidence: hook` and assert `the usage poll's limited stands`. Confirm each fails with its branch reverted.
+
+**Done when** reverting either branch fails a test.
+
+**Resolved:** 2026-10-22 (grinder-ao-1, PR #2278) — `test_explain_on_a_live_record_at_the_box_gives_the_rules_reason` (`tests/test_gemini_title.py`) explains the record at the Gemini usage box with a hook within a tick and with the poll's `limited` at `confidence: hook`, asserting each reason; replacing either branch with `False` fails it.
+
+---
