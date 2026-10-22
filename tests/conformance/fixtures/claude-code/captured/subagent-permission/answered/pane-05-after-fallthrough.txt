@@ -1,0 +1,25 @@
+title: ✳ probe
+[38;5;114m●[39m [1mAgent[0m(Touch probe file)
+[38;5;246m  ⎿  [39mBackgrounded agent[38;5;246m (↓ to manage · ctrl+o to expand)[39m
+
+[38;5;231m●[39m I've started a background subagent that will run [38;5;153mtouch probe-subagent.txt[39m and
+  then stop. I'll get a notification when it finishes.
+
+[38;5;246m✻[39m [38;5;246mWaiting for [1m1[0m[38;5;246m background agent to finish[39m
+
+[38;5;153m────────────────────────────────────────────────────────────────────────────────
+[39m [1m[38;5;153mBash command[0m [38;5;246m· [39mfrom the general-purpose agent
+ [1mTip: auto mode handles these prompts for you — choose "switch to auto mode" [0m
+ [1mbelow[0m
+ [38;5;246mCreate empty probe file[39m
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m touch probe-subagent.txt
+[38;5;239m╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+[39m Do you want to proceed?
+ [38;5;153m❯[39m [38;5;246m1.[39m [38;5;153mYes[39m
+   [38;5;246m2.[39m Yes, and always allow access to [1m/tmp/aop-dl8cyo15/walk[0m from this project
+   [38;5;246m3.[39m Yes, and switch to auto mode[38;5;246m ·[39m [38;5;246mauto[39m [38;5;246mmode[39m [38;5;246mhandles[39m [38;5;246mthese[39m [38;5;246mprompts[39m [38;5;246mfor[39m [38;5;246myou[39m
+   [38;5;246m4.[39m No
+
+ [38;5;246mEsc[39m [38;5;246mto[39m [38;5;246mcancel[39m [38;5;246m·[39m [38;5;246mTab[39m [38;5;246mto[39m [38;5;246mamend[39m [38;5;246m·[39m [38;5;246mctrl+x[39m [38;5;246mctrl+k[39m [38;5;246mtwice[39m [38;5;246mto[39m [38;5;246mstop[39m [38;5;246mbackground[39m [38;5;246magents[39m
+
