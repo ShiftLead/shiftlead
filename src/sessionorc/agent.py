@@ -937,6 +937,9 @@ class HostAgent(
             got = next((p for p in prs.get("open") or [] if isinstance(p, dict) and p.get("number") == int(pr)), None)
             if got is not None:
                 row = got
+            if prs.get("error") and not at:  # never read at all (a forge with no reading): nothing to wait on
+                word = "gone"
+                break
             if after or not fresh:
                 if got is None and after:
                     word, row = "gone", None  # an earlier reading's row is not this one's

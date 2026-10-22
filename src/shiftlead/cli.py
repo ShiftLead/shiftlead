@@ -2710,7 +2710,9 @@ def _pr_wait(args: argparse.Namespace) -> int:
     if word == "gone":
         return fail(
             args,
-            f"PR #{args.n} is not open in the home's reading of {root}: closed, merged, or another repo's",
+            f"the home has no reading of {root}'s PRs: {got['read_error']}"
+            if got.get("read_error") and not got.get("read_at")
+            else f"PR #{args.n} is not open in the home's reading of {root}: closed, merged, or another repo's",
             gone,
             **got,
         )
