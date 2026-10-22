@@ -2385,19 +2385,19 @@ def ending_card():
     figure — then what each entry cost, bars scaled to the largest with the figures in one right-aligned
     column, then the day around it and the account's windows. Quiet on purpose: the banner above is
     the page's one loud thing."""
-    entries = (("TD-156", 18.20, "5.4M"), ("TD-942", 14.90, "4.4M"), ("TD-623", 4.10, "1.2M"), ("between entries", 4.60, "1.4M"))
-    top = max(f for _, f, _ in entries)
-    erow = lambda ref, fig, tok: (
-        f'<div style="display: grid; grid-template-columns: 140px 420px 80px 80px; align-items: center; gap: 12px; font-size: 13px;">'
+    entries = (("TD-156", 18.20), ("TD-942", 14.90), ("TD-623", 4.10), ("between entries", 4.60))
+    top = max(f for _, f in entries)
+    erow = lambda ref, fig: (
+        f'<div style="display: grid; grid-template-columns: 140px 420px 80px; align-items: center; gap: 12px; font-size: 13px;">'
         f'{f"<a href={chr(34)}#{chr(34)} class={chr(34)}mono{chr(34)}>{ref}</a>" if ref.startswith("TD-") else f"<span class={chr(34)}meta{chr(34)}>{ref}</span>"}'
         f'<span style="height: 10px; width: {fig / top * 100:.0f}%; background: #1e40af; opacity: .45; border-radius: 2px;"></span>'
-        f'<span class="mono" style="text-align: right;">≈${fig:.2f}</span><span class="meta mono" style="text-align: right;">{tok} tok</span></div>')
+        f'<span class="mono" style="text-align: right;">≈${fig:.2f}</span></div>')
     side = lambda k, v, t="": (f'<div style="display: grid; grid-template-columns: 140px 1fr; gap: 12px; font-size: 13px;"{f" title={chr(34)}{t}{chr(34)}" if t else ""}>'
                                f'<span class="meta">{k}</span><span>{v}</span></div>')
-    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost, read once when it ended — the Spend page has the live figures (design §4.5a, TD-942)">
+    return f'''<div class="card" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 16px;" title="what this session cost: read when it ended and once more a minute later, so the last minute's turns may still be on their way — the Spend page has the live figures (design §4.5a, TD-942)">
       <div style="display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;">
         <span class="mono" style="font-size: 28px; font-weight: 500; line-height: 1;" title="API-equivalent at your weights: a subscription's turns, never a bill (design §4.4 Spend per seat)">≈$41.80</span>
-        <span style="font-size: 14px;">spent by dc-paul since Oct 19, over 2 runs</span>
+        <span style="font-size: 14px;">spent by dc-paul since Oct 19</span>
         <span class="meta" title="input 0.9M · output 0.3M · cache read 10.6M · cache write 0.6M">12.4M tokens in 312 turns; this run 16:28 to 18:42 (2h 14m)</span>
       </div>
       <div style="display: flex; flex-direction: column; gap: 7px;">
@@ -2409,7 +2409,7 @@ def ending_card():
         {side("All teams today", '<span class="mono">≈$212.40</span> <span class="meta">and</span> <span class="mono">$8.75</span> <span class="meta">metered, 66.2M tokens</span>', "≈$ and $ apart, never summed (design §4.6 The disconnect card)")}
         {side("Claude, paul", '<span class="mono">9%</span> <span class="meta">of the week, resets Mon 09:00;</span> <span class="mono">25%</span> <span class="meta">of 5 hours, resets 21:10</span>')}
       </div>
-      <div class="meta" style="font-size: 12px;">Read at 18:43. <a href="#">Open dc-paul in Spend</a></div>
+      <div class="meta" style="font-size: 12px;">as of 18:43 · <a href="#">Open dc-paul in Spend</a></div>
     </div>'''
 
 
@@ -2433,7 +2433,7 @@ def focus_ended():
       <span style="flex-grow: 1;"></span><span class="btn sm link">more ▾</span>
     </div>
     <div style="padding: 12px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #7c3d00; border-radius: 6px;" title="the ending banner (design §4.5a, TD-942)">
-      <span style="font-size: 15px; font-weight: 600; color: #7c3d00;">Closed by you at 18:42</span>
+      <span style="font-size: 15px; font-weight: 600; color: #7c3d00;">closed by you · 18:42</span>
       <span style="display: flex; gap: 6px; flex-wrap: wrap;"><span class="btn sm primary">Resume</span><span class="btn sm">Resume with changes…</span><span class="btn sm">New session here</span><span class="btn sm ghost" title="forget the record now — it is forgotten by itself a day after the close">Forget</span></span>
       <span style="flex-grow: 1;"></span>
       <span class="btn sm link" title="A closed record is forgotten by itself a day after the close; its run log and transcript stay readable until then. Resume starts it again under its own name, attended." style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>
@@ -2444,7 +2444,7 @@ def focus_ended():
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
     {PUT_AWAY}
     {side_card("Git", '<span class="mono muted" style="font-size: 12px;">dc-paul · 13 behind</span>', '<div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div>')}
-    {side_card("Reports", summary_meta("2 done, 1 filed"), open_=False)}
+    {side_card("Reports", summary_meta("2 progress · 1 filed"), open_=False)}
     {side_card("Inbox", summary_meta("6, all read"), open_=False)}
     {side_card("Sent", summary_meta("4 sent"), open_=False)}
     {side_card("Session", summary_meta("opus-5-5", "claude-code · paul · opus-5-5") + f'<span class="btn sm link" style="margin-left: 8px; flex-shrink: 0;">{ICON["code"]}VS Code</span>', open_=False)}
@@ -2485,7 +2485,7 @@ def focus_held():
     {PUT_AWAY}
     {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 1m ago</span>', '<div style="font-size: 12px; margin-top: 8px;">TD-301: waiting on the techlead about #811</div>')}
     {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td301-fix · 2 unpushed</span>', '<div class="mono" style="font-size: 12px; margin-top: 8px;"><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>')}
-    {side_card("Reports", summary_meta("0 of 1 done, 2 filed"), open_=False)}
+    {side_card("Reports", summary_meta("1 progress · 2 filed"), open_=False)}
     {side_card("Inbox", summary_meta("1 unread of 5", tone="unread"), open_=False)}
     {side_card("Sent", summary_meta("3 sent, 1 waiting", "1 ask still waiting for its answer", tone="warn"), open_=False)}
     {side_card("Ready to close", summary_meta("✗ branch pushed, +1", "✗ branch pushed · ✗ outcomes reported (1 owed): the first failing check, +1 for each more", tone="warn"), open_=False)}
