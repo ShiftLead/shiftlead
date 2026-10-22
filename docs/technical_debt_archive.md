@@ -17866,3 +17866,101 @@ The other cases:
 **Resolved:** 2026-10-21 (grinder-ao-1) — TD-937 archived in this PR with its `**Resolved:**` naming #2225 and the test.
 
 ---
+## TD-623: No document says how a repo gets its first ShiftLead team
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-09 (Paul, while starting guardians' team)
+**Owner:** designer
+**Kind:** design-first
+**Blocked by:** TD-942
+**Status:** Designed 2026-10-21 (the designer). The page is `ao team --skill` (`src/shiftlead/team_skill.md`),
+the recipe TD-028's list was measured against, so it lives where a session in any repo already reads it and
+no copy drifts under `docs/` (design §4.7 *Skills*). Every gap on TD-028's list is folded in, each read
+against the code first: step 0b *What the repo needs before a team can pick anything* (`Blocked by:`,
+`Kind:`, `Owner:`, the PR rules written down; `Owner: paul` keeps an entry only from a lane with an
+`owner:` word, `Blocked by: decision (paul)` from every lane — `_word_matches` reads no Owner, so TD-028's
+*Owner: paul keeps it from workers* holds only beside `owner:`); step 1's `env` file (keys, `0600`,
+unquoted), the token as the fence, the per-profile login and what a node does to the devcontainer; step
+3 leading with the repo's `.shiftlead.yml` form and `place:`; *What a lane takes* (`owner:` lets an
+absent Owner through, a named lane is the brief's alone, work orders in every `free-pick` lane so the
+briefs are the only fence, the settling / held / waiting / needs-a-team marks); *A repo over sibling
+repos* (one repo's PRs only; paired PRs until TD-943); and that a definition on a branch is not checked
+until it merges. Two gaps are tool changes: checking a branch's definition is TD-942 (design §4.7
+`ao org check --root`, built here); reading sibling PRs is TD-943, its own design. Was, before:
+Standing up guardians' team (2026-10-09) needed facts spread across design §4.4a,
+§4.9, §4.9b, §4.9c, `docs/briefs/README.md`, the package role templates, two working examples
+(contractmatch's and dev-cadence's repo config and briefs) and TD-299's step list. A session
+in the new repo had to be handed a brief written from all of them. **Decided 2026-10-21** (Paul, on the
+board's line *No document says how a repo gets its first ShiftLead team*): the list is enough to write
+from — *See TD-028 on guardians-devenv*, its **agentorc doc gaps** list, measured against `ao team --skill`
+(`src/shiftlead/team_skill.md`). Paul's three: nothing covers an umbrella repo whose work lands in other
+repos; lanes are under-documented (the `owner:` lane word, and that a `free-pick` lane also takes every
+decided board line and every red or sync PR, so a board line cannot be kept from a team and for dnsguard
+the briefs are the only fence); nothing says what goes in a container node's `env` file or which command
+does the logins. The list adds: keeping an entry from workers (`Owner: paul`), a TD-id lane matching
+nothing in code, what a node does to the devcontainer, a token's scope as the fence, and the
+`settling`/`held`/`waiting`/`needs_team` marks an empty first lane is read through.
+**Location:** a new how-to (where it lives is part of the fix: the README's *Run it*, a
+`docs/` page, or `ao`'s skill text), `docs/briefs/README.md`, design §4.9.
+
+**Why:** every repo that joins repeats the same search, and a brief written from memory goes stale
+(the retired `guardians-orchestrator.md` did: it said the repos were not on kmaster and the
+devcontainer question was open, both untrue by the time it would have run).
+
+**Fix:** one page, in order: what the repo must have first (the cadence, §4, a ledger whose entries
+carry `Blocked by:` so a worker can pick), `.shiftlead.yml` (teams, flows, `held:`), the briefs as
+supplements and the techlead primer, `ao org check`, `ao team start` on the host, then the
+container node (`hosts.yml`, the node's `env` and logins, `ao host up`, `place:`) — and which of
+those are the person's. Fold in each gap guardians-devenv TD-028 records, and say what a
+constellation (an umbrella ledger, PRs in sibling repos) does differently.
+
+**Done when:** a session in a repo with no team stands one up from that page alone, without a
+brief written for it.
+
+**Related:** TD-299, guardians-devenv TD-028 and `docs/briefs/team-setup.md`, TD-055 (archived
+with the retired brief).
+
+**Resolved:** 2026-10-21 (grinder-ao-2) — its design merged in #2238 (`ao team --skill` is the first-team page, guardians-devenv TD-028's gaps folded in); its one build, TD-942 (`ao org check --root`), merged in #2243, so it archives with its last build (design §4.9c). TD-943 carries the sibling-repo PR reading on its own.
+
+---
+## TD-942: `ao org check --root <worktree>`: check a team definition on the branch it is written on, before it merges
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (the designer, from TD-623; guardians-devenv TD-028's *How to check a definition before it merges*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open.
+**Location:** `src/shiftlead/orgcheck.py`, `src/shiftlead/cli.py` (`ao org`), `src/shiftlead/team_skill.md` (step 3's *A definition on a branch is not checked yet* and the agent checklist's item 2, so no copy of *check after the merge* survives); design §4.7 *`ao org check --root <dir>`*
+
+**Why:** `ao org check` and `ao team list` read each registered checkout as it stands, so a `.shiftlead.yml`
+written on a branch — where a repo's review rules want it — is invisible to both until it merges; the only
+check guardians found was importing `shiftlead.repoconfig` and `shiftlead.org` by hand.
+
+**Fix:** as design §4.7 says: `--root <dir>` on `ao org check` reads the repo file, and the briefs, primer
+and role directories it names, at `<dir>` in place of the registered checkout whose git common directory
+`<dir>`'s, through the one `{<registered root>: <dir>}` mapping the design names, readers by readers; every other repo as
+without it; a `<dir>` that is no worktree of a registered checkout, nor that checkout itself, refused,
+*`<dir>` is not a checkout of a registered repo*, exit 2; no off-branch or changes warning for `<dir>`. Then
+`team_skill.md`'s *A definition on a branch is not checked yet* paragraph says to run
+`ao org check --root <worktree>` before the PR, in place of after the merge, and drops its *TD-942 builds* clause.
+
+**Done when** `ao org check --root <worktree>` on a branch whose `.shiftlead.yml` names a profile
+`profiles.yml` lacks prints that lack and exits 1, the same file unmerged; the teams at `<dir>` pair
+with the registered checkout's ledger reading under its name and path (a `Team` declaration on main
+that names a team only the branch defines reads clean, and a branch that drops a team the ledger still
+declares reads that lack; a repo whose `org.yml` heading gives a path on this host reads the branch's
+briefs all the same; a subdirectory of a worktree is refused with exit 2; a branch that renames
+`.agentorc.yml` to `.shiftlead.yml` reads no TD-553 lack; no *held only on a node* warning appears that the run without `--root` does not give); a directory outside every registered repo is
+refused with exit 2, and so is a directory that is not a git one; `--root` at the registered checkout
+itself reads as without it but for the header and the checkout-state warnings; the first line and `--json`'s `root` name the repo and
+`<dir>`; a test holds each. The recipe's paragraph says to run `ao org check --root <worktree>` before
+the PR, and its agent checklist's item 2 says *`ao org check --root <worktree>` before the PR,
+`ao team list` after the merge*.
+
+**Related:** TD-623, guardians-devenv TD-028.
+
+**Resolved:** 2026-10-21 (grinder-ao-2) — built by #2243: `ao org check --root <dir>` (`orgcheck.stand_in_for`, the `{<registry entry>: <dir>}` mapping through `org.with_repos` / `merge_repo_teams(stands_for=…)`, the root loop, the role and flow readers and `team_lacks`); `team_skill.md` says to run it before the PR; each case of Done when is a test in `tests/test_cli_org.py`.
+
+---

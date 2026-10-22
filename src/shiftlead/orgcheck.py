@@ -8,7 +8,7 @@ RPC that changes anything. The terminal's half (the words in a line, the exit co
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -156,20 +156,61 @@ def checkout_warnings(root: Path) -> list[str]:
     return out
 
 
-def team_lacks(org: orgmod.Org, here: str, readings: dict[str, Any]) -> list[str]:
+def _git_path(directory: Path, *args: str) -> Path | None:
+    """`git -C <directory> <args>`'s one line as a resolved path, or None when git says nothing."""
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(directory), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    out = cp.stdout.strip()
+    return Path(out).resolve() if cp.returncode == 0 and out else None
+
+
+def stand_in_for(directory: str, roots: Collection[str]) -> dict[str, Path]:
+    """`ao org check --root <dir>`'s one mapping (design §4.7, TD-942): `{<registry entry>: <dir>}`,
+    the entry the checkout of this host's registry whose git common directory is `<dir>`'s — the entry
+    that is `<dir>` itself where there is one, else the first in the registry's order. A `<dir>` that is
+    not its own work tree's top (a subdirectory, a `.git`, a bare repo, no git at all), or matches no
+    entry, is a `ValueError` in the check's words."""
+    d = Path(directory).expanduser().resolve()
+    refused = ValueError(f"{directory} is not a checkout of a registered repo")
+    if not d.is_dir() or _git_path(d, "rev-parse", "--show-toplevel") != d:
+        raise refused
+    common = _git_path(d, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if common is None:
+        raise refused
+    for root in roots:
+        if Path(root).expanduser().resolve() == d:
+            return {root: d}
+    for root in roots:
+        r = Path(root).expanduser()
+        if r.is_dir() and _git_path(r, "rev-parse", "--path-format=absolute", "--git-common-dir") == common:
+            return {root: d}
+    raise refused
+
+
+def team_lacks(
+    org: orgmod.Org, here: str, readings: dict[str, Any], stand_in: Mapping[str, Path] | None = None
+) -> list[str]:
     """Where a repo's definitions on this host and its ledger's `Team` declaration disagree (§4.4 *A
     stale team*, *An untagged or unknown entry is handed to a techlead*, TD-730), each a lack: a
     declared name no definition of the repo holds, naming the entries that carry it; where the repo's
     definitions hold two or more teams, each the declaration leaves out, whatever its size; and the
     `needs_team` ids of a repo none of whose teams has a techlead seat. A repo with no reading, or a
-    ledger that did not parse, says nothing."""
+    ledger that did not parse, says nothing. A reading of a checkout `stand_in` stands a directory in
+    for (`--root`, §4.7, TD-942) is paired with the teams whose checkout is that directory, so the
+    ledger as merged is checked against the branch's teams."""
     out: list[str] = []
+    stood = {str(Path(k).expanduser().resolve()): Path(v) for k, v in (stand_in or {}).items()}
     for root, r in sorted(readings.items()):
         led = (r or {}).get("ledger") if isinstance(r, dict) else None
         if not isinstance(led, dict) or "declared_teams" not in led or "error" in led:
             continue
         name = r.get("name") or root
-        defs = [t["team"] for t in teams.entry_teams(org, str(Path(root).resolve()), here)]
+        at = stood.get(str(Path(root).expanduser().resolve()), Path(root))
+        defs = [t["team"] for t in teams.entry_teams(org, str(at.expanduser().resolve()), here)]
         declared = [str(t) for t in led.get("declared_teams") or []]
         stale = teams.stale_teams(declared, defs, led.get("entries") or [])
         names = [*declared, *(s["team"] for s in stale if s["kind"] == "left-out")]
@@ -206,6 +247,7 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     settings: dict[str, Any] | None = None,
     repos_of: orgmod.ReposOf | None = None,
     readings: dict[str, Any] | None = None,
+    stand_in: Mapping[str, Path] | None = None,
 ) -> dict[str, Any]:
     """`ao org check`: the aggregate as a verdict — `{ok, lacks, warnings}`, `ok` false when
     anything is lacking. `notes` are `with_repos`' own (a repo file that cannot be read, a name
@@ -226,22 +268,38 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     changes, a `place:` naming a team no registered repo defines, a repo a linked host's registry
     holds that this one's does not (or a linked registry that could not be read; `repos_of` asks),
     and, per team under a flow, each key it writes that the flow would fill with the same value
-    (`teams.flow_redundant`)."""
+    (`teams.flow_redundant`).
+
+    `stand_in` (`ao org check --root <dir>`, §4.7, TD-942) maps a registry entry, as written, to the
+    directory read in its place — the same mapping `with_repos` was given: the root loop tests `<dir>`
+    and warns of neither path's checkout state, the role directories and flows are read at `<dir>`,
+    the ledger reading is paired with the branch's teams, and a team of that repo `place:` puts on
+    another host is warned of, its briefs read there and not at `<dir>`."""
     lacks: list[str] = []
     warnings: list[str] = []
+    stand_in = stand_in or {}
+    seen = [stand_in.get(str(r), r) for r in roots]  # what each reader that takes the roots reads
 
     def lack(line: str) -> None:
         if line not in lacks:
             lacks.append(line)
 
     for root in roots:
-        path = Path(root).expanduser()
+        at = stand_in.get(str(root))
+        path = Path(at if at is not None else root).expanduser()
         if not path.is_dir():
-            lack(f"{root}: a registered checkout that is not there — remove its line from the registry, or clone it")
+            lack(
+                f"{path if at is not None else root}: a registered checkout that is not there — remove its line "
+                "from the registry, or clone it"
+            )
         else:
             if (path / OLD_REPO_FILE).is_file() and not paths.repo_file(path).is_file():
-                lack(f"{root}: its {OLD_REPO_FILE} is read by nothing — rename it {paths.REPO_FILE} (TD-553)")
-            warnings.extend(checkout_warnings(path))
+                lack(
+                    f"{path if at is not None else root}: its {OLD_REPO_FILE} is read by nothing — rename it "
+                    f"{paths.REPO_FILE} (TD-553)"
+                )
+            if at is None:  # `<dir>` is on a branch by design, and the checkout it stands for is not read
+                warnings.extend(checkout_warnings(path))
     elsewhere, unread = held_elsewhere(roots, linked, repos_of)
     warnings.extend(held_line(row, here) for row in elsewhere)
     warnings.extend(unread)
@@ -274,22 +332,26 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
             lack(str(e).strip('"'))
         else:
             warnings.extend(teams.flow_redundant(org, team, here, here, files))
+        for root, at in stand_in.items():
+            host = org.landed.get(name, ("", ""))[0]
+            if team.repo == Path(root).expanduser().resolve().name and host and host != here:
+                warnings.append(f"{name}: briefs read on {host}'s checkout, not at {at}")
     # a flow nobody lists that is not usable (§4.9c): a listed one is the start's refusal, said above
     listed = {f for t in org.teams.values() for f in t.flows}
-    for f in flowdefs.visible(roots, org.roles):
+    for f in flowdefs.visible(seen, org.roles):
         if not f["usable"] and not f.get("shadowed") and f["name"] not in listed:
             lack(f"flow {f['name']} ({f['source']}) is not usable — {'; '.join(f['problems'])}")
-    defined = {r["name"] for r in repoconfig.visible(roots) if r["usable"]}
+    defined = {r["name"] for r in repoconfig.visible(seen) if r["usable"]}
     for name in sorted(org.roles):  # an overlay is not a definition (§4.9c): org.yml's key must name one
         if name not in repoconfig.PRESETS and name not in defined:
             lack(
                 f"{org.path.name if org.path else 'org.yml'}: roles.{name} — unknown role: no preset and no role "
                 "directory, the org's or a registered checkout's, defines it (an overlay is not a definition, §4.9c)"
             )
-    for r in repoconfig.visible(roots):  # a role directory that is not whole, or takes a preset's name
+    for r in repoconfig.visible(seen):  # a role directory that is not whole, or takes a preset's name
         if not r["usable"] and not r.get("shadowed"):
             lack(f"role {r['name']} ({r['source']}) is not usable — {'; '.join(r['problems'])}")
-    for line in team_lacks(org, here, readings or {}):
+    for line in team_lacks(org, here, readings or {}, stand_in):
         lack(line)
     for name in sorted(settings_mod.teams(settings or {})):
         if name not in org.teams and name not in org.refused:

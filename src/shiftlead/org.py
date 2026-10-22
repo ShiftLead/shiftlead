@@ -328,7 +328,12 @@ def load(path: Path | None = None) -> Org:
 
 
 def merge_repo_teams(
-    org: Org, repo_root: Path, repo_teams: dict[str, Any] | None, repo_roles: Collection[str] = ()
+    org: Org,
+    repo_root: Path,
+    repo_teams: dict[str, Any] | None,
+    repo_roles: Collection[str] = (),
+    *,
+    stands_for: Path | None = None,
 ) -> Org:
     """Fold a repo's `.shiftlead.yml` `teams:` into the org (design §4.9): each is a team on that
     repo, so a repo can ship its own grind team beside its code. The org file wins
@@ -340,9 +345,13 @@ def merge_repo_teams(
     `repo_root` — a path the org file's project already gives for this host is used as it stands —
     and its project the heading that lists it, else none. A `repo:` naming another repo is refused;
     so is placing, which is the org file's: a `projects:` key and a `host:` are each refused naming the
-    key (§4.9 *The org is an aggregate*), and a `{team: …}` member is refused as it is in the org file."""
+    key (§4.9 *The org is an aggregate*), and a `{team: …}` member is refused as it is in the org file.
+
+    `stands_for` is the registered checkout `repo_root` stands in for (`ao org check --root`, §4.7,
+    TD-942): the repo's name is that checkout's directory name, and its path on this host is
+    `repo_root`, written over a path the org file's project gives for this host."""
     repo_root = Path(repo_root).expanduser().resolve()
-    rname = repo_root.name
+    rname = Path(stands_for).expanduser().resolve().name if stands_for is not None else repo_root.name
     merged = org.copy()
     source = paths.repo_file(repo_root)
     label = f"{source}"
@@ -364,7 +373,9 @@ def merge_repo_teams(
         for i, m in enumerate(raw.get("members") or []):
             if isinstance(m, dict) and "team" in m:  # before the shadow check: a refused shape is refused anywhere
                 raise ValueError(f"{key}.members[{i}].team: {NO_NESTING}")
-    if teams:  # no project is made for it: a repo in no project is a heading of its own (§4.9 *Projects*)
+    if stands_for is not None:  # the branch's checkout is the repo's on this host (§4.7 `--root`)
+        merged.checkouts.setdefault(rname, {})[hosts.local_host().name] = repo_root
+    elif teams:  # no project is made for it: a repo in no project is a heading of its own (§4.9 *Projects*)
         merged.checkouts.setdefault(rname, {}).setdefault(hosts.local_host().name, repo_root)
     for tname, raw in teams.items():
         tname = str(tname)
@@ -452,7 +463,13 @@ def _land(org: Org, here: str, repos_of: ReposOf | None) -> None:
         org.checkouts.setdefault(repo, {})[host] = Path(found[0])
 
 
-def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | None = None) -> tuple[Org, list[str]]:
+def with_repos(
+    org: Org,
+    roots: Collection[Path | str],
+    *,
+    repos_of: ReposOf | None = None,
+    stand_in: Mapping[str, Path] | None = None,
+) -> tuple[Org, list[str]]:
     """The org a client sees (design §4.9 *The org is an aggregate*, TD-229): `org` — the org file —
     plus the `teams:` of every checkout in `roots` (the host's repos registry), as each is checked
     out. `ao team` and the pages both read this one function, so they cannot disagree.
@@ -466,32 +483,45 @@ def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | N
     Each repo's team is then given where it lands (`landing`, `_land`): the org file's `place:`,
     else this host, whose registry is what `roots` is. `repos_of` asks another host for its
     registry — the path of a placed team's checkout there — and is only called for a team that
-    `place:` puts on another host. One that cannot be landed stays listed, `unlanded` saying why."""
+    `place:` puts on another host. One that cannot be landed stays listed, `unlanded` saying why.
+
+    `stand_in` maps a registry entry, as written, to the directory read in its place (`ao org check
+    --root <dir>`, §4.7, TD-942): its `.shiftlead.yml` is the one at `<dir>`, under the registered
+    checkout's name, and its checkout on this host is `<dir>`."""
     notes: list[str] = []
     file_org = org
-    found: list[tuple[repoconfig.RepoConfig, dict[str, Any]]] = []
+    stand_in = stand_in or {}
+    found: list[tuple[repoconfig.RepoConfig, dict[str, Any], Path | None]] = []
     seen: dict[Path, None] = {}  # the registry's order: the first of two checkouts of one name is the one read
+    stood: dict[str, Path] = {}  # repo name → the directory standing in for its checkout
     for root in roots:
         where = Path(root).expanduser().resolve()
         if where in seen:  # one checkout written twice (a trailing slash, a symlink) is one repo, not two
             continue
         seen[where] = None
+        at = stand_in.get(str(root))
+        if at is not None:
+            stood[where.name] = Path(at).expanduser().resolve()
         try:
-            cfg = repoconfig.load(Path(root).expanduser())
+            cfg = repoconfig.load(Path(at if at is not None else root).expanduser())
         except (OSError, ValueError) as e:
-            notes.append(f"{root}: {str(e).strip(chr(34))}")
+            notes.append(f"{at if at is not None else root}: {str(e).strip(chr(34))}")
             continue
         if cfg.teams and cfg.root:
-            found.append((cfg, dict(cfg.teams)))
+            found.append((cfg, dict(cfg.teams), where if at is not None else None))
     by_name: dict[str, list[Path]] = {}
-    for cfg, teams in found:
+    for cfg, teams, _ in found:
         for tname in teams:
             by_name.setdefault(str(tname), []).append(cfg.path or Path(cfg.root) / repoconfig.FILE)
     twice = {n: files for n, files in by_name.items() if len(files) > 1 and n not in org.teams}
-    for cfg, teams in found:
+    for cfg, teams, stands_for in found:
         mine = {k: v for k, v in teams.items() if str(k) not in twice}
         try:
-            org = merge_repo_teams(org, Path(cfg.root), mine, repoconfig.role_names(cfg)) if mine else org
+            org = (
+                merge_repo_teams(org, Path(cfg.root), mine, repoconfig.role_names(cfg), stands_for=stands_for)
+                if mine
+                else org
+            )
         except (OSError, ValueError) as e:
             notes.append(f"{cfg.root}: {str(e).strip(chr(34))}")
     if org is file_org:  # a copy of our own before anything is written on it
@@ -500,6 +530,8 @@ def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | N
     for where in seen:  # a repo no heading lists is its registered checkout's directory name (§4.9 *Teams*)
         if org.heading(where.name) is None:
             org.checkouts.setdefault(where.name, {}).setdefault(here, where)
+    for rname, at in stood.items():  # over the registry's path and a heading's for this host alike (§4.7)
+        org.checkouts.setdefault(rname, {})[here] = at
     if twice:
         for n, files in twice.items():
             org.refused[n] = (
