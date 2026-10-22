@@ -74,7 +74,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-948 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
 | TD-950 | A subagent's permission: the pending names its asker and says the pane shows nothing until the deadline; only the asker's own events end its waiter, which keeps the main thread's state | Medium | Built (#2261–#2268) — live check, blocked by TD-960 |
 | TD-951 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed 2026-10-21 with Paul — review rounds under way (held) |
-| TD-958 | `test_the_answered_capture_ends_the_question_at_the_subagents_own_end` fails when the Stop's `since` and the restore straddle a second | Low | Open |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-960 | The tool's own `SubagentStop`, for an id no `SubagentStart` announced, takes `subagents` to 0 and ends a live subagent's permission waiter: the record reads `idle` while the pane draws its dialog | Medium | Open |
 
@@ -1652,23 +1651,6 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Done when** Paul, closing an own session from Focus, reads one line saying how it ended, the buttons, and what it cost, with no guessed cause; a member taken over shows Hand back where Take over was; the side panel opens folded with a value on each summary and the Session heading level with its chevron; a session that has sent mail shows it under Sent.
 
 **Related:** TD-156 (the first round, archived), TD-923 (the disconnect card, whose frame the ending card reuses), TD-818 / TD-830–833 (Spend per seat, the figures), TD-490 (the ending's words), TD-096 (Take over / Hand back), TD-075 (`ao inbox --sent`), TD-029 (the reconnect contract), TD-266 (*forgotten by itself a day after the close*).
-
-## TD-958: `test_the_answered_capture_ends_the_question_at_the_subagents_own_end` fails when the Stop's `since` and the restore straddle a second
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-22 (grinder-ao-2)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_prompt_stack.py` (~L95–L118); `src/sessionorc/` where the prompt stack restores `kept` (TD-950 slice 3b, #2265)
-
-**Why:** Seen on #2270's CI (run 39752588219, test (3.12), 2026-10-22 09:10Z), a PR that does not touch the stack: `assert (rec["state"], rec["confidence"], rec["since"]) == ("idle", "hook", stopped)` read `since` 09:10:43Z against the Stop's 09:10:42Z. It passed on 3.13 in the same run and in a local full suite. Either `stopped` is read before the Stop's `since` settles (the test's race), or the restore writes a fresh `since` in some path (the code's, and §4.2 *the main thread's state is kept beneath* says the restored state keeps its own `since`). Which one is not yet known.
-
-**Fix:** Find which: run the test in a loop (`--count` or a shell loop, bounded) with the clock at a second's edge, and read where `since` is set on the restore. If it is the test, read `stopped` from the record once the Stop's hook has been applied (the `kept` the fall-through stores carries it); if it is the code, the restore keeps `kept`'s `since`.
-
-**Done when** the test reads the Stop's own `since` deterministically, and a restore that wrote `now` would fail it.
-
 ## TD-959: A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file
 
 **Priority:** Medium
