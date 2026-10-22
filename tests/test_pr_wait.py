@@ -77,7 +77,7 @@ async def test_a_settled_reading_answers_at_once_and_fresh_waits_for_a_later_rea
         call = asyncio.create_task(c.call("pr_wait", root=root, pr=7, timeout=10, fresh=True))
         await asyncio.sleep(0.2)
         assert not call.done(), "fresh: the reading before the call does not count"
-        assert agent._repos_read_at == float("-inf"), "fresh makes the next tick's PR pass due"
+        assert agent._repos_fresh is True, "fresh makes the next tick's PR pass due"
         agent._repos[root] = _reading(root, [_row(checks="pending", conflicting=True)], datetime.now(UTC))
         got = await asyncio.wait_for(call, 5)
     assert got["word"] == "conflicting"
@@ -96,7 +96,10 @@ async def test_a_number_the_reading_does_not_hold_is_gone_only_after_a_later_rea
         got = await asyncio.wait_for(call, 5)
         assert got["word"] == "gone" and got["head"] is None
         got = await c.call("pr_wait", root=root, pr=7, timeout=0.2)
-        assert got["word"] == "timeout" and got["checks"] == "pending"
+        assert got["word"] == "timeout" and got["checks"] == "pending" and got["read_error"] is None
+        agent._repos[root]["prs"]["error"] = "gh: offline"
+        got = await c.call("pr_wait", root=root, pr=7, timeout=0.2)
+        assert got["word"] == "timeout" and got["read_error"] == "gh: offline"
         with pytest.raises(AgentError, match="holds no reading"):
             await c.call("pr_wait", root=str(tmp_path / "elsewhere"), pr=7, timeout=1)
 
@@ -126,6 +129,27 @@ async def test_a_closed_client_ends_the_wait_at_the_home(agent, tmp_path, monkey
     seen = looks
     await asyncio.sleep(0.3)
     assert looks == seen, "the wait stopped looking once its client went"
+
+
+async def test_a_fresh_asked_while_a_pass_runs_gets_the_pass_after_it(agent, tmp_path, monkeypatch):
+    """The pass clears the ask before its read, so one made during the read survives it (review of TD-940)."""
+    await park_ticks(agent)
+    asked = []
+
+    def reading(d, now, **kw):
+        asked.append(d)
+        agent._repos_fresh = True  # a `--fresh` arriving mid-read
+        return {"open": [], "windows": {}, "recent": [], "at": now.isoformat()}
+
+    monkeypatch.setattr(reports, "pr_reading", reading)
+    import time
+
+    agent._repos_read_at = time.monotonic()  # not due by the clock
+    agent._repos_fresh = True
+    monkeypatch.setattr("sessionorc.hosts.Host.repos", lambda self: [str(tmp_path)])
+    await agent._refresh_repos()
+    assert asked, "the asked pass ran though the clock said not due"
+    assert agent._repos_fresh is True, "the ask made during it stands for the next"
 
 
 # -- the client ------------------------------------------------------------------------------------

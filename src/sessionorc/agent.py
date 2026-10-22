@@ -732,6 +732,7 @@ class HostAgent(
         self.repos_store = RepoStore()
         self._repos: dict[str, dict[str, Any]] = self.repos_store.load()
         self._repos_read_at = float("-inf")  # monotonic: the first tick reads
+        self._repos_fresh = False  # `pr_wait --fresh` asked for the next tick's PR pass (TD-940)
         self._boards_read_at = float("-inf")  # monotonic: the boards' own clock, `BOARD_EVERY`
         # monotonic, by root: when a write-back last re-read that board (`_reread_board`), so a tick's
         # read that began before it does not put the board from before the press back
@@ -913,7 +914,8 @@ class HostAgent(
         so the latency is the tick's `REPOS_EVERY`; `fresh` makes the next tick's pass due and counts
         only a reading taken after the call. A number the reading does not hold is *gone* once a
         reading taken after the call still lacks it (a PR opened a minute ago is not yet in the one
-        before), and at `timeout` the word is *timeout* with the last row. A read: it decides nothing
+        before), and at `timeout` the word is *timeout* with the last row; `read_error` is the last
+        read's failure, if it failed. A read: it decides nothing
         on its caller, and the client names the root (`ao` sends its record's repo). Its connection
         is held as a `wait`'s is (`_serve_wait`), so a Ctrl-C ends it here too. The home's."""
         want = str(Path(root).resolve())
@@ -924,7 +926,7 @@ class HostAgent(
         deadline = loop.time() + max(float(timeout), 0.0)
         began = datetime.now(UTC)
         if fresh:
-            self._repos_read_at = float("-inf")  # the next tick reads every repo's PRs, this one's among them
+            self._repos_fresh = True  # the next tick reads every repo's PRs, this one's among them
         row: dict[str, Any] | None = None
         at = ""
         while True:
@@ -937,7 +939,7 @@ class HostAgent(
                 row = got
             if after or not fresh:
                 if got is None and after:
-                    word = "gone"
+                    word, row = "gone", None  # an earlier reading's row is not this one's
                     break
                 if got is not None and (word := reports.pr_wait_word(got)) != "pending":
                     break
@@ -955,6 +957,8 @@ class HostAgent(
             "head": row.get("head"),
             "url": row.get("url"),
             "read_at": at or None,
+            # the last read failed (`gh` offline, a lapsed token): the reading is the one before it
+            "read_error": str(prs.get("error") or "") or None,
         }
 
     async def rpc_queue(self, omit: list[str] | None = None) -> dict[str, Any]:

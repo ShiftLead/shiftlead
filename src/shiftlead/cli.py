@@ -2704,6 +2704,8 @@ def _pr_wait(args: argparse.Namespace) -> int:
         if str(e).startswith("unknown method"):
             return fail(args, "the running host agent predates ao pr wait (TD-940): it waits for its promote", gone)
         return fail(args, str(e), gone)
+    except Exception as e:  # noqa: BLE001 — anything else is no word: 1 or 2 would read as red or conflicting
+        return fail(args, f"the wait could not be made: {type(e).__name__}: {e}", gone)
     word = str(got.get("word") or "")
     if word == "gone":
         return fail(
@@ -2721,6 +2723,8 @@ def _pr_wait(args: argparse.Namespace) -> int:
         elif word == "timeout":
             tail = f" after {args.timeout:g}s, still {got.get('checks') or 'unread'}" + (f" on {head}" if head else "")
         print(f"PR #{args.n} {word}{tail}")
+        if got.get("read_error"):
+            print(f"the home's last read of the PRs failed: {got['read_error']}")
 
     emit(args, got, prose)
     return reports.PR_WAIT_EXIT.get(word, gone)
