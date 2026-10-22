@@ -578,6 +578,7 @@ def read_when(
     refills: bool = False,
     lapses: bool = True,
     cache: bool = False,
+    modal_limit: bool = False,
 ) -> str:
     """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
     built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
@@ -593,7 +594,9 @@ def read_when(
     `ask` does. `lapses` False is an `ask` that carries no bound — a handed entry, which never lapses
     (§4.10 *An entry handed to a seat*) — so the sentence names none. `cache` is the home's word that a
     ring would be a restart instead (§4.10 *A lapsed cache is started again, not rung*, TD-467:
-    `agent_common.cache_restarts` on a record of its own host). Advice, never a refusal."""
+    `agent_common.cache_restarts` on a record of its own host). `modal_limit` is the home's word that a
+    `limited` record's cap is a modal rule's, a dialog with no reset (§4.3 *The limit dialog is read off
+    the screen*: `agent_common.limit_is_modal` on a record of its own host). Advice, never a refusal."""
     ask = kind == "ask"
     tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask and lapses else ""
     if s is not None and not mail_wakes(s):
@@ -628,6 +631,8 @@ def read_when(
     if stop or s.gated:
         why = "it is wrapping up" if stop else "it is paused for usage"
         return f"lands and waits: {why}, and mail never pushes a session past a stop" + tail
+    if state == "limited" and modal_limit:
+        return "lands and waits: the tool's usage-limit dialog is up; it is read once that is answered" + tail
     if state == "limited":
         cap = s.pending.text if s.pending and s.pending.text else "a usage cap"
         return f"lands and waits: its account is capped ({cap}), and it is rung after" + tail

@@ -371,8 +371,8 @@ def limit_is_modal(s: Session | None, adapter: Any) -> bool:
     screen*): `scraped`, and the adapter's `explain` on the record's own tail a `modal` match. A title
     adapter is asked without a title, so its manifest alone answers. No record, no `explain`, or no match
     is not modal."""
-    if s is None or s.confidence != "scraped":
-        return False
+    if s is None or s.state != "limited" or s.confidence != "scraped":
+        return False  # asked of every view and every send: only a scraped `limited` reads its tail
     explain = getattr(adapter, "explain", None)
     m = explain(s.tail) if explain is not None else None
     return bool(m is not None and m.modal)

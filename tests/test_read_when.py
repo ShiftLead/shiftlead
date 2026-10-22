@@ -56,6 +56,11 @@ def test_each_case_of_the_table_in_the_doorbells_order():
     assert rw(capped, "note", NOW) == (
         "lands and waits: its account is capped (week cap · resets 14:00Z), and it is rung after"
     )
+    # a modal rule's limit (Gemini's dialog, §4.3) has no reset to name (TD-944)
+    assert rw(capped, "note", NOW, modal_limit=True) == (
+        "lands and waits: the tool's usage-limit dialog is up; it is read once that is answered"
+    )
+    assert rw(rec("idle"), "note", NOW, modal_limit=True).startswith("rung within a tick")
     assert rw(rec("needs-you", pending=Pending(kind="question", text="?")), "note", NOW) == (
         "read once its question is answered and its turn ends"
     )

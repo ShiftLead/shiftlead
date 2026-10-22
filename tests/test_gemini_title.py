@@ -309,7 +309,7 @@ async def test_explain_on_a_live_record_at_the_box_gives_the_rules_reason(agent,
     monkeypatch.setattr(type(hookstub), "explain", lambda self, tail, title="": ad.explain(tail, title=title))
     fixture = Path(__file__).parent / "conformance" / "fixtures" / "gemini" / "captured" / "panes" / "6-a-doorbell.txt"
     async with LocalClient() as c:
-        s = await c.call("create", name="box", dir=str(tmp_path), adapter="hookstub")
+        s = await c.call("create", name="box", dir=str(tmp_path), adapter="hookstub", unattended=True)
         await c.call("hook", session=s["id"], state="working")
         agent.tmux.send_prompt(s["id"], f"clear; cat {fixture}")
 
@@ -322,4 +322,10 @@ async def test_explain_on_a_live_record_at_the_box_gives_the_rules_reason(agent,
         ex = await c.call("explain", id=s["id"])
         assert ex["match"]["rule"] == "gemini-usage-limit" and ex["match"]["modal"] is True
         assert ex["reason"] == "rule gemini-usage-limit matched, applied as scraped; held for its screen"
+        # a send lands and waits with no reset to name (§4.10), and the card's composer says so
+        no_reset = "lands and waits: the tool's usage-limit dialog is up; it is read once that is answered"
+        got = await c.call("msg", to=s["id"], kind="note", text="when you can")
+        assert got["read_when"][s["id"]].startswith(no_reset)
+        view = next(v for v in await c.call("list") if v["id"] == s["id"])
+        assert view["read_when"]["note"].startswith(no_reset)
         await c.call("kill", id=s["id"])
