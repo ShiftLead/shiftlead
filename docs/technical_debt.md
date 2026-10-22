@@ -74,6 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-965 | The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile | Medium | Open |
 | TD-966 | `ao td next` becomes a front end over dev-cadence's ledger-id counter on origin: one counter, with or without the home | High | Open — design-first, waits on dev-cadence#TD-124 |
+| TD-967 | The Inbox counts a *Needs you* row it does not show: every board row leaves a `<div>` open, so later rows nest inside it and a filter that hides it hides them | Medium | Open |
 
 ---
 
@@ -1449,3 +1450,23 @@ builds are in the ledger.
 **Done when** a session with no home running and a session asking `ao td next` take ids at the same moment and get different ones, and §4.4 says where the one counter lives.
 
 **Related:** dev-cadence#TD-124 (the counter, the §2.10 rewrite and the cadence-check row), TD-693 / TD-696 (the home's allocator), TD-731 (`--held`), TD-964 (whose PR collided).
+
+---
+
+## TD-967: The Inbox counts a *Needs you* row it does not show: every board row leaves a `<div>` open, so later rows nest inside it and a filter that hides it hides them
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — cause found 2026-10-22 on the live copy (`89e42acd`); nothing built.
+**Location:** `src/shiftlead/ui/templates/inbox_row.html` (the `board` macro: the `<div class="row gap wrap mfoot">` opened before `{% if mode == 'card' %}`, and again inside the `{% else %}` branch, the Inbox's); `src/shiftlead/ui/static/app.js` (`inboxFilter`, which hides rows one by one); design §4.5 screen 6 *Needs you* and *Where a row is drawn*; `tests/test_ui_inbox.py`
+
+**Why:** Paul, 2026-10-22, with a screenshot of `/inbox` with the rail's team *ao-grind* picked: *Needs you 1 of 19*, the rail's ao-grind line *1 of 1*, and nothing under *Needs you* — *is this some sort of sync issue? Lets also make sure that our inbox is correctly coordinating/working with our new queue page.* It is not sync and not the Queue split: the server draws the row (grinder-ao-2's *cadence check failed · #2240*, `data-section="needs"`, `data-team="ao-grind"`, `home: inbox`), and the count is right. Since #2188 (TD-914) the `board` macro opens its footer `<div>` before `{% if mode == 'card' %}` and the Inbox's `{% else %}` branch opens it again, closing it once, so each board row on the page leaves one `<div>` open: the live `/inbox` had 869 `<div` and 847 `</div>` for its 22 board rows. The browser nests every later row inside the board rows before it — the ao-grind row sat inside 15 of them — and `inboxFilter` sets `hidden` on each board row the pick does not match, which hides every row nested in it. So a pick (team, repo, section, kind or find) can hide rows it counts as shown, and design §4.5 screen 6's rule that the Inbox's number is *exactly the rows of this section the page draws* fails in front of the person; unfiltered, the rows are drawn but inside the wrong parents, so a row's keys and focus order are also suspect. The Queue draws the macro in `card` mode (`queue_mail.html`), whose branch writes no second open: `/queue` balanced (2,708 each) on the same reading, so the split TD-931 draws between the two pages is not at fault.
+
+**Fix:** (1) drop the second `<div class="row gap wrap mfoot">`, the one the `{% else %}` branch opens, so both modes open the footer once; (2) a test that renders every row macro the Inbox and the Queue draw — each kind in each section, in `inbox` and `card` mode — and holds its `<div>`s balanced (an `HTMLParser` count, as `tests/test_ui_queue_picks.py` reads cards), so a doubled open in any row fails CI; (3) a test that a page of a board row followed by a state row, filtered to the state row's team, leaves the state row shown (the node probe the Inbox's filter tests use); (4) the Inbox–Queue check Paul asked for, read once the fix is live: on the live `/inbox` and `/queue`, `<div` equals `</div>`; for each rail pick on `/inbox`, the visible rows under *Needs you* equal the section's *shown* count; and the top bar's Inbox and Queue numbers add up to `ao inbox --counts`' `needs` (design §4.5 screen 6 *Two numbers, by home*, TD-931).
+
+**Done when** the live `/inbox` with any rail pick shows every row its numbers count, both pages' markup balances, and the tests above hold it.
+
+**Related:** TD-914 (#2188, which doubled the line), TD-931 (the two numbers by home), TD-748 (the Queue).
