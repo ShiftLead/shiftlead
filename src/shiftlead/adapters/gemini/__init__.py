@@ -29,7 +29,7 @@ from pathlib import Path
 from sessionorc import paths
 from sessionorc.adapters import LaunchSpec
 from sessionorc.models import Confidence, Pending, State
-from sessionorc.screen import Match, painted_text
+from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
 from shiftlead.adapters.claude_code import _resolves
@@ -38,6 +38,7 @@ from shiftlead.profiles import Profile
 log = logging.getLogger("shiftlead.adapters.gemini")
 
 NAME = "gemini"
+RULES_FILE = Path(__file__).with_name("screen_rules.toml")  # its screen-rule manifest (§4.3, TD-944)
 ADAPTER_FLAG = "--adapter"  # `shiftlead-hook --adapter gemini`: read from argv before any import (§4.1)
 HOOK_EVENTS = ("SessionStart", "SessionEnd", "BeforeAgent", "AfterAgent", "BeforeTool", "AfterTool", "Notification")
 HOOK_TIMEOUT_MS = 10_000  # the tool's `timeout` is in milliseconds; every hook here is fire-and-forget
@@ -225,8 +226,9 @@ class GeminiAdapter:
     # the rest come with TD-785's and TD-786's later slices
     implements: frozenset[str] = frozenset({"composer", "title"})
 
-    def __init__(self, binary: str | None = None):
+    def __init__(self, binary: str | None = None, rules: Path | None = None):
         self._binary = binary
+        self.rules = Manifest.load(rules or RULES_FILE)  # what neither hooks nor the title say (§4.3)
 
     @property
     def binary(self) -> str:
@@ -275,8 +277,12 @@ class GeminiAdapter:
         return None  # hook-fed: the screen has no opinion; the title's check is the tick's (§4.3)
 
     def explain(self, tail: list[str], title: str = "") -> Match | None:
-        """The title's verdict (design §4.3 *Two gaps*): the state its leading glyph says, `✋` a question
-        with no text — the tick writes the text by the state it replaces. The tail is not read."""
+        """The screen-rule manifest's verdict on the tail's painted text, else the title's (design §4.3 *The
+        limit dialog is read off the screen*, *Two gaps*): so while the limit box is up its verdict stands
+        over `✦`. The title's is the state its leading glyph says, `✋` a question with no text — the tick
+        writes the text by the state it replaces. With no title, the manifest alone is read."""
+        if (m := self.rules.explain([painted_text(r) for r in tail])) is not None:
+            return m
         state = title_state(title)
         if state is None:
             return None

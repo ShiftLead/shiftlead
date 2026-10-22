@@ -75,7 +75,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Built — live check on #2244 (`ao pr wait` on a real PR, then the cadence check); the procedure pair is TD-946 |
 | TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Designed — a screen rule reads the dialog as `limited`; builds TD-944 |
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
-| TD-944 | Gemini's screen-rule manifest: the *Usage limit reached* dialog reads `limited` (`gemini-usage-limit`), over the title's `✦` | Medium | Open |
+| TD-944 | Gemini's screen-rule manifest: the *Usage limit reached* dialog reads `limited` (`gemini-usage-limit`), over the title's `✦` | Medium | Slice 1 built (the manifest); slices 2–3 left |
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-947 | A background subagent's permission shows *Needs you* on a session whose pane shows nothing to answer: only Allow / Deny can reach it, and the card does not say so | Medium | Open |
 | TD-949 | No test would catch the tick dropping `remote=` from its `pr_reading` call: a GitLab repo would be read through `gh` again with the whole suite green | Medium | Open |
@@ -1553,7 +1553,7 @@ builds are in the ledger.
 **Added:** 2026-10-21 (the designer, from TD-941)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open.
+**Status:** Slice 1 built (grinder-ao-2, 2026-10-21): the manifest, `modal` on `Rule` and `Match` (`ao explain --json` prints it), `explain` manifest first, the fixture declared `limited`; `_title_verdict` ignores a non-title match and `rpc_explain` says the rule is not applied yet. Left: slice 2, the tick's screen road for a title adapter (`_screen_verdict`, `_screen_gone`, the chain's order, the no-saved fallback's upgrade, the poll-marked guard); slice 3, the poll's modal test (`agent_common.limit_is_modal`, `_usage_limits`, the lift's restore) and `read_when(…, modal_limit=…)` with §4.10's no-reset send text.
 **Location:** `src/shiftlead/adapters/gemini/` (`__init__.py` `explain`, a new `screen_rules.toml`), the tick's title verdict (`agent_tick._title_verdict`), `sessionorc/agent.py` `rpc_explain`'s `state_in_title` branch
 (a non-`title` match gets its own reason, *rule gemini-usage-limit matched, applied as scraped; held for
 its screen*, never `_title_reading`'s), `tests/conformance/fixtures/gemini/captured/panes/6-a-doorbell.txt`; design §4.3 *The limit dialog is read off the screen*, §4.2

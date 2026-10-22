@@ -45,6 +45,16 @@ def test_manifest_load_priority_and_pending(tmp_path):
     assert got.pending is not None and got.pending.kind == "question" and got.pending.text == "the x line"
     assert got.to_dict()["evidence"] == ["  the x line  "]
     assert m.explain(["nothing"]) is None
+    assert got.modal is False and got.to_dict()["modal"] is False  # `modal` false where unset
+
+
+def test_a_rules_modal_reaches_its_match(tmp_path):
+    """`modal = true` (design §4.3 *The limit dialog is read off the screen*, TD-944): read as a bool, carried
+    into the `Match` and its dict, which `ao explain --json` prints."""
+    p = tmp_path / "rules.toml"
+    p.write_text('[[rules]]\nid = "box"\nstate = "limited"\nmodal = true\nall = ["box"]\n')
+    got = Manifest.load(p).explain(["the box"])
+    assert got is not None and got.modal is True and got.to_dict()["modal"] is True
 
 
 @pytest.mark.parametrize(
