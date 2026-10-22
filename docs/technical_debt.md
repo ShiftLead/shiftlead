@@ -1549,15 +1549,17 @@ check guardians found was importing `shiftlead.repoconfig` and `shiftlead.org` b
 
 **Fix:** as design §4.7 says: `--root <dir>` on `ao org check` reads the repo file, and the briefs, primer
 and role directories it names, at `<dir>` in place of the registered checkout whose git common directory
-`<dir>`'s is; every other repo as without it; a `<dir>` that is no worktree of a registered checkout refused,
+`<dir>`'s, through the one `{<registered root>: <dir>}` mapping the design names, readers by readers; every other repo as
+without it; a `<dir>` that is no worktree of a registered checkout, nor that checkout itself, refused,
 *`<dir>` is not a checkout of a registered repo*, exit 2; no off-branch or changes warning for `<dir>`. Then
 `team_skill.md`'s *A definition on a branch is not checked yet* paragraph says to run
-`ao org check --root <worktree>` before the PR, in place of after the merge.
+`ao org check --root <worktree>` before the PR, in place of after the merge, and drops its *TD-942 builds* clause.
 
 **Done when** `ao org check --root <worktree>` on a branch whose `.shiftlead.yml` names a profile
 `profiles.yml` lacks prints that lack and exits 1, the same file unmerged; the teams at `<dir>` pair
 with the registered checkout's ledger reading under its name and path (a `Team` declaration on main
-that names a team only the branch defines reads clean); a directory outside every registered repo is
+that names a team only the branch defines reads clean, and a branch that drops a team the ledger still
+declares reads that lack; no *held only on a node* warning appears that the run without `--root` does not give); a directory outside every registered repo is
 refused with exit 2, and so is a directory that is not a git one; `--root` at the registered checkout
 itself reads as without it but for the header and the checkout-state warnings; the first line and `--json`'s `root` name the repo and
 `<dir>`; a test holds each. The recipe's paragraph says to run `ao org check --root <worktree>` before
