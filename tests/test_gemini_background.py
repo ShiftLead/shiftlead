@@ -8,9 +8,9 @@ import json
 from pathlib import Path
 
 import pytest
+from conformance._harness import RecordedProc
 
 from shiftlead.adapters.gemini import GeminiAdapter
-from tests.conformance._harness import RecordedProc
 
 pytestmark = pytest.mark.unit
 
