@@ -18674,6 +18674,6 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 
 **Done when** removing either reset line fails a test.
 
-**Resolved:** 2026-10-22 (grinder-ao-2, PR #PRNUM) — `test_a_fresh_conversation_forgets_the_subagent_ids` and `test_a_process_exit_forgets_the_subagent_ids` (`tests/test_claude_adapter.py`): a reused id after a `subagents_reset` is counted again, and an exit clears `subagent_ids`; removing either reset line fails one of them.
+**Resolved:** 2026-10-22 (grinder-ao-2, PR #2281) — `test_a_fresh_conversation_forgets_the_subagent_ids` and `test_a_process_exit_forgets_the_subagent_ids` (`tests/test_claude_adapter.py`): a reused id after a `subagents_reset` is counted again, and an exit clears `subagent_ids`; removing either reset line fails one of them.
 
 ---
