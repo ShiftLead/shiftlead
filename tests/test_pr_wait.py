@@ -320,8 +320,10 @@ def test_a_gitlab_read_that_fails_is_an_error_and_another_forge_has_no_reading(t
     _glab(monkeypatch, [_mr()], fail="/jobs")
     row = reports.pr_reading(tmp_path, datetime.now(UTC), remote="https://gitlab.com/g/r")["open"][0]
     assert row["required_error"] == "glab: HTTP 401" and "required" not in row
-    got = reports.pr_reading(tmp_path, datetime.now(UTC), remote="https://gitea.example/a/b")
-    assert "gitea.example" in got["error"] and "no PR reading" in got["error"]
+    many = [{"name": f"j{i}", "allow_failure": False} for i in range(100)]
+    _glab(monkeypatch, [_mr()], jobs=many)
+    row = reports.pr_reading(tmp_path, datetime.now(UTC), remote="https://gitlab.com/g/r")["open"][0]
+    assert row["required_cut"] is True and len(row["required"]) == 100
 
 
 async def test_ao_pr_wait_returns_a_gitlab_mrs_word(agent, tmp_path, monkeypatch):
@@ -340,9 +342,18 @@ async def test_ao_pr_wait_returns_a_gitlab_mrs_word(agent, tmp_path, monkeypatch
 async def test_a_repo_never_read_is_refused_with_the_readings_why(agent, tmp_path, monkeypatch, capsys):
     await park_ticks(agent)
     root = str(tmp_path)
-    why = "origin is on gitea.example, a forge with no PR reading: GitHub and GitLab have one"
-    agent._repos[root] = {"name": "r", "root": root, "prs": {"error": why, "failed_at": "x"}}
+    why = "gh: none of the git remotes configured for this repository point to a known GitHub host (gitea.example)"
+    agent.PR_WAIT_STEP = 0.05
+    agent._repos[root] = {
+        "name": "r",
+        "root": root,
+        "remote": "https://github.com/a/b",
+        "prs": {"error": "gh: offline"},
+    }
     async with LocalClient() as c:
+        got = await c.call("pr_wait", root=root, pr=3, timeout=0.3)
+        assert got["word"] == "timeout", "a GitHub repo whose first read failed is waited on, never refused"
+        agent._repos[root] = {"name": "r", "root": root, "remote": "https://gitea.example/a/b", "prs": {"error": why}}
         got = await c.call("pr_wait", root=root, pr=3, timeout=5)
     assert got["word"] == "gone" and got["read_error"] == why and got["read_at"] is None
     from shiftlead import cli

@@ -813,7 +813,8 @@ GITLAB_UNREAD = "windows, recent and held are not read on GitLab: its open MRs a
 
 def forge_of(remote: str) -> tuple[str, str]:
     """`(forge, where)` of an origin URL (TD-940): `("github", "")`; `("gitlab", "<host>/<group/…/repo>")`;
-    `("other", <host>)` for a forge with no reading, or a GitLab origin naming no project."""
+    `("other", <host>)` for any other host, or a GitLab origin naming no project — read through `gh`,
+    which answers for a GitHub Enterprise host and fails in its own words for anything else."""
     raw = (remote or "").strip()
     if m := _REMOTE_URL.fullmatch(raw):
         if m[1].lower() == "file":
@@ -906,6 +907,8 @@ def _gitlab_reading(directory: Path | str, where: str, now: datetime, timeout: f
             # GitLab's required checks are the head pipeline's jobs that may not fail: per MR, not per base
             jobs, why = _glab_api(directory, host, f"{project}/pipelines/{pipe['id']}/jobs?per_page=100", timeout)
             if why is None and isinstance(jobs, list):
+                if len(jobs) >= 100:  # one page: a pipeline of more jobs may require one past it
+                    row["required_cut"] = True
                 row["required"] = sorted(
                     {
                         str(j.get("name"))
@@ -956,8 +959,8 @@ def pr_reading(
     forge, where = forge_of(remote)  # the origin the caller read; none given reads as GitHub
     if forge == "gitlab":  # the fold per forge (TD-940): a GitLab origin's open MRs, nothing more yet
         return _gitlab_reading(directory, where, now, timeout, old)
-    if forge == "other":
-        return {"error": f"origin is on {where}, a forge with no PR reading: GitHub and GitLab have one"}
+    # another host is read through `gh` as before: a GitHub Enterprise origin answers, any other fails in
+    # gh's own words (the cadence's `forge` setting is not read here: forge.py is the cadence's)
     since = now - PR_WINDOWS["month"]
     open_ = _gh_prs(directory, ["--state", "open", "--limit", "200"], timeout, OPEN_PR_FIELDS)
     if isinstance(open_, str):
