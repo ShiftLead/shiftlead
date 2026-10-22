@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-917 | Build TD-909 (8): the backfill of `Ask:` lines and consequences | Medium | Open — blocked by TD-772, dev-cadence#TD-121 |
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
+| TD-940 | `ao pr wait <n>`: block on the home's folded reading of a PR's checks (green / red / conflicting / none) so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab | Medium | Open |
 | TD-941 | A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read | Medium | Open |
 
 ---
@@ -1496,6 +1497,25 @@ The ao-paul session's assessment, for the round to test: the build chip moves to
 
 ---
 
+## TD-940: `ao pr wait <n>` — block on the home's folded reading of a PR's checks, so no session hand-rolls a CI poll; one fold per forge, GitHub and GitLab alike
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-21 (Paul, with the ao-paul session)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.7 (a new `ao pr wait <n>` paragraph beside `ao pr held <n>`), §4.4 *Repos* (the `prs` reading's `checks` and `conflicting` fold); `docs/procedures/cadence.md` and `docs/claude-memory/no-checks-means-conflicting.md` (the pair to write and the memory to retire); `src/shiftlead/cli.py` (`ao pr`, ~L4467 `ao wait` for the blocking shape), `src/sessionorc/agent_serve.py` (the `wait` RPC, `_serve_wait` ~L229) and `src/sessionorc/agent_remote.py` (its client side), `src/sessionorc/reports.py` (`_gh_prs` ~L617, `fold_checks` ~L342, `failing_items` ~L314, the `gh pr view` read ~L573 — GitHub-only today); `tests/test_cli.py` and the tests of `fold_checks`
+
+**Why:** Every session that opens a PR waits for its checks before `scripts/check_cadence.py --pr N`, and each writes its own `gh pr checks` loop. Two went wrong on 2026-10-21 alone in the ao-paul session: one read an empty check list as "no CI" (the PR was conflicting, the memory *no checks means conflicting*), one tested a rollup field that never reported and sat until Paul asked whether something was broken. The home already makes the judgement once, on its tick: the `prs` reading folds every open PR's `statusCheckRollup` into *green*, *red*, *pending* or *none* and reads `conflicting` from the merge state, with the fold's rules in §4.4 (`fold_checks`), and `ao wait` is already a thin blocking RPC on the host agent. Paul, 2026-10-21: standardise the background wait as an `ao` call, and *make sure it will work for GitLab/other as well as GitHub* — the fold reads `gh` today, so a GitLab remote has no reading at all.
+
+**Fix:**
+- **`ao pr wait <n> [--timeout S] [--json]`**: blocks until the home's reading of PR `n` in the session's repo leaves *pending*, then prints the word and exits by it — `0` green, `1` red, `2` conflicting, `3` none (no CI on the base), `4` timeout. `--json` prints the folded reading: `checks`, `conflicting`, `failing` (the names), `head` (the sha the reading is of) and `read_at`, so a caller can see the wait was on its own commit. Shape as `ao wait`: a call to the host agent, its own connection, Ctrl-C ends it; the wake is the reading's refresh, so the latency is the tick, and `--fresh` asks the home to re-read that repo's PRs first. A number the reading does not hold (closed, merged, another repo) is refused in words, exit `5`.
+- **One fold per forge, the wait names none.** The reading's fold moves behind a forge seam in `reports.py`: the GitHub fold is the one that exists (`gh pr view` and `statusCheckRollup`); a **GitLab** fold beside it reads the merge request's head pipeline (`glab mr view <iid> --json` or the API's `merge_requests/<iid>` with `head_pipeline.status` and `detailed_merge_status` / `has_conflicts`) into the same four words and the same `conflicting`, *none* for a project with no pipeline. The forge is picked from the repo's remote host, as the cadence's `scripts/forge.py` does (GitHub by `gh`, GitLab by `glab`, picked by the remote's host, TD-104), and a remote on no known forge gives the reading `error` and the wait exit `5` with the why. `required` (§4.4, the base's required check names) gets the same seam — GitLab's are the pipeline's jobs that `allow_failure: false`. Every test of the fold runs on both forges' fixtures.
+- **The cadence says the pair.** `docs/procedures/cadence.md`: `ao pr wait N && scripts/check_cadence.py --pr N` is how a kmaster session waits; a cloud session has no `ao` to call (ADR 2026-09-24: `ao` has nothing to talk to there), so its CI wait stays the GitHub MCP tools' and the cadence check runs from kmaster on its PR's number, as the ADR says. The *no checks means conflicting* memory is retired (the wait says *conflicting*), with a line in `MEMORY.md` pointing at the command.
+- Design: the §4.7 paragraph, and §4.4's reading sentence gains *per forge* with the GitLab fold's rules beside GitHub's. A history line under §4.7.
+
+**Done when** `ao pr wait` returns the word and exit code for a GitHub PR and a GitLab merge request in tests, the live check waits out one real PR's CI on kmaster and the cadence check follows it, and the procedure and memory say the pair.
 ## TD-941: A Gemini session at its own *Usage limit reached* dialog reads `working`: the title stays `✦ Working…` and an API-key home has no quota to read
 
 **Priority:** Medium
