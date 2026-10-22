@@ -496,3 +496,48 @@ async def test_a_pr_wait_is_remade_across_a_drop_and_a_home_never_up_is_refused_
             "pr_wait", caller="ao-x", timeout=30.0, expired=None, sock=tmp_path / "none.sock", pr=7
         )
     assert time.monotonic() - began < 1.0, "a home that was never up is not given the restart's grace"
+
+
+async def test_a_wait_out_of_time_in_a_restarts_gap_returns_expired_and_a_first_call_is_always_made(tmp_path):
+    """`blocking_rpc`'s two ends of time (TD-956): a home that drops the wait and is still gone when the
+    caller's timeout runs out returns `expired` within the grace, not the refusal; and a call with no
+    time left on a live home is still made — the home answers it, rather than the client answering
+    `expired` for it."""
+    from sessionorc import client as clientmod
+
+    sock = tmp_path / "home.sock"
+    gone = asyncio.Event()
+
+    async def dropping(reader, writer):
+        await reader.readline()
+        writer.close()  # the promote: the unit goes under the wait and does not come back in time
+        gone.set()
+
+    server = await asyncio.start_unix_server(dropping, path=str(sock))
+    try:
+        call = asyncio.create_task(
+            clientmod.blocking_rpc("pr_wait", caller="ao-x", timeout=0.6, expired="expired", sock=sock, grace=30.0)
+        )
+        await gone.wait()
+    finally:
+        server.close()
+        await server.wait_closed()
+    assert await asyncio.wait_for(call, 5.0) == ("expired", 0)
+
+    asked = []
+
+    async def home(reader, writer):
+        req = json.loads(await reader.readline())
+        asked.append(req["params"])
+        writer.write((json.dumps({"id": req["id"], "result": {"pr": 7, "word": "timeout"}}) + "\n").encode())
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_unix_server(home, path=str(sock))
+    try:
+        for timeout in (0, -5):
+            got = await clientmod.blocking_rpc("pr_wait", caller="ao-x", timeout=timeout, expired="expired", sock=sock)
+            assert got == ({"pr": 7, "word": "timeout"}, 0)
+    finally:
+        server.close()
+    assert len(asked) == 2, "a first call is always made"
