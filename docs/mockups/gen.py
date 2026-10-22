@@ -2434,12 +2434,12 @@ def focus_ended():
     </div>
     <div style="padding: 12px 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #7c3d00; border-radius: 6px;" title="the ending banner (design §4.5a, TD-942)">
       <span style="font-size: 15px; font-weight: 600; color: #7c3d00;">closed by you · 18:42</span>
-      <span style="display: flex; gap: 6px; flex-wrap: wrap;"><span class="btn sm primary">Resume</span><span class="btn sm">Resume with changes…</span><span class="btn sm">New session here</span><span class="btn sm ghost" title="forget the record now — it is forgotten by itself a day after the close">Forget</span></span>
+      <span style="display: flex; gap: 6px; flex-wrap: wrap;"><span class="btn sm primary">Resume</span><span class="btn sm">Resume with changes…</span><span class="btn sm">New session here</span><span class="btn sm ghost" title="forget the record: it, its report line and its mail go; the worktree, run log and conversation stay&#10;forgotten by itself a day after the close">Forget</span></span>
       <span style="flex-grow: 1;"></span>
       <span class="btn sm link" title="A closed record is forgotten by itself a day after the close; its run log and transcript stay readable until then. Resume starts it again under its own name, attended." style="min-width: 26px; padding: 0 6px; font-style: italic; font-family: Georgia, serif;">i</span>
     </div>
     {ending_card()}
-    <div class="note">Was: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> a dead terminal and a composer with nothing to type to; the composer is not drawn now. The cause's guess stays only where the record names none (a pane found gone, a close with no closer). A team member's banner adds <b>Restart</b> after Resume.</div>
+    <div class="note">Was: <i>closed by you · 18:42 — This session's process has closed. Its pane is gone (killed, or the tmux server restarted); the run log stays readable — or read its transcript.</i> a dead terminal and a composer with nothing to type to; the composer is not drawn now. The cause's guess stays only where the record names none (a pane found gone, a close with no closer). dc-paul is Paul's interactive session in dc-grind and not supervised, so no Restart and its team's line reads <i>dc-grind today</i>; a supervised member's banner adds <b>Restart</b> after Resume, and a session with no team reads <i>interactive sessions today</i>.</div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
     {PUT_AWAY}
