@@ -85,6 +85,7 @@ NODE_OWNED = frozenset(
         "model",
         "context",
         "subagents",
+        "subagent_ids",
         "subagent_at",
         "shells",
         "shells_at",
@@ -1010,6 +1011,10 @@ class Session:
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).
     pane: bool = True
     subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
+    # The live subagents' ids, as their `SubagentStart`s named them (§4.2, TD-960): a `SubagentStop` for an
+    # id none announced (the tool's own) moves no count. A count above their number is an id-less start's,
+    # or a record of an older build, and an unannounced stop still takes it down.
+    subagent_ids: list[str] = field(default_factory=list)
     # When a subagent last said anything (design §4.2 *Working on its own*, TD-734): the time of the last
     # event the adapter marked `subagent_seen`, never moved back, so a replay never revives a stale
     # pill. `subagents_live` reads it with `subagents`; both are reset on a fresh conversation and on exit.
@@ -1520,6 +1525,7 @@ class Session:
             self.ended = None  # a run that came back has not ended
         else:
             self.subagents, self.subagent_at = 0, None  # no subagent outlives its process (§4.2, TD-734)
+            self.subagent_ids = []
             self.shells, self.shells_at = [], None  # nor a shell task (§4.2 *A background shell task*, TD-766)
             self.pendings, self.kept = [], None  # nor a prompt, nor the state beneath one (TD-950)
 

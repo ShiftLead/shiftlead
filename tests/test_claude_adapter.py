@@ -765,6 +765,55 @@ async def test_a_subagents_waiter_is_keyed_by_its_call_and_ended_only_by_its_own
         assert await task is None and not agent._permission_waiting(sid)
 
 
+async def test_the_tools_own_subagent_stop_moves_no_count_and_ends_no_waiter(agent, hookstub, tmp_path):
+    """TD-960, design §4.2 *The thread scopes it*, from the captured `subagent-permission/stray-stop/`: a
+    `SubagentStop` for an id no `SubagentStart` named — the tool's own, thirty seconds into the wait —
+    leaves `subagents` at 1, the subagent's waiter live and the record `needs-you`; the asked call's own
+    `PostToolUse` ends the waiter, and the subagent's own `SubagentStop` takes the count to 0."""
+    events = _captured("stray-stop")
+    i = next(n for n, e in enumerate(events) if e.get("kind") == "permission")
+    asked = events[i]
+    started = {e["subagent"] for e in events if (e.get("subagent_delta") or 0) > 0}
+    assert asked["subagent"] in started
+    j = next(n for n, e in enumerate(events) if (e.get("subagent_delta") or 0) < 0)
+    stray = events[j]
+    assert j > i and stray["subagent"] not in started
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="s", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        task = await _feed(agent, c, sid, events[: i + 1])
+        await _feed(agent, c, sid, events[i + 1 : j + 2])  # the stray stop, then the dialog's notice
+        assert events[j + 1].get("notice") == "permission_prompt"
+        assert not task.done() and agent._permission_waiting(sid, asked["subagent"])
+        rec = await c.call("get", id=sid)
+        assert rec["state"] == "needs-you" and rec["pending"]["subagent_name"] == "general-purpose"
+        assert rec["subagents"] == 1 and rec["subagent_ids"] == [asked["subagent"]]
+        k = next(n for n, e in enumerate(events) if n > j and e.get("call") == "end")
+        await _feed(agent, c, sid, events[j + 2 : k + 1])
+        assert await task is None and not agent._permission_waiting(sid)
+        own = next(e for e in events[k:] if (e.get("subagent_delta") or 0) < 0)
+        assert own["subagent"] == asked["subagent"]
+        await _feed(agent, c, sid, [own])
+        rec = await c.call("get", id=sid)
+        assert rec["subagents"] == 0 and rec["subagent_ids"] == []
+
+
+async def test_an_unannounced_subagent_stop_still_takes_down_a_count_with_no_id(agent, hookstub, tmp_path):
+    """TD-960: a count above the record's ids — an id-less start, or a record of an older build — is still
+    taken down by a `SubagentStop` whatever its id, and one naming no subagent moves the count as before."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="n", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await c.call("hook", session=sid, subagent_delta=1, subagent_seen=True)  # an id-less start
+        await c.call("hook", session=sid, subagent="a1", subagent_delta=1, subagent_seen=True)
+        assert (await c.call("get", id=sid))["subagents"] == 2
+        await c.call("hook", session=sid, subagent="zz", subagent_delta=-1, subagent_seen=True)
+        rec = await c.call("get", id=sid)
+        assert rec["subagents"] == 1 and rec["subagent_ids"] == ["a1"]
+        await c.call("hook", session=sid, subagent="zz", subagent_delta=-1, subagent_seen=True)
+        assert (await c.call("get", id=sid))["subagents"] == 1  # the tool's own: nothing left unnamed
+        await c.call("hook", session=sid, subagent_delta=-1, subagent_seen=True)
+        assert (await c.call("get", id=sid))["subagents"] == 0
+
+
 async def test_a_main_thread_waiter_is_keyed_by_its_call(agent, hookstub, tmp_path):
     """TD-950, design §4.2 *A waiter is keyed by its call*, from the captured `subagent-permission/main/`:
     the main thread's permission is keyed by its `PreToolUse`'s `tool_use_id`, and the dialog's own

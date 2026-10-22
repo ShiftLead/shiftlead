@@ -1,0 +1,171 @@
+{"t": 0.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": null}
+{"t": 1.0, "state": "working", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": null}
+{"t": 2.0, "state": "working", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": null}
+{"t": 3.0, "state": "working", "conf": "hook", "pending": null, "subagents": 1, "subagent_at": "2026-10-22T09:57:07Z"}
+{"t": 4.0, "state": "working", "conf": "hook", "pending": null, "subagents": 1, "subagent_at": "2026-10-22T09:57:07Z"}
+{"t": 5.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 6.0, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 7.5, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 8.5, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 9.5, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 10.5, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 11.5, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 12.5, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 13.5, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 14.6, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 15.6, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 16.6, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 17.6, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 18.6, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 19.6, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 20.6, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 21.7, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 22.7, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 23.7, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 24.7, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 25.7, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 26.7, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 27.8, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 28.8, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 29.8, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 30.8, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 31.8, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 32.8, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 33.8, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 34.8, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 35.9, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 36.9, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 37.9, "state": "needs-you", "conf": "hook", "pending": {"kind": "permission", "text": "Bash: touch probe-subagent.txt", "deadline": "2026-10-22T09:58:40Z", "tool_use_id": "toolu_01PxD2sttfEsHixLVgqt4ack", "subagent": "a66652f5a4df59ac1", "subagent_name": "general-purpose", "pane_held": true}, "subagents": 1, "subagent_at": "2026-10-22T09:57:10Z"}
+{"t": 38.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 39.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 40.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 41.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 42.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 43.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 44.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 45.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 46.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 47.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 48.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 49.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 50.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 51.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 52.9, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 54.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 55.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 56.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 57.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 58.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 59.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 60.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 61.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 62.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 63.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 64.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 65.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 66.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 67.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 68.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 69.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 70.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 71.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 72.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 73.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 74.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 75.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 76.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 77.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 78.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 79.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 80.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 81.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 82.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 83.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 84.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 85.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 86.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 87.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 88.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 89.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 90.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 91.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 92.0, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 93.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 94.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 95.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 96.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 97.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 98.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 99.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 100.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 101.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 102.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 103.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 104.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 105.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 106.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 107.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 108.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 109.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 110.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 111.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:57:43Z"}
+{"t": 112.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:56Z"}
+{"t": 113.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 114.1, "state": "working", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 115.1, "state": "working", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 116.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 117.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 118.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 119.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 120.1, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 121.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 122.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 123.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 124.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 125.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 126.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 127.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 128.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 129.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 130.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 131.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 132.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 133.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 134.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 135.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 136.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 137.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 138.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 139.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 140.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 141.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 142.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 143.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 144.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 145.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 146.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 147.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 148.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 149.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 150.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 151.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 152.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 153.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 154.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 155.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 156.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 157.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 158.2, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 159.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 160.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 161.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 162.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 163.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 164.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 165.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 166.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 167.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 168.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 169.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 170.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
+{"t": 171.3, "state": "idle", "conf": "hook", "pending": null, "subagents": 0, "subagent_at": "2026-10-22T09:58:58Z"}
