@@ -418,6 +418,50 @@ async def test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped(
         await person.call("remove", id=rid)
 
 
+@pytest.mark.parametrize("exit_", ["no read", "nothing new", "turns sent"])
+async def test_a_nodes_ended_profile_is_read_once_more_and_then_dropped(agent, hookstub, tmp_path, monkeypatch, exit_):
+    """TD-965 on a node (`_seats_to_home`, TD-972): a profile whose last live session ended is read on the
+    pass after and then no more, whichever way that read ends — the adapter's reason, nothing new since
+    the home's cursors, or the turns sent home."""
+    await park_ticks(agent)
+    hookstub.billing, hookstub.accounts = {}, {}
+    sent: list[dict] = []
+
+    class Mux:  # the home's side of the link: it answers the cursors it was sent, seeded
+        async def request(self, method, timeout=None, **params):
+            sent.append(params)
+            return {"cursors": params["cursors"] or {"t1": 1}, "seeded": True}
+
+    asked: list[str] = []
+
+    async def read(name, prof, cursors):
+        asked.append(prof)
+        if exit_ == "no read":
+            return None
+        if exit_ == "nothing new":
+            return {"reason": "ok", "turns": [], "cursors": dict(cursors)}
+        return {"reason": "ok", "turns": [_t(f"u{len(asked)}", len(asked))], "cursors": {"t1": len(asked) + 1}}
+
+    monkeypatch.setattr(agent, "_read_seats", read)
+    async with LocalClient() as person:
+        rid = (await person.call("create", name="w", dir=str(tmp_path), adapter="hookstub", profile="sub"))["id"]
+        agent.sessions[rid].adapter_id = "cv"
+        await person.call("kill", id=rid)  # the kill routes as the home's; the passes below are the node's
+        agent.mode, agent._home_mux, agent._snapshot_sent = "node", Mux(), True
+        agent._seat_live = {("hookstub", "sub")}  # the pass before saw it live
+        try:
+            await agent._refresh_seats_inner()  # its last minute, though nothing else runs on "sub"
+            assert asked == ["sub"] and ("hookstub", "sub") not in agent._seat_ended
+            if exit_ == "turns sent":
+                assert sent[-1]["turns"]
+            asked.clear()
+            await agent._refresh_seats_inner()
+            assert asked == []  # read once more, then dropped
+        finally:
+            agent.mode, agent._home_mux, agent._snapshot_sent = "home", None, False
+        await person.call("remove", id=rid)
+
+
 async def test_the_home_charges_a_nodes_seat_turns_once_and_its_seeding_charges_nothing(agent):
     """`seat_spend` at the home (TD-833): a read answers the cursors and whether the profile is
     seeded; the seeding takes a new transcript's end and charges nothing; a turn is owned among the
