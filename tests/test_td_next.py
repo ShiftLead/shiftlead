@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -70,7 +71,7 @@ def gh(monkeypatch):
     real = agent_ids._run
     state = {"urls": {}, "prs": {}, "slow": {}, "list_error": None, "on_list": None, "calls": []}
 
-    async def fake(argv, cwd, timeout):
+    async def fake(argv, cwd, timeout, **kw):
         state["calls"].append(argv)
         if argv[:1] == ["git"] and argv[3:6] == ["remote", "get-url", "origin"]:
             url = state["urls"].get(argv[2])
@@ -94,7 +95,7 @@ def gh(monkeypatch):
                 return 1, "", files
             out = [json.dumps({"f": f, "p": p}) if json.dumps(f) in jq else "0" for f, p in files]
             return 0, "\n".join(out) + "\n", ""
-        return await real(argv, cwd, timeout)
+        return await real(argv, cwd, timeout, **kw)
 
     monkeypatch.setattr(agent_ids, "_run", fake)
     return state
@@ -150,7 +151,7 @@ async def test_count_gives_ids_in_a_row_and_the_record_keeps_who(home, gh, tmp_p
     _one(tmp_path, gh, nums=(1, 4))
     got = await home.rpc_td_next(repo="shiftlead", count=3, caller="ao-w")
     assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-005", "TD-006", "TD-007"],
-                   "unread": []}  # fmt: skip
+                   "unread": [], "reserved": True, "why": "", "warnings": []}  # fmt: skip
     rec = json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]
     assert rec["last"] == 7 and [(g["id"], g["by"]) for g in rec["given"]] == [
         ("TD-005", "ao-w"), ("TD-006", "ao-w"), ("TD-007", "ao-w")
@@ -376,7 +377,8 @@ def test_the_cli_sends_a_symlinked_checkouts_registered_name(tmp_path, monkeypat
     assert out == "TD-001\nTD-002\n" and "open PR #3 not read: x" in err
     assert cli.main(["--json", "td", "next"]) == 0
     assert json.loads(capsys.readouterr().out) == {"repo": "shiftlead", "ids": ["TD-001", "TD-002"],
-                                                   "unread": ["open PR #3 not read: x"]}  # fmt: skip
+                                                   "unread": ["open PR #3 not read: x"], "reserved": True,
+                                                   "why": "", "warnings": []}  # fmt: skip
 
 
 @pytest.mark.unit
@@ -488,3 +490,184 @@ def test_the_cli_sends_held_and_says_so_in_json(tmp_path, monkeypatch, capsys):
     assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead", "--held", "--json"]) == 0
     assert sent == {"repo": "ShiftLead/shiftlead", "count": 1, "held": True}
     assert json.loads(capsys.readouterr().out)["held"] is True
+
+
+# -- TD-970: the road over origin's counter (§4.4 *A ledger entry's id is handed out by the home*) ---------------
+
+
+def _stub(root: Path, rc: int = 0, ids=("TD-050",), why: str = "", unread=(), warnings=(), out=None, sleep=0.0,
+          where: str = "scripts") -> Path:  # fmt: skip
+    """A stand-in `ledger_next_id.py` in the checkout's working tree: it records its argv, cwd, race budget and
+    pid (and a `sleep` child's, in its group) to `<root>.stub.json`, then prints `out` (the script's JSON by
+    default) and exits `rc`."""
+    log = root.with_suffix(".stub.json")
+    body = (
+        out
+        if out is not None
+        else json.dumps(
+            {"ids": list(ids), "reserved": rc == 0, "why": why, "unread": list(unread), "warnings": list(warnings)}
+        )
+    )
+    (root / where).mkdir(parents=True, exist_ok=True)
+    (root / where / "ledger_next_id.py").write_text(
+        "import json, os, subprocess, sys, time\n"
+        f"child = subprocess.Popen(['sleep', '60']).pid if {sleep!r} else None\n"
+        f"open({str(log)!r}, 'w').write(json.dumps({{'argv': sys.argv[1:], 'cwd': os.getcwd(), 'pid': os.getpid(),"
+        " 'child': child, 'race': os.environ.get('LEDGER_IDS_RACE_SECONDS')}))\n"
+        f"time.sleep({sleep!r})\n"
+        f"print({body!r})\n"
+        "print('stub stderr line', file=sys.stderr)\n"
+        f"sys.exit({rc})\n"
+    )
+    return log
+
+
+def _gone(pid: int) -> bool:
+    """Dead or a zombie waiting for its reaper: either way it runs nothing."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().split(") ")[1][0] in "ZX"
+    except (OSError, IndexError):
+        return True
+
+
+@pytest.mark.integration
+async def test_the_script_road_passes_the_floor_by_count_and_ledger_and_records_what_it_gave(home, gh, tmp_path):
+    root = _one(tmp_path, gh, nums=(1, 2))
+    paths.ids_file().write_text(json.dumps({"shiftlead/shiftlead": {"last": 40, "given": []}}))
+    log = _stub(root, ids=("TD-041", "TD-042"))
+    got = await home.rpc_td_next(repo="shiftlead", count=2, caller="ao-w")
+    assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-041", "TD-042"], "unread": [],
+                   "reserved": True, "why": "", "warnings": []}  # fmt: skip
+    seen = json.loads(log.read_text())
+    assert seen["argv"] == ["--count", "2", "--by", "ao-w", "--floor", "40", "--ledger", LEDGER, "--archive", ARCHIVE,
+                            "--json"]  # fmt: skip
+    assert Path(seen["cwd"]) == root and float(seen["race"]) <= agent_ids.BUDGET - agent_ids.SCRIPT_SLACK
+    rec = json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]
+    assert rec["last"] == 42 and [(g["id"], g["by"]) for g in rec["given"]] == [("TD-041", "ao-w"), ("TD-042", "ao-w")]
+    assert not [c for c in gh["calls"] if c[:1] == ["gh"] or "fetch" in c], "the home reads no PR and fetches nothing"
+    _stub(root, ids=("TD-043",))
+    await home.rpc_td_next(repo="shiftlead")
+    assert json.loads(log.read_text())["argv"][3:6] == ["person", "--floor", "42"], "the last given is the next floor"
+
+
+@pytest.mark.integration
+async def test_a_custom_ledger_is_passed_to_the_script(home, gh, tmp_path):
+    root = _one(tmp_path, gh, files={".shiftlead.yml": "ledger: notes/debt.md\n", "notes/debt.md": _ledger(3)})
+    log = _stub(root)
+    await home.rpc_td_next(repo="shiftlead")
+    argv = json.loads(log.read_text())["argv"]
+    assert argv[argv.index("--ledger") + 1] == "notes/debt.md" and argv[argv.index("--archive") + 1] == (
+        "notes/debt_archive.md"
+    )
+
+
+@pytest.mark.integration
+async def test_exit_3_gives_the_ids_unreserved_with_why_and_records_them(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    _stub(root, rc=3, ids=("TD-007",), why="the push was refused with the counter unmoved: protected",
+          unread=["#12", "the list (cut at 100)"], warnings=["no forge"])  # fmt: skip
+    got = await home.rpc_td_next(repo="shiftlead")
+    assert got["ids"] == ["TD-007"] and got["reserved"] is False
+    assert got["why"] == "the push was refused with the counter unmoved: protected"
+    assert got["unread"] == ["open PRs not read: #12, the list (cut at 100)"] and got["warnings"] == ["no forge"]
+    assert json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]["last"] == 7
+
+
+@pytest.mark.integration
+async def test_exit_2_refuses_with_the_scripts_why_and_records_nothing(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    _stub(root, rc=2, ids=(), why="could not fetch origin/main: unreachable")
+    with pytest.raises(RpcError, match="shiftlead's ids were not given: could not fetch origin/main: unreachable"):
+        await home.rpc_td_next(repo="shiftlead")
+    assert not paths.ids_file().exists()
+
+
+@pytest.mark.integration
+async def test_a_reply_that_is_not_the_scripts_json_refuses_naming_the_exit(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    for rc, out in ((2, "usage: ledger_next_id.py: unrecognized arguments: --floor"), (1, None), (0, None)):
+        _stub(root, rc=rc, ids=() if rc == 0 else ("TD-009",), out=out)
+        with pytest.raises(
+            RpcError, match=rf"scripts/ledger_next_id.py did not answer with its JSON \(exit {rc}\): stub"
+        ):
+            await home.rpc_td_next(repo="shiftlead")
+    assert not paths.ids_file().exists()
+
+
+@pytest.mark.integration
+async def test_a_script_past_the_budget_refuses_and_dies_with_its_group(home, gh, tmp_path, monkeypatch):
+    root = _one(tmp_path, gh)
+    monkeypatch.setattr(agent_ids, "BUDGET", 6.5)
+    log = _stub(root, sleep=60.0)
+    with pytest.raises(RpcError, match="budget, ask again"):
+        await home.rpc_td_next(repo="shiftlead")
+    seen = json.loads(log.read_text())
+    assert 1.0 <= float(seen["race"]) < 6.5 - agent_ids.SCRIPT_SLACK + 0.01
+    for _ in range(40):
+        if _gone(seen["pid"]) and _gone(seen["child"]):
+            break
+        await asyncio.sleep(0.05)
+    assert _gone(seen["pid"]) and _gone(seen["child"]), "the script and the git it ran are killed at the deadline"
+    assert not paths.ids_file().exists()
+
+
+@pytest.mark.integration
+async def test_dev_cadences_own_checkout_runs_files_scripts(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    log = _stub(root, where="files/scripts", ids=("TD-003",))
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-003"] and log.exists()
+    assert agent_ids.ids_script(str(root)) == root / "files/scripts/ledger_next_id.py"
+    _stub(root, where="scripts", ids=("TD-004",))
+    assert agent_ids.ids_script(str(root)) == root / "scripts/ledger_next_id.py", "a syncing repo's copy first"
+
+
+@pytest.mark.integration
+async def test_held_holds_the_scripts_ids(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    _stub(root, rc=3, ids=("TD-030",), why="no push")
+    got = await home.rpc_td_next(repo="shiftlead", held=True)
+    assert got["held"] is True and got["reserved"] is False
+    assert "TD-030" in json.loads(paths.ledger_seen_file().read_text())["shiftlead/shiftlead"]
+
+
+@pytest.mark.integration
+async def test_the_home_and_a_direct_run_at_once_take_different_ids_from_one_counter(home, gh, tmp_path):
+    """The real synced script, on a bare origin with no forge: one counter, with the home and without it."""
+    files = {LEDGER: _ledger(1, 2), ARCHIVE: _ledger()}
+    files.update({f"scripts/{p.name}": p.read_text() for p in (Path(__file__).parent.parent / "scripts").glob("*.py")})
+    root = _one(tmp_path, gh, files=files)
+    other = _repo(tmp_path, "other", {}, origin=Path(_git(root, "remote", "get-url", "origin")))
+    env = {**os.environ, **GIT_ENV, "LEDGER_IDS_RACE_SECONDS": "20"}
+
+    def direct() -> str:
+        cp = subprocess.run([sys.executable, "scripts/ledger_next_id.py", "--json", "--by", "direct"], cwd=other,
+                            capture_output=True, text=True, env=env, timeout=60)  # fmt: skip
+        assert cp.returncode == 0, cp.stderr
+        return json.loads(cp.stdout)["ids"][0]
+
+    mine, theirs = await asyncio.gather(home.rpc_td_next(repo="shiftlead", caller="ao-w"), asyncio.to_thread(direct))
+    assert mine["reserved"] is True and mine["ids"][0] != theirs and {mine["ids"][0], theirs} == {"TD-003", "TD-004"}
+    origin = _git(root, "remote", "get-url", "origin")
+    assert _git(Path(origin), "show", "cadence/ledger-ids:LAST").strip() == "4"
+
+
+@pytest.mark.unit
+def test_the_cli_says_an_unreserved_id_and_each_warning_on_stderr_and_exits_0(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    reply = {"repo": "shiftlead", "ids": ["TD-005"], "unread": [], "reserved": False, "why": "no push rights",
+             "warnings": ["the counter's LAST is absent"]}  # fmt: skip
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: reply)
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
+    out, err = capsys.readouterr()
+    assert out == "TD-005\n"
+    assert "not reserved on origin's counter: no push rights" in err and "the counter's LAST is absent" in err
+    assert cli.main(["--json", "td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert (got["reserved"], got["why"], got["warnings"]) == (False, "no push rights", ["the counter's LAST is absent"])
+
+
+def test_the_offline_refusal_names_the_script():
+    why = modes.offline_refusal("td_next", "ao-x", {}, host="laptop", home="kmaster")
+    assert "scripts/ledger_next_id.py" in why

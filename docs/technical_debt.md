@@ -73,7 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-966 | `ao td next` becomes a front end over dev-cadence's ledger-id counter on origin: one counter, with or without the home | High | Designed — the home's `td_next` runs the synced script with `--floor`; builds TD-969, TD-970; TD-971 follows on its own |
-| TD-970 | The home's `td_next` runs `scripts/ledger_next_id.py` with `--floor`, where the checkout has it: one counter with or without the home | High | Open |
+| TD-970 | The home's `td_next` runs `scripts/ledger_next_id.py` with `--floor`, where the checkout has it: one counter with or without the home | High | Built (#2293) — live check once promoted |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — blocked by TD-970; waits on every registered repo's sync |
 
 ---
@@ -1439,8 +1439,8 @@ builds are in the ledger.
 **Type:** debt
 **Added:** 2026-10-22 (the designer, from TD-966)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2293
+**Status:** Built 2026-10-23 (grinder-ao-1, #2293): the script road in `agent_ids.py` (`ids_script`, `_ids_script`, `_record_given`, `_run`'s process group), the CLI's *not reserved* and warning lines, the offline refusal and the brief; every *Done when* test in `tests/test_td_next.py`, the live one on a bare origin included. **Left, read on the live copy once #2293 is live** (the anchor's, as TD-940's was): one `ao td next` against this repo's origin answers `reserved: true`, and `git ls-remote origin cadence/ledger-ids` shows its new commit; an exit 3 there is the unit's push credential.
 **Location:** `src/sessionorc/agent_ids.py` (`rpc_td_next`, `_ids_give`, `_record`, `_run`); `src/shiftlead/cli.py` `cmd_td_next`; `src/sessionorc/modes.py` (`td_next`'s offline refusal); `src/shiftlead/briefs/entry.md` (*The number*); `tests/test_td_next.py`; design §4.4 *A ledger entry's id is handed out by the home*, §4.4a's `td_next` row, §4.7 `ao td next`
 
 **Why:** the home's `ids.json` is a second counter beside origin's (TD-966): an id it gives is invisible to a session that takes from `scripts/ledger_next_id.py`, and one the script gives is invisible to the home until it is pushed.
