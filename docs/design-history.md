@@ -315,6 +315,10 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-22 (TD-966, review round 3, Fable): 2 findings, both new, both adopted:
   - dev-cadence's own checkout holds the script only at `files/scripts/`, so the home probes `scripts/` and then `files/scripts/`;
   - the home's own road serves no repo once each has synced, so TD-971 removes it then and refuses a checkout without the script. Keeping it through the switch is a steer to the techlead, since removing it now would refuse every repo that has not synced.
+- 2026-10-22 (TD-966, review round 3, Sonnet): 2 findings and 1 nit, all adopted:
+  - TD-971 names every own-road sentence it deletes from *Both roads*;
+  - TD-971's event says how it is checked (each registered root's sync lock), and that each repo's sync is that repo's own. TD-966 archives with TD-970, so it is not held open by other repos;
+  - *The run* names the script found.
 - 2026-10-21 (TD-940 slice 2, grinder-ao-1; the scope steered with the techlead, m-eb7127cfc157): the PR reading per forge — a GitLab origin reads its open merge requests, the head pipeline folded into the four words, `conflicting`, and `required` on the MR's row; windows, `recent` and held are unread there. Was: `gh` for every origin, so a GitLab remote had no reading.
 - 2026-10-20 (TD-927, the designer): *Spend per seat* — every figure the readings carry carries its tokens by kind, and a token count is drawn as every kind summed, the four kinds on hover: one rule for the Spend page, `ao spend` and the Focus's disconnect card (TD-923 drew it first); built by TD-929.
 - 2026-10-20 (TD-915): *The Queue*'s rows — the breadth-first walk sets each row's level and parent; the page draws them depth first, each under its own parent, so the drawn tree reads as the walk built it.

@@ -72,7 +72,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
-| TD-966 | `ao td next` becomes a front end over dev-cadence's ledger-id counter on origin: one counter, with or without the home | High | Designed — the home's `td_next` runs the synced script with `--floor`; builds TD-969, TD-970, TD-971 |
+| TD-966 | `ao td next` becomes a front end over dev-cadence's ledger-id counter on origin: one counter, with or without the home | High | Designed — the home's `td_next` runs the synced script with `--floor`; builds TD-969, TD-970; TD-971 follows on its own |
 | TD-969 | Sync dev-cadence to 232f2ad or later, so `scripts/ledger_next_id.py`, §2.10's allocator rule and the `ledger` row's id check land here | High | Open |
 | TD-970 | The home's `td_next` runs `scripts/ledger_next_id.py` with `--floor`, where the checkout has it: one counter with or without the home | High | Open — blocked by TD-969 |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — blocked by TD-970; waits on every registered repo's sync |
@@ -1421,7 +1421,7 @@ builds are in the ledger.
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed 2026-10-22 (the designer): design §4.4 *A ledger entry's id is handed out by the home*, §4.4a's `td_next` row, §4.7 `ao td next`. dev-cadence#TD-124 is built and archived (its #292–#295).
-**Blocked by:** TD-969, TD-970, TD-971
+**Blocked by:** TD-969, TD-970
 **Location:** design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries* (`ao td next`); `src/sessionorc/` (the `td_next` RPC, `ids.json`), `src/shiftlead/cli.py` (`cmd_td_next`)
 
 **Why:** the home hands ids out under a lock (TD-693/696), but only to a session that asks it. Every session that cannot ask (a cloud session, another machine, a repo with no home) and every session that follows cadence §2.10's hand rule instead (TD-949 and TD-954–956 on 2026-10-22, none in `ids.json`, and #2240's own TD-942 and TD-948) numbers around it, and the home's record of what it gave is invisible to them until a PR is pushed. dev-cadence#TD-124 puts the counter on origin as a git ref that every session can advance, with or without a home. If the home keeps its own `ids.json` beside it, there are two counters that can disagree.
@@ -1505,14 +1505,14 @@ builds are in the ledger.
 **Added:** 2026-10-22 (the designer, from TD-966; Fable round 3: the home's own road serves no repo once each has synced)
 **Owner:** grinder
 **Kind:** build
-**Waits:** event — every repo registered with the home has `scripts/ledger_next_id.py` on its default branch (its `docs/cadence-sync.lock` at dev-cadence 232f2ad or later), or is dev-cadence itself (`files/scripts/`)
+**Waits:** event — every repo registered with the home has `scripts/ledger_next_id.py` on its default branch (its `docs/cadence-sync.lock` at dev-cadence 232f2ad or later), or is dev-cadence itself (`files/scripts/`). The check: for each root `ao repo --json` lists, `git -C <root> show origin/<default>:docs/cadence-sync.lock` names 232f2ad or later. Each repo's sync is its own sessions' work, as TD-969 is this repo's; this entry chases none of them, and TD-966 archives with TD-970, not with this
 **Status:** Open
 **Blocked by:** TD-970
 **Location:** `src/sessionorc/agent_ids.py` (`_ids_prs`, `added_ids`, `files_jq`, `PR_READERS`, `FILES_CAP`, `_record`, the own-reads branch of `_ids_give`); `tests/test_td_next.py`; design §4.4 *A ledger entry's id is handed out by the home* (*A checkout without the script*), §4.7 `ao td next` (`reserved` on the home's own road)
 
 **Why:** after the switch (TD-970), the home's own reads serve only a checkout from before the sync, where they can collide with an unpushed id the script gave (Sonnet round 2). They also keep two answer shapes alive. The ADR's end state is one counter, with `ids.json` handing out nothing of its own.
 
-**Fix:** delete the home's own reads and `_record`. A checkout without the script is refused with *no scripts/ledger_next_id.py in <repo>: sync dev-cadence to 232f2ad or later*. `ids.json` stays as the floor and the record (`_record_given`). In the same PR, §4.4 drops *A checkout without the script* and its three reads, keeping *Both roads*' lock, budget and record text as the one road's; §4.7 drops `reserved`'s own-road clause; the history line under §4.4 says the road is gone.
+**Fix:** delete the home's own reads and `_record`. A checkout without the script is refused with *no scripts/ledger_next_id.py in <repo>: sync dev-cadence to 232f2ad or later*. `ids.json` stays as the floor and the record (`_record_given`). In the same PR, §4.4 drops *A checkout without the script* and its three reads, and from *Both roads* every own-road sentence: the PRs read a few at a time until 30 seconds in, the fetch that refuses when it does not finish, the *open PRs not read: <why>* line with the 200-PR list and the unread and `patch` rules, and *A fetch that fails refuses the call … main's ids are the floor*. It keeps the lock, the budget, the keying and the record as the one road's, keeps the script's `unread` line under *What it reads*, and rewords *as on the other road* in *The run* and *The record* to stand alone; §4.7 drops `reserved`'s own-road clause; the history line under §4.4 says the road is gone.
 
 **Done when** `rpc_td_next` on a scratch checkout without the script refuses, naming the sync; the own-reads tests are gone; and every remaining `tests/test_td_next.py` test passes.
 
