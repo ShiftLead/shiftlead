@@ -18801,3 +18801,25 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-914 (#2188, which doubled the line), TD-931 (the two numbers by home), TD-748 (the Queue).
 
 **Resolved:** 2026-10-22 (PR #2287; live check read in this archive's PR) — on the live copy with 8f479a0 live: `/inbox` 871 `<div` and 871 `</div>`, `/queue` 2,684 each; no `.mailrow` inside another; the bare page and each of the rail's 22 picks (6 sections, 5 teams, 5 repos, 6 kinds), each loaded by its URL in headless Chromium, showed under *Needs you* exactly the rows the rail's *Needs you* line counted (18 unfiltered; ao-grind 0, gd-grind 7, team none 8, kind board 15); the top bar's Inbox 18 and Queue 29 add up to `ao inbox --counts`' `needs` 47.
+
+---
+
+## TD-969: Sync dev-cadence to 232f2ad or later, so `scripts/ledger_next_id.py`, §2.10's allocator rule and the `ledger` row's id check land here
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-22 (the designer, from TD-966)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built 2026-10-23 (grinder-ao-1, #2291): `sync.sh` from dev-cadence at 232f2ad, and `scripts/vendor_ledgerboard.sh v1.3` in the same PR.
+**Location:** `docs/cadence-sync.lock` (at 4453db4); dev-cadence's `sync.sh`; the files it brings: `scripts/ledger_next_id.py` (new), `scripts/check_cadence.py` (the `ledger` row), `scripts/cadence_config.py` (`ledger-ids-host`), `docs/cadence.md` §2.10 and §9.18, `docs/cadence-changes.md`
+
+**Why:** TD-966's wrapper (TD-970) runs the synced `scripts/ledger_next_id.py`, which dev-cadence shipped in TD-124 (its #293–#295, on main at 232f2ad). This repo's last sync is 4453db4 (#2198), from before it.
+
+**Fix:** run dev-cadence's `sync.sh` from a worktree, as #2198 did, to its main at 232f2ad or later, and land what it writes as one PR titled `sync dev-cadence <sha>`. The range brings ledgerboard v1.3 (dev-cadence #288, TD-121) into `scripts/ledgerboard.py`, while the wheel's copy `src/sessionorc/ledgerboard.py` is v1.2, and `tests/test_ledgerboard_fixtures.py` holds the two byte-equal: run `scripts/vendor_ledgerboard.sh v1.3` in the same PR (the wheel copy and `tests/ledgerboard/`), as #1930 did for v1.2, and read what v1.3 changes (its `Ask:` line) against `ledger.py --check` on this ledger. Edit no SYNCED file by hand. Read `docs/cadence-changes.md`'s new lines: §2.10 now says *the front end first* (`ao td next`), and the ledger row now warns on a new id above the counter's `LAST`. Until a first take creates `cadence/ledger-ids`, the row has no counter to compare against and warns nothing; once TD-970's live check has made it, a PR numbered by the home before TD-970 warns there, as the ADR expects. Leave `ledger-ids-host` unset: this repo is private, and the default is `on`.
+
+**Done when** `docs/cadence-sync.lock` names 232f2ad or later, `scripts/ledger_next_id.py` is in the tree, the wheel's ledgerboard is v1.3, `pdm run test` passes, and `python3 scripts/check_cadence.py --pr <the sync's PR>` exits 0.
+
+**Related:** TD-966, TD-970, dev-cadence#TD-124.
+
+**Resolved:** 2026-10-23 (PR #2291) — `docs/cadence-sync.lock` names 232f2ad; `scripts/ledger_next_id.py` is in the tree; `src/sessionorc/ledgerboard.py` and `tests/ledgerboard/` are v1.3, byte-equal to the synced `scripts/ledgerboard.py`; `ledger.py --check` 0 errors, and no open board line has an answer with a ` — ` consequence, so v1.3's label split changes no live line; `ledger-ids-host` left unset.
