@@ -18921,3 +18921,27 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-975, TD-977, TD-543 (the `links` read this mirrors).
 
 **Resolved:** 2026-10-22 (PR #2299; live check read by grinder-ao-1) — on a `look_home.py` scratch home running `origin/main` with #2299 merged, a Claude Code 2.1.309 session of `ao new` on the `conformance` profile: a prompt typed into its terminal at 05:47:10Z was in `ao status --json`'s `prompts` by 05:47:17Z as `from: person` with its reply `typed`; an `ao send` from a second session's pane (`ao-aolp-caller`) at 05:47:26Z was listed under `from: ao-aolp-caller` with its reply `sent`; `drawn` was `❯ ` and the first forty characters, `whole` false. The scratch home was torn down after.
+
+---
+
+## TD-460: Read back the one-week trial of a 200k context bound on ao-grind's grinders
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
+**Owner:** grinder
+**Kind:** live-check #1317
+**Waits:** until 2026-10-23 — the second trial week ends 10-23 04:26Z; read it from then (Paul, 2026-10-15)
+**Status:** **Read 2026-10-15 (the anchor): flat. Paul, 2026-10-15 (board, m-e9930892429c): run another week — the line stays, and the check is read again from 2026-10-23 05:00Z over the second trial week (10-16 04:26Z to 10-23 04:26Z) against the same two weeks; that reading keeps the line or takes it out, a result still unclear going to Paul as a `steer`.** Steer `m-1aa735ccc0cc` to the techlead is overtaken by Paul's answer. Per merged PR the grinders' weighted cost was 1.54M the week before and 1.52M in the trial; mean context fell 191k → 153k, while requests per PR rose 102 → 117 and runs per PR 0.56 → 0.89. The table is in the ADR's Consequences. The second reading's answer is acted on in a PR of its own: the line out of `.shiftlead.yml` (and its comment), or kept and design §4.8 saying this repo's grinder number is measured. Was: Open — the bound is set in `.agentorc.yml` (`roles.grinder.context: {bound: 200k}`) by the PR that filed this entry. Each grinder takes it at its next start, and the trial week runs from the first such start to about 2026-10-15. Until then the check waits on the calendar, which nobody can hurry.
+**Location:** `.shiftlead.yml` (`roles: grinder: context:`); design §4.8 *The bound has two layers*; the usage ledger and the run logs under `~/.shiftlead/` (read only)
+
+**Why:**
+- Requests over 200k tokens of context carried 35% of agentorc's weighted cost from 2026-10-01 to 10-08 ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)).
+- A 200k bound cuts the mean context per request by about 29%. Against that, each grinder run is about two-fifths shorter, and every restart pays its first write and a re-orientation (the ledger, the files and the design read again).
+- Nobody can net the two on paper. Paul decided to measure it on the weekly window for a week.
+
+**Fix:** after a week on 200k (from about 2026-10-15), compare ao-grind's grinders' usage-window percentage per merged PR against the week before (2026-10-01–08). Count their restarts per merged PR alongside. Write the reading into the ADR's Consequences. Then keep the line in `.agentorc.yml` (and design §4.8 says this repo's grinder number is measured), or take it out (the 300k default returns), in a PR. A result that is unclear goes to Paul as a `steer` with the reading. **Done when** the line stays or goes with a written reading behind it.
+
+**Related:** TD-378 (archived), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 4, TD-249 (the bound's last change), TD-459.
+
+**Resolved:** 2026-10-23 (grinder-ao-2, this PR) — the second trial week (10-16 04:26Z to 10-23 04:26Z) read like the first: 0.80M weighted per merged PR (trial week 1 0.78M) against 0.84M the week before, mean context 157k against 191k, and the cost's share past 200k 30% against 55%, with runs per PR 0.47 against 0.31. Every week is counted again with one count of merged PRs, about twice the first reading's. The 200k line stays in `.shiftlead.yml`, and design §4.8 *The bound has two layers* calls it measured. The table is in [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)'s Consequences.

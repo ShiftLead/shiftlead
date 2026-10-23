@@ -30,7 +30,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | Paul's — contractmatch done; guardians' team, node and `place:` left |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Live check #993 — waits on a look from a node (TD-299) |
-| TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
@@ -377,26 +376,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when:** a look from a member on a node draws its screenshots on the home's Inbox.
 
 **Related:** TD-292 (the row), TD-299 (teams on nodes), TD-057 (the home and node split).
-
-## TD-460: Read back the one-week trial of a 200k context bound on ao-grind's grinders
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
-**Owner:** grinder
-**Kind:** live-check #1317
-**Waits:** until 2026-10-23 — the second trial week ends 10-23 04:26Z; read it from then (Paul, 2026-10-15)
-**Status:** **Read 2026-10-15 (the anchor): flat. Paul, 2026-10-15 (board, m-e9930892429c): run another week — the line stays, and the check is read again from 2026-10-23 05:00Z over the second trial week (10-16 04:26Z to 10-23 04:26Z) against the same two weeks; that reading keeps the line or takes it out, a result still unclear going to Paul as a `steer`.** Steer `m-1aa735ccc0cc` to the techlead is overtaken by Paul's answer. Per merged PR the grinders' weighted cost was 1.54M the week before and 1.52M in the trial; mean context fell 191k → 153k, while requests per PR rose 102 → 117 and runs per PR 0.56 → 0.89. The table is in the ADR's Consequences. The second reading's answer is acted on in a PR of its own: the line out of `.shiftlead.yml` (and its comment), or kept and design §4.8 saying this repo's grinder number is measured. Was: Open — the bound is set in `.agentorc.yml` (`roles.grinder.context: {bound: 200k}`) by the PR that filed this entry. Each grinder takes it at its next start, and the trial week runs from the first such start to about 2026-10-15. Until then the check waits on the calendar, which nobody can hurry.
-**Location:** `.shiftlead.yml` (`roles: grinder: context:`); design §4.8 *The bound has two layers*; the usage ledger and the run logs under `~/.shiftlead/` (read only)
-
-**Why:**
-- Requests over 200k tokens of context carried 35% of agentorc's weighted cost from 2026-10-01 to 10-08 ([ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)).
-- A 200k bound cuts the mean context per request by about 29%. Against that, each grinder run is about two-fifths shorter, and every restart pays its first write and a re-orientation (the ledger, the files and the design read again).
-- Nobody can net the two on paper. Paul decided to measure it on the weekly window for a week.
-
-**Fix:** after a week on 200k (from about 2026-10-15), compare ao-grind's grinders' usage-window percentage per merged PR against the week before (2026-10-01–08). Count their restarts per merged PR alongside. Write the reading into the ADR's Consequences. Then keep the line in `.agentorc.yml` (and design §4.8 says this repo's grinder number is measured), or take it out (the 300k default returns), in a PR. A result that is unclear goes to Paul as a `steer` with the reading. **Done when** the line stays or goes with a written reading behind it.
-
-**Related:** TD-378 (archived), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 4, TD-249 (the bound's last change), TD-459.
 
 ## TD-512: A PR that truncates `docs/technical_debt_archive.md` passes every gate: nothing reads what the archive lost
 

@@ -139,6 +139,30 @@ rank the levers.
   came before the trial began. The weekly window, the measure the decision named, is account-wide
   and keeps no history, so it cannot be split per grinder. Paul, 2026-10-15: run another week. The
   line stays, and a second trial week (to 10-23 04:26Z) is read the same way before it stays or goes.
+- **The second reading (grinder-ao-2, 2026-10-23, TD-460): the line stays.** The data and weights are
+  the same, and the requests are from grinder-ao-1's and grinder-ao-2's main conversations under both
+  repo names. A merged PR is again one a grinder reported with `ao progress done --pr`, read this time
+  from the transcripts' `ao progress done … --pr N` calls. Against GitHub's list of merged PRs, every PR
+  counted is merged, except one stray #5 in the first two weeks. That count finds about twice the PRs the first reading did. It was applied to
+  every week, so the first reading's per-PR figures above are not comparable with these. The costs,
+  request counts and contexts agree with the first reading's (184M weighted in this ADR's week; mean
+  context 185k, 191k and 154k).
+
+  | grinders | 10-01–08 | 10-02 04:26–10-09 04:26 (before) | trial week 1 (to 10-16 04:26) | trial week 2 (to 10-23 04:26) |
+  |---|---|---|---|---|
+  | merged PRs | 216 | 218 | 272 | 244 |
+  | weighted cost per merged PR | 0.85M | 0.84M | 0.78M | 0.80M |
+  | requests per merged PR | 55 | 56 | 60 | 60 |
+  | runs per merged PR | 0.40 | 0.31 | 0.45 | 0.47 |
+  | mean context per request | 185k | 191k | 154k | 157k |
+  | share of the cost over 200k of context | 49% | 55% | 27% | 30% |
+
+  Cost per merged PR, the measure the decision named, is lower in both trial weeks: about 5–7% below the
+  week before. That is net of the restarts, and the first reading called a difference of that size
+  flat, so the bound costs no more than 300k did, perhaps a little less. The mean context fell by about
+  a fifth, and the share of the cost read past 200k fell by about half (55% to 27% and 30%). Runs per PR
+  rose by half and requests per PR by about 7%. The 200k line stays in `.shiftlead.yml`. The weekly
+  window still keeps no history, so this per-PR reading is the measure.
 
 ## Revisit triggers
 
