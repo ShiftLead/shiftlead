@@ -18757,3 +18757,27 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** §4.5 *The card's anatomy* (the outlined next act), §4.5a *Focus: Wrap up*, *Focus: Kill*, *Focus side panel: Close*, *card: Close session*, *Org: team groups* (the fold), §4.9a (a declaration is not a state), TD-081 / TD-145 / TD-155 (the resumed session this was seen on), TD-154 (reading a transcript, the other reason the session was resumed at all), TD-095 (the card's foot and slot).
 
 **Resolved:** 2026-10-21 (PR #2240) — Paul's live look, in the td-156 session he opened from the Queue: *everything seems to be working per the original design*. The lasting content is design §4.5 *The Focus screen's anatomy* and *Whose session it is*, §4.5a's Focus and team-group rows, and the mockups `Focus`, `FocusReady` and `FocusOrc`; (g) went to its own TD. The changes Paul asked for at the same look are TD-964.
+
+---
+
+## TD-965: The seat pass reads only the profiles of live sessions, so a session's last minute is not charged until something else runs on its profile
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-21 (found by TD-964's review, round 1: the ending card's total would miss the closed session's last turns)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved — designed in TD-964's PR (#2240): design §4.4 *Spend per seat*, *What is read*.
+**Location:** `src/sessionorc/agent_spend.py` (the seat pass, `SEAT_EVERY`), `src/sessionorc/agent_tick.py` (where the pass is started)
+
+**Why:** the seat pass runs once a minute for every (adapter, profile) pair its **live** sessions run under. A session that ends between two passes has its last turns unread, and when it was the profile's last live session nothing reads that profile again until another session runs on it — the seat ledger, the Spend page and the Focus's ending card (TD-964) all read short for that session in the meantime, and the turns land later charged by cursor.
+
+**Fix:** the pass keeps the pairs it read last time; a pair whose last live session ended since then is read once more on the next pass, then dropped. A test: a session ends with turns past the cursor, no other session on its profile, and the next pass charges them to its record.
+
+**Done when** a session's turns up to its ending are in the seat ledger within one pass of the ending, whether or not another session runs on its profile.
+
+**Related:** TD-964 (the ending card, which reads the ledger at the ending), TD-818 / TD-830 (Spend per seat).
+
+**Resolved:** 2026-10-22 (grinder-ao-2, PR #2286) — `_refresh_seats_inner` (`src/sessionorc/agent_spend.py`) reads the pairs live now and those whose last live session ended (`_seat_ended`, from `_seat_live`, the pairs live at the pass before), each ended pair kept until a read of it is made and then dropped — a node offline or a pass cut short loses nothing; `test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped` (`tests/test_seats.py`) charges an ended session's last turn to its record with nothing else on its profile after a pass cut short, and fails with no extra read, with a one-shot read and with a read that is never dropped.
+
+---
