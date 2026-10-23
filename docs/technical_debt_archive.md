@@ -19068,3 +19068,25 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-975, TD-976, TD-022, TD-667, TD-794.
 
 **Resolved:** 2026-10-23 (PR #2303; live check read by grinder-ao-1) — on the scratch home the card was folded at load with *4 · last 0m ago*, its rows newest first, each with its reply's first line. Pressing the oldest (*Reply with just: alpha*) put the pane in copy mode at scroll position 81 of 86, the prompt on the terminal's top line and *● alpha* under it. With the pane's history cleared, the same press left copy mode (`pane_in_mode 0`) and the row read *not in the terminal's history · Transcript*. Its link (`?at=2026-10-23T06%3A49%3A55.744Z`) opened the Transcript with that prompt outlined. Every *Done when* test passed in #2303; Paul's own press is the design's success case and needs nothing more from the ledger.
+
+---
+
+## TD-972: #2286's node-mode seat pass drops an ended profile with three `_seat_ended.discard` lines no test reaches: removing them leaves the whole suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_spend.py` (`_seats_to_home`, the three `self._seat_ended.discard((name, prof))` in its profile loop); `tests/test_seats.py`
+
+**Why:** Found auditing the tests of #2286 (TD-965). The PR adds `_seat_ended` and discards a pair once a read of it is made in both the home pass (`_refresh_seats_inner`) and the node's `_seats_to_home` (on `r is None`, on "nothing new", and after the pieces are sent). Its one test, `test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped`, runs in home mode. Probe: replace those three discards in `_seats_to_home` with `pass` and run the whole suite (`PYTHONPATH=$PWD/src pdm run pytest -q tests`): the same 2 failures as on a clean `origin/main` (`test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness` and `test_the_adapter_declares_its_mail_a_turns`, both from Gemini's not being registered in the scratch run) and 3974 passed — nothing else fails. `grep -rn "_seat_ended" tests` finds no hit. Effect: on a node an ended profile is never dropped, so the pass reads it every minute for as long as the agent lives, or (were a discard misplaced) loses the last minute the PR was made to charge.
+
+**Fix:** In `tests/test_seats.py`, run the pass in node mode (`agent.mode = "node"` over a link, as `tests/test_link.py`'s seat_spend test does), end the last session on its profile, and assert the profile is read once more and then not read, for each of the three exits (an adapter answering `None`, nothing new, turns sent). Confirm each fails with its discard replaced by `pass`.
+
+**Done when** removing any of the three node-mode discards fails a test.
+
+**Related:** TD-965 (the change), TD-833 (`seat_spend` at the home).
+
+**Resolved:** 2026-10-23 (grinder-ao-2, this PR) — `test_a_nodes_ended_profile_is_read_once_more_and_then_dropped` runs the pass in node mode over a stand-in link, one case per exit (the adapter's reason, nothing new, turns sent), and asserts the ended profile is read on the next pass and not on the one after; each of the three discards replaced by `pass` fails its own case.
