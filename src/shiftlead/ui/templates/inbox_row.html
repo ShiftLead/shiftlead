@@ -878,7 +878,6 @@
   {%- endcall %}
 </div>
 {%- else %}
-<div class="row gap wrap mfoot">
   {%- if waits or drawn_on_queue %}{# a waiting line, or the Queue, has no Snooze (screen 12) #}
   <span class="st">on the board — Reply writes on its line and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
   {%- else %}
