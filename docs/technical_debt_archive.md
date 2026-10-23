@@ -18782,8 +18782,6 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 
 ---
 
----
-
 ## TD-967: The Inbox counts a *Needs you* row it does not show: every board row leaves a `<div>` open, so later rows nest inside it and a filter that hides it hides them
 
 **Priority:** Medium
