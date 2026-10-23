@@ -1470,8 +1470,8 @@ builds are in the ledger.
 **Type:** debt
 **Added:** 2026-10-22 (the designer, from TD-975)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2303
+**Status:** Built 2026-10-23 (grinder-ao-1, #2303): the bridge's jump and its walk, the card, the press and its frame, the Transcript's `?at=`, help and the mockup; every *Done when* test passes. It was read on a scratch home before the PR: a Claude Code session's oldest prompt landed at the terminal's top with its reply under it; with the history cleared, the press read *not in the terminal's history* with **Transcript**, which opened the prompt outlined (the PR's UI check). **Left, once #2303 is merged:** read the same on a scratch home running `origin/main` (a press needs one), or on the live copy once it is live, without pressing, then archive.
 **Location:** `src/shiftlead/ui/pty_bridge.py` (the `jump` message in `pump`, a `jump_argv` and the walk beside `scroll_argv`, `JUMP_WITHIN`), `src/shiftlead/ui/app.py` (the attach's `run_tmux`, which reads no output today, and the text frame back), `src/shiftlead/ui/templates/focus.html`, `src/shiftlead/ui/static/app.js` (the card, its fold key, the frame), `src/shiftlead/ui/transcript.py` and its template (`?at=`), `src/shiftlead/ui/help.py`, `docs/mockups/gen.py` (`Focus.dc.html`); design §4.5 *The Prompts card*, §4.6 *A jump to a prompt*, §4.5a *Focus side panel* **Prompts**, §4.5 screen 9
 
 **Why:** the card is TD-975's answer to Paul's *I find myself scrolling up quite a bit to see what I last said in a session*. The read (TD-976) gives the rows, and this entry draws them and makes a press land.

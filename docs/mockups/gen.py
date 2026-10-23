@@ -761,6 +761,24 @@ def focus_rail():
     return html[:i] + rail + html[j:]
 
 
+def focus_prompts_card():
+    """The Prompts card, unfolded (§4.5 *The Prompts card*, TD-975, built by TD-977): newest first, the time,
+    the sender where it is not the person, the prompt's first line cut with …, the reply's first line in grey;
+    each row one press that scrolls the terminal back to it. Its summary is grey: it asks nothing."""
+    def row(time, text, reply="", sender="", miss=False):
+        who = f'<i class="muted" style="margin-right: 6px;">{sender}</i>' if sender else ""
+        rep = f'<div class="muted" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{reply}</div>' if reply else ""
+        gone = ('<div class="meta" style="padding: 0 2px 4px;">not in the terminal\'s history · <a href="#">Transcript</a></div>'
+                if miss else "")
+        return (f'<div style="border-top: 1px solid #eceef1; padding: 4px 2px; cursor: pointer;" title="press: the terminal scrolls back to it">'
+                f'<div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><span class="meta" style="margin-right: 6px;">{time}</span>{who}{text}</div>{rep}</div>{gone}')
+    body = ('<div style="font-size: 12px; margin-top: 6px;">'
+            + row("20:11", "and the stuck notice's test — does it cover a notice that was re-sent?", "It does: test_resent_notice_is_read_once covers it…")
+            + row("20:04", "go ahead and open the PR", "Opening the PR against main now.")
+            + row("20:02", "You are a grinder: an unattended worker in this repo, running as…", "I'll start by reading CLAUDE.md and the cadence.", sender="the brief", miss=True)
+            + '</div>')
+    return side_card("Prompts", '<span class="meta" style="font-size: 12px;">3 · last 4m ago</span>', body)
+
 def focus():
     term = '''<span class="d">● tdgrind-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/tdgrind-1</span>
 
@@ -793,6 +811,7 @@ def focus():
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
     {PUT_AWAY}
     {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 14s ago</span>', '<div style="font-size: 12px; margin-top: 8px;" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review</div>')}
+    {focus_prompts_card()}
     {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td301-fix · 2 ahead of origin/main</span>', '''
       <div class="mono" style="font-size: 12px; line-height: 1.7; margin-top: 8px;">
         <div><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>

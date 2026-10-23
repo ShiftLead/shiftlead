@@ -16,6 +16,7 @@ from collections.abc import Awaitable, Callable
 
 import ptyprocess
 
+from sessionorc.models import RECENT_PROMPTS
 from sessionorc.tmux import attach_argv as tmux_attach_argv
 
 # The bridge's queue is bounded in bytes (TD-611 slice 5): past `QUEUE_HIGH` unsent the pty is no
@@ -165,6 +166,117 @@ def leave_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
 
 LEAVE_WITHIN = 2.0  # seconds a leave may take before the key is written anyway (design §4.6)
 
+JUMP_WITHIN = 5.0  # seconds a jump's read may take before it is a miss (design §4.6 *A jump to a prompt*)
+JUMP_DRAWN_MAX = 200  # characters of one opening in a `jump` message
+
+
+def jump_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
+    """A jump's one read, the view held (design §4.6 *A jump to a prompt*, TD-975): leave any copy mode
+    (`copy-mode -e` on a pane already in mode keeps that mode's older view), enter it again, and print
+    `history_size` and then every row of the pane, history and screen, as plain text."""
+    argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
+    t = f"={session_id}:"
+    return argv + [
+        *("copy-mode", "-q", "-t", t, ";"),
+        *("copy-mode", "-e", "-t", t, ";"),
+        *("display-message", "-p", "-t", t, "#{history_size}", ";"),
+        *("capture-pane", "-p", "-S", "-", "-E", "-", "-t", t),
+    ]
+
+
+def land_argv(session_id: str, line: int, *, socket_name: str | None = None) -> list[str]:
+    """The landing: copy mode's `goto-line`, `line` the lines above the live screen, so the found row is
+    the terminal's top (0 for a row on the live screen). `send-keys -F` is not used: on tmux 3.5a its
+    `goto-line` argument did not land."""
+    argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
+    return argv + ["send-keys", "-X", "-t", f"={session_id}:", "goto-line", str(max(0, int(line)))]
+
+
+def jump_openings(value: object) -> list[dict] | None:
+    """A `jump` message's openings, or None for one the bridge ignores (design §4.6): a list of at most
+    `RECENT_PROMPTS` objects, each a string `drawn` of at most `JUMP_DRAWN_MAX` characters and a boolean
+    `whole`, newest first, the pressed one last."""
+    if not isinstance(value, list) or not value or len(value) > RECENT_PROMPTS:
+        return None
+    out = []
+    for o in value:
+        if not isinstance(o, dict):
+            return None
+        drawn, whole = o.get("drawn"), o.get("whole")
+        if not isinstance(drawn, str) or len(drawn) > JUMP_DRAWN_MAX or not isinstance(whole, bool):
+            return None
+        out.append({"drawn": drawn, "whole": whole})
+    return out
+
+
+def _flat(text: str) -> str:
+    # a row and an opening alike: leading whitespace stripped, trailing spaces trimmed, a non-breaking
+    # space read as a space, since the tool may draw its glyph indented and followed by one
+    return text.replace("\xa0", " ").strip()
+
+
+def jump_walk(rows: list[str], openings: list[dict]) -> int | None:
+    """The row the pressed prompt starts on, or None (design §4.6 *The walk*). From the bottom row up,
+    the newest opening's row, then above it the next one's, and so on to the pressed one's, the last:
+    each found above the last, so the newest copy of a repainted conversation is walked and a newer
+    prompt with the same opening is passed on the way. A newer opening not found is skipped and the walk
+    goes on from where it stood. An opening marked `whole` must equal the row; any other is its start."""
+    flat = [_flat(r) for r in rows]
+    stood = len(flat)
+    for k, o in enumerate(openings):
+        want = _flat(o["drawn"])
+        hit = None
+        if want:
+            for i in range(stood - 1, -1, -1):
+                if flat[i] == want if o["whole"] else flat[i].startswith(want):
+                    hit = i
+                    break
+        if hit is None:
+            if k == len(openings) - 1:
+                return None
+            continue
+        stood = hit
+    return stood
+
+
+def jump_read(out: str) -> tuple[int, list[str]] | None:
+    """`jump_argv`'s output as `(history_size, rows)`: its first line is `history_size`, row *i* the
+    *i*-th line after it. None for output that does not start with a number."""
+    lines = out.split("\n")
+    if not lines or not lines[0].strip().isdigit():
+        return None
+    rows = lines[1:]
+    if rows and rows[-1] == "":
+        rows.pop()  # the newline that ends the capture
+    return int(lines[0].strip()), rows
+
+
+async def run_jump(
+    openings: list[dict],
+    read: Callable[[list[str]], Awaitable[str | None]],
+    run: Callable[[list[str]], Awaitable[None]],
+    session_id: str,
+    *,
+    socket_name: str | None = None,
+) -> bool:
+    """One jump (design §4.6): the read through `read` (bounded by the caller at `JUMP_WITHIN`; None is a
+    miss), the walk, and the landing or, on a miss, `copy-mode -q` through `run`. True when it landed."""
+    got = None
+    with contextlib.suppress(Exception):
+        out = await read(jump_argv(session_id, socket_name=socket_name))
+        got = jump_read(out) if out is not None else None
+    i = jump_walk(got[1], openings) if got else None
+    try:
+        if i is None:
+            await run(leave_argv(session_id, socket_name=socket_name))
+            return False
+        await run(land_argv(session_id, got[0] - i, socket_name=socket_name))  # type: ignore[index]
+    except Exception as e:  # noqa: BLE001 — a failed landing is a miss, never the attach's end
+        log.warning("a jump's landing failed: %s", type(e).__name__)
+        return False
+    return True
+
+
 _KEYS_THAT_COUNT = (b"\r", b"\t", b"\x7f", b"\b")
 _PASTE_OPENER = b"\x1b[200~"
 
@@ -241,6 +353,7 @@ async def pump(
     scroll: Callable[[str, int | None], Awaitable[None]] | None = None,
     *,
     leave: Callable[[], Awaitable[None]] | None = None,
+    jump: Callable[[list[dict]], Awaitable[bool]] | None = None,
     read_only: bool = False,
 ) -> None:
     """Run both directions until either side ends. `recv` yields str (keys), bytes, or a dict
@@ -256,7 +369,12 @@ async def pump(
 
     `read_only` (design §4.6 *A read-only attach*, TD-096): key frames are dropped — str and bytes
     alike, every one: the wheel is a scroll message, never a mouse report (TD-174). Resize and
-    scroll messages pass as ever."""
+    scroll messages pass as ever.
+
+    `jump` (optional; design §4.6 *A jump to a prompt*, TD-975): a dict with `jump: [{drawn, whole}, …]`
+    is awaited as `jump(openings)` in frame order, as a scroll is, and sets the *scrolled* mark; one
+    `jump_openings` refuses is ignored. The callback answers the page itself and returns whether it landed.
+    A read-only attach passes it, as a scroll."""
 
     async def down() -> None:
         try:
@@ -285,6 +403,12 @@ async def pump(
                     await scroll(
                         str(msg["scroll"]), lines if isinstance(lines, int) and not isinstance(lines, bool) else None
                     )
+                elif "jump" in msg and jump is not None and (openings := jump_openings(msg["jump"])) is not None:
+                    scrolled = True
+                    try:
+                        await jump(openings)
+                    except Exception as e:  # noqa: BLE001 — a failed jump is a miss, never the attach's end
+                        log.warning("a jump failed: %s", type(e).__name__)
                 continue
             data = msg.encode() if isinstance(msg, str) else msg
             if read_only:

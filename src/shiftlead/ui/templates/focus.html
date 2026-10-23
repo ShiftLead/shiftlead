@@ -239,6 +239,14 @@
       <summary class="row gap"><span class="h2">Working</span><span class="meta" id="workingage">{% if s.doing and s.doing.age %}says · {{ s.doing.age }} ago{% endif %}</span></summary>
       <div class="doing" id="workingtext" title="what this session says it is doing (design §4.8): its own words">{{ (s.doing or {}).text }}</div>
     </details>{% endif %}
+    {# **Prompts** (§4.5 *The Prompts card*, §4.5a, TD-975, built by TD-977): the conversation's prompts from
+       the record's `prompts`, newest first, each a press that scrolls the terminal back to it (§4.6 *A jump to
+       a prompt*); folded at first, drawn only while the record holds one, and kept from the delta by
+       `renderPrompts`. Grey, with no rail glyph: it asks nothing of the person. #}
+    {% if s.agent %}<details class="card pad side prompts{% if not s.prompts %} hidden{% endif %}" data-side="prompts" id="promptscard">
+      <summary class="row gap"><span class="h2" title="{{ help_title('prompts') }}">Prompts</span><span class="meta" id="promptscount"></span></summary>
+      <div class="promptlist" id="promptlist"></div>
+    </details>{% endif %}
     <details class="card pad side" data-side="git" id="gitcard" open>
       <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
       {# §4.5a *Git card: the pick · ↑ · ↓* (TD-856, built by TD-862): what the lines list — Working tree
