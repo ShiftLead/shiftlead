@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
+| TD-972 | #2286's node-mode seat pass drops an ended profile with three `_seat_ended.discard` lines no test reaches: removing them leaves the whole suite green | Low | Open |
 | TD-975 | Focus has no list of the person's prompts: a Prompts card on the side panel, each prompt a press that scrolls the terminal back to it | Medium | Designed 2026-10-22 — builds TD-976, TD-977 |
 | TD-977 | The Focus Prompts card and the jump: the bridge walks tmux's history and lands the pressed prompt at the terminal's top; a miss opens the Transcript at it (TD-975's second build) | Medium | Open |
 | TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Open — design first: what Close removes when the branch's PR is still open |
@@ -1435,6 +1436,26 @@ builds are in the ledger.
 **Done when** `rpc_td_next` on a scratch checkout without the script refuses, naming the sync; the own-reads tests are gone; and every remaining `tests/test_td_next.py` test passes.
 
 **Related:** TD-966, TD-970.
+
+---
+
+## TD-972: #2286's node-mode seat pass drops an ended profile with three `_seat_ended.discard` lines no test reaches: removing them leaves the whole suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_spend.py` (`_seats_to_home`, the three `self._seat_ended.discard((name, prof))` in its profile loop); `tests/test_seats.py`
+
+**Why:** Found auditing the tests of #2286 (TD-965). The PR adds `_seat_ended` and discards a pair once a read of it is made in both the home pass (`_refresh_seats_inner`) and the node's `_seats_to_home` (on `r is None`, on "nothing new", and after the pieces are sent). Its one test, `test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped`, runs in home mode. Probe: replace those three discards in `_seats_to_home` with `pass` and run the whole suite (`PYTHONPATH=$PWD/src pdm run pytest -q tests`): the same 2 failures as on a clean `origin/main` (`test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness` and `test_the_adapter_declares_its_mail_a_turns`, both from Gemini's not being registered in the scratch run) and 3974 passed — nothing else fails. `grep -rn "_seat_ended" tests` finds no hit. Effect: on a node an ended profile is never dropped, so the pass reads it every minute for as long as the agent lives, or (were a discard misplaced) loses the last minute the PR was made to charge.
+
+**Fix:** In `tests/test_seats.py`, run the pass in node mode (`agent.mode = "node"` over a link, as `tests/test_link.py`'s seat_spend test does), end the last session on its profile, and assert the profile is read once more and then not read, for each of the three exits (an adapter answering `None`, nothing new, turns sent). Confirm each fails with its discard replaced by `pass`.
+
+**Done when** removing any of the three node-mode discards fails a test.
+
+**Related:** TD-965 (the change), TD-833 (`seat_spend` at the home).
 
 ---
 
