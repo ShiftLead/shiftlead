@@ -632,6 +632,10 @@ class HostAgent(
         # the links read's byte cursor per record, with the tool session it is into (TD-543): in memory,
         # so a restart reads the transcript again from 0 and the merge drops what the record holds
         self._links_cursor: dict[str, tuple[str, int]] = {}
+        # the prompts read's cadence and cursor, as the links read's (TD-976), and the records a hook made due
+        self._prompts_checked: dict[str, datetime] = {}
+        self._prompts_cursor: dict[str, tuple[str, int]] = {}
+        self._prompts_due: set[str] = set()
         # When a `kill` or a `close` destroyed a pane, so a tick holding a pane list taken before
         # it does not observe a session that is already gone (TD-063). Dropped as soon as a
         # snapshot newer than the kill arrives, so it holds at most one tick's worth of ids.

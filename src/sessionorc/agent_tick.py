@@ -10,6 +10,7 @@ import contextlib
 import copy
 import json
 import os
+import re
 import shutil
 import time
 from collections.abc import Collection, Mapping
@@ -91,6 +92,7 @@ from sessionorc.models import (
     PR_CLOSED,
     RECENT_FILES,
     RECENT_LINKS,
+    RECENT_PROMPTS,
     SYSTEM,
     Pending,
     ProgressEntry,
@@ -259,6 +261,7 @@ class TickMixin:
         await self._refresh_context(snapshot_at)
         await self._refresh_shells(snapshot_at, panes)
         await self._refresh_links(snapshot_at)
+        await self._refresh_prompts(snapshot_at)
         if self._derive_task is None or self._derive_task.done():
             # detached for the same reason the usage refresh is: `gh` talks to the network, and the
             # tick and its push must not wait on it (review 2026-09-11)
@@ -3977,6 +3980,48 @@ class TickMixin:
                 live.links = merged
                 self.store.save(live)
 
+    async def _refresh_prompts(self, now: datetime) -> None:
+        """Each live record's prompts (design §4.2 *The record's `prompts`*, §4.3 `prompts`, TD-976): the
+        adapter's read of the transcript from the record's own cursor, in a thread, once per LINKS_EVERY as
+        `links` is, attended records too, and on the tick after a hook reported a prompt or the main
+        thread's turn end. The merge is `merge_prompts`; a new tool session starts the list and the cursor
+        again. An adapter without the read, or a read that fails, leaves the field as it was."""
+        every = agent_common.LINKS_EVERY
+        due = []
+        for s in self.sessions.values():
+            if not (s.adapter_id and s.dir) or s.state == "closed":
+                continue
+            checked = self._prompts_checked.get(s.id, datetime.min.replace(tzinfo=UTC))
+            if s.id not in self._prompts_due and now - checked <= every:
+                continue
+            try:
+                fn = getattr(adapters.get(s.adapter), "prompts", None)
+            except KeyError:
+                fn = None
+            if fn:
+                tool, cursor = self._prompts_cursor.get(s.id, ("", 0))
+                due.append((s, fn, str(s.adapter_id), tool, cursor if tool == s.adapter_id else 0))
+        if not due:
+            return
+        for s, *_ in due:
+            self._prompts_due.discard(s.id)
+        results = await asyncio.gather(
+            *(asyncio.to_thread(fn, aid, Path(s.dir), s.profile, cursor=cursor) for s, fn, aid, _, cursor in due),
+            return_exceptions=True,
+        )
+        for (s, _, aid, tool, cursor), result in zip(due, results, strict=True):
+            self._prompts_checked[s.id] = now
+            live = self.sessions.get(s.id)
+            if live is None or not isinstance(result, tuple) or len(result) != 3:
+                continue
+            found, leading, after = result
+            self._prompts_cursor[s.id] = (aid, int(after))
+            held = [] if tool and tool != aid else live.prompts  # a new tool session starts the list again
+            merged = merge_prompts(held, found, leading, live.sends, from_start=cursor == 0)
+            if merged != live.prompts:
+                live.prompts = merged
+                self.store.save(live)
+
     async def _refresh_usage(self) -> None:
         """Ask each account a live agent session's profile names for its usage, once per account
         (§4.2a, TD-122), in a thread, and only on demand (§4.4 *Usage*, TD-233 slice 3): when its
@@ -4569,6 +4614,8 @@ class TickMixin:
         self._apply_subagents(s, event, at)
         if not queued:
             self._track_call(sid, event)  # a replayed event touches no list: no waiter outlived the outage
+        if event.get("prompt") or (event.get("state") == "idle" and not event.get("subagent")):
+            self._prompts_due.add(sid)  # the prompts read on the next tick, not a minute later (§4.2, TD-976)
         if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):
             # a prompt went in (the tool's UserPromptSubmit, §4.1 *No prose in the argv*): the brief
             # typed by the tick, or a person's or a manager's send that cures *brief not sent*
@@ -4866,6 +4913,8 @@ class TickMixin:
             self._context_checked,
             self._links_checked,
             self._links_cursor,
+            self._prompts_checked,
+            self._prompts_cursor,
             self._pre_limited,
             self._last_hook,
             self._hook_state,
@@ -4882,6 +4931,7 @@ class TickMixin:
             side.pop(sid, None)
         self._lead_typed.discard(sid)  # a reused id never starts with the old run's line in the composer (TD-347)
         self._recheck.discard(sid)
+        self._prompts_due.discard(sid)
         if not (lock := self._typing.get(sid)) or not lock.locked():
             self._typing.pop(sid, None)  # a held one stays: its typist is mid-paste, the name reused or not
         for key in [k for k in self._attention_how if k.split("|", 1)[0] == sid]:
@@ -4946,6 +4996,94 @@ class TickMixin:
         self._scrub(sid)
         self._killed_run_at.pop(sid, None)  # kept past `_scrub` for a resume (TD-822), not past a forget
         self._gone.append(sid)
+
+
+# The home's doorbell (design §4.10): typed with no `sends` entry, it would read as the person's prompt.
+_DOORBELL = re.compile(re.escape(mail.unread_line(0)).replace("0", r"\d+") + r"\Z")
+BRIEF_SEND = "(the brief)"  # the `system` entry the brief's send leaves in `sends` (agent_wake)
+BRIEF_NEAR = timedelta(minutes=1)  # how near a brief sent without its lead line names its prompt
+
+
+def _first(text: str) -> str:
+    return next((x.strip() for x in text[:300].splitlines() if x.strip()), "")
+
+
+def _when(iso: Any) -> datetime | None:
+    try:
+        return _parse(str(iso)) if iso else None
+    except ValueError:
+        return None
+
+
+def merge_prompts(
+    held: list[dict[str, Any]], found: list[Any], leading: str | None, sends: list[Any], *, from_start: bool
+) -> list[dict[str, Any]]:
+    """A record's `prompts` after one read (design §4.2 *The record's `prompts`*, TD-976): `held` newest
+    first, `found` the read's `Prompt`s oldest first, `leading` the read's first reply before any prompt.
+
+    An entry already held is matched by `at` and `text`: it keeps its `from` and takes a reply while it has
+    none, so a reread from 0 changes nothing; the leading reply fills the newest entry only on a read from a
+    cursor past 0. A new entry's `from` comes from `sends`, each matched to one prompt at most — the held
+    entries are matched again first, oldest first, so a send is never given twice: a prompt opening with
+    the brief's lead line is the brief, consuming the *(the brief)* entry; an unconsumed *(the brief)* entry
+    names the earliest prompt within a minute of it; else the oldest unconsumed send made before it with the
+    same first line; else the person. The doorbell is left out, and the newest `RECENT_PROMPTS` kept."""
+    out = [dict(x) for x in held]
+    if leading and not from_start and out and not out[0].get("reply"):
+        out[0]["reply"] = leading
+    keys = {(x.get("at"), x.get("text")): x for x in out}
+    briefs = [e for e in sends if e.from_ == SYSTEM and e.text == BRIEF_SEND]
+    others = [e for e in sends if not (e.from_ == SYSTEM and e.text == BRIEF_SEND)]
+    used: set[str] = set()
+    if len(out) >= RECENT_PROMPTS and (floor := _when(out[-1].get("at"))):
+        used |= {e.id for e in sends if (_when(e.at) or floor) < floor}  # their prompts left the list
+
+    def take(sender: str, first: str, at: datetime | None) -> str | None:
+        for e in others:
+            if e.id in used or (sender and e.from_ != sender) or _first(e.text) != first:
+                continue
+            if at is not None and (made := _when(e.at)) is not None and made > at:
+                continue
+            used.add(e.id)
+            return e.from_
+        return None
+
+    def take_brief(at: datetime | None, lead: bool) -> bool:
+        for e in briefs:
+            near = at is not None and (made := _when(e.at)) is not None and abs(made - at) <= BRIEF_NEAR
+            if e.id not in used and (lead or near):
+                used.add(e.id)
+                return True
+        return False
+
+    for x in reversed(out):  # the held entries consume their sends again, oldest first
+        at = _when(x.get("at"))
+        if x.get("from") == "brief":
+            take_brief(at, lead=str(x.get("text") or "").startswith(mail.BRIEF_LINE))
+        elif x.get("from") not in (PERSON, None):
+            take(str(x["from"]), _first(str(x.get("text") or "")), at)
+    for p in found:
+        first = _first(p.text)
+        if _DOORBELL.match(first):
+            continue
+        same = keys.get((p.at, p.text))
+        if same is not None:
+            if p.reply and not same.get("reply"):
+                same["reply"] = p.reply
+            continue
+        at = _when(p.at)
+        if p.text.startswith(mail.BRIEF_LINE):
+            take_brief(at, lead=True)
+            sender = "brief"
+        elif take_brief(at, lead=False):
+            sender = "brief"
+        else:
+            sender = take("", first, at) or PERSON
+        entry = {"at": p.at, "text": p.text, "drawn": p.drawn, "whole": p.whole, "reply": p.reply, "from": sender}
+        keys[(p.at, p.text)] = entry
+        out.insert(0, entry)
+    out.sort(key=lambda x: str(x.get("at") or ""), reverse=True)
+    return out[:RECENT_PROMPTS]
 
 
 def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, get_args
 
 from sessionorc import adapters
-from sessionorc.adapters import ENTRY_KINDS, OPTIONAL_METHODS, Link, Transcript, TranscriptEntry
+from sessionorc.adapters import ENTRY_KINDS, OPTIONAL_METHODS, Link, Prompt, Transcript, TranscriptEntry
 from sessionorc.identity import Proc
 from sessionorc.models import State
 
@@ -123,6 +123,25 @@ def check_links(got: object) -> None:
     for link in found:
         assert isinstance(link, Link), f"{link!r} is not a Link"
         assert link.url.startswith(("http://", "https://")), f"{link.url!r} is not an http(s) URL"
+
+
+def check_prompts(got: object) -> None:
+    assert isinstance(got, tuple) and len(got) == 3, f"prompts returned {got!r}, not (prompts, reply, cursor)"
+    found, reply, cursor = got
+    assert isinstance(cursor, int) and cursor >= 0, f"cursor {cursor!r}"
+    assert reply is None or isinstance(reply, str), f"leading reply {reply!r}"
+    for p in found:
+        assert isinstance(p, Prompt), f"{p!r} is not a Prompt"
+        assert isinstance(p.text, str) and p.text and len(p.text) <= 300, f"text {p.text!r}"
+        assert p.reply is None or (isinstance(p.reply, str) and len(p.reply) <= 200), f"reply {p.reply!r}"
+        assert p.drawn is None or isinstance(p.drawn, str), f"drawn {p.drawn!r}"
+        assert isinstance(p.whole, bool), f"whole {p.whole!r}"
+
+
+def pane_row(row: str) -> str:
+    """A pane row as the jump compares it (design §4.6 *A jump to a prompt*): leading whitespace stripped,
+    trailing spaces trimmed, a non-breaking space read as a space."""
+    return row.replace("\xa0", " ").strip()
 
 
 def check_spend(got: object, tool_fields: frozenset[str]) -> None:

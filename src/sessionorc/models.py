@@ -91,6 +91,7 @@ NODE_OWNED = frozenset(
         "shells_at",
         "files",
         "links",
+        "prompts",
         "wrapup_sent_at",
         "gated",
         "wrapup_at",
@@ -768,6 +769,22 @@ WAKE_FIELDS = ("state", "exit_code")
 RECENT_FILES = 20
 # How many printed URLs a record keeps (design §4.2 *The record's `links`*, TD-543): the newest twenty.
 RECENT_LINKS = 20
+# How many prompts a record keeps (design §4.2 *The record's `prompts`*, TD-976): the newest twenty, and how
+# much of each the view carries — enough for the Focus Prompts card's row and its hover.
+RECENT_PROMPTS = 20
+PROMPT_VIEW_TEXT = 120
+PROMPT_VIEW_REPLY = 100
+
+
+def prompt_view(entry: dict[str, Any]) -> dict[str, Any]:
+    """One of a record's `prompts` as its view carries it (design §4.2 *The view*): `text` and `reply` trimmed
+    for the card's row and hover; the record keeps the whole, which the merge reads."""
+    reply = entry.get("reply")
+    return {
+        **entry,
+        "text": str(entry.get("text") or "")[:PROMPT_VIEW_TEXT],
+        "reply": reply[:PROMPT_VIEW_REPLY] if reply else reply,
+    }
 
 
 def wake_digest(session: dict[str, Any]) -> str:
@@ -1034,6 +1051,11 @@ class Session:
     # adapter's `links` read of the transcript on the tick, newest first, a URL once at its newest `at`, at
     # most `RECENT_LINKS` — the Focus Session card's recent links. Read on the record's host, so the node's.
     links: list[dict[str, Any]] = field(default_factory=list)
+    # The conversation's prompts (design §4.2 *The record's `prompts`*, TD-976): `{at, text, drawn, whole,
+    # reply, from}` from the adapter's `prompts` read of the transcript on the tick, newest first, at most
+    # `RECENT_PROMPTS` — the Focus Prompts card's rows. `from` is who typed it: `person`, a session's id,
+    # `brief` or `system`, set once from `sends`. Read on the record's host, so the node's.
+    prompts: list[dict[str, Any]] = field(default_factory=list)
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
     # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):
@@ -1357,6 +1379,7 @@ class Session:
         d.pop("inbox")
         d.pop("outbox")
         d.pop("first_prompt")  # the brief's text, as a body is: the record's file has it until it is sent
+        d["prompts"] = [prompt_view(x) for x in self.prompts]
         if not bookkeeping:
             d.pop("threads")
             d.pop("wakes")

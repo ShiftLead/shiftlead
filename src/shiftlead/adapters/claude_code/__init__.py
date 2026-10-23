@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import identity, paths
-from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Transcript
+from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Prompt, Transcript
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, State
 from sessionorc.screen import Manifest, Match, painted_text
@@ -524,7 +524,7 @@ class ClaudeCodeAdapter:
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
     # session of this tool is handed its mail by a pane write (§4.10)
-    implements = frozenset({"background", "composer", "context", "links", "spend", "title", "usage_report"})
+    implements = frozenset({"background", "composer", "context", "links", "prompts", "spend", "title", "usage_report"})
     usage_report = staticmethod(usage_report)  # the status line's windows, read by the hook command (§4.4 *Usage*)
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
@@ -788,6 +788,26 @@ class ClaudeCodeAdapter:
             return None
         try:
             return transcript_mod.links(p, cursor)
+        except OSError:
+            return None
+
+    def prompts(
+        self, session_id: str, cwd: Path, profile: str = "", *, cursor: int = 0
+    ) -> tuple[list[Prompt], str | None, int] | None:
+        """The prompts the session's transcript holds past byte `cursor` at the top level — its meta lines,
+        a local command's output, the compaction summary, the interrupt lines and a notice- or reminder-only
+        entry left out, a slash command as the line typed — the first text line past `cursor` before any
+        prompt, and the new cursor (design §4.3 `prompts`, §4.2 *The record's `prompts`*, TD-976). None when
+        there is no file, or the profile is unknown."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        p = self.transcript_path(session_id, cwd, prof)
+        if p is None:
+            return None
+        try:
+            return transcript_mod.prompts(p, cursor)
         except OSError:
             return None
 
