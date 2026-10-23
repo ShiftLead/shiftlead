@@ -18945,3 +18945,69 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-378 (archived), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 4, TD-249 (the bound's last change), TD-459.
 
 **Resolved:** 2026-10-23 (grinder-ao-2, this PR) — the second trial week (10-16 04:26Z to 10-23 04:26Z) read like the first: 0.80M weighted per merged PR (trial week 1 0.78M) against 0.84M the week before, mean context 157k against 191k, and the cost's share past 200k 30% against 55%, with runs per PR 0.47 against 0.31. Every week is counted again with one count of merged PRs, about twice the first reading's. The 200k line stays in `.shiftlead.yml`, and design §4.8 *The bound has two layers* calls it measured. The table is in [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md)'s Consequences.
+
+---
+
+## TD-980: A truncated transcript is read from 0 but its leading text still fills the newest prompt's reply: `after < cursor` in `_refresh_prompts` is untested
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_refresh_prompts`, `from_start=cursor == 0 or after < cursor`); `tests/test_record_prompts.py`
+
+**Why:** Found auditing the tests of #2299 (TD-976). `transcript.prompts` reads "a cursor past the file's end ... from 0" (its docstring), and the tick passes `from_start=cursor == 0 or after < cursor` so that read's leading text, which is no reply to what the record holds, is not written onto `out[0]`. Probe: change that argument to `from_start=cursor == 0` and run `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_record_prompts.py`: 13 passed. The tick test only reads from cursors 0, 100 and 160, always forward; `test_a_reread_changes_nothing_held...` calls `merge_prompts` directly with `from_start` given, so nothing runs the tick with a file that shrank (a transcript rewritten or compacted). Effect: after such a read, the newest held prompt that has no reply takes an unrelated first line as its reply.
+
+**Fix:** In the tick test, hand the next read a cursor lower than the one held (`([], "unrelated", 10)` after 160) with the newest prompt reply-less, and assert its `reply` stays None; confirm it fails with the `or after < cursor` removed.
+
+**Done when** removing `or after < cursor` fails a test.
+
+**Related:** TD-976 (the change, #2299).
+
+**Resolved:** 2026-10-23 (grinder-ao-2, this PR) — the tick test now reads a prompt to cursor 200 and then a shrunk file to cursor 10 leading with *unrelated*, and asserts the newest prompt's `reply` stays None; with `or after < cursor` removed it fails.
+
+---
+
+## TD-981: Sends of prompts that left the newest-twenty list are marked used so they are not given to a later prompt: that line in `merge_prompts` is untested
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`merge_prompts`, `used |= {e.id for e in sends if (_when(e.at) or floor) < floor}`); `tests/test_record_prompts.py`
+
+**Why:** Found auditing the tests of #2299 (TD-976). The docstring says the held entries consume their sends again so "a send is never given twice", and that a send older than the oldest kept prompt is spent because "their prompts left the list". Probe: replace that line with `used |= set()` and run `tests/test_record_prompts.py`: 13 passed. `test_the_newest_twenty_are_kept_newest_first` passes no sends, and no other test holds `RECENT_PROMPTS` entries together with sends. Effect: with a full list, a new person-typed prompt whose first line equals an old send's is credited to that send's sender.
+
+**Fix:** Hold `RECENT_PROMPTS` entries and a send older than the oldest of them with the same first line as a new prompt; assert the new prompt's `from` is the person. Confirm it fails with the line replaced.
+
+**Done when** removing that `used |=` line fails a test.
+
+**Related:** TD-976 (the change, #2299).
+
+**Resolved:** 2026-10-23 (grinder-ao-2, this PR) — `test_a_send_older_than_the_oldest_kept_prompt_is_spent` holds `RECENT_PROMPTS` entries and a send older than the oldest with a new prompt's first line, and asserts the new prompt is the person's; with the `used |=` line replaced by `set()` it fails.
+
+---
+
+## TD-982: Three behaviours TD-976 added to the prompts read are reached by no test: the reply cap, the `isMeta` skip in `_prompt_of`, and the closed-record skip in `_refresh_prompts`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/adapters/claude_code/transcript.py` (`_reply_of` `line[:REPLY_CAP]`; `_prompt_of` `d.get("isMeta")`); `src/sessionorc/agent_tick.py` (`_refresh_prompts`, `s.state == "closed"`); `tests/test_record_prompts.py`, `tests/conformance/`
+
+**Why:** Found auditing the tests of #2299 (TD-976). Probes, each run on `tests/test_record_prompts.py` and `tests/conformance` (with the one test that fails on a clean tree from Gemini's not being registered in a scratch run deselected): `return line[:REPLY_CAP] or None` -> `return line or None`: 34 passed; deleting the `isSidechain`/`isMeta` early return in `_prompt_of`: 34 passed; dropping `or s.state == "closed"` from `_refresh_prompts`: 13 passed. The design's 200-character reply, a meta entry not shown as a prompt, and a closed record's list left alone all have no assertion.
+
+**Fix:** Add to the fixture transcript a reply over 200 characters and a `isMeta` user entry and assert both in `test_record_prompts.py`; in the tick test close a session with a prompts read due and assert the adapter is not asked. Confirm each fails with its line removed.
+
+**Done when** each of the three removals fails a test.
+
+**Related:** TD-976 (the change, #2299).
+
+**Resolved:** 2026-10-23 (grinder-ao-2, this PR) — the read tests now assert a 250-character reply is cut to 200 and an `isMeta` entry of plain text is left out, and the tick test closes a session with a read due and asserts the adapter is not asked; each fails with its line removed (the cap, the `isMeta` check, `or s.state == "closed"`).

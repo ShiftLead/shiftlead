@@ -62,6 +62,7 @@ def test_the_read_leaves_out_what_no_person_typed_and_draws_a_slash_command_as_t
             _user("T10", [{"type": "tool_result", "content": "ok"}]),
             _user("T11", "a subagent's prompt", isSidechain=True),
             _user("T12", "typed\n<system-reminder>\nappended\n</system-reminder>"),
+            _user("T13", "plain text the tool wrote", isMeta=True),
         ],
     )
     found, leading, cursor = transcript_mod.prompts(p)
@@ -80,6 +81,8 @@ def test_the_read_cuts_text_at_300_and_drawn_at_40_marking_a_whole_line(tmp_path
     assert (b.drawn, b.whole) == (f"❯ {'y' * 40}", False)
     assert (c.drawn, c.whole) == ("❯ opening", True)  # the first non-empty line
     assert len(d.text) == 300
+    _write(p, [_user("T5", "long"), _text("T6", "w" * 250)])
+    assert transcript_mod.prompts(p)[0][0].reply == "w" * 200  # a reply's first line is cut at 200
 
 
 @pytest.mark.unit
@@ -172,6 +175,18 @@ def test_a_policy_line_is_the_systems_and_the_doorbell_is_left_out():
 
 
 @pytest.mark.unit
+def test_a_send_older_than_the_oldest_kept_prompt_is_spent():
+    full = merge_prompts(
+        [], [_p(f"2026-10-22T10:{i:02d}:00Z", f"prompt {i}") for i in range(RECENT_PROMPTS)], None, [], from_start=True
+    )
+    assert len(full) == RECENT_PROMPTS and all(x["from"] == PERSON for x in full)
+    # its prompt left the list, so a new prompt with its first line is the person's, not the old sender's
+    sends = [_send(1, "ao-old", "rebase and push", "2026-10-22T09:00:00Z")]
+    got = merge_prompts(full, [_p("2026-10-22T11:00:00Z", "rebase and push")], None, sends, from_start=False)
+    assert (got[0]["text"], got[0]["from"]) == ("rebase and push", PERSON)
+
+
+@pytest.mark.unit
 def test_a_reread_changes_nothing_held_and_the_leading_reply_fills_only_from_a_cursor():
     held = merge_prompts([], [_p("T1", "one")], None, [], from_start=True)
     assert held[0]["reply"] is None
@@ -261,6 +276,15 @@ async def test_the_tick_gives_a_prompt_its_sender_and_the_next_read_its_reply(ag
         await agent.tick()
         assert asked[-1] == ("conv-1", 100)
         assert (await person.call("get", id=sid))["prompts"][0]["reply"] == "On it."
+        # a file that shrank is read from 0: its leading text is no reply to the newest held prompt
+        batches.append(([_p("2026-10-22T10:02:00Z", "and then?")], None, 200))
+        agent._prompts_checked.clear()
+        await agent.tick()
+        batches.append(([], "unrelated", 10))
+        agent._prompts_checked.clear()
+        await agent.tick()
+        assert asked[-1] == ("conv-1", 200)
+        assert (await person.call("get", id=sid))["prompts"][0]["reply"] is None
         # read on the tick after a prompt hook, not once per LINKS_EVERY; a subagent's stop makes none due
         agent._prompts_checked[sid] = now
         n = len(asked)
@@ -284,5 +308,11 @@ async def test_the_tick_gives_a_prompt_its_sender_and_the_next_read_its_reply(ag
         assert [x["text"] for x in (await person.call("get", id=sid))["prompts"]] == ["fresh"]
         await person.call("kill", id=sid)
         await person.call("close", id=sid)
+        # a closed record's list is left alone, even with a read due
+        agent._prompts_due.add(sid)
+        agent._prompts_checked.clear()
+        n = len(asked)
+        await agent.tick()
+        assert len(asked) == n
         await person.call("remove", id=sid)
         assert sid not in agent._prompts_checked and sid not in agent._prompts_cursor and sid not in agent._prompts_due
