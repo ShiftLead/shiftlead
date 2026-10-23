@@ -310,6 +310,58 @@ def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
+def _jumped(ws) -> bool:
+    """The `/term/` socket's next `{jumped}` frame, past pane bytes and the attach's other words."""
+    words: list = []
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        pane_bytes(ws, words)
+        if got := [w["jumped"] for w in words if "jumped" in w]:
+            return got[0]
+        ws.send_text(json.dumps({"resize": [100, 20]}))  # keeps pane frames coming while it waits
+    raise AssertionError("no {jumped} frame reached the page")
+
+
+def test_a_jump_over_the_term_socket_lands_or_misses_and_says_so(client, subprocess_agent, tmp_path, monkeypatch):
+    """TD-983 (design §4.6 *A jump to a prompt*, TD-977): the `/term/` route wires `jump` into the pump
+    with a read bounded at `JUMP_WITHIN`, and answers each press with its own `{jumped}` frame — `true`
+    with the pane in copy mode on a row found in tmux's history, `false` with the pane on the live
+    screen on a miss, and `false` on a read slower than the bound."""
+    from shiftlead.ui import app as ui_app
+
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "jump"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    tmux = Tmux(socket_name=subprocess_agent.sock_name)
+
+    def mode() -> str:
+        return tmux.run("display", "-p", "-t", f"={sid}:", "#{pane_in_mode}", check=False).stdout.strip()
+
+    hit = {"jump": [{"drawn": "JUMP-ROW-42", "whole": True}]}
+    with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
+        # the row is output, never the typed line, which starts with the prompt; 60 more lines put it
+        # in tmux's history
+        ws.send_text("echo JUMP-ROW-$((40+2)); seq 1 60; echo JUMP-DONE\r")
+        buf = b""
+        deadline = time.time() + 8
+        while time.time() < deadline and b"JUMP-DONE" not in buf:
+            buf += pane_bytes(ws)
+        assert b"JUMP-DONE" in buf
+        assert wait_for(lambda: mode() == "0"), "the pane never settled on the live screen"
+        ws.send_text(json.dumps(hit))
+        assert _jumped(ws) is True
+        assert mode() == "1", "a landed jump leaves the pane in copy mode"
+        ws.send_text(json.dumps({"jump": [{"drawn": "NEVER-DRAWN-ROW", "whole": False}]}))
+        assert _jumped(ws) is False
+        assert wait_for(lambda: mode() == "0"), "a miss leaves copy mode"
+        # a read slower than the bound is no reading: the press is a miss
+        monkeypatch.setattr(ui_app, "JUMP_WITHIN", 0.0001)
+        ws.send_text(json.dumps(hit))
+        assert _jumped(ws) is False
+        assert mode() == "0"
+    client.post(f"/api/sessions/{sid}/kill")
+
+
 def test_a_key_typed_into_a_scrolled_back_terminal_reaches_the_program(client, subprocess_agent, tmp_path):
     """TD-667 / TD-669 slice 1 (design §4.6 *Typing returns the pane to the live screen*): after a
     scroll up, a typed key leaves copy mode first, so the first key is not copy mode's and the line

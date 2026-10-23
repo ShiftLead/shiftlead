@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
 | TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Open — design first: what Close removes when the branch's PR is still open |
-| TD-983 | #2303's websocket `jump` closure in `ui/app.py` has no test: its `JUMP_WITHIN` bound, its `{"jumped": landed}` frame and its `jump=jump` wiring into `pump` can each be broken with the suite green | Low | Open |
 
 ---
 
@@ -1430,25 +1429,3 @@ builds are in the ledger.
 **Done when** closing a member whose PR is still open leaves no local branch for `check_cadence.py --pr`'s `pushed` row to fail on, and the design's Close rows say what Close does with the worktree.
 
 **Related:** TD-922 (#2195), TD-972 (#2292), board act line of 2026-10-22 (*Remove the closed test-audit-ao-1 session's clean worktree so PR #2292 can merge*).
-
----
-
-## TD-983: #2303's websocket `jump` closure in `ui/app.py` has no test: its `JUMP_WITHIN` bound, its `{"jumped": landed}` frame and its `jump=jump` wiring into `pump` can each be broken with the suite green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-23 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`read_tmux`, `jump`, the `pump(..., jump=jump, ...)` call); `tests/test_pty_bridge_jump.py`, `tests/test_ui_focus_prompts.py`
-
-**Why:** Found auditing the tests of #2303 (TD-977). The pure parts (`jump_openings`, `jump_walk`, `jump_read`, `run_jump`, `pump`'s handling) are well pinned: eight mutants there each fail a test. The closure in `app.py` that joins them to the websocket is reached by no test. Probes, each run against `tests/test_pty_bridge_jump*.py`, `tests/test_ui_focus_prompts.py`, `tests/test_ui*.py` and `tests/test_pty*.py` (1102 tests, all passing on a clean `origin/main`): (1) `functools.partial(read_tmux, within=JUMP_WITHIN)` → `within=0.0001`: 1102 passed; (2) `json.dumps({"jumped": landed})` → `{"jumped": True}`: 1102 passed, so a miss would tell the page it landed; (3) `pump(..., leave=leave, jump=jump, read_only=read_only)` → without `jump=jump`: 1102 passed, so the feature is dead at the websocket. `grep -rln 'jumped' tests` finds only `tests/test_ui_focus_prompts.py`, a check of the page's script, and no test sends a `jump` message through the focus websocket. The `read_tmux` refactor of `read_clients` (timeout parameter) is likewise only reached through the terminal mark's tests.
-
-**Fix:** Add a websocket test (as the existing focus-terminal tests drive `app.py`'s attach) that sends a `jump` message over a stub tmux and asserts the `{"jumped": true|false}` frame for a hit and a miss, and one whose read exceeds a patched `JUMP_WITHIN` that gets `false`. Confirm each of the three probes above fails.
-
-**Done when** each of the three mutations fails a test.
-
-**Related:** TD-977 (the change), TD-975, TD-976.
-
----
