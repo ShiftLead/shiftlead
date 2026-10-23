@@ -298,6 +298,13 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 - 2026-10-22 (TD-966, the designer; Paul, in td-156: *we do want it to work without shiftlead running*; dev-cadence ADR 2026-10-22, its TD-124 built): **a ledger id comes from one counter on origin**. The home's `td_next` is a front end over the synced `scripts/ledger_next_id.py` where the checkout has it. It runs the script under its lock and budget, with `--floor` set to `ids.json`'s last, so nothing it gave before is given again. It passes the script's `reserved`, `why` and `warnings` through. `ids.json` stays, as the floor and as the record for a repo with no script, whose ids come from the home's own reads as before. A session with no home, or on a node whose link is down, runs the script itself (cadence §2.10). Until then the home's record was a second counter that nothing else could see: #2240 collided twice on it. §4.4a's offline refusal names the script, and §4.7's `--json` gains `reserved`, `why` and `warnings`. Builds TD-969 (the sync) and TD-970 (the wrapper).
+- 2026-10-22 (TD-966, review round 1, Fable): 6 findings, all adopted:
+  - TD-969's range brings ledgerboard v1.3, so the sync vendors it into the wheel's copy, else the fixture test fails;
+  - TD-970 records the script's ids with a new `_record_given`, since `_record` computes its own;
+  - the script has no deadline, so the home sets its race knob to the budget left and a late kill is a gap;
+  - an exit 3 on every call is the unit's push credential, with a live check on the real origin after the promote;
+  - a hold on an unreserved id is said;
+  - the script is read from the serving checkout's working tree, which stays on `main`.
 - 2026-10-21 (TD-940 slice 2, grinder-ao-1; the scope steered with the techlead, m-eb7127cfc157): the PR reading per forge — a GitLab origin reads its open merge requests, the head pipeline folded into the four words, `conflicting`, and `required` on the MR's row; windows, `recent` and held are unread there. Was: `gh` for every origin, so a GitLab remote had no reading.
 - 2026-10-20 (TD-927, the designer): *Spend per seat* — every figure the readings carry carries its tokens by kind, and a token count is drawn as every kind summed, the four kinds on hover: one rule for the Spend page, `ao spend` and the Focus's disconnect card (TD-923 drew it first); built by TD-929.
 - 2026-10-20 (TD-915): *The Queue*'s rows — the breadth-first walk sets each row's level and parent; the page draws them depth first, each under its own parent, so the drawn tree reads as the walk built it.

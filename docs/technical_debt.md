@@ -1445,9 +1445,9 @@ builds are in the ledger.
 
 **Why:** TD-966's wrapper (TD-970) runs the synced `scripts/ledger_next_id.py`, which dev-cadence shipped in TD-124 (its #293–#295, on main at 232f2ad). This repo's last sync is 4453db4 (#2198), from before it.
 
-**Fix:** run dev-cadence's `sync.sh` from a worktree, as #2198 did, to its main at 232f2ad or later, and land what it writes as one PR titled `sync dev-cadence <sha>`. Edit no SYNCED file by hand. Read `docs/cadence-changes.md`'s new lines: §2.10 now says *the front end first* (`ao td next`), and the ledger row now warns on a new id above the counter's `LAST`. Until TD-970 lands, the home's ids are not on the counter, so that warning is expected on every PR that files an entry (the ADR's *The check*). Leave `ledger-ids-host` unset: this repo is private, and the default is `on`.
+**Fix:** run dev-cadence's `sync.sh` from a worktree, as #2198 did, to its main at 232f2ad or later, and land what it writes as one PR titled `sync dev-cadence <sha>`. The range brings ledgerboard v1.3 (dev-cadence #288, TD-121) into `scripts/ledgerboard.py`, while the wheel's copy `src/sessionorc/ledgerboard.py` is v1.2, and `tests/test_ledgerboard_fixtures.py` holds the two byte-equal: run `scripts/vendor_ledgerboard.sh v1.3` in the same PR (the wheel copy and `tests/ledgerboard/`), as #1930 did for v1.2, and read what v1.3 changes (its `Ask:` line) against `ledger.py --check` on this ledger. Edit no SYNCED file by hand. Read `docs/cadence-changes.md`'s new lines: §2.10 now says *the front end first* (`ao td next`), and the ledger row now warns on a new id above the counter's `LAST`. Until TD-970 lands, the home's ids are not on the counter, so that warning is expected on every PR that files an entry (the ADR's *The check*). Leave `ledger-ids-host` unset: this repo is private, and the default is `on`.
 
-**Done when** `docs/cadence-sync.lock` names 232f2ad or later, `scripts/ledger_next_id.py` is in the tree, and `python3 scripts/check_cadence.py --pr <the sync's PR>` exits 0.
+**Done when** `docs/cadence-sync.lock` names 232f2ad or later, `scripts/ledger_next_id.py` is in the tree, the wheel's ledgerboard is v1.3, `pdm run test` passes, and `python3 scripts/check_cadence.py --pr <the sync's PR>` exits 0.
 
 **Related:** TD-966, TD-970, dev-cadence#TD-124.
 
@@ -1467,9 +1467,9 @@ builds are in the ledger.
 **Why:** the home's `ids.json` is a second counter beside origin's (TD-966): an id it gives is invisible to a session that takes from `scripts/ledger_next_id.py`, and one the script gives is invisible to the home until it is pushed.
 
 **Fix:** as design §4.4 says.
-- **The road.** `_ids_give` checks for `<root>/scripts/ledger_next_id.py` in the checkout that serves the call. Where it is there, the home runs it as `[sys.executable, <script>, "--count", n, "--by", by, "--floor", last, "--ledger", <ledger>, "--archive", <archive>, "--json"]`. `cwd` is the root, and `_run` runs it off the event loop with what is left of the 45-second budget, killing it at that deadline. All of it is under the repo's existing lock. `last` is `ids.json`'s `last` for the origin (0 where none), and the ledger paths are the ones the PR read uses today. Where the script is missing, today's reads run unchanged.
+- **The road.** `_ids_give` checks for `<root>/scripts/ledger_next_id.py` in the checkout that serves the call. Where it is there, the home runs it as `[sys.executable, <script>, "--count", n, "--by", by, "--floor", last, "--ledger", <ledger>, "--archive", <archive>, "--json"]`. `cwd` is the root, and `_run` runs it off the event loop with what is left of the 45-second budget, killing it at that deadline; its environment sets `LEDGER_IDS_RACE_SECONDS` to that remainder less 5 (at least 1). All of it is under the repo's existing lock. `last` is `ids.json`'s `last` for the origin (0 where none), and the ledger paths are the ones the PR read uses today. Where the script is missing, today's reads run unchanged.
 - **The answer.** The script's stdout is one JSON object, `{ids, reserved, why, unread, warnings}`: `ids` as `TD-NNN` strings, `unread` a list of the PRs it could not read, which the home folds into its one *open PRs not read: …* line.
-  - Exit 0 and exit 3 give the ids, which are recorded by `_record` with `floor` = the highest id given.
+  - Exit 0 and exit 3 give the ids. They are recorded by a new writer, `_record_given(key, ids, by)`, which appends them to `given` and sets `last = max(last, highest)`. `_record` still computes and records ids on today's road; called with the script's ids it would record the next `count` instead.
   - Exit 2 raises `RpcError` with the script's `why`.
   - A timeout raises *budget*. Output that is not that JSON raises an error naming the exit code and the first line of stderr.
   - `rpc_td_next` returns `{repo, origin, ids, unread, reserved, why, warnings}`. On today's road, `reserved` is true and `warnings` is empty.
@@ -1484,9 +1484,10 @@ builds are in the ledger.
   - exit 0 gives the ids and records them, with `last` moving to the highest;
   - exit 3 gives them with `reserved: false` and the `why`, and records them;
   - exit 2 refuses with the `why`;
-  - a stub that sleeps past the budget refuses with *budget*;
+  - a stub that sleeps past the budget refuses with *budget* (the test patches `BUDGET`, as others patch `LOCK_BY`), and the stub saw `LEDGER_IDS_RACE_SECONDS` below it;
   - a checkout without the script takes today's road, and its existing tests pass unchanged.
 - **One live test** on a bare scratch origin (`git init --bare`, no forge), with the real synced script and no stub. A home's `td_next` and a direct `scripts/ledger_next_id.py` run at the same moment from a second clone get different ids. The counter's `LAST` then holds the higher of them.
 - The CLI test shows the *not reserved* line on stderr and an exit of 0.
+- **Live check, after the promote** (the anchor's, as TD-940's was): one `ao td next` against this repo's real origin answers `reserved: true`, and `git ls-remote origin cadence/ledger-ids` shows its new commit. An exit 3 there is the unit's push credential, to fix before closing.
 
 **Related:** TD-966, TD-969, TD-693 / TD-696 (the home's allocator), TD-731 (`--held`), dev-cadence#TD-124.
