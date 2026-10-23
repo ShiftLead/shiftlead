@@ -1839,8 +1839,8 @@ def _every_row(tmp_path, monkeypatch):
 def test_every_row_the_inbox_and_the_queue_draw_balances_its_divs(tmp_path, monkeypatch):
     """TD-967 (design §4.5 screen 6 *Needs you*): each of `_every_row`'s rows — board lines, mail and a
     permission; not every kind `row()` draws — opens as many `<div>`s as it closes, in the Inbox's mode
-    in the four sections they can sit in and in the Queue's `card` mode for each `want`, so no row is drawn inside another.
-    Since #2188 the board row's Inbox branch opened its footer twice."""
+    in the four sections they can sit in and in the Queue's `card` mode for each `want`, so no row is
+    drawn inside another. Since #2188 the board row's Inbox branch opened its footer twice."""
     from shiftlead.ui.app import templates
 
     rows = _every_row(tmp_path, monkeypatch)
