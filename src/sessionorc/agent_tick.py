@@ -4017,7 +4017,8 @@ class TickMixin:
             found, leading, after = result
             self._prompts_cursor[s.id] = (aid, int(after))
             held = [] if tool and tool != aid else live.prompts  # a new tool session starts the list again
-            merged = merge_prompts(held, found, leading, live.sends, from_start=cursor == 0)
+            # a cursor past the file's end was read from 0: its leading text is no reply to what the record holds
+            merged = merge_prompts(held, found, leading, live.sends, from_start=cursor == 0 or after < cursor)
             if merged != live.prompts:
                 live.prompts = merged
                 self.store.save(live)
@@ -5082,7 +5083,7 @@ def merge_prompts(
         entry = {"at": p.at, "text": p.text, "drawn": p.drawn, "whole": p.whole, "reply": p.reply, "from": sender}
         keys[(p.at, p.text)] = entry
         out.insert(0, entry)
-    out.sort(key=lambda x: str(x.get("at") or ""), reverse=True)
+    out.sort(key=lambda x: _when(x.get("at")) or datetime.min.replace(tzinfo=UTC), reverse=True)
     return out[:RECENT_PROMPTS]
 
 
