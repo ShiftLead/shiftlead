@@ -69,6 +69,8 @@ const timers = () => {
   const late = j.press([]); t.fire(); out.late = await late;
   const shut = j.press([]); j.closed(); out.shut = await shut;
   j = AO.jumper(() => false, timers()); out.unsent = await j.press([]);
+  const thrower = AO.jumper(() => { throw new Error("closing"); }, timers());
+  out.threw = await thrower.press([]); out.threwBusy = thrower.busy();
   out.busy = j.busy();
   out.html = AO.promptsHtml(P, "ao x", new Set(["2026-10-22T10:04:00Z"]), false);
   out.gone = AO.promptsHtml(P.slice(0, 1), "ao x", new Set(), true);
@@ -126,6 +128,7 @@ def test_one_press_pending_and_its_frame(got):
     assert got["landed"] is True
     assert got["miss"] is False and got["late"] is False and got["shut"] is False
     assert got["unsent"] is False and got["busy"] is False  # a socket not open: a miss at the page
+    assert got["threw"] is False and got["threwBusy"] is False  # a send that throws frees the press
 
 
 def test_the_rows(got):

@@ -3697,7 +3697,8 @@
       if (r.found) { const p = r.found.closest(".tprompt"); p.classList.add("tfound"); p.scrollIntoView({ block: "center" }); }
       else if (r.why === "start") say("that prompt is not in this transcript");
       else if (r.why === "further") say("that prompt is further back — press earlier turns");
-    });
+      else say("earlier turns could not be read — press earlier turns");
+    }, () => say("earlier turns could not be read — press earlier turns"));
   };
   AO.TRANSCRIPT_SEEK = 50;  // fetches a `?at=` makes before it hands over to **earlier turns**
   // The seek behind `?at=` (§4.5 screen 9): `find()` the prompt held, else `more()` — the next twenty
@@ -5264,7 +5265,9 @@
         if (pending) return null;
         return new Promise((resolve) => {
           pending = { resolve, timer: null };
-          if (!send(openings)) { settle(false); return; }
+          let sent = false;
+          try { sent = send(openings); } catch (e) { sent = false; }  // a socket closing under the send
+          if (!sent) { settle(false); return; }
           if (pending) pending.timer = t.set(() => settle(false), AO.JUMP_WAIT);
         });
       },
@@ -5650,14 +5653,15 @@
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }
     // the **Prompts** card (§4.5 *The Prompts card*, TD-977): drawn from the delta while the record holds
     // a prompt; a press scrolls this window's terminal back to it, and a miss offers the Transcript
-    let promptsV = [];
+    let promptsV = [], promptsGone = false;
     const promptsMissed = new Set();
     function renderPrompts(v) {
       const pc = $("#promptscard"); if (!pc) return;
       promptsV = Array.isArray(v.prompts) ? v.prompts : [];
       pc.classList.toggle("hidden", !promptsV.length);
       $("#promptscount").textContent = AO.promptsSummary(promptsV);
-      $("#promptlist").innerHTML = AO.promptsHtml(promptsV, id, promptsMissed, paneGone || AO.paneIsGone(v));
+      promptsGone = paneGone || AO.paneIsGone(v);
+      $("#promptlist").innerHTML = AO.promptsHtml(promptsV, id, promptsMissed, promptsGone);
     }
     const plist = $("#promptlist");
     if (plist) plist.addEventListener("click", async (e) => {
@@ -5667,7 +5671,7 @@
       const landed = ops ? await jumper.press(ops) : false;
       if (landed === null) return;
       if (landed) promptsMissed.delete(String(p.at || "")); else promptsMissed.add(String(p.at || ""));
-      $("#promptlist").innerHTML = AO.promptsHtml(promptsV, id, promptsMissed, paneGone);
+      $("#promptlist").innerHTML = AO.promptsHtml(promptsV, id, promptsMissed, promptsGone || paneGone);
     });
     function render(v) {
       document.title = AO.focusTitle(v);
