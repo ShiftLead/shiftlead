@@ -297,6 +297,31 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-04 (TD-283 part 2 slice 2, grinder-ao-2): the page is built. `/api/entry/session` hands `entry.md`'s filled lines to `create` as `start_context`, and answers the person's words alone as the composer's text. `entry.md`'s first line says *their first message is their words for it*, where it said *their words follow these lines*. Focus draws **Told at start** above Session, its heading the count of non-blank lines.
 
 ## 4.4 Host agent
+- 2026-10-22 (TD-966, the designer; Paul, in td-156: *we do want it to work without shiftlead running*; dev-cadence ADR 2026-10-22, its TD-124 built): **a ledger id comes from one counter on origin**. The home's `td_next` is a front end over the synced `scripts/ledger_next_id.py` where the checkout has it. It runs the script under its lock and budget, with `--floor` set to `ids.json`'s last, so nothing it gave before is given again. It passes the script's `reserved`, `why` and `warnings` through. `ids.json` stays, as the floor and as the record for a repo with no script, whose ids come from the home's own reads as before. A session with no home, or on a node whose link is down, runs the script itself (cadence §2.10). Until then the home's record was a second counter that nothing else could see: #2240 collided twice on it. §4.4a's offline refusal names the script, and §4.7's `--json` gains `reserved`, `why` and `warnings`. Builds TD-969 (the sync) and TD-970 (the wrapper).
+- 2026-10-22 (TD-966, review round 1, Fable): 6 findings, all adopted:
+  - TD-969's range brings ledgerboard v1.3, so the sync vendors it into the wheel's copy, else the fixture test fails;
+  - TD-970 records the script's ids with a new `_record_given`, since `_record` computes its own;
+  - the script has no deadline, so the home sets its race knob to the budget left and a late kill is a gap;
+  - an exit 3 on every call is the unit's push credential, with a live check on the real origin after the promote;
+  - a hold on an unreserved id is said;
+  - the script is read from the serving checkout's working tree, which stays on `main`.
+- 2026-10-22 (TD-966, review round 1, Sonnet): 2 findings and 4 nits, all adopted:
+  - the home passes no `--prs`, so a hand-typed id above `LAST` in an open PR is no longer seen by a take: accepted, since §2.10 forbids it, and the check's `ledger` row is the backstop;
+  - TD-970 parses the script's output before it acts on the exit code;
+  - §4.4's shared lock, budget and `ids.json` text is headed *Both roads*;
+  - the `unread` join and its empty case are said, the script is killed by its process group, and §4.7 says what `reserved` means on the home's own road.
+- 2026-10-22 (TD-966, review round 2, Fable): 2 findings (1 follow-on, 1 new), both adopted: the *no forge* warning comes only on the takes that read the PRs; and until a first take makes the counter, the `ledger` row warns nothing, so TD-969 expects no warning.
+- 2026-10-22 (TD-966, review round 2, Sonnet): READY, with 1 nit, adopted: the home's own road reads no `LAST`, so a serving checkout on a branch from before the sync can collide with an unpushed id the script gave; this is accepted, with the `ledger` row as the backstop.
+- 2026-10-22 (TD-966, review round 3, Fable): 2 findings, both new, both adopted:
+  - dev-cadence's own checkout holds the script only at `files/scripts/`, so the home probes `scripts/` and then `files/scripts/`;
+  - the home's own road serves no repo once each has synced, so TD-971 removes it then and refuses a checkout without the script. Keeping it through the switch is a steer to the techlead, since removing it now would refuse every repo that has not synced.
+- 2026-10-22 (TD-966, review round 3, Sonnet): 2 findings and 1 nit, all adopted:
+  - TD-971 names every own-road sentence it deletes from *Both roads*;
+  - TD-971's event says how it is checked (each registered root's sync lock), and that each repo's sync is that repo's own. TD-966 archives with TD-970, so it is not held open by other repos;
+  - *The run* names the script found.
+- 2026-10-22 (TD-966, steer to the techlead, answered m-c5f8c783e3d2): the default stands. The home's own reads stay through the switch and TD-971 removes them, since deleting them now would send unsynced repos back to hand numbers. TD-970's tests cover both roads, so the delete is a clean cut.
+- 2026-10-22 (TD-966, review round 4, Fable): 1 finding, a follow-on of Sonnet round 3's check, adopted. TD-971's event is checked by the script's presence on each registered root's default branch, not by comparing the sync lock's short sha.
+- 2026-10-22 (TD-966, review round 4, Sonnet): READY, with 2 nits left as they stand (§4.4a's reason still reads true; TD-971 already rewords *the other road*). The loop ends: Sonnet said READY, and Fable round 4 had only a follow-on of the last adoption.
 - 2026-10-21 (TD-940 slice 2, grinder-ao-1; the scope steered with the techlead, m-eb7127cfc157): the PR reading per forge — a GitLab origin reads its open merge requests, the head pipeline folded into the four words, `conflicting`, and `required` on the MR's row; windows, `recent` and held are unread there. Was: `gh` for every origin, so a GitLab remote had no reading.
 - 2026-10-20 (TD-927, the designer): *Spend per seat* — every figure the readings carry carries its tokens by kind, and a token count is drawn as every kind summed, the four kinds on hover: one rule for the Spend page, `ao spend` and the Focus's disconnect card (TD-923 drew it first); built by TD-929.
 - 2026-10-20 (TD-915): *The Queue*'s rows — the breadth-first walk sets each row's level and parent; the page draws them depth first, each under its own parent, so the drawn tree reads as the walk built it.
