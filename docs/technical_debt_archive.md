@@ -18823,3 +18823,71 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-966, TD-970, dev-cadence#TD-124.
 
 **Resolved:** 2026-10-23 (PR #2291) — `docs/cadence-sync.lock` names 232f2ad; `scripts/ledger_next_id.py` is in the tree; `src/sessionorc/ledgerboard.py` and `tests/ledgerboard/` are v1.3, byte-equal to the synced `scripts/ledgerboard.py`; `ledger.py --check` 0 errors, and no open board line has an answer with a ` — ` consequence, so v1.3's label split changes no live line; `ledger-ids-host` left unset.
+
+---
+
+## TD-970: The home's `td_next` runs `scripts/ledger_next_id.py` with `--floor`, where the checkout has it: one counter with or without the home
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-22 (the designer, from TD-966)
+**Owner:** grinder
+**Kind:** live-check #2293
+**Status:** Built 2026-10-23 (grinder-ao-1, #2293): the script road in `agent_ids.py` (`ids_script`, `_ids_script`, `_record_given`, `_run`'s process group), the CLI's *not reserved* and warning lines, the offline refusal and the brief; every *Done when* test in `tests/test_td_next.py`, the live one on a bare origin included. **Left, read on the live copy once #2293 is live** (the anchor's, as TD-940's was): one `ao td next` against this repo's origin answers `reserved: true`, and `git ls-remote origin cadence/ledger-ids` shows its new commit; an exit 3 there is the unit's push credential.
+**Location:** `src/sessionorc/agent_ids.py` (`rpc_td_next`, `_ids_give`, `_record`, `_run`); `src/shiftlead/cli.py` `cmd_td_next`; `src/sessionorc/modes.py` (`td_next`'s offline refusal); `src/shiftlead/briefs/entry.md` (*The number*); `tests/test_td_next.py`; design §4.4 *A ledger entry's id is handed out by the home*, §4.4a's `td_next` row, §4.7 `ao td next`
+
+**Why:** the home's `ids.json` is a second counter beside origin's (TD-966): an id it gives is invisible to a session that takes from `scripts/ledger_next_id.py`, and one the script gives is invisible to the home until it is pushed.
+
+**Fix:** as design §4.4 says.
+- **The road.** `_ids_give` checks for `<root>/scripts/ledger_next_id.py`, then `<root>/files/scripts/ledger_next_id.py` (dev-cadence's own checkout, whose siblings are beside it there), in the checkout that serves the call, and runs the first found. Where it is there, the home runs it as `[sys.executable, <script>, "--count", n, "--by", by, "--floor", last, "--ledger", <ledger>, "--archive", <archive>, "--json"]`. `cwd` is the root, and `_run` runs it off the event loop with what is left of the 45-second budget, killing it at that deadline; its environment sets `LEDGER_IDS_RACE_SECONDS` to that remainder less 5 (at least 1). All of it is under the repo's existing lock. `last` is `ids.json`'s `last` for the origin (0 where none), and the ledger paths are the ones the PR read uses today. Where the script is missing, today's reads run unchanged.
+- **The answer.** The script's stdout is one JSON object, `{ids, reserved, why, unread, warnings}`: `ids` as `TD-NNN` strings, `unread` a list of the PRs it could not read, which the home folds into its one *open PRs not read: …* line.
+  - **The order.** Parse stdout first. Output that is not that JSON, an exit other than 0, 2 or 3, or an exit 0 or 3 with an empty `ids` raises the error naming the exit code and the first line of stderr (an older script without `--floor`, a path outside a work tree). Only then act on the exit code.
+  - Exit 0 and exit 3 give the ids. They are recorded by a new writer, `_record_given(key, ids, by)`, which appends them to `given` and sets `last = max(last, highest)`. `_record` still computes and records ids on today's road; called with the script's ids it would record the next `count` instead.
+  - Exit 2 raises `RpcError` with the script's `why`.
+  - A timeout raises *budget*. The script starts in its own session (`start_new_session=True`), and the kill at the deadline goes to its process group, so an in-flight `git fetch` or `git push` dies with it.
+  - The script's `unread` list is joined into one line, `open PRs not read: <refs, comma-joined>`, and an empty list gives an empty `unread`. The home passes no `--prs` (§4.4 *What it reads*).
+  - `rpc_td_next` returns `{repo, origin, ids, unread, reserved, why, warnings}`. On today's road, `reserved` is true and `warnings` is empty.
+  - `held` is unchanged: it is the settle clock's.
+- **The CLI.** `cmd_td_next` prints `unread` as today. On standard error it also prints *not reserved on origin's counter: <why>* when `reserved` is false, and each warning. The exit stays 0. `--json` carries the three new keys.
+- **Offline.** `modes.py`'s refusal of `td_next` on a node whose link is down names `scripts/ledger_next_id.py`, for the session to run itself (§4.4 *Without the home*).
+- **The brief.** `src/shiftlead/briefs/entry.md`'s *The number* says the home takes the id from origin's counter. Where `ao` is missing or refuses, the session runs `scripts/ledger_next_id.py` itself, never numbering by hand (cadence §2.10).
+
+**Done when**
+- **Tests** in `tests/test_td_next.py`, each with a stub `scripts/ledger_next_id.py` in a scratch checkout that records its argv:
+  - the home passes `--floor` = `ids.json`'s last, `--by` = the caller, `--count`, and the repo's ledger paths;
+  - exit 0 gives the ids and records them, with `last` moving to the highest;
+  - exit 3 gives them with `reserved: false` and the `why`, and records them;
+  - exit 2 refuses with the `why`;
+  - a stub that sleeps past the budget refuses with *budget* (the test patches `BUDGET`, as others patch `LOCK_BY`), and the stub saw `LEDGER_IDS_RACE_SECONDS` below it;
+  - a checkout with the script only at `files/scripts/` (dev-cadence's layout) runs that one;
+  - a checkout without the script takes today's road, and its existing tests pass unchanged.
+- **One live test** on a bare scratch origin (`git init --bare`, no forge), with the real synced script and no stub. A home's `td_next` and a direct `scripts/ledger_next_id.py` run at the same moment from a second clone get different ids. The counter's `LAST` then holds the higher of them.
+- The CLI test shows the *not reserved* line on stderr and an exit of 0.
+- **Live check, after the promote** (the anchor's, as TD-940's was): one `ao td next` against this repo's real origin answers `reserved: true`, and `git ls-remote origin cadence/ledger-ids` shows its new commit. An exit 3 there is the unit's push credential, to fix before closing.
+
+**Related:** TD-966, TD-969, TD-693 / TD-696 (the home's allocator), TD-731 (`--held`), dev-cadence#TD-124.
+
+**Resolved:** 2026-10-23 (PR #2293; live check read in this archive's PR) — on the live copy with 3e1edad live, `ao td next --json` answered `reserved: true`, no warnings, exit 0, twice: grinder-ao-1 took TD-973 (`cadence/ledger-ids` absent before, 85c1548 after) and grinder-ao-2 took TD-974 (2104fbc, `LAST` 973 → 974, its commit `by: ao-shiftlead-grinder-ao-2`). No exit 3, so the unit's push credential holds. TD-973 and TD-974 are spent on the check and left unused. The road lives in `src/sessionorc/agent_ids.py` and `tests/test_td_next.py`; design §4.4 *A ledger entry's id is handed out by the home*.
+
+---
+
+## TD-966: `ao td next` and the home's `ids.json` become a front end over dev-cadence's ledger-id counter on origin, so there is one counter whether or not the home runs
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-22 (Paul, in the td-156 session, after its PR #2240 collided twice: TD-942 was the home's to designer-ao-1 and merged first by #2238; the hand renumber to TD-951 took an id the home had given grinder-ao-1. Paul: *we do want it to work without shiftlead running*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-22 (the designer): design §4.4 *A ledger entry's id is handed out by the home*, §4.4a's `td_next` row, §4.7 `ao td next`. dev-cadence#TD-124 is built and archived (its #292–#295).
+**Blocked by:** TD-969, TD-970
+**Location:** design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries* (`ao td next`); `src/sessionorc/` (the `td_next` RPC, `ids.json`), `src/shiftlead/cli.py` (`cmd_td_next`)
+
+**Why:** the home hands ids out under a lock (TD-693/696), but only to a session that asks it. Every session that cannot ask (a cloud session, another machine, a repo with no home) and every session that follows cadence §2.10's hand rule instead (TD-949 and TD-954–956 on 2026-10-22, none in `ids.json`, and #2240's own TD-942 and TD-948) numbers around it, and the home's record of what it gave is invisible to them until a PR is pushed. dev-cadence#TD-124 puts the counter on origin as a git ref that every session can advance, with or without a home. If the home keeps its own `ids.json` beside it, there are two counters that can disagree.
+
+**Fix:** design first, once dev-cadence#TD-124's design is agreed: (1) §4.4 rewritten so the home's `td_next` takes its ids from the counter on origin (the synced script or the same push), keeping what the home adds on top: the one lock per repo so its own callers do not race each other's retries, `by` as the envelope's verified caller, the 45-second budget, and the *open PRs not read* line; (2) `ids.json`: retired, or kept only for what the counter does not carry (`--held`, TD-731), and its `last` folded into the counter's first value so no id it gave is handed out again; (3) the build entries named, with `Blocked by` lines.
+
+**Done when** a session with no home running and a session asking `ao td next` take ids at the same moment and get different ones, and §4.4 says where the one counter lives.
+
+**Related:** dev-cadence#TD-124 (the counter, the §2.10 rewrite and the cadence-check row), TD-693 / TD-696 (the home's allocator), TD-731 (`--held`), TD-964 (whose PR collided).
+
+**Resolved:** 2026-10-23 — designed in #2290 (design §4.4 *A ledger entry's id is handed out by the home*, §4.4a's `td_next` row, §4.7 `ao td next`); built by TD-969 (#2291, the sync of dev-cadence 232f2ad) and TD-970 (#2293, the home's `td_next` over `scripts/ledger_next_id.py`, its live check held in this archive's PR). TD-971, the removal of the home's own reads, follows on its own.
