@@ -39,7 +39,9 @@ The commands are GitHub's (`gh`), with GitLab's (`glab`, a PR is a merge request
    `cadence-review: <SHIP|FIXED|BLOCK> · <your model> · <code|docs> · <n> findings` — SHIP,
    FIXED or BLOCK and no other word*. A reviewer asked in its own words writes its own
    (`CLEAN`), which the row never reads as a review: it fails naming the word, and the cure is a
-   new comment (TD-116). Fix the findings, re-verify, and then post the evidence comment (§4; on GitLab the same body through `glab mr note <n> -m`, which glab 1.123 marks deprecated but runs; a fine-grained token needs the notes permissions):
+   new comment (TD-116). **One round for a change that adds no mechanism and alters no rule**
+   (a wording, a constant, a comment, a rename); iterated rounds are for a new or changed mechanism
+   or rule (cadence §4.8, TD-123). Fix the findings, re-verify, and then post the evidence comment (§4; on GitLab the same body through `glab mr note <n> -m`, which glab 1.123 marks deprecated but runs; a fine-grained token needs the notes permissions):
 
    ```
    gh pr comment <n> --body "$(cat <<'MSG'

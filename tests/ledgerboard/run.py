@@ -21,7 +21,8 @@ Fixtures, each an invented input and its expected JSON:
   ``item_line()``/``decided_line()``, the line predicates, the version reader (v1.0), and
   ``bold_head()``, ``is_not_right_form()`` and ``fill_not_right()`` (v1.1), and the rank —
   ``queue_subject()``, ``implicit_key()``, ``key_order()``, ``midpoint()``, ``rank()``, ``set_rank()``,
-  ``rank_path()`` and ``components()`` of a ledger fixture's entries (v1.2).
+  ``rank_path()`` and ``components()`` of a ledger fixture's entries (v1.2); an answer's
+  consequence — ``item_record()``'s ``consequences`` and ``decided_line()``'s marked label (v1.3).
 """
 
 from __future__ import annotations

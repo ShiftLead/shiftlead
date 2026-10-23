@@ -12,6 +12,18 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (ShiftLead design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-22 — Ledger IDs come from the counter on origin, never by hand
+Do: take a new ledger ID, or a renumber's, from the repo's front end where it has one (`ao td next`), else `python3 scripts/ledger_next_id.py` — exit 3 prints an ID it could not reserve; never number by hand. Leave origin's `cadence/ledger-ids` branch alone: it is the counter, never stranded work.
+See: cadence.md §2.10, §9.18 (`ledger-ids-host`); TD-124.
+
+## 2026-10-22 — Size the review to the change: a wording change gets one round
+Do: give a change that adds no mechanism and alters no rule (a wording, a constant, a comment, a rename) one review round, fix and re-verify its findings, then merge; iterate rounds only for a new or changed mechanism or rule. Put the reasons for a reword in the PR, not in the doc.
+See: cadence.md §4.8; cadence procedure step 3; TD-123.
+
+## 2026-10-20 — An entry waiting on the person says it in one sentence; an answer says what it leads to
+Do: give an entry with `Owner: paul`, `Blocked by: decision (paul)` or `**Answers:**` an `**Ask:**` line in its body (never its header): one sentence a cold reader can decide from. Write an answer that has a consequence as `<label> (default) — <consequence>`; the label is what a press sends.
+See: cadence.md §2.3, §3.5; TD-121.
+
 ## 2026-10-20 — Codex sessions are seen: `agents = "claude,codex"`
 Do: in a repo where Codex sessions run, list `codex` in `docs/cadence.toml`'s `agents`; the anchor guard, the reaper, `list_sessions.py` (`codex resume <uuid>`) and the sweep row then see them, and "cannot see codex" means no readable `${CODEX_HOME:-~/.codex}` (or `/proc`) here.
 See: cadence.md §1.13, §9.18; TD-102.

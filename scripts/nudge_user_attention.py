@@ -71,9 +71,11 @@ session's proposed answers) and ``Decided: <text> (YYYY-MM-DD).`` (written by
 board and stays due, but it waits on a session, not the person: the reports
 mark it so and list it first, ``--due-only`` shows it whether or not it is due,
 the nudge never pushes it as due, and ``--json`` carries ``answers``,
-``default``, ``decided`` and ``waiting_on`` per item. One answer may end in
-`` (default)`` — the one the session recommends (TD-066): stripped from the answer's
-text, carried as ``default``, and shown in the reports' tag.
+``default``, ``consequences``, ``decided`` and ``waiting_on`` per item. One answer's label may
+end in `` (default)`` — the one the session recommends (TD-066): stripped from the answer's
+text, carried as ``default``, and shown in the reports' tag. An answer may say what it leads
+to after its first `` — `` (TD-121): ``answers`` carries the labels, ``consequences`` the rest
+beside them ("" for none).
 
 For a tool that draws the board (TD-075) — so that it parses neither a board line nor a
 sentence of this report: each ``--json`` item carries ``session`` and ``host`` (from its

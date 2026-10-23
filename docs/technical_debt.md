@@ -73,8 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-966 | `ao td next` becomes a front end over dev-cadence's ledger-id counter on origin: one counter, with or without the home | High | Designed — the home's `td_next` runs the synced script with `--floor`; builds TD-969, TD-970; TD-971 follows on its own |
-| TD-969 | Sync dev-cadence to 232f2ad or later, so `scripts/ledger_next_id.py`, §2.10's allocator rule and the `ledger` row's id check land here | High | Open |
-| TD-970 | The home's `td_next` runs `scripts/ledger_next_id.py` with `--floor`, where the checkout has it: one counter with or without the home | High | Open — blocked by TD-969 |
+| TD-970 | The home's `td_next` runs `scripts/ledger_next_id.py` with `--floor`, where the checkout has it: one counter with or without the home | High | Open |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — blocked by TD-970; waits on every registered repo's sync |
 
 ---
@@ -1434,26 +1433,6 @@ builds are in the ledger.
 
 ---
 
-## TD-969: Sync dev-cadence to 232f2ad or later, so `scripts/ledger_next_id.py`, §2.10's allocator rule and the `ledger` row's id check land here
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-22 (the designer, from TD-966)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/cadence-sync.lock` (at 4453db4); dev-cadence's `sync.sh`; the files it brings: `scripts/ledger_next_id.py` (new), `scripts/check_cadence.py` (the `ledger` row), `scripts/cadence_config.py` (`ledger-ids-host`), `docs/cadence.md` §2.10 and §9.18, `docs/cadence-changes.md`
-
-**Why:** TD-966's wrapper (TD-970) runs the synced `scripts/ledger_next_id.py`, which dev-cadence shipped in TD-124 (its #293–#295, on main at 232f2ad). This repo's last sync is 4453db4 (#2198), from before it.
-
-**Fix:** run dev-cadence's `sync.sh` from a worktree, as #2198 did, to its main at 232f2ad or later, and land what it writes as one PR titled `sync dev-cadence <sha>`. The range brings ledgerboard v1.3 (dev-cadence #288, TD-121) into `scripts/ledgerboard.py`, while the wheel's copy `src/sessionorc/ledgerboard.py` is v1.2, and `tests/test_ledgerboard_fixtures.py` holds the two byte-equal: run `scripts/vendor_ledgerboard.sh v1.3` in the same PR (the wheel copy and `tests/ledgerboard/`), as #1930 did for v1.2, and read what v1.3 changes (its `Ask:` line) against `ledger.py --check` on this ledger. Edit no SYNCED file by hand. Read `docs/cadence-changes.md`'s new lines: §2.10 now says *the front end first* (`ao td next`), and the ledger row now warns on a new id above the counter's `LAST`. Until a first take creates `cadence/ledger-ids`, the row has no counter to compare against and warns nothing; once TD-970's live check has made it, a PR numbered by the home before TD-970 warns there, as the ADR expects. Leave `ledger-ids-host` unset: this repo is private, and the default is `on`.
-
-**Done when** `docs/cadence-sync.lock` names 232f2ad or later, `scripts/ledger_next_id.py` is in the tree, the wheel's ledgerboard is v1.3, `pdm run test` passes, and `python3 scripts/check_cadence.py --pr <the sync's PR>` exits 0.
-
-**Related:** TD-966, TD-970, dev-cadence#TD-124.
-
----
-
 ## TD-970: The home's `td_next` runs `scripts/ledger_next_id.py` with `--floor`, where the checkout has it: one counter with or without the home
 
 **Priority:** High
@@ -1462,7 +1441,6 @@ builds are in the ledger.
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-969
 **Location:** `src/sessionorc/agent_ids.py` (`rpc_td_next`, `_ids_give`, `_record`, `_run`); `src/shiftlead/cli.py` `cmd_td_next`; `src/sessionorc/modes.py` (`td_next`'s offline refusal); `src/shiftlead/briefs/entry.md` (*The number*); `tests/test_td_next.py`; design §4.4 *A ledger entry's id is handed out by the home*, §4.4a's `td_next` row, §4.7 `ao td next`
 
 **Why:** the home's `ids.json` is a second counter beside origin's (TD-966): an id it gives is invisible to a session that takes from `scripts/ledger_next_id.py`, and one the script gives is invisible to the home until it is pushed.
