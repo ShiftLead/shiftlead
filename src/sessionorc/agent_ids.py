@@ -10,7 +10,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import re
+import signal
+import sys
 import threading
 import time
 from datetime import UTC, datetime
@@ -34,6 +37,9 @@ GIVEN_KEEP = 200
 COUNT_MAX = 10
 WHY_CHARS = 200  # a hold's words and a drop notice's, one line (TD-905)
 ADDED = re.compile(r"^\+## TD-(\d+):", re.M)
+SCRIPTS = ("scripts/ledger_next_id.py", "files/scripts/ledger_next_id.py")  # a syncing repo's; dev-cadence's own
+SCRIPT_SLACK = 5.0  # the script's race ends this far before the call's deadline
+TID = re.compile(r"TD-\d+")
 GITHUB = re.compile(
     r"^(?:https?://(?:[^@/]+@)?|ssh://(?:[^@/]+@)?|[^@/]+@)github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$"
 )
@@ -64,22 +70,29 @@ def files_jq(paths_: tuple[str, ...]) -> str:
     return f".[] | if ({names}) then {{f: .filename, p: .patch}} else 0 end"
 
 
-async def _run(argv: list[str], cwd: str | None, timeout: float) -> tuple[int, str, str]:
+async def _run(
+    argv: list[str], cwd: str | None, timeout: float, env: dict[str, str] | None = None, group: bool = False
+) -> tuple[int, str, str]:
     """A subprocess off the event loop, killed at its deadline (or when the call is cancelled).
-    `(returncode, stdout, stderr)`; a deadline passed is `(-1, "", "timed out")`."""
+    `(returncode, stdout, stderr)`; a deadline passed is `(-1, "", "timed out")`. With `group` it starts in
+    its own session and the kill goes to its process group, so a `git` it runs dies with it."""
     if timeout <= 0:
         return -1, "", "timed out"
     try:
         proc = await asyncio.create_subprocess_exec(
-            *argv, cwd=cwd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
+            *argv, cwd=cwd, env=env, start_new_session=group,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )  # fmt: skip
     except OSError as e:
         return -1, "", f"{argv[0]} could not be run: {type(e).__name__}"
     try:
         out, err = await asyncio.wait_for(proc.communicate(), timeout)
     except (TimeoutError, asyncio.CancelledError) as e:
         with contextlib.suppress(ProcessLookupError):
-            proc.kill()
+            if group:
+                os.killpg(proc.pid, signal.SIGKILL)
+            else:
+                proc.kill()
         with contextlib.suppress(Exception):
             await asyncio.shield(proc.wait())
         if isinstance(e, asyncio.CancelledError):
@@ -90,6 +103,11 @@ async def _run(argv: list[str], cwd: str | None, timeout: float) -> tuple[int, s
 
 def _why(err: str, fallback: str) -> str:
     return ((err or "").strip().splitlines() or [fallback])[-1][:200]
+
+
+def ids_script(root: str) -> Path | None:
+    """The synced `ledger_next_id.py` the checkout serving a `td_next` has, the first of `SCRIPTS` found."""
+    return next((Path(root) / s for s in SCRIPTS if (Path(root) / s).is_file()), None)
 
 
 def settle_key(root: str, remote: str) -> str:
@@ -243,7 +261,8 @@ class IdsMixin:
         reply, so its entry lands held until the person's Release: the person's and an interactive
         session's, refused to an unattended caller and to one the graph does not hold. Returns `{repo,
         origin, ids, unread}` — and `held: true` with `held` — `unread` the lines naming the open PRs that
-        could not be read."""
+        could not be read, and `reserved`, `why` and `warnings` the script's (on the home's own road `reserved`
+        is true, `why` empty and `warnings` none)."""
         start = time.monotonic()
         if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= COUNT_MAX:
             raise RpcError(f"--count is 1 to {COUNT_MAX}, not {count!r}")
@@ -256,16 +275,21 @@ class IdsMixin:
         except TimeoutError:
             raise RpcError(f"{name}'s ids are being handed out to another caller: busy, ask again") from None
         try:
-            ids, unread = await self._ids_give(root, key, count, start, caller)
+            if script := await asyncio.to_thread(ids_script, root):
+                got = await self._ids_script(root, key, name, script, count, start, caller)
+            else:
+                ids, unread = await self._ids_give(root, key, count, start, caller)
+                got = {"ids": ids, "unread": unread, "reserved": True, "why": "", "warnings": []}
         finally:
             lock.release()
-        for line in unread:
+        for line in [*got["unread"], *got["warnings"]] + ([] if got["reserved"] else [f"not reserved: {got['why']}"]):
             log.info("td_next %s: %s", name, line)
+        out = {"repo": name, "origin": key, **got}
         if held:  # the clock is keyed by the origin as `settle_key` keys a reading's (an origin is read here)
             by = PERSON if mail.is_person(caller) else str(caller)
-            await asyncio.to_thread(settle_mod.prehold, key, ids, by, datetime.now(UTC))
-            return {"repo": name, "origin": key, "ids": ids, "unread": unread, "held": True}
-        return {"repo": name, "origin": key, "ids": ids, "unread": unread}
+            await asyncio.to_thread(settle_mod.prehold, key, got["ids"], by, datetime.now(UTC))
+            out["held"] = True
+        return out
 
     def _held_caller(self, caller: Any) -> None:
         """`--held` is the person's and an interactive session's (design §4.4 *An entry can land held*): the
@@ -319,6 +343,50 @@ class IdsMixin:
             raise RpcError(f"{want!r} names checkouts of different origins: {named}; name one by its owner/repo")
         root = next(r for r, k in keys.items() if k)
         return root, keys[root], Path(root).name
+
+    async def _ids_script(
+        self, root: str, key: str, name: str, script: Path, count: int, start: float, caller: Any
+    ) -> dict[str, Any]:
+        """The road over origin's counter (design §4.4 *A ledger entry's id is handed out by the home*, TD-970): the
+        synced script, run in the checkout with this interpreter, the home's last given as its `--floor`, and killed
+        with its group at the call's deadline. It fetches and reads what it needs; the home reads no PR here."""
+        rel = await asyncio.to_thread(ledger_mod.ledger_path, root)
+        by = PERSON if caller is None or mail.is_person(caller) else str(caller)
+        floor = await asyncio.to_thread(_last, key)
+        left = start + BUDGET - time.monotonic()
+        argv = [
+            sys.executable, str(script), "--count", str(count), "--by", by, "--floor", str(floor),
+            "--ledger", rel, "--archive", ledger_mod.archive_path(rel), "--json",
+        ]  # fmt: skip
+        env = {**os.environ, "LEDGER_IDS_RACE_SECONDS": f"{max(1.0, left - SCRIPT_SLACK):g}"}
+        rc, out, err = await _run(argv, root, left, env=env, group=True)
+        if (rc, out, err) == (-1, "", "timed out"):
+            raise RpcError(f"{name}'s id script did not answer within the call's {BUDGET:g} s: budget, ask again")
+        try:
+            res = json.loads(out)
+        except ValueError:
+            res = None
+        ok = (
+            isinstance(res, dict)
+            and isinstance(res.get("ids"), list)
+            and all(isinstance(i, str) and TID.fullmatch(i) for i in res["ids"])
+        )
+        if not ok or rc not in (0, 2, 3) or (rc != 2 and not res["ids"]):
+            first = ((err or "").strip().splitlines() or ["nothing on standard error"])[0][:200]
+            raise RpcError(f"{script.relative_to(root)} did not answer with its JSON (exit {rc}): {first}")
+        why = " ".join(str(res.get("why") or "").split())[:200]
+        if rc == 2:
+            raise RpcError(f"{name}'s ids were not given: {why or 'the script refused'}")
+        ids = [str(i) for i in res["ids"]]
+        await asyncio.to_thread(_record_given, key, ids, by)
+        refs = [str(r) for r in res.get("unread") or [] if str(r).strip()]
+        return {
+            "ids": ids,
+            "unread": [f"open PRs not read: {', '.join(refs)}"] if refs else [],
+            "reserved": rc == 0,
+            "why": "" if rc == 0 else why,
+            "warnings": [str(w) for w in res.get("warnings") or [] if str(w).strip()],
+        }
 
     async def _ids_give(
         self, root: str, key: str, count: int, start: float, caller: Any
@@ -424,6 +492,26 @@ def _record(key: str, floor: int, count: int, by: str) -> list[str]:
         store[key] = {"last": top + count, "given": given[-GIVEN_KEEP:]}
         _save(store)
         return ids
+
+
+def _last(key: str) -> int:
+    """The last id the home gave for the origin, 0 where it gave none: the script road's `--floor`."""
+    with _STORE:
+        rec = _load().get(key)
+    return rec["last"] if isinstance(rec, dict) and isinstance(rec.get("last"), int) else 0
+
+
+def _record_given(key: str, ids: list[str], by: str) -> None:
+    """Record ids the script gave, as they are: appended to `given`, `last` moved to the highest of them."""
+    with _STORE:
+        store = _load()
+        rec = store.get(key) if isinstance(store.get(key), dict) else {}
+        last = rec.get("last") if isinstance(rec.get("last"), int) else 0
+        at = now_iso()
+        given = [g for g in rec.get("given") or [] if isinstance(g, dict)]
+        given += [{"id": i, "by": by, "at": at} for i in ids]
+        store[key] = {"last": max([last, *(int(i[3:]) for i in ids)]), "given": given[-GIVEN_KEEP:]}
+        _save(store)
 
 
 def _load() -> dict[str, Any]:

@@ -3301,7 +3301,8 @@ def cmd_td_next(args: argparse.Namespace) -> int:
     `td_next`, one a line. Open to every session and the person; `--held` (§4.4 *An entry can land held*,
     TD-731) lands each id held, the person's and an interactive session's. The repo goes by its registered name, or by
     its origin's `owner/repo` when checkouts of different origins share that name; an open PR the home could
-    not read is said on standard error."""
+    not read is said on standard error, and so are an id not reserved on origin's counter and each of the
+    script's warnings (TD-970), the exit still 0."""
     if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
         try:
             _td_repo(args.repo)
@@ -3320,7 +3321,19 @@ def _td_next_send(args: argparse.Namespace, name: str) -> int:
     got = call_sync("td_next", repo=name, count=args.count, **extra)  # the home's 45 s budget is under the client's
     for line in got.get("unread") or ():
         print(line, file=sys.stderr)
-    out = {"repo": got.get("repo"), "ids": got.get("ids") or [], "unread": got.get("unread") or []}
+    reserved = got.get("reserved") is not False  # an older home has no counter road: its ids are recorded
+    if not reserved:
+        print(f"not reserved on origin's counter: {got.get('why') or 'the script did not say why'}", file=sys.stderr)
+    for line in got.get("warnings") or ():
+        print(line, file=sys.stderr)
+    out = {
+        "repo": got.get("repo"),
+        "ids": got.get("ids") or [],
+        "unread": got.get("unread") or [],
+        "reserved": reserved,
+        "why": got.get("why") or "",
+        "warnings": got.get("warnings") or [],
+    }
     if got.get("held"):
         out["held"] = True
     return emit(args, out, lambda: print("\n".join(out["ids"])))

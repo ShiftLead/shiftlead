@@ -174,7 +174,11 @@ def offline_refusal(
     if method in HOME_EDITS:
         return f"{method} edits what the home owns, so it waits for the link: {tail}"
     if method in IDS:
-        return f"ids.json is the home's: the ledger ids are handed out there alone: {tail}"
+        return (
+            f"ids.json is the home's: the ledger ids are handed out there alone: {tail}; run the checkout's "
+            "scripts/ledger_next_id.py yourself, which takes from the same counter on origin "
+            "(design §4.4 *Without the home*)"
+        )
     if method in RANKS:
         return f"ranks.json is the home's: a move on the rank is kept and landed there alone: {tail}"
     if caller is None or method not in NODE_ACTS or as_person(caller, records or {}):
