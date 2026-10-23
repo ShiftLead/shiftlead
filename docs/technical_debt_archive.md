@@ -19011,3 +19011,60 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-976 (the change, #2299).
 
 **Resolved:** 2026-10-23 (grinder-ao-2, this PR) — the read tests now assert a 250-character reply is cut to 200 and an `isMeta` entry of plain text is left out, and the tick test closes a session with a read due and asserts the adapter is not asked; each fails with its line removed (the cap, the `isMeta` check, `or s.state == "closed"`).
+
+---
+
+## TD-975: Focus has no list of the person's prompts: a Prompts card on the side panel, each prompt a press that scrolls the terminal back to it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (Paul, through Add entry; drafted by the prompt-links session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-22 (the designer; design §4.5 *The Prompts card*, §4.2 *The record's `prompts`*, §4.3 `prompts`, §4.6 *A jump to a prompt*, §4.5a *Focus side panel* **Prompts**, §4.5 screen 9 `?at=`)
+**Blocked by:** TD-976, TD-977
+**Location:** design §4.5 *The Focus screen's anatomy* item 4 (the side panel), §4.5a *Focus side panel* rows (a new *Prompts* row, and its place in the panel's order in the *diff / log / PRs* row), §4.6 *Scrollback is tmux's, reached through tmux (TD-022)*; `src/shiftlead/ui/templates/focus.html` (the side cards), `src/shiftlead/ui/static/app.js` (the terminal's scroll messages), `src/shiftlead/ui/pty_bridge.py` (`scroll_argv`, the bridge's message loop), `src/shiftlead/adapters/claude_code/transcript.py` (the `prompt` entries), `src/shiftlead/ui/transcript.py`
+
+**Why:** Paul: *I find myself scrolling up quite a bit to see what I last said in a session, and to see if an immediate reply was given that has since scrolled off.* On Focus, what the person last said, and whatever came straight back, scrolls off under the tool's later output. The only ways back are the wheel through tmux's history, a notch at a time, or the Transcript page in another tab, which is a different view from the terminal the person is reading. Each check costs a hunt and breaks the person's place in the live screen.
+
+**Fix:** design first. A **Prompts** card in the Focus side panel, a fold like the others, listing the person's prompts to this session, newest first, each with its time and its first line. Pressing one scrolls the terminal back to where that prompt was typed. What the design settles:
+- **Where the list comes from.** The adapter's transcript read already yields `prompt` entries (`TranscriptEntry(kind="prompt")`). They are read from the file and never from the pane, which keeps to §4.6 and the adapter rule (§4.3). Settle whether a prompt sent from the composer, a steer, or mail delivered into the pane counts as the person's.
+- **How the jump lands.** xterm.js holds no scrollback (`scrollback: 0`, TD-022), so the jump is a new bridge message beside `scroll`. The bridge runs `copy-mode -e` and then `send-keys -X search-backward-text` for the prompt's opening text: plain text, since `search-backward` reads a regular expression and a prompt is free text. `scroll_argv`'s form is the model, and typing leaves copy mode as it does today (TD-667). Settle what is matched: the tool draws the prompt behind its `❯` and wraps long lines, and pasted text shows only as a placeholder. (Superseded: design §4.6 *A jump to a prompt* walks the history itself, since `search-backward-text` lands a short prompt on its newest match.)
+- **When it cannot land.** The prompt may have passed `history-limit`, gone in a `/clear` or a compaction repaint, or been drawn twice by a resize (TD-794). The press then says so and offers the Transcript page at that prompt.
+- **Its place and its summary.** Where the card sits in the panel's order, what its folded summary shows (the last prompt's age?), whether it has a rail glyph, and whether each row shows the start of the reply that followed. That last item is the second half of Paul's ask, and it would let the reply be read without jumping at all.
+- A record with no agent (TD-665): what a `shell` draws, given that it has no transcript.
+
+**Done when** on a session's Focus, Paul opens the Prompts card, presses his last prompt, and the terminal shows that prompt with the reply under it. A prompt that is no longer in tmux's history says so and opens it in the Transcript.
+
+**Related:** TD-022 (tmux owns the scrollback), TD-667 (typing returns the pane to the live screen), TD-794 (repaints that duplicate lines), TD-964 (the side panel's folds and summaries), TD-665 (a record with no agent); builds TD-976, TD-977.
+
+**Resolved:** 2026-10-23 — designed in #2296 (design §4.5 *The Prompts card*, §4.2 *The record's `prompts`*, §4.3 `prompts`, §4.6 *A jump to a prompt*, §4.5a *Focus side panel* **Prompts**); built by TD-976 (#2299, the record's `prompts`; live check #2300) and TD-977 (#2303, the card and the jump; live check in this archive's PR). The untested guards #2299 left were TD-980–982, tested and archived in #2306.
+
+---
+
+## TD-977: The Focus Prompts card and the jump: the bridge walks tmux's history and lands the pressed prompt at the terminal's top; a miss opens the Transcript at it (TD-975's second build)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (the designer, from TD-975)
+**Owner:** grinder
+**Kind:** live-check #2303
+**Status:** Built 2026-10-23 (grinder-ao-1, #2303): the bridge's jump and its walk, the card, the press and its frame, the Transcript's `?at=`, help and the mockup; every *Done when* test passes. It was read on a scratch home before the PR: a Claude Code session's oldest prompt landed at the terminal's top with its reply under it; with the history cleared, the press read *not in the terminal's history* with **Transcript**, which opened the prompt outlined (the PR's UI check). **Live check read** 2026-10-23 (grinder-ao-1) on a `look_home.py` scratch home running `origin/main` at a015dffd9 (#2303's squash; the live copy was 51af8f4, so a press needed the scratch home), against a Claude Code 2.1.309 session on the `conformance` profile with four prompts sent, the last a 90-line reply that put the first three in tmux's history.
+**Location:** `src/shiftlead/ui/pty_bridge.py` (the `jump` message in `pump`, a `jump_argv` and the walk beside `scroll_argv`, `JUMP_WITHIN`), `src/shiftlead/ui/app.py` (the attach's `run_tmux`, which reads no output today, and the text frame back), `src/shiftlead/ui/templates/focus.html`, `src/shiftlead/ui/static/app.js` (the card, its fold key, the frame), `src/shiftlead/ui/transcript.py` and its template (`?at=`), `src/shiftlead/ui/help.py`, `docs/mockups/gen.py` (`Focus.dc.html`); design §4.5 *The Prompts card*, §4.6 *A jump to a prompt*, §4.5a *Focus side panel* **Prompts**, §4.5 screen 9
+
+**Why:** the card is TD-975's answer to Paul's *I find myself scrolling up quite a bit to see what I last said in a session*. The read (TD-976) gives the rows, and this entry draws them and makes a press land.
+
+**Fix:** as the design sections say:
+- **The bridge.** `{jump: [{drawn, whole}, …]}` is one ordered tmux command. It reads `copy-mode -q ; copy-mode -e ; display -p '#{history_size}' ; capture-pane -p -S - -E -`, each with `-t =<id>:`, through the attach's prefix, with the output read and the call bounded by `JUMP_WITHIN = 5`. The walk is a pure function of the rows and the openings, returning the row index or None. It compares rows and openings alike with leading whitespace stripped, trailing spaces trimmed and `\xa0` read as a space, and an opening marked `whole` must equal the row, any other matched as its start; the bridge reads the mark, never a glyph or a cut. The landing is `send-keys -X goto-line <history_size − i>` (0 for a row on the live screen), and a miss is `copy-mode -q`. A `jump` that is not a list of at most `RECENT_PROMPTS` objects, each a string `drawn` (at most 200 characters) and a boolean `whole`, is ignored, with a test. The answer is a text frame `{jumped: true|false}`: `pump` takes a `jump=` callback returning the bool, as it takes `scroll`, and `app.py` passes it with a closure that sends the text frame. The read's first output line is `history_size`, and the rows follow it. The jump sets the *scrolled* mark, and a read-only attach passes it. `send-keys -F` is not used: on tmux 3.5a its `goto-line` argument did not land (checked by hand, 2026-10-22).
+- **The card.** It sits between Working and Git, **folded** at first, under the fold key the other cards use, with no rail glyph. The rows and summary are as §4.5a's row says. A miss line on the row carries **Transcript** to `/transcript/<id>?at=<at>`. A pressed prompt without `drawn` is a miss at the page, as is every row on a record with no pane. The sender label is *the brief* for `brief`, *the policy* for `system`, else the session's name: the UI host's `view` adds `from_name` to each prompt from the known records, as the Inbox's `from_name` is made (`names.get(id, id)`), and the page draws that.
+- **The Transcript page's `?at=`.** The page loads as without it, and its script fetches earlier turns as **earlier turns** does (`part=1&before=`), one `transcript` call per twenty turns, until a `.tprompt [data-at]` (the time span inside the prompt) whose `data-at` equals `at` as a string is held, the file's start, or fifty fetches (the page's turns include entries the card leaves out, so more than one fetch can be needed). Found, it scrolls to and outlines it; at the file's start, *that prompt is not in this transcript*; at fifty fetches, *that prompt is further back — press earlier turns*, from where **earlier turns** goes on. The card's `href` URL-encodes `at`.
+- **The frame.** The page's `ws.onmessage` returns on a `jumped` frame, as on `read_only` and `clients`, and resolves the pending press; a test shows it is never written to the terminal. No frame within 7 s (`JUMP_WITHIN` + 2 s, written in the page as 7 s), or a socket that closes first, resolves the press as a miss at the page; a press while one is pending is ignored. An `app.js` test covers both.
+- **Its window's terminal.** A press goes to the socket of the window the card is in. A window whose terminal socket is not open (popped out, reconnecting, never attached) treats the press as a miss at the page, showing the row's *not in the terminal's history* with **Transcript**.
+- **Help.** Add to the §4.5a help list and `help.py`, in the same PR, with a test pair as the others: **Prompts** (Focus side panel) — *The prompts this conversation was sent, newest first, each with the first line of its reply. Press one to scroll the terminal back to it, with the reply under it; typing returns to the live screen. One no longer in the terminal's history opens in the Transcript instead.*
+- **The mockup.** `Focus.dc.html` gains the card, unfolded, with a person's prompt, *the brief*, and a miss row.
+
+**Done when** the walk's unit tests pass: a repeated opening, a repainted conversation, a skipped newer prompt, an indented `❯ 1. Yes`. A bridge test on a private tmux socket lands a row at the top and leaves copy mode on a miss. Then Paul, on a session's Focus, opens the Prompts card and presses his last prompt, and the terminal shows that prompt with the reply under it. A prompt no longer in tmux's history says so and opens in the Transcript.
+
+**Related:** TD-975, TD-976, TD-022, TD-667, TD-794.
+
+**Resolved:** 2026-10-23 (PR #2303; live check read by grinder-ao-1) — on the scratch home the card was folded at load with *4 · last 0m ago*, its rows newest first, each with its reply's first line. Pressing the oldest (*Reply with just: alpha*) put the pane in copy mode at scroll position 81 of 86, the prompt on the terminal's top line and *● alpha* under it. With the pane's history cleared, the same press left copy mode (`pane_in_mode 0`) and the row read *not in the terminal's history · Transcript*. Its link (`?at=2026-10-23T06%3A49%3A55.744Z`) opened the Transcript with that prompt outlined. Every *Done when* test passed in #2303; Paul's own press is the design's success case and needs nothing more from the ledger.
