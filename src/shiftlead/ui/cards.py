@@ -574,6 +574,13 @@ def view(
     # who closed it (§4.5 row 5 (b), TD-265): a session named by its name where the fleet holds it
     names = {str(o.get("id")): str(o.get("name") or "") for o in fleet or []}
     d["closer_text"] = closer_words(s, names)
+    # the Focus Prompts card's sender (§4.5 *The Prompts card*, TD-977): a session's name as the Inbox's
+    # `from_name` is made; `person`, `brief` and `system` are the page's words
+    d["prompts"] = [
+        {**p, "from_name": names.get(str(p.get("from")), "") or str(p.get("from") or "")}
+        for p in s.get("prompts") or ()
+        if isinstance(p, dict)
+    ]
     # an exit, and how (§4.5 row 5 (b), TD-490): the record's `ended` in `ending.exit_words`' words
     d["exit_text"] = exit_words(s, names, now) if state == "exited" else ""
     # the ending with its time: the pill's hover where nothing outranks it, and always the Focus end banner's first line

@@ -9,6 +9,7 @@ import asyncio
 import base64
 import contextlib
 import contextvars
+import functools
 import gzip
 import html
 import json
@@ -367,12 +368,14 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     team_summary,  # noqa: F401
 )
 from .pty_bridge import (
+    JUMP_WITHIN,
     LEAVE_WITHIN,
     PtySession,
     attach_argv,
     clients_argv,
     leave_argv,
     pump,
+    run_jump,
     scroll_argv,
     watch_clients,
 )
@@ -5049,14 +5052,14 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # and logs a failure
             await run_tmux(leave_argv(sid, socket_name=sock))
 
-        async def read_clients() -> str | None:
-            # tmux's clients and window for the terminal mark (design §4.6, TD-480), through the same
-            # prefix and socket the scroll command takes; a slow or failed read is no reading
-            argv = [*[a for a in inside if a != "-it"], *clients_argv(sid, socket_name=sock)]
+        async def read_tmux(argv: list[str], within: float) -> str | None:
+            # A tmux command's output, through the same prefix and socket the scroll command takes; a
+            # read slower than `within`, or failed, is no reading
+            argv = [*[a for a in inside if a != "-it"], *argv]
             pipe, devnull = asyncio.subprocess.PIPE, asyncio.subprocess.DEVNULL
             proc = await asyncio.create_subprocess_exec(*argv, stdout=pipe, stderr=devnull)
             try:
-                out, _ = await asyncio.wait_for(proc.communicate(), timeout=3)
+                out, _ = await asyncio.wait_for(proc.communicate(), timeout=within)
             except TimeoutError:
                 return None
             finally:
@@ -5068,9 +5071,23 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     reapers.add(asyncio.ensure_future(proc.wait()))
             return out.decode(errors="replace") if proc.returncode == 0 else None
 
+        async def read_clients() -> str | None:
+            # tmux's clients and window for the terminal mark (design §4.6, TD-480)
+            return await read_tmux(clients_argv(sid, socket_name=sock), 3)
+
+        async def jump(openings: list[dict]) -> bool:
+            # A press on a Prompts row (design §4.6 *A jump to a prompt*, TD-975): the read bounded at
+            # `JUMP_WITHIN`, the walk and the landing, then the page's text frame — its own word, as
+            # `clients` is, never pane output
+            read = functools.partial(read_tmux, within=JUMP_WITHIN)
+            landed = await run_jump(openings, read, run_tmux, sid, socket_name=sock)
+            with contextlib.suppress(Exception):
+                await ws.send_text(json.dumps({"jumped": landed}))
+            return landed
+
         watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))
         try:
-            await pump(pty, send, recv, scroll, leave=leave, read_only=read_only)
+            await pump(pty, send, recv, scroll, leave=leave, jump=jump, read_only=read_only)
         finally:
             watcher.cancel()
             for f in reapers:

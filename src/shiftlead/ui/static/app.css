@@ -530,6 +530,20 @@ details.side .told { margin-top: 8px; font-size: var(--t-small); line-height: 1.
 #entryline { white-space: normal; }  /* the note under Open a session wraps: its second sentence says where the rest is read */
 input.input#entryname { width: 170px; }  /* §4.5a *Add entry form: Name* beside Open a session, as the mockup draws it (TD-677) */
 details.side .doing { margin-top: 8px; font-size: var(--t-small); line-height: 1.55; overflow-wrap: anywhere; }
+/* the Focus Prompts card (§4.5 *The Prompts card*, TD-977): two lines a row, the body scrolling past eight */
+.promptlist { margin-top: 6px; max-height: calc(8 * 2.9em); overflow-y: auto; }
+.prow { border-top: 1px solid var(--line); }
+.prow:first-child { border-top: none; }
+.prbtn { display: block; width: 100%; text-align: left; background: none; border: none; padding: 4px 2px; color: inherit; font: inherit; font-size: var(--t-small); cursor: pointer; }
+.prbtn:hover:not(:disabled) { background: var(--hover); }
+.prbtn:disabled { cursor: default; }
+.prline, .prreply { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prtime { margin-right: 6px; }
+.prfrom { margin-right: 6px; font-style: italic; color: var(--muted); }
+.prreply { color: var(--muted); }
+.prmiss { padding: 0 2px 4px; white-space: normal; }
+/* a Transcript opened at a prompt (§4.5 screen 9 `?at=`, TD-977) */
+.tprompt.tfound { outline: 2px solid var(--link); outline-offset: 2px; border-radius: 4px; }
 /* design §4.5 *The Focus screen's anatomy* (TD-156): the header is two lines — the identity line
    above, this acts line below it — with the card's foot rule: the next act outlined at normal
    strength, the rest plain, more ▾ at the right. The buttons had been spread over the tail of the

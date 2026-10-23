@@ -193,6 +193,16 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "prompts",
+        "Prompts",
+        "Focus side panel",
+        (
+            "The prompts this conversation was sent, newest first, each with the first line of its reply. "
+            "Press one to scroll the terminal back to it, with the reply under it; typing returns to the live "
+            "screen. One no longer in the terminal's history opens in the Transcript instead."
+        ),
+    ),
+    Help(
         "pane-link",
         "a URL is a link",
         "Focus pane",
@@ -732,7 +742,17 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "focus",
         "Focus",
-        ("wrap-up", "kill", "resume", "side-panel", "pane-link", "pane-hyperlink", "pane-path", "disconnect-card"),
+        (
+            "wrap-up",
+            "kill",
+            "resume",
+            "side-panel",
+            "prompts",
+            "pane-link",
+            "pane-hyperlink",
+            "pane-path",
+            "disconnect-card",
+        ),
     ),
     (
         "inbox",

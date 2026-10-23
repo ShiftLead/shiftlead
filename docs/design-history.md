@@ -726,6 +726,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-05 (TD-144, grinder-ao-2; Paul's look of 2026-10-04 at the live page: *bigger*): `--t-body` raised from 14 px to 15 px and nothing else moved, as the *Type scale* says; the card's rows, slot and foot keep their pixel tokens, so every Org card is still one height (read headless at 1440 and 390 px on a scratch home).
 
 ## 4.5a Controls
+- 2026-10-23 (TD-977, grinder-ao-1): *The help text* gains **Prompts** (Focus side panel), after **» put away** on the Help page's *Focus* screen.
 - 2026-10-21 (TD-964, Paul with the td-156 session): **Take over** / **Hand back** share the acts line's slot and more ▾ keeps only *Switch to unattended*; the exited banner row becomes **the ending banner** and gains **Restart**; new rows **Focus side panel: Sent** and **Focus: ending card**; the side panel row's folds and summaries; **Reports** folded at first; *card (closed): Details* points at the ending card.
 - 2026-10-20 (TD-932, grinder-ao-2): *Sessions top bar: the bar's three groups*, *Queue tab* and *Inbox* lose their *until TD-932 builds this* sentences — the bar draws the three groups, each tab its own number, Settings a gear among the tools.
 - 2026-10-20 (TD-931's review, round 4, Fable, READY, 8 low findings, all adopted): *Inbox row: red PR*'s home clause ends in a semicolon; *the bar's three groups* names the ghost button's height, not *today*, and the `null` count rule once.

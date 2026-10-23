@@ -3663,13 +3663,13 @@
       }).then((r) => (r.ok ? r.json() : Promise.reject(r.status))));
       box.addEventListener("mouseover", (ev) => AO.transcriptBlock(ev.target.closest(".tturns > *"), asker, pe));
     }
-    box.addEventListener("click", async (ev) => {
-      const b = ev.target.closest('[data-act="transcript-earlier"]'); if (!b || b.disabled) return;
+    // the twenty turns before the first shown, in the button's place; true when they came
+    const earlier = async (b) => {
       b.disabled = true;
       try {
         const res = await fetch(`/transcript/${encodeURIComponent(id)}?part=1&before=${encodeURIComponent(b.dataset.before)}`);
         const html = await res.text();
-        if (!res.ok) { b.insertAdjacentHTML("afterend", html); return; }
+        if (!res.ok) { b.insertAdjacentHTML("afterend", html); return false; }
         const wrap = b.closest(".tearlier");
         const tmp = document.createElement("div"); tmp.innerHTML = html;
         const got = tmp.querySelector(".tturns");
@@ -3677,8 +3677,41 @@
         if (shown && got) shown.textContent = String((+shown.textContent || 0) + (+got.dataset.turns || 0));
         wrap.replaceWith(...tmp.childNodes);
         showLocalTimes();
+        return true;
       } finally { b.disabled = false; }
+    };
+    box.addEventListener("click", (ev) => {
+      const b = ev.target.closest('[data-act="transcript-earlier"]'); if (!b || b.disabled) return;
+      earlier(b);
     });
+    // **Opened with `?at=<time>`** (§4.5 screen 9, TD-977): the Prompts card's way in for a prompt that
+    // left the terminal's history — earlier turns fetched as the button does until the prompt sent at
+    // that time is held, the file's start, or `TRANSCRIPT_SEEK` fetches
+    const at = new URLSearchParams(location.search).get("at");
+    if (!at) return;
+    const say = (text) => { const n = document.createElement("p"); n.className = "note tseek"; n.textContent = text; box.prepend(n); };
+    AO.transcriptSeek(
+      () => [...box.querySelectorAll(".tprompt [data-at]")].find((el) => el.dataset.at === at) || null,
+      () => { const b = box.querySelector('[data-act="transcript-earlier"]'); return b ? earlier(b) : Promise.resolve(null); },
+    ).then((r) => {
+      if (r.found) { const p = r.found.closest(".tprompt"); p.classList.add("tfound"); p.scrollIntoView({ block: "center" }); }
+      else if (r.why === "start") say("that prompt is not in this transcript");
+      else if (r.why === "further") say("that prompt is further back — press earlier turns");
+    });
+  };
+  AO.TRANSCRIPT_SEEK = 50;  // fetches a `?at=` makes before it hands over to **earlier turns**
+  // The seek behind `?at=` (§4.5 screen 9): `find()` the prompt held, else `more()` — the next twenty
+  // turns, resolving true when they came, false when a fetch failed, null at the file's start. Resolves
+  // `{found}`, or `{why}`: "start", "further" (at `TRANSCRIPT_SEEK` fetches) or "failed". Pure, for a test.
+  AO.transcriptSeek = async function (find, more) {
+    for (let n = 0; ; n++) {
+      const found = find();
+      if (found) return { found };
+      if (n >= AO.TRANSCRIPT_SEEK) return { why: "further" };
+      const got = await more();
+      if (got === null) return { why: "start" };
+      if (!got) return { why: "failed" };
+    }
   };
 
   // The id a page's hash names, or "" — a hash that does not decode names nothing. Pure, for a test.
@@ -5192,6 +5225,84 @@
       buffer: { get active() { return view(term.buffer.active); } },
     };
   };
+  // ---- the Prompts card (design §4.5 *The Prompts card*, §4.6 *A jump to a prompt*, TD-977) ----
+  // Who sent a row, drawn before its text where it is not the person: *the brief*, *the policy* for the
+  // home's own fixed lines, else a session's name as the view gives it (`from_name`). Pure, for a test.
+  AO.promptSender = function (p) {
+    const f = (p && p.from) || "person";
+    if (f === "person") return "";
+    if (f === "brief") return "the brief";
+    if (f === "system") return "the policy";
+    return String(p.from_name || f);
+  };
+  // What a press on row `i` sends (§4.6): the drawn openings and their `whole` marks of the card's
+  // prompts from the newest down to the pressed one, those without one left out; null when the pressed
+  // one has none — a miss at the page, and nothing is sent. Pure, for a test.
+  AO.jumpOpenings = function (prompts, i) {
+    const has = (x) => !!x && typeof x.drawn === "string" && x.drawn !== "";
+    const list = prompts || [];
+    if (!has(list[i])) return null;
+    return list.slice(0, i + 1).filter(has).map((x) => ({ drawn: x.drawn, whole: !!x.whole }));
+  };
+  AO.JUMP_WAIT = 7000;  // the bridge's `JUMP_WITHIN` and two seconds more (§4.6 *The answer*)
+  // One press pending at a time (§4.6 *The answer*): `send(openings)` puts the jump on the socket and
+  // answers false when it cannot. `press` resolves true on `{jumped: true}`; false on `{jumped: false}`,
+  // on no frame within `JUMP_WAIT`, on a socket that closed first (`closed`) or on one that was not open;
+  // and returns null for a press while one waits, which is ignored. A frame with no press pending is
+  // dropped. Pure, for a test: `timers` stands in for setTimeout.
+  AO.jumper = function (send, timers) {
+    const t = timers || { set: (f, ms) => setTimeout(f, ms), clear: (h) => clearTimeout(h) };
+    let pending = null;
+    const settle = (ok) => {
+      if (!pending) return;
+      const p = pending; pending = null;
+      if (p.timer != null) t.clear(p.timer);
+      p.resolve(ok);
+    };
+    return {
+      press(openings) {
+        if (pending) return null;
+        return new Promise((resolve) => {
+          pending = { resolve, timer: null };
+          if (!send(openings)) { settle(false); return; }
+          if (pending) pending.timer = t.set(() => settle(false), AO.JUMP_WAIT);
+        });
+      },
+      frame(c) { settle(!!(c && c.jumped)); },
+      closed() { settle(false); },
+      busy() { return !!pending; },
+    };
+  };
+  // The card's rows (§4.5a *Focus side panel* **Prompts**): each one press, its time (age and date on
+  // hover), the sender where it is not the person, the prompt's first line, and under it in grey the
+  // reply's first line; the press's hover the prompt's opening. A row in `missed` (its `at`) says *not in
+  // the terminal's history* with **Transcript** opened at it; with `gone` (no pane) every row is the
+  // Transcript alone. Pure, for a test.
+  AO.promptsHtml = function (prompts, id, missed, gone) {
+    const pad = (n) => String(n).padStart(2, "0");
+    return (prompts || []).map((p, i) => {
+      const at = String(p.at || ""), d = new Date(Date.parse(at));
+      const time = isNaN(d) ? "" : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      const hover = isNaN(d) ? at : `${AO.fmtShortAge(at)} ago · ${d.toLocaleString()}`;
+      const who = AO.promptSender(p), first = String(p.text || "").split("\n")[0];
+      const reply = String(p.reply || "").split("\n")[0];
+      const href = `/transcript/${encodeURIComponent(id)}?at=${encodeURIComponent(at)}`;
+      const link = `<a href="${esc(href)}" target="_blank" rel="noopener">Transcript</a>`;
+      const miss = gone ? `<div class="prmiss meta">${link}</div>`
+        : missed && missed.has(at) ? `<div class="prmiss meta">not in the terminal's history · ${link}</div>` : "";
+      return `<div class="prow"><button class="prbtn" type="button" data-i="${i}" title="${esc(p.text || "")}"${gone ? " disabled" : ""}>`
+        + `<span class="prline"><span class="meta prtime" title="${esc(hover)}">${esc(time)}</span>`
+        + `${who ? `<span class="prfrom">${esc(who)}</span>` : ""}<span class="prtext">${esc(first)}</span></span>`
+        + `${reply ? `<span class="prreply">${esc(reply)}</span>` : ""}</button>${miss}</div>`;
+    }).join("");
+  };
+  // …its summary, grey: *n · last <age>* (§4.5 *The Prompts card*)
+  AO.promptsSummary = function (prompts) {
+    const list = prompts || [];
+    if (!list.length) return "";
+    const age = AO.fmtShortAge(list[0].at);
+    return age ? `${list.length} · last ${age} ago` : String(list.length);
+  };
   AO.focus = function (s, popped) {
     const id = s.id;
     // §4.5a *Git card: the pick · ↑ · ↓* (TD-856, built by TD-862): read through the page's `git_files` route
@@ -5294,11 +5405,15 @@
     // decides and drops the keys (§4.6); the page learns it from the attach's first frame and only
     // says so — `mode` is the record's as last seen, and a change to it re-attaches.
     let readOnly = false, mode = !!s.unattended, hinted = 0;
+    // a press on a Prompts row goes to this window's terminal socket (§4.6 *A jump to a prompt*); one not
+    // open is a miss at the page
+    const jumper = AO.jumper((ops) => !!(ws && ws.readyState === 1) && (ws.send(JSON.stringify({ jump: ops })), true));
     const roLine = document.getElementById("termro");
     // The pane is gone for good: end the terminal and stop reconnecting. The events push says so
     // before any reconnect could, and the server's 4404 says so too (TD-029).
     function endTerm(text) {
       paneGone = true;
+      jumper.closed();
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       mk.retryAt = null; mk.open = false; drawMark();
       term.write(`\r\n\x1b[90m[shiftlead] ${text}\x1b[0m\r\n`);
@@ -5331,6 +5446,8 @@
             return;
           }
           // the bridge's reading of tmux's clients and window (§4.6), sent when it changes
+          // a jump's answer (§4.6): the pending press's, never pane output
+          if (c && "jumped" in c) { jumper.frame(c); return; }
           if (c && "clients" in c) {
             mk.clients = Number(c.clients) || 0; mk.window = Array.isArray(c.window) ? c.window : null;
             tlog("clients", mk.clients, "window", mk.window, "grid", [term.cols, term.rows]); drawMark();
@@ -5346,6 +5463,7 @@
       let opened = false;
       ws.addEventListener("open", () => { opened = true; });
       ws.onclose = (e) => {
+        jumper.closed();
         if (paneGone) return;  // the push already ended it
         mk.open = false;
         tlog("closed", e.code, e.reason || "");
@@ -5361,6 +5479,7 @@
     // which reads the mode afresh (§4.6).
     function reattach() {
       if (paneGone) return;
+      jumper.closed();
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       delay = 500; openTerm();
     }
@@ -5529,6 +5648,27 @@
     });
 
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }
+    // the **Prompts** card (§4.5 *The Prompts card*, TD-977): drawn from the delta while the record holds
+    // a prompt; a press scrolls this window's terminal back to it, and a miss offers the Transcript
+    let promptsV = [];
+    const promptsMissed = new Set();
+    function renderPrompts(v) {
+      const pc = $("#promptscard"); if (!pc) return;
+      promptsV = Array.isArray(v.prompts) ? v.prompts : [];
+      pc.classList.toggle("hidden", !promptsV.length);
+      $("#promptscount").textContent = AO.promptsSummary(promptsV);
+      $("#promptlist").innerHTML = AO.promptsHtml(promptsV, id, promptsMissed, paneGone || AO.paneIsGone(v));
+    }
+    const plist = $("#promptlist");
+    if (plist) plist.addEventListener("click", async (e) => {
+      const b = e.target.closest("button.prbtn"); if (!b || b.disabled || jumper.busy()) return;
+      const p = promptsV[+b.dataset.i]; if (!p) return;
+      const ops = AO.jumpOpenings(promptsV, +b.dataset.i);
+      const landed = ops ? await jumper.press(ops) : false;
+      if (landed === null) return;
+      if (landed) promptsMissed.delete(String(p.at || "")); else promptsMissed.add(String(p.at || ""));
+      $("#promptlist").innerHTML = AO.promptsHtml(promptsV, id, promptsMissed, paneGone);
+    });
     function render(v) {
       document.title = AO.focusTitle(v);
       // the chips go with the composer on a session nothing can be sent to (§4.5a, TD-170)
@@ -5618,6 +5758,7 @@
       // one outlined act (§4.5 *The card's anatomy*, row 6): Close session outranks Take over,
       // which is drawn plain beside it while the checklist passes
       if (ma) { ma.classList.toggle("next", !(readyNow && v.own)); ma.classList.toggle("link", !!(readyNow && v.own)); }
+      renderPrompts(v);
       // the **Working** card (TD-156): the session's own words, and their age, from the delta
       const wc = $("#workingcard");
       if (wc) {
