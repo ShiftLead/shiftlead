@@ -76,9 +76,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-975 | Focus has no list of the person's prompts: a Prompts card on the side panel, each prompt a press that scrolls the terminal back to it | Medium | Designed 2026-10-22 — builds TD-976, TD-977 |
 | TD-977 | The Focus Prompts card and the jump: the bridge walks tmux's history and lands the pressed prompt at the terminal's top; a miss opens the Transcript at it (TD-975's second build) | Medium | Open |
 | TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Open — design first: what Close removes when the branch's PR is still open |
-| TD-980 | `merge_prompts` and the tick take a cursor past the file's end as a read from 0 (`after < cursor`), and no test would catch it going back | Medium | Open |
-| TD-981 | `merge_prompts` frees the sends of prompts that left the newest-twenty list (`used |= …`), and no test would catch it going back | Low | Open |
-| TD-982 | TD-976's transcript read caps a reply at `REPLY_CAP`, leaves out `isMeta` system lines and skips a closed record, and no test reaches any of the three | Low | Open |
 
 ---
 
@@ -1508,63 +1505,3 @@ builds are in the ledger.
 **Done when** closing a member whose PR is still open leaves no local branch for `check_cadence.py --pr`'s `pushed` row to fail on, and the design's Close rows say what Close does with the worktree.
 
 **Related:** TD-922 (#2195), TD-972 (#2292), board act line of 2026-10-22 (*Remove the closed test-audit-ao-1 session's clean worktree so PR #2292 can merge*).
-
----
-
-## TD-980: A truncated transcript is read from 0 but its leading text still fills the newest prompt's reply: `after < cursor` in `_refresh_prompts` is untested
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_refresh_prompts`, `from_start=cursor == 0 or after < cursor`); `tests/test_record_prompts.py`
-
-**Why:** Found auditing the tests of #2299 (TD-976). `transcript.prompts` reads "a cursor past the file's end ... from 0" (its docstring), and the tick passes `from_start=cursor == 0 or after < cursor` so that read's leading text, which is no reply to what the record holds, is not written onto `out[0]`. Probe: change that argument to `from_start=cursor == 0` and run `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_record_prompts.py`: 13 passed. The tick test only reads from cursors 0, 100 and 160, always forward; `test_a_reread_changes_nothing_held...` calls `merge_prompts` directly with `from_start` given, so nothing runs the tick with a file that shrank (a transcript rewritten or compacted). Effect: after such a read, the newest held prompt that has no reply takes an unrelated first line as its reply.
-
-**Fix:** In the tick test, hand the next read a cursor lower than the one held (`([], "unrelated", 10)` after 160) with the newest prompt reply-less, and assert its `reply` stays None; confirm it fails with the `or after < cursor` removed.
-
-**Done when** removing `or after < cursor` fails a test.
-
-**Related:** TD-976 (the change, #2299).
-
----
-
-## TD-981: Sends of prompts that left the newest-twenty list are marked used so they are not given to a later prompt: that line in `merge_prompts` is untested
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`merge_prompts`, `used |= {e.id for e in sends if (_when(e.at) or floor) < floor}`); `tests/test_record_prompts.py`
-
-**Why:** Found auditing the tests of #2299 (TD-976). The docstring says the held entries consume their sends again so "a send is never given twice", and that a send older than the oldest kept prompt is spent because "their prompts left the list". Probe: replace that line with `used |= set()` and run `tests/test_record_prompts.py`: 13 passed. `test_the_newest_twenty_are_kept_newest_first` passes no sends, and no other test holds `RECENT_PROMPTS` entries together with sends. Effect: with a full list, a new person-typed prompt whose first line equals an old send's is credited to that send's sender.
-
-**Fix:** Hold `RECENT_PROMPTS` entries and a send older than the oldest of them with the same first line as a new prompt; assert the new prompt's `from` is the person. Confirm it fails with the line replaced.
-
-**Done when** removing that `used |=` line fails a test.
-
-**Related:** TD-976 (the change, #2299).
-
----
-
-## TD-982: Three behaviours TD-976 added to the prompts read are reached by no test: the reply cap, the `isMeta` skip in `_prompt_of`, and the closed-record skip in `_refresh_prompts`
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-22 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/adapters/claude_code/transcript.py` (`_reply_of` `line[:REPLY_CAP]`; `_prompt_of` `d.get("isMeta")`); `src/sessionorc/agent_tick.py` (`_refresh_prompts`, `s.state == "closed"`); `tests/test_record_prompts.py`, `tests/conformance/`
-
-**Why:** Found auditing the tests of #2299 (TD-976). Probes, each run on `tests/test_record_prompts.py` and `tests/conformance` (with the one test that fails on a clean tree from Gemini's not being registered in a scratch run deselected): `return line[:REPLY_CAP] or None` -> `return line or None`: 34 passed; deleting the `isSidechain`/`isMeta` early return in `_prompt_of`: 34 passed; dropping `or s.state == "closed"` from `_refresh_prompts`: 13 passed. The design's 200-character reply, a meta entry not shown as a prompt, and a closed record's list left alone all have no assertion.
-
-**Fix:** Add to the fixture transcript a reply over 200 characters and a `isMeta` user entry and assert both in `test_record_prompts.py`; in the tick test close a session with a prompts read due and assert the adapter is not asked. Confirm each fails with its line removed.
-
-**Done when** each of the three removals fails a test.
-
-**Related:** TD-976 (the change, #2299).
