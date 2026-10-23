@@ -74,6 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-966 | `ao td next` becomes a front end over dev-cadence's ledger-id counter on origin: one counter, with or without the home | High | Open — design-first, waits on dev-cadence#TD-124 |
 | TD-967 | The Inbox counts a *Needs you* row it does not show: every board row leaves a `<div>` open, so later rows nest inside it and a filter that hides it hides them | Medium | Open |
+| TD-968 | #2286's node-mode seat pass drops an ended profile with three `_seat_ended.discard` lines no test reaches: removing them leaves the whole suite green | Low | Open |
 
 ---
 
@@ -1449,3 +1450,23 @@ builds are in the ledger.
 **Done when** the live `/inbox` with any rail pick shows every row its numbers count, both pages' markup balances, and the tests above hold it.
 
 **Related:** TD-914 (#2188, which doubled the line), TD-931 (the two numbers by home), TD-748 (the Queue).
+
+---
+
+## TD-968: #2286's node-mode seat pass drops an ended profile with three `_seat_ended.discard` lines no test reaches: removing them leaves the whole suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-22 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_spend.py` (`_seats_to_home`, the three `self._seat_ended.discard((name, prof))` in its profile loop); `tests/test_seats.py`
+
+**Why:** Found auditing the tests of #2286 (TD-965). The PR adds `_seat_ended` and discards a pair once a read of it is made in both the home pass (`_refresh_seats_inner`) and the node's `_seats_to_home` (on `r is None`, on "nothing new", and after the pieces are sent). Its one test, `test_a_profiles_last_session_ended_is_read_once_more_and_then_dropped`, runs in home mode. Probe: replace those three discards in `_seats_to_home` with `pass` and run the whole suite (`PYTHONPATH=$PWD/src pdm run pytest -q tests`): the same 2 failures as on a clean `origin/main` (`test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness` and `test_the_adapter_declares_its_mail_a_turns`, both from Gemini's not being registered in the scratch run) and 3974 passed — nothing else fails. `grep -rn "_seat_ended" tests` finds no hit. Effect: on a node an ended profile is never dropped, so the pass reads it every minute for as long as the agent lives, or (were a discard misplaced) loses the last minute the PR was made to charge.
+
+**Fix:** In `tests/test_seats.py`, run the pass in node mode (`agent.mode = "node"` with the link stubbed as the existing `_seats_to_home` tests do), end the last session on its profile, and assert the profile is read once more and then not read, for each of the three exits (an adapter answering `None`, nothing new, turns sent). Confirm each fails with its discard replaced by `pass`.
+
+**Done when** removing any of the three node-mode discards fails a test.
+
+**Related:** TD-965 (the change), TD-833 (`seat_spend` at the home).
