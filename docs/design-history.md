@@ -305,6 +305,11 @@ decisions; this file points at them rather than repeating them.
   - an exit 3 on every call is the unit's push credential, with a live check on the real origin after the promote;
   - a hold on an unreserved id is said;
   - the script is read from the serving checkout's working tree, which stays on `main`.
+- 2026-10-22 (TD-966, review round 1, Sonnet): 2 findings and 4 nits, all adopted:
+  - the home passes no `--prs`, so a hand-typed id above `LAST` in an open PR is no longer seen by a take: accepted, since §2.10 forbids it, and the check's `ledger` row is the backstop;
+  - TD-970 parses the script's output before it acts on the exit code;
+  - §4.4's shared lock, budget and `ids.json` text is headed *Both roads*;
+  - the `unread` join and its empty case are said, the script is killed by its process group, and §4.7 says what `reserved` means on the home's own road.
 - 2026-10-21 (TD-940 slice 2, grinder-ao-1; the scope steered with the techlead, m-eb7127cfc157): the PR reading per forge — a GitLab origin reads its open merge requests, the head pipeline folded into the four words, `conflicting`, and `required` on the MR's row; windows, `recent` and held are unread there. Was: `gh` for every origin, so a GitLab remote had no reading.
 - 2026-10-20 (TD-927, the designer): *Spend per seat* — every figure the readings carry carries its tokens by kind, and a token count is drawn as every kind summed, the four kinds on hover: one rule for the Spend page, `ao spend` and the Focus's disconnect card (TD-923 drew it first); built by TD-929.
 - 2026-10-20 (TD-915): *The Queue*'s rows — the breadth-first walk sets each row's level and parent; the page draws them depth first, each under its own parent, so the drawn tree reads as the walk built it.
