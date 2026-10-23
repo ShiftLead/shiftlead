@@ -74,6 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
 | TD-975 | Focus has no list of the person's prompts: a Prompts card on the side panel, each prompt a press that scrolls the terminal back to it | Medium | Open |
+| TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Open — design first: what Close removes when the branch's PR is still open |
 
 ---
 
@@ -1455,3 +1456,23 @@ builds are in the ledger.
 **Done when** on a session's Focus, Paul opens the Prompts card, presses his last prompt, and the terminal shows that prompt with the reply under it. A prompt that is no longer in tmux's history says so and opens it in the Transcript.
 
 **Related:** TD-022 (tmux owns the scrollback), TD-667 (typing returns the pane to the live screen), TD-794 (repaints that duplicate lines), TD-964 (the side panel's folds and summaries), TD-665 (a record with no agent).
+
+---
+
+## TD-978: Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (grinder-ao-2, from pr:2292)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` `rpc_close` (kills the tmux session and keeps the record; nothing touches the worktree); design §2 goal 11, §4.2's *person clicks Close (kill + reap worktree)* row, §4.5a's **Close session** row (*kill + reap worktree*); cadence §1.2 (a worktree lives as long as its unmerged work); `scripts/check_cadence.py` `row_pushed` (dev-cadence's)
+
+**Why:** the design says three times that Close removes the session's worktree (*kills the session, reaps the worktree, and moves the card to `closed`*), but `rpc_close` only kills the session, and nothing under `src/` removes a session's worktree. A closed member's worktree therefore keeps its branch checked out at its last commit. Once another session rebases that member's open PR (a `pr:<n>` red-PR order, design §4.9b), the gate's `pushed` row reads the stale local branch as *1 local commit(s) … not on origin* and the cadence check exits 1. The merge then waits on a person to delete a worktree no grinder may touch. This has happened twice: #2195 (TD-922, test-audit-ao-1's worktree at b6ea073, the board's act line of 2026-10-20, moot when it merged anyway) and #2292 (TD-972, test-audit-ao-1 closed 2026-10-23T04:00Z, its worktree clean on `td972-node-seat-ended` at 232f333 while origin holds the rebased 47d73f7; the techlead held the merge, m-c772526c2bc5). Each closed audit or worker with an open PR leaves one such worktree.
+
+**Fix:** design first. Decide what Close does with a worktree whose branch still carries an open PR. Options: remove it when the tree is clean and every commit on its branch is on origin, since nothing is lost and the local branch goes with it (cadence §1.2's *verify its content is on main* reads as *on origin* here); or keep the worktree and detach its HEAD, so the branch ref is free; or bring the design's three lines down to what the code does and have the gate's `pushed` row pass a branch whose only checkout is a closed record's (dev-cadence's file). Then build it in `rpc_close` (and the tick's own close), with a test that a closed member's clean, pushed worktree no longer holds its branch.
+
+**Done when** closing a member whose PR is still open leaves no local branch for `check_cadence.py --pr`'s `pushed` row to fail on, and the design's Close rows say what Close does with the worktree.
+
+**Related:** TD-922 (#2195), TD-972 (#2292), board act line of 2026-10-22 (*Remove the closed test-audit-ao-1 session's clean worktree so PR #2292 can merge*).
