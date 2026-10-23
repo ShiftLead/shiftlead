@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
+| TD-975 | Focus has no list of the person's prompts: a Prompts card on the side panel, each prompt a press that scrolls the terminal back to it | Medium | Open |
 
 ---
 
@@ -1429,3 +1430,28 @@ builds are in the ledger.
 **Done when** `rpc_td_next` on a scratch checkout without the script refuses, naming the sync; the own-reads tests are gone; and every remaining `tests/test_td_next.py` test passes.
 
 **Related:** TD-966, TD-970.
+
+---
+
+## TD-975: Focus has no list of the person's prompts: a Prompts card on the side panel, each prompt a press that scrolls the terminal back to it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (Paul, through Add entry; drafted by the prompt-links session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 *The Focus screen's anatomy* item 4 (the side panel), §4.5a *Focus side panel* rows (a new *Prompts* row, and its place in the panel's order in the *diff / log / PRs* row), §4.6 *Scrollback is tmux's, reached through tmux (TD-022)*; `src/shiftlead/ui/templates/focus.html` (the side cards), `src/shiftlead/ui/static/app.js` (the terminal's scroll messages), `src/shiftlead/ui/pty_bridge.py` (`scroll_argv`, the bridge's message loop), `src/shiftlead/adapters/claude_code/transcript.py` (the `prompt` entries), `src/shiftlead/ui/transcript.py`
+
+**Why:** Paul: *I find myself scrolling up quite a bit to see what I last said in a session, and to see if an immediate reply was given that has since scrolled off.* On Focus, what the person last said, and whatever came straight back, scrolls off under the tool's later output. The only ways back are the wheel through tmux's history, a notch at a time, or the Transcript page in another tab, which is a different view from the terminal the person is reading. Each check costs a hunt and breaks the person's place in the live screen.
+
+**Fix:** design first. A **Prompts** card in the Focus side panel, a fold like the others, listing the person's prompts to this session, newest first, each with its time and its first line. Pressing one scrolls the terminal back to where that prompt was typed. What the design settles:
+- **Where the list comes from.** The adapter's transcript read already yields `prompt` entries (`TranscriptEntry(kind="prompt")`). They are read from the file and never from the pane, which keeps to §4.6 and the adapter rule (§4.3). Settle whether a prompt sent from the composer, a steer, or mail delivered into the pane counts as the person's.
+- **How the jump lands.** xterm.js holds no scrollback (`scrollback: 0`, TD-022), so the jump is a new bridge message beside `scroll`. The bridge runs `copy-mode -e` and then `send-keys -X search-backward-text` for the prompt's opening text: plain text, since `search-backward` reads a regular expression and a prompt is free text. `scroll_argv`'s form is the model, and typing leaves copy mode as it does today (TD-667). Settle what is matched: the tool draws the prompt behind its `❯` and wraps long lines, and pasted text shows only as a placeholder.
+- **When it cannot land.** The prompt may have passed `history-limit`, gone in a `/clear` or a compaction repaint, or been drawn twice by a resize (TD-794). The press then says so and offers the Transcript page at that prompt.
+- **Its place and its summary.** Where the card sits in the panel's order, what its folded summary shows (the last prompt's age?), whether it has a rail glyph, and whether each row shows the start of the reply that followed. That last item is the second half of Paul's ask, and it would let the reply be read without jumping at all.
+- A record with no agent (TD-665): what a `shell` draws, given that it has no transcript.
+
+**Done when** on a session's Focus, Paul opens the Prompts card, presses his last prompt, and the terminal shows that prompt with the reply under it. A prompt that is no longer in tmux's history says so and opens it in the Transcript.
+
+**Related:** TD-022 (tmux owns the scrollback), TD-667 (typing returns the pane to the live screen), TD-794 (repaints that duplicate lines), TD-964 (the side panel's folds and summaries), TD-665 (a record with no agent).
