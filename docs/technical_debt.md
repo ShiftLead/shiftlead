@@ -72,7 +72,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
-| TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Open — design first: what Close removes when the branch's PR is still open |
+| TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Designed 2026-10-22 — build TD-979 |
+| TD-979 | A close reaps the worktree ShiftLead made for its record, when nothing in it would be lost; the restarts keep it; `worktree_kept` says why one is kept (TD-978's build) | Medium | Open |
 
 ---
 
@@ -1419,13 +1420,86 @@ builds are in the ledger.
 **Added:** 2026-10-22 (grinder-ao-2, from pr:2292)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-22 (the designer; design §4.1 *A close reaps the worktree*, §2 goal 11, §4.2's Close row, §4.5a's Close and Session rows, §6 *Worktree reap*)
+**Blocked by:** TD-979
 **Location:** `src/sessionorc/agent.py` `rpc_close` (kills the tmux session and keeps the record; nothing touches the worktree); design §2 goal 11, §4.2's *person clicks Close (kill + reap worktree)* row, §4.5a's **Close session** row (*kill + reap worktree*); cadence §1.2 (a worktree lives as long as its unmerged work); `scripts/check_cadence.py` `row_pushed` (dev-cadence's)
 
 **Why:** the design says three times that Close removes the session's worktree (*kills the session, reaps the worktree, and moves the card to `closed`*), but `rpc_close` only kills the session, and nothing under `src/` removes a session's worktree. A closed member's worktree therefore keeps its branch checked out at its last commit. Once another session rebases that member's open PR (a `pr:<n>` red-PR order, design §4.9b), the gate's `pushed` row reads the stale local branch as *1 local commit(s) … not on origin* and the cadence check exits 1. The merge then waits on a person to delete a worktree no grinder may touch. This has happened twice: #2195 (TD-922, test-audit-ao-1's worktree at b6ea073, the board's act line of 2026-10-20, moot when it merged anyway) and #2292 (TD-972, test-audit-ao-1 closed 2026-10-23T04:00Z, its worktree clean on `td972-node-seat-ended` at 232f333 while origin holds the rebased 47d73f7; the techlead held the merge, m-c772526c2bc5). Each closed audit or worker with an open PR leaves one such worktree.
 
 **Fix:** design first. Decide what Close does with a worktree whose branch still carries an open PR. Options: remove it when the tree is clean and every commit on its branch is on origin, since nothing is lost and the local branch goes with it (cadence §1.2's *verify its content is on main* reads as *on origin* here); or keep the worktree and detach its HEAD, so the branch ref is free; or bring the design's three lines down to what the code does and have the gate's `pushed` row pass a branch whose only checkout is a closed record's (dev-cadence's file). Then build it in `rpc_close` (and the tick's own close), with a test that a closed member's clean, pushed worktree no longer holds its branch.
 
-**Done when** closing a member whose PR is still open leaves no local branch for `check_cadence.py --pr`'s `pushed` row to fail on, and the design's Close rows say what Close does with the worktree.
+**Done when** closing a member whose PR is still open leaves no local branch for `check_cadence.py --pr`'s `pushed` row to fail on, whether another session rebases the PR after the close or rebased it cleanly before; and the design's Close rows say what Close does with the worktree. (A rebase before the close that resolved a conflict is kept and named, the person's; design §4.1.)
 
-**Related:** TD-922 (#2195), TD-972 (#2292), board act line of 2026-10-22 (*Remove the closed test-audit-ao-1 session's clean worktree so PR #2292 can merge*).
+**Related:** TD-922 (#2195), TD-972 (#2292), board act line of 2026-10-22 (*Remove the closed test-audit-ao-1 session's clean worktree so PR #2292 can merge*). Build: TD-979.
+
+---
+
+## TD-979: A close reaps the worktree ShiftLead made for its record, when nothing in it would be lost; the restarts keep it; `worktree_kept` says why one is kept (TD-978's build)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-22 (the designer, from TD-978)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`rpc_close` and its `reap` argument, `rpc_restart`'s close, `_cancel_start`, `rpc_create`'s `worktree_made`, and its locking: the directory's lock taken before the worktree's is let go), `src/sessionorc/adapters.py` (`external_sessions`' `blind`), `src/sessionorc/agent_tick.py` (the `is_dir` check of kept records; the closes in `_lost_brief`, `_wanted_restart`, `_brief_restart`, `_cache_restart`, which keep, and in `_finished_close`, `_sit_out_close` and `_seat_pass`, which reap), `src/shiftlead/teamrun.py` (`_close_settled`, the team Start's close), `src/shiftlead/cli.py` (`ao host down --wind-down`, `ao close` on a closed record, `ao status`), `src/sessionorc/gitinfo.py` (`ensure_worktree` reporting creation and basing the launch branch on `origin/<name>`; the reap beside it), `src/sessionorc/models.py` (`worktree_made`, `worktree_kept`, `worktree_reaped_at`, `worktree_reaping`: `Session` fields with `to_dict`/`from_dict`, `NODE_OWNED`, the view), `src/shiftlead/ui/app.py` (`resume_create`, `resume_form_url`), `src/shiftlead/ui/` (the Session card's directory line, the Git card and diff / log / PRs on a reaped record), `src/shiftlead/ui/help.py` (Close's and Kill's paragraphs); design §4.1 *A close reaps the worktree it made*
+
+**Why:** TD-978. A closed member's worktree holds its branch at its last commit, and once another session rebases that member's open PR, the gate's `pushed` row fails on the stale local branch. Detaching the worktree's HEAD would not be enough, because the row reads `refs/heads/<branch>`, so the local branch has to go too.
+
+**Fix:** as design §4.1 *A close reaps the worktree it made* says:
+- **Which closes.** `rpc_close(..., reap: bool | str = True)`, with `reap` carried in `_route_act("close", …)`'s arguments; a missing one reaps. The person's Restart and the four tick restarts pass `reap=False`; every other caller keeps the default. A `scheduled` Cancel reaps a worktree its scheduling made, under the same tests.
+- **What is reaped.** A record gets `worktree_made` when `ensure_worktree` created its worktree (it returns whether it did), or inherits it whenever `supersedes` names a record that has it and the start reused that record's worktree at the same `dir` (a restart, Resume, scheduled start, team Start, refill or New session under a closed holder's name). It is tri-state: true, false, or absent for a record from before the build. A one-time migration marks only an absent one that holds a `worktree`, a `team` and `unattended`; it is idempotent and never touches a `False`. Only such a record is reaped, and only one with an agent; any other reads *not made here*.
+- **The tests, all read-only, first.** They are `reap_worktrees.sh`'s *clean* (with its `ignored_blockers` exemptions: symlinks, a `settings.local.json` that `--settings-disposable` passes — the script owns that path — and a nested worktree `--check` judges; plus `DISPOSABLE_IGNORED` = `__pycache__`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, `.pdm-build`, `.pdm-python`, `*.egg-info` and a real `.venv`, a knowing departure from the reaper; a nested `.git` directory always blocks), *idle* (never counting the record being closed or cancelled, by id. It is ported through ShiftLead's own seams: no live record of any adapter, a shell's included, inside the worktree, over `occupants`' host set (the host's own and sharing hosts' while linked, never a machine node's), with its own filter; and no `adapters.external_sessions()` session inside. `external_sessions()` returns `{items, blind}` as dev-cadence's `live()` does, `blind` the adapters it could not read, and a blind adapter keeps; a sharing host whose link is down keeps as *<host> unreachable*), *unlocked* and *nested* (`hydrate_worktree.sh --check`), each as that script defines it. *pushed* (`git rev-list HEAD --not --remotes=origin` empty, or each commit it names has its own twin among `git rev-list origin/<branch> --not origin/HEAD`, one origin commit per local one, by `git diff-tree -p -U0 --root <c> | git patch-id --verbatim`; an empty patch-id never matches, so a merge or empty commit, an absent `origin/<branch>` or a detached HEAD keeps; never `git cherry`, which skips merges and ignores whitespace) stands in for its *landed*. *idle* skips an external session whose tool id is one of ShiftLead's records. `reap` is `True`, `False` (a restart: keep, say nothing) or a why string, taken only from a call with no session caller as `closer` is, that the home sends when a record on a sharing host is inside (`in use by <id@host>`), which the node writes as `worktree_kept`; the node checks its own records again.
+- **Port, not call.** The reaper is dev-cadence's SYNCED script and has no single-worktree mode. So the build ports its tests into `gitinfo` beside `ensure_worktree`, each with a comment naming the reaper's test, and runs the hydrate script from the main checkout.
+- **Then the reap.** (`git fetch --prune origin` runs before the tests above, bounded by `REAP_STEP`, under a `fetch:<repo>` lock shared with `ensure_worktree`'s fetch; a failure keeps as *fetch failed*.) Then `--dehydrate`, never started past 40 s (`REAP_WITHIN − REAP_STEP`), `git worktree remove` without `--force`, then `git branch -D` on the checked-out branch and the launch branch, each only if it is *pushed* by the worktree's test (the same test on `<b>`), its reads made before `--dehydrate` and the deletes one `git branch -D` exempt from the deadline, it is not `origin/HEAD`'s branch, and no worktree has it checked out. A refusal after `--dehydrate` hydrates again.
+- **Where and how long.** After the kill, once `has_session` reads the pane gone. After the `closed` save. Under the `_dir_locks["worktree:<repo>:<name>"]` lock that `ensure_worktree`'s create takes, `<repo>` the main checkout as `worktree_path` resolves it in both, then `_dir_locks[str(directory)]`, both held until the thread returns: `asyncio.to_thread` awaited with no `wait_for`, the lock-holding section a task shielded from the call's cancellation. Each lock, and the `fetch:<repo>` lock, is awaited only for what is left of `REAP_WITHIN`; one still held keeps as *busy: a start is using it*. The re-hydrate is exempt from the deadline and runs on every exit after `--dehydrate` but a successful remove. `worktree_reaping` is stamped before `--dehydrate` and cleared at the end, holding the checked-out branch (or none), the launch branch, and each one's *pushed* verdict and tip oid; the host agent's start hydrates a record found with it again, as *interrupted*, or, its directory gone, stamps `worktree_reaped_at`, deletes each branch the stamp holds as pushed by `git update-ref -d refs/heads/<b> <oid>`, runs `git worktree prune` and clears the stamp. No `origin` reads *no origin*. `REAP_WITHIN = 60` is a deadline the thread reads between steps, starting none past it and never `--dehydrate` past it; each subprocess has its own `REAP_STEP = 20` timeout. The close answers after the reap, its view carrying the result. A Cancel's kept worktree is in its reply (`cancelled: true`, `worktree_kept`) and the log.
+- **The record.** `worktree_kept` holds the why, or `worktree_reaped_at` the time. A reap clears `worktree_kept`, and so does a tick check of each closed record holding one that only asks `Path.is_dir()`; `_refresh_git`'s `due` filter, which skips closed records, is left alone. A record from before the build that the migration did not mark reads *not made here*. A marked closed record is retried by `ao close`. #2292's is kept as *n commits on no remote ref*, since the rebase came before its close, so it stays a removal by hand. `ao close` on a `closed` record with `worktree_made` whose directory is there runs the reap again and kills nothing, leaving `closed_at` and `closer` as they were. Never raise out of the close.
+- **Started again.** `ensure_worktree` checks out a local `<name>` that is still there as it stands; otherwise it fetches with `--prune` and bases a new launch branch on `origin/HEAD`, except for a Resume, which bases it on `origin/<name>` when that exists and is not contained in `origin/HEAD`. `resume_create` sends `dir = rec["repo"]` with `worktree = rec["worktree"]` when the record has both, and `resume_form_url` fills the form's worktree field the same way.
+- **The display.** The Session card's directory line reads *kept — <why>* or *reaped*. A reaped record draws no Git card and no diff / log / PRs. `ao status` prints both.
+- **Help.** Close's paragraph in the §4.5a help list and `help.py` loses *it is the one press that removes a worktree* and *Press it when the work is merged* for: *It reaps the worktree it made, unless that would lose something; a kept worktree says why on the Session card.* Kill's *It is not Close, which also reaps the worktree* stays. Both change in the same PR.
+
+**Done when** these tests pass, on a scratch repo with a bare origin:
+- **Reaped:**
+  - a clean, pushed, created worktree, its checked-out and launch branches, with origin untouched;
+  - a detached HEAD weighs only the launch branch;
+  - an exited shell inside does not hold it;
+  - a close after a restart (the new record inherits `worktree_made`);
+  - a team member's record from before the build, marked by the migration;
+  - a worktree that has run `pytest` and `ruff` (its caches are disposable);
+  - a Cancel, and the Close of an exited agent record (the closing record never holds its own worktree);
+  - every reaping caller, parametrized: the person's Close, `ao close`, rule 9's finished, sit-out and retired closes, a seat's close, `ao team stop --close`, a team Start, `--wind-down`, a scheduled Cancel.
+- **Kept, each with its `worktree_kept`:**
+  - a dirty tree;
+  - an unpushed commit;
+  - an ignored scratch file;
+  - a `settings.local.json` holding a new grant;
+  - a nested checkout with an unpushed commit, with `hydrate_worktree.sh` present and without it;
+  - a live shell record;
+  - a locked worktree;
+  - a worktree the start found already there, as *not made here*;
+  - a restart's close, for each of the five restarts;
+  - a blind `external_sessions()` adapter;
+  - a failed fetch, and two fetches in one checkout serialised by the `fetch:<repo>` lock;
+  - a sharing host whose link is down;
+  - a timeout, with the lock held until the thread returns and no step begun past the deadline;
+  - a Cancel's kept worktree, said in its reply.
+- **Branches:** the default branch is never deleted, and a branch checked out in another worktree is kept.
+- **Over the link:** a node close carries `reap`, and a restart's `reap=False` crosses the link.
+- **After a reap:**
+  - `check_cadence.row_pushed({"state": "open", "head": b}, root)` reads `na` for a branch another session then rebased;
+  - the one-press Resume starts in a recreated worktree;
+  - a Resume bases its launch branch on `origin/<name>`, and on `origin/HEAD` when that ref is stale or pruned; a refill always on `origin/HEAD`;
+  - a branch another session rebased cleanly before the close is reaped (each commit with its own `-U0 --verbatim` patch-id twin on origin), including one rebased over an edit within three lines of its change; one whose conflict resolution changed a diff, one whose rebase dropped a commit upstream had, and one whose only twin is an older commit a revert of a revert repeats are kept; two identical local commits need two twins; a stale ref on a second remote never vouches;
+  - a reap killed after the remove: the host agent's start stamps `worktree_reaped_at`, deletes only the branches the stamp holds as pushed, and keeps one whose tip moved since;
+  - a close cancelled mid-reap keeps both locks until the thread ends, and a create waits;
+  - a lock still held at the deadline keeps as *busy*;
+  - a reap killed after `--dehydrate` is hydrated again at the host agent's start, as *interrupted*, and one killed after the remove becomes `worktree_reaped_at` with its branches deleted;
+  - a local merge commit keeps, and a whitespace-only local change with a different whitespace change on origin keeps;
+  - a remove that ends past the deadline still deletes the branches;
+  - the migration is idempotent and leaves a post-build `False` alone, and a refill inherits `worktree_made`;
+  - a session caller's string `reap` is refused;
+  - `ao close` on a closed kept record reaps it and keeps `closed_at`; the tick's `is_dir` check clears a `worktree_kept` whose directory is gone; a reap that raises leaves the record closed; `ao status` prints both fields; `resume_create` sends `repo` as `dir`;
+  - a reap racing a create of the same name waits, and removes nothing under the starting session;
+  - the card shows *reaped* with no Git card.
+
+**Related:** TD-978, TD-922, TD-972. The reap departs from cadence §1.2 (a worktree lives as long as its unmerged work) and from `reap_worktrees.sh`'s ignored-file rule: both are dev-cadence's, so the session that builds this tells dev-cadence by `ao msg` (a note to its techlead seat) that §1.2 could name a close's reap of a pushed worktree, and the caches list.

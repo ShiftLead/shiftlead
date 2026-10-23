@@ -26,7 +26,8 @@
 11. **Ready to close, decided by the person**: a per-repo checklist (PR merged, branch pushed,
     tree clean, no subagents or background tasks running, ledger/attention board updated) says
     when a session is *ready* to close; only the person closes it (**Close** kills the session,
-    reaps the worktree, and moves the card to `closed`). An exit that fails the checklist is
+    reaps the worktree when nothing in it would be lost, and moves the card to `closed`;
+    §4.1 *A close reaps the worktree*). An exit that fails the checklist is
     shown as `exited` with the failing items. The tool never declares work done.
 12. **Dark mode**: CSS tokens, `prefers-color-scheme` default plus a manual toggle. The terminal
     panes are dark regardless, so light chrome is the jarring case at night. The Focus pane

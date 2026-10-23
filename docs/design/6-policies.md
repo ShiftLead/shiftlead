@@ -1619,7 +1619,8 @@ teams:
   (Not built — phase 3): `working` with no output past `stall_after` → flag `stalled?`, send one
   prompt, then wrap up. **Exit reap** (Not built — phase 3): a worker whose tool exited sits on a
   sleep; reap it and keep the run log. **Worktree reap** (Not built — phase 3): run
-  `reap_worktrees.sh` (or its generalized form) between lifecycles. **Stranded-work flag** (Not
+  `reap_worktrees.sh` (or its generalized form) between lifecycles; a closed record's own worktree
+  is reaped by its close (§4.1 *A close reaps the worktree*, TD-978), so this is for the rest. **Stranded-work flag** (Not
   built — phase 3): any session going `idle`/`exited` with a dirty tree or unpushed commits is
   flagged in the team — the stranded-work audit, continuous. **PAUSE** flag and `on`/`off`/`off
   --now` semantics (Not built — phase 3): kept as agent RPCs.
