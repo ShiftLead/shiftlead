@@ -1545,7 +1545,7 @@ builds are in the ledger.
 
 **Priority:** Medium
 **Type:** debt
-**Added:** 2026-10-23 (test-audit-ao-1)
+**Added:** 2026-10-22 (test-audit-ao-1)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
@@ -1565,7 +1565,7 @@ builds are in the ledger.
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-23 (test-audit-ao-1)
+**Added:** 2026-10-22 (test-audit-ao-1)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
@@ -1585,7 +1585,7 @@ builds are in the ledger.
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-23 (test-audit-ao-1)
+**Added:** 2026-10-22 (test-audit-ao-1)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
