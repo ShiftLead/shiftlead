@@ -148,6 +148,12 @@
   },
   {
    "refused": "an answer may not carry Context:, Answers:, Decided: or Closed: — say it in other words"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (person) — Where the cache lives. Context: TD-40. Due: 2026-01-15. Answers: On disk (default) — the next run reads it back | In memory — every run starts cold | Not now. Decided: On disk (2026-01-15).\n"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (person) — Pick a region. Context: TD-41. Due: 2026-01-15. Answers: North (default) — closer — but dearer | South. Decided: North (2026-01-15).\n"
   }
  ],
  "edits": {

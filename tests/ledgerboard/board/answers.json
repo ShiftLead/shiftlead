@@ -1,0 +1,96 @@
+{
+ "closed": [],
+ "items": [
+  {
+   "answers": [
+    "On disk",
+    "In memory",
+    "Not now"
+   ],
+   "consequences": [
+    "the next run reads it back",
+    "every run starts cold",
+    ""
+   ],
+   "decided": null,
+   "default": "On disk",
+   "detail": [],
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "host": "box-1",
+   "kind": "decide",
+   "line": 5,
+   "overdue_days": null,
+   "refs": [
+    "TD-040"
+   ],
+   "replies": [],
+   "session": "s-1",
+   "text": "decide 2026-01-05 (session s-1 on box-1) — **Where the cache lives.** Context: TD-040. Due: 2026-01-20. Answers: On disk (default) — the next run reads it back | In memory — every run starts cold | Not now.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [
+    "North",
+    "South"
+   ],
+   "consequences": [
+    "closer — but dearer",
+    ""
+   ],
+   "decided": null,
+   "default": "South",
+   "detail": [],
+   "due": "2026-01-21",
+   "due_error": null,
+   "due_tag": "due 2026-01-21",
+   "host": "box-1",
+   "kind": "decide",
+   "line": 6,
+   "overdue_days": null,
+   "refs": [
+    "TD-041"
+   ],
+   "replies": [],
+   "session": "s-2",
+   "text": "decide 2026-01-06 (session s-2 on box-1) — Pick a region. Context: TD-041. Due: 2026-01-21. Answers: North — closer — but dearer | South (default).",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [
+    "Keep",
+    "Drop"
+   ],
+   "consequences": [
+    "nothing changes",
+    ""
+   ],
+   "decided": {
+    "date": "2026-01-14",
+    "text": "Keep"
+   },
+   "default": "Keep",
+   "detail": [],
+   "due": "2026-01-22",
+   "due_error": null,
+   "due_tag": "due 2026-01-22",
+   "host": "box-2",
+   "kind": "decide",
+   "line": 7,
+   "overdue_days": null,
+   "refs": [
+    "TD-042"
+   ],
+   "replies": [],
+   "session": "s-3",
+   "text": "decide 2026-01-07 (session s-3 on box-2) — An old whole-answer mark. Context: TD-042. Due: 2026-01-22. Answers: Keep — nothing changes (default) | Drop. Decided: Keep (2026-01-14).",
+   "waiting_on": "session"
+  }
+ ],
+ "keys": [
+  "- [ ] decide 2026-01-05 (session s-1 on box-1) — **Where the cache lives.** Context: TD-040. Answers: On disk (default) — the next run reads it back | In memory — every run starts cold | Not now",
+  "- [ ] decide 2026-01-06 (session s-2 on box-1) — Pick a region. Context: TD-041. Answers: North — closer — but dearer | South (default)",
+  "- [ ] decide 2026-01-07 (session s-3 on box-2) — An old whole-answer mark. Context: TD-042. Answers: Keep — nothing changes (default) | Drop"
+ ]
+}

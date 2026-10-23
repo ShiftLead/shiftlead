@@ -90,6 +90,13 @@ never a fake pass):
               `<repo>#TD-NNN` this machine cannot resolve is named, never a fail (it is
               a fact about the machine's roster). Commits not in this clone, or no
               `ledger.py` beside this script: not checked, and the row says so.
+              On an OPEN PR that touches the ledger or archive, its new ids (in its
+              head's ledger and archive, not in its merge-base's — an archive move is
+              not new) are judged too (TD-124, cadence §2.10): a new id main holds, or
+              another open PR also adds as new (less what the two heads share: a
+              stack, or two PRs stacked on one parent), fails, named; an open PR it could not read is a ⚠ in the
+              row, and so is a new id above LAST on origin's cadence/ledger-ids — an id
+              nobody handed out. The PR read is ledger_next_id.py's read_prs.
     worktree  a merged PR's local worktree is gone or reapable (clean including
               untracked, and landed by the §1 scoped diff); it is normal for it to
               still exist until the anchor's next pull, so existing is not the fault
@@ -664,8 +671,85 @@ def ledger_edit_check(pr, root):
     return errors, note
 
 
+def ledger_ids_check(pr, root):
+    """TD-124, on an open PR only: (fails, warns) for the ids it adds — those in its head's ledger
+    and archive and not in its merge-base's, so an archive move and main merged in are not new.
+    A new id main already holds, or another open PR also adds as new, fails (named with that PR;
+    a PR stacked on this one, or under it, is not a collision); a PR that could not be read warns.
+    A new id above the counter's LAST (origin's cadence/ledger-ids, cadence §2.10) warns: nobody
+    handed it out. Reads commits, never the working tree."""
+    if not root or pr["state"] != "open" or not set(LEDGER_FILES) & set(pr.get("files") or []):
+        return [], []
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import ledger_next_id as X  # sibling SYNC script: the id reader, the PR read and the counter
+    except ImportError:
+        return [], ["ids not checked: no ledger_next_id.py beside this script"]
+    from pathlib import Path
+    head = pr.get("head_sha")
+    if not head or git(["cat-file", "-e", f"{head}^{{commit}}"], cwd=root) is None:
+        fetch_once(root)
+        if not head or git(["cat-file", "-e", f"{head}^{{commit}}"], cwd=root) is None:
+            return [], [f"ids not checked: {(head or 'its head')[:7]} is not in this clone"]
+    base = git(["merge-base", default_ref(root), head], cwd=root)
+    if not base:
+        return [], [f"ids not checked: no merge-base of {head[:7]} with {default_ref(root)}"]
+    r = Path(root)
+    new = X.ids_at(r, head, *LEDGER_FILES) - X.ids_at(r, base.strip(), *LEDGER_FILES)
+    if not new:
+        return [], []
+    fails, warns = [], []
+    on_main = sorted(new & X.ids_at(r, default_ref(root), *LEDGER_FILES))
+    if on_main:
+        fails.append(f"{', '.join(map(X.tid, on_main))} already on {default_ref(root)}")
+    prs, unread = X.read_prs(r, *LEDGER_FILES, base=True, be=FORGE)
+    for n, rec in sorted(prs.items()):
+        if n == pr["number"] or rec["base"] is None:
+            continue
+        both = new & (rec["head"] - rec["base"])
+        # what the two heads share is not a collision: a stack (one under the other), or two
+        # PRs stacked on one parent, whose ids both carry
+        shared = git(["merge-base", head, rec["sha"]], cwd=root) if both else None
+        if shared:
+            both -= X.ids_at(r, shared.strip(), *LEDGER_FILES)
+        if both:
+            fails.append(f"{', '.join(map(X.tid, sorted(both)))} also added by {FORGE.ref(n)}")
+    me = FORGE.ref(pr["number"])
+    unread = [u for u in unread if u != me and not u.startswith(me + " ")]
+    if unread:
+        warns.append(f"open PRs not read for ids: {', '.join(unread)}")
+    tip = X.probe(r)
+    if tip is None:
+        warns.append("the ledger-id counter was not read (origin did not answer)")
+    elif tip:
+        got = git(["fetch", "-q", "--no-tags", "origin", f"+{X.COUNTER_REF}:{X.TRACKING_REF}"], cwd=root)
+        bad_last: list = []
+        last = X.read_last(r, X.TRACKING_REF, bad_last) if got is not None else None
+        if last is None:
+            warns.append("the ledger-id counter was not fetched")
+        elif bad_last:
+            warns.append("the ledger-id counter's LAST could not be read (absent or not a number)")
+        else:
+            above = sorted(n for n in new if n > last)
+            if above:
+                warns.append(f"{', '.join(map(X.tid, above))} above the counter's LAST ({last}): an id "
+                             "nobody handed out — take ids from the front end or ledger_next_id.py (cadence §2.10)")
+    return fails, warns
+
+
 def row_ledger(pr, root=None):
     errors, note = ledger_edit_check(pr, root)
+    fails, warns = ledger_ids_check(pr, root)
+    if fails:
+        return row(
+            "ledger",
+            "fail",
+            f"this PR adds an id another holds: {'; '.join(fails)} — renumber it from "
+            "`ledger_next_id.py` or the front end (cadence §2.10)" + "".join(f"; ⚠ {w}" for w in warns)
+            + (f"; also {len(errors)} bad field(s): {errors[0]}" if errors else ""),
+        )
+    if warns:
+        note = "; ".join([note, *(f"⚠ {w}" for w in warns)] if note else [f"⚠ {w}" for w in warns])
     if errors:
         more = f" (+{len(errors) - 1} more)" if len(errors) > 1 else ""
         return row(

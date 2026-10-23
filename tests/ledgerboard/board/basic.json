@@ -8,6 +8,10 @@
     "alpha",
     "beta"
    ],
+   "consequences": [
+    "",
+    ""
+   ],
    "decided": {
     "date": "2026-01-14",
     "text": "beta"
@@ -32,6 +36,7 @@
   },
   {
    "answers": [],
+   "consequences": [],
    "decided": null,
    "default": null,
    "detail": [
@@ -66,6 +71,10 @@
     "Works",
     "Not right: <what>"
    ],
+   "consequences": [
+    "",
+    ""
+   ],
    "decided": null,
    "default": null,
    "detail": [],
@@ -84,6 +93,7 @@
   },
   {
    "answers": [],
+   "consequences": [],
    "decided": null,
    "default": null,
    "detail": [],
@@ -102,6 +112,7 @@
   },
   {
    "answers": [],
+   "consequences": [],
    "decided": null,
    "default": null,
    "detail": [],
@@ -120,6 +131,7 @@
   },
   {
    "answers": [],
+   "consequences": [],
    "decided": null,
    "default": null,
    "detail": [],
@@ -138,6 +150,7 @@
   },
   {
    "answers": [],
+   "consequences": [],
    "decided": null,
    "default": null,
    "detail": [],

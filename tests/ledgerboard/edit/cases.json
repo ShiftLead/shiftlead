@@ -185,6 +185,29 @@
       "answers": [],
       "default": null,
       "words": "Closed: yes"
+    },
+    {
+      "fn": "decided_line",
+      "title": "Where the cache lives",
+      "ref": "TD-40",
+      "answers": [
+        "On disk — the next run reads it back",
+        "In memory — every run starts cold",
+        "Not now"
+      ],
+      "default": 0,
+      "words": "On disk"
+    },
+    {
+      "fn": "decided_line",
+      "title": "Pick a region",
+      "ref": "TD-41",
+      "answers": [
+        "North — closer — but dearer",
+        "South"
+      ],
+      "default": 0,
+      "words": "North"
     }
   ],
   "predicates": [

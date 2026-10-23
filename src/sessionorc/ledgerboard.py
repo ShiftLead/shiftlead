@@ -1,4 +1,4 @@
-# ledgerboard v1.2 sha256:a3935e7a90244b1363a33dfef186598d95df95535d67ef25e64f0e3689177417
+# ledgerboard v1.3 sha256:db17c348ccfc676da0790bef88084c2de1b20324df228d04806cfcc9bbe7cc09
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard.py (vendored by dev-cadence as files/scripts/ledgerboard.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
@@ -575,8 +575,10 @@ DUE_ATTEMPT_RE = re.compile(r"\bDue:?\s*(?P<raw>\d{1,4}[-/.]\d{1,2}(?:[-/.]\d{1,
 # followed by a date is a kind, so prose that happens to start with "act" is not.
 KINDS = ("decide", "act", "look", "watch", "fyi")
 KIND_RE = re.compile(r"^(?P<kind>decide|act|look|watch|fyi)\s+(?=\d{4}-\d{2}-\d{2}\b)", re.IGNORECASE)
-# At most one answer ends in " (default)" — the asker's recommendation.
+# At most one answer's label ends in " (default)" — the asker's recommendation.
 DEFAULT_MARK_RE = re.compile(r"\s*\(default\)$", re.IGNORECASE)
+# An answer may say what it leads to after its first " — ": `<label> (default) — <consequence>`.
+CONSEQUENCE_SEP = " — "
 # A live look's (a `look`'s) answers, in exactly these words, so a tool can draw the same two buttons.
 LIVE_LOOK_ANSWERS = ("Works", "Not right: <what>")
 # The second of them is a FORM, its slot the person's words: offered as `Not right:` alone or with
@@ -611,15 +613,39 @@ def _raw_answers(text: str) -> list[str]:
     return [a for a in parts if a]
 
 
+def split_answer(answer: str) -> tuple[str, str, bool]:
+    """One written answer as (label, consequence, marked): split on its first ` — ` (a
+    dashless answer is all label, its consequence ""), the ` (default)` mark read and
+    stripped at the label's end — or at the answer's very end, where a whole answer was
+    marked before v1.3."""
+    label, sep, cons = answer.partition(CONSEQUENCE_SEP)
+    label, cons = label.strip(), cons.strip()
+    if not sep and label.endswith(CONSEQUENCE_SEP.rstrip()):
+        label = label[: -len(CONSEQUENCE_SEP.rstrip())].rstrip() or label  # `B —`: an empty consequence
+    marked = bool(DEFAULT_MARK_RE.search(label))
+    if marked:
+        label = DEFAULT_MARK_RE.sub("", label) or label
+    elif sep and DEFAULT_MARK_RE.search(cons):
+        marked, cons = True, DEFAULT_MARK_RE.sub("", cons)
+    return label, cons, marked
+
+
 def parse_answers(text: str) -> list[str]:
-    """The item's `Answers:` list, in order, any ` (default)` mark stripped; [] when none."""
-    return [DEFAULT_MARK_RE.sub("", a) or a for a in _raw_answers(text)]
+    """The item's `Answers:` labels, in order, any ` (default)` mark stripped and any
+    ` — <consequence>` left out (parse_consequences); [] when none."""
+    return [split_answer(a)[0] for a in _raw_answers(text)]
+
+
+def parse_consequences(text: str) -> list[str]:
+    """What each of the item's answers leads to, parallel to parse_answers(): the text after
+    its first ` — `, "" for an answer that says none."""
+    return [split_answer(a)[1] for a in _raw_answers(text)]
 
 
 def parse_default(text: str) -> str | None:
-    """The answer marked ` (default)`, its text without the mark; None when no answer is
-    marked, or more than one is (no single recommendation to show)."""
-    marked = [DEFAULT_MARK_RE.sub("", a) for a in _raw_answers(text) if DEFAULT_MARK_RE.search(a)]
+    """The label marked ` (default)`, without the mark; None when no answer is marked, or
+    more than one is (no single recommendation to show)."""
+    marked = [label for label, _, m in map(split_answer, _raw_answers(text)) if m]
     return marked[0] if len(marked) == 1 and marked[0] else None
 
 
@@ -663,8 +689,9 @@ class BoardItem:
     text: str
     due: date | None
     line: int = 0  # 1-based line in the board; 0 when parsed from a string with no file
-    answers: list[str] = field(default_factory=list)
-    default: str | None = None  # the answer marked ` (default)`
+    answers: list[str] = field(default_factory=list)  # the labels
+    default: str | None = None  # the label marked ` (default)`
+    consequences: list[str] = field(default_factory=list)  # parallel to answers; "" for none
     # A decided item is NOT done: it stays on the board, and stays due, until whoever acts on
     # it closes it — but it is no longer the person's to-do.
     decided: tuple[str, date] | None = None
@@ -760,7 +787,7 @@ def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
         if kind == "fyi":
             due, bad = None, None  # an fyi is never due
         items.append(BoardItem(text=text, due=due, line=lineno, answers=parse_answers(text),
-                               default=parse_default(text),
+                               default=parse_default(text), consequences=parse_consequences(text),
                                decided=parse_decided(text), bad_due=bad,
                                kind=kind, fyi_due=fyi_due,
                                detail=detail_block(lines, lineno)))
@@ -829,6 +856,7 @@ def item_record(item: BoardItem, today: date) -> dict:
         "due_tag": due_tag(item, today),
         "answers": item.answers,
         "default": item.default,
+        "consequences": item.consequences,
         "decided": ({"text": item.decided[0], "date": item.decided[1].isoformat()}
                     if item.decided else None),
         "waiting_on": item.waiting_on,
@@ -951,6 +979,7 @@ def edit_line(body: str, action: str, *, to: date | None = None, answer: str | N
                 new = f"{body[:at].rstrip()} Due: {to.isoformat()}. {body[at:]}"
         got = parse_board(new, warn=False)
         if not got or got[0].due != to or got[0].answers != parse_answers(text) \
+                or got[0].consequences != parse_consequences(text) or got[0].default != parse_default(text) \
                 or got[0].decided != parse_decided(text):
             raise Refused(f"after the edit the reader does not read Due: {to.isoformat()} "
                           "with the item's other fields unchanged")
@@ -969,6 +998,7 @@ def edit_line(body: str, action: str, *, to: date | None = None, answer: str | N
             new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} {fld}"
         got = parse_board(new, warn=False)
         if not got or got[0].decided != (answer, today) or got[0].answers != parse_answers(text) \
+                or got[0].consequences != parse_consequences(text) or got[0].default != parse_default(text) \
                 or got[0].due != parse_board(body, warn=False)[0].due:
             raise Refused(f"the reader would not read back 'Decided: {answer}' with the item's "
                           "other fields unchanged — rephrase the answer")
@@ -994,7 +1024,8 @@ def edit_line(body: str, action: str, *, to: date | None = None, answer: str | N
             new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} {body[at:]}"
         was, got = parse_board(body, warn=False)[0], parse_board(new, warn=False)
         replies = parse_replies(new)
-        if not got or (got[0].due, got[0].answers, got[0].decided) != (was.due, was.answers, was.decided) \
+        if not got or (got[0].due, got[0].answers, got[0].consequences, got[0].decided) \
+                != (was.due, was.answers, was.consequences, was.decided) \
                 or parse_default(got[0].text) != parse_default(text) \
                 or item_refs(got[0].text) != item_refs(text) \
                 or replies[:-1] != parse_replies(body) or not replies \
@@ -1028,19 +1059,21 @@ def item_line(text: str, due: str, today: str, session: str | None, host: str | 
 def decided_line(title: str, ref: str, answers: list[str], default: int | None, words: str, today: str) -> str:
     """A new item already decided, for a person's answer given elsewhere (on a ledger entry):
     `- [ ] decide <today> (person) — <title>. Context: <ref>. Due: <today>. Answers: a | b (default).
-    Decided: <words> (<today>).` with its line ending. Refused for empty words, words carrying a
-    field's name, or a line the reader would not read back."""
+    Decided: <words> (<today>).` with its line ending. An answer may carry its consequence,
+    `<label> — <consequence>`; the mark goes on the label. Refused for empty words, words
+    carrying a field's name, or a line the reader would not read back."""
     head = ANY_FIELD_RE.sub(r"\1", " ".join(str(title or "").split())).rstrip(".") or ref
     said = " ".join(str(words or "").split())
     if not said:
         raise Refused("a decision needs its words: one of the entry's answers, or what you typed")
     if FIELD_NAME_RE.search(said):
         raise Refused("an answer may not carry Context:, Answers:, Decided: or Closed: — say it in other words")
-    opts = [
-        ANY_FIELD_RE.sub(r"\1", " ".join(str(a).split())).replace("|", "\\|") + (" (default)" if i == default else "")
-        for i, a in enumerate(answers or ())
-        if str(a).strip()
-    ]
+    if any(REPLY_TAIL_RE.search(" ".join(str(a).split())) for a in answers or ()):
+        raise Refused("an answer's consequence may not read as a reply (` — <name>, <date>: `) — say it in other words")
+    def opt(a: str, marked: bool) -> str:
+        label, cons, _ = split_answer(ANY_FIELD_RE.sub(r"\1", " ".join(str(a).split())).replace("|", "\\|"))
+        return label + (" (default)" if marked else "") + (CONSEQUENCE_SEP + cons if cons else "")
+    opts = [opt(a, i == default) for i, a in enumerate(answers or ()) if str(a).strip()]
     tail = f" Answers: {' | '.join(opts)}." if opts else ""
     body = f"decide {today} (person) — {_sentence(head)} Context: {ref}. Due: {today}.{tail} Decided: {said} ({today})."
     d, c = DECIDED_RE.search(body), CONTEXT_RE.search(body)

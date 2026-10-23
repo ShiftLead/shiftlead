@@ -1,11 +1,13 @@
 # Written by scripts/vendor_ledgerboard.sh — do not edit by hand.
-tag: v1.2
-commit: e7e4bc4c7e8f5d9cf75d55d4676068451b69daed
-file: src/sessionorc/ledgerboard.py 5a3a8f9ac5daee9fb336ed44cf3fbf03d2a4ca1cebb132c834b66ef04105d7a9
-file: tests/ledgerboard/board/basic.json 2e6fd2eb6fb7b31eb17f14afbaf5b09db657402618029d0f0dda4ad64ab5c312
+tag: v1.3
+commit: 2e796b16a99a3d0ce968404fc0c0b48ec70aa45d
+file: src/sessionorc/ledgerboard.py d796e486b91dc0c897f9bcadb0e2383154a2c794b31cfa9f1720bc7585b34584
+file: tests/ledgerboard/board/answers.json f17946ea9ffe730593ab17966d00043f1aef60fa72b4fa8b7dae1e6431d3293e
+file: tests/ledgerboard/board/answers.md 3851ce1d9aec5b389e1dece6a20496b1b17ab84835a6e1e73c94f9e73c772c1f
+file: tests/ledgerboard/board/basic.json 33f96492f58bf2af9c206d7b96c3e8075831fc6c3d19fdfc72a014a06e32b3ee
 file: tests/ledgerboard/board/basic.md a8911f1afae75534477966cba517af45ede59335c1072f2ea6bf9cfa7f236b54
-file: tests/ledgerboard/edit/cases.json 709e96af26c2d9eaf3078aa7aa03a9e6d8066a1f4866d70ba9893ab2c1a4c849
-file: tests/ledgerboard/edit/expected.json a61629e5597b3fccbbf3432ac01691788d1f0bc85ad62f8f2f1ba66b29f2b092
+file: tests/ledgerboard/edit/cases.json 2dcaf6bc946f97126af89604f4e7c5f7dc8d7e88a322c62e1f0999fefce08537
+file: tests/ledgerboard/edit/expected.json b908edbe68e9f781ec1185dc8894a4a0c85028df66383d8d6c4a1225aed3d110
 file: tests/ledgerboard/ledger/basic.archive.md e30dbbbf73065564e295f3eef936a863781b16b9730807e4a4cbaa94afc4f7a1
 file: tests/ledgerboard/ledger/basic.json c25e9ac5db4f07f880df57be87b8a4f8905537cd28e565b073934ac00f6e8743
 file: tests/ledgerboard/ledger/basic.md 05c06b9d0cbf42471dfb38d6cef4d15609bde0ec7675e8c34c87a6f5e78e46b2
@@ -18,4 +20,4 @@ file: tests/ledgerboard/ledger/ranked.json 1580ead44f7c9c085f18f1ea0450c6e1a95c6
 file: tests/ledgerboard/ledger/ranked.md e29593c13077a983420afcc1e6b68bf3a5856546193a34816061f6b55539b9c5
 file: tests/ledgerboard/ledger/ranked.rank.yml ae07b1f72381176665fe26090165c60e8cb1e8caecd4b3b6213190944fbaf8cc
 file: tests/ledgerboard/ledger/ranked.resolve.json 665bb5e1b691cc339ed7d93a63d3fd22829e440de894bf82183a82e318642dc7
-file: tests/ledgerboard/run.py debc120dbc9f22299a6e467982bea3e337a7ee7b97c098a19c71a8614e135a99
+file: tests/ledgerboard/run.py 97059b456e12f73b997be29cbeafe4e9e59d3b0ddfee382ac396d2b410983f2b

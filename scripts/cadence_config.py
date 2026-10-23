@@ -30,7 +30,7 @@ Where a value comes from, the first that has it (cadence.md §9.18):
     machine  cadence.toml in the roster's directory — $DEV_CADENCE_REG_DIR, else
              ${XDG_CONFIG_HOME:-~/.config}/dev-cadence (§9.2), so a test's override moves it too
     default  KEYS below
-A repo key (REPO_KEYS below: precheck, post-sync) has the repo row only — no env, no machine file, no
+A repo key (REPO_KEYS below: precheck, post-sync, ledger-ids-host) has the repo row only — no env, no machine file, no
 default: it is a decision about that one repo.
 
 The files are TOML, read with `tomllib` (Python >= 3.11). **People write them; tools only
@@ -92,7 +92,11 @@ def _rel_dir(v: str) -> str:
 REPO_KEYS = {
     "precheck": "the repo's own checks (lint, typecheck, tests) as one command; scripts/precheck.py runs it on a PR's head before the merge and records a cadence/precheck status (TD-117)",
     "post-sync": "a command sync.sh runs from the repo root after it writes the files (sync-all commits its changes with them); a failure fails the sync",
+    "ledger-ids-host": "on | off: whether a take from the ledger-id counter names this machine in its commit (TD-124); unset reads as on — off for a repo that is public, or about to be",
 }
+
+# A repo key with a fixed vocabulary: the values check() accepts (resolve() still hands over the string).
+REPO_CHOICES = {"ledger-ids-host": ("on", "off")}
 
 
 # key -> a function returning the value to use, or raising ValueError naming what is wrong.
@@ -220,6 +224,8 @@ def check(files: list[tuple[str, dict]]) -> list[str]:
             elif k in REPO_KEYS:
                 if not isinstance(v, str) or not v.strip():
                     problems.append(f"{label}: {k} must be a non-empty string, not {v!r}")
+                elif k in REPO_CHOICES and v.strip().lower() not in REPO_CHOICES[k]:
+                    problems.append(f"{label}: {k} must be one of {', '.join(REPO_CHOICES[k])}, not {v!r}")
             elif k not in KEYS:
                 problems.append(f"{label}: unknown key '{k}' — nothing reads it (known: {', '.join([*KEYS, *REPO_KEYS])})")
             elif not isinstance(v, str) or not v:
