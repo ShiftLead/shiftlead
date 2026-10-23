@@ -1505,7 +1505,7 @@ builds are in the ledger.
 **Added:** 2026-10-22 (the designer, from TD-966; Fable round 3: the home's own road serves no repo once each has synced)
 **Owner:** grinder
 **Kind:** build
-**Waits:** event — every repo registered with the home has `scripts/ledger_next_id.py` on its default branch (its `docs/cadence-sync.lock` at dev-cadence 232f2ad or later), or is dev-cadence itself (`files/scripts/`). The check: for each root `ao repo --json` lists, `git -C <root> show origin/<default>:docs/cadence-sync.lock` names 232f2ad or later. Each repo's sync is its own sessions' work, as TD-969 is this repo's; this entry chases none of them, and TD-966 archives with TD-970, not with this
+**Waits:** event — every repo registered with the home has `scripts/ledger_next_id.py` on its default branch (its `docs/cadence-sync.lock` at dev-cadence 232f2ad or later), or is dev-cadence itself (`files/scripts/`). The check: for each root `ao repo --json` lists, `git -C <root> cat-file -e origin/<default>:scripts/ledger_next_id.py` (or `files/scripts/ledger_next_id.py` in dev-cadence) succeeds; presence suffices, since the script has taken `--floor` since its first commit (71a501c). Each repo's sync is its own sessions' work, as TD-969 is this repo's; this entry chases none of them, and TD-966 archives with TD-970, not with this
 **Status:** Open
 **Blocked by:** TD-970
 **Location:** `src/sessionorc/agent_ids.py` (`_ids_prs`, `added_ids`, `files_jq`, `PR_READERS`, `FILES_CAP`, `_record`, the own-reads branch of `_ids_give`); `tests/test_td_next.py`; design §4.4 *A ledger entry's id is handed out by the home* (*A checkout without the script*), §4.7 `ao td next` (`reserved` on the home's own road)
