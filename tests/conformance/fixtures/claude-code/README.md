@@ -24,3 +24,13 @@ read from it at capture.
   (the state mapping and `pending`); `statusline.jsonl`, the status line's payloads (`usage_report`); and
   `titles.json`, the pane titles on the walk's tmux server at its end (`title`). The walk ran in a scratch
   directory under `/tmp` on a profile set aside for it, so no person's session is in them.
+
+- `transcripts/prompts.jsonl` and `panes/prompts.txt` (TD-976, the `prompts` read): one conversation of
+  seven prompts captured by hand on the `conformance` profile (Claude Code 2.1.309, Haiku, 2026-10-22) in
+  a scratch directory under `/tmp`, on a tmux server of its own: a short prompt, *yes*, the first prompt
+  typed again, one longer than forty characters, `/rename conformance prompts` (a local command with
+  arguments and its output, which this build writes as two `system` entries), the meta line the rename
+  leaves, a count interrupted with Escape (`[Request interrupted by user]`), and one more. The transcript
+  keeps its `user`, `assistant`, `system` and `custom-title` lines, unshortened; the `attachment` and
+  `api-request*` lines are dropped, since they carry the system prompt. The pane is `capture-pane -p -S -
+  -E -` of the same conversation at its end, trailing empty rows dropped.

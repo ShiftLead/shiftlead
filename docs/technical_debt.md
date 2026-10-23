@@ -1468,8 +1468,8 @@ builds are in the ledger.
 **Type:** debt
 **Added:** 2026-10-22 (the designer, from TD-975)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2299
+**Status:** Built 2026-10-22 (grinder-ao-1, #2299): the read, the neutral `Prompt`, the captured fixture and its conformance test, `merge_prompts`, the tick pass with its hook-due mark, the node-owned field and its trimmed view; every *Done when* test but the live one. **Left, read on a scratch home once #2299 is merged** (the merged code runs there whether or not it is live): a session of `ao new` (Claude Code) lists the prompt typed into its terminal in `ao status --json`'s `prompts` as `from: person` within a tick of its `UserPromptSubmit`, and an `ao send`'s prompt under the sender's id.
 **Location:** `src/sessionorc/adapters.py` (`OPTIONAL_METHODS`, a neutral `Prompt`), `src/shiftlead/adapters/claude_code/transcript.py` and `__init__.py` (`prompts`, `implements`), `src/sessionorc/agent_tick.py` (`_refresh_links`'s pass; `_apply_event`, the due mark), `src/sessionorc/models.py` (`RECENT_PROMPTS` beside `RECENT_LINKS`, the `prompts` field, `NODE_OWNED`, `Session.view`, `to_dict`, `from_dict`), `tests/conformance/`; design §4.2 *The record's `prompts`*, §4.3 `prompts`
 
 **Why:** the Focus Prompts card (TD-975, TD-977) reads its rows from the record, which holds no prompts today. The Transcript page's read is on demand and goes backwards by turns; the card wants the newest twenty on every Focus read without opening the file.

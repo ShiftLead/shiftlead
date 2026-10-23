@@ -17,6 +17,7 @@ from _harness import (
     check_declaration,
     check_hook_reading,
     check_links,
+    check_prompts,
     check_spend,
     check_state,
     check_transcript,
@@ -24,6 +25,7 @@ from _harness import (
     fixture,
     hook_reading,
     manifest,
+    pane_row,
 )
 
 from sessionorc import adapters
@@ -178,6 +180,37 @@ def test_links_are_the_urls_printed_and_a_cursor(name, tmp_path, monkeypatch):
         check_links(again)
         assert again[0] == [] and again[1] == got[1]  # nothing new past the cursor
         assert ad.links("no-such-session", cwd, profile) is None
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_prompts_are_what_was_typed_each_opening_a_row_of_the_pane(name, tmp_path, monkeypatch):
+    """The `prompts` read (design §4.3 `prompts`, §4.2 *The record's `prompts`*, TD-976) on a captured
+    conversation: the lines typed, each reply's first line, and each `drawn` opening a row of the pane the
+    same conversation drew — equal to it where `whole`."""
+    harness = HARNESSES[name]
+    ad = adapters.get(name)
+    profile = harness.profile(tmp_path, monkeypatch)
+    for i, t in enumerate(_need(name, "prompts", "prompts")):
+        sid = f"s{i}"
+        cwd = harness.place_transcript(tmp_path, fixture(name, t["file"]), sid)
+        got = ad.prompts(sid, cwd, profile, cursor=0)
+        check_prompts(got)
+        found, leading, cursor = got
+        assert [{"text": p.text, "reply": p.reply} for p in found] == t["prompts"]
+        assert leading is None
+        rows = [pane_row(r) for r in fixture(name, t["pane"]).read_text(encoding="utf-8").splitlines()]
+        for p in found:
+            if p.drawn is None:
+                continue
+            drawn = pane_row(p.drawn)
+            if p.whole:
+                assert drawn in rows, f"no row of {t['pane']} is {drawn!r}"
+            else:
+                assert any(r.startswith(drawn) for r in rows), f"no row of {t['pane']} opens {drawn!r}"
+        again = ad.prompts(sid, cwd, profile, cursor=cursor)
+        check_prompts(again)
+        assert again == ([], None, cursor)  # nothing new past the cursor
+        assert ad.prompts("no-such-session", cwd, profile) is None
 
 
 @pytest.mark.parametrize("name", AGENTS)

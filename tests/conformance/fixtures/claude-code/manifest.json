@@ -24,6 +24,21 @@
       "spend_turns": 10
     }
   ],
+  "prompts": [
+    {
+      "file": "transcripts/prompts.jsonl",
+      "pane": "panes/prompts.txt",
+      "prompts": [
+        {"text": "Reply with the one word: ready. Use no tools.", "reply": "ready"},
+        {"text": "yes", "reply": "Hi! What would you like to work on? The repo at `/tmp/aoprompts-I5AZ` is on `master` with a clean working tree, so I can start there, or you can give me a different task."},
+        {"text": "Reply with the one word: ready. Use no tools.", "reply": "ready"},
+        {"text": "Write two short lines: first the word alpha, then the word beta. This prompt is deliberately longer than forty characters so its row is cut. Use no tools.", "reply": "alpha"},
+        {"text": "/rename conformance prompts", "reply": "Session renamed to: conformance prompts"},
+        {"text": "Count from 1 to 300, one number per line, with no other text. Use no tools.", "reply": "1"},
+        {"text": "Reply with the one word: done. Use no tools.", "reply": "done"}
+      ]
+    }
+  ],
   "procs": [
     {"file": "procs/grinder-two-tasks.json", "background": ["timeout 300 sleep 290", "python3 procs.py"]}
   ],

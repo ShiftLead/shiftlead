@@ -112,6 +112,16 @@ class Adapter(Protocol):
     #                                                      from 0), for the record's `links` (design §4.2, §4.3,
     #                                                      TD-543); None when there is no file. An adapter
     #                                                      without a transcript lacks it, which is the `shell` case
+    #   prompts(session_id: str, cwd: Path, profile: str, *, cursor: int)
+    #       -> tuple[list[Prompt], str | None, int] | None
+    #                                                      the prompts the transcript holds past byte `cursor`
+    #                                                      at the top level — the lines no person typed left out,
+    #                                                      a slash command as the line typed — the first text
+    #                                                      line past `cursor` before any prompt (the reply to
+    #                                                      the record's newest), and the new cursor, for the
+    #                                                      record's `prompts` (design §4.2, §4.3, TD-976); None
+    #                                                      when there is no file. An adapter without a
+    #                                                      transcript lacks it, as `links`
     #   account_for(profile: str) -> str | None           the account the profile runs under (§4.2a, TD-122):
     #                                                      usage is polled, cached and backed off once per
     #                                                      `(adapter, account)`; None, or no method, keys on
@@ -173,7 +183,7 @@ class Adapter(Protocol):
 
 # The optional methods an agent adapter declares in `implements` (design §4.3 *The conformance suite*,
 # TD-112): what the suite tests where declared and finds absent where not.
-OPTIONAL_METHODS = ("background", "composer", "context", "links", "mail", "spend", "title", "usage_report")
+OPTIONAL_METHODS = ("background", "composer", "context", "links", "mail", "prompts", "spend", "title", "usage_report")
 
 # The live walk's `--capture` (design §4.3 *The conformance suite*, TD-784): set in a launch's environment,
 # it names a directory where the adapter's hook appends each payload its tool hands it, as received, one
@@ -213,6 +223,21 @@ class Link:
 
     url: str
     at: str | None = None
+
+
+@dataclass
+class Prompt:
+    """A prompt the transcript holds at the conversation's top level (design §4.2 *The record's `prompts`*,
+    §4.3 `prompts`, TD-976): `at`, the entry's own time; `text`, its first 300 characters; `drawn`, the
+    opening of the pane row the tool draws first for it (None where the adapter knows of none) and `whole`
+    when `drawn` holds its first line uncut; `reply`, the first line of the first text written after it
+    (None until one is)."""
+
+    at: str | None
+    text: str
+    drawn: str | None = None
+    whole: bool = False
+    reply: str | None = None
 
 
 @dataclass

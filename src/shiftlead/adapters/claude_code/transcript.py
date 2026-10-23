@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
-from sessionorc.adapters import Link, Transcript, TranscriptEntry
+from sessionorc.adapters import Link, Prompt, Transcript, TranscriptEntry
 
 CHUNK = 256 * 1024  # bytes read per step backwards
 HEAD = 64 * 1024  # bytes read from the file's start for its first timestamp
@@ -334,6 +334,126 @@ def links(path: Path, cursor: int = 0) -> tuple[list[Link], int]:
                 at = str(d["timestamp"]) if d.get("timestamp") else None
                 out.extend(Link(url=u, at=at) for u in _line_links(d))
     return out, pos
+
+
+# The record's `prompts` (design §4.2, §4.3 `prompts`, TD-976). A prompt's row in the pane is the glyph, a
+# space and the prompt's first line (Claude Code 2.1.309, `panes/prompts.txt`); `drawn` is its first forty
+# characters, cut there and not at a word.
+PROMPT_CAP = 300  # characters of a prompt's `text`
+DRAWN_CAP = 40  # characters of the first line in `drawn`
+REPLY_CAP = 200  # characters of a reply's first line
+PROMPT_GLYPH = "❯"
+# a `user` entry whose text opens with one of these is no line a person typed
+NOT_TYPED = (
+    "<local-command-stdout>",
+    "<local-command-stderr>",
+    "<local-command-caveat>",
+    "[Request interrupted by user",
+)
+# the tool's notice or reminder blocks: an entry that is only these is no prompt either
+NOTICE_RE = re.compile(r"<(task-notification|system-reminder)>.*?</\1>", re.S)
+COMMAND_RE = re.compile(r"<command-name>\s*(.*?)\s*</command-name>", re.S)
+COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.S)
+STDOUT_RE = re.compile(r"<local-command-stdout>(.*?)</local-command-stdout>", re.S)
+
+
+def _first_line(text: str) -> str:
+    return next((x.strip() for x in text.splitlines() if x.strip()), "")
+
+
+def _typed(text: str) -> str | None:
+    """What the person typed, from a prompt entry's text: a slash command as the line typed (`/x args`),
+    never its tags; None for a line no person typed."""
+    if text.lstrip().startswith(NOT_TYPED):
+        return None
+    name = COMMAND_RE.search(text)
+    if name:
+        args = COMMAND_ARGS_RE.search(text)
+        line = "/" + name.group(1).lstrip("/")
+        return f"{line} {args.group(1).strip()}".rstrip() if args else line
+    rest = NOTICE_RE.sub("", text)  # the tool's notices and reminders are no part of what was typed
+    return rest.strip("\n") if rest.strip() else None
+
+
+def _prompt_of(d: dict[str, Any]) -> str | None:
+    """The prompt a top-level entry is, as typed, or None: a person's prompt (`_prompt_text`), or a local
+    slash command, which the tool writes as a `system` entry of its own (2.1.309)."""
+    if d.get("isSidechain") or d.get("isMeta"):
+        return None
+    if d.get("type") == "system" and d.get("subtype") == "local_command":
+        content = d.get("content")
+        return _typed(content) if isinstance(content, str) and "<command-name>" in content else None
+    text = _prompt_text(d)
+    return _typed(text) if text is not None else None
+
+
+def _reply_of(d: dict[str, Any]) -> str | None:
+    """The first non-empty line of the text a top-level entry wrote — the assistant's text, a local
+    command's output — or None where it wrote none."""
+    if d.get("isSidechain"):
+        return None
+    if d.get("type") == "assistant":
+        content = (d.get("message") or {}).get("content")
+        texts = [b.get("text") for b in content or [] if isinstance(b, dict) and b.get("type") == "text"]
+        line = next((_first_line(str(t)) for t in texts if t and _first_line(str(t))), "")
+    elif d.get("type") == "system" and d.get("subtype") == "local_command":
+        out = STDOUT_RE.search(str(d.get("content") or ""))
+        line = _first_line(out.group(1)) if out else ""
+    else:
+        return None
+    return line[:REPLY_CAP] or None
+
+
+def prompt(at: str | None, typed: str) -> Prompt:
+    """A `Prompt` of the text typed: its opening, and the row the pane draws for it."""
+    first = _first_line(typed)
+    return Prompt(
+        at=at,
+        text=typed[:PROMPT_CAP],
+        drawn=f"{PROMPT_GLYPH} {first[:DRAWN_CAP]}".rstrip(),
+        whole=len(first) <= DRAWN_CAP,
+    )
+
+
+def prompts(path: Path, cursor: int = 0) -> tuple[list[Prompt], str | None, int]:
+    """The prompts the transcript holds past byte `cursor`, oldest first, each with its reply where one is
+    written; the first text line past the cursor before any prompt (the reply to the prompt an earlier read
+    ended on); and the cursor after its last whole line (design §4.3 `prompts`, TD-976). Read forwards from
+    the cursor as `links` reads; a cursor past the file's end reads from 0, and a line still being written
+    is left for the next read. Raises OSError when the file cannot be read."""
+    with path.open("rb") as f:
+        size = f.seek(0, 2)
+        start = cursor if 0 <= cursor <= size else 0
+        f.seek(start)
+        out: list[Prompt] = []
+        leading: str | None = None
+        pos = start
+        while pos < size:
+            line = f.readline()
+            if not line.endswith(b"\n"):
+                break
+            pos += len(line)
+            if b'"user"' not in line and b'"assistant"' not in line and b"local_command" not in line:
+                continue
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(d, dict):
+                continue
+            typed = _prompt_of(d)
+            if typed is not None:
+                out.append(prompt(str(d["timestamp"]) if d.get("timestamp") else None, typed))
+                continue
+            reply = _reply_of(d)
+            if reply is None:
+                continue
+            if out:
+                if out[-1].reply is None:
+                    out[-1].reply = reply
+            elif leading is None:
+                leading = reply
+    return out, leading, pos
 
 
 def _subagent(directory: Path, call_id: str) -> TranscriptEntry | None:
