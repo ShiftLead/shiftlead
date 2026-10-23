@@ -7,11 +7,12 @@ import os
 import pathlib
 import shutil
 from datetime import UTC, date, datetime, timedelta
+from html.parser import HTMLParser
 
 import pytest
 from conftest import fake_gh_bin, with_origin
 from fastapi.testclient import TestClient
-from test_ui_inbox import needs_line
+from test_ui_inbox import PERMISSION, entry, needs_line, rec, state_rows_of
 
 READER = pathlib.Path(__file__).parents[1] / "scripts" / "nudge_user_attention.py"
 LEDGERBOARD = READER.with_name("ledgerboard.py")  # the reader imports it from beside itself
@@ -1774,3 +1775,93 @@ def test_every_board_row_draws_its_id_and_every_press_on_it_carries_it(tmp_path,
     js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
     assert js.count('key: b.dataset.key || ""') == 3  # Snooze/Done/decide, Reply, Not right…
     assert 'AO.toast(b.dataset.copied || "copied", true)' in js
+
+
+# -- the rows' markup balances (TD-967) ---------------------------------------------------------------
+
+
+class _Divs(HTMLParser):
+    """Each `<div>`'s depth, and each `.mailrow` with the `.mailrow`s it sits inside: a row left open
+    nests every later row in it, and the filter's `hidden` on it hides them all (TD-967)."""
+
+    def __init__(self):
+        super().__init__()
+        self.stack: list[str | None] = []  # per open div: its row's id, if it is a row
+        self.low = 0
+        self.inside: dict[str, list[str]] = {}
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "div":
+            return
+        a = dict(attrs)
+        row = a.get("data-msg") if "mailrow" in (a.get("class") or "").split() else None
+        if row:
+            self.inside[row] = [r for r in self.stack if r]
+        self.stack.append(row)
+
+    def handle_endtag(self, tag):
+        if tag == "div":
+            if self.stack:
+                self.stack.pop()
+            else:
+                self.low -= 1
+
+
+def _divs(html):
+    p = _Divs()
+    p.feed(html)
+    p.close()
+    return p
+
+
+def _every_row(tmp_path, monkeypatch):
+    """A row of each kind the Inbox draws: board lines (plain, with answers, decided, a live look),
+    mail (a note, an ask, a steer) and a state row (a permission), the board's of team *grind*."""
+    host(tmp_path, monkeypatch)
+    from shiftlead.ui.app import board_rows
+
+    root = tmp_path / "ao"
+    of = {"name": "ao", "label": "ao", "teams": ["grind"]}
+    rep = report(root, item(3, "plain", "2026-09-20", "2d overdue"), decide_item(9), decide_item(11, decided="approve"))
+    rep["boards"][0]["items"].append(look_item())
+    boards = board_rows(rep, {str(root.resolve()): of})
+    mail = [
+        entry("m-n", "note"),
+        entry("m-a", "ask"),
+        entry("m-s", "steer", default="go", bound="2026-09-19T12:00:00Z"),
+    ]
+    states = state_rows_of([rec("ao-p", "needs-you", pending=PERMISSION, team="audit")])
+    assert len(boards) == 4 and states
+    return [*boards, *mail, *states]
+
+
+@pytest.mark.unit
+def test_every_row_the_inbox_and_the_queue_draw_balances_its_divs(tmp_path, monkeypatch):
+    """TD-967 (design §4.5 screen 6 *Needs you*): each of `_every_row`'s rows — board lines, mail and a
+    permission; not every kind `row()` draws — opens as many `<div>`s as it closes, in the Inbox's mode
+    in the four sections they can sit in and in the Queue's `card` mode for each `want`, so no row is
+    drawn inside another. Since #2188 the board row's Inbox branch opened its footer twice."""
+    from shiftlead.ui.app import templates
+
+    rows = _every_row(tmp_path, monkeypatch)
+    for section in ("needs", "later", "fyi", "snoozed"):
+        for e in rows:
+            p = _divs(templates.get_template("inbox_rows.html").render(rows=[e], section=section))
+            assert (p.stack, p.low) == ([], 0), (section, e.get("row") or e.get("kind"), e["id"])
+    for want in ("read", "decide", "do"):
+        for e in rows:
+            p = _divs(templates.get_template("queue_mail.html").render(e={**e, "want": want}, section="needs"))
+            assert (p.stack, p.low) == ([], 0), ("card", want, e.get("row") or e.get("kind"), e["id"])
+
+
+@pytest.mark.unit
+def test_a_row_after_a_board_row_is_not_inside_it_so_a_team_pick_leaves_it_shown(tmp_path, monkeypatch):
+    """TD-967: the Inbox's filter sets `hidden` row by row, so a row drawn inside a board row is hidden
+    with it. Board rows of team *grind*, then mail and a state row of team *audit*: picked to *audit*,
+    the board rows are hidden and every other row is drawn at the top level, shown."""
+    from shiftlead.ui.app import templates
+
+    rows = _every_row(tmp_path, monkeypatch)
+    p = _divs(templates.get_template("inbox_rows.html").render(rows=rows, section="needs"))
+    assert set(p.inside) == {e["id"] for e in rows}
+    assert {r: o for r, o in p.inside.items() if o} == {}
