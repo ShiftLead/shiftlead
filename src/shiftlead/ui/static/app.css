@@ -570,20 +570,6 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 /* open, it takes the bar's place (`--cbarh`, the bar and the gap above it) and grows up over the terminal's foot */
 .composer.overlay { position: absolute; left: 0; right: 0; bottom: calc(-1 * var(--cbarh, 0px)); max-height: calc(100% + var(--cbarh, 0px)); overflow: auto; z-index: 5; box-shadow: 0 -6px 18px rgba(0, 0, 0, .35); }
 .composerbar.under { visibility: hidden; }
-/* §4.5a **Focus pane: soft-key row** (TD-990): under the terminal on a phone or a coarse pointer, the keys they
-   have none of; its height is `--softh` on the wrap, which the composer opened over the terminal stands above */
-.softkeys { display: none; }
-@media (max-width: 720px), (pointer: coarse) {
-  .softkeys { display: flex; gap: 6px; padding: 6px 0 0; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
-  .softkeys button { flex: none; min-width: 44px; height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--card); color: var(--fg); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono);
-    touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
-  .softkeys button.down { background: var(--hover); border-color: var(--fg); }
-  .softkeys.dim button { opacity: .45; }
-}
-@media (pointer: coarse) and (min-width: 721px) {
-  .composer.overlay { bottom: var(--softh, 0px); max-height: calc(100% - var(--softh, 0px)); }
-}
 .composer.overlay.folded { display: none; } .composer.overlay textarea { height: auto; }
 .composerbar { padding: 6px 10px; align-items: center; }
 .composerbar .cbtext { min-width: 0; text-align: left; padding: 6px 4px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-body); cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -628,6 +614,20 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
      the tools stay at the right of the tabs' row, and the host is left off (above) */
   .barend { display: contents; } .readings { order: 1; flex-basis: 100%; } #usagechip { flex-shrink: 1; max-width: none; }
   .grid { grid-template-columns: 1fr; }
+}
+/* §4.5a **Focus pane: soft-key row** (TD-990): under the terminal on a phone or a coarse pointer, the keys they
+   have none of; its height is `--softh` on the wrap, which the composer opened over the terminal stands above */
+.softkeys { display: none; }
+@media (max-width: 720px), (pointer: coarse) {
+  .softkeys { display: flex; gap: 6px; padding: 6px 0 0; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .softkeys button { flex: none; min-width: 44px; height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--card); color: var(--fg); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono);
+    touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .softkeys button.down { background: var(--hover); border-color: var(--fg); }
+  .softkeys.dim button { opacity: .45; }
+}
+@media (pointer: coarse) and (min-width: 721px) {
+  .composer.overlay { bottom: var(--softh, 0px); max-height: calc(100% - var(--softh, 0px)); }
 }
 
 /* ---- the team-first Org (design §4.5 screen 1, §4.5a *team card: summary*, TD-176 slice 3) ---- */
