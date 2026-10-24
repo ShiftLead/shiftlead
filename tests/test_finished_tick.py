@@ -47,7 +47,7 @@ class _Home:
         monkeypatch.setattr(agent, "rpc_close", self._close)
         monkeypatch.setattr(agent, "_policy_send", self._send)
 
-    async def _close(self, id: str, closer: dict | None = None) -> dict:
+    async def _close(self, id: str, closer: dict | None = None, reap: bool | str = True) -> dict:
         s = self.agent.sessions[id]
         self.closers.append(closer)
         s.set_state("closed", confidence="scraped")
