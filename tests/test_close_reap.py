@@ -346,7 +346,7 @@ async def test_a_retry_after_the_directory_was_removed_by_hand(agent, repo):
         (Path(s["dir"]) / "scratch").write_text("x")
         assert (await c.call("close", id=s["id"]))["worktree_kept"] == "1 uncommitted"
         shutil.rmtree(s["dir"])
-        agent._clear_gone_kept()  # the tick's check: the directory is gone, so it no longer says kept
+        await agent._clear_gone_kept()  # the tick's check: the directory is gone, so it no longer says kept
         assert agent.sessions[s["id"]].worktree_kept is None
         got = await c.call("close", id=s["id"])
         assert got["worktree_reaped_at"] and sorted(got["branches_deleted"]) == ["w", "x"] and got["branch_kept"] == {}
@@ -391,9 +391,94 @@ async def test_the_ticks_check_passes_over_a_reap_still_running_and_a_tree_still
         (Path(s["dir"]) / "scratch").write_text("x")
         await c.call("close", id=s["id"])
     rec = agent.sessions[s["id"]]
-    agent._clear_gone_kept()
+    await agent._clear_gone_kept()
     assert rec.worktree_kept == "1 uncommitted"  # still there
     rec.dir = str(repo / "gone")
     rec.worktree_reaping = {"at": "t", "branch": "w"}
-    agent._clear_gone_kept()
+    await agent._clear_gone_kept()
     assert rec.worktree_kept == "1 uncommitted"  # the reap's own to write
+
+
+async def test_a_retry_over_a_detached_stale_entry_weighs_the_launch_branch_alone(agent, repo):
+    import shutil
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        git(repo, "branch", "-q", "y")  # a branch the detached tree never names
+        git(s["dir"], "checkout", "-q", "--detach")
+        (Path(s["dir"]) / "scratch").write_text("x")
+        assert (await c.call("close", id=s["id"]))["worktree_kept"] == "1 uncommitted"
+        shutil.rmtree(s["dir"])
+        got = await c.call("close", id=s["id"])
+    assert got["branches_deleted"] == ["w"] and got["branch_kept"] == {} and "y" in branches(repo)
+
+
+async def test_a_registration_not_read_stamps_nothing_and_a_retry_never_raises(agent, repo, monkeypatch):
+    import shutil
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        (Path(s["dir"]) / "scratch").write_text("x")
+        await c.call("close", id=s["id"])
+        shutil.rmtree(s["dir"])
+        monkeypatch.setattr("sessionorc.agent.reweigh_gone", lambda *a: None)
+        assert (await c.call("close", id=s["id"]))["worktree_reaped_at"] is None
+
+        def broken(*a):
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr("sessionorc.agent.reweigh_gone", broken)
+        got = await c.call("close", id=s["id"])
+    assert got["state"] == "closed" and got["worktree_reaped_at"] is None
+    assert not any(lk.locked() for lk in agent._dir_locks.values())
+
+
+async def test_a_cancelled_retry_holds_the_lock_until_the_thread_returns(agent, repo, monkeypatch):
+    import shutil
+    import threading
+
+    from sessionorc import gitinfo
+
+    gate, entered = threading.Event(), threading.Event()
+    real = gitinfo.reweigh_gone
+
+    def slow(*a):
+        entered.set()
+        gate.wait(10)
+        return real(*a)
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        (Path(s["dir"]) / "scratch").write_text("x")
+        await c.call("close", id=s["id"])
+    shutil.rmtree(s["dir"])
+    monkeypatch.setattr("sessionorc.agent.reweigh_gone", slow)
+    retry = asyncio.create_task(agent.rpc_close(s["id"]))
+    assert await asyncio.to_thread(entered.wait, 10)
+    retry.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await retry
+    assert any(k.startswith("worktree:") and lk.locked() for k, lk in agent._dir_locks.items())
+    gate.set()
+    for _ in range(200):
+        if not any(lk.locked() for lk in agent._dir_locks.values()):
+            break
+        await asyncio.sleep(0.05)
+    rec = agent.sessions[s["id"]]
+    assert not any(lk.locked() for lk in agent._dir_locks.values()) and rec.worktree_reaped_at
+    assert rec.branches_deleted == ["w"]  # written by the shielded task, though its close was cancelled
+
+
+async def test_a_retry_passes_over_a_record_not_made_here_and_a_reap_still_stamped(agent, repo):
+    found = repo / ".claude" / "worktrees" / "found"
+    git(repo, "worktree", "add", "-q", "-b", "found", str(found))
+    async with LocalClient() as c:
+        f = await c.call("create", name="f", dir=str(repo), worktree="found", **AGENT)
+        first = await c.call("close", id=f["id"])
+        assert first["worktree_kept"] == "not made here"
+        assert (await c.call("close", id=f["id"])) == first
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        await c.call("close", id=s["id"], reap=False)
+        agent.sessions[s["id"]].worktree_reaping = {"at": "t", "branch": "w"}
+        got = await c.call("close", id=s["id"])
+    assert got["worktree_reaped_at"] is None and Path(s["dir"]).is_dir()  # the start's recovery's to finish

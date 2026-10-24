@@ -729,7 +729,7 @@ def reweigh_gone(
     again the branches `kept` names; one never reaped (a directory removed by hand) reads its checked-out branch
     from `git worktree list --porcelain`'s stale entry at `wt` (none when it has none or reads `detached`), runs
     `git worktree prune` and weighs that branch and `launch`. Answers `(deleted, kept)` as `weigh_branches`
-    does, or None when the registration could not be read; never raises."""
+    does, or None when the registration could not be read or pruned, so nothing is stamped; never raises."""
     if reaped:
         return weigh_branches(repo, list(kept or {}))
     cp = _run(["git", "-C", str(repo), "worktree", "list", "--porcelain"], REAP_STEP)
@@ -742,7 +742,9 @@ def reweigh_gone(
         if lines and lines[0].startswith("worktree ") and os.path.realpath(lines[0][9:]) == want:
             branch = next((x[7:].removeprefix("refs/heads/") for x in lines if x.startswith("branch ")), None)
             break
-    _run(["git", "-C", str(repo), "worktree", "prune"], REAP_STEP)  # frees the branch for `-D`, the path for `add`
+    pruned = _run(["git", "-C", str(repo), "worktree", "prune"], REAP_STEP)  # frees the branch and the path
+    if pruned is None or pruned.returncode != 0:
+        return None
     return weigh_branches(repo, [branch, launch])
 
 
