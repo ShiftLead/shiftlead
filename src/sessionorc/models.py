@@ -92,6 +92,12 @@ NODE_OWNED = frozenset(
         "files",
         "links",
         "prompts",
+        "worktree_made",
+        "worktree_kept",
+        "worktree_reaped_at",
+        "worktree_reaping",
+        "branch_kept",
+        "branches_deleted",
         "wrapup_sent_at",
         "gated",
         "wrapup_at",
@@ -1056,6 +1062,18 @@ class Session:
     # `RECENT_PROMPTS` — the Focus Prompts card's rows. `from` is who typed it: `person`, a session's id,
     # `brief` or `system`, set once from `sends`. Read on the record's host, so the node's.
     prompts: list[dict[str, Any]] = field(default_factory=list)
+    # A close's reap of the worktree its start made (design §4.1 *A close reaps the worktree it made*, TD-979),
+    # the node's: `worktree_made` true when `ensure_worktree` created it (or a record it supersedes at the same
+    # `dir` had it), false when the start found it, None for a record from before the build. A close then
+    # writes `worktree_kept` (why it stayed) or `worktree_reaped_at`; `worktree_reaping` `{at, branch}` is
+    # stamped before `--dehydrate` and cleared at the end; `branch_kept` maps a branch the reap kept to why,
+    # and `branches_deleted` names those it deleted.
+    worktree_made: bool | None = None
+    worktree_kept: str | None = None
+    worktree_reaped_at: str | None = None
+    worktree_reaping: dict[str, Any] | None = None
+    branch_kept: dict[str, str] = field(default_factory=dict)
+    branches_deleted: list[str] = field(default_factory=list)
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
     # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):
