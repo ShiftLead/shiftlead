@@ -449,6 +449,34 @@ class RemoteMixin:
             raise RpcError(f"{host} did not answer {method}: {e or 'the link dropped'}") from None
         return naming.readdress(reply, lambda a: self._from_host(a, host))
 
+    def _shared_inside(self, host: str, rid: str, directory: str) -> str | None:
+        """A live record that the home holds inside `directory` on a host other than `host` that shares the
+        checkout — the home's own, or another container node's — as `<id>@<host>`, or `<host> unreachable` for a
+        sharing node whose link is down, for a close's reap of `rid@host` (design §4.1 *A close reaps the worktree it
+        made*); None when there is none."""
+        if not directory:
+            return None
+        wt = Path(directory).resolve()
+
+        def inside(r: Any) -> bool:
+            if r.state in ("exited", "closed") or not r.dir:
+                return False
+            p = Path(r.dir).resolve()
+            return p == wt or wt in p.parents
+
+        for r in list(self.sessions.values()):
+            if r.id != rid and inside(r):
+                return f"{r.id}@{self.host}"
+        for other in containers.container_nodes():
+            if other == host:
+                continue
+            if not (self.links.get(other) or {}).get("up"):
+                return f"{other} unreachable"  # its unseen record could be inside (§4.1 *idle*)
+            for r in list(self.remote.get(other, {}).values()):
+                if inside(r):
+                    return f"{r.id}@{other}"
+        return None
+
     async def _route_act(self, method: str, params: dict[str, Any], caller: Any, host: str) -> Any:
         """An act on another host's record, gated here already: executed by that host's node and
         its verdict returned (§4.4a). Refused in words — never queued — while the link is down.
@@ -467,6 +495,12 @@ class RemoteMixin:
         mux = self._node_mux(host)
         sent = dict(params)
         sent.pop("prompt_from", None)  # the launch record's alone, and the home writes a node's (§6 rule 7)
+        if home_copy is not None and sent.get("reap", True) is True and host in containers.container_nodes():
+            # a record the home holds on a host sharing the directory is inside: the node cannot see it, and
+            # `worktree_kept` is the node's to write, so the why goes as the close's `reap` (§4.1, TD-979)
+            held = await asyncio.to_thread(self._shared_inside, host, rid, home_copy.dir)
+            if held:
+                sent["reap"] = held if held.endswith(" unreachable") else f"in use by {held}"
         if rid:
             sent["id"] = rid
         for key in ("controllers", "add", "remove") if method in ("create", "set_controllers") else ():

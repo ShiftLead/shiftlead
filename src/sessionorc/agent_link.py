@@ -339,7 +339,8 @@ class LinkMixin:
             asked = p.pop("host", None)
             if asked and asked != self.host:
                 raise link.LinkError(f"a {rpc} for {asked} is not {self.host}'s: not my host")
-        method = getattr(self, f"rpc_{rpc}")
+        # a close's string `reap` is the home's word whoever closed (§4.1), so the gate on it is the socket's alone
+        method = self._close if rpc == "close" else getattr(self, f"rpc_{rpc}")
         if ignored := _drop_unknown(method, p):
             log.warning("act %s from the home: ignored unknown params %s", rpc, ", ".join(ignored))
         if "caller" in inspect.signature(method).parameters:

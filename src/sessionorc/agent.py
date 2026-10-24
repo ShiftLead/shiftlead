@@ -23,6 +23,7 @@ import os
 import secrets
 import signal
 import socket
+import subprocess
 import sys
 import time
 from collections import OrderedDict, defaultdict
@@ -224,7 +225,21 @@ from sessionorc.agent_spend import SpendMixin
 from sessionorc.agent_sync import SyncMixin
 from sessionorc.agent_tick import TickMixin
 from sessionorc.agent_wake import WakeMixin
-from sessionorc.gitinfo import GitPickError, WorktreeError, ensure_worktree, git_info, pick_files, work_left
+from sessionorc.gitinfo import (
+    REAP_STEP,
+    REAP_WITHIN,
+    TIMED_OUT,
+    GitPickError,
+    WorktreeError,
+    ensure_worktree,
+    git_info,
+    main_checkout,
+    pick_files,
+    reap_worktree,
+    rehydrate,
+    weigh_branches,
+    work_left,
+)
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
     GRANTS,
@@ -251,6 +266,23 @@ from sessionorc.store import (
     UsageStore,
 )
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
+
+
+def _inherits_made(new: Session, old: Any) -> bool:
+    """Whether `new`, superseding `old`, inherits its `worktree_made`: `old` had it and the start reused its
+    worktree at the same `dir` — a restart, Resume, scheduled start, team Start, refill or New session under a
+    closed holder's name (design §4.1 *A close reaps the worktree it made*, TD-979)."""
+    return isinstance(old, Session) and bool(old.worktree_made) and old.dir == new.dir
+
+
+def _migrate_made(s: Session, host: str) -> bool:
+    """The one-time mark of a record from before TD-979 (design §4.1): a team member's worktree is ShiftLead's by
+    construction, so an absent `worktree_made` on this host's record holding a `worktree`, a `team` and
+    `unattended` becomes true. Idempotent, and never touches a `False`. Answers whether it marked."""
+    if s.worktree_made is None and s.host == host and s.worktree and s.team and s.unattended:
+        s.worktree_made = True
+        return True
+    return False
 
 
 def _place_attachment(where: Path, name: str, place: Any) -> Path:
@@ -573,6 +605,8 @@ class HostAgent(
             if not s.host:  # a record written before TD-057 step 1: it ran here, so it is this host's
                 s.host = self.host
                 self.store.save(s)
+            if _migrate_made(s, self.host):
+                self.store.save(s)
         # (sender, client nonce) → the verdict its first send got (design §4.4a "Delivery and
         # time"): a retry after a reconnect never lands twice and is not an identical repeat —
         # it returns the original verdict. Bounded, oldest out, in memory only.
@@ -846,6 +880,7 @@ class HostAgent(
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
         self.tmux.ensure_server()
+        await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
         # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
         server = await asyncio.start_unix_server(self._handle_conn, sock=_bound(sock), limit=link.FRAME_LIMIT)
         log.info("listening on %s", sock)
@@ -1247,18 +1282,38 @@ class HostAgent(
                     f"({ARG_LIMIT:,}): put text that long in a file and tell the session to read it "
                     "(design §4.3, TD-068)"
                 )
+        made = False  # whether this start created its worktree: the record's `worktree_made` (TD-979)
         if worktree:
             # Design §4.5 New session "new worktree": the checkout is the repo, the session runs in
             # `<repo>/.claude/worktrees/<name>` on branch <name>, created here if missing.
             repo_root = Path(repo).expanduser().resolve() if repo else directory
-            async with self._dir_locks[f"worktree:{repo_root}:{worktree}"]:  # two creates of one name: second reuses
-                try:
-                    directory = await asyncio.to_thread(ensure_worktree, repo_root, worktree)
-                except WorktreeError as e:
-                    raise RpcError(str(e)) from None
+            # two creates of one name: the second reuses. Keyed by the main checkout as `worktree_path`
+            # resolves it, as a close's reap keys it (§4.1 *A close reaps the worktree it made*, TD-979)
+            try:
+                main = await asyncio.to_thread(main_checkout, repo_root)
+            except WorktreeError as e:
+                raise RpcError(str(e)) from None
+            wt_lock = self._dir_locks[f"worktree:{main}:{worktree}"]
+            await wt_lock.acquire()
+            try:
+                directory, made = await asyncio.to_thread(ensure_worktree, repo_root, worktree)
+            except WorktreeError as e:
+                wt_lock.release()
+                raise RpcError(str(e)) from None
+            except BaseException:
+                wt_lock.release()
+                raise
             repo = str(directory.parent.parent.parent)  # <repo>/.claude/worktrees/<name> → the main checkout
+        else:
+            wt_lock = None
         async with contextlib.AsyncExitStack() as locks:
-            await locks.enter_async_context(self._dir_locks[str(directory)])
+            try:
+                # the directory's lock is taken before the worktree's is let go, so a reap — which takes them
+                # in the same order — never runs between `ensure_worktree` and the pane (TD-979)
+                await locks.enter_async_context(self._dir_locks[str(directory)])
+            finally:
+                if wt_lock is not None:
+                    wt_lock.release()
             # A name identifies one session per *scope* (§4.1), and a scope spans a repo's
             # worktrees — so the name check needs a lock on the scope, not just on this directory,
             # or two concurrent creates of one name from two worktrees would both pass it (review).
@@ -1416,6 +1471,7 @@ class HostAgent(
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
                 kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
                 s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
+            s.worktree_made = made or _inherits_made(s, holder)
             self.sessions[sid] = s
             self.store.save(s)
             if draft_dir is not None:  # the form's files are the new session's from here (§4.4, TD-630)
@@ -1513,6 +1569,7 @@ class HostAgent(
         kept = state == "closed" and bool(given.get("keep_mail")) and isinstance(holder, Session)
         if isinstance(holder, Session):
             s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
+        s.worktree_made = bool(given.get("made")) or _inherits_made(s, holder)
         self.sessions[sid] = s
         if kept:
             self._move_mail(holder, s)
@@ -1595,6 +1652,7 @@ class HostAgent(
             old.set_state("closed", confidence=old.confidence)
             old.closed_at = now_iso()
         new.supersedes = [*new.supersedes, {"id": old.id, "mail": True, "at": new.created}]
+        new.worktree_made = bool(new.worktree_made) or _inherits_made(new, old)
         self._move_mail(old, new)
         old.superseded_by = self._address(new)
         if self.mode != "node":
@@ -1810,6 +1868,7 @@ class HostAgent(
                 if new is not None:
                     self._move_mail(other, new)
                     new.supersedes.append({"id": other.id, "mail": True, "at": new.created})
+                    new.worktree_made = bool(new.worktree_made) or _inherits_made(new, other)
                 self.store.save(other)
         if replaced is not None and new is not None and replaced.id == new_sid and replaced.adapter_id == adapter_id:
             self._move_mail(replaced, new)
@@ -1912,7 +1971,7 @@ class HostAgent(
                 if not (self.links.get(host) or {}).get("up"):
                     continue
                 out += [f"{s.id}@{host} ({s.state})" for s in list(self.remote.get(host, {}).values()) if holds(s)]
-        for ext in adapters.external_sessions():
+        for ext in adapters.external_sessions()["items"]:
             if ext.tool_id and ext.tool_id in ours:
                 continue  # that is one of ours, seen through the tool's registry
             if Path(ext.cwd).resolve() == directory:
@@ -1940,7 +1999,7 @@ class HostAgent(
         for s in records:
             if s.state not in rest:
                 return s.name
-        for ext in adapters.external_sessions():
+        for ext in adapters.external_sessions()["items"]:
             if ext.tool_id and ext.tool_id in ours:
                 continue
             if Path(ext.cwd).resolve() == directory and ext.status != "idle":
@@ -1958,7 +2017,7 @@ class HostAgent(
             if s.adapter_id == adapter_id and s.state not in ("exited", "closed")
         ]
         ours = {s.adapter_id for s in self.sessions.values() if s.adapter_id}
-        for ext in adapters.external_sessions():
+        for ext in adapters.external_sessions()["items"]:
             if ext.tool_id == adapter_id and ext.tool_id not in ours:
                 out.append(f"{ext.name} ({ext.adapter}, outside shiftlead{', ' + ext.status if ext.status else ''})")
         return out
@@ -2022,17 +2081,31 @@ class HostAgent(
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
 
-    async def rpc_close(self, id: str, caller: Any = None, closer: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def rpc_close(
+        self, id: str, caller: Any = None, closer: dict[str, Any] | None = None, reap: bool | str = True
+    ) -> dict[str, Any]:
         """End a session and keep its record (§4.5a **Close**). Writes `closer: {by, why, at}`
         (§4.5 row 5 (b), TD-265): `by` is `person` when the envelope carries no caller, else the
         caller's id. `closer` is the tick's own word (`{"by": "tick", "why": …}`) or the home's,
         handed on to a node over the link; it is taken only from a call with no session caller, so
-        a session can never write *closed by the tick* or another's name."""
+        a session can never write *closed by the tick* or another's name. `reap` (§4.1 *A close reaps
+        the worktree it made*, TD-979): `True` reaps the worktree the record's start made, `False` is a
+        restart's and keeps it saying nothing, a string is the home's why to write as `worktree_kept` —
+        taken only from a call with no session caller on this socket, as `closer` is. A missing one reaps."""
+        if isinstance(reap, str) and not mail.is_person(caller):
+            raise RpcError("a close's reap why is the home's word: a session closes with reap true or false")
+        return await self._close(id, caller, closer, reap)
+
+    async def _close(
+        self, id: str, caller: Any = None, closer: dict[str, Any] | None = None, reap: bool | str = True
+    ) -> dict[str, Any]:
+        """`rpc_close` past its gate. A close the home routed here (`_act`) comes in at this door: a string
+        `reap` over the link is the home's why whatever session closed (§4.1), so it is never refused."""
         s = self._get(id)
         if s.state == "scheduled":
             # **Cancel** (design §6 *Start time*, §4.5a): nothing ran, so there is nothing to keep —
             # the record and its launch record are forgotten and the directory's slot is free
-            return await self._cancel_start(s)
+            return await self._cancel_start(s, reap)
         await asyncio.to_thread(self.tmux.kill_session, id)
         s.set_state("closed", confidence="tick")
         s.pane = False
@@ -2047,7 +2120,175 @@ class HostAgent(
         self.store.save(s)
         self._asker_gone(s, self._address(s))  # its open questions to the person close with it (§4.10)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
+        if await self._reap(s, reap):  # after the `closed` save, so a crash midway leaves a record to retry
+            await self._push_changes()
         return s.view()
+
+    # -- a close's reap of the worktree its start made (design §4.1 *A close reaps the worktree it made*) --
+
+    async def _reap(self, s: Session, reap: bool | str) -> bool:
+        """Reap `s`'s worktree as its close's `reap` says, writing the result on the record: `worktree_kept`
+        with its why, or `worktree_reaped_at` with `branches_deleted` and `branch_kept`. Only a record with
+        an agent whose start made its worktree is reaped; one that named a worktree it did not make reads
+        *not made here*. Never raises: a reap that fails leaves the record closed. Answers whether it wrote."""
+        if reap is False or not adapters.has_agent(s.adapter):
+            return False
+        if isinstance(reap, str):
+            if not (s.worktree or s.worktree_made):
+                return False  # no worktree: nothing to keep, and nothing said
+            s.worktree_kept = reap
+        elif not s.worktree_made:
+            if not s.worktree:
+                return False
+            s.worktree_kept = "not made here"
+        else:
+            deadline = time.monotonic() + REAP_WITHIN
+            task = asyncio.ensure_future(self._reap_locked(s, deadline))
+            task.add_done_callback(lambda t: t.cancelled() or t.exception())  # retrieved, should the close go
+            try:
+                # shielded: a dropped link or a client that gives up never lets the locks go while the thread
+                # is still removing the tree
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001 — never raise out of the close
+                log.warning("%s: its reap failed: %s", s.id, e)
+                s.worktree_reaping = None
+                s.worktree_kept = f"the reap failed: {str(e) or type(e).__name__}"
+        self.store.save(s)
+        return True
+
+    async def _reap_locked(self, s: Session, deadline: float) -> None:
+        """The reap under the per-name worktree lock `rpc_create` takes around `ensure_worktree`, then the
+        directory's, each awaited only for what is left of `REAP_WITHIN` and both held until the thread
+        returns."""
+        wt = Path(s.dir)
+        name = s.worktree or wt.name
+        loop = asyncio.get_running_loop()
+
+        def left() -> float:
+            return deadline - time.monotonic()
+
+        try:
+            main = await asyncio.to_thread(main_checkout, wt)
+        except WorktreeError:
+            main = wt.parent.parent.parent
+        async with contextlib.AsyncExitStack() as locks:
+            for key in (f"worktree:{main}:{name}", str(wt)):
+                lock = self._dir_locks[key]
+                try:
+                    await asyncio.wait_for(lock.acquire(), max(left(), 0.01))
+                except TimeoutError:
+                    self._reaped(s, {"kept": "busy: a start is using it"})
+                    return
+                locks.callback(lock.release)
+            while await asyncio.to_thread(self.tmux.has_session, s.id):
+                if left() <= REAP_STEP:
+                    self._reaped(s, {"kept": TIMED_OUT})  # the pane outlived what is left of the deadline
+                    return
+                await asyncio.sleep(0.1)  # after the kill, once the pane is gone: nothing writes into the tree
+
+            running = [True]
+
+            def stamp(branch: str | None) -> None:
+                async def put() -> None:  # on the loop, which owns the record; never after the reap ended
+                    if running[0]:
+                        s.worktree_reaping = {"at": now_iso(), "branch": branch}
+                        self.store.save(s)
+
+                asyncio.run_coroutine_threadsafe(put(), loop).result(REAP_STEP)
+
+            try:
+                got = await asyncio.to_thread(
+                    reap_worktree, wt, name, deadline=deadline, idle=lambda: self._reap_idle(s, wt), on_reaping=stamp
+                )
+            finally:
+                running[0] = False
+            self._reaped(s, got)
+
+    def _reaped(self, s: Session, got: dict[str, Any]) -> None:
+        """Write a reap's result on the record, saved here so a close cancelled midway still keeps it, and the log."""
+        s.worktree_reaping = None
+        if "kept" in got:
+            s.worktree_kept = str(got["kept"])
+            self.store.save(s)
+            log.info("%s: its worktree %s is kept: %s", s.id, s.dir, s.worktree_kept)
+            return
+        s.worktree_kept = None
+        s.worktree_reaped_at = now_iso()
+        s.branches_deleted = list(got.get("branches_deleted") or [])
+        s.branch_kept = dict(got.get("branch_kept") or {})
+        self.store.save(s)
+        log.info(
+            "%s: its worktree %s is reaped; branches deleted %s, kept %s",
+            s.id,
+            s.dir,
+            s.branches_deleted,
+            s.branch_kept,
+        )
+
+    def _reap_idle(self, s: Session, wt: Path) -> str | None:
+        """The reaper's *idle*, through ShiftLead's own seams (§4.1): no live record of any adapter, a shell's
+        included, has its `dir` inside `wt` — this host's, and while their link is up those of the container
+        nodes that share the directory (a link down keeps as *<host> unreachable*) — and no session outside
+        ShiftLead is inside; a blind adapter keeps. `s` itself, and an outside session whose tool id is one of
+        ours, never count. Run in a thread: it reads copies of the maps."""
+        wt = wt.resolve()
+
+        def inside(d: str) -> bool:
+            p = Path(d).resolve()
+            return p == wt or wt in p.parents
+
+        mine = list(self.sessions.values())
+        ours = {r.adapter_id for r in mine if r.adapter_id}
+        for r in mine:
+            if r.id != s.id and r.state not in ("exited", "closed") and r.dir and inside(r.dir):
+                return f"in use by {r.id}"
+        if self.mode == "home" and self.remote:
+            for host in containers.container_nodes():
+                if not (self.links.get(host) or {}).get("up"):
+                    return f"{host} unreachable"
+                for r in list(self.remote.get(host, {}).values()):
+                    ours.add(r.adapter_id or "")
+                    if r.state not in ("exited", "closed") and r.dir and inside(r.dir):
+                        return f"in use by {r.id}@{host}"
+        seen = adapters.external_sessions()
+        if seen["blind"]:
+            return f"{seen['blind'][0]} sessions could not be read"
+        for ext in seen["items"]:
+            if ext.tool_id and ext.tool_id in ours:
+                continue
+            if ext.cwd and inside(ext.cwd):
+                return f"in use by {ext.name} ({ext.adapter}, outside shiftlead)"
+        return None
+
+    def _recover_reaps(self) -> None:
+        """At the host agent's start, a record still stamped `worktree_reaping` was cut off midway (a promote,
+        a crash): its directory there, it is hydrated again and reads *interrupted*; gone, the remove had
+        finished, so it is `worktree_reaped_at`, `git worktree prune` runs and its branches are weighed."""
+        for s in list(self.sessions.values()):
+            if not s.worktree_reaping or s.host != self.host:
+                continue
+            wt = Path(s.dir)
+            try:
+                main = main_checkout(wt if wt.is_dir() else wt.parent.parent.parent)
+            except WorktreeError:
+                main = wt.parent.parent.parent
+            if wt.is_dir():
+                rehydrate(main, wt)
+                s.worktree_kept = "interrupted"
+            else:
+                with contextlib.suppress(OSError, subprocess.SubprocessError):
+                    subprocess.run(
+                        ["git", "-C", str(main), "worktree", "prune"], capture_output=True, timeout=REAP_STEP
+                    )
+                deleted, kept = weigh_branches(main, [s.worktree_reaping.get("branch"), s.worktree or wt.name])
+                s.worktree_kept = None
+                s.worktree_reaped_at = now_iso()
+                s.branches_deleted, s.branch_kept = deleted, kept
+            s.worktree_reaping = None
+            log.info("%s: a reap cut off at the last start: %s", s.id, s.worktree_kept or "reaped")
+            self.store.save(s)
 
     async def rpc_restart(self, id: str, caller: Any = None) -> dict[str, Any]:
         """A person's restart (design §6 rule 2 *A person's restart*, TD-250): what the tick would not
@@ -2067,11 +2308,11 @@ class HostAgent(
         params = self._restart_check(s, now)
         entry: dict[str, Any] = {"at": now_iso(), "why": "person"}
         read = await self._refill_prompt(s, params, entry)  # before the close: a read that raises touches nothing
-        if s.state == "idle":
+        if s.state == "idle":  # a restart keeps the worktree: the new run takes up its directory and branch
             if s.host == self.host:
-                await self.rpc_close(s.id)
+                await self.rpc_close(s.id, reap=False)
             else:
-                await self._route_act("close", {"id": s.id}, None, s.host)
+                await self._route_act("close", {"id": s.id, "reap": False}, None, s.host)
         try:
             if s.host == self.host:
                 view = await self.rpc_create(**params)
@@ -2891,10 +3132,14 @@ class HostAgent(
         await self._push_changes()
         return self._view(s)
 
-    async def _cancel_start(self, s: Session) -> dict[str, Any]:
+    async def _cancel_start(self, s: Session, reap: bool | str = True) -> dict[str, Any]:
         """A scheduled record cancelled (design §6 *Start time*): forgotten with its launch record, and
-        its open questions closed with it, as a close does."""
+        its open questions closed with it, as a close does. The worktree its scheduling made is reaped
+        under a close's tests (§4.1, TD-979); the record is forgotten, so a kept one is said in the reply."""
+        await self._reap(s, reap)
         view = {**s.view(), "state": "closed", "cancelled": True}
+        if s.worktree_kept:
+            log.info("%s: the cancel kept its worktree %s: %s", s.id, s.dir, s.worktree_kept)
         self._asker_gone(s, self._address(s), how="cancelled")
         self._forget(s.id)
         log.info("%s: its scheduled start cancelled", s.id)

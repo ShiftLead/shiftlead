@@ -209,11 +209,12 @@ def test_ensure_worktree_creates_reuses_and_validates(tmp_path):
     run("git", "add", "f", cwd=repo)
     run("git", "commit", "-q", "-m", "one", cwd=repo)
     run("git", "push", "-q", "-u", "origin", "main", cwd=repo)
-    wt = ensure_worktree(repo, "topic-1")
+    wt, made = ensure_worktree(repo, "topic-1")
+    assert made  # this call created it: the record's `worktree_made` (TD-979)
     assert wt == repo / ".claude" / "worktrees" / "topic-1" and (wt / "f").is_file()
     branch = subprocess.run(["git", "-C", str(wt), "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
     assert branch.stdout.strip() == "topic-1"
-    assert ensure_worktree(repo, "topic-1") == wt  # idempotent
+    assert ensure_worktree(repo, "topic-1") == (wt, False)  # idempotent, and found rather than made
     import pytest
 
     with pytest.raises(WorktreeError, match="letters, digits"):
@@ -233,14 +234,14 @@ def test_ensure_worktree_from_inside_a_worktree_and_without_origin(tmp_path):
     (repo / "f").write_text("1")
     run("git", "add", "f", cwd=repo)
     run("git", "commit", "-q", "-m", "one", cwd=repo)
-    wt1 = ensure_worktree(repo, "wt1")
+    wt1, _ = ensure_worktree(repo, "wt1")
     assert wt1 == repo / ".claude" / "worktrees" / "wt1"
     # called with the worktree as the "repo": lands beside wt1 under the main checkout, not nested
-    wt2 = ensure_worktree(wt1, "wt2")
+    wt2, _ = ensure_worktree(wt1, "wt2")
     assert wt2 == repo / ".claude" / "worktrees" / "wt2"
     # an existing local branch with no worktree yet is checked out, not recreated
     run("git", "branch", "pre-made", cwd=repo)
-    wt3 = ensure_worktree(repo, "pre-made")
+    wt3, _ = ensure_worktree(repo, "pre-made")
     head = subprocess.run(["git", "-C", str(wt3), "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
     assert head.stdout.strip() == "pre-made"
 
@@ -278,7 +279,7 @@ def test_a_new_worktree_is_set_up_by_the_repos_worktree_setup(tmp_path):
     run("git", "add", "f", cwd=repo)
     run("git", "commit", "-q", "-m", "one", cwd=repo)
     assert worktree_setup(repo) == ("absent", None)
-    plain = ensure_worktree(repo, "plain")
+    plain, _ = ensure_worktree(repo, "plain")
     assert sorted(p.name for p in plain.iterdir()) == [".git", "f"], "no setup: nothing runs"
 
     hydrate = repo / "scripts" / "hydrate_worktree.sh"
@@ -287,17 +288,17 @@ def test_a_new_worktree_is_set_up_by_the_repos_worktree_setup(tmp_path):
     assert worktree_setup(repo) == ("absent", None), "a script that cannot be run is no default"
     os.chmod(hydrate, 0o755)
     assert worktree_setup(repo) == ("defaulted", "scripts/hydrate_worktree.sh")
-    assert (ensure_worktree(repo, "hydrated") / ".hydrated").is_file()
+    assert (ensure_worktree(repo, "hydrated")[0] / ".hydrated").is_file()
 
     for text in ("worktree_setup: ''\n", "worktree_setup: [a]\n", "worktree_setup: [\n"):
         (repo / ".shiftlead.yml").write_text(text)
         assert worktree_setup(repo)[0] == "defaulted", text
     (repo / ".shiftlead.yml").write_text("worktree_setup: ' pwd > .setup-ran; echo \"$1\" >> .setup-ran '\n")
     assert worktree_setup(repo) == ("set", 'pwd > .setup-ran; echo "$1" >> .setup-ran')
-    wt = ensure_worktree(repo, "set")
+    wt, _ = ensure_worktree(repo, "set")
     assert (wt / ".setup-ran").read_text().split() == [str(wt)] * 2, "run in the new worktree, its path $1"
     assert not (wt / ".hydrated").exists(), "the configured command, not the default"
-    assert not (ensure_worktree(repo, "set") / ".hydrated").exists() and (wt / ".setup-ran").is_file()
+    assert not (ensure_worktree(repo, "set")[0] / ".hydrated").exists() and (wt / ".setup-ran").is_file()
     (wt / ".setup-ran").unlink()
     ensure_worktree(repo, "set")
     assert not (wt / ".setup-ran").exists(), "a worktree that exists is reused, not set up again"

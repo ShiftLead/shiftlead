@@ -202,7 +202,7 @@ def _rec(name: str, directory: Path, state: str, adapter: str = "shell") -> Sess
 async def test_the_root_is_at_rest_only_when_every_session_there_is(agent, repo, monkeypatch):
     root, _ = repo
     await park_ticks(agent)
-    monkeypatch.setattr(adapters, "external_sessions", lambda: [])
+    monkeypatch.setattr(adapters, "external_sessions", lambda: {"items": [], "blind": []})
     assert agent.pull_occupant(root) is None  # no session at all is idle
     for state in ("idle", "exited", "closed"):
         agent.sessions["ao-x-main"] = _rec("main", root, state, adapter="claude-code")
@@ -218,7 +218,8 @@ async def test_the_root_is_at_rest_only_when_every_session_there_is(agent, repo,
     assert agent.pull_occupant(root) is None
 
     def ext(status):
-        return [ExternalSession(adapter="claude-code", cwd=str(root), name="vscode", tool_id="t-1", status=status)]
+        items = [ExternalSession(adapter="claude-code", cwd=str(root), name="vscode", tool_id="t-1", status=status)]
+        return {"items": items, "blind": []}
 
     for status, want in (("idle", None), ("busy", "vscode"), ("shell", "vscode"), (None, "")):
         monkeypatch.setattr(adapters, "external_sessions", lambda status=status: ext(status))
@@ -228,7 +229,7 @@ async def test_the_root_is_at_rest_only_when_every_session_there_is(agent, repo,
 async def test_the_home_pass_pulls_and_host_carries_the_reading(agent, repo, monkeypatch):
     root, other = repo
     await park_ticks(agent)
-    monkeypatch.setattr(adapters, "external_sessions", lambda: [])
+    monkeypatch.setattr(adapters, "external_sessions", lambda: {"items": [], "blind": []})
     reg = hosts.default_repos_registry()
     reg.parent.mkdir(parents=True, exist_ok=True)
     reg.write_text(f"{root}\n")

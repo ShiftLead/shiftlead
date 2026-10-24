@@ -46,17 +46,21 @@ class WorktreeError(RuntimeError):
 WORKTREES_DIR = ".claude/worktrees"  # design §5 default; Claude Code's own `--worktree` uses the same place
 
 
-def worktree_path(repo: Path, name: str) -> Path:
+def worktree_path(repo: Path, name: str, timeout: float | None = None) -> Path:
     """Where `ensure_worktree` puts (or finds) the worktree `name` of `repo`: under the MAIN
     checkout's `.claude/worktrees/`, even when `repo` is a worktree or a subdirectory of it —
     `--show-toplevel` would answer with the worktree and nest the new one under it (cadence §9
     path-resolution; review 2026-09-06). Read-only: the one resolution every check of that path
-    shares (review of PR #215)."""
-    common = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", "--path-format=absolute", "--git-common-dir"],
-        capture_output=True,
-        text=True,
-    )
+    shares (review of PR #215). `timeout` bounds the read, as a reap's every git call is (TD-979)."""
+    try:
+        common = subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise WorktreeError(f"{repo}: git did not say where its checkout is within {timeout:g} s") from None
     if common.returncode != 0:
         raise WorktreeError(f"{repo} is not a git repository")
     return Path(common.stdout.strip()).parent / WORKTREES_DIR / name
@@ -95,12 +99,13 @@ def worktree_setup(repo: Path | str) -> tuple[str, str | None]:
     return "absent", None
 
 
-def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
-    """`<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
+def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> tuple[Path, bool]:
+    """`(path, created)`: `<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
     (after a fetch) or from HEAD when there is no origin. Reused when it already exists. A new one is
     then set up by the repo's `worktree_setup` (§5 *The seams*, TD-589): a configured command, run by
     the shell in the new worktree with its path as `$1`, or by default the repo's own `scripts/hydrate_worktree.sh` when
-    present (dev-cadence repos), so the worktree gets the untracked pieces git leaves out."""
+    present (dev-cadence repos), so the worktree gets the untracked pieces git leaves out. `created` is whether
+    this call made it, which the record keeps as `worktree_made` (design §4.1 *A close reaps the worktree it made*)."""
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
         raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
     path = worktree_path(repo, name)
@@ -108,7 +113,7 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     if path.is_dir():
         if subprocess.run(["git", "-C", str(path), "rev-parse", "--git-dir"], capture_output=True).returncode != 0:
             raise WorktreeError(f"{path} exists but is not a worktree")
-        return path
+        return path, False
     path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "-C", str(repo), "fetch", "-q", "origin"], capture_output=True, timeout=timeout)
     base = "origin/HEAD"
@@ -127,7 +132,7 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
         raise WorktreeError(f"git worktree add failed: {cp.stderr.strip() or cp.stdout.strip()}")
     kind, command = worktree_setup(repo)
     if kind == "absent" or not command:
-        return path
+        return path, True
     if kind == "set":
         what, argv, cwd = command, ["sh", "-c", command, "sh", str(path)], str(path)  # the path its `$1`
     else:
@@ -139,7 +144,7 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     if hp.returncode != 0:
         # The worktree exists and is usable; say what the setup left out rather than hide it.
         raise WorktreeError(f"worktree created at {path}, but {what} failed: {(hp.stderr or hp.stdout).strip()[-400:]}")
-    return path
+    return path, True
 
 
 def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
@@ -476,9 +481,9 @@ TIMED_OUT = "timed out"
 NOT_WEIGHED = "could not be weighed"
 
 
-def main_checkout(directory: Path | str) -> Path:
-    """The main checkout of the repo `directory` is in, as `worktree_path` resolves it."""
-    return worktree_path(Path(directory), "x").parent.parent.parent
+def main_checkout(directory: Path | str, timeout: float = REAP_STEP) -> Path:
+    """The main checkout of the repo `directory` is in, as `worktree_path` resolves it, the read bounded."""
+    return worktree_path(Path(directory), "x", timeout).parent.parent.parent
 
 
 def _hydrate_script(repo: Path) -> Path | None:
@@ -559,6 +564,22 @@ def ignored_blockers(wt: Path, repo: Path, timeout: float = REAP_STEP) -> list[s
     return out
 
 
+def _dirty(wt: Path, timeout: float) -> int | None:
+    """The tracked and untracked files `git_info` counts as `dirty`, read in one `git status` and none of
+    `git_info`'s follow-up reads, so the test stays inside one step's allowance; None when git could not say."""
+    cp = _run(["git", "-C", str(wt), "status", "--porcelain=v2", "-z", "--untracked-files=normal"], timeout)
+    if cp is None or cp.returncode != 0:
+        return None
+    n, fields, i = 0, cp.stdout.split("\0"), 0
+    while i < len(fields):
+        line = fields[i]
+        i += 1
+        if line[:2] in ("1 ", "2 ", "? ", "u "):
+            n += 1
+            i += line.startswith("2 ")  # a rename's source is the next field
+    return n
+
+
 def _locked(repo: Path, wt: Path, timeout: float) -> bool | None:
     """`git worktree list --porcelain`'s `locked` for `wt`, or None when it could not be read."""
     out = _git(repo, "worktree", "list", "--porcelain", timeout=timeout)
@@ -583,11 +604,11 @@ def worktree_holds(wt: Path, repo: Path, deadline: float, *, idle=None) -> str |
 
     if left() <= 0:
         return TIMED_OUT
-    info = git_info(wt, timeout=left())  # tracked and untracked, as the card counts them
-    if info is None:
+    dirty = _dirty(wt, left())
+    if dirty is None:
         return UNKNOWN
-    if info.dirty:
-        return f"{info.dirty} uncommitted"
+    if dirty:
+        return f"{dirty} uncommitted"
     if left() <= 0:
         return TIMED_OUT
     blockers = ignored_blockers(wt, repo, left())

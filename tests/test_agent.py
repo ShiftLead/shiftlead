@@ -306,8 +306,57 @@ async def test_create_in_new_worktree(agent, tmp_path):
         )
         assert s["dir"] == str(repo / ".claude" / "worktrees" / "td-9") and s["repo"] == str(repo)
         assert (repo / ".claude" / "worktrees" / "td-9" / "README").is_file()
+        assert s["worktree_made"] is True  # this start made it, so its close may reap it (TD-979)
         with pytest.raises(AgentError, match="letters, digits"):
             await c.call("create", name="bad", dir=str(repo), adapter="shell", worktree="a b")
+
+
+async def test_worktree_made_is_inherited_at_the_same_dir_and_false_for_a_found_worktree(agent, tmp_path):
+    """Design §4.1 *A close reaps the worktree it made* (TD-979): a create under a closed holder's name that
+    reuses its worktree at the same `dir` inherits `worktree_made`; a worktree the start found is *not made
+    here*, and so is a plain directory."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for cmd in (["git", "init", "-q", "-b", "main"], ["git", "config", "user.email", "t@t"]):
+        subprocess.run(cmd, cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=repo, check=True)
+    (repo / "README").write_text("x")
+    subprocess.run(["git", "add", "README"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=repo, check=True)
+    found = repo / ".claude" / "worktrees" / "found"
+    subprocess.run(["git", "worktree", "add", "-q", "-b", "found", str(found)], cwd=repo, check=True)
+    shell = {"adapter": "shell", "argv": ["bash", "--norc"]}
+    async with LocalClient() as c:
+        first = await c.call("create", name="w", dir=str(repo), worktree="w", **shell)
+        assert first["worktree_made"] is True
+        await c.call("close", id=first["id"])
+        again = await c.call("create", name="w", dir=str(repo), worktree="w", **shell)
+        assert again["supersedes"][0]["id"] == first["id"] and again["worktree_made"] is True  # a restart's
+        by_hand = await c.call("create", name="f", dir=str(repo), worktree="found", **shell)
+        assert by_hand["worktree_made"] is False
+        plain = await c.call("create", name="p", dir=str(tmp_path), **shell)
+        assert plain["worktree_made"] is False
+
+
+def test_the_migration_marks_a_team_members_worktree_once_and_never_a_false():
+    from sessionorc.agent import _migrate_made
+
+    def rec(**kw):
+        return Session(id="x", name="x", kind="interactive", adapter="shell", dir="/d", host="h", **kw)
+
+    member = rec(worktree="m", team="t", unattended=True)
+    assert _migrate_made(member, "h") and member.worktree_made is True
+    assert not _migrate_made(member, "h") and member.worktree_made is True  # idempotent
+    for kw in (
+        {"worktree": "m", "team": "t", "unattended": True, "worktree_made": False},  # a post-build *not made here*
+        {"worktree": "m", "team": "", "unattended": True},  # a person's worktree-named session
+        {"worktree": "m", "team": "t", "unattended": False},
+        {"worktree": None, "team": "t", "unattended": True},
+    ):
+        other = rec(**kw)
+        assert not _migrate_made(other, "h") and other.worktree_made == kw.get("worktree_made")
+    elsewhere = rec(worktree="m", team="t", unattended=True)
+    assert not _migrate_made(elsewhere, "another-host")  # the node that holds it marks it
 
 
 async def test_occupancy_sees_own_and_external_sessions(agent, tmp_path, monkeypatch):

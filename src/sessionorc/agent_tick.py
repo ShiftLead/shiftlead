@@ -928,10 +928,10 @@ class TickMixin:
             log.info("%s: no hook reached it since its launch and its brief was not sent: relaunching it", s.id)
             try:
                 closer = {"by": "tick", "why": "lost-brief"}
-                if s.host == self.host:
-                    await self.rpc_close(s.id, closer=closer)
+                if s.host == self.host:  # a restart keeps the worktree (§4.1, TD-979)
+                    await self.rpc_close(s.id, closer=closer, reap=False)
                 else:
-                    await self._route_act("close", {"id": s.id, "closer": closer}, None, s.host)
+                    await self._route_act("close", {"id": s.id, "closer": closer, "reap": False}, None, s.host)
                 self._mark_closed(s, "lost-brief")
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 if s.state == "closed":  # a close that failed before it marked the record leaves no mark
@@ -1042,10 +1042,10 @@ class TickMixin:
         if s.state == "idle":
             try:
                 closer = {"by": "tick", "why": "wanted"}
-                if s.host == self.host:
-                    await self.rpc_close(s.id, closer=closer)
+                if s.host == self.host:  # a restart keeps the worktree (§4.1, TD-979)
+                    await self.rpc_close(s.id, closer=closer, reap=False)
                 else:
-                    await self._route_act("close", {"id": s.id, "closer": closer}, None, s.host)
+                    await self._route_act("close", {"id": s.id, "closer": closer, "reap": False}, None, s.host)
                 self._mark_closed(s, "wanted")
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 # `rpc_close` marks the record closed before its own tail runs, so a failure there
@@ -1181,7 +1181,7 @@ class TickMixin:
         log.info("%s: its %s changed and it is idle with its work pushed: restarting it", s.id, why)
         if s.state == "idle":
             try:
-                await self.rpc_close(s.id, closer={"by": "tick", "why": why})
+                await self.rpc_close(s.id, closer={"by": "tick", "why": why}, reap=False)  # a restart keeps it
                 self._mark_closed(s, why)
             except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
                 if s.state == "closed":  # a close that failed before it marked the record leaves no mark
@@ -1213,7 +1213,7 @@ class TickMixin:
             return False
         log.info("%s: idle %sh with %d tokens: restarting it on its brief rather than ringing", s.id, *lapsed.values())
         try:
-            await self.rpc_close(s.id, closer={"by": "tick", "why": "cache"})
+            await self.rpc_close(s.id, closer={"by": "tick", "why": "cache"}, reap=False)  # a restart keeps it
         except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
             if s.state != "closed":
                 s.restarts = [*s.restarts, {"at": now_iso(), "why": "cache", **lapsed, "error": f"close: {e}"}]
