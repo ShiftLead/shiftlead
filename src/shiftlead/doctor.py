@@ -1,22 +1,25 @@
 """`ao doctor`'s verdicts (design §4.7 **`ao doctor`**, TD-465 slice 2): the client's judgement of
-the host agent's `doctor` and `repos` readings, the promote's build line and `ao org check`'s reading —
-nine checks, in order, each line in `ao org check`'s words (*ok*, *warning*, *lacking*), every lack
-naming its cure, since the command repairs nothing. Pure: the readings come in, the lines go out,
-so each verdict is tested against a faked reading."""
+the host agent's `doctor` and `repos` readings, the promote's build line, `ao org check`'s reading
+and, on a node, the client's own `ao` on `PATH` — nine checks, in order, each line in `ao org check`'s
+words (*ok*, *warning*, *lacking*), every lack naming its cure, since the command repairs nothing.
+Pure: the readings come in, the lines go out, so each verdict is tested against a faked reading."""
 
 from __future__ import annotations
 
+import os
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import ledgerboard
+from sessionorc import containers, ledgerboard
 from sessionorc.models import TOLD
 
 CHECKS = ("agent", "tmux", "hooks", "identity", "profiles", "nodes", "org", "repos", "route")
-# the checks that read the home: on a node they say *home only* and count as neither (§4.7)
-HOME_ONLY = frozenset({"nodes", "org"})
+# the checks that read the home: on a node they say *home only* and count as neither (§4.7) — the
+# build against `main` (the agent line's) and org; the nodes row reads the node's own `ao` there (TD-998)
+HOME_ONLY = frozenset({"org"})
 # a queued hook line older than this the tick should have applied: it drains within a tick
 QUEUE_STALE = 60.0
 # how long a probe waits for its scratch launch's first hook (§4.7 `--probe`)
@@ -294,11 +297,19 @@ def profiles(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out or [_row("profiles", OK, "profiles — none defined")]
 
 
-def nodes(rows: list[dict[str, Any]], node: bool) -> list[dict[str, Any]]:
+def nodes(
+    rows: list[dict[str, Any]],
+    node: bool,
+    *,
+    ao_on_path: str | None = None,
+    prefix: str = sys.prefix,
+    name: str = "",
+) -> list[dict[str, Any]]:
     """Each linked node: its link and, for a container node, its build against the home's wheel —
-    `ao host status`' reading."""
+    `ao host status`' reading. On a node (TD-998), the node's own `ao`: whether `ao_on_path` (the
+    client's `shutil.which("ao")`), resolved, is this install's `<prefix>/bin/ao`."""
     if node:
-        return [_row("nodes", HOME, "nodes — read at the home")]
+        return [_ao_on_path(ao_on_path, prefix, name)]
     if not rows:
         return [_row("nodes", OK, "nodes — none linked")]
     out: list[dict[str, Any]] = []
@@ -317,6 +328,30 @@ def nodes(rows: list[dict[str, Any]], node: bool) -> list[dict[str, Any]]:
         build = f", build {b['running']} = home" if b.get("home") else ""
         out.append(_row("nodes", OK, f"node {name} — link up{build}", node=r))
     return out
+
+
+def _ao_on_path(which: str | None, prefix: str, name: str) -> dict[str, Any]:
+    """The nodes row on a node: *ok* when `ao` on `PATH` is this install's, else *lacking* with the
+    cure — a rebuild or the image's rename for a container node, a link or a rename for another."""
+    own = f"{prefix}/bin/ao"
+    container = prefix == containers.INSIDE_VENV
+    resolved = os.path.realpath(which) if which else None
+    raw = {"ao_on_path": which, "resolved": resolved, "prefix": prefix, "container": container}
+    if resolved is not None and resolved == os.path.realpath(own):
+        return _row("nodes", OK, "nodes — read at the home · `ao` on PATH", **raw)
+    if which is None:
+        cure = (
+            f"`ao host rebuild {name}` at the home"
+            if container
+            else f"link {own} into a PATH directory, e.g. ~/.local/bin/ao"
+        )
+        return _row("nodes", LACKING, f"nodes — `ao` not on PATH here, only {own} ({cure})", **raw)
+    cure = (
+        "the image's own `ao`: rename it in the repo's image"
+        if container
+        else f"remove or rename {which}, or put {own}'s link earlier on PATH"
+    )
+    return _row("nodes", LACKING, f"nodes — `ao` on PATH is {which} → {resolved}, not this install's ({cure})", **raw)
 
 
 def org(

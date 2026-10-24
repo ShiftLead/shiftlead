@@ -10,6 +10,7 @@ import math
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 from collections.abc import Callable, Mapping
@@ -2986,7 +2987,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         elif check == "profiles":
             rows += doctor.profiles(reading["profiles"])
         elif check == "nodes":
-            rows += doctor.nodes(reading["nodes"], node)
+            # the node's own `ao`, read in this process: the agent's PATH is not a shell's (TD-998)
+            on_path = shutil.which("ao") if node else None
+            rows += doctor.nodes(
+                reading["nodes"], node, ao_on_path=on_path, name=hosts.local_host().name if node else ""
+            )
         elif check == "route":
             rows += connect.route_line(_reach(), node=node)
         elif check == "repos":
