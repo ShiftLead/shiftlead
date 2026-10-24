@@ -57,7 +57,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 (done) |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
-| TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
+| TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check, blocked by TD-991 |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-902, TD-901, TD-903, TD-904, TD-905, TD-907 |
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Built (#2160, #2162) — live check |
@@ -74,6 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Designed — builds TD-989, TD-990 |
 | TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Built (#2320) — the phone look with Paul |
+| TD-991 | A member still waits on CI in its own turn — a foreground `timeout N gh pr checks --watch` — on a brief that says to run it in the background | Low | Open — design first |
 
 ---
 
@@ -1077,8 +1078,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** grinder
 **Kind:** live-check #2051
-**Waits:** until 2026-10-24 — a week of runs on the new briefs since #2051 went live; read the transcripts from then
-**Status:** Built (2026-10-17, #2051): §4.10, `ao --skill` and every role preset say a member never waits in its own turn and what wakes it. Live check, once #2051 is live (`ao promote status`) and a week of runs has started on the new briefs (2026-10-24): read the members' transcripts (`ao transcript <id>`, read-only) for a foreground wait loop — `sleep`, `tail -f /dev/null`, `timeout N` between `ao status` reads; none holds it, one found is a new entry.
+**Blocked by:** TD-991
+**Status:** Built (2026-10-17, #2051): §4.10, `ao --skill` and every role preset say a member never waits in its own turn and what wakes it. Live check, once #2051 is live (`ao promote status`) and a week of runs has started on the new briefs (2026-10-24): read the members' transcripts (`ao transcript <id>`, read-only) for a foreground wait loop — `sleep`, `tail -f /dev/null`, `timeout N` between `ao status` reads; none holds it, one found is a new entry. **Read 2026-10-24 06:05Z (grinder-ao-1)**: every unattended member's Claude Code transcript since #2051 went live (2026-10-17 20:43Z), read-only, the commands each ran in the foreground: no `tail -f /dev/null` and no loop of `ao status` reads anywhere — the polled loop this entry was filed for is gone. What is left is TD-991: on briefs carrying the new sentence, the techlead and the test auditor still waited on CI inside their turn (a foreground `timeout 110`–`1800 gh pr checks <n> --watch`, 2026-10-22 and 10-23), and members tried a foreground `sleep 100; cat <their background task's output>` that the tool refused (grinder-ao-2 10-24, dc-grinder and test-audit 10-23). This check waits on TD-991.
 **Location:** design §4.10 *Waiting on mail is ending the turn*, §4.2 *Working on its own*; `src/shiftlead/skill.md` (*Mail*: *Waiting on mail is ending the turn*); every role preset's first paragraph in `src/shiftlead/briefs/` (`grinder.md`, `designer.md`, `hunter.md`, `auditor.md`, `manager.md`, `manager_on_call.md`, `techlead.md`, and the `.stage.md` variants where they carry the line)
 
 **Why:**
@@ -1454,3 +1455,26 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Done when** a unit test pins the key-to-bytes table (both cursor modes); a template test shows the row present on a live record and absent on an ended one; and a Playwright check at 390 px with touch emulation on a scratch home (`scripts/look_home.py`), on a shell session, taps the terminal (so xterm's textarea is focused), types `ls /us`, presses the row's Tab and reads `/usr/` completed in the pane, with xterm's textarea still `document.activeElement` after the press and the screenshot named in the PR; the same check presses Esc, an arrow and a digit in a scrolled-back pane and reads `#{pane_in_mode}`: the arrow keeps copy mode, the digit leaves it (the bridge, TD-667), and Esc leaves it (tmux's own cancel in the default emacs table; the check runs with it); a `pointerup` off the key or on another key sends nothing, and a sideways pan of the row (ending in `pointercancel`) sends nothing; a reconnect neither shows nor hides the row (an unattended one's stays hidden, an attended one's stays shown and dimmed while down), and Hand back then a reconnect keeps it hidden; on a live shell with the page open, `exit` in the pane hides the row with no reload (the `fexited` side), and Resume (a reload) shows it again; the node probe drives `render()` with a live, attended view and shows the row while `paneGone` is false and leaves it hidden while true; a press between Take over's flip and its re-attach sends nothing and the row is dimmed then; at 390 px the open composer is static with `max-height: none`; with the socket closed the row is dimmed and a press sends nothing; on an unattended session the row is hidden from the first paint, and Take over shows it without a reload. At 1024 px with a coarse pointer (`has_touch`, `(pointer: coarse)` emulated) the row is drawn, and Take over / Hand back leave no gap and no overlap under the terminal, folded and with the composer open, and the open composer's bounding rect ends at or above the row's top (`#composerbar` is outside `.termwrap`, so the wrap's foot is the row's); at 1440 px with a fine pointer the row is not drawn. A unit test shows the arrows' bytes follow `term.modes.applicationCursorKeysMode`. The rest of TD-003's narrow mode stays TD-003's. Then a look on the phone (TD-290).
 
 **Related:** TD-986, TD-989, TD-003, TD-667 (Tab and Enter leave copy mode), TD-290.
+
+---
+
+## TD-991: A member still waits on CI in its own turn — a foreground `timeout N gh pr checks --watch` — on a brief that says to run it in the background
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (grinder-ao-1, from TD-850's live check)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — found by TD-850's live check; whether guidance can do more, or something should refuse the wait, is the design's question.
+**Location:** design §4.10 *Waiting on mail is ending the turn*; `src/shiftlead/briefs/techlead.md`, `src/shiftlead/briefs/auditor.md` (and the presets they share the sentence with); the Claude Code adapter's hooks, if a refusal is chosen (`src/shiftlead/adapters/claude_code/`)
+
+**Why:**
+- TD-850's live check (2026-10-24) read every unattended member's transcript since #2051 went live. The `tail -f /dev/null` loop between `ao status` reads is gone. A plainer form of the same wait is not: on runs whose brief carries *never wait inside your own turn … runs as one background command*, the techlead ran `timeout 1800 gh pr checks 2246 --watch` in the foreground (2026-10-22 02:43Z), and the test auditor ran `timeout 110`, `200` and `580 gh pr checks <n> --watch` in the foreground before its merges (#2258 on 10-22, #2301 on 10-23). Short `sleep 20; gh pr checks <n>` after a push, a single poll and not a loop, shows up in grinders and the designer too (10-22 to 10-24).
+- Members also try `sleep 100; cat <their own background task's output>` in the foreground. Claude Code refuses a long bare `sleep` itself, so it costs no wait, only a turn (grinder-ao-2 10-24 02:05Z, dc-grinder 10-23 00:31Z, test-audit-ao-1 ten times 10-18 to 10-23).
+- Each of these is one bounded command, not a turn spent on every pass, so the cost is far lower than TD-850's loop. Still, a session in a foreground watch is `working` and is not rung for mail until the watch ends (§4.10), which is what the sentence is there to prevent.
+
+**Fix:** design first. Two ways, perhaps both: (a) the sentence in the techlead's and auditor's presets, which are short-lived runs that merge their own PRs, names the exact pattern they use (`timeout N gh pr checks <n> --watch` before a merge) as the wait to put in the background; (b) the Claude Code adapter's PreToolUse hook refuses a foreground Bash call whose command waits on CI (`gh pr checks … --watch`) or sleeps, naming the background form, the way the tool already refuses a bare `sleep`. (b) touches every member's tool calls, so it needs the person's word (memory *agent settings are the person's*).
+
+**Done when** the design says which way, and TD-850's live check reads a week with no foreground CI wait.
+
+**Related:** TD-850 (the live check that found it), TD-153, TD-761.
