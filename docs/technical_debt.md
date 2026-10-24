@@ -1467,7 +1467,7 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Owner:** designer
 **Kind:** design-first
 **Blocked by:** TD-992
-**Status:** Designed 2026-10-24 (the designer, PR #2324): way (b), scoped — Claude Code's `PreToolUse` hook refuses a foreground `gh pr checks … --watch` or `gh run watch` on the main thread of an unattended record, the host agent's reply to the event saying the record is unattended (design §4.3 *A wait the guard refuses*). The briefs' words stay as they are: they already name the exact command, which was run in the foreground anyway. Built by TD-992.
+**Status:** Designed 2026-10-24 (the designer, PR #2324): way (b), scoped — Claude Code's `PreToolUse` hook refuses a foreground `gh pr checks … --watch` or `gh run watch` on the main thread of an unattended record, the host agent's reply to the event saying the record is unattended (design §4.3 *A wait the guard refuses*). The role presets' words stay as they are: each opening sentence already names the exact command, which was run in the foreground anyway; the held path's stage sentence (`grinder.stage.md`) names the watch with no *in the background*, and TD-992 adds it. Built by TD-992.
 **Location:** design §4.10 *Waiting on mail is ending the turn*; `src/shiftlead/briefs/techlead.md`, `src/shiftlead/briefs/auditor.md` (and the presets they share the sentence with); the Claude Code adapter's hooks, if a refusal is chosen (`src/shiftlead/adapters/claude_code/`)
 
 **Why:**
@@ -1496,13 +1496,15 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Fix:**
 - `wait_guard.waits(command) -> bool`: the command masked by `kill_guard.mask`, split on the kill guard's separators, each command's word found by `command_word` past its wrappers; true when one is `gh` whose next words are `pr checks` with `--watch` among its arguments, or `run watch`. Text only, no call.
 - The hook, on a `PreToolUse` of `Bash` the kill guard does not refuse, with no `agent_id`, `tool_input.run_in_background` not true and `waits(command)`: sets `wait: true` on the event's params, and prints `deny(wait_guard.REASON)` when the reply carries `refuse_wait: true`. The reply is the event's own `call_agent`; an error, a timeout or a queued event prints nothing.
-- `rpc_hook` pops `wait` as it pops `mail`, applies the event as before, and returns `refuse_wait: true` (merged with `unread` when both are asked) when the record it holds is `unattended`; a missing record answers nothing. On a node this is the node's replica (§4.4a).
+- `rpc_hook` pops `wait` as it pops `mail`, applies the event as before, and returns `refuse_wait: true` (merged with `unread` when both are asked) when the record it holds is `unattended`; a missing record answers nothing. On a node this is the node's replica (§4.4a), the `s.unattended` read `_by_rule` already makes there.
+- The queued copy of the event (`EventQueue().append`) leaves `wait` out, as Gemini CLI's hook leaves `mail` out of its own: a drained event goes straight to `_apply_event`, and nothing would answer it. The hook prints at most one decision: the kill guard's, before anything is sent, or the wait's, printed and flushed when the reply lands.
+- `src/shiftlead/briefs/grinder.stage.md`: *(`gh pr checks <n> --watch`: …)* becomes *(`gh pr checks <n> --watch`, in the background: …)*, so the held path's sentence says what every preset's opening sentence says.
 - `REASON`: *shiftlead: refused — a foreground CI watch in an unattended session; run the same command in the background (`run_in_background`) and end the turn: its end wakes you (design §4.10)*.
 
 **Done when:**
-- `waits` is true for `gh pr checks 12 --watch`, `timeout 1800 gh pr checks 12 --watch --interval 30`, `nohup gh run watch 99`, `cd x && gh pr checks 12 --watch`; false for `gh pr checks 12`, `sleep 20; gh pr checks 12`, `git commit -m "gh pr checks --watch"`, a here-document body naming it, `echo gh run watch`.
+- `waits` is true for `gh pr checks 12 --watch`, `timeout 1800 gh pr checks 12 --watch --interval 30`, `nohup gh run watch 99`, `cd x && gh pr checks 12 --watch`, `nohup gh pr checks 12 --watch >ci.log 2>&1 &` (a shell `&` is not the background form); false for `gh pr checks 12`, `sleep 20; gh pr checks 12`, `git commit -m "gh pr checks --watch"`, a here-document body naming it, `echo gh run watch`.
 - The hook, fed payloads with a stub host agent: a foreground watch on an unattended record prints the `deny` with `REASON`; the same with `run_in_background: true`, with an `agent_id`, on an interactive record, with the host agent down, or with a reply slower than the wait prints none and the event still reports `working`; a `kill $PPID` inside a watch command prints the kill guard's deny alone.
-- `rpc_hook` answers `refuse_wait` for an `unattended` record and not after a Take over flips it, and still answers `unread` with `mail`.
+- `rpc_hook` answers `refuse_wait` for an `unattended` record and not after a Take over flips it, and still answers `unread` with `mail`; an event queued while the host agent was down carries no `wait`.
 - TD-850's live check (it waits on TD-991) reads a week of members' transcripts after this is live with no foreground CI watch run; one refused shows as the tool's refusal, then the same command in the background.
 
-**Related:** TD-991 (its design), TD-850, TD-489 / TD-496 (the kill guard it sits beside).
+**Related:** TD-991 (its design), TD-850, TD-489 / TD-496 (the kill guard it sits beside). Gemini CLI's wiring (its `run_shell_command`'s `is_background`) is a follow-on: the builder files it once this is built.
