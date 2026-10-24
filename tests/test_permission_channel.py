@@ -218,3 +218,15 @@ async def test_a_permission_answered_in_the_terminal_leaves_the_stack(agent, noc
         agent._apply_event(sid, {"state": "idle", "pending": None})
         assert (await person.call("get", id=sid))["state"] == "idle"
         await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_permission_with_a_channel_waits_for_its_waiter(agent, hookstub, tmp_path):
+    """The same events on a tool with a channel leave its permission open: its waiter ends it (§4.2)."""
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="h", dir=str(tmp_path), adapter="hookstub"))["id"]
+        agent._apply_event(sid, {"state": "needs-you", "pending": {"kind": "permission", "text": "Bash: touch x"}})
+        agent._apply_event(sid, {"state": "working", "pending": None, "event": "PostToolUse:Bash"})
+        rec = await person.call("get", id=sid)
+        assert (rec["state"], rec["pending"]["kind"]) == ("needs-you", "permission")
+        await person.call("kill", id=sid)
