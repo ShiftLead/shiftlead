@@ -1126,7 +1126,7 @@ class Session:
     # Text the session holds from its start that is no prompt (design §4.3 `start_context`, TD-283):
     # no turn ran for it and nothing typed it. Set once at create and handed to every launch of the
     # conversation — a resume carries it whether or not it says so — so a page can show what the
-    # session was told beside the person's own words (§4.5a **Told at start**). None: there is none.
+    # session was told beside the person's own words (§4.5a **told at start** row). None: there is none.
     start_context: str | None = None
     # The brief, typed and never passed (design §4.1 *No prose in the argv*, TD-339): the first prompt
     # the adapter handed back (`LaunchSpec.first_prompt`) rather than put in the argv, kept until the

@@ -1,9 +1,9 @@
 """The pages of a record with no agent (design §4.3 *A record with no agent*, §4.5a *Focus, card: A record
 with no agent*, TD-665, built by TD-666 slice 2): every control the row names reads the view's `agent`,
-never an adapter's name — Wrap up, Message, the mode toggle, Reports, Inbox, Working, Told at start, the
-grants and controllers chips, the adapter id, context and rounds lines and the Ready to close card are
-not drawn on a shell; the composer reads *Type a command…*, Send never *Steer*; Close is offered without
-the checks, confirming that the shell is killed and the directory left as it is."""
+never an adapter's name — Wrap up, Message, the mode toggle, Reports, Inbox, Working, the Session card's
+told at start row, the grants and controllers chips, the adapter id, context and rounds lines and the Ready
+to close card are not drawn on a shell; the composer reads *Type a command…*, Send never *Steer*; Close is
+offered without the checks, confirming that the shell is killed and the directory left as it is."""
 
 from __future__ import annotations
 
