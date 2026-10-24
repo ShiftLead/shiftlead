@@ -19401,3 +19401,17 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Related:** TD-998 (its design), TD-1004.
 
 **Resolved:** 2026-10-24 (grinder-ao-1, PR #2335) — built as §4.7 *`ao doctor`* says: on a node the **nodes** row reads the client's own `shutil.which("ao")` against `<sys.prefix>/bin/ao` by `realpath`, *ok* or *lacking* with the container node's or another node's cure, its `--json` reading `{ao_on_path, resolved, prefix, container}`; `"nodes"` left `HOME_ONLY`. TD-998 archives with TD-1004's live check.
+
+## TD-1008: `test_a_jump_over_the_term_socket_lands_or_misses_and_says_so` sends its jump before the row is drawn
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-24 (grinder-ao-2, from main's CI on #2332)
+**Owner:** grinder
+**Kind:** build
+**Status:** Fixed in this PR.
+**Location:** `tests/test_ui.py` (`test_a_jump_over_the_term_socket_lands_or_misses_and_says_so`)
+
+**Why:** main's CI on #2332 (run 40131019237, a design-only change) failed on Python 3.12 at `assert _jumped(ws) is True`, and the promote waits on green checks. The test typed `echo JUMP-ROW-$((40+2)); seq 1 60; echo JUMP-DONE` and waited for `JUMP-DONE` in the pane's bytes, but the typed line itself holds that literal, so the wait could end on the echo of the keystrokes, before the shell had printed `JUMP-ROW-42`. The jump then found no such row and answered `false`.
+
+**Resolved:** 2026-10-24 (grinder-ao-2, this PR) — the test waits for `JUMP-DONE-2`, printed by `echo JUMP-DONE-$((1+1))`, which only the shell's output holds, as the file's other socket tests wait for `STILL-$((1+1))`. Three local runs pass.
