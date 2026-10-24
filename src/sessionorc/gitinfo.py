@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import time
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -457,3 +458,291 @@ def _not_in_upstream(directory: Path | str, upstream: str, ahead: int, timeout: 
         if merged and tree and merged.split("\n", 1)[0].strip() == tree.strip():
             return 0
     return left
+
+
+# -- a close's reap of the worktree it made (design §4.1 *A close reaps the worktree it made*, TD-979) ----------
+# The tests are dev-cadence's `reap_worktrees.sh`'s *clean*, *unlocked* and *nested*, ported here because that
+# script is synced and has no one-worktree mode; *idle* reads ShiftLead's own records, so the caller gives it.
+
+REAP_WITHIN = 60.0  # the deadline the reap reads between steps: no step starts past it
+REAP_STEP = 20.0  # each git and script call's own timeout; `--dehydrate` never starts past REAP_WITHIN − REAP_STEP
+# ignored directories rebuilt by a run or a sync, so removing them loses nothing: a knowing departure from the
+# reaper, which exempts only `__pycache__` — every worktree a worker ran its tests or linter in holds the rest
+DISPOSABLE_IGNORED = (
+    "__pycache__", ".pytest_cache", ".ruff_cache", ".mypy_cache", ".pdm-build", ".pdm-python", "*.egg-info", ".venv",
+)  # fmt: skip
+NESTED_REPOS = "docs/nested-repos.txt"
+TIMED_OUT = "timed out"
+NOT_WEIGHED = "could not be weighed"
+
+
+def main_checkout(directory: Path | str) -> Path:
+    """The main checkout of the repo `directory` is in, as `worktree_path` resolves it."""
+    return worktree_path(Path(directory), "x").parent.parent.parent
+
+
+def _hydrate_script(repo: Path) -> Path | None:
+    """The main checkout's `hydrate_worktree.sh` when it is there and executable, as the reaper runs it."""
+    script = repo / HYDRATE
+    return script if script.is_file() and os.access(script, os.X_OK) else None
+
+
+def _run(argv: list[str], timeout: float, cwd: Path | str | None = None) -> subprocess.CompletedProcess | None:
+    """One call bounded by `timeout`, or None when it could not be run or ran out."""
+    try:
+        env = {**os.environ, "LC_ALL": "C"}  # git's refusals are matched in English
+        return subprocess.run(argv, capture_output=True, text=True, timeout=max(timeout, 0.1), cwd=cwd, env=env)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def _nested_depth(repo: Path) -> int:
+    """How deep a nested worktree may sit (the reaper's and hydrate's `nested_depth`): the deepest path in
+    `docs/nested-repos.txt`, every word but the last, never less than 3."""
+    deepest = 3
+    try:
+        lines = (repo / NESTED_REPOS).read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return deepest
+    for line in lines:
+        words = line.split("#", 1)[0].split()
+        if len(words) >= 2:
+            p = " ".join(words[:-1]).removeprefix("./").rstrip("/")
+            deepest = max(deepest, len(p.split("/")))
+    return deepest
+
+
+def _disposable(rel: str, wt: Path) -> bool:
+    """Whether an ignored path lies under one of `DISPOSABLE_IGNORED`'s derived directories (a `.venv` only
+    when it is a real directory, a symlinked one being exempt as a symlink)."""
+    parts = rel.split("/")
+    for i, part in enumerate(parts):
+        if part == ".venv":
+            if (wt / "/".join(parts[: i + 1])).is_dir():
+                return True
+        elif any(re.fullmatch(p.replace(".", r"\.").replace("*", ".*"), part) for p in DISPOSABLE_IGNORED):
+            return True
+    return False
+
+
+def ignored_blockers(wt: Path, repo: Path, timeout: float = REAP_STEP) -> list[str] | None:
+    """The ignored paths in worktree `wt` that removing it would destroy (the reaper's `ignored_blockers`), or
+    None when git could not say. Every ignored path blocks except a symlink, a `.claude/settings.local.json`
+    the hydrate script calls disposable, a nested worktree its `--check` judges, and a path under
+    `DISPOSABLE_IGNORED`; a nested `.git` directory always blocks."""
+    cp = _run(["git", "-C", str(wt), "status", "--porcelain", "-z", "--ignored", "--untracked-files=all"], timeout)
+    if cp is None or cp.returncode != 0:
+        return None
+    hydrate = _hydrate_script(repo)
+    depth = _nested_depth(repo)
+    out = []
+    for entry in cp.stdout.split("\0"):
+        if not entry.startswith("!! "):
+            continue
+        p = entry[3:]
+        rel = p.rstrip("/")
+        if (wt / rel).is_symlink():
+            continue  # removing a link never touches its target
+        if (wt / rel / ".git").is_dir():
+            out.append(p)  # a nested clone, with whatever it holds unpushed
+            continue
+        if _disposable(rel, wt):
+            continue
+        if rel == ".claude/settings.local.json" and hydrate:
+            sp = _run([str(hydrate), "--settings-disposable", str(wt)], timeout)
+            if sp is not None and sp.returncode == 0:
+                continue
+        nested = p.endswith("/") and (wt / rel / ".git").is_file() and hydrate
+        if nested and "node_modules" not in rel.split("/") and rel.count("/") <= depth - 1:
+            continue  # a nested worktree: the hydrate script's `--check` judges it
+        out.append(p)
+    return out
+
+
+def _locked(repo: Path, wt: Path, timeout: float) -> bool | None:
+    """`git worktree list --porcelain`'s `locked` for `wt`, or None when it could not be read."""
+    out = _git(repo, "worktree", "list", "--porcelain", timeout=timeout)
+    if out is None:
+        return None
+    here = None
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            here = Path(line[len("worktree ") :]).resolve() == wt.resolve()
+        elif here and (line == "locked" or line.startswith("locked ")):
+            return True
+    return False
+
+
+def worktree_holds(wt: Path, repo: Path, deadline: float, *, idle=None) -> str | None:
+    """Why worktree `wt` of `repo` must be kept, or None when removing it loses nothing: the reaper's *clean*
+    (tracked, untracked, then ignored one by one), the caller's *idle* (a callable answering a why or None),
+    *unlocked* and *nested*, each read fresh, each started only before `deadline` (`time.monotonic()`)."""
+
+    def left() -> float:
+        return min(REAP_STEP, deadline - time.monotonic())
+
+    if left() <= 0:
+        return TIMED_OUT
+    info = git_info(wt, timeout=left())  # tracked and untracked, as the card counts them
+    if info is None:
+        return UNKNOWN
+    if info.dirty:
+        return f"{info.dirty} uncommitted"
+    if left() <= 0:
+        return TIMED_OUT
+    blockers = ignored_blockers(wt, repo, left())
+    if blockers is None:
+        return UNKNOWN
+    if blockers:
+        more = f" and {len(blockers) - 1} more" if len(blockers) > 1 else ""
+        return f"ignored: {blockers[0]}{more}"
+    if idle is not None:
+        if left() <= 0:
+            return TIMED_OUT
+        why = idle()
+        if why:
+            return why
+    if left() <= 0:
+        return TIMED_OUT
+    locked = _locked(repo, wt, left())
+    if locked is None:
+        return UNKNOWN
+    if locked:
+        return "locked"
+    hydrate = _hydrate_script(repo)
+    if hydrate:
+        if left() <= 0:
+            return TIMED_OUT
+        cp = _run([str(hydrate), "--check", "--quiet", str(wt)], left())
+        if cp is None:
+            return TIMED_OUT
+        if cp.returncode != 0:
+            return "nested work unsaved"
+    return None
+
+
+def _branch_of(wt: Path, timeout: float) -> tuple[bool, str | None]:
+    """(read, branch) — the branch checked out in `wt`, None when HEAD is detached; `read` False when git failed."""
+    cp = _run(["git", "-C", str(wt), "symbolic-ref", "-q", "--short", "HEAD"], timeout)
+    if cp is None or cp.returncode not in (0, 1):
+        return False, None
+    return True, (cp.stdout.strip() or None) if cp.returncode == 0 else None
+
+
+def _commits(n: int) -> str:
+    return f"{n} commit{'s' if n != 1 else ''} never on origin"
+
+
+def weigh_branches(
+    repo: Path, branches: list[str | None], within: float = REAP_STEP
+) -> tuple[list[str], dict[str, str]]:
+    """Delete each of `branches` whose tip origin has held (design §4.1 *The branches: was it ever on origin*):
+    `git branch -d`'s test widened to every `origin` ref and every value of `origin/<b>`'s reflog. Answers
+    `(deleted, kept)`, `kept` a map of branch to why. The default branch, a missing branch and a repeat are
+    skipped, named in neither; the whole step is bounded by `within`, and nothing raises."""
+    end = time.monotonic() + within
+    names = list(dict.fromkeys(b for b in branches if b))
+    deleted: list[str] = []
+    kept: dict[str, str] = {}
+
+    def left() -> float:
+        return end - time.monotonic()
+
+    def git(*args: str) -> subprocess.CompletedProcess | None:
+        return _run(["git", "-C", str(repo), *args], left()) if left() > 0 else None
+
+    remotes = git("remote")
+    if remotes is None or remotes.returncode != 0:
+        return [], dict.fromkeys(names, NOT_WEIGHED)
+    if "origin" not in remotes.stdout.split():
+        return [], dict.fromkeys(names, "no origin")
+    head = git("symbolic-ref", "-q", "refs/remotes/origin/HEAD")
+    if head is None or head.returncode not in (0, 1):
+        return [], dict.fromkeys(names, NOT_WEIGHED)
+    if head.returncode != 0 or not head.stdout.strip():
+        return [], dict.fromkeys(names, "no origin/HEAD")
+    default = head.stdout.strip().removeprefix("refs/remotes/origin/")
+    for b in names:
+        if b == default:
+            continue
+        there = git("show-ref", "--verify", "--quiet", f"refs/heads/{b}")
+        if there is None or there.returncode not in (0, 1):
+            kept[b] = NOT_WEIGHED
+            continue
+        if there.returncode == 1:
+            continue  # nothing to delete
+        held: list[str] = []
+        logged = git("reflog", "exists", f"refs/remotes/origin/{b}")
+        if logged is None:
+            kept[b] = NOT_WEIGHED
+            continue
+        if logged.returncode == 0:
+            values = git("reflog", "show", "--format=%H", f"refs/remotes/origin/{b}")
+            if values is None or values.returncode != 0:
+                kept[b] = NOT_WEIGHED
+                continue
+            held = sorted({v for v in values.stdout.split() if v})
+        never = git("rev-list", f"refs/heads/{b}", "--not", "--remotes=origin", *held)
+        if never is None or never.returncode != 0:
+            kept[b] = NOT_WEIGHED
+            continue
+        n = len(never.stdout.split())
+        if n:
+            kept[b] = _commits(n)
+            continue
+        cp = git("branch", "-D", b)
+        if cp is None:
+            kept[b] = NOT_WEIGHED
+        elif cp.returncode == 0:
+            deleted.append(b)
+        else:
+            where = re.search(r"(?:checked out at|used by worktree at) '([^']+)'", cp.stderr)
+            kept[b] = f"checked out in {where.group(1)}" if where else NOT_WEIGHED
+    return deleted, kept
+
+
+def rehydrate(repo: Path, wt: Path) -> None:
+    """Hydrate `wt` again after a `--dehydrate` that was not followed by a remove; exempt from the deadline."""
+    hydrate = _hydrate_script(repo)
+    if hydrate and wt.is_dir():
+        _run([str(hydrate), "--quiet", str(wt)], REAP_STEP)
+
+
+def reap_worktree(
+    wt: Path | str, launch: str | None, *, deadline: float | None = None, idle=None, on_reaping=None
+) -> dict[str, Any]:
+    """Remove worktree `wt` when nothing in it would be lost, then weigh its branches (design §4.1 *A close
+    reaps the worktree it made*). `launch` is the launch branch `<name>`; `idle` the caller's *idle* test;
+    `on_reaping(branch)` is called before `--dehydrate`, so the caller stamps `worktree_reaping`. Answers
+    `{"kept": why}` or `{"reaped": True, "branches_deleted": [...], "branch_kept": {...}}`; never raises."""
+    wt = Path(wt)
+    deadline = time.monotonic() + REAP_WITHIN if deadline is None else deadline
+    try:
+        repo = main_checkout(wt)
+    except WorktreeError:
+        return {"kept": UNKNOWN}
+    if time.monotonic() >= deadline:
+        return {"kept": TIMED_OUT}
+    read, branch = _branch_of(wt, min(REAP_STEP, deadline - time.monotonic()))
+    if not read:
+        return {"kept": UNKNOWN}
+    why = worktree_holds(wt, repo, deadline, idle=idle)
+    if why:
+        return {"kept": why}
+    hydrate = _hydrate_script(repo)
+    if time.monotonic() > (deadline - REAP_STEP if hydrate else deadline):
+        return {"kept": TIMED_OUT}  # no step starts past the deadline, and `--dehydrate` none past its own
+    if on_reaping is not None:
+        on_reaping(branch)
+    if hydrate:
+        cp = _run([str(hydrate), "--dehydrate", "--quiet", str(wt)], REAP_STEP)
+        if cp is None or cp.returncode != 0:
+            rehydrate(repo, wt)
+            return {"kept": "nested work unsaved"}
+    cp = _run(["git", "-C", str(repo), "worktree", "remove", str(wt)], REAP_STEP)
+    if cp is None or cp.returncode != 0:
+        rehydrate(repo, wt)
+        said = (cp.stderr or cp.stdout).strip().splitlines() if cp is not None else []
+        return {"kept": said[-1].removeprefix("fatal: ") if said else TIMED_OUT}
+    deleted, kept = weigh_branches(repo, [branch, launch])
+    return {"reaped": True, "branches_deleted": deleted, "branch_kept": kept}
