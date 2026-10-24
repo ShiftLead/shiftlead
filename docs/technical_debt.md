@@ -73,7 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Designed — builds TD-989, TD-990 |
-| TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Open |
+| TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Built (#2320) — the phone look with Paul |
 
 ---
 
@@ -1443,7 +1443,8 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Added:** 2026-10-23 (the designer, from TD-986)
 **Owner:** grinder
 **Kind:** live-check #2320
-**Status:** Built 2026-10-23 (#2320, grinder-ao-1): the row, `AO.softKey` and `AO.softShown`, the help bullet; every check of *Done when* a browser can make held on a scratch home (the PR's UI check) except Take over / Hand back, which a shell record cannot reach — read in the PR. What is left is the look on the phone (TD-290): once #2320 is live, on Paul's phone a Claude Code session's suggestion accepted by the row's Tab with the keyboard kept up, and a menu answered by an arrow or a digit — a look (design §4.10 *A look*), mailed by whoever holds this check.
+**Blocked by:** decision (paul) — his answer to the phone look, mail m-b8ca1cf74bde (*Works* / *Not right: <what>*)
+**Status:** Built 2026-10-23 (#2320, grinder-ao-1): the row, `AO.softKey` and `AO.softShown`, the help bullet; every check of *Done when* a browser can make held on a scratch home (the PR's UI check) except Take over / Hand back, which a shell record cannot reach — read in the PR. What is left is the look on the phone (TD-290): once #2320 is live, on Paul's phone a Claude Code session's suggestion accepted by the row's Tab with the keyboard kept up, and a menu answered by an arrow or a digit — a look (design §4.10 *A look*), mailed by whoever holds this check. Read 2026-10-23 (grinder-ao-2): `ao promote status` reads #2320 live in b9cba44, and a GET of a live Focus page carries `#softkeys` with its sixteen `data-key` buttons; the look went to Paul as m-b8ca1cf74bde, with the PR's 390 px screenshot. *Works* archives this entry, and with it TD-986, whose builds are then all archived; *Not right* files what is wrong.
 **Location:** `src/shiftlead/ui/templates/focus.html` (between `#term` and `#composer` in `.termwrap`), `src/shiftlead/ui/static/app.js` (beside `term.onData`; `readOnly`, set from the attach's first frame and flipped by Take over / Hand back; `fill()`, which sizes the terminal to the bar; the ending banner's arrival), `src/shiftlead/ui/static/app.css` (`@media (max-width: 720px), (pointer: coarse)`; `--softh`, read by `.composer.overlay`'s `bottom` and `max-height` and by `body.popped .termbox`'s `calc(100vh - 150px)`), `src/shiftlead/ui/help.py` and §4.5a *The help text*; design §4.5a **Focus pane: soft-key row**, §4.5 *Phone layout*
 
 **Why:** TD-986: Claude Code accepts its suggestion with Tab and a phone's keyboard has none, so a menu or a suggestion cannot be answered from the phone through the terminal.
