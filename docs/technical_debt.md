@@ -1582,16 +1582,17 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Location:** `src/shiftlead/doctor.py` (`nodes`, on a node, and its caller in the CLI); `tests/test_doctor.py`, `tests/test_cli_doctor.py` (the *home only: nodes — read at the home* assertion, reworded); design §4.7 *`ao doctor`* (the **nodes** line on a node)
+**Location:** `src/shiftlead/doctor.py` (`nodes`, on a node, and its caller in the CLI); `tests/test_doctor.py`, `tests/test_cli_doctor.py` (its module docstring's *home only* on a node; line 143's `doctor.nodes(rows, True)` verdict; `test_on_a_node_the_home_reads_say_home_only_and_count_as_neither`'s *home only: nodes — read at the home* row, its name and its *count as neither* premise, which no longer hold for the nodes row, `shutil.which` faked there); design §4.7 *`ao doctor`* (the **nodes** line on a node)
 
 **Why:** TD-998: a node member that cannot find `ao` goes silent to the org, and nothing said why.
 
 **Fix:**
-- `nodes` takes the reading as arguments, as every check does: `nodes(rows, node, *, ao_on_path: str | None = None, prefix: str = sys.prefix)`, the CLI caller passing `shutil.which("ao")`. Its tests are plain calls.
-- On a node, the row's verdict is no longer *home only*: it is *ok* or *lacking*, by the reading of `shutil.which("ao")`, resolved (`os.path.realpath`), against `os.path.realpath(<prefix>/bin/ao)`. The same file is *ok: nodes — read at the home · `ao` on PATH*.
+- `nodes` takes the reading as arguments, as every check does: `nodes(rows, node, *, ao_on_path: str | None = None, prefix: str = sys.prefix, name: str = "")`, the CLI caller passing `shutil.which("ao")` and `hosts.local_host().name`. A container node is one whose `prefix` is `containers.INSIDE_VENV`. Its tests are plain calls. The row carries `{ao_on_path, resolved, prefix, container}` as its `--json` reading.
+- On a node, the row's verdict is no longer *home only*: it is *ok* or *lacking*, by the reading of `ao_on_path`, resolved (`os.path.realpath`), against `os.path.realpath(<prefix>/bin/ao)`. The same file is *ok: nodes — read at the home · `ao` on PATH*.
 - No `ao` on `PATH` is *lacking: nodes — `ao` not on PATH here, only <sys.prefix>/bin/ao*. The cure for a container node (its `sys.prefix` is `INSIDE_VENV`) is *(`ao host rebuild <local host name>` at the home)*. For another node it is *(put <sys.prefix>/bin on PATH)*.
 - Another file is *lacking: nodes — `ao` on PATH is <which> → <resolved>, not this install's*. The cure for a container node is *(the image's own `ao`: rename it in the repo's image)*.
-- A lack counts as any lack does (exit 1).
+- A lack counts as any lack does (exit 1): on a node, the nodes row leaves the *home only, counts as neither* list (§4.7).
+- The two paths are compared by `realpath` whether or not each exists, so anything but this install's own `ao` is *lacking*.
 
 **Done when:**
 - `doctor.nodes` tests on a node (`ao_on_path` and `prefix` passed): one with this install's `ao`, one with none, and one with another's. Each gives its row and the cure in the design's words, the container node's cure naming the host.
