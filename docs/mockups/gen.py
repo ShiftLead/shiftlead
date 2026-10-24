@@ -1784,6 +1784,38 @@ def inbox_phone():
 ''' + TAIL
 
 
+def focus_phone():
+    """Focus at 390 px (TD-986): the soft-key row under the terminal (§4.5a **Focus pane: soft-key row**) and
+    a finger's drag scrolling tmux's history (§4.6 *A finger's drag scrolls it too*), above the composer the
+    narrow mode already draws open (TD-500). The rest of the narrow mode is TD-003's and not drawn here."""
+    term = """<span class="d">⏺</span> Bash(pdm run test tests/test_ui.py)
+  <span class="g">212 passed in 41.3s</span>
+<span class="d">⏺</span> The row is in; the branch is
+  pushed.
+
+<span class="p">&gt;</span> <span class="d">open the PR and ask for review</span>
+<span class="d">  ⏎ send · tab to accept</span>"""
+    keys = ["Tab", "Esc", "↑", "↓", "←", "→", "Enter"] + [str(i) for i in range(1, 10)]
+    tab = " border-color: #1f5fa8; color: #1f5fa8;"
+    kb = "".join(
+        f'<span class="btn mono" style="height: 44px; min-width: 44px; padding: 0 8px; justify-content: center; flex-shrink: 0;{tab if k == "Tab" else ""}">{k}</span>'
+        for k in keys
+    )
+    return head("Focus — phone") + f'''<div style="width: 390px; min-height: 900px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">Shift<b>Lead</b></span><span class="tab on" style="height: 28px;">Focus</span><span style="flex-grow: 1;"></span></div>
+<div style="padding: 10px 12px 20px; display: flex; flex-direction: column; gap: 8px;">
+  <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px; font-weight: 600;" class="mono">td-985</span>{pill("idle")}<span style="flex-grow: 1;"></span><span class="meta">interactive</span></div>
+  <div style="position: relative;">
+    <div class="term" style="height: 420px; white-space: pre-wrap;" title="design §4.6 A finger's drag scrolls it too (TD-986)">{term}</div>
+    <div style="position: absolute; right: 18px; top: 120px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: #9ec5ff; font-size: 12px;"><span style="font-size: 22px;">☝</span><span>↕ drag</span></div>
+  </div>
+  <div style="display: flex; gap: 6px; overflow: hidden;" title="design §4.5a Focus pane: soft-key row (TD-986)">{kb}</div>
+  <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;"><div class="input" style="height: 64px; align-items: flex-start; padding-top: 8px; color: #9ca3af; font-size: 13px;">Compose a prompt… multi-line, paste-friendly.</div><div style="display: flex; gap: 8px; justify-content: flex-end;"><span class="btn" style="height: 44px;">Attach</span><span class="btn primary" style="height: 44px;">Send</span></div></div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Soft-key row</b> (§4.5a, TD-986): below 720 px or on a coarse pointer, one row of 44 px keys directly under the terminal — <span class="mono">Tab Esc ↑ ↓ ← → Enter</span>, then <span class="mono">1</span>–<span class="mono">9</span>; Tab first, so it is never scrolled off, and the row scrolls sideways where it is wider than the page. A press sends what a keyboard would, through the terminal (<span class="mono">term.input</span>): <b>Tab</b> accepts Claude Code's suggestion, the digits and arrows answer a menu. It moves no focus, so the phone's keyboard stays where it was. It is not there while the terminal is read-only, nor on an ended record. Under it, the composer the narrow mode keeps open (TD-500). <b>A finger's drag</b> (§4.6): one finger moves tmux's history with it, a drag down showing older lines, as the wheel does. A touch under 10 px is a tap, which focuses the terminal; two fingers put down together zoom the page; a long press neither selects nor pastes.</div>
+</div>
+</div>
+''' + TAIL
+
 def type_scale():
     """The type scale (design §4.5 *Type scale*, TD-130): six tokens and where each is used, at the size it draws."""
     rows = [
@@ -2537,6 +2569,7 @@ files = {
     "InboxMessage.dc.html": inbox_message(),
     "InboxPress.dc.html": inbox_press(),
     "InboxPhone.dc.html": inbox_phone(),
+    "FocusPhone.dc.html": focus_phone(),
     "Type.dc.html": type_scale(),
     "TypeDark.dc.html": darken(type_scale()),
     "Settings.dc.html": settings_page(),
@@ -2576,6 +2609,7 @@ LAYOUT = [
     ("Message.dc.html", "Message — when it is read", 0),
     ("Phone.dc.html", "Sessions — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
+    ("FocusPhone.dc.html", "Focus — phone: the soft-key row and a finger's drag (TD-986)", 1),
     ("InboxPress.dc.html", "Inbox — a control answers the press (TD-338)", 1),
     ("NewSession.dc.html", "New session", 1),
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
