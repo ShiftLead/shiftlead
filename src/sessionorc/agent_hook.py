@@ -44,9 +44,17 @@ class HookMixin:
         # `mail`: the hook hands the turn its mail line (an adapter whose `mail` is a turn's, design §4.3),
         # so the reply carries the count, read after the event — never a sender's words
         wants_mail = bool(event.pop("mail", False))
+        # `wait`: the event is a foreground CI watch the hook refuses only for an unattended record, whose
+        # mode it cannot know itself (§4.3 *A wait the guard refuses*) — on a node, the replica's field
+        wants_wait = bool(event.pop("wait", False))
         self._apply_event(session, event)
         await self._push_changes()
-        return {"unread": self._unread_of(session)} if wants_mail else None
+        reply: dict[str, Any] = {}
+        if wants_mail:
+            reply["unread"] = self._unread_of(session)
+        if wants_wait and (s := self.sessions.get(session)) is not None and s.unattended:
+            reply["refuse_wait"] = True
+        return reply or None
 
     def _unread_of(self, session: str) -> int:
         """The record's unread mail: the inbox at the home, the count the home last pushed on a node
