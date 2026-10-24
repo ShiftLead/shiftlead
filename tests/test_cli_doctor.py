@@ -1,7 +1,7 @@
 """TD-465 slice 2, design §4.7 **`ao doctor`**: the client's verdicts over the `doctor` RPC's
 readings — nine checks in order, each in `ao org check`'s words, every lack naming its cure, the
 closing count, exit 1 on a lack and 3 with no host agent, `ao doctor <check>…`, `--json` with each
-check's raw reading, *home only* on a node. The RPC is faked: what is judged is the reading."""
+check's raw reading, *home only* on a node for the build and org. The RPC is faked: what is judged is the reading."""
 
 from __future__ import annotations
 
@@ -140,7 +140,64 @@ def test_a_node_down_or_behind_lacks_with_its_cure():
         ("ok", "node ok — link up, build 0.3.1 = home"),
     ]
     assert verdicts(doctor.nodes([], False)) == [("ok", "nodes — none linked")]
-    assert verdicts(doctor.nodes(rows, True))[0][0] == "home only"
+    on_node = doctor.nodes(rows, True, ao_on_path="/v/bin/ao", prefix="/v", name="cm")
+    assert verdicts(on_node) == [("ok", "nodes — read at the home · `ao` on PATH")]
+
+
+def _fake_ao(prefix: pathlib.Path) -> pathlib.Path:
+    (prefix / "bin").mkdir(parents=True)
+    own = prefix / "bin" / "ao"
+    own.write_text("")
+    return own
+
+
+def test_on_a_node_the_nodes_row_reads_this_installs_ao_on_path(tmp_path, monkeypatch):
+    """TD-1005, §4.7 **nodes** on a node: this install's `ao`, none, and another's, for a container
+    node (its prefix `containers.INSIDE_VENV`) and another node, each with the design's cure."""
+    from sessionorc import containers
+
+    venv = tmp_path / "venv"
+    own = _fake_ao(venv)
+    link = tmp_path / "usr-local-bin-ao"
+    link.symlink_to(own)
+    other = tmp_path / "opt" / "ao"
+    other.parent.mkdir()
+    other.write_text("")
+    stray = tmp_path / "stray-ao"
+    stray.symlink_to(other)
+    for container in (True, False):
+        prefix = str(venv)
+        if container:
+            monkeypatch.setattr(containers, "INSIDE_VENV", prefix)
+        else:
+            monkeypatch.setattr(containers, "INSIDE_VENV", "/shiftlead/venv")
+
+        def row(which, prefix=prefix):
+            (got,) = doctor.nodes([], True, ao_on_path=which, prefix=prefix, name="cm")
+            return got
+
+        ok = row(str(link))
+        assert (ok["verdict"], ok["text"]) == ("ok", "nodes — read at the home · `ao` on PATH")
+        assert ok["resolved"] == str(own) and ok["container"] is container and ok["prefix"] == prefix
+        none = row(None)
+        cure = (
+            "`ao host rebuild cm` at the home"
+            if container
+            else f"link {own} into a PATH directory, e.g. ~/.local/bin/ao"
+        )
+        assert (none["verdict"], none["text"]) == ("lacking", f"nodes — `ao` not on PATH here, only {own} ({cure})")
+        assert none["ao_on_path"] is None and none["resolved"] is None
+        theirs = row(str(stray))
+        cure = (
+            "the image's own `ao`: rename it in the repo's image"
+            if container
+            else f"remove or rename {stray}, or put {own}'s link earlier on PATH"
+        )
+        assert (theirs["verdict"], theirs["text"]) == (
+            "lacking",
+            f"nodes — `ao` on PATH is {stray} → {other}, not this install's ({cure})",
+        )
+    assert doctor.summary([theirs])["ok"] is False
 
 
 def test_the_agent_line_reads_the_promote_and_behind_is_a_warning():
@@ -229,13 +286,17 @@ def test_named_checks_run_alone_and_an_unknown_one_is_refused(agent, capsys):
     assert "no check tmuxx" in capsys.readouterr().err
 
 
-def test_on_a_node_the_home_reads_say_home_only_and_count_as_neither(agent, capsys):
+def test_on_a_node_the_build_and_org_say_home_only_and_nodes_reads_ao(agent, capsys, monkeypatch):
     agent["host"] = {"mode": "node", "built_from": {}}
     assert verdicts(doctor.org(None, {}, 0, True)) == [("home only", "org — read at the home")]
+    import shutil
+    import sys
+
+    monkeypatch.setattr(shutil, "which", lambda cmd, *a, **k: f"{sys.prefix}/bin/ao" if cmd == "ao" else None)
     assert cli.main(["doctor", "agent", "nodes"]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[0].startswith("home only: agent — ") and out[1] == "home only: nodes — read at the home"
-    assert out[-1] == "ok: 0 checks"
+    assert out[0].startswith("home only: agent — ") and out[1] == "ok: nodes — read at the home · `ao` on PATH"
+    assert out[-1] == "ok: 1 check"
 
 
 def test_a_session_in_its_first_seconds_is_not_scraped_yet():
