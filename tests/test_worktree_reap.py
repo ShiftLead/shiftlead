@@ -64,7 +64,7 @@ def reap(wt, launch, **kw):
 
 
 def test_a_clean_worktree_with_its_branch_pushed_goes_with_its_branch_and_origin_is_untouched(repo, tmp_path):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     commit(wt, "g", msg="work")
     git(wt, "push", "-q", "-u", "origin", "ao-w")
     before = git(tmp_path / "origin.git", "for-each-ref")
@@ -75,7 +75,7 @@ def test_a_clean_worktree_with_its_branch_pushed_goes_with_its_branch_and_origin
 
 
 def test_an_unpushed_commit_keeps_the_branch_never_the_worktree(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     commit(wt, "g", msg="pushed")
     git(wt, "push", "-q", "-u", "origin", "ao-w")
     commit(wt, "h", msg="after the last push")
@@ -85,7 +85,7 @@ def test_an_unpushed_commit_keeps_the_branch_never_the_worktree(repo):
 
 
 def test_a_detached_head_weighs_only_the_launch_branch(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     git(repo, "branch", "other", "origin/main")
     commit(repo, "local", msg="a local commit on main, so the next branch is ahead")
     git(repo, "branch", "other-ahead")
@@ -96,7 +96,7 @@ def test_a_detached_head_weighs_only_the_launch_branch(repo):
 
 
 def test_a_worktree_that_ran_pytest_and_ruff_is_reaped_its_caches_being_disposable(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     for d in ("__pycache__", ".pytest_cache/v", ".ruff_cache/0.1", "pkg/__pycache__", "src/x.egg-info", ".venv/lib"):
         (wt / d).mkdir(parents=True)
         (wt / d / "blob").write_text("derived")
@@ -107,7 +107,7 @@ def test_a_worktree_that_ran_pytest_and_ruff_is_reaped_its_caches_being_disposab
 
 
 def test_a_dirty_tree_is_kept_and_said(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     (wt / "f").write_text("changed")
     (wt / "new.txt").write_text("u")
     assert reap(wt, "ao-w") == {"kept": "2 uncommitted"}
@@ -115,7 +115,7 @@ def test_a_dirty_tree_is_kept_and_said(repo):
 
 
 def test_an_ignored_scratch_file_keeps_the_worktree(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     (wt / "scratch").mkdir()
     (wt / "scratch" / "notes.txt").write_text("mine")
     (wt / "scratch" / "more.txt").write_text("mine")
@@ -124,7 +124,7 @@ def test_an_ignored_scratch_file_keeps_the_worktree(repo):
 
 
 def test_a_symlink_is_no_blocker_and_a_nested_clone_always_is(repo, tmp_path):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     (wt / ".claude").mkdir()
     (wt / ".claude" / "link").symlink_to(tmp_path)  # ignored, as hydrate's links are
     git(tmp_path, "init", "-q", str(tmp_path / "linked"))
@@ -137,7 +137,7 @@ def test_a_symlink_is_no_blocker_and_a_nested_clone_always_is(repo, tmp_path):
 
 
 def test_a_locked_worktree_is_kept_before_anything_is_touched(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     git(repo, "worktree", "lock", str(wt))
     stamped = []
     assert reap(wt, "ao-w", on_reaping=stamped.append) == {"kept": "locked"}
@@ -145,13 +145,13 @@ def test_a_locked_worktree_is_kept_before_anything_is_touched(repo):
 
 
 def test_the_callers_idle_test_keeps_the_worktree_with_its_why(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     assert reap(wt, "ao-w", idle=lambda: "in use by ao-repo-shell") == {"kept": "in use by ao-repo-shell"}
     assert reap(wt, "ao-w", idle=lambda: None)["reaped"]
 
 
 def test_no_step_starts_past_the_deadline(repo, monkeypatch):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     calls = []
     real = gitinfo._run
     monkeypatch.setattr(gitinfo, "_run", lambda argv, timeout, cwd=None: calls.append(argv) or real(argv, timeout, cwd))
@@ -185,7 +185,7 @@ def _calls(repo) -> list[str]:
 
 
 def test_a_settings_file_the_hydrate_script_will_not_call_disposable_keeps_the_worktree(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     (wt / ".claude").mkdir()
     (wt / ".claude" / "settings.local.json").write_text('{"permissions": {"allow": ["Bash(new)"]}}')
     _hydrate(repo, 'case "$1" in --settings-disposable) exit 1;; esac; exit 0')
@@ -196,7 +196,7 @@ def test_a_settings_file_the_hydrate_script_will_not_call_disposable_keeps_the_w
 
 
 def test_nested_work_the_hydrate_check_refuses_keeps_the_worktree_and_a_failed_remove_hydrates_again(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     _hydrate(repo, 'case "$1" in --check) exit 1;; esac; exit 0')
     assert reap(wt, "ao-w") == {"kept": "nested work unsaved"}
     assert not any(c.startswith("--dehydrate") for c in _calls(repo))
@@ -212,7 +212,7 @@ def test_nested_work_the_hydrate_check_refuses_keeps_the_worktree_and_a_failed_r
 
 
 def _wt_pushed(repo, name="ao-w"):
-    wt = ensure_worktree(repo, name)
+    wt, _ = ensure_worktree(repo, name)
     commit(wt, "g", msg="work")
     git(wt, "push", "-q", "-u", "origin", name)
     return wt
@@ -253,13 +253,13 @@ def test_a_branch_another_session_rebased_before_the_close_is_deleted_and_the_ga
 
 
 def test_a_launch_branch_never_pushed_with_no_commit_of_its_own_is_deleted(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     assert not ok(repo, "rev-parse", "--verify", "-q", "refs/remotes/origin/ao-w")
     assert reap(wt, "ao-w")["branches_deleted"] == ["ao-w"]
 
 
 def test_a_launch_branch_whose_commits_went_out_on_a_topic_branch_is_deleted_with_it(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     commit(wt, "g", msg="work")
     git(wt, "checkout", "-q", "-b", "td1-topic")
     commit(wt, "h", msg="more")
@@ -269,7 +269,7 @@ def test_a_launch_branch_whose_commits_went_out_on_a_topic_branch_is_deleted_wit
 
 
 def test_a_branch_merged_with_a_merge_commit_is_deleted(repo, tmp_path):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     commit(wt, "g", msg="work")  # never pushed under its own name
     git(repo, "merge", "-q", "--no-ff", "-m", "merge", "ao-w")
     git(repo, "push", "-q", "origin", "main")
@@ -277,7 +277,7 @@ def test_a_branch_merged_with_a_merge_commit_is_deleted(repo, tmp_path):
 
 
 def test_a_branch_never_pushed_with_a_commit_of_its_own_is_kept_and_counted(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     commit(wt, "g", msg="one")
     commit(wt, "h", msg="two")
     assert reap(wt, "ao-w")["branch_kept"] == {"ao-w": "2 commits never on origin"}
@@ -285,7 +285,7 @@ def test_a_branch_never_pushed_with_a_commit_of_its_own_is_kept_and_counted(repo
 
 def test_a_launch_branch_tracking_origin_heads_branch_is_weighed_against_origin_not_its_upstream(repo):
     git(repo, "branch", "--track", "ao-w", "origin/main")  # as `worktree add -b` from origin/HEAD leaves it
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     assert git(wt, "rev-parse", "--abbrev-ref", "@{upstream}") == "origin/main"
     commit(wt, "g", msg="own")
     assert reap(wt, "ao-w")["branch_kept"] == {"ao-w": "1 commit never on origin"}
@@ -297,7 +297,7 @@ def test_a_pruned_remote_ref_or_no_reflog_keeps_a_branch_with_a_commit_of_its_ow
     git(repo, "update-ref", "-d", "refs/remotes/origin/ao-w")  # as a `fetch --prune` of a deleted branch: reflog gone
     assert reap(wt, "ao-w")["branch_kept"] == {"ao-w": "1 commit never on origin"}
     git(repo, "config", "core.logAllRefUpdates", "false")
-    wt2 = ensure_worktree(repo, "ao-v")
+    wt2, _ = ensure_worktree(repo, "ao-v")
     commit(wt2, "v", msg="v1")
     git(wt2, "push", "-q", "-u", "origin", "ao-v")
     _rebase_elsewhere(repo, tmp_path, "ao-v")
@@ -306,7 +306,7 @@ def test_a_pruned_remote_ref_or_no_reflog_keeps_a_branch_with_a_commit_of_its_ow
 
 
 def test_a_branch_checked_out_in_another_worktree_is_kept_by_gits_own_refusal(repo):
-    other = ensure_worktree(repo, "ao-v")
+    other, _ = ensure_worktree(repo, "ao-v")
     git(other, "checkout", "-q", "-b", "shared")  # held by origin/main, so only git's refusal keeps it
     git(repo, "branch", "spare", "origin/main")
     deleted, kept = weigh_branches(repo, ["shared", "spare"])
@@ -314,7 +314,7 @@ def test_a_branch_checked_out_in_another_worktree_is_kept_by_gits_own_refusal(re
 
 
 def test_the_default_branch_and_a_branch_deleted_by_hand_are_skipped_named_in_neither(repo):
-    wt = ensure_worktree(repo, "ao-w")
+    wt, _ = ensure_worktree(repo, "ao-w")
     git(repo, "checkout", "-q", "--detach")
     git(wt, "checkout", "-q", "main")  # the default branch checked out in the worktree
     git(repo, "branch", "-D", "ao-w")  # the launch branch deleted by hand

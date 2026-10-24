@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from sessionorc.models import Confidence, State
 from sessionorc.tmux import PaneInfo
@@ -352,20 +352,23 @@ class ExternalSession:
     status: str | None
 
 
-def external_sessions() -> list[ExternalSession]:
-    """Every registered adapter's view of live sessions outside shiftlead. Optional per adapter."""
+def external_sessions() -> dict[str, Any]:
+    """Every registered adapter's view of live sessions outside shiftlead, `{items, blind}`: `blind` the
+    adapters whose registry could not be read, which a create passes over and a close's reap keeps the
+    worktree for, since an unseen session could be inside (§4.1, TD-979). Optional per adapter."""
     if not _REGISTRY:
         load_all()
     out: list[ExternalSession] = []
-    for ad in list(_REGISTRY.values()):
+    blind: list[str] = []
+    for name, ad in list(_REGISTRY.items()):
         fn = getattr(ad, "external_sessions", None)
         if fn is None:
             continue
         try:
             out.extend(fn())
         except Exception:  # noqa: BLE001 — a broken registry never blocks a create
-            continue
-    return out
+            blind.append(name)
+    return {"items": out, "blind": blind}
 
 
 class ShellAdapter:

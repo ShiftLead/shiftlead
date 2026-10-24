@@ -217,7 +217,10 @@ async def test_resume_of_a_live_conversation_is_refused(agent, hookstub, tmp_pat
         monkeypatch.setattr(
             adapters,
             "external_sessions",
-            lambda: [ExternalSession("ext", str(tmp_path / "c"), "vscode-conv", "cc-ext", "idle")],
+            lambda: {
+                "items": [ExternalSession("ext", str(tmp_path / "c"), "vscode-conv", "cc-ext", "idle")],
+                "blind": [],
+            },
         )
         with pytest.raises(AgentError, match="vscode-conv .*outside shiftlead"):
             await c.call("create", name="again", dir=str(tmp_path / "b"), adapter="hookstub", resume="cc-ext")
