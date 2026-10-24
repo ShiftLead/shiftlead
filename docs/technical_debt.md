@@ -78,7 +78,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-997 | The Transcript draws a session's start context as its first entry — Paul's to keep or drop | Low | Open — waits on Paul |
 | TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Designed — builds TD-1004, TD-1005 |
 | TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Open — design first: a background shell's end wakes no Gemini session |
-| TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Open — build |
+| TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Built (#2333) — live check |
 | TD-1005 | `ao doctor` on a node says when `ao` on `PATH` is not this install's, with the cure | Low | Open — build |
 
 ---
@@ -1558,8 +1558,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Type:** debt
 **Added:** 2026-10-24 (the designer, from TD-998)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — build
+**Kind:** live-check #2333
+**Status:** Built 2026-10-24 (grinder-ao-2, #2333): `dockerfile_text` writes the guarded link after the tmux step and the machine layers, before `USER <image user>`; its path is `containers.PATH_AO`, its target `INSIDE_VENV`'s `bin/ao`, and `test_the_dockerfile_links_ao_onto_path_after_tmux_and_before_the_images_user` holds the line and its place. Left: the live check in *Done when*, once #2333 is live and contractmatch is rebuilt.
 **Location:** `src/sessionorc/containers.py` (`dockerfile_text`); `tests/test_containers.py`; design §4.4a (the generated Dockerfile, *The link puts `ao` on every shell's `PATH`*)
 
 **Why:** TD-998: on the contractmatch node, `ao` was *command not found* in every session and shell. The node's agent starts by its absolute path with the image's `PATH`, and nothing puts `/shiftlead/venv/bin` on it.
