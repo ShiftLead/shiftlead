@@ -903,19 +903,19 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qcard.dragging { opacity: .45; }
 .qcard.dropbefore { box-shadow: inset 0 3px 0 var(--link); }
 .qcard.dropafter { box-shadow: inset 0 -3px 0 var(--link); }
-.qhead { display: grid; grid-template-columns: 1.4em 2.6em 1fr; column-gap: 8px; align-items: baseline; padding: 9px 14px 9px 4px; }
+.qhead { display: grid; grid-template-columns: 1.4em 2.6em minmax(0, 1fr); column-gap: 8px; align-items: baseline; padding: 9px 14px 9px 4px; }
 .qhead[role="button"] { cursor: pointer; }
 .qgrip { color: var(--ended); cursor: grab; letter-spacing: -.2em; font-size: var(--t-small); user-select: none; }
 .qplace { font-size: calc(var(--t-body) * 2); font-weight: 600; line-height: 1; color: var(--fg); opacity: .25; text-align: right; }
 /* where the home reads more than one repo, a number per repo, each over its repo's chip (§4.5a *Queue page,
    Up next: the number*, TD-901): the column widens for the chip, and only the number is at a quarter strength */
-.qcards.multi .qhead { grid-template-columns: 1.4em 5.5em 1fr; }
+.qcards.multi .qhead { grid-template-columns: 1.4em 5.5em minmax(0, 1fr); }
 .qplace.multi { opacity: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 0; }
 .qpn { display: flex; flex-direction: column; align-items: flex-end; max-width: 100%; }
 .qpn .qn { opacity: .25; }
 /* a Waiting card's wait column (§4.5a *Queue page, Waiting: the wait column*, TD-918): the date or word at the
    number's size and strength, the chip and *would be n in <repo>* under it, at full strength in small type */
-.qwaits .qhead, .qwaits.multi .qhead { grid-template-columns: 1.4em 8.5em 1fr; }
+.qwaits .qhead, .qwaits.multi .qhead { grid-template-columns: 1.4em 8.5em minmax(0, 1fr); }
 .qplace.qwait { opacity: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 0; }
 .qwait .qn { opacity: .25; white-space: nowrap; }
 .qwouldbe { font-size: var(--t-small); font-weight: 400; color: var(--muted); text-align: right; line-height: 1.3; }
@@ -983,7 +983,10 @@ details.qdots { display: inline-block; }
 .qmail ul.leads { margin: 2px 0; padding-left: 2ch; }
 .qmail .leads { color: var(--muted); }
 /* a card's sections (TD-828): Needs you in the header, the rest in the body above the rows, each with its count */
-.qsec { flex: 1 0 100%; }
+/* a section and its items never widen the card past the screen (TD-985): the header's last column is
+   `minmax(0, 1fr)`, not `1fr`, whose least width is its content's, and a long word in an item breaks */
+.qsec { flex: 1 0 100%; min-width: 0; }
+.qmail .mailrow { min-width: 0; } .qmail .body { overflow-wrap: anywhere; }
 .qsech { display: flex; gap: 8px; align-items: center; padding: 6px 0 0 calc(6ch + 2.4em); font-size: var(--t-small); font-weight: 600; color: var(--muted); }
 .qrows > .qsec .qsech { padding-left: calc(4em + 20px + 2ch); }
 .qrows > .qsec .qmail { padding-left: calc(4em + 20px + 2ch); }
@@ -1033,13 +1036,16 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .qring { outline: 2px solid var(--needs-fg); outline-offset: 2px; border-radius: 4px; }
 .qother { display: flex; gap: 10px; align-items: baseline; padding: 8px 14px 8px 17px; border-top: 1px solid var(--line); font-size: var(--t-small); }
 @media (max-width: 720px) {
-  .qhead { grid-template-columns: 1em 1.6em 1fr; column-gap: 6px; }
-  .qcards.multi .qhead { grid-template-columns: 1em 4.5em 1fr; }
+  .qhead { grid-template-columns: 1em 1.6em minmax(0, 1fr); column-gap: 6px; }
+  .qcards.multi .qhead { grid-template-columns: 1em 4.5em minmax(0, 1fr); }
   .qplace { font-size: calc(var(--t-body) * 1.4); }
-  .qwaits .qhead, .qwaits.multi .qhead { grid-template-columns: 1.4em 6em 1fr; }
+  .qwaits .qhead, .qwaits.multi .qhead { grid-template-columns: 1.4em 6em minmax(0, 1fr); }
   .qtitle { flex: 1 1 0; min-width: 8em; }
   .qright { margin-left: 0; justify-content: flex-start; flex-basis: 100%; }
   .qbuilds, .qnote { padding-left: 0; }
+  /* a card's items take the card's width, as the notes do: no desktop indent under the number (TD-985) */
+  .qsech, .qmail, .qrows > .qsec .qsech, .qrows > .qsec .qmail, .qread > summary.qsech,
+  .qread .qsec .qsech, .qread .qsec .qmail { padding-left: 0; }
   .qfind { margin-left: 0; flex-basis: 100%; }
   .qfind input { width: 100%; min-width: 0; }
   .qrow { padding-left: calc(2.6em + var(--qd, 1) * 1ch); }

@@ -832,3 +832,30 @@ def test_each_tab_has_its_number_and_the_rollup_reads_the_inboxs_beside_an_overd
           "answer_needed": 0, "answer_team": ""}  # fmt: skip
     html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=0, person_overdue=1)
     assert "data-inbox-needs>0<" in html and "data-inbox-overdue>1</span> overdue" in html  # 1 overdue over 0
+
+
+def test_a_cards_items_fit_a_phone_width():
+    """TD-985 (design §4.5 screen 12 *Narrow (below 720 px)*): a card's items never widen it past the screen.
+    The header's last column is `minmax(0, 1fr)` (a bare `1fr`'s least width is its content's, so a long
+    word in a Decide item widened it under the card's `overflow: hidden`), a section may shrink, an item's
+    words break, and below 720 px the items drop the desktop indent under the number, as the notes do.
+    Read at 390 px on a scratch home: the page's scrollWidth was its innerWidth and no item passed its card."""
+    from pathlib import Path
+
+    css = (Path(__file__).parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.css").read_text()
+    narrow = css[css.index("  .qhead { grid-template-columns: 1em") :]
+    narrow = narrow[: narrow.index("\n}\n")]
+    for rule in (
+        ".qhead { display: grid; grid-template-columns: 1.4em 2.6em minmax(0, 1fr);",
+        ".qcards.multi .qhead { grid-template-columns: 1.4em 5.5em minmax(0, 1fr); }",
+        ".qwaits .qhead, .qwaits.multi .qhead { grid-template-columns: 1.4em 8.5em minmax(0, 1fr); }",
+        ".qsec { flex: 1 0 100%; min-width: 0; }",
+        ".qmail .mailrow { min-width: 0; } .qmail .body { overflow-wrap: anywhere; }",
+    ):
+        assert rule in css, rule
+    assert not re.search(r"\.qhead \{[^}]*grid-template-columns:[^;}]*[^,] 1fr", css)  # every one, wide and narrow
+    assert ".qcards.multi .qhead { grid-template-columns: 1em 4.5em minmax(0, 1fr); }" in narrow
+    assert (
+        ".qsech, .qmail, .qrows > .qsec .qsech, .qrows > .qsec .qmail, .qread > summary.qsech,\n"
+        "  .qread .qsec .qsech, .qread .qsec .qmail { padding-left: 0; }"
+    ) in narrow
