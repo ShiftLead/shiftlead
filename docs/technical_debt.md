@@ -76,8 +76,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Built (#2320) — the phone look with Paul |
 | TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Open — design first |
 | TD-997 | The Transcript draws a session's start context as its first entry — Paul's to keep or drop | Low | Open — waits on Paul |
-| TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Open — design first |
+| TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Designed — builds TD-1004, TD-1005 |
 | TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Open — design first: a background shell's end wakes no Gemini session |
+| TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Open — build |
+| TD-1005 | `ao doctor` on a node says when `ao` on `PATH` is not this install's, with the cure | Low | Open — build |
 
 ---
 
@@ -1514,7 +1516,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-24 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — reported from the contractmatch node; the cause is read in the code, and the fix is the design's to name.
+**Blocked by:** TD-1004, TD-1005
+**Status:** Designed 2026-10-24 (the designer): the generated Dockerfile links `/usr/local/bin/ao` to `/shiftlead/venv/bin/ao`, which every shell's `PATH` holds, a login shell's included; the venv's `bin` is not put on `PATH` (a Debian `/etc/profile` resets it for login shells, and its `python3` would shadow the repo's). `ao doctor`'s **nodes** line on a node says when `ao` is not this install's (design §4.4a, §4.7 *`ao doctor`*). Built by TD-1004 (the link) and TD-1005 (the doctor line).
 **Location:** `src/sessionorc/containers.py` (the agent's start script, `exec {INSIDE_VENV}/bin/shiftlead-agent serve`, run by `exec_cmd` with `SHIFTLEAD_HOME` and the node's env file and no `PATH`; the generated Dockerfile); design §4.4a (the node's `/shiftlead/venv`, filled with the home's wheel), §4.7 *`ao doctor`* (its checks; on a node they read the node); `src/shiftlead/skill.md` (*`ao` is on `PATH`*)
 
 **Why:** seen 2026-10-24 on the contractmatch node (user `developer`). The container mounts shiftlead's virtualenv at `/shiftlead/venv`, but `/shiftlead/venv/bin` is not on PATH, so `ao` is *command not found* there. It is missing in an interactive session's shell and in the shell from Focus's **Open shell here**; only `/shiftlead/venv/bin/ao` works. The node's agent is started by its absolute path with the image's PATH, and the tmux sessions it creates inherit that PATH. TD-301 met the same gap for the hooks and worked around it: `hook_command()` in the Claude Code adapter finds `shiftlead-hook` beside the interpreter. Nothing does the same for `ao`. So a session or a person in the container has to know the install path to reach `ao` at all. The skill (*`ao` is on `PATH`*), the briefs and the docs all say `run ao …`, and those commands fail there as written. Mail, `ao progress` and `ao doing` are how a member reports, so a node member that cannot find `ao` goes silent to the org.
@@ -1548,3 +1551,49 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when** an unattended Gemini session's foreground `gh pr checks <n> --watch` is blocked with `wait_guard.REASON`, and one with `is_background` true, or on an interactive record, is not.
 
 **Related:** TD-992, TD-991, TD-785 (the kill guard in Gemini CLI).
+
+## TD-1004: The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (the designer, from TD-998)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`dockerfile_text`); `tests/test_containers.py`; design §4.4a (the generated Dockerfile, *The link puts `ao` on every shell's `PATH`*)
+
+**Why:** TD-998: on the contractmatch node, `ao` was *command not found* in every session and shell. The node's agent starts by its absolute path with the image's `PATH`, and nothing puts `/shiftlead/venv/bin` on it.
+
+**Fix:**
+- `dockerfile_text` adds, in its root step after tmux, `RUN [ -e /usr/local/bin/ao ] || { install -d -o root -g root -m 0755 /usr/local/bin && ln -s /shiftlead/venv/bin/ao /usr/local/bin/ao; }`. The target is built from `INSIDE_VENV`, never a literal. A base image's own `/usr/local/bin/ao` is kept (TD-1005 reports it).
+- Nothing else changes: the agent's start script, `exec_cmd`'s env and the image's `PATH` stay as they are.
+
+**Done when:**
+- A `dockerfile_text` test asserts the `RUN` line, after the tmux step and before `USER <image user>`.
+- A live check, once live: after `ao host rebuild contractmatch`, `ao` resolves (`command -v ao`) in a node session, in an **Open shell here** shell, and in `docker exec -it <cid> bash -l`.
+
+**Related:** TD-998 (its design), TD-1005, TD-301 (the hook command beside the interpreter).
+
+## TD-1005: `ao doctor` on a node says when `ao` on `PATH` is not this install's, with the cure
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (the designer, from TD-998)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/doctor.py` (`nodes`, on a node); `tests/test_doctor.py`; design §4.7 *`ao doctor`* (the **nodes** line on a node)
+
+**Why:** TD-998: a node member that cannot find `ao` goes silent to the org, and nothing said why.
+
+**Fix:**
+- On a node, `nodes` adds to its *read at the home* row the reading of `shutil.which("ao")`, resolved (`os.path.realpath`), against `os.path.realpath(<sys.prefix>/bin/ao)`. The same file is *ok: nodes — read at the home · `ao` on PATH*.
+- No `ao` on `PATH` is *lacking: nodes — `ao` not on PATH here, only <sys.prefix>/bin/ao*. The cure for a container node (its `sys.prefix` is `INSIDE_VENV`) is *(`ao host rebuild <local host name>` at the home)*. For another node it is *(put <sys.prefix>/bin on PATH)*.
+- Another file is *lacking: nodes — `ao` on PATH is <which> → <resolved>, not this install's*. The cure for a container node is *(the image's own `ao`: rename it in the repo's image)*.
+- A lack counts as any lack does (exit 1).
+
+**Done when:**
+- `doctor.nodes` tests on a node (stubbed `shutil.which` and `sys.prefix`): one with this install's `ao`, one with none, and one with another's. Each gives its row and the cure in the design's words, the container node's cure naming the host.
+- The home's rows are unchanged.
+
+**Related:** TD-998 (its design), TD-1004.
