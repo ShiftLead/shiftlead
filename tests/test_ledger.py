@@ -21,7 +21,7 @@ DOCS = pathlib.Path(__file__).parents[1] / "docs"
 OPEN = DOCS / "technical_debt.md"
 ARCHIVE = DOCS / "technical_debt_archive.md"
 
-ROW = re.compile(r"^\| (TD-\d{3}) \|", re.M)
+ROW = re.compile(r"^\| (TD-\d{3,}) \|", re.M)  # past TD-999 an id has four digits (TD-1000, 2026-10-24)
 
 
 def text(path):
@@ -37,7 +37,7 @@ def headings(path):
 def entries(path):
     """(id, body) for each entry, the body running to the next heading."""
     t = text(path)
-    return list(zip(headings(path), re.split(r"^## TD-\d{3}:", t, flags=re.M)[1:], strict=True))
+    return list(zip(headings(path), re.split(r"^## TD-\d{3,}:", t, flags=re.M)[1:], strict=True))
 
 
 def test_no_id_is_used_twice_anywhere_in_the_ledger():
@@ -66,7 +66,8 @@ def test_ids_are_assigned_in_order_within_each_file():
         assert ids, f"{path.name} has no entries"
         # The archive is append-ordered by resolution, not by id; only the open file is sorted.
         if path is OPEN:
-            assert ids == sorted(ids), f"{path.name} entries are out of id order: {ids}"
+            # by number: past TD-999 a string sort puts TD-1000 before TD-993
+            assert ids == sorted(ids, key=lambda i: int(i[3:])), f"{path.name} entries are out of id order: {ids}"
 
 
 def test_every_entry_has_a_body_and_not_someone_elses():
