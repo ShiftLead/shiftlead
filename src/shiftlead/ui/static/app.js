@@ -2758,6 +2758,16 @@
     const n = Math.trunc(acc);
     return { msg: n ? { scroll: n < 0 ? "up" : "down", lines: Math.abs(n) } : null, rest: acc - n };
   };
+  // A finger's drag on the terminal (design §4.6 *A finger's drag scrolls it too*, TD-989): `total` is the
+  // touch's vertical travel since it started, `sent` the travel already turned into scroll. Nothing while
+  // the touch is still inside the 10 px slop and nothing has been sent; then all of `total - sent`, so the
+  // first 10 px count once and nothing twice. The caller divides `add` by the cell height and negates it
+  // into the wheel's accumulator: the content follows the finger, a drag down is `up`.
+  AO.TOUCH_SLOP = 10;
+  AO.touchStep = function (total, sent) {
+    if (!sent && Math.abs(total) < AO.TOUCH_SLOP) return { add: 0, sent: 0 };
+    return { add: total - sent, sent: total };
+  };
   AO.termClose = function (code, opened, delay, reason) {
     if (code === 4404) return { retry: false, final: true, delay, why: "no terminal for this session" };
     if (code === 1006 && !opened) {
@@ -5528,24 +5538,79 @@
       if (e.shiftKey && (e.key === "PageUp" || e.key === "PageDown")) { ws && ws.readyState === 1 && ws.send(JSON.stringify({ scroll: e.key === "PageUp" ? "up" : "down" })); return false; }
       return true;
     });
-    $("#term").addEventListener("contextmenu", (e) => { e.preventDefault(); pasteClip(); });
+    // A long press fires `contextmenu` too, and it is no right-click (§4.6 *A touch does not select*,
+    // TD-989): the browser's menu is still prevented, but a paste follows only a mouse's or a pen's. The
+    // last `pointerdown` on the terminal says which, each replacing the last (a hybrid device's mouse after a
+    // touch right-clicks as before); pointer events fire for a touch whose `touchstart` is prevented.
+    let touchPointer = false;
+    $("#term").addEventListener("pointerdown", (e) => { touchPointer = e.pointerType === "touch"; }, { capture: true });
+    $("#term").addEventListener("contextmenu", (e) => { e.preventDefault(); if (!touchPointer) pasteClip(); });
     $("#tcopy").addEventListener("click", () => { if (!copySel()) AO.toast("select text in the terminal first (drag; Shift+click grows it)"); });
     // The wheel scrolls tmux's history (§4.6, TD-174): caught before xterm.js sees it — with no
     // mouse tracking it would turn a notch into arrow keys for the pane — and sent as lines, the
     // notches of one animation frame in one message. A read-only attach passes it, as every scroll.
     let wheelAcc = 0, wheelFrame = 0;
-    $("#term").addEventListener("wheel", (e) => {
-      e.preventDefault(); e.stopPropagation();
-      const cell = term.rows ? $("#term").clientHeight / term.rows : 16;
-      wheelAcc += e.deltaMode === 1 ? e.deltaY : e.deltaMode === 2 ? e.deltaY * (term.rows || 24) : e.deltaY / (cell || 16);
+    let touch = null;  // the finger on the terminal, below
+    const cellH = () => (term.rows ? $("#term").clientHeight / term.rows : 16) || 16;
+    // a touch's travel not yet taken goes into the accumulator first: one step per frame, and one at its end
+    const touchTake = () => {
+      if (!touch || !touch.scrolling) return;
+      const { add, sent } = AO.touchStep(touch.total, touch.sent);
+      touch.sent = sent;
+      wheelAcc -= add / cellH();
+    };
+    const scrollFrame = () => {
       if (wheelFrame) return;
       wheelFrame = requestAnimationFrame(() => {
         wheelFrame = 0;
+        touchTake();
         const { msg, rest } = AO.wheelStep(wheelAcc);
         wheelAcc = rest;
         if (msg && ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
       });
+    };
+    $("#term").addEventListener("wheel", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      wheelAcc += e.deltaMode === 1 ? e.deltaY : e.deltaMode === 2 ? e.deltaY * (term.rows || 24) : e.deltaY / cellH();
+      scrollFrame();
     }, { capture: true, passive: false });
+    // A finger's drag scrolls it too (§4.6, TD-989): a touch screen sends no `wheel`, so a one-finger touch's
+    // vertical travel becomes the wheel's message, caught in the capture phase before xterm.js's own touch
+    // listeners. Under the slop it stays the browser's tap (it focuses the terminal); past it the touch is a
+    // scroll until it lifts, its default prevented so no tap or emulated mouse follows. Two fingers put down
+    // together are the browser's (a pinch); a second finger joining a scroll ends it, and the touch is inert
+    // (`dead`) until every finger lifts. `touch-action: pinch-zoom` (app.css) keeps the page from scrolling.
+    const termEl = $("#term");
+    termEl.addEventListener("touchstart", (e) => {
+      if (touch && touch.dead) { if (touch.scrolled) e.preventDefault(); return; }
+      if (e.touches.length !== 1) {
+        if (touch && touch.scrolling) { touchTake(); scrollFrame(); e.preventDefault(); }
+        touch = { dead: true, scrolled: !!(touch && touch.scrolling) };
+        return;
+      }
+      const t = e.touches[0];
+      touch = { id: t.identifier, y0: t.clientY, total: 0, sent: 0, scrolling: false, dead: false };
+    }, { capture: true, passive: false });
+    termEl.addEventListener("touchmove", (e) => {
+      if (!touch) return;
+      if (touch.dead) { if (touch.scrolled) e.preventDefault(); return; }
+      const t = Array.from(e.touches).find((x) => x.identifier === touch.id);
+      if (!t) return;
+      touch.total = t.clientY - touch.y0;
+      if (!touch.scrolling && Math.abs(touch.total) >= AO.TOUCH_SLOP) touch.scrolling = true;
+      if (!touch.scrolling) return;
+      e.preventDefault(); e.stopPropagation();
+      scrollFrame();
+    }, { capture: true, passive: false });
+    const touchEnd = (e) => {
+      if (!touch) return;
+      if (touch.scrolling || touch.scrolled) e.preventDefault();
+      if (!touch.dead && touch.scrolling) { touchTake(); scrollFrame(); }
+      if (e.touches.length === 0) touch = null;
+      else if (!touch.dead) touch = { dead: true, scrolled: touch.scrolling };
+    };
+    termEl.addEventListener("touchend", touchEnd, { capture: true, passive: false });
+    termEl.addEventListener("touchcancel", touchEnd, { capture: true, passive: false });
     // Copy on select (§4.5a, TD-174): the person's, in settings.yml, on by default. A selection ended —
     // the mouse released, which a Shift+click is too — is copied when it is on, and says so with
     // Copy's own toast, *copied* or *clipboard blocked* (TD-273: a silent copy could not be told from
