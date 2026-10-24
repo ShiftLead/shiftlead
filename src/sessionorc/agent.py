@@ -1297,7 +1297,7 @@ class HostAgent(
             wt_lock = self._dir_locks[f"worktree:{main}:{worktree}"]
             await wt_lock.acquire()
             try:
-                directory, made = await asyncio.to_thread(ensure_worktree, repo_root, worktree)
+                directory, made = await asyncio.to_thread(ensure_worktree, repo_root, worktree, resume=bool(resume))
             except WorktreeError as e:
                 wt_lock.release()
                 raise RpcError(str(e)) from None

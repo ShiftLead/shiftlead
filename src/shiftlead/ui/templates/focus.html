@@ -247,7 +247,8 @@
       <summary class="row gap"><span class="h2" title="{{ help_title('prompts') }}">Prompts</span><span class="meta" id="promptscount"></span></summary>
       <div class="promptlist" id="promptlist"></div>
     </details>{% endif %}
-    <details class="card pad side" data-side="git" id="gitcard" open>
+    {# a reaped record has no tree to read: no Git card (§4.1 *Kept, and said*, TD-979) #}
+    {% if not s.reaped %}<details class="card pad side" data-side="git" id="gitcard" open>
       <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
       {# §4.5a *Git card: the pick · ↑ · ↓* (TD-856, built by TD-862): what the lines list — Working tree
          (the pushed record's porcelain), one of the newest ten commits, or Session — read through the
@@ -259,7 +260,7 @@
       </div>
       <div class="mono small muted gitpickline hidden" id="gitpickline"></div>
       <div class="mono small gitfiles" id="gitfiles">{% if s.git %}{% for f in s.git.files %}<div>{{ f }}</div>{% endfor %}{% if not s.git.files %}<div class="muted">clean</div>{% endif %}{% endif %}</div>
-    </details>
+    </details>{% endif %}
     {# design §4.5a Focus side panel **Reports** (TD-143's design, built by TD-150): grouped by state —
        in progress, in review (a claim with a PR), done, dropped — so a claim in review never reads as
        one not started. The explanation is the heading's **i** mark, read before a press; **Drop**
@@ -300,7 +301,7 @@
     {# open on the person's own session, folded on a team member (TD-156, Paul: *a user will presume
        the team members behave correctly and close when they are supposed to*) #}
     {% if s.agent %}<details class="card pad side" data-side="ready"{% if s.own %} open{% endif %}>
-      <summary class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm{% if not s.own %} hidden{% endif %}" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped." title="{{ help_title('close') }}" disabled>Close session</button></summary>
+      <summary class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm{% if not s.own %} hidden{% endif %}" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped unless that would lose something." title="{{ help_title('close') }}" disabled>Close session</button></summary>
       <div class="checks" id="checks"></div>
       <div class="note">{% if s.own %}Closing is your act; the checklist only says when it is ready.{% else %}A team member is closed by its team's Wind down or Start once these pass; Close this one alone is under more ▾.{% endif %}</div>
     </details>{% endif %}
@@ -323,7 +324,7 @@
         {% if s.context_line and s.agent %}<dt>context</dt><dd title="what this session's last turn sent (design §6 rule 5)"{% if s.context_over %} class="context over"{% endif %}>{{ s.context_line }}{% if s.context_bound %}, bound {{ s.context_bound }}{% endif %}</dd>{% endif %}
         {% if s.agent %}<dt>adapter id</dt><dd class="mono small" id="adapter_id">{{ s.adapter_id or '—' }}</dd>{% endif %}
         <dt>tmux</dt><dd class="mono small">{{ s.id }}</dd>
-        <dt>directory</dt><dd class="mono small">{{ s.dir }}</dd>
+        <dt>directory</dt><dd class="mono small">{{ s.dir }}{% if s.worktree_line %} <span class="muted" id="fworktree" title="what the close did with the worktree its start made (design §4.1)">· {{ s.worktree_line }}</span>{% endif %}</dd>
         <dt>started</dt><dd>{{ s.created[:16].replace('T', ' ') }}Z</dd>
         <dt>last output</dt><dd id="last_output">{{ s.last_output or '—' }}</dd>
         <dt>mode</dt><dd id="fmode" title="changed by Take over and Hand back">{{ 'unattended' if s.unattended else 'interactive' }}</dd>
