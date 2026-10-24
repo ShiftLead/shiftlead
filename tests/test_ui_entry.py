@@ -217,10 +217,11 @@ def test_a_seat_with_no_checkout_is_not_read_as_no_seat():
 
 
 @pytest.mark.unit
-def test_focus_draws_told_at_start_folded_escaped_and_only_on_a_record_holding_one(tmp_path, monkeypatch):
-    """§4.5a Focus side panel **Told at start** (TD-283 part 2): a fold, closed, above Session, its
-    heading the start context's length in lines, the text escaped with nothing in it a control — and
-    no card at all on a record without one."""
+def test_the_session_card_draws_told_at_start_folded_escaped_and_only_on_a_record_holding_one(tmp_path, monkeypatch):
+    """§4.5a Focus side panel, Session card: **told at start** row (TD-283 part 2, TD-993): a row right after
+    *started*, its value the start context's length in lines in a fold of its own, closed; the text the list's
+    very next item, escaped with nothing in it a control — and no row, and no side-panel card, on a record
+    without one or on a shell."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from shiftlead.ui.app import templates, view
 
@@ -238,16 +239,22 @@ def test_focus_draws_told_at_start_folded_escaped_and_only_on_a_record_holding_o
 
     told = "The person asked for a new entry.\n\n- **Read** <b>first</b>\n- [the site](https://example.com) `code`"
     html = page(start_context=told)
-    card = re.search(r'<details class="card pad side" data-side="told" id="toldcard">(.*?)</details>', html, re.S)
-    assert card, "drawn closed: no `open` on it"
-    assert ">Told at start<" in card[1] and ">3 lines<" in card[1]  # blank lines are not counted
+    assert 'id="toldcard"' not in html and 'data-side="told"' not in html  # the side-panel card is gone
+    row = re.search(
+        r'<dt>started</dt><dd>[^<]*</dd>\s*<dt>told at start</dt><dd><details class="toldfold"><summary>3 lines'
+        r'</summary></details></dd>\s*<dd class="told"[^>]*>(.*?)</dd>',
+        html,
+        re.S,
+    )
+    assert row, "right after started, closed (no `open`), the text the dl's next child"  # blank lines not counted
     # the closed markdown subset (bold, code), every other character escaped, and no link: nothing pressable
-    assert "<strong>Read</strong>" in card[1] and "<code>code</code>" in card[1]
-    assert "&lt;b&gt;first&lt;/b&gt;" in card[1] and "<a " not in card[1] and "<button" not in card[1]
-    assert "[the site](https://example.com)" in card[1]
-    assert html.index('data-side="told"') < html.index('data-side="session"')  # above Session
-    assert 'data-side="told"' not in page() and 'data-side="told"' not in page(start_context=None)
-    assert ">1 line<" in page(start_context="one")
+    assert "<strong>Read</strong>" in row[1] and "<code>code</code>" in row[1]
+    assert "&lt;b&gt;first&lt;/b&gt;" in row[1] and "<a " not in row[1] and "<button" not in row[1]
+    assert "[the site](https://example.com)" in row[1]
+    assert html.index("<dt>told at start</dt>") > html.index('data-side="session"')  # inside the Session card
+    assert "told at start</dt>" not in page() and "told at start</dt>" not in page(start_context=None)
+    assert "<summary>1 line</summary>" in page(start_context="one")
+    assert "told at start</dt>" not in page(start_context=told, adapter="shell", agent=False)
 
 
 def test_under_a_flow_a_feature_opens_its_design_stage(tmp_path, monkeypatch):

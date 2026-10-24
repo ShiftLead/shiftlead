@@ -3568,7 +3568,7 @@
       }
       if ($("#entryteamrow")) $("#entryteamrow").hidden = ts.length < 2;
       // a name that is not free: its reason stands in place of the line, and the button is disabled
-      $("#entryline").textContent = v.name_why || `Starts ${v.line}, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, under Told at start.`;
+      $("#entryline").textContent = v.name_why || `Starts ${v.line}, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, in the Session card under told at start.`;
       const h = v.hand || { why: "the host agent did not say who takes it" };
       handWhy = h.why || "";
       $("#entryseat").textContent = h.name || h.to || "";

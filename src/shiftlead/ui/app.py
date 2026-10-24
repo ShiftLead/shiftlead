@@ -2772,7 +2772,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         names for the Type — `plain` with no badge where no team services the repo — at the prompt: no
         opening prompt and no brief.
         `entry.md`'s lines, filled, are the session's **start context** (§4.3, TD-283 part 2): it holds
-        them from its start with no turn run for them, and Focus draws them under **Told at start**.
+        them from its start with no turn run for them, and Focus draws them in the Session card's **told at start** row.
         Answers `{id, text}`: the composer's text — the person's words alone — which the page keeps in
         the browser as that session's draft; nothing is typed into the pane, and the record holds the
         lines, never the words."""

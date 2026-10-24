@@ -125,7 +125,7 @@ def test_a_blank_line_inside_a_code_block_is_not_the_fold():
 
 @pytest.mark.unit
 def test_without_links_a_link_is_its_characters_everywhere_in_the_text():
-    """TD-283's **Told at start**: text in which nothing may be pressable — a link stays its
+    """TD-283's **told at start** row (TD-993): text in which nothing may be pressable — a link stays its
     characters, in a paragraph, a list item and inside emphasis, while the rest of the subset renders."""
     text = "See [a](https://example.com).\n\n- **[b](https://example.org)** and `c`"
     html = render(text, links=False)

@@ -526,7 +526,14 @@ body.popped .page { padding: 10px 12px; } body.popped .termbox, body.popped .ter
 /* the one long thing the row may take back instead: the tool's title, shown and never acted on,
    the whole of it on hover (the doing line left the header for the Working card, TD-156) */
 .focus #fhead > .tool-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-details.side .told { margin-top: 8px; font-size: var(--t-small); line-height: 1.5; overflow-wrap: anywhere; color: var(--muted); } details.side .told p, details.side .told ul { margin: 0 0 6px; } details.side .told ul { padding-left: 16px; }
+/* the Session card's **told at start** row (§4.5a, TD-993): its own fold, the text the grid's next item */
+.kv details.toldfold > summary { list-style: none; cursor: pointer; color: var(--link); }
+.kv details.toldfold > summary::-webkit-details-marker { display: none; }
+.kv details.toldfold > summary::before { content: "▸"; margin-right: 4px; }
+.kv details.toldfold[open] > summary::before { content: "▾"; }
+.kv dd.told { grid-column: 1 / -1; display: none; margin: 2px 0 4px; font-size: var(--t-small); line-height: 1.5; overflow-wrap: anywhere; color: var(--muted); }
+.kv dd:has(> details.toldfold[open]) + dd.told { display: block; }
+.kv dd.told p, .kv dd.told ul { margin: 0 0 6px; } .kv dd.told ul { padding-left: 16px; }
 #entryline { white-space: normal; }  /* the note under Open a session wraps: its second sentence says where the rest is read */
 input.input#entryname { width: 170px; }  /* §4.5a *Add entry form: Name* beside Open a session, as the mockup draws it (TD-677) */
 details.side .doing { margin-top: 8px; font-size: var(--t-small); line-height: 1.55; overflow-wrap: anywhere; }
