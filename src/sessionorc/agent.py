@@ -228,6 +228,7 @@ from sessionorc.agent_wake import WakeMixin
 from sessionorc.gitinfo import (
     REAP_STEP,
     REAP_WITHIN,
+    TIMED_OUT,
     GitPickError,
     WorktreeError,
     ensure_worktree,
@@ -2090,10 +2091,17 @@ class HostAgent(
         a session can never write *closed by the tick* or another's name. `reap` (§4.1 *A close reaps
         the worktree it made*, TD-979): `True` reaps the worktree the record's start made, `False` is a
         restart's and keeps it saying nothing, a string is the home's why to write as `worktree_kept` —
-        taken only from a call with no session caller, as `closer` is. A missing one reaps."""
-        s = self._get(id)
+        taken only from a call with no session caller on this socket, as `closer` is. A missing one reaps."""
         if isinstance(reap, str) and not mail.is_person(caller):
             raise RpcError("a close's reap why is the home's word: a session closes with reap true or false")
+        return await self._close(id, caller, closer, reap)
+
+    async def _close(
+        self, id: str, caller: Any = None, closer: dict[str, Any] | None = None, reap: bool | str = True
+    ) -> dict[str, Any]:
+        """`rpc_close` past its gate. A close the home routed here (`_act`) comes in at this door: a string
+        `reap` over the link is the home's why whatever session closed (§4.1), so it is never refused."""
+        s = self._get(id)
         if s.state == "scheduled":
             # **Cancel** (design §6 *Start time*, §4.5a): nothing ran, so there is nothing to keep —
             # the record and its launch record are forgotten and the directory's slot is free
@@ -2176,7 +2184,7 @@ class HostAgent(
                 locks.callback(lock.release)
             while await asyncio.to_thread(self.tmux.has_session, s.id):
                 if left() <= REAP_STEP:
-                    self._reaped(s, {"kept": "its pane is still there"})
+                    self._reaped(s, {"kept": TIMED_OUT})  # the pane outlived what is left of the deadline
                     return
                 await asyncio.sleep(0.1)  # after the kill, once the pane is gone: nothing writes into the tree
 

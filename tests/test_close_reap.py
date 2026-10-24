@@ -283,3 +283,16 @@ async def test_a_string_reap_on_a_record_with_no_worktree_says_nothing(agent, re
         s = await c.call("create", name="p", dir=str(repo.parent), **AGENT)
     got = await agent.rpc_close(s["id"], reap="in use by ao-x@box")
     assert got["worktree_kept"] is None
+
+
+async def test_a_routed_close_takes_the_homes_why_whatever_session_closed(agent, repo):
+    """A manager's close of a container node's member: the home sends its why as `reap` and the session as the
+    caller; the node closes it and writes the why, never refusing the close (§4.1, #2312's review)."""
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+    got = await agent._act(
+        {"rpc": "close", "params": {"id": s["id"], "reap": "in use by ao-x-sh@kmaster"}, "caller": "ao-mgr"}
+    )
+    rec = agent.sessions[s["id"]]
+    assert rec.state == "closed" and rec.worktree_kept == "in use by ao-x-sh@kmaster" and Path(s["dir"]).is_dir()
+    assert got["result"]["closer"]["by"] == "ao-mgr"
