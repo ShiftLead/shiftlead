@@ -5581,20 +5581,22 @@
     // together are the browser's (a pinch); a second finger joining a scroll ends it, and the touch is inert
     // (`dead`) until every finger lifts. `touch-action: pinch-zoom` (app.css) keeps the page from scrolling.
     const termEl = $("#term");
+    // the fingers counted are the terminal's (`targetTouches`): one resting elsewhere on the page is not a
+    // second finger, and its lift, which the terminal never hears, cannot leave the touch inert
     termEl.addEventListener("touchstart", (e) => {
-      if (touch && touch.dead) { if (touch.scrolled) e.preventDefault(); return; }
-      if (e.touches.length !== 1) {
+      if (touch && touch.dead && e.targetTouches.length > 1) { if (touch.scrolled) e.preventDefault(); return; }
+      if (e.targetTouches.length !== 1) {
         if (touch && touch.scrolling) { touchTake(); scrollFrame(); e.preventDefault(); }
         touch = { dead: true, scrolled: !!(touch && touch.scrolling) };
         return;
       }
-      const t = e.touches[0];
+      const t = e.targetTouches[0];
       touch = { id: t.identifier, y0: t.clientY, total: 0, sent: 0, scrolling: false, dead: false };
     }, { capture: true, passive: false });
     termEl.addEventListener("touchmove", (e) => {
       if (!touch) return;
       if (touch.dead) { if (touch.scrolled) e.preventDefault(); return; }
-      const t = Array.from(e.touches).find((x) => x.identifier === touch.id);
+      const t = Array.from(e.targetTouches).find((x) => x.identifier === touch.id);
       if (!t) return;
       touch.total = t.clientY - touch.y0;
       if (!touch.scrolling && Math.abs(touch.total) >= AO.TOUCH_SLOP) touch.scrolling = true;
@@ -5604,9 +5606,9 @@
     }, { capture: true, passive: false });
     const touchEnd = (e) => {
       if (!touch) return;
-      if (touch.scrolling || touch.scrolled) e.preventDefault();
+      if ((touch.scrolling || touch.scrolled) && e.cancelable) e.preventDefault();
       if (!touch.dead && touch.scrolling) { touchTake(); scrollFrame(); }
-      if (e.touches.length === 0) touch = null;
+      if (e.targetTouches.length === 0) touch = null;
       else if (!touch.dead) touch = { dead: true, scrolled: touch.scrolling };
     };
     termEl.addEventListener("touchend", touchEnd, { capture: true, passive: false });
