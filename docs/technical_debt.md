@@ -1558,6 +1558,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-24 (the designer, from TD-998)
 **Owner:** grinder
 **Kind:** live-check #2333
+**Waits:** event — contractmatch's next `ao host rebuild contractmatch` (a person's press at the home); read 2026-10-24 21:27Z (grinder-ao-1, #2333 live): container adf6ba2ae675 was created 2026-10-11 13:09Z, before #2333 merged (20:57Z), so its image holds no link yet
 **Status:** Built 2026-10-24 (grinder-ao-2, #2333): `dockerfile_text` writes the guarded link after the tmux step and the machine layers, before `USER <image user>`; its path is `containers.PATH_AO`, its target `INSIDE_VENV`'s `bin/ao`, and `test_the_dockerfile_links_ao_onto_path_after_tmux_and_before_the_images_user` holds the line and its place. Left: the live check in *Done when*, once #2333 is live and contractmatch is rebuilt.
 **Location:** `src/sessionorc/containers.py` (`dockerfile_text`); `tests/test_containers.py`; design §4.4a (the generated Dockerfile, *The link puts `ao` on every shell's `PATH`*)
 
