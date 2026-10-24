@@ -19138,7 +19138,7 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 
 ---
 
-**Resolved:** 2026-10-23 — its design landed in #2298 and was built by TD-979: #2311, #2312, #2313 and #PRNUM4. A close now reaps the worktree its start made when nothing in it would be lost (design §4.1 *A close reaps the worktree it made*).
+**Resolved:** 2026-10-23 — its design landed in #2298 and was built by TD-979: #2311, #2312, #2313 and #2314. A close now reaps the worktree its start made when nothing in it would be lost (design §4.1 *A close reaps the worktree it made*).
 
 ---
 
@@ -19222,4 +19222,4 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 
 ---
 
-**Resolved:** 2026-10-23 (grinder-ao-2) — built in four slices: #2311, the machinery (`gitinfo`'s worktree tests, `reap_worktree`, `weigh_branches` and the record's fields); #2312, the close's reap (`worktree_made` with its inheritance and migration, `rpc_close`'s `reap` over the link, the restarts' keep, *idle* over the records and `external_sessions()`'s `blind`, the locks, the `worktree_reaping` stamp's recovery and the Cancel); #2313, `ao close` on a closed record (the reap again, or its branches weighed again with the stale registration's recovery) and the tick's `is_dir` check; #PRNUM4, the Resume's `origin/<name>` base, `resume_create`'s `repo`/`worktree`, the Session card's *kept — <why>* / *reaped* line with no Git card on a reaped record, `ao status -v`'s `worktree:` line, and Close's help in §4.5a and `help.py`. The lasting content is design §4.1 *A close reaps the worktree it made*.
+**Resolved:** 2026-10-23 (grinder-ao-2) — built in four slices: #2311, the machinery (`gitinfo`'s worktree tests, `reap_worktree`, `weigh_branches` and the record's fields); #2312, the close's reap (`worktree_made` with its inheritance and migration, `rpc_close`'s `reap` over the link, the restarts' keep, *idle* over the records and `external_sessions()`'s `blind`, the locks, the `worktree_reaping` stamp's recovery and the Cancel); #2313, `ao close` on a closed record (the reap again, or its branches weighed again with the stale registration's recovery) and the tick's `is_dir` check; #2314, the Resume's `origin/<name>` base, `resume_create`'s `repo`/`worktree`, the Session card's *kept — <why>* / *reaped* line with no Git card on a reaped record, `ao status -v`'s `worktree:` line, and Close's help in §4.5a and `help.py`. The lasting content is design §4.1 *A close reaps the worktree it made*.
