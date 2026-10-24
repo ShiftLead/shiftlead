@@ -75,6 +75,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Designed 2026-10-23 — build TD-979 |
 | TD-979 | A close reaps the worktree ShiftLead made for its record, when nothing in it would be lost; the restarts keep it; `worktree_kept` says why one is kept (TD-978's build) | Medium | Open |
 | TD-985 | On a phone the Queue cuts a card's items off at its right edge, and the page cannot be scrolled sideways to read them | Medium | Open |
+| TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Open — design-first |
 
 ---
 
@@ -1528,3 +1529,25 @@ builds are in the ledger.
 **Fix:** below 720 px, make every Queue card's contents fit the screen width. Give the header's and the rows' columns `minmax(0, 1fr)`. Drop the items' and section headings' left padding, as `.qbuilds`/`.qnote` already drop theirs. Let an item's chips, kind, sentence and title wrap or ellipsize, as the Inbox's own rows do on a phone. Wrap the answer buttons under the sentence. This is §4.5 screen 12's narrow rule (*the buttons wrap under the title*) carried to the card's items, so no design change is needed. Verify it as a UI change (TD-290): a scratch home and Playwright at a phone's width (390 px), with an open card holding Decide, Do and Read items and a long sentence. Then check that `document.documentElement.scrollWidth <= innerWidth`, and that no item's right edge passes its card's. Screenshots go under `docs/mockups/reviews/`.
 
 **Related:** TD-003 (the phone layout), TD-771 (the Queue page), TD-911 (an item's shape on a card), TD-290.
+
+## TD-986: On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-23 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open. The touch scroll needs a design sentence first: §4.6 says what the wheel and Shift+PageUp do, and nothing about touch. The Tab key is already designed, in §4.5's phone layout soft-key row, which is TD-003's.
+**Location:** `src/shiftlead/ui/static/app.js` (the terminal's `wheel` handler and `AO.wheelStep`, TD-174, which a touch never reaches; the bridge's `{scroll: up|down, lines: n}` message), `src/shiftlead/ui/templates/focus.html` (the terminal and the composer), `src/shiftlead/ui/static/app.css` (`@media (max-width: 720px)`); design §4.6 *Scrollback is tmux's, reached through tmux* (the wheel), §4.5 *Phone layout* (the soft-key row `↑ ↓ ← → Enter Esc Tab 1–9`)
+
+**Why:** Paul, 2026-10-23, on his phone over the tailnet (`paste-20261023-210421.png` in the Add entry draft), on the Focus page of an idle Claude Code session whose composer shows a ghost suggestion: *on the focus terminal there is no way to scroll the terminal reliably and no way to hit tab to accept an answer.*
+
+The terminal keeps no local buffer: history is tmux's, reached by the scroll message the page sends on a `wheel` event (§4.6). A finger's drag sends no `wheel` event, so on a phone the history can be reached only by chance, if at all. Claude Code accepts its suggestion with Tab, and a phone's keyboard has no Tab key, so the suggestion cannot be accepted from the terminal. The harm is that a session cannot be read back or steered from the phone through its own terminal. Now that the phone reaches the home over Tailscale, §4.5's phone layout is no longer waiting for a route.
+
+**Fix:** design, then build.
+1. **Touch scroll (design).** §4.6 gains a sentence for touch: a vertical drag on the terminal is turned into the same `{scroll, lines}` message the wheel sends, batched per animation frame, while a long press still selects text. The design round settles how a drag and a selection are told apart, and whether `touch-action` keeps the page itself from scrolling under the terminal.
+2. **Tab (build).** §4.5's soft-key row has a Tab key (`↑ ↓ ← → Enter Esc Tab 1–9`), sent as key frames through the terminal websocket (invariant 6). This entry builds that row, or Tab at least, below 720 px. The rest of TD-003's narrow mode stays TD-003's.
+
+Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on a scratch home, then a look on the phone.
+
+**Related:** TD-003 (the phone layout; the soft-key row is designed there), TD-174 (the wheel), TD-667 (typing returns the pane to the live screen), TD-985 (the Queue on a phone), TD-290.
