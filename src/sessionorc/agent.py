@@ -2109,8 +2109,12 @@ class HostAgent(
             return await self._cancel_start(s, reap)
         if s.state == "closed":
             # a retry (§4.1 *the record*): the reap again, or its branches weighed again; it kills nothing,
-            # and the close's stamps stand
-            if await self._reap_again(s, reap):
+            # and the close's stamps stand — but any close clears the tick's mark (§6 rule 2, TD-237)
+            marked = s.closed_for is not None
+            if marked:
+                s.closed_for = None
+                self.store.save(s)
+            if await self._reap_again(s, reap) or marked:
                 await self._push_changes()
             return s.view()
         await asyncio.to_thread(self.tmux.kill_session, id)
