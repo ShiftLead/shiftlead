@@ -1467,7 +1467,7 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Owner:** designer
 **Kind:** design-first
 **Blocked by:** TD-992
-**Status:** Designed 2026-10-24 (the designer, PR #PRNUM): way (b), scoped — Claude Code's `PreToolUse` hook refuses a foreground `gh pr checks … --watch` or `gh run watch` on the main thread of an unattended record, the host agent's reply to the event saying the record is unattended (design §4.3 *A wait the guard refuses*). The briefs' words stay as they are: they already name the exact command, which was run in the foreground anyway. Built by TD-992.
+**Status:** Designed 2026-10-24 (the designer, PR #2324): way (b), scoped — Claude Code's `PreToolUse` hook refuses a foreground `gh pr checks … --watch` or `gh run watch` on the main thread of an unattended record, the host agent's reply to the event saying the record is unattended (design §4.3 *A wait the guard refuses*). The briefs' words stay as they are: they already name the exact command, which was run in the foreground anyway. Built by TD-992.
 **Location:** design §4.10 *Waiting on mail is ending the turn*; `src/shiftlead/briefs/techlead.md`, `src/shiftlead/briefs/auditor.md` (and the presets they share the sentence with); the Claude Code adapter's hooks, if a refusal is chosen (`src/shiftlead/adapters/claude_code/`)
 
 **Why:**
