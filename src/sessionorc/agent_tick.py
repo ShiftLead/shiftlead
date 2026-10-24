@@ -4669,8 +4669,14 @@ class TickMixin:
             and (thread is not None or (state and state != "needs-you" and not self._permission_waiting(sid, None)))
         ):
             tid = event.get("tool_use_id")
+            # a tool with no permission channel answers its permission in the terminal: no waiter ends it,
+            # so it leaves as a question does (§4.3 *Permissions: no channel*, TD-786)
+            terminal = not adapters.permission_channel(s.adapter)
             self._end_entries(
-                s, lambda p: p.subagent == thread and p.kind != "permission", sure=not tid or None, tool_use_id=tid
+                s,
+                lambda p: p.subagent == thread and (p.kind != "permission" or terminal),
+                sure=not tid or None,
+                tool_use_id=tid,
             )
         if state == "needs-you":
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else Pending("question", "")
