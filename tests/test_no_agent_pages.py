@@ -37,7 +37,7 @@ def test_the_view_of_a_record_with_no_agent_draws_no_checks_and_no_mode_toggle()
         a = cards.view(rec)
         assert a["agent"] is True and a["mode_act"] == "Switch to unattended"
         assert ("tree clean", False) in a["ready"] and not a["ready_ok"]
-        assert a["close_confirm"] == "Close sh? It is killed and its worktree reaped."
+        assert a["close_confirm"] == "Close sh? It is killed and its worktree reaped unless that would lose something."
 
 
 @pytest.mark.unit
@@ -89,7 +89,7 @@ def test_focus_of_a_shell_draws_a_shells_controls_and_an_agents_draws_its_own(cl
         assert confirm in menu[:200] and "disabled" not in menu[: menu.index(">")]
         assert 'data-act="kill"' in sh and 'data-act="shell-here"' in sh
         # Wrap up and Message on the agent's page, and its acts line holds Close back for the checks
-        assert 'data-confirm="Close ag? It is killed and its worktree reaped."' in ag
+        assert 'data-confirm="Close ag? It is killed and its worktree reaped unless that would lose something."' in ag
     finally:
         for sid in (shell, agent):
             client.post(f"/api/sessions/{sid}/kill")

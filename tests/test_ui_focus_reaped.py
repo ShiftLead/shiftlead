@@ -34,12 +34,21 @@ def _start(client, repo, name):  # noqa: F811
 
 def test_a_reaped_record_draws_no_git_card_and_a_kept_one_says_why(client, tmp_path):  # noqa: F811
     repo = _repo(tmp_path)
-    reaped, kept = _start(client, repo, "rp"), _start(client, repo, "kp")
-    assert 'id="gitcard"' in client.get(f"/focus/{reaped}").text  # live: the Git card
+    reaped, kept, ahead = _start(client, repo, "rp"), _start(client, repo, "kp"), _start(client, repo, "ah")
+    html = client.get(f"/focus/{reaped}").text
+    assert 'id="gitcard"' in html  # live: the Git card
+    assert 'data-confirm="Close rp? It is killed and its worktree reaped unless that would lose something."' in html
     (repo / ".claude" / "worktrees" / "kp" / "scratch").write_text("x")
-    for sid in (reaped, kept):
+    wt = repo / ".claude" / "worktrees" / "ah"
+    (wt / "f").write_text("x")
+    git(wt, "add", "f")
+    git(wt, "commit", "-q", "-m", "unpushed")
+    for sid in (reaped, kept, ahead):
         assert client.post(f"/api/sessions/{sid}/close").status_code == 200
     html = client.get(f"/focus/{reaped}").text
     assert 'id="gitcard"' not in html and 'id="fworktree"' in html and "· reaped</span>" in html
     html = client.get(f"/focus/{kept}").text
     assert 'id="gitcard"' in html and "· kept — 1 uncommitted</span>" in html
+    # a branch kept for commits never on origin: the card adds that the repo's reaper takes a landed one
+    html = client.get(f"/focus/{ahead}").text
+    assert "· reaped — branch kept, 1 commit never on origin (the repo&#39;s reaper takes a landed one)</span>" in html

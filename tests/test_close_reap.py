@@ -559,6 +559,25 @@ def test_the_worktree_words_the_card_and_ao_status_share():
     two = {"worktree_reaped_at": "t", "branch_kept": {"w": "no origin/HEAD", "x": "1 commit never on origin"}}
     assert worktree_words(two) == "reaped — branches kept, w: no origin/HEAD; x: 1 commit never on origin"
     assert worktree_words({}) == "" and worktree_words({"worktree_reaped_at": "t", "branch_kept": "junk"}) == "reaped"
+    # the Session card adds that the repo's reaper takes a landed one, for a never-on-origin why alone (§4.1)
+    landed = " (the repo's reaper takes a landed one)"
+    assert worktree_words(one, card=True) == "reaped — branch kept, 3 commits never on origin" + landed
+    assert worktree_words(two, card=True).endswith("x: 1 commit never on origin" + landed)
+    assert worktree_words({"worktree_reaped_at": "t", "branch_kept": {"w": "no origin"}}, card=True) == (
+        "reaped — branch kept, no origin"
+    )
+
+
+def test_the_session_card_says_the_repos_reaper_takes_a_landed_branch():
+    from shiftlead.ui import cards
+
+    rec = {
+        "id": "ao-r-w", "name": "w", "adapter": "claude-code", "dir": "/tmp/x", "state": "closed",
+        "since": "2026-10-14T08:00:00Z", "confidence": "hook", "tail": [], "closed_at": "2026-10-14T08:00:00Z",
+        "worktree_reaped_at": "2026-10-14T08:00:00Z", "branch_kept": {"w": "1 commit never on origin"},
+    }  # fmt: skip
+    v = cards.view(rec)
+    assert v["worktree_line"] == "reaped — branch kept, 1 commit never on origin (the repo's reaper takes a landed one)"
 
 
 def test_a_resume_checks_out_a_local_name_as_it_stands(repo):

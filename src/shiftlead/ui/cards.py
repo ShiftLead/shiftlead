@@ -559,7 +559,7 @@ def view(
     # offered wherever it is drawn, and closing it kills the shell and reaps nothing
     d["ready_ok"] = (bool(d["ready"]) and all(ok for _, ok in d["ready"])) or not d["agent"]
     d["close_confirm"] = (
-        f"Close {s.get('name')}? It is killed and its worktree reaped."
+        f"Close {s.get('name')}? It is killed and its worktree reaped unless that would lose something."
         if d["agent"]
         else f"Close {s.get('name')}? The shell is killed; the directory is left as it is."
     )
@@ -583,7 +583,7 @@ def view(
     names = {str(o.get("id")): str(o.get("name") or "") for o in fleet or []}
     d["closer_text"] = closer_words(s, names)
     # what the close did with the worktree its start made (§4.1, TD-979): after the directory on the Session card
-    d["worktree_line"] = worktree_words(s)
+    d["worktree_line"] = worktree_words(s, card=True)
     d["reaped"] = bool(s.get("worktree_reaped_at")) and state == "closed"
     # the Focus Prompts card's sender (§4.5 *The Prompts card*, TD-977): a session's name as the Inbox's
     # `from_name` is made; `person`, `brief` and `system` are the page's words

@@ -19218,7 +19218,7 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
   - a retry racing a create of the same name waits for the worktree lock, or answers *busy*;
   - a default branch checked out in the worktree is skipped, named in neither field.
 
-**Related:** TD-978, TD-922, TD-972. The reap departs from cadence §1.2 (a worktree lives as long as its unmerged work) and from `reap_worktrees.sh`'s ignored-file rule: both are dev-cadence's, so the session that builds this tells dev-cadence by `ao msg` (a note to its techlead seat) that §1.2 could name a close's reap of a clean worktree, whose commits stay on its branch, and the caches list.
+**Related:** TD-978, TD-922, TD-972. The reap departs from cadence §1.2 (a worktree lives as long as its unmerged work) and from `reap_worktrees.sh`'s ignored-file rule: both are dev-cadence's, so the session that builds this tells dev-cadence by `ao msg` (a note to its techlead seat) that §1.2 could name a close's reap of a clean worktree, whose commits stay on its branch, and the caches list. That note was refused by §4.10's reach (another project), and on the techlead's word it went to the person instead, as `ao msg person --kind note` m-c229d49d5483 (2026-10-24, #2314).
 
 ---
 
