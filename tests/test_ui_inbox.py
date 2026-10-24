@@ -2451,6 +2451,19 @@ eval(fs.readFileSync(process.argv[2], "utf8"));
 const gone = window.AO.paneIsGone, close = window.AO.termClose, wheel = window.AO.wheelStep;
 console.log(JSON.stringify({
   wheel: [-3, 2.5, 0.4, -0.9, 0].map(wheel),
+  touch: [[0, 0], [9, 0], [-9.5, 0], [10, 0], [-12, 0], [30, 12], [5, 12], [0, 12]]
+    .map(([t, s]) => window.AO.touchStep(t, s)),
+  // a drag down to 12, 30 and 70 px on 16 px cells, as the page's caller does it: negated into the accumulator
+  drag: (() => {
+    let acc = 0, sent = 0;
+    return [12, 30, 70].map((total) => {
+      const st = window.AO.touchStep(total, sent);
+      sent = st.sent;
+      const { msg, rest } = wheel(acc - st.add / 16);
+      acc = rest;
+      return msg;
+    });
+  })(),
   gone_closed: gone({state: "closed", pane: true}),
   gone_pane_false: gone({state: "working", pane: false}),
   gone_working: gone({state: "working", pane: true}),
@@ -2500,6 +2513,16 @@ def test_the_terminals_two_client_rules_are_reachable_and_right():
     # an `exited` session that still has its pane is *not* gone: its last screen and run log are
     # kept on purpose (TD-023), and ending the terminal there would throw them away
     assert got["gone_exited_with_pane"] is False
+
+    # a finger's drag (§4.6 *A finger's drag scrolls it too*, TD-989): nothing inside the 10 px slop,
+    # then all the travel not yet sent, so the first 10 px count once; it returns from the slop as travel
+    assert got["touch"] == [
+        {"add": 0, "sent": 0}, {"add": 0, "sent": 0}, {"add": 0, "sent": 0}, {"add": 10, "sent": 10},
+        {"add": -12, "sent": -12}, {"add": 18, "sent": 30}, {"add": -7, "sent": 5}, {"add": -12, "sent": 0},
+    ]  # fmt: skip
+    # a drag down is `up` (the content follows the finger), and the fraction carries: 12 px is under a line
+    # of 16, 30 px makes one line with 14 px left, and 70 px makes four in all, three more
+    assert got["drag"] == [None, {"scroll": "up", "lines": 1}, {"scroll": "up", "lines": 3}]
 
     # (c) 4404 is the server saying the pane is gone: final, and never retried
     assert got["final_4404"] == {"retry": False, "final": True, "delay": 500,

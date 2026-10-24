@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Designed — builds TD-989, TD-990 |
-| TD-989 | A finger's drag on the Focus terminal scrolls tmux's history, as the wheel does | Medium | Open |
 | TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Open |
 
 ---
@@ -1436,24 +1435,6 @@ The terminal keeps no local buffer: history is tmux's, reached by the scroll mes
 Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on a scratch home, then a look on the phone.
 
 **Related:** TD-003 (the phone layout; the soft-key row is designed there), TD-174 (the wheel), TD-667 (typing returns the pane to the live screen), TD-985 (the Queue on a phone), TD-290.
-
-## TD-989: A finger's drag on the Focus terminal scrolls tmux's history, as the wheel does
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-23 (the designer, from TD-986)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/static/app.js` (beside the terminal's `wheel` listener and `AO.wheelStep`; the `contextmenu` listener that pastes), `src/shiftlead/ui/static/app.css` (`.termbox`); design §4.6 *Scrollback is tmux's, reached through tmux* (**A finger's drag scrolls it too**), §4.5a **Focus pane: a finger's drag**, *Copy / Paste*
-
-**Why:** TD-986: on a phone the terminal's history can be reached only by chance, since a drag sends no `wheel`.
-
-**Fix:** as §4.6 says. In the capture phase on `#term`, `passive: false`: a one-finger `touchstart` records the point; `touchmove` past 10 px of travel marks the touch a scroll (default prevented from then on, so no tap or emulated mouse follows; xterm.js's own touch listeners on `.xterm` bubble, so the capture listener runs first), and once per animation frame the caller takes `{add, sent}` from `AO.touchStep(total, sent)`, divides `add` by the cell height, negates it and adds it to an accumulator flushed through `AO.wheelStep` — the wheel's own function, so its sign convention gives a drag down `up`; `touchend` / `touchcancel` end it. A second finger joining a scroll ends it; two fingers put down together are the browser's (a pinch). `.termbox` and xterm.js's `.xterm`, `.xterm-viewport` and `.xterm-screen` get `touch-action: pinch-zoom` (the viewport is its own scroll container). The `contextmenu` listener does nothing when the last `pointerdown` on `#term` — a capture-phase listener, each one replacing the last — had `pointerType === "touch"`. `AO.touchStep(total, sent)` is the pure step §4.6 defines: vertical travel since the touch's start and the travel already sent in, the pixels to add and the new `sent` out — nothing under the 10 px slop, then `total - sent`, so the first 10 px count once; sideways travel is nothing. After a second finger ends a scroll the touch is inert until every finger lifts. The `contextmenu` listener still calls `preventDefault()` after a touch, and skips `pasteClip()`.
-
-**Done when** a test beside the `AO.wheelStep` one (the node probe that evals `app.js` in `tests/test_ui_inbox.py`) pins the touch step: travel under 10 px is no message, a drag down is `up`, the fraction carries; and a Playwright check at 390 px with `has_touch` on a scratch home (`scripts/look_home.py`), its drags sent through CDP `Input.dispatchTouchEvent` (`page.touchscreen` only taps), on a page taller than the viewport, drags down on a session's terminal with history and reads the pane scrolled back (`tmux display -p -t <pane> '#{pane_in_mode}'` on the scratch home's socket reads `1`), the page's `scrollY` unchanged, and a tap still focusing the terminal (`document.activeElement` is xterm's textarea); and, since Playwright synthesises no `contextmenu` from a held touch, dispatches a `pointerdown` with `pointerType: "touch"` then a `contextmenu` on `#term` and sees no clipboard read and nothing sent. The same check shows a drag leaves the pane in copy mode (a typed key leaves it, TD-667), a second finger joining a drag ends the scroll, two fingers put down together send no scroll message (two CDP touch points), a drag on an unattended session's read-only Focus scrolls too, a drag that starts on the soft-key row or the composer scrolls nothing, and a mouse right-click after a touch still pastes. Desktop wheel, selection and Shift+click are unchanged. Then a look on the phone (TD-290).
-
-**Related:** TD-986, TD-990, TD-174 (the wheel), TD-667, TD-003.
 
 ## TD-990: The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer
 

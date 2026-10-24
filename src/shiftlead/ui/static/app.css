@@ -559,6 +559,9 @@ details.side > summary { list-style: none; cursor: pointer; align-items: center;
 details.side > summary .h2::before { content: "▾ "; color: var(--muted); font-weight: 400; } details.side:not([open]) > summary .h2::before { content: "▸ "; }
 details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side .kv dd .controllers { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 6px; } .termbox .xterm { height: 100%; }
+/* a finger's drag on the terminal is tmux's scroll, never the page's (§4.6, TD-989); xterm.js's viewport is a scroll
+   container of its own, so its layers carry the value too; two fingers still zoom the page */
+.termbox, .termbox .xterm, .termbox .xterm-viewport, .termbox .xterm-screen { touch-action: pinch-zoom; }
 .composer { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 /* §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): folded, the composer is one bar under the
    terminal and opens as an overlay over the terminal's foot — the terminal's width, never past its top,
