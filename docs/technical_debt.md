@@ -1547,7 +1547,7 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Why:** seen 2026-10-24 by contractmatch's interactive session `ao-contractmatch-cm-queue`, on the contractmatch container node, asked to send samscrape a ledger request. Every way it tried was closed:
 1. `ao msg samscrape …` answered *no session named samscrape here*. An addressee is a session's id or name. Nothing addresses a repo, a team or its techlead seat. The node cannot read the org either (*the org lives on kmaster (home)…*), so it could not look up a session id to use.
 2. `ao td add --repo samscrape …` was refused: it is the person's act alone (§4.7), and a session writes its entry on its own branch or files `ao finding`.
-3. `ao finding` takes a ref in the session's own repo only.
+3. `ao finding` took only a ref in the session's own repo (the reporter's reading; the design states no such limit, §4.7, §4.8, so the design round checks it).
 4. Claude Code's peer list (`ListAgents`) showed no other sessions, and it is not the channel anyway (§4.10).
 
 So the session printed a command for the person to run on the home, which is the hop the mail layer exists to save. Even with a session id in hand, the gate would refuse the send today. Samscrape and contractmatch are separate projects until TD-723, and §4.10's cross-team edge admits only a session with the same `project` badge. So the request reaches samscrape only through the person. And the same gap stays inside one project: a session can reach another team's sessions only by knowing their ids, and a seat that is empty has no session to address.
