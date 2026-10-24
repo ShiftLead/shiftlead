@@ -123,6 +123,22 @@ def test_the_node_is_the_repos_with_the_persons_parts_out_and_shiftleads_in(home
     assert "USER" not in containers.dockerfile_text("x", "").split("USER root")[1]
 
 
+def test_the_dockerfile_links_ao_onto_path_after_tmux_and_before_the_images_user():
+    lines = containers.dockerfile_text(
+        "x", "developer", [("/etc/gemini-cli/settings.json", "layer-0.json")]
+    ).splitlines()
+    link = (
+        "RUN [ -e /usr/local/bin/ao ] || [ -L /usr/local/bin/ao ] || { install -d -o root -g root -m 0755"
+        " /usr/local/bin && ln -s /shiftlead/venv/bin/ao /usr/local/bin/ao; }"
+    )
+    assert lines.count(link) == 1
+    at = lines.index(link)
+    tmux = lines.index("RUN sh /tmp/shiftlead-install-tmux.sh && rm -f /tmp/shiftlead-install-tmux.sh")
+    assert tmux < at < lines.index("USER developer") and lines.index("USER root") < at
+    # the target is the venv's, whatever INSIDE_VENV names
+    assert f"ln -s {containers.INSIDE_VENV}/bin/ao " in link
+
+
 def test_the_repos_features_and_image_go_to_the_base_and_a_string_mount_is_understood(tmp_path):
     repo = {
         "image": "python:3.12",
