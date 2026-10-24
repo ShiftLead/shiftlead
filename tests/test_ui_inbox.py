@@ -2165,10 +2165,11 @@ def test_a_resume_of_a_worktree_record_checks_the_name_in_the_records_scope(tmp_
         "adapter_id": "u-1", "state": "exited", "unattended": True,
     }  # fmt: skip
     got = resume_create(rec)
-    assert got["repo"] == str(repo) and got["dir"] == str(wt)
+    # the repo as `dir` with the worktree's name, so a reaped record's start makes it again (§4.1, TD-979)
+    assert got["repo"] == str(repo) and got["dir"] == str(repo) and got["worktree"] == "techlead-ao-1"
     # the proof: the id the agent's name check would compute is the record's own
     assert naming.base_id(got["dir"], got["repo"], got["name"]) == rec["id"]
-    assert naming.base_id(got["dir"], None, got["name"]) == "ao-techlead-ao-1"  # what it was without `repo`
+    assert naming.base_id(str(wt), None, got["name"]) == "ao-techlead-ao-1"  # the worktree without `repo`
     # a record with no repo sends none (§4.4: a parameter never set is never sent)
     assert "repo" not in resume_create({**rec, "repo": None, "dir": str(tmp_path)})
     # Resume with changes…: the form's fields, the way its Start sends them back

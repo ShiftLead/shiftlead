@@ -1149,7 +1149,7 @@ def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
     why = "not ready to close — agent working — wait or Wrap up, tree clean"
     assert f'data-confirm="Close w?" disabled title="{why}' in working
     clean = {"branch": "w", "dirty": 0, "unpushed": 0}
-    closes = 'title="Kills the session and reaps its worktree; the record reads closed.">Close</button>'  # TD-167
+    closes = 'title="Kills the session; the record reads closed.">Close</button>'  # TD-167, TD-979
     assert f'data-confirm="Close w?" {closes}' in foot(_card(git=clean))
 
 

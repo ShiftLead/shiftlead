@@ -72,10 +72,13 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
+<<<<<<< HEAD
 | TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Designed 2026-10-23 — build TD-979 |
 | TD-979 | A close reaps the worktree ShiftLead made for its record, when nothing in it would be lost; the restarts keep it; `worktree_kept` says why one is kept (TD-978's build) | Medium | Open |
 | TD-985 | On a phone the Queue cuts a card's items off at its right edge, and the page cannot be scrolled sideways to read them | Medium | Open |
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Open — design-first |
+=======
+>>>>>>> df46a23b2 (TD-979 slice 4: the summary table drops TD-978 and TD-979; two tests read the Resume's repo dir and Close's new help)
 
 ---
 
