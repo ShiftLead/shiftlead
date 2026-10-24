@@ -559,3 +559,10 @@ def test_the_worktree_words_the_card_and_ao_status_share():
     two = {"worktree_reaped_at": "t", "branch_kept": {"w": "no origin/HEAD", "x": "1 commit never on origin"}}
     assert worktree_words(two) == "reaped — branches kept, w: no origin/HEAD; x: 1 commit never on origin"
     assert worktree_words({}) == "" and worktree_words({"worktree_reaped_at": "t", "branch_kept": "junk"}) == "reaped"
+
+
+def test_a_resume_checks_out_a_local_name_as_it_stands(repo):
+    """A local `<name>` the reap kept for its unpushed commits wins over `origin/<name>` (§4.1 *Started again*)."""
+    _pushed_branch(repo, "k")
+    git(repo, "branch", "-q", "k", "main")  # the local branch, behind its pushed tip
+    assert _resume_base(repo, "k", resume=True) == git(repo, "rev-parse", "main")
