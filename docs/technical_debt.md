@@ -74,6 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
 | TD-978 | Closing a session leaves its worktree behind, though the design says Close removes it, so a PR another session rebased cannot pass the merge gate until a person deletes the worktree | Medium | Designed 2026-10-23 — build TD-979 |
 | TD-979 | A close reaps the worktree ShiftLead made for its record, when nothing in it would be lost; the restarts keep it; `worktree_kept` says why one is kept (TD-978's build) | Medium | Open |
+| TD-985 | On a phone the Queue cuts a card's items off at its right edge, and the page cannot be scrolled sideways to read them | Medium | Open |
 
 ---
 
@@ -1511,3 +1512,19 @@ builds are in the ledger.
   - a default branch checked out in the worktree is skipped, named in neither field.
 
 **Related:** TD-978, TD-922, TD-972. The reap departs from cadence §1.2 (a worktree lives as long as its unmerged work) and from `reap_worktrees.sh`'s ignored-file rule: both are dev-cadence's, so the session that builds this tells dev-cadence by `ao msg` (a note to its techlead seat) that §1.2 could name a close's reap of a clean worktree, whose commits stay on its branch, and the caches list.
+
+## TD-985: On a phone the Queue cuts a card's items off at its right edge, and the page cannot be scrolled sideways to read them
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-23 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.css` (the Queue's rules: `.qcards:not(.bcards) > .qcard` with `overflow: hidden`, `.qhead`'s `1fr` column, `.qmail` and `.qsech` with `padding-left: calc(6ch + 2.4em)`, and the `@media (max-width: 720px)` block, which resets `.qbuilds`/`.qnote` but not these; `.qmail .cardline > summary`'s `nowrap`); `src/shiftlead/ui/templates/queue_row.html` (`items`, the `qsec` blocks); design §4.5 screen 12 *Narrow (below 720 px)*, §4.5a *Queue card: what needs the person*
+
+**Why:** Paul, 2026-10-23, on his phone (`paste-20261023-205040.png` in the Add entry draft): *The phone view on the Queue cuts off and does not scroll horizontally.* On the open card for dev-cadence#TD-126, the *Decide (2)* items are drawn wider than the screen: the repo and team chips, the *ledger · your decision* kind, the item's sentence, its title and its *Lift the hold* / *Answer* row all run past the card's right edge and are clipped. The card's `overflow: hidden` clips them, so sideways scrolling does not help either. The likely cause, from the CSS: the header's grid column is `1fr`, and a grid item's minimum width is its content, so a `nowrap` line or chip inside an item makes the column wider than the screen; below 720 px the items also keep their desktop left padding. The harm: on a phone a Decide item cannot be read, and its answers cannot be pressed with any confidence. The Inbox, improved, is meant to be the phone's text interface (TD-003, Paul 2026-10-13), and the Queue holds the items that ask the person to decide.
+
+**Fix:** below 720 px, make every Queue card's contents fit the screen width. Give the header's and the rows' columns `minmax(0, 1fr)`. Drop the items' and section headings' left padding, as `.qbuilds`/`.qnote` already drop theirs. Let an item's chips, kind, sentence and title wrap or ellipsize, as the Inbox's own rows do on a phone. Wrap the answer buttons under the sentence. This is §4.5 screen 12's narrow rule (*the buttons wrap under the title*) carried to the card's items, so no design change is needed. Verify it as a UI change (TD-290): a scratch home and Playwright at a phone's width (390 px), with an open card holding Decide, Do and Read items and a long sentence. Then check that `document.documentElement.scrollWidth <= innerWidth`, and that no item's right edge passes its card's. Screenshots go under `docs/mockups/reviews/`.
+
+**Related:** TD-003 (the phone layout), TD-771 (the Queue page), TD-911 (an item's shape on a card), TD-290.
