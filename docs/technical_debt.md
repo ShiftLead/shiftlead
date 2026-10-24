@@ -77,6 +77,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-993 | **Told at start** leaves the Focus side panel: a row of the Session card, and the first entry of the Transcript | Medium | Open — design first |
 | TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Open — design first |
 | TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Open — design first |
+| TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Open |
 
 ---
 
@@ -1531,3 +1532,23 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when** `ao` resolves on PATH in a node session, in an **Open shell here** shell and in a `docker exec` shell, after an `ao host rebuild`, and `ao doctor` on a node without it says so.
 
 **Related:** TD-301 (the hooks off the node's PATH), TD-299 (the container nodes), TD-062 (the wheel the node is provisioned from).
+
+---
+
+## TD-999: The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (grinder-ao-1, from TD-992)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — the follow-on TD-992 named.
+**Location:** `src/shiftlead/adapters/gemini/hook.py` (`refused_command`, `main`; the kill guard is wired there at its `run_shell_command`); design §4.3 *A wait the guard refuses* (it names Claude Code's hook alone) and *The second adapter: Gemini CLI*
+
+**Why:** TD-992 built the wait guard in Claude Code's hook only. Gemini CLI's hook already runs the kill guard on `run_shell_command`, so the same net is one call away there: `wait_guard.waits(command)` when the call's `is_background` is not true. It also needs the same `wait` / `refuse_wait` round trip to the host agent, whose `rpc_hook` already answers it.
+
+**Fix:** design first in the same PR: §4.3 says the Gemini hook refuses too, naming its block form (exit 2 with the reason on stderr, as the kill guard's). Then wire it in `gemini/hook.py`, with a test beside its kill guard's.
+
+**Done when** an unattended Gemini session's foreground `gh pr checks <n> --watch` is blocked with `wait_guard.REASON`, and one with `is_background` true, or on an interactive record, is not.
+
+**Related:** TD-992, TD-991, TD-785 (the kill guard in Gemini CLI).
