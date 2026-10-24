@@ -78,6 +78,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-992 | The wait guard: an unattended Claude Code session's foreground `gh pr checks … --watch` or `gh run watch` is refused, naming the background form | Low | Open — build |
 | TD-993 | **Told at start** leaves the Focus side panel: a row of the Session card, and the first entry of the Transcript | Medium | Open — design first |
 | TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Open — design first |
+| TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Open — design first |
 
 ---
 
@@ -1562,3 +1563,23 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when** the design says how a session reaches another repo's or team's techlead (or says it does not, and why), and its build is merged. A session on a node can then put a ledger request to another repo without the person running a command, and `ao msg <to> --kind note "…"` either sends or ends with a refusal naming the fix.
 
 **Related:** TD-723 (samscrape and contractmatch under one project, which opens the project edge between them), TD-582 (the cross-team edge), TD-299 (the container nodes).
+
+## TD-998: `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — reported from the contractmatch node; the cause is read in the code, and the fix is the design's to name.
+**Location:** `src/sessionorc/containers.py` (the agent's start script, `exec {INSIDE_VENV}/bin/shiftlead-agent serve`, run by `exec_cmd` with `SHIFTLEAD_HOME` and the node's env file and no `PATH`; the generated Dockerfile); design §4.4a (the node's `/shiftlead/venv`, filled with the home's wheel), §4.7 *`ao doctor`* (its checks; on a node they read the node); `src/shiftlead/skill.md` (*`ao` is on `PATH`*)
+
+**Why:** seen 2026-10-24 on the contractmatch node (user `developer`). The container mounts shiftlead's virtualenv at `/shiftlead/venv`, but `/shiftlead/venv/bin` is not on PATH, so `ao` is *command not found* there. It is missing in an interactive session's shell and in the shell from Focus's **Open shell here**; only `/shiftlead/venv/bin/ao` works. The node's agent is started by its absolute path with the image's PATH, and the tmux sessions it creates inherit that PATH. TD-301 met the same gap for the hooks and worked around it: `hook_command()` in the Claude Code adapter finds `shiftlead-hook` beside the interpreter. Nothing does the same for `ao`. So a session or a person in the container has to know the install path to reach `ao` at all. The skill (*`ao` is on `PATH`*), the briefs and the docs all say `run ao …`, and those commands fail there as written. Mail, `ao progress` and `ao doing` are how a member reports, so a node member that cannot find `ao` goes silent to the org.
+
+**Fix:** design first, in the reporter's direction:
+1. **Put `/shiftlead/venv/bin` on PATH** for every shell in the container: either the generated image's `ENV PATH`, or the environment the node's agent starts with (`exec_cmd`'s `env`) so its tmux server and every session and shell it makes inherit it. The design names one in §4.4a. A `docker exec` shell a person opens by hand gets the image's PATH only, which favours the image.
+2. **`ao doctor` on a node** reports *`ao` not on PATH* with the cure, when the host is a container node and `shutil.which("ao")` does not resolve to the venv's own.
+
+**Done when** `ao` resolves on PATH in a node session, in an **Open shell here** shell and in a `docker exec` shell, after an `ao host rebuild`, and `ao doctor` on a node without it says so.
+
+**Related:** TD-301 (the hooks off the node's PATH), TD-299 (the container nodes), TD-062 (the wheel the node is provisioned from).
