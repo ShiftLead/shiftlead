@@ -237,6 +237,7 @@ from sessionorc.gitinfo import (
     pick_files,
     reap_worktree,
     rehydrate,
+    reweigh_gone,
     weigh_branches,
     work_left,
 )
@@ -2106,6 +2107,16 @@ class HostAgent(
             # **Cancel** (design §6 *Start time*, §4.5a): nothing ran, so there is nothing to keep —
             # the record and its launch record are forgotten and the directory's slot is free
             return await self._cancel_start(s, reap)
+        if s.state == "closed":
+            # a retry (§4.1 *the record*): the reap again, or its branches weighed again; it kills nothing,
+            # and the close's stamps stand — but any close clears the tick's mark (§6 rule 2, TD-237)
+            marked = s.closed_for is not None
+            if marked:
+                s.closed_for = None
+                self.store.save(s)
+            if await self._reap_again(s, reap) or marked:
+                await self._push_changes()
+            return s.view()
         await asyncio.to_thread(self.tmux.kill_session, id)
         s.set_state("closed", confidence="tick")
         s.pane = False
@@ -2156,6 +2167,64 @@ class HostAgent(
                 s.worktree_reaping = None
                 s.worktree_kept = f"the reap failed: {str(e) or type(e).__name__}"
         self.store.save(s)
+        return True
+
+    async def _reap_again(self, s: Session, reap: bool | str) -> bool:
+        """`ao close` on a `closed` record whose start made its worktree (§4.1): its directory there, the reap
+        runs again; gone, its branches are weighed again under the per-name worktree lock — the ones
+        `branch_kept` names, or, never reaped, the stale registration's branch and the launch branch, then
+        `worktree_reaped_at`. A reap still stamped `worktree_reaping` is the start's recovery's. Answers whether
+        it wrote; never raises."""
+        if reap is False or not s.worktree_made or not adapters.has_agent(s.adapter) or s.worktree_reaping:
+            return False
+        if Path(s.dir).is_dir():
+            return await self._reap(s, reap)
+        if s.worktree_reaped_at and not s.branch_kept:
+            return False  # reaped, and nothing kept to weigh again
+        wt = Path(s.dir)
+        try:
+            main = await asyncio.to_thread(main_checkout, s.repo or wt.parent.parent.parent)
+        except (WorktreeError, OSError) as e:
+            # the lock's key is the main checkout as the create resolves it: weighed under another key, a
+            # create could check out a branch the retry is deleting
+            log.warning("%s: its branches are not weighed again: the main checkout could not be read: %s", s.id, e)
+            return False
+        task = asyncio.ensure_future(self._reweigh_locked(s, main, s.worktree or wt.name))
+        task.add_done_callback(lambda t: t.cancelled() or t.exception())  # retrieved, should the close go
+        try:
+            return await asyncio.shield(task)  # the lock held, and the record written, until the thread returns
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001 — never raise out of the close
+            log.warning("%s: weighing its branches again failed: %s", s.id, e)
+            return False
+
+    async def _reweigh_locked(self, s: Session, main: Path, name: str) -> bool:
+        """`_reap_again`'s weigh under the per-name worktree lock `rpc_create` takes, awaited within
+        `REAP_WITHIN` (held: *busy*), and the record written before the lock is let go."""
+        lock = self._dir_locks[f"worktree:{main}:{name}"]
+        try:
+            await asyncio.wait_for(lock.acquire(), REAP_WITHIN)
+        except TimeoutError:
+            s.worktree_kept = "busy: a start is using it"
+            self.store.save(s)
+            return True
+        try:
+            got = await asyncio.to_thread(reweigh_gone, main, s.dir, name, s.branch_kept, bool(s.worktree_reaped_at))
+            if got is None:
+                log.warning(
+                    "%s: its worktree %s is gone and git's registration of it was not read and pruned", s.id, s.dir
+                )
+                return False
+            deleted, kept = got
+            s.worktree_kept = None
+            s.worktree_reaped_at = s.worktree_reaped_at or now_iso()
+            s.branches_deleted = list(dict.fromkeys([*(s.branches_deleted or []), *deleted]))
+            s.branch_kept = kept
+            self.store.save(s)
+        finally:
+            lock.release()
+        log.info("%s: its branches weighed again: deleted %s, kept %s", s.id, deleted, kept)
         return True
 
     async def _reap_locked(self, s: Session, deadline: float) -> None:

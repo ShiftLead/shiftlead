@@ -256,6 +256,7 @@ class TickMixin:
             self._notify_pass(snapshot_at)
         except Exception:  # noqa: BLE001 — telling the person is never worth a tick
             log.exception("the Telegram pass failed")
+        await self._clear_gone_kept()
         await self._refresh_git(snapshot_at)
         await self._refresh_model(snapshot_at)
         await self._refresh_context(snapshot_at)
@@ -3675,6 +3676,23 @@ class TickMixin:
                     log.warning("could not prune attachment %s: %s", f, e)
             with contextlib.suppress(OSError):  # not empty: a younger file keeps it
                 folder.rmdir()
+
+    async def _clear_gone_kept(self) -> None:
+        """A closed record still saying its worktree is kept stops saying so once the directory is gone, such as
+        one the person removed by hand (§4.1 *the record*, TD-979): the check asks only `Path.is_dir()`, no git,
+        and passes over a reap still running. `_refresh_git` skips closed records and is left so."""
+        held = [
+            s
+            for s in self.sessions.values()
+            if s.state == "closed" and s.worktree_kept and not s.worktree_reaping and s.dir
+        ]
+        if not held:
+            return
+        gone = await asyncio.to_thread(lambda: {s.id for s in held if not Path(s.dir).is_dir()})  # off the loop
+        for s in held:
+            if s.id in gone and s.worktree_kept and not s.worktree_reaping:
+                s.worktree_kept = None
+                self.store.save(s)
 
     async def _refresh_git(self, now: datetime) -> None:
         due = [
