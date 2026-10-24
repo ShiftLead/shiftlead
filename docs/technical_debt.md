@@ -77,10 +77,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Designed — builds TD-1000, TD-1001 |
 | TD-997 | The Transcript draws a session's start context as its first entry — Paul's to keep or drop | Low | Open — waits on Paul |
 | TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Designed — builds TD-1004, TD-1005 |
-| TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Open — design first: a background shell's end wakes no Gemini session |
+| TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Designed — build TD-1007 |
 | TD-1000 | A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo | Medium | Open — build |
 | TD-1001 | `ao msg` takes its options anywhere among the addressees and the text | Low | Open — build |
 | TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Built (#2333) — live check |
+| TD-1007 | Gemini CLI's layer wakes a session at a background command's end, and its hook refuses an unattended foreground CI watch | Low | Open — build |
 
 ---
 
@@ -1541,7 +1542,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-24 (grinder-ao-1, from TD-992)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — design first. Picked to build 2026-10-24 (grinder-ao-1) and handed back: in Gemini CLI a background shell's end does not wake the session, so the refusal's *run it in the background … its end wakes you* would be untrue there.
+**Blocked by:** TD-1007
+**Status:** Designed 2026-10-24 (the designer): the layer sets `tools.shell.backgroundCompletionBehavior: inject` and `experimental.modelSteering: true`, which in 0.65.0 is what makes a background command's end start an idle session's turn, and the hook refuses on `run_shell_command` not `is_background`, in words naming `is_background` (design §4.3 *A wait the guard refuses*, *The second adapter*). Steered to the techlead as m-d0741b96f424 (bound 12 h, lapses 2026-10-25 08:46Z). Built by TD-1007. Reviewed in eight rounds (Fable and Sonnet alternating; Sonnet READY at round 8; design history §4.3). Before: picked to build 2026-10-24 (grinder-ao-1) and handed back: in Gemini CLI a background shell's end does not wake the session, so the refusal's *run it in the background … its end wakes you* would be untrue there.
 **Location:** `src/shiftlead/adapters/gemini/hook.py` (`refused_command`, `main`; the kill guard is wired there at its `run_shell_command`); design §4.3 *A wait the guard refuses* (it names Claude Code's hook alone) and *The second adapter: Gemini CLI*
 
 **Why:** TD-992 built the wait guard in Claude Code's hook only. Gemini CLI's hook already runs the kill guard on `run_shell_command`, so the same net is one call away there: `wait_guard.waits(command)` when the call's `is_background` is not true. It also needs the same `wait` / `refuse_wait` round trip to the host agent, whose `rpc_hook` already answers it.
@@ -1550,7 +1552,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 
 **Fix (as filed, now waiting on that):** design first in the same PR: §4.3 says the Gemini hook refuses too, naming its block form (exit 2 with the reason on stderr, as the kill guard's). Then wire it in `gemini/hook.py`, with a test beside its kill guard's.
 
-**Done when** an unattended Gemini session's foreground `gh pr checks <n> --watch` is blocked with `wait_guard.REASON`, and one with `is_background` true, or on an interactive record, is not.
+**Done when** (as filed; TD-1007's supersedes it) an unattended Gemini session's foreground `gh pr checks <n> --watch` is blocked with `wait_guard.REASON`, and one with `is_background` true, or on an interactive record, is not.
 
 **Related:** TD-992, TD-991, TD-785 (the kill guard in Gemini CLI).
 
@@ -1666,3 +1668,30 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 - A live check, once live: after `ao host rebuild contractmatch`, `ao` resolves (`command -v ao`) in a node session, in an **Open shell here** shell, and in `docker exec -it <cid> bash -l`.
 
 **Related:** TD-998 (its design), TD-1005, TD-301 (the hook command beside the interpreter).
+
+## TD-1007: Gemini CLI's layer wakes a session at a background command's end, and its hook refuses an unattended foreground CI watch
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (the designer, from TD-999)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/adapters/gemini/__init__.py` (`LAYER_SETTINGS`, `layer_wakes`, `launch`, the doctor note), `src/shiftlead/adapters/gemini/hook.py` (`WAKES_ENV`, `refused_command`, `main`), `src/shiftlead/wait_guard.py` (the reason's words per background form); `tests/test_gemini_adapter.py` (the hook, beside the kill guard's), `tests/test_gemini_setup.py` (the launch with the `home` fixture's temp `MACHINE_LAYER`, the stale note) and `tests/test_gemini_guards.py` (its note assertion); design §4.3 *A wait the guard refuses*, *The second adapter: Gemini CLI*
+
+**Why:** TD-999: in Gemini CLI 0.65.0 a background command's end wakes nothing by default, so the refusal's *its end wakes you* would be untrue there. With `inject` the completion is queued, and an idle session takes it as a turn only with `experimental.modelSteering` on.
+
+**Fix:**
+- `LAYER_SETTINGS` gains `"tools": {"shell": {"backgroundCompletionBehavior": "inject"}}` and `"experimental": {"modelSteering": True}`. Its comment names why. The wanted copy changes, so `ao doctor` reads the installed layer as *stale* until the person re-runs the `sudo install` line.
+- `wait_guard` keeps `REASON` (Claude Code's words, byte for byte, as its test pins them) and gains `GEMINI_REASON`, naming `is_background: true` (§4.3).
+- `gemini/hook.py`: on `BeforeTool` of `run_shell_command`, when the kill guard does not refuse, `tool_input.get("is_background") is not True` (a string or a missing field is the foreground, as `claude_code/hook.py` reads `run_in_background`) and `wait_guard.waits(command)` holds, `main` sets `params["wait"] = True` on the translated `BeforeTool` event, as it sets `mail`. The event goes through `report()`'s existing 3-second call, inside the tool's 10-second `HOOK_TIMEOUT_MS`, with no longer wait. A reply with `refuse_wait: true` prints `GEMINI_REASON` on stderr and exits `BLOCK` before any other output. Gemini's `BeforeTool` has no subagent marker, so no main-thread test is read. No reply (the host agent down, or past the wait) lets the call run, as Claude Code's does. `report()` strips `wait` from the queued copy, beside `session` and `mail`, so the drained event is applied unanswered.
+- The wait is asked only when the session was launched under a layer that holds both new settings, since Gemini CLI reads its settings once, at launch, and a reinstall reaches no running session. One helper reads a layer: `layer_wakes(path: Path | None = None) -> bool` in `__init__.py`, resolving `path or MACHINE_LAYER` at call time, false for a missing, unreadable or non-JSON layer or one without `tools.shell.backgroundCompletionBehavior: "inject"` and `experimental.modelSteering: true`. `launch` calls it after `machine_reading()` (a second read, as the doctor's; a layer replaced between the two is the one the tool reads at launch, so the later read is the truer) and, when it holds, adds `SHIFTLEAD_GEMINI_WAKES=1` to the session's env (the constant `WAKES_ENV` in `gemini/hook.py`, beside `START_CONTEXT_ENV`). The hook reads only that variable, never the file: `main` asks the wait only after `waits()` holds and `os.environ.get(WAKES_ENV) == "1"`; otherwise the watch runs (§4.3 *A wait the guard refuses*). The hook reads no record: the reply's `refuse_wait`, decided by the host agent from the record's `unattended`, is the gate.
+- The doctor's system note for a stale layer (`__init__.py`, the `words` / `refused` text) stops saying *a Gemini session gets no hooks*, which is a refused layer's case, and says the installed layer is not this install's; only when `layer_wakes()` on the reading's path is false does it add (a second read of the file; a change between the two only rewords the note, whose key refreshes) that a background command's end wakes no Gemini session until it is reinstalled. The note's key carries that reading beside the digest and the state, so the wording refreshes when it changes. `wait_guard`'s docstring stops saying *on the main thread* of every hook: that is Claude Code's test alone.
+
+**Done when:**
+- Hook tests: an unattended record's foreground `timeout 1800 gh pr checks 12 --watch` is blocked with the Gemini words. So is one whose `is_background` is missing or the string `"true"`. One with `is_background: true`, one on an interactive record (no `refuse_wait`), and one with no reply all run. A command the kill guard refuses is refused for that alone, and the wait is not asked.
+- A layer test: `layer_settings()` holds both new keys. The hook tests that block set `SHIFTLEAD_GEMINI_WAKES=1` in the hook's env; one without it (a session launched under a stale layer) lets the unattended foreground watch run and sends no `wait`. Launch tests, with the existing fixture's temp `MACHINE_LAYER`: a layer written from `layer_settings()` puts `SHIFTLEAD_GEMINI_WAKES=1` in the spec's env, and a stale copy without the two keys does not. `layer_wakes()` tests: missing, unreadable, non-JSON and keyless layers are false. Doctor tests: the stale note no longer says *gets no hooks*, and it names the missing wake only for a stale layer without the two settings, not for one stale for another reason that holds them.
+- An unreachable host agent queues the event without `wait`.
+- A live check, once live: with the layer reinstalled, an unattended Gemini session's `gh pr checks <n> --watch` with `is_background: true` ends its turn. The watch's end then starts a new turn (`BeforeAgent`, its prompt the steering wrapper, the record `working`) without a prompt typed. An `ao send` to a working Gemini session steers its turn.
+
+**Related:** TD-999 (its design), TD-991 / TD-992 (the wait guard in Claude Code), TD-785 (the kill guard in Gemini CLI), TD-871 (the machine's layer).
