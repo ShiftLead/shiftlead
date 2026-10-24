@@ -250,6 +250,17 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "soft-key-row",
+        "soft-key row",
+        "Focus pane",
+        (
+            "Keys under the terminal — Tab, Esc, the arrows, Enter and 1–9 — that type into the session as a "
+            "keyboard would. Press one on a phone or a tablet, which has no such keys: Tab accepts Claude Code's "
+            "suggestion, an arrow or a digit picks from a menu. It moves no focus, so the phone's keyboard stays "
+            "as it is, and it is not there while the terminal is read-only."
+        ),
+    ),
+    Help(
         "restart",
         "Restart",
         "the Inbox restart row, a card's *more ▾*",
@@ -752,6 +763,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "pane-hyperlink",
             "pane-path",
             "disconnect-card",
+            "soft-key-row",
         ),
     ),
     (

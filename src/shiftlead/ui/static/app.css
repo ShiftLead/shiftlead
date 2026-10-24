@@ -507,7 +507,7 @@ details.more .menu .menutoggle { display: flex; align-items: center; gap: 6px; p
 .focus a.railbtn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
 .focus .railbtn.g-needs { background: var(--needs-bg); color: var(--needs-fg); border-color: var(--needs); font-weight: 600; }
 /* a popped-out Focus (§4.5 *Pop out*, TD-046): no top bar, so the terminal takes the room it left */
-body.popped .page { padding: 10px 12px; } body.popped .termbox, body.popped .termwrap.cfold .termbox { height: calc(100vh - 150px); }
+body.popped .page { padding: 10px 12px; } body.popped .termbox, body.popped .termwrap.cfold .termbox { height: calc(100vh - 150px - var(--softh, 0px)); }
 /* design §4.5a **Focus header** (TD-085). The row had no wrap, and 2026-09-19 and -20 put three
    more things in it — the tool's title, the **out of work** chip and the **doing** line, beside
    the path, the state, the mode toggle, the stop badge, team, role, grants, controllers and, on a
@@ -570,6 +570,20 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 /* open, it takes the bar's place (`--cbarh`, the bar and the gap above it) and grows up over the terminal's foot */
 .composer.overlay { position: absolute; left: 0; right: 0; bottom: calc(-1 * var(--cbarh, 0px)); max-height: calc(100% + var(--cbarh, 0px)); overflow: auto; z-index: 5; box-shadow: 0 -6px 18px rgba(0, 0, 0, .35); }
 .composerbar.under { visibility: hidden; }
+/* §4.5a **Focus pane: soft-key row** (TD-990): under the terminal on a phone or a coarse pointer, the keys they
+   have none of; its height is `--softh` on the wrap, which the composer opened over the terminal stands above */
+.softkeys { display: none; }
+@media (max-width: 720px), (pointer: coarse) {
+  .softkeys { display: flex; gap: 6px; padding: 6px 0 0; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .softkeys button { flex: none; min-width: 44px; height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--card); color: var(--fg); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono);
+    touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .softkeys button.down { background: var(--hover); border-color: var(--fg); }
+  .softkeys.dim button { opacity: .45; }
+}
+@media (pointer: coarse) and (min-width: 721px) {
+  .composer.overlay { bottom: var(--softh, 0px); max-height: calc(100% - var(--softh, 0px)); }
+}
 .composer.overlay.folded { display: none; } .composer.overlay textarea { height: auto; }
 .composerbar { padding: 6px 10px; align-items: center; }
 .composerbar .cbtext { min-width: 0; text-align: left; padding: 6px 4px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-body); cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
