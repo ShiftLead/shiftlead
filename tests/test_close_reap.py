@@ -95,7 +95,7 @@ async def test_a_live_shell_inside_keeps_it_an_exited_one_does_not(agent, repo):
         sh = await c.call("create", name="sh", dir=str(Path(s["dir"])), **SHELL)
         assert (await c.call("close", id=s["id"]))["worktree_kept"] == f"in use by {sh['id']}"
         agent.sessions[sh["id"]].set_state("exited", confidence="tick")
-        again = await c.call("close", id=s["id"])  # `ao close` on a closed record is slice 3's; here a re-close
+        again = await c.call("close", id=s["id"])  # `ao close` on the closed record: the reap again
     assert again["worktree_reaped_at"] and not Path(s["dir"]).exists()
 
 
@@ -296,3 +296,104 @@ async def test_a_routed_close_takes_the_homes_why_whatever_session_closed(agent,
     rec = agent.sessions[s["id"]]
     assert rec.state == "closed" and rec.worktree_kept == "in use by ao-x-sh@kmaster" and Path(s["dir"]).is_dir()
     assert got["result"]["closer"]["by"] == "ao-mgr"
+
+
+# -- `ao close` on a closed record (§4.1 *the record*): the reap again, or the branches weighed again ----------
+
+
+async def test_a_retry_reaps_a_kept_record_and_its_close_stamps_stand(agent, repo):
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        (Path(s["dir"]) / "scratch").write_text("x")
+        first = await c.call("close", id=s["id"])
+        assert first["worktree_kept"] == "1 uncommitted"
+        (Path(s["dir"]) / "scratch").unlink()
+        assert (await c.call("close", id=s["id"], reap=False)) == first  # a restart's: nothing touched
+        again = await c.call("close", id=s["id"])
+    assert again["worktree_reaped_at"] and again["worktree_kept"] is None and not Path(s["dir"]).exists()
+    assert (again["closed_at"], again["closer"]) == (first["closed_at"], first["closer"])
+
+
+async def test_a_retry_weighs_the_kept_branches_again(agent, repo):
+    """*no origin/HEAD* cured by `set-head`: the launch branch, with nothing of its own, goes to
+    `branches_deleted`; the checked-out branch keeps with its fresh why, then goes once pushed."""
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        git(repo, "remote", "set-head", "origin", "-d")
+        git(s["dir"], "checkout", "-q", "-b", "x")
+        (Path(s["dir"]) / "f").write_text("x")
+        git(s["dir"], "add", "f")
+        git(s["dir"], "commit", "-q", "-m", "mine")
+        first = await c.call("close", id=s["id"])
+        assert first["branch_kept"] == {"x": "no origin/HEAD", "w": "no origin/HEAD"} and first["worktree_reaped_at"]
+        git(repo, "remote", "set-head", "origin", "-a")
+        again = await c.call("close", id=s["id"])
+        assert again["branches_deleted"] == ["w"] and again["branch_kept"] == {"x": "1 commit never on origin"}
+        assert again["worktree_reaped_at"] == first["worktree_reaped_at"]
+        git(repo, "push", "-q", "origin", "x")
+        last = await c.call("close", id=s["id"])
+    assert last["branches_deleted"] == ["w", "x"] and last["branch_kept"] == {} and not {"w", "x"} & branches(repo)
+
+
+async def test_a_retry_after_the_directory_was_removed_by_hand(agent, repo):
+    """No `worktree_reaped_at`: the stale registration names the checked-out branch, `prune` frees it and the
+    path, both branches are weighed, and a later start of the name makes the worktree again."""
+    import shutil
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        git(s["dir"], "checkout", "-q", "-b", "x")
+        (Path(s["dir"]) / "scratch").write_text("x")
+        assert (await c.call("close", id=s["id"]))["worktree_kept"] == "1 uncommitted"
+        shutil.rmtree(s["dir"])
+        agent._clear_gone_kept()  # the tick's check: the directory is gone, so it no longer says kept
+        assert agent.sessions[s["id"]].worktree_kept is None
+        got = await c.call("close", id=s["id"])
+        assert got["worktree_reaped_at"] and sorted(got["branches_deleted"]) == ["w", "x"] and got["branch_kept"] == {}
+        assert str(Path(s["dir"])) not in git(repo, "worktree", "list", "--porcelain")
+        new = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+    assert new["dir"] == s["dir"] and Path(new["dir"]).is_dir() and new["worktree_made"] is True
+
+
+async def test_a_retry_racing_a_create_of_the_name_answers_busy(agent, repo, monkeypatch):
+    import shutil
+
+    monkeypatch.setattr("sessionorc.agent.REAP_WITHIN", 0.5)
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        git(repo, "remote", "set-head", "origin", "-d")
+        assert (await c.call("close", id=s["id"]))["branch_kept"] == {"w": "no origin/HEAD"}
+        shutil.rmtree(s["dir"], ignore_errors=True)
+        held = [lk for k, lk in agent._dir_locks.items() if k.startswith("worktree:") and k.endswith(":w")]
+        assert len(held) == 1
+        await held[0].acquire()
+        try:
+            got = await c.call("close", id=s["id"])
+        finally:
+            held[0].release()
+    assert got["worktree_kept"] == "busy: a start is using it" and got["branch_kept"] == {"w": "no origin/HEAD"}
+
+
+async def test_a_retry_with_nothing_kept_and_a_record_not_made_here_write_nothing(agent, repo):
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        first = await c.call("close", id=s["id"])
+        assert first["worktree_reaped_at"] and first["branch_kept"] == {}
+        assert (await c.call("close", id=s["id"])) == first
+    rec = agent.sessions[s["id"]]
+    rec.worktree_made, rec.worktree_reaped_at, rec.branch_kept = False, None, {"w": "no origin"}
+    assert (await agent.rpc_close(s["id"]))["branch_kept"] == {"w": "no origin"}  # not this start's to weigh
+
+
+async def test_the_ticks_check_passes_over_a_reap_still_running_and_a_tree_still_there(agent, repo):
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        (Path(s["dir"]) / "scratch").write_text("x")
+        await c.call("close", id=s["id"])
+    rec = agent.sessions[s["id"]]
+    agent._clear_gone_kept()
+    assert rec.worktree_kept == "1 uncommitted"  # still there
+    rec.dir = str(repo / "gone")
+    rec.worktree_reaping = {"at": "t", "branch": "w"}
+    agent._clear_gone_kept()
+    assert rec.worktree_kept == "1 uncommitted"  # the reap's own to write

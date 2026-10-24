@@ -722,6 +722,30 @@ def weigh_branches(
     return deleted, kept
 
 
+def reweigh_gone(
+    repo: Path, wt: Path | str, launch: str | None, kept: dict[str, str] | None, reaped: bool
+) -> tuple[list[str], dict[str, str]] | None:
+    """`ao close`'s retry on a closed record whose worktree directory is gone (design §4.1): a reaped one weighs
+    again the branches `kept` names; one never reaped (a directory removed by hand) reads its checked-out branch
+    from `git worktree list --porcelain`'s stale entry at `wt` (none when it has none or reads `detached`), runs
+    `git worktree prune` and weighs that branch and `launch`. Answers `(deleted, kept)` as `weigh_branches`
+    does, or None when the registration could not be read; never raises."""
+    if reaped:
+        return weigh_branches(repo, list(kept or {}))
+    cp = _run(["git", "-C", str(repo), "worktree", "list", "--porcelain"], REAP_STEP)
+    if cp is None or cp.returncode != 0:
+        return None
+    want = os.path.realpath(wt)
+    branch = None
+    for block in cp.stdout.split("\n\n"):
+        lines = block.splitlines()
+        if lines and lines[0].startswith("worktree ") and os.path.realpath(lines[0][9:]) == want:
+            branch = next((x[7:].removeprefix("refs/heads/") for x in lines if x.startswith("branch ")), None)
+            break
+    _run(["git", "-C", str(repo), "worktree", "prune"], REAP_STEP)  # frees the branch for `-D`, the path for `add`
+    return weigh_branches(repo, [branch, launch])
+
+
 def rehydrate(repo: Path, wt: Path) -> None:
     """Hydrate `wt` again after a `--dehydrate` that was not followed by a remove; exempt from the deadline."""
     hydrate = _hydrate_script(repo)
