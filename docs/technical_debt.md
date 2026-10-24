@@ -1565,11 +1565,11 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Why:** TD-998: on the contractmatch node, `ao` was *command not found* in every session and shell. The node's agent starts by its absolute path with the image's `PATH`, and nothing puts `/shiftlead/venv/bin` on it.
 
 **Fix:**
-- `dockerfile_text` adds, in its root step after tmux, `RUN [ -e /usr/local/bin/ao ] || { install -d -o root -g root -m 0755 /usr/local/bin && ln -s /shiftlead/venv/bin/ao /usr/local/bin/ao; }`. The target is built from `INSIDE_VENV`, never a literal. A base image's own `/usr/local/bin/ao` is kept (TD-1005 reports it).
+- `dockerfile_text` adds, in its root step after tmux, `RUN [ -e /usr/local/bin/ao ] || [ -L /usr/local/bin/ao ] || { install -d -o root -g root -m 0755 /usr/local/bin && ln -s /shiftlead/venv/bin/ao /usr/local/bin/ao; }`. The target is built from `INSIDE_VENV`, never a literal. A base image's own `/usr/local/bin/ao` is kept, a dangling link included (`-L`), so the build never fails on it (TD-1005 reports it).
 - Nothing else changes: the agent's start script, `exec_cmd`'s env and the image's `PATH` stay as they are.
 
 **Done when:**
-- A `dockerfile_text` test asserts the `RUN` line, after the tmux step and before `USER <image user>`.
+- A `dockerfile_text` test asserts the `RUN` line, with its `-e` and `-L` guards, after the tmux step and before `USER <image user>`.
 - A live check, once live: after `ao host rebuild contractmatch`, `ao` resolves (`command -v ao`) in a node session, in an **Open shell here** shell, and in `docker exec -it <cid> bash -l`.
 
 **Related:** TD-998 (its design), TD-1005, TD-301 (the hook command beside the interpreter).
@@ -1582,18 +1582,19 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Location:** `src/shiftlead/doctor.py` (`nodes`, on a node); `tests/test_doctor.py`; design §4.7 *`ao doctor`* (the **nodes** line on a node)
+**Location:** `src/shiftlead/doctor.py` (`nodes`, on a node, and its caller in the CLI); `tests/test_doctor.py`, `tests/test_cli_doctor.py` (the *home only: nodes — read at the home* assertion, reworded); design §4.7 *`ao doctor`* (the **nodes** line on a node)
 
 **Why:** TD-998: a node member that cannot find `ao` goes silent to the org, and nothing said why.
 
 **Fix:**
-- On a node, `nodes` adds to its *read at the home* row the reading of `shutil.which("ao")`, resolved (`os.path.realpath`), against `os.path.realpath(<sys.prefix>/bin/ao)`. The same file is *ok: nodes — read at the home · `ao` on PATH*.
+- `nodes` takes the reading as arguments, as every check does: `nodes(rows, node, *, ao_on_path: str | None = None, prefix: str = sys.prefix)`, the CLI caller passing `shutil.which("ao")`. Its tests are plain calls.
+- On a node, the row's verdict is no longer *home only*: it is *ok* or *lacking*, by the reading of `shutil.which("ao")`, resolved (`os.path.realpath`), against `os.path.realpath(<prefix>/bin/ao)`. The same file is *ok: nodes — read at the home · `ao` on PATH*.
 - No `ao` on `PATH` is *lacking: nodes — `ao` not on PATH here, only <sys.prefix>/bin/ao*. The cure for a container node (its `sys.prefix` is `INSIDE_VENV`) is *(`ao host rebuild <local host name>` at the home)*. For another node it is *(put <sys.prefix>/bin on PATH)*.
 - Another file is *lacking: nodes — `ao` on PATH is <which> → <resolved>, not this install's*. The cure for a container node is *(the image's own `ao`: rename it in the repo's image)*.
 - A lack counts as any lack does (exit 1).
 
 **Done when:**
-- `doctor.nodes` tests on a node (stubbed `shutil.which` and `sys.prefix`): one with this install's `ao`, one with none, and one with another's. Each gives its row and the cure in the design's words, the container node's cure naming the host.
-- The home's rows are unchanged.
+- `doctor.nodes` tests on a node (`ao_on_path` and `prefix` passed): one with this install's `ao`, one with none, and one with another's. Each gives its row and the cure in the design's words, the container node's cure naming the host.
+- The home's rows are unchanged. `tests/test_cli_doctor.py`'s node assertion reads *ok: nodes — read at the home · `ao` on PATH*.
 
 **Related:** TD-998 (its design), TD-1004.
