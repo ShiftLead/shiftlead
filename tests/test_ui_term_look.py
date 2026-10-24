@@ -67,7 +67,7 @@ def test_a_saved_size_reaches_an_open_terminal_and_refits_it():
 def test_focus_tells_tmux_every_change_of_the_grid():
     js = JS.read_text()
     start = js.index("const term = new Terminal(")
-    body = js[start : start + 20000]
+    body = js[start : js.index("\n  };\n", start)]  # to the end of `AO.focus`, which grows (TD-989, TD-990)
     # the resize goes from the terminal's own resize event, so a refit by a look change sends it too…
     # (through the sender, one per gesture: TD-794, tests/test_ui_term_resize.py)
     assert "term.onResize(({ cols, rows }) => sendGrid(cols, rows));" in body

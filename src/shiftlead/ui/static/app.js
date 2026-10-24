@@ -2768,6 +2768,18 @@
     if (!sent && Math.abs(total) < AO.TOUCH_SLOP) return { add: 0, sent: 0 };
     return { add: total - sent, sent: total };
   };
+  // The soft-key row (design §4.5a **Focus pane: soft-key row**, TD-990): a key's name to the bytes xterm.js
+  // sends for it — an arrow `ESC [ A`–`D`, or `ESC O A`–`D` while the program has set application cursor
+  // keys; null for a name the row does not have
+  AO.softKey = function (name, appCursor) {
+    const arrow = { Up: "A", Down: "B", Right: "C", Left: "D" }[name];
+    if (arrow) return (appCursor ? "\x1bO" : "\x1b[") + arrow;
+    if (/^[1-9]$/.test(name)) return name;
+    return { Tab: "\t", Esc: "\x1b", Enter: "\r" }[name] || null;
+  };
+  // ...and whether it is drawn: where the terminal takes keys — neither ended nor unattended, the page
+  // with a terminal (`paneGone` false). Its own state: never read from `readOnly`, which an attach resets
+  AO.softShown = (v, paneGone) => !!v && !v.unattended && !["exited", "closed"].includes(v.state) && !paneGone;
   AO.termClose = function (code, opened, delay, reason) {
     if (code === 4404) return { retry: false, final: true, delay, why: "no terminal for this session" };
     if (code === 1006 && !opened) {
@@ -5371,6 +5383,9 @@
     // The terminal mark's state (`AO.termMark`, above), redrawn each second and on each change
     const mk = { retryAt: null, clients: 0, window: null, grid: null, open: false, state: s.state, lastByte: null };
     const markEl = $("#ftermmark");
+    // the soft-key row (§4.5a, TD-990): dimmed while the attach cannot take its keys — cosmetic, since a
+    // press reads the same two things itself
+    const softEl = $("#softkeys");
     const tlog = (...a) => console.info("[shiftlead] terminal", ...a, new Date().toISOString());
     // The disconnect card (`AO.dropCard`, above): drawn with the mark while it reads *reconnecting…*,
     // gone with it on the first pane byte; never over the pane, and the retry line is the terminal's.
@@ -5405,6 +5420,7 @@
       dropEl.replaceChildren(...kids);
     };
     const drawMark = () => {
+      if (softEl) softEl.classList.toggle("dim", !(ws && ws.readyState === 1) || readOnly);
       if (!markEl) return;
       mk.grid = [term.cols, term.rows];
       const m = AO.termMark(mk, Date.now());
@@ -5429,6 +5445,7 @@
       jumper.closed();
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       mk.retryAt = null; mk.open = false; drawMark();
+      if (softEl) softEl.classList.add("hidden");  // no terminal, no keys
       term.write(`\r\n\x1b[90m[shiftlead] ${text}\x1b[0m\r\n`);
     }
     function openTerm() {
@@ -5443,7 +5460,7 @@
         const grid = [term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows];
         ws.send(JSON.stringify({ resize: grid }));
         sendGrid.mark(...grid);
-        mk.open = true; mk.lastByte = Date.now(); tlog("open");
+        mk.open = true; mk.lastByte = Date.now(); tlog("open"); drawMark();
         AO.dropRead(id, s.team || "");  // the disconnect card's reading, at load and at each reconnect
         if (pathLinks) pathLinks.clear();  // a re-attach asks the host again (TD-501)
       };
@@ -5456,6 +5473,8 @@
           if (c && "read_only" in c) {
             readOnly = !!c.read_only;
             if (roLine) roLine.classList.toggle("hidden", !readOnly);
+            if (readOnly && softEl) softEl.classList.add("hidden");
+            drawMark();
             return;
           }
           // the bridge's reading of tmux's clients and window (§4.6), sent when it changes
@@ -5478,7 +5497,7 @@
       ws.onclose = (e) => {
         jumper.closed();
         if (paneGone) return;  // the push already ended it
-        mk.open = false;
+        mk.open = false; drawMark();
         tlog("closed", e.code, e.reason || "");
         // The rule is `AO.termClose` (above), so a test can reach it; this is what acts on it.
         const v = AO.termClose(e.code, opened, delay, e.reason);
@@ -5613,6 +5632,33 @@
     };
     termEl.addEventListener("touchend", touchEnd, { capture: true, passive: false });
     termEl.addEventListener("touchcancel", touchEnd, { capture: true, passive: false });
+    // The soft-key row (§4.5a **Focus pane: soft-key row**, TD-990): a press types the key's bytes through the
+    // terminal, as xterm.js's own keys do (`onData`, the socket), and moves no focus, so the phone's keyboard
+    // stays as it is. The pointer is captured, so its `pointerup` reaches the key whatever it is, and the key is
+    // sent only when that `pointerup` is still over it; a pan of the row ends in `pointercancel` and sends nothing.
+    if (softEl) {
+      const keyOf = (e) => e.target.closest && e.target.closest("button[data-key]");
+      const up = (k) => k && k.classList.remove("down");
+      softEl.addEventListener("pointerdown", (e) => {
+        const k = keyOf(e); if (!k) return;
+        e.preventDefault();
+        try { k.setPointerCapture(e.pointerId); } catch (_) { /* a pointer already gone */ }
+        k.classList.add("down");
+      });
+      // WebKit moves focus on the emulated mousedown a prevented pointerdown does not stop
+      softEl.addEventListener("mousedown", (e) => { if (keyOf(e)) e.preventDefault(); });
+      softEl.addEventListener("pointerup", (e) => {
+        const k = keyOf(e); if (!k) return;
+        up(k);
+        const at = document.elementFromPoint(e.clientX, e.clientY);
+        if (!at || at.closest("button[data-key]") !== k) return;
+        if (!live() || readOnly) return;  // read at the press: the dim is only what it looks like
+        const bytes = AO.softKey(k.dataset.key, !!term.modes.applicationCursorKeysMode);
+        if (bytes) term.input(bytes, true);
+      });
+      softEl.addEventListener("pointercancel", (e) => up(keyOf(e)));
+      softEl.addEventListener("lostpointercapture", (e) => up(keyOf(e)));
+    }
     // Copy on select (§4.5a, TD-174): the person's, in settings.yml, on by default. A selection ended —
     // the mouse released, which a Shift+click is too — is copied when it is on, and says so with
     // Copy's own toast, *copied* or *clipboard blocked* (TD-273: a silent copy could not be told from
@@ -5662,7 +5708,8 @@
       const bar = $("#composerbar"), barH = bar && !bar.classList.contains("hidden") ? bar.offsetHeight + 10 : 0;
       wrap.style.setProperty("--cbarh", `${barH}px`);  // the open composer takes the bar's place
       if (document.body.classList.contains("popped") || matchMedia("(max-width: 720px)").matches) { wrap.style.removeProperty("--termh"); return; }
-      wrap.style.setProperty("--termh", `${AO.termFill(window.innerHeight, $("#term").getBoundingClientRect().top + window.scrollY, barH + 16)}px`);
+      const softH = parseFloat(wrap.style.getPropertyValue("--softh")) || 0;  // the soft-key row's, unset as 0
+      wrap.style.setProperty("--termh", `${AO.termFill(window.innerHeight, $("#term").getBoundingClientRect().top + window.scrollY, barH + softH + 16)}px`);
     };
     if (wrap && wrap.classList.contains("cfold")) {
       const ro = new ResizeObserver(fill);
@@ -5671,6 +5718,9 @@
       window.addEventListener("resize", fill);
       fill();
     }
+    // the soft-key row's height is one variable (`--softh` on the wrap, 0 while it is hidden), which `fill()`
+    // adds to the bar's and the composer and a popped-out terminal read; registered folded or not
+    if (softEl && wrap) new ResizeObserver(() => { wrap.style.setProperty("--softh", `${softEl.offsetHeight}px`); fill(); }).observe(softEl);
     // a draft (§4.5a **Open a session**, TD-219; **the bar**, TD-500): kept in this browser as the person
     // writes it and dropped once it is sent. The Add entry form's is opened on load, filled, focused and
     // not sent; one the person folded waits on the bar, named there
@@ -5950,6 +6000,9 @@
         if (mk) { ex.appendChild(mk.content.cloneNode(true)); AO.applyHelpMarks(ex); }
         ex.classList.remove("hidden");
       } else ex.classList.add("hidden");
+      // the soft-key row (§4.5a, TD-990): gone with the ending, back on its other side while the page has a
+      // terminal, and with the record's mode — Hand back hides it before its re-attach, Take over shows it
+      if (softEl) softEl.classList.toggle("hidden", !AO.softShown(v, paneGone));
       const aid = $("#adapter_id"); if (aid) aid.textContent = v.adapter_id || "—";
       const tr = $("#ftranscript");
       if (tr) tr.classList.toggle("hidden", !v.adapter_id);
@@ -6192,7 +6245,7 @@
           if (ev.session.state === "working" && mk.lastByte != null) mk.lastByte = Date.now();
           mk.state = ev.session.state; drawMark();
         }
-        if (!!ev.session.unattended !== mode) { mode = !!ev.session.unattended; reattach(); }
+        if (!!ev.session.unattended !== mode) { mode = !!ev.session.unattended; reattach(); drawMark(); }
         // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
       } else if (ev.event === "repos" && ev.root) {

@@ -174,6 +174,18 @@
     {%- set folded = composer != 'open' %}
     <div class="termwrap{% if folded %} cfold{% endif %}" id="termwrap">
     <div id="term" class="termbox"></div>
+    {#- design §4.5a **Focus pane: soft-key row** (TD-986, built by TD-990): the keys a phone has none of, drawn
+        by the media query in app.css and typed through the terminal (`AO.softKey`); seeded hidden where the
+        terminal takes no keys — an unattended record (read-only) or an ended one — and shown and hidden by
+        `app.js` from then on -#}
+    <div class="softkeys{% if s.unattended or s.state in ('exited', 'closed') %} hidden{% endif %}" id="softkeys" role="group" aria-label="terminal keys" title="{{ help_title('soft-key-row') }}">
+      {%- for key, label in [('Tab', 'Tab'), ('Esc', 'Esc'), ('Up', '↑'), ('Down', '↓'), ('Left', '←'), ('Right', '→'), ('Enter', 'Enter')] %}
+      <button type="button" tabindex="-1" data-key="{{ key }}">{{ label }}</button>
+      {%- endfor %}
+      {%- for n in range(1, 10) %}
+      <button type="button" tabindex="-1" data-key="{{ n }}">{{ n }}</button>
+      {%- endfor %}
+    </div>
     <div class="card composer{% if folded %} overlay folded{% endif %}{% if s.unattended %} hidden{% endif %}" id="composer">
       <textarea id="compose"{% if folded %} rows="6"{% endif %} placeholder="{% if s.agent %}Compose a prompt… multi-line, paste-friendly. The terminal above takes keys directly for menus and questions. Esc → terminal.{% else %}Type a command…{% endif %}"></textarea>
       <div class="row gap">
