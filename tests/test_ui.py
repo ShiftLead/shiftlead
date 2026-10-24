@@ -340,13 +340,14 @@ def test_a_jump_over_the_term_socket_lands_or_misses_and_says_so(client, subproc
     hit = {"jump": [{"drawn": "JUMP-ROW-42", "whole": True}]}
     with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
         # the row is output, never the typed line, which starts with the prompt; 60 more lines put it
-        # in tmux's history
-        ws.send_text("echo JUMP-ROW-$((40+2)); seq 1 60; echo JUMP-DONE\r")
+        # in tmux's history. The end is waited for as output too: the typed line holds a literal
+        # JUMP-DONE before the shell has run it, and a jump sent then misses (TD-1008)
+        ws.send_text("echo JUMP-ROW-$((40+2)); seq 1 60; echo JUMP-DONE-$((1+1))\r")
         buf = b""
         deadline = time.time() + 8
-        while time.time() < deadline and b"JUMP-DONE" not in buf:
+        while time.time() < deadline and b"JUMP-DONE-2" not in buf:
             buf += pane_bytes(ws)
-        assert b"JUMP-DONE" in buf
+        assert b"JUMP-DONE-2" in buf
         assert wait_for(lambda: mode() == "0"), "the pane never settled on the live screen"
         ws.send_text(json.dumps(hit))
         assert _jumped(ws) is True
