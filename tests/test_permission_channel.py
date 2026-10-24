@@ -198,3 +198,35 @@ def test_answer_needed_says_answer_it_in_the_terminal(tmp_path, monkeypatch):
     assert row["text"] == "Shell: rm -rf build — answer it in the terminal"
     [row] = answer_blocks([{**m, "permission_channel": True}])
     assert row["text"] == "Shell: rm -rf build"
+
+
+@pytest.mark.integration
+async def test_a_permission_answered_in_the_terminal_leaves_the_stack(agent, nochannel, tmp_path):
+    """§4.2 *Open prompts are a stack*, §4.3 *Permissions: no channel* (TD-786, the live walk on 0.65.0): a
+    permission of a tool with no channel has no waiter to end it, so the main thread's next event — the asked
+    call's `AfterTool` once the person answered in the terminal — removes it, as it removes a question."""
+    async with LocalClient() as person:
+        s = await person.call("create", name="g", dir=str(tmp_path), adapter="nochannel")
+        sid = s["id"]
+        agent._apply_event(sid, {"state": "working", "pending": None, "event": "BeforeTool:run_shell_command"})
+        agent._apply_event(sid, {"state": "needs-you", "pending": {"kind": "permission", "text": "Shell: touch x"}})
+        rec = await person.call("get", id=sid)
+        assert (rec["state"], rec["pending"]["kind"]) == ("needs-you", "permission")
+        agent._apply_event(sid, {"state": "working", "pending": None, "event": "AfterTool:run_shell_command"})
+        rec = await person.call("get", id=sid)
+        assert (rec["state"], rec["pending"], agent.sessions[sid].pendings) == ("working", None, [])
+        agent._apply_event(sid, {"state": "idle", "pending": None})
+        assert (await person.call("get", id=sid))["state"] == "idle"
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_permission_with_a_channel_waits_for_its_waiter(agent, hookstub, tmp_path):
+    """The same events on a tool with a channel leave its permission open: its waiter ends it (§4.2)."""
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="h", dir=str(tmp_path), adapter="hookstub"))["id"]
+        agent._apply_event(sid, {"state": "needs-you", "pending": {"kind": "permission", "text": "Bash: touch x"}})
+        agent._apply_event(sid, {"state": "working", "pending": None, "event": "PostToolUse:Bash"})
+        rec = await person.call("get", id=sid)
+        assert (rec["state"], rec["pending"]["kind"]) == ("needs-you", "permission")
+        await person.call("kill", id=sid)
