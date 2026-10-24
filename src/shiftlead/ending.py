@@ -46,6 +46,25 @@ def closer_words(s: Mapping[str, Any], names: Mapping[str, str] | None = None) -
     return f"closed by {(names or {}).get(by) or by}"
 
 
+def worktree_words(s: Mapping[str, Any]) -> str:
+    """What a close did with the worktree its start made (design §4.1 *A close reaps the worktree it made*,
+    TD-979), drawn after the directory: *kept — <why>* (`worktree_kept`), *reaped* (`worktree_reaped_at`), or
+    *reaped — branch kept, <why>* with each kept branch named where there are two (`branch_kept`, a map of
+    branch to why). "" when neither field is set, and for anything malformed; never raises."""
+    kept = s.get("worktree_kept")
+    if isinstance(kept, str) and kept:
+        return f"kept — {kept}"
+    if not s.get("worktree_reaped_at"):
+        return ""
+    branches = s.get("branch_kept")
+    whys = {str(b): str(w) for b, w in branches.items()} if isinstance(branches, Mapping) else {}
+    if not whys:
+        return "reaped"
+    if len(whys) == 1:
+        return f"reaped — branch kept, {next(iter(whys.values()))}"
+    return "reaped — branches kept, " + "; ".join(f"{b}: {w}" for b, w in whys.items())
+
+
 # The tool's own end, said for a reason it gives without a code (§4.5 row 5 (b), TD-490): the one reason
 # §4.5 words for a person; any other (`logout`, `other`) is said as the tool gave it.
 EXIT_REASON = {"prompt_input_exit": "the composer closed"}

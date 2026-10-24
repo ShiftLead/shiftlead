@@ -48,7 +48,7 @@ from sessionorc.models import (
 from sessionorc.tmux import attach_argv
 from shiftlead import connect, doctor, orgcheck, repoconfig, repoinit, service, teamrun, teams
 from shiftlead import org as orgmod
-from shiftlead.ending import closer_words, exit_words, restart_words, waiting_words
+from shiftlead.ending import closer_words, exit_words, restart_words, waiting_words, worktree_words
 
 
 def _age(iso: str) -> str:
@@ -316,6 +316,11 @@ def cmd_status(args: argparse.Namespace) -> int:
             if s["state"] == "closed":  # who closed it, in the card's words (§4.5 row 5 (b), TD-265)
                 when = f" {_age(s['closed_at'])} ago" if s.get("closed_at") else ""
                 print(f"{'':<{w}}      {closer_words(s, id_names)}{when}")
+                # what the close did with the worktree its start made (§4.1, TD-979), as the Session card says it
+                if line := worktree_words(s):
+                    deleted = ", ".join(str(b) for b in s.get("branches_deleted") or [])
+                    gone = f" · deleted {deleted}" if deleted else ""
+                    print(f"{'':<{w}}      worktree: {line}{gone}")
             elif s["state"] == "exited":  # how it ended, in the card's words (§4.5 row 5 (b), TD-490)
                 ended = s.get("ended") if isinstance(s.get("ended"), dict) else {}
                 when = f" {_age(ended['at'])} ago" if isinstance(ended.get("at"), str) and ended["at"] else ""

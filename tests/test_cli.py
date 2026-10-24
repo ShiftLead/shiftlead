@@ -2323,6 +2323,28 @@ def test_the_presets_say_what_over_its_line_means():
     assert "one line in your round log" in manager and "do not restart or wind them down" in manager
 
 
+def test_status_v_says_what_a_close_did_with_the_worktree(monkeypatch, capsys):
+    """design §4.1 *Kept, and said* (TD-979): `ao status -v` prints a closed record's `worktree_kept`,
+    `worktree_reaped_at` and `branch_kept` in the Session card's words, and the branches it deleted."""
+    at = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=5)).isoformat()
+
+    def rec(sid, **kw):
+        return {"id": sid, "name": sid, "state": "closed", "confidence": "hook", "since": at, "adapter": "shell", **kw}
+
+    records = [
+        rec("ao-r-k", worktree_kept="2 uncommitted"),
+        rec("ao-r-r", worktree_reaped_at=at, branches_deleted=["r", "topic"]),
+        rec("ao-r-b", worktree_reaped_at=at, branch_kept={"b": "1 commit never on origin"}),
+        rec("ao-r-n"),
+    ]
+    monkeypatch.setattr(cli, "call_sync", lambda method, **_: records if method == "list" else {})
+    assert cli.main(["status", "-v"]) == 0
+    out = capsys.readouterr().out
+    assert "worktree: kept — 2 uncommitted" in out and "worktree: reaped · deleted r, topic" in out
+    assert "worktree: reaped — branch kept, 1 commit never on origin" in out
+    assert out.count("worktree:") == 3
+
+
 def test_status_v_says_who_closed_a_record_in_the_cards_words(monkeypatch, capsys):
     """design §4.7 (TD-262, built by TD-265): `ao status -v` prints a closed record's closer in the
     card's words — one function, `ending.closer_words`, for both — and a session by its name."""

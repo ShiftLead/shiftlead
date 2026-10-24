@@ -32,7 +32,15 @@ from sessionorc.models import (
 from sessionorc.reports import branch_ref
 from shiftlead import profiles as profiles_mod
 from shiftlead import repoconfig
-from shiftlead.ending import NO_CLOSER, closer_words, ending_hover, exit_words, restart_words, waiting_words
+from shiftlead.ending import (
+    NO_CLOSER,
+    closer_words,
+    ending_hover,
+    exit_words,
+    restart_words,
+    waiting_words,
+    worktree_words,
+)
 from shiftlead.org import MANAGER_WHEN
 
 from . import uiconf
@@ -574,6 +582,9 @@ def view(
     # who closed it (§4.5 row 5 (b), TD-265): a session named by its name where the fleet holds it
     names = {str(o.get("id")): str(o.get("name") or "") for o in fleet or []}
     d["closer_text"] = closer_words(s, names)
+    # what the close did with the worktree its start made (§4.1, TD-979): after the directory on the Session card
+    d["worktree_line"] = worktree_words(s)
+    d["reaped"] = bool(s.get("worktree_reaped_at")) and state == "closed"
     # the Focus Prompts card's sender (§4.5 *The Prompts card*, TD-977): a session's name as the Inbox's
     # `from_name` is made; `person`, `brief` and `system` are the page's words
     d["prompts"] = [

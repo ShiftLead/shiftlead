@@ -482,3 +482,80 @@ async def test_a_retry_passes_over_a_record_not_made_here_and_a_reap_still_stamp
         agent.sessions[s["id"]].worktree_reaping = {"at": "t", "branch": "w"}
         got = await c.call("close", id=s["id"])
     assert got["worktree_reaped_at"] is None and Path(s["dir"]).is_dir()  # the start's recovery's to finish
+
+
+# -- started again, and the display (§4.1 *Started again*, *Kept, and said*): slice 4 --------------------------
+
+
+def _resume_base(repo, name, *, resume) -> str:
+    from sessionorc.gitinfo import ensure_worktree
+
+    path, made = ensure_worktree(repo, name, resume=resume)
+    assert made
+    return git(path, "rev-parse", "HEAD")
+
+
+def _pushed_branch(repo, name) -> str:
+    """`origin/<name>` with a commit of its own, the local branch gone, as a reap leaves a pushed member."""
+    git(repo, "checkout", "-q", "-b", name)
+    (repo / f"{name}.txt").write_text("x")
+    git(repo, "add", f"{name}.txt")
+    git(repo, "commit", "-q", "-m", name)
+    git(repo, "push", "-q", "origin", name)
+    tip = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "-q", "main")
+    git(repo, "branch", "-q", "-D", name)
+    return tip
+
+
+def test_a_resume_bases_its_launch_branch_on_origin_name_every_other_start_on_origin_head(repo):
+    main = git(repo, "rev-parse", "origin/HEAD")
+    tip = _pushed_branch(repo, "r")
+    assert _resume_base(repo, "r", resume=True) == tip
+    _pushed_branch(repo, "n")
+    assert _resume_base(repo, "n", resume=False) == main  # a refill, a team Start: origin/HEAD
+
+
+def test_a_resume_over_a_stale_or_pruned_origin_name_starts_from_origin_head(repo, tmp_path):
+    _pushed_branch(repo, "merged")
+    git(repo, "push", "-q", "origin", "origin/merged:refs/heads/main")  # merged: origin/HEAD contains it
+    git(repo, "fetch", "-q", "origin")
+    head = git(repo, "rev-parse", "origin/HEAD")
+    assert _resume_base(repo, "merged", resume=True) == head
+    _pushed_branch(repo, "pruned")
+    git(repo, "push", "-q", "origin", "--delete", "pruned")  # GitHub deleted it at the merge; the fetch prunes
+    git(repo, "update-ref", "refs/remotes/origin/pruned", head)  # a stale ref the fetch's --prune removes
+    assert _resume_base(repo, "pruned", resume=True) == head
+
+
+async def test_a_resume_of_a_reaped_record_starts_in_a_recreated_worktree(agent, repo):
+    from shiftlead.ui.app import resume_create
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="w", dir=str(repo), worktree="w", **AGENT)
+        closed = await c.call("close", id=s["id"])
+        assert closed["worktree_reaped_at"] and not Path(s["dir"]).exists()
+        params = resume_create(closed)
+        assert (params["dir"], params["worktree"]) == (str(repo), "w")
+        params.pop("resume")  # the hook stub holds no conversation; the start's directory is what is read
+        new = await c.call("create", **params)
+    assert new["dir"] == s["dir"] and Path(new["dir"]).is_dir() and new["worktree_made"] is True
+
+
+def test_resume_create_keeps_dir_for_a_record_with_no_worktree():
+    from shiftlead.ui.app import resume_create
+
+    got = resume_create({"name": "p", "dir": "/r/sub", "repo": "/r", "adapter_id": "x", "state": "closed"})
+    assert got["dir"] == "/r/sub" and "worktree" not in got
+
+
+def test_the_worktree_words_the_card_and_ao_status_share():
+    from shiftlead.ending import worktree_words
+
+    assert worktree_words({"worktree_kept": "2 uncommitted"}) == "kept — 2 uncommitted"
+    assert worktree_words({"worktree_reaped_at": "t", "branch_kept": {}}) == "reaped"
+    one = {"worktree_reaped_at": "t", "branch_kept": {"w": "3 commits never on origin"}}
+    assert worktree_words(one) == "reaped — branch kept, 3 commits never on origin"
+    two = {"worktree_reaped_at": "t", "branch_kept": {"w": "no origin/HEAD", "x": "1 commit never on origin"}}
+    assert worktree_words(two) == "reaped — branches kept, w: no origin/HEAD; x: 1 commit never on origin"
+    assert worktree_words({}) == "" and worktree_words({"worktree_reaped_at": "t", "branch_kept": "junk"}) == "reaped"

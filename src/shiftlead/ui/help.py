@@ -154,9 +154,9 @@ HELP: tuple[Help, ...] = (
         "Close",
         "*Close session* on a card's foot, the Focus side panel, *more ▾*",
         (
-            "Kills the session and reaps its worktree; the record reads closed. Press it when the work is "
-            "merged and every line of Ready to close is green. It is offered only when that checklist passes "
-            "— Kill always is — and it is the one press that removes a worktree."
+            "Kills the session; the record reads closed. It reaps the worktree it made, unless that would "
+            "lose something; a kept worktree says why on the Session card. It is offered only when every "
+            "line of Ready to close is green — Kill always is."
         ),
     ),
     Help(

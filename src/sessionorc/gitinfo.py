@@ -99,9 +99,12 @@ def worktree_setup(repo: Path | str) -> tuple[str, str | None]:
     return "absent", None
 
 
-def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> tuple[Path, bool]:
+def ensure_worktree(repo: Path, name: str, timeout: float = 60.0, *, resume: bool = False) -> tuple[Path, bool]:
     """`(path, created)`: `<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
-    (after a fetch) or from HEAD when there is no origin. Reused when it already exists. A new one is
+    (after a fetch with `--prune`) or from HEAD when there is no origin. A local `<name>` is checked out as it
+    stands; a `resume` bases a new one on `origin/<name>` when that exists and `origin/HEAD` does not already
+    contain it, so a Resume of a reaped record takes up its pushed work (design §4.1 *Started again*). Reused
+    when it already exists. A new one is
     then set up by the repo's `worktree_setup` (§5 *The seams*, TD-589): a configured command, run by
     the shell in the new worktree with its path as `$1`, or by default the repo's own `scripts/hydrate_worktree.sh` when
     present (dev-cadence repos), so the worktree gets the untracked pieces git leaves out. `created` is whether
@@ -115,13 +118,19 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> tuple[Path,
             raise WorktreeError(f"{path} exists but is not a worktree")
         return path, False
     path.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["git", "-C", str(repo), "fetch", "-q", "origin"], capture_output=True, timeout=timeout)
-    base = "origin/HEAD"
+    subprocess.run(["git", "-C", str(repo), "fetch", "-q", "--prune", "origin"], capture_output=True, timeout=timeout)
+
+    def git_ok(*args: str) -> bool:
+        return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, timeout=timeout).returncode == 0
+
+    base = "origin/HEAD" if git_ok("rev-parse", "--verify", "-q", "origin/HEAD") else "HEAD"
     if (
-        subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "-q", base], capture_output=True).returncode
-        != 0
+        resume
+        and base == "origin/HEAD"
+        and git_ok("rev-parse", "--verify", "-q", f"refs/remotes/origin/{name}")
+        and not git_ok("merge-base", "--is-ancestor", f"refs/remotes/origin/{name}", "origin/HEAD")
     ):
-        base = "HEAD"
+        base = f"origin/{name}"  # one pruned, or already in origin/HEAD, starts from origin/HEAD
     has_branch = subprocess.run(
         ["git", "-C", str(repo), "rev-parse", "--verify", "-q", f"refs/heads/{name}"], capture_output=True
     )

@@ -5891,7 +5891,7 @@
       // a file link (§4.6, TD-689): `href` and `data-label` alone — the transcript is one launch, so never `data-folder`
       if (te) { te.classList.toggle("hidden", !v.transcript_editor); if (v.transcript_editor) { te.href = v.transcript_editor.url; te.dataset.label = v.transcript_editor.label; } }
       $("#last_output").textContent = v.last_output ? fmtAge(v.last_output) + " ago" : "—";
-      if (v.git) {
+      if (v.git && $("#gitline")) {  // a reaped record draws no Git card (§4.1, TD-979)
         // the one measure first (design §4.2, TD-080: *only on this machine*), then `ahead`, which
         // is *unmerged* and a different question — the template renders the same three parts
         const unpushed = v.git.unpushed ? ` · ${v.git.unpushed} unpushed${v.git.pushed_against ? ` vs ${v.git.pushed_against}` : ""}` : "";

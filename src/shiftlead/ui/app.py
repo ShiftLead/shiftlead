@@ -626,6 +626,12 @@ def resume_create(rec: dict[str, Any], *, prompt: str = "") -> dict[str, Any]:
         **({"repo": str(rec["repo"])} if rec.get("repo") else {}),
         **({"host": host} if host and host != host_name() else {}),
     }
+    if rec.get("repo") and rec.get("worktree"):
+        # the repo as `dir` with the worktree's name, as the restarts' launch record does: a reaped record's
+        # directory is gone and the create refuses one that is, so the start makes the worktree again at the
+        # same path, where the tool finds its conversation (§4.1 *Started again*, TD-979)
+        got["dir"] = str(rec["repo"])
+        got["worktree"] = str(rec["worktree"])
     if prompt:
         got["prompt"] = prompt
     # The **grants** and the **ledger** come from the directory's repo through the record's role,
