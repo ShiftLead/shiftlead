@@ -1211,6 +1211,29 @@ def help_page():
 
 
 
+def entry_session(told_open):
+    """Add entry's Focus side panel, the Session card open (TD-993): its **told at start** row right after
+    *started*, the start context's length in lines, a fold of its own — closed as the page loads, and open
+    with the text under the row at the list's full width, display only."""
+    chev = "▾" if told_open else "▸"
+    text = """<dd style="grid-column: 1 / -1; font-size: 12px; line-height: 1.5; margin: 2px 0 4px; color: #4b5563; display: flex; flex-direction: column; gap: 6px;" title="the session's start context (design §4.3, TD-283): display only">
+        <div>The person asked for a new entry in the ledger of shiftlead: docs/technical_debt.md, with Type debt and Priority Medium. Their first message is their words for it. Turn them into one entry, asking the person only for what the words and the repo do not settle.</div>
+        <div><b>Read before you write</b>: the ledger's preamble and template, and its three newest entries …</div>
+        <div><b>The number</b> is the first free one over the ledger, its archive and every open PR …</div>
+        <div class="muted">… four more lines</div></dd>""" if told_open else ""
+    body = f'''<dl class="kv" style="margin: 10px 0 0;">
+        <dt>profile</dt><dd class="mono" style="font-size: 12px;">claude-code · max · fable</dd>
+        <dt>tmux</dt><dd class="mono">entry-3</dd>
+        <dt>directory</dt><dd class="mono" style="font-size: 12px; overflow-wrap: anywhere;">…/worktrees/entry-3</dd>
+        <dt>started</dt><dd>2026-10-24 09:41Z</dd>
+        <dt title="design §4.5a Focus side panel, Session card: told at start row (TD-993)">told at start</dt><dd><span style="color: #1f5fa8; cursor: pointer;" title="a details fold; the text is the list's next dd, spanning both columns while it is open">{chev} 7 lines</span></dd>
+        {text}
+        <dt>last output</dt><dd>12s ago</dd>
+        <dt>mode</dt><dd>interactive</dd>
+      </dl>'''
+    return side_card("Session", '<span class="meta" style="font-size: 12px;">claude-code · max · fable</span>', body)
+
+
 def add_entry():
     """The **Add entry…** form (design §4.9 *Add an entry to the ledger*, §4.5a, TD-180): one form from
     the Repo page and the team card, two ways out — mail to the techlead seat, or an interactive
@@ -1245,7 +1268,7 @@ def add_entry():
       </div>
       <div style="display: flex; flex-direction: column; gap: 6px;">
         <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">Open a session</span><span class="note">named</span><span class="input mono" style="width: 170px; height: 30px; font-size: 12.5px;" title="design §4.5a Add entry form: Name (TD-675)">entry-3</span></div>
-        <span class="note">Starts <b>an interactive techlead session, entry-3, in a new worktree</b>, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, under <i>Told at start</i>.</span>
+        <span class="note">Starts <b>an interactive techlead session, entry-3, in a new worktree</b>, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, in the Session card under <i>told at start</i>.</span>
         <span class="note">With Type <i>feature</i>: an interactive designer session (the team's <span class="mono">entries:</span>).</span>
         <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px; opacity: 0.95;"><span class="btn" style="opacity: 0.45;">Open a session</span><span class="note">named</span><span class="input mono" style="width: 170px; height: 30px; font-size: 12.5px; border-color: #dc2626;">entry-2</span></div>
         <span class="note" style="color: #b91c1c;">entry-2 is running — switch to it, or pick another name</span>
@@ -1259,16 +1282,11 @@ def add_entry():
       <div style="display: flex; gap: 8px; align-items: center;"><span class="note">your words only: filled and focused, not sent — edit them, then Send</span><span style="flex-grow: 1;"></span><span class="btn primary">Send</span></div>
     </div>
     <div style="width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">
-      {side_card("Told at start", '<span class="meta" style="font-size: 12px;">7 lines</span>', "", open_=False)}
-      {side_card("Told at start", '<span class="meta" style="font-size: 12px;">7 lines</span>', """<div style="font-size: 12px; line-height: 1.5; margin-top: 8px; color: #4b5563; display: flex; flex-direction: column; gap: 6px;" title="the session's start context (design §4.3, TD-283): display only">
-        <div>The person asked for a new entry in the ledger of shiftlead: docs/technical_debt.md, with Type debt and Priority Medium. Their first message is their words for it. Turn them into one entry, asking the person only for what the words and the repo do not settle.</div>
-        <div><b>Read before you write</b>: the ledger's preamble and template, and its three newest entries …</div>
-        <div><b>The number</b> is the first free one over the ledger, its archive and every open PR …</div>
-        <div class="muted">… four more lines</div></div>""")}
-      {side_card("Session", '<span class="meta" style="font-size: 12px;">claude-code · max · fable</span>', "", open_=False)}
+      {entry_session(False)}
+      {entry_session(True)}
     </div>
   </div>
-  <div class="note" style="width: 760px;">Design notes, not page text. <b>Told at start</b> is drawn twice here, closed as it arrives and open as it reads; the page has one, above Session (TD-283 part 2, designed 2026-10-03: the entry brief left the composer). One form from two places: <b>Add entry…</b> beside Open ledger on the Repo page, and on the team card's Repo facet. The page writes no file. A team with no techlead seat draws the first button disabled with its reason; a repo no team services starts a <span class="mono">plain</span> session. The <b>Name</b> box (TD-675) holds the default <span class="mono">entry-&lt;n&gt;</span> until the person types; the second, disabled <b>Open a session</b> shows a typed name that is not free, its reason in place of the line under the button — the same test picks the default and checks a typed name, as typed and again at the press.</div>
+  <div class="note" style="width: 760px;">Design notes, not page text. The Session card is drawn twice here, its <b>told at start</b> row closed as it arrives and open as it reads; the page has one (TD-993, 2026-10-24: the row of the Session card, right after <i>started</i>, where a side-panel card of its own stood until then; TD-283 part 2, 2026-10-03: the entry brief left the composer). One form from two places: <b>Add entry…</b> beside Open ledger on the Repo page, and on the team card's Repo facet. The page writes no file. A team with no techlead seat draws the first button disabled with its reason; a repo no team services starts a <span class="mono">plain</span> session. The <b>Name</b> box (TD-675) holds the default <span class="mono">entry-&lt;n&gt;</span> until the person types; the second, disabled <b>Open a session</b> shows a typed name that is not free, its reason in place of the line under the button — the same test picks the default and checks a typed name, as typed and again at the press.</div>
 </div>
 </div>
 ''' + TAIL
@@ -2535,7 +2553,7 @@ def focus_held():
     {side_card("Sent", summary_meta("3 sent, 1 waiting", "1 ask still waiting for its answer", tone="warn"), open_=False)}
     {side_card("Ready to close", summary_meta("✗ branch pushed, +1", "✗ branch pushed · ✗ outcomes reported (1 owed): the first failing check, +1 for each more", tone="warn"), open_=False)}
     {side_card("Session", summary_meta("sonnet-5-5", "claude-code · grind (pro) · sonnet-5-5") + f'<span class="btn sm link" style="margin-left: 8px; flex-shrink: 0;">{ICON["code"]}VS Code</span>', open_=False)}
-    <div class="note">Folded at first: Reports, Inbox, Sent, Ready to close, Session, and Told at start. Each says what it holds; colour only where it asks something of you.</div>
+    <div class="note">Folded at first: Reports, Inbox, Sent, Ready to close and Session. Each says what it holds; colour only where it asks something of you.</div>
   </div>
 </div>
 </div>

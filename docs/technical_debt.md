@@ -74,8 +74,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Designed — builds TD-989, TD-990 |
 | TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Built (#2320) — the phone look with Paul |
-| TD-993 | **Told at start** leaves the Focus side panel: a row of the Session card, and the first entry of the Transcript | Medium | Open — design first |
+| TD-993 | **Told at start** leaves the Focus side panel: a row of the Session card, and the first entry of the Transcript | Medium | Designed — build TD-996; the Transcript entry is TD-997, Paul's |
 | TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Open — design first |
+| TD-996 | Focus's **Told at start** card becomes the Session card's **told at start** row | Medium | Open — build |
+| TD-997 | The Transcript draws a session's start context as its first entry — Paul's to keep or drop | Low | Open — waits on Paul |
 | TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Open — design first |
 | TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Open — design first: a background shell's end wakes no Gemini session |
 
@@ -1468,14 +1470,15 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Added:** 2026-10-24 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — Paul's direction is the Session card; the Transcript entry is the drafting session's suggestion, his to keep or drop.
+**Blocked by:** TD-996
+**Status:** Designed 2026-10-24 (the designer, PR #2327): the Session card's **told at start** row, right after *started*, a fold of its own; the side-panel card goes (design §4.5a *Focus side panel, Session card: told at start row*). Built by TD-996. The Transcript entry (part 2) is TD-997, waiting on Paul's word; the Prompts card (part 3) is not a place, as the entry says.
 **Location:** `src/shiftlead/ui/templates/focus.html` (the `toldcard` fold above **Session**; the Session card's `dl.kv`), `src/shiftlead/ui/cards.py` (`start_lines`), `src/shiftlead/ui/transcript.py` and the Claude Code adapter's transcript read (`src/shiftlead/adapters/claude_code/`), which today skip the `SessionStart` hook's attachment; `docs/mockups/gen.py` (the Focus and Add entry artboards); design §4.5a rows **Told at start** and the *Focus side panel, Session card* rows, §4.5 (the fold list: *… Session and Told at start start folded*), §4.3 *`start_context`* (through `SessionStart`'s `additionalContext`), §4.9 *Add an entry to the ledger*
 
 **Why:** Paul, 2026-10-24, on this session's Focus, which he opened by Add entry as a quick way to a terminal: *There is also a new "Told at start" card - where did that come from - do we need it?* … *Lets move it into the Session card. Alternately we could have it in the Prompts list, and/or we could add it to the actual transcript.*
 
 The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a session started by **Open a session**, so the person meets it rarely, and when they do it reads as a new card standing between the side panel's working cards. What it holds is read once, at the start — the Session card's kind of fact (`focus.html`'s note on the card, TD-156: *what is read at a session's start and rarely after*). It cannot simply go: the start context reaches the tool through `SessionStart`'s `additionalContext`, so nothing in the terminal or the composer shows what the session was told besides the person's words (here: a debt entry at medium priority, its id from `ao td next`, landed by PR).
 
-**Fix:** design first.
+**Fix:** designed (TD-996 builds part 1; part 2 is TD-997).
 1. **The Session card** (Paul's pick): a `told at start` row in the card's `dl.kv`, its value the line count (*7 lines*), unfolding the text in place under the same rules as today (display only, the closed markdown subset with no link, selectable); the side-panel card goes, and with it §4.5's fold-list mention and the Add entry note's *under Told at start*, which names the new place. Drawn only where the record holds a start context, as now.
 2. **The Transcript** (suggested): the text is already in the conversation file, as the `SessionStart` hook's attachment, and the Transcript drops it. Drawing it as the conversation's first entry, marked *told at start* and set apart from the prompts, makes the Transcript the whole record of what the session was given, for a closed session too. The design says whether the Session row then opens the Transcript at that entry instead of unfolding in place, and what an adapter whose start context reaches the conversation another way (Gemini, TD-786; §4.1 names `mail.start_context_file_text` for every adapter that carries one) shows there.
 3. **Not the Prompts card:** a start context is not a prompt (glossary *start context*): no turn ran for it and the pane holds no line for the jump to land on, so it would be the one row a press cannot jump to.
@@ -1512,6 +1515,47 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when** the design says how a session reaches another repo's or team's techlead (or says it does not, and why), and its build is merged. A session on a node can then put a ledger request to another repo without the person running a command, and `ao msg <to> --kind note "…"` either sends or ends with a refusal naming the fix.
 
 **Related:** TD-723 (samscrape and contractmatch under one project, which opens the project edge between them), TD-582 (the cross-team edge), TD-299 (the container nodes).
+
+## TD-996: Focus's **Told at start** card becomes the Session card's **told at start** row
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-24 (the designer, from TD-993)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/ui/templates/focus.html` (the `toldcard` `<details>` above **Session**, and the Session card's `dl.kv`, after *started*; the side panel's order comment), `src/shiftlead/ui/static/app.css` (`details.side .told`), `src/shiftlead/ui/static/app.js` (the Add entry note, `#entryline`), `src/shiftlead/ui/app.py` (the Open a session docstring naming the card), `src/shiftlead/ui/common.py` (`md`'s docstring naming the card), `src/shiftlead/ui/cards.py` (`start_lines`, its comment), `src/sessionorc/models.py` (the `start_context` field's comment); tests `tests/test_ui_entry.py` (the card's test), `tests/test_render.py`, `tests/test_no_agent_pages.py`; design §4.5a **Focus side panel, Session card: told at start row**, §4.5 *The Focus screen's anatomy* (the side panel's list and the fold list)
+
+**Why:** TD-993: Paul, 2026-10-24, *Lets move it into the Session card* — the card is drawn on few sessions and reads as a new card among the working ones, while what it holds is read once, at the start, which is the Session card's kind of fact.
+
+**Fix:**
+- The `toldcard` fold goes, and with it its `data-side="told"` key; a browser's remembered fold under that key is left unread.
+- The Session card's `dl.kv` gains, right after *started* and only where `s.start_lines and s.agent` (as the card was drawn): `<dt>told at start</dt>`; a `<dd>` holding `<details class="toldfold"><summary>7 lines</summary></details>` (`s.start_lines`, *1 line* for one), closed at every load and not remembered (fold memory reads only `details.side`); and, as the `dl`'s next child, `<dd class="told">` holding the text (`md(s.start_context, links=False)`, as today). Only a grid's direct children are its items, so the text is its own: `.kv dd.told { grid-column: 1 / -1; display: none }`, shown by `.kv dd:has(> details.toldfold[open]) + dd.told { display: block }` — the native fold, no script; `:has()` adds no browser floor, as `.tgroup:has(…)` and `#usagechip`'s rules already rest on it. The side panel's summary rules (`details.side > summary`, its `.h2` chevron) do not reach a nested summary, so the build adds `.kv details.toldfold > summary { list-style: none; cursor: pointer; color: <the link colour> }`, `::-webkit-details-marker { display: none }`, and a `::before` carrying `▸`, `▾` under `[open]` — the mockup's marker, its `content` and `[open]` swap copied from `.inboxpage details.isec > summary`'s, the `::before` inheriting the link colour (no `var(--muted)`). The whole of `details.side .told`'s line (its font size, line height, wrap, colour, and its `p`/`ul` margins) becomes `.kv dd.told …`, its `margin-top: 8px` becoming `margin: 2px 0 4px` as the mockup draws it (the grid's `4px` gap already sets it off the row). The `dd.told` keeps the old text's `title` (*the session's start context (design §4.3, TD-283): display only*). Nothing in the text is a control.
+- The Add entry note reads *… what the session is told besides is on its Focus, in the Session card under told at start.*; the comments and docstrings that name the card name the row.
+
+**Done when:**
+- `tests/test_ui_entry.py`'s card test, rewritten: a record holding a start context draws no `#toldcard`, and its Session card holds `told at start` after `started` with *3 lines* (blank lines not counted) in a `<details class="toldfold">` with no `open` attribute, and the `dd.told` holding the text as the `dl`'s very next child after that row's `dd` (the `+` the rule rests on), escaped, with no `<a`; a record with none draws no such row; a shell record draws none.
+- The docstrings of `tests/test_render.py` and `tests/test_no_agent_pages.py` say the row where they said the card (neither asserts on it).
+- The UI check (TD-290) on a scratch home, at 1440 px and 390 px: a session started by Add entry's **Open a session** shows the row under *started* with the Session card unfolded, its text opened in place and selectable; the side panel holds no **Told at start** card; the rail draws nothing new.
+
+**Related:** TD-993 (its design), TD-283 (the start context), TD-997 (the Transcript entry, waiting on Paul).
+
+## TD-997: The Transcript draws a session's start context as its first entry, marked *told at start* — Paul's to keep or drop
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-24 (the designer, from TD-993 part 2)
+**Owner:** designer
+**Kind:** design-first
+**Blocked by:** decision (paul) — his answer to the ask m-7f566ce663c2
+**Status:** Open — waits on Paul's word whether the Transcript should show it.
+**Location:** `src/shiftlead/ui/transcript.py`, the Claude Code adapter's transcript read (`src/shiftlead/adapters/claude_code/transcript.py`, which skips every line type it does not list, the `SessionStart` hook's attachment among them), the Gemini adapter's (TD-786); design §4.5 the Transcript, §4.3 `start_context`
+
+**Why:** TD-993 part 2, the drafting session's suggestion: the start context is already in the conversation file, as the `SessionStart` hook's attachment, and the Transcript drops it; drawn as the conversation's first entry it would make the Transcript the whole record of what the session was given, for a closed session too. TD-993 designed the Session card's row (TD-996) and left this to Paul, since it is his to keep or drop.
+
+**Fix:** design first, once Paul says yes: the entry's mark and style, set apart from the prompts; what an adapter whose start context reaches the conversation another way shows (§4.1 `mail.start_context_file_text`); whether the Session card's row then also links to it.
+
+**Related:** TD-993, TD-996, TD-154 (the Transcript).
 
 ## TD-998: `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao`
 
