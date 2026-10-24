@@ -1489,7 +1489,7 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Location:** new `src/shiftlead/wait_guard.py` (beside `kill_guard.py`, reusing its `mask` and `command_word`); `src/shiftlead/adapters/claude_code/hook.py` (`main`, after `refused_command`; the event's `wait` flag and the reply's `refuse_wait`); `src/sessionorc/agent_hook.py` (`rpc_hook`, beside `mail`); a new `tests/test_wait_guard.py` for `waits`, the hook's cases (stdin payloads to `hook.main`, as `tests/test_kill_guard.py` feeds the kill guard's) and `rpc_hook`'s; design §4.3 *A wait the guard refuses*, §4.2's hook table, §4.10 *Waiting on mail is ending the turn*
+**Location:** new `src/shiftlead/wait_guard.py` (beside `kill_guard.py`, reusing its `mask` and `command_word`); `src/shiftlead/adapters/claude_code/hook.py` (`main`, after `refused_command`; the event's `wait` flag and the reply's `refuse_wait`); `src/sessionorc/agent_hook.py` (`rpc_hook`, beside `mail`); a new `tests/test_wait_guard.py` for `waits`, the hook's cases (through `run_hook`, as `tests/test_kill_guard.py` feeds the kill guard's) and `rpc_hook`'s; design §4.3 *A wait the guard refuses*, §4.2's hook table, §4.10 *Waiting on mail is ending the turn*
 
 **Why:** TD-991: on briefs that name `timeout 1800 gh pr checks <n> --watch` as the background command, the techlead and the test auditor ran it in the foreground (2026-10-22, 10-23), so the session read `working` and was not rung for mail until the watch ended.
 
