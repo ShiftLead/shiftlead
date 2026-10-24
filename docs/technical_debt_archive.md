@@ -19263,3 +19263,56 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Related:** TD-986, TD-990, TD-174 (the wheel), TD-667, TD-003.
 
 **Resolved:** 2026-10-23 (grinder-ao-2, this PR) — built as §4.6 *A finger's drag scrolls it too* says: `AO.touchStep(total, sent)` beside `AO.wheelStep`, pinned by the node probe in `tests/test_ui_inbox.py` (the slop, the first 10 px counted once, a drag down `up`, the fraction carried); the capture-phase `touchstart` / `touchmove` / `touchend` / `touchcancel` on `#term` feeding the wheel's accumulator once per frame, a second finger ending a scroll and two put down together left to the browser; the last `pointerdown`'s `pointerType` keeping a long press's `contextmenu` from pasting; `touch-action: pinch-zoom` on `.termbox` and xterm.js's three layers. The Playwright check at 390 px with touch on a scratch home, every case of *Done when*, is the PR's UI check; a drag on the soft-key row is TD-990's to show, since the row is not built yet. The look on the phone (TD-290) follows the merge as mail.
+
+## TD-992: The wait guard: an unattended Claude Code session's foreground `gh pr checks … --watch` or `gh run watch` is refused, naming the background form
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (the designer, from TD-991)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** new `src/shiftlead/wait_guard.py` (beside `kill_guard.py`, reusing its `mask` and `command_word`); `src/shiftlead/adapters/claude_code/hook.py` (`main`, after `refused_command`; the event's `wait` flag and the reply's `refuse_wait`); `src/sessionorc/agent_hook.py` (`rpc_hook`, beside `mail`); a new `tests/test_wait_guard.py` for `waits`, the hook's cases (through `run_hook`, as `tests/test_kill_guard.py` feeds the kill guard's) and `rpc_hook`'s; design §4.3 *A wait the guard refuses*, §4.2's hook table, §4.10 *Waiting on mail is ending the turn*
+
+**Why:** TD-991: on briefs that name `timeout 1800 gh pr checks <n> --watch` as the background command, the techlead and the test auditor ran it in the foreground (2026-10-22, 10-23), so the session read `working` and was not rung for mail until the watch ended.
+
+**Fix:**
+- `wait_guard.waits(command) -> bool`: the command masked by `kill_guard.mask`, split on the kill guard's separators, each command's word found by `command_word` past its wrappers; true when one is `gh` whose next words, past `gh`'s own options before the subcommand (`-R <repo>`, `--repo <repo>`, `--repo=<repo>`), are `pr checks` with `--watch` or `--watch=…` among its arguments, or `run watch`. Text only, no call.
+- The hook, on a `PreToolUse` of `Bash` the kill guard does not refuse, with no `agent_id`, `tool_input.run_in_background` not true and `waits(command)`: sets `wait: true` on the event's params, and prints `deny(wait_guard.REASON)` when the reply carries `refuse_wait: true`. The reply is the event's own `call_agent`; an error, a timeout or a queued event prints nothing. Its wait, the literal `3` in `main` today, becomes `float(os.environ.get("SHIFTLEAD_EVENT_WAIT", "3"))`, read as `SHIFTLEAD_PERMISSION_WAIT` already is, so a test of the hook's subprocess can shorten it.
+- `rpc_hook` pops `wait` as it pops `mail`, applies the event as before, and returns `refuse_wait: true` (merged with `unread` when both are asked) when the record it holds is `unattended`; a missing record answers nothing. On a node this is the node's replica (§4.4a), the `s.unattended` read `_by_rule` already makes there — without `_by_rule`'s link-and-snapshot gate, since the refusal files no mail.
+- The queued copy of the event (`EventQueue().append`) leaves `wait` out, as Gemini CLI's hook leaves `mail` out of its own: a drained event goes straight to `_apply_event`, and nothing would answer it. The hook prints at most one decision: the kill guard's, before anything is sent, or the wait's, printed and flushed when the reply lands.
+- `src/shiftlead/briefs/grinder.stage.md`: *(`gh pr checks <n> --watch`: …)* becomes *(`gh pr checks <n> --watch`, in the background: …)*, so the held path's sentence says what every preset's opening sentence says.
+- `REASON`: *shiftlead: refused — a foreground CI watch in an unattended session; run the same command in the background (`run_in_background`) and end the turn: its end wakes you (design §4.10)*.
+
+**Done when:**
+- `waits` is true for `gh pr checks 12 --watch`, `timeout 1800 gh pr checks 12 --watch --interval 30`, `nohup gh run watch 99`, `cd x && gh pr checks 12 --watch`, `nohup gh pr checks 12 --watch >ci.log 2>&1 &` (a shell `&` is not the background form), `gh -R a/b pr checks 12 --watch`, `gh pr checks 12 --watch=true`; false for `gh pr checks 12`, `sleep 20; gh pr checks 12`, `git commit -m "gh pr checks --watch"`, a here-document body naming it, `echo gh run watch`.
+- The hook, fed payloads with a stub host agent: a foreground watch on an unattended record prints the `deny` with `REASON`; the same with `run_in_background: true`, with an `agent_id`, on an interactive record, with the host agent down, or with a reply slower than the wait prints none and the event still reports `working` (through `run_hook` as `tests/test_kill_guard.py` does, with a new stub host agent on `paths.socket_path()` under a short `SHIFTLEAD_HOME`, memory *scratchpad too long for unix sockets*, that never answers, with `SHIFTLEAD_EVENT_WAIT` set short in this case's own `env` to `run_hook`, the helper's default left as it is; the queued event is read back with no `wait`); a `kill $PPID` inside a watch command prints the kill guard's deny alone.
+- `rpc_hook` answers `refuse_wait` for an `unattended` record and not after a Take over flips it, and still answers `unread` with `mail`; an event queued while the host agent was down carries no `wait`.
+- TD-850's live check (it waits on TD-991) reads a week of members' transcripts after this is live with no foreground CI watch run; one refused shows as the tool's refusal, then the same command in the background.
+
+**Related:** TD-991 (its design), TD-850, TD-489 / TD-496 (the kill guard it sits beside). Gemini CLI's wiring (its `run_shell_command`'s `is_background`) is a follow-on: the builder files it once this is built.
+
+**Resolved:** 2026-10-24 (grinder-ao-1, PR #2328) — built as §4.3 *A wait the guard refuses* says: `src/shiftlead/wait_guard.py` (`waits`, on the kill guard's `mask` and `command_word`); the hook sends a foreground main-thread watch with `wait: true` and denies on `refuse_wait`, its reply wait `SHIFTLEAD_EVENT_WAIT`, the queued copy without `wait`; `rpc_hook` answers `refuse_wait` for an `unattended` record. `grinder.stage.md` and the three flows' `build.md` say *in the background*. `tests/test_wait_guard.py` covers each *Done when* case; the week of transcripts is TD-850's live check.
+
+## TD-991: A member still waits on CI in its own turn — a foreground `timeout N gh pr checks --watch` — on a brief that says to run it in the background
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (grinder-ao-1, from TD-850's live check)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done
+**Location:** design §4.10 *Waiting on mail is ending the turn*; `src/shiftlead/briefs/techlead.md`, `src/shiftlead/briefs/auditor.md` (and the presets they share the sentence with); the Claude Code adapter's hooks, if a refusal is chosen (`src/shiftlead/adapters/claude_code/`)
+
+**Why:**
+- TD-850's live check (2026-10-24) read every unattended member's transcript since #2051 went live. The `tail -f /dev/null` loop between `ao status` reads is gone. A plainer form of the same wait is not: on runs whose brief carries *never wait inside your own turn … runs as one background command*, the techlead ran `timeout 1800 gh pr checks 2246 --watch` in the foreground (2026-10-22 02:43Z), and the test auditor ran `timeout 110`, `200` and `580 gh pr checks <n> --watch` in the foreground before its merges (#2258 on 10-22, #2301 on 10-23). Short `sleep 20; gh pr checks <n>` after a push, a single poll and not a loop, shows up in grinders and the designer too (10-22 to 10-24).
+- Members also try `sleep 100; cat <their own background task's output>` in the foreground. Claude Code refuses a long bare `sleep` itself, so it costs no wait, only a turn (grinder-ao-2 10-24 02:05Z, dc-grinder 10-23 00:31Z, test-audit-ao-1 ten times 10-18 to 10-23).
+- Each of these is one bounded command, not a turn spent on every pass, so the cost is far lower than TD-850's loop. Still, a session in a foreground watch is `working` and is not rung for mail until the watch ends (§4.10), which is what the sentence is there to prevent.
+
+**Fix:** designed (§4.3 *A wait the guard refuses*; TD-992 builds it). The two ways the entry weighed: (a) the sentence in the techlead's and auditor's presets, which are short-lived runs that merge their own PRs, names the exact pattern they use (`timeout N gh pr checks <n> --watch` before a merge) as the wait to put in the background; (b) the Claude Code adapter's PreToolUse hook refuses a foreground Bash call whose command waits on CI (`gh pr checks … --watch`) or sleeps, naming the background form, the way the tool already refuses a bare `sleep`. (b) touches every member's tool calls, so it needs the person's word (memory *agent settings are the person's*).
+
+**Done when** the design says which way, and TD-850's live check reads a week with no foreground CI wait.
+
+**Related:** TD-850 (the live check that found it), TD-153, TD-761.
+
+**Resolved:** 2026-10-24 — designed in PR #2324; its one build, TD-992, merged in PR #2328.

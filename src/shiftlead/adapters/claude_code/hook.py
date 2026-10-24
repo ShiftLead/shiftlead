@@ -7,7 +7,9 @@ Every other event is fire-and-forget: socket first, `events/<session>.jsonl` if 
 An error in the reply is the agent answering — a refusal (design §4.8a) or a bug — and is never
 queued: the tick applies the queue unjudged, so a queued refusal would be applied anyway (TD-115).
 A `PreToolUse` of `Bash` whose command the kill guard refuses (`guard.py`, design §4.3) prints a `deny`
-with its reason first, the hook's own decision, and is reported as any `PreToolUse` is.
+with its reason first, the hook's own decision, and is reported as any `PreToolUse` is. One that is a
+foreground CI watch on the main thread (`wait_guard.py`) goes with `wait: true`, and is denied when the
+reply says the record is unattended (`refuse_wait`, design §4.3 *A wait the guard refuses*).
 
 With `--statusline` it is the session's status line instead (design §4.4 *A report*, TD-233): it
 reports the account's limits the tool hands it as `usage_report`, keeps the context window and
@@ -34,6 +36,7 @@ from typing import Any
 from sessionorc import paths
 from sessionorc.adapters import CAPTURE_ENV
 from sessionorc.store import EventQueue
+from shiftlead import wait_guard
 from shiftlead.adapters.claude_code import (
     AT_COMPOSER_ENV,
     STATUSLINE_FLAG,
@@ -231,6 +234,17 @@ def refused_command(payload: dict[str, Any]) -> str | None:
     return refuse(command) if isinstance(command, str) else None
 
 
+def waits_in_the_foreground(payload: dict[str, Any]) -> bool:
+    """A `PreToolUse` of `Bash` on the main thread, not run in the background, that is a CI watch (§4.3)."""
+    if payload.get("hook_event_name") != "PreToolUse" or payload.get("tool_name") != "Bash":
+        return False
+    if payload.get("agent_id"):
+        return False  # a subagent's wait is its caller's to put in the background
+    ti = payload.get("tool_input") or {}
+    command = ti.get("command")
+    return ti.get("run_in_background") is not True and isinstance(command, str) and wait_guard.waits(command)
+
+
 def deny(reason: str) -> dict[str, Any]:
     """The `PreToolUse` decision that refuses the call, with the reason the session reads."""
     return {
@@ -419,15 +433,21 @@ def main() -> int:
     except ValueError:  # not JSON, or not UTF-8
         return 0
     capture("hooks", raw)
+    ask_wait = False
     if isinstance(payload, dict) and (reason := refused_command(payload)):
         # the hook's own decision, before the host agent is asked anything: one it cannot reach still
         # refuses, and the event below still reports `working` (design §4.3 *A kill the guard refuses*)
         print(json.dumps(deny(reason)))
         sys.stdout.flush()
+    elif isinstance(payload, dict):
+        ask_wait = waits_in_the_foreground(payload)
     params = translate(payload, at_composer=os.environ.get(AT_COMPOSER_ENV) == "1")
     if params is None:
         return 0
     params["session"] = session
+    if ask_wait:
+        # the record's mode is the host agent's to say: Take over and Hand back flip it after launch (§4.3)
+        params["wait"] = True
     if params.get("kind") == "permission":
         wait = float(os.environ.get("SHIFTLEAD_PERMISSION_WAIT", "600"))
         params["wait_seconds"] = wait
@@ -442,14 +462,19 @@ def main() -> int:
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": out}}))
         return 0
     try:
-        call_agent(params, timeout=3)
+        reply = call_agent(params, timeout=float(os.environ.get("SHIFTLEAD_EVENT_WAIT", "3")))
+        if ask_wait and isinstance(reply, dict) and reply.get("refuse_wait"):
+            print(json.dumps(deny(wait_guard.REASON)))
+            sys.stdout.flush()
     except Refused as e:
         print(f"shiftlead-hook: {session}: the host agent refused the event: {e}", file=sys.stderr)
     except Exception:  # noqa: BLE001
         with contextlib.suppress(OSError):
             # `at`: when it happened, so the drain can tell it from a newer event that got through
             # live while this one waited (TD-169)
-            EventQueue().append(session, {**{k: v for k, v in params.items() if k != "session"}, "at": time.time()})
+            # the queued copy carries no `wait`: a drained event is applied unanswered (§4.3)
+            kept = {k: v for k, v in params.items() if k not in ("session", "wait")}
+            EventQueue().append(session, {**kept, "at": time.time()})
     return 0
 
 
