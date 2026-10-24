@@ -144,7 +144,7 @@ def test_a_node_down_or_behind_lacks_with_its_cure():
     assert verdicts(on_node) == [("ok", "nodes — read at the home · `ao` on PATH")]
 
 
-def _fake_ao(tmp_path, prefix: pathlib.Path) -> pathlib.Path:
+def _fake_ao(prefix: pathlib.Path) -> pathlib.Path:
     (prefix / "bin").mkdir(parents=True)
     own = prefix / "bin" / "ao"
     own.write_text("")
@@ -157,7 +157,7 @@ def test_on_a_node_the_nodes_row_reads_this_installs_ao_on_path(tmp_path, monkey
     from sessionorc import containers
 
     venv = tmp_path / "venv"
-    own = _fake_ao(tmp_path, venv)
+    own = _fake_ao(venv)
     link = tmp_path / "usr-local-bin-ao"
     link.symlink_to(own)
     other = tmp_path / "opt" / "ao"
