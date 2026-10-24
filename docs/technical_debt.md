@@ -75,6 +75,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Designed — builds TD-989, TD-990 |
 | TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Built (#2320) — the phone look with Paul |
 | TD-991 | A member still waits on CI in its own turn — a foreground `timeout N gh pr checks --watch` — on a brief that says to run it in the background | Low | Open — design first |
+| TD-993 | **Told at start** leaves the Focus side panel: a row of the Session card, and the first entry of the Transcript | Medium | Open — design first |
 
 ---
 
@@ -1478,3 +1479,26 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Done when** the design says which way, and TD-850's live check reads a week with no foreground CI wait.
 
 **Related:** TD-850 (the live check that found it), TD-153, TD-761.
+
+## TD-993: **Told at start** leaves the Focus side panel: a row of the Session card, and the first entry of the Transcript
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-24 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — Paul's direction is the Session card; the Transcript entry is the drafting session's suggestion, his to keep or drop.
+**Location:** `src/shiftlead/ui/templates/focus.html` (the `toldcard` fold above **Session**; the Session card's `dl.kv`), `src/shiftlead/ui/cards.py` (`start_lines`), `src/shiftlead/ui/transcript.py` and the Claude Code adapter's transcript read (`src/shiftlead/adapters/claude_code/`), which today skip the `SessionStart` hook's attachment; `docs/mockups/gen.py` (the Focus and Add entry artboards); design §4.5a rows **Told at start** and the *Focus side panel, Session card* rows, §4.5 (the fold list: *… Session and Told at start start folded*), §4.3 *`start_context`* (through `SessionStart`'s `additionalContext`), §4.9 *Add an entry to the ledger*
+
+**Why:** Paul, 2026-10-24, on this session's Focus, which he opened by Add entry as a quick way to a terminal: *There is also a new "Told at start" card - where did that come from - do we need it?* … *Lets move it into the Session card. Alternately we could have it in the Prompts list, and/or we could add it to the actual transcript.*
+
+The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a session started by **Open a session**, so the person meets it rarely, and when they do it reads as a new card standing between the side panel's working cards. What it holds is read once, at the start — the Session card's kind of fact (`focus.html`'s note on the card, TD-156: *what is read at a session's start and rarely after*). It cannot simply go: the start context reaches the tool through `SessionStart`'s `additionalContext`, so nothing in the terminal or the composer shows what the session was told besides the person's words (here: a debt entry at medium priority, its id from `ao td next`, landed by PR).
+
+**Fix:** design first.
+1. **The Session card** (Paul's pick): a `told at start` row in the card's `dl.kv`, its value the line count (*7 lines*), unfolding the text in place under the same rules as today (display only, the closed markdown subset with no link, selectable); the side-panel card goes, and with it §4.5's fold-list mention and the Add entry note's *under Told at start*, which names the new place. Drawn only where the record holds a start context, as now.
+2. **The Transcript** (suggested): the text is already in the conversation file, as the `SessionStart` hook's attachment, and the Transcript drops it. Drawing it as the conversation's first entry, marked *told at start* and set apart from the prompts, makes the Transcript the whole record of what the session was given, for a closed session too. The design says whether the Session row then opens the Transcript at that entry instead of unfolding in place, and what an adapter whose start context reaches the conversation another way (Gemini, TD-786; §4.1 names `mail.start_context_file_text` for every adapter that carries one) shows there.
+3. **Not the Prompts card:** a start context is not a prompt (glossary *start context*): no turn ran for it and the pane holds no line for the jump to land on, so it would be the one row a press cannot jump to.
+
+**Done when** the design names the place or places, and their build is merged with its UI check (TD-290): the side panel has no **Told at start** card, the Session card's row shows the start context on a record that holds one and is absent on one that does not, and the mockups and help text follow.
+
+**Related:** TD-283 (the start context and the card), TD-964 (the folded side panel), TD-975 / TD-977 (the Prompts card), TD-154 (the Transcript).
