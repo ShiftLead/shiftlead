@@ -185,7 +185,8 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       claim, because a manager hands out nothing — its members choose for themselves (§4.8
       *Choosing in a free-pick lane*). The manager is told and logs it.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row is the current
-      answer; revisit after phase 2 if it is too fiddly one-handed.
+      answer (the row is built ahead of the narrow mode by TD-990, §4.5a **soft-key row**); revisit
+      after phase 2 if it is too fiddly one-handed.
 - [x] **Rename the Herd page?** (2026-09-13): **yes, to Team** — "Herd" reads too close to
       herdr (§3, prior art, not renamed).
 - [x] **Does a team wind down when it runs out of work?** (2026-09-14): it did not — every
