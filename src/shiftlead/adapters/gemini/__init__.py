@@ -35,7 +35,7 @@ from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
 from shiftlead.adapters.claude_code import SHELL_CMD_LEN, SHELL_WALK_NODES, _resolves, write_context_file
 from shiftlead.adapters.gemini import transcript as transcript_mod
-from shiftlead.adapters.gemini.hook import START_CONTEXT_ENV
+from shiftlead.adapters.gemini.hook import START_CONTEXT_ENV, WAKES_ENV
 from shiftlead.profiles import Profile
 
 log = logging.getLogger("shiftlead.adapters.gemini")
@@ -54,7 +54,9 @@ YOLO = ["--approval-mode", "yolo"]  # an unattended launch under `permission_pro
 # no `asking_args` (§4.3): under `permission_prompts: all` the launch is `ask`'s, yolo dropped and nothing added
 # The layer's settings besides its hooks (design §4.3 `launch`): no on-screen notification hooks, no
 # tips or banner, the version the build was read against pinned, and the title the state check reads
-# turned on, so the person's own settings cannot turn it off.
+# turned on, so the person's own settings cannot turn it off. A background command's end is queued for the
+# session (`inject`; the default, `silent`, wakes nothing) and steering lets an idle session take it as a
+# turn, so a member's background CI watch wakes it, as §4.10 says (TD-999, §4.3 *A wait the guard refuses*).
 LAYER_SETTINGS = {
     "hooksConfig": {"notifications": False},
     "general": {"enableAutoUpdate": False},
@@ -65,6 +67,8 @@ LAYER_SETTINGS = {
         "hideWindowTitle": False,
         "showStatusInTitle": False,
     },
+    "tools": {"shell": {"backgroundCompletionBehavior": "inject"}},
+    "experimental": {"modelSteering": True},
 }
 # The title's leading glyph and the state it means (design §4.3 *Two gaps*): `◇  Ready`, `✦  Working…`
 # responding, `⏲  Working…` its shell quiet with no output, `✋  Action Required` a confirmation or that
@@ -212,6 +216,19 @@ def machine_reading() -> dict:
     return out | ({"state": "ok", "why": ""} if same else {"state": "stale", "why": "differs from the wanted copy"})
 
 
+def layer_wakes(path: Path | None = None) -> bool:
+    """Whether a background command's end wakes a session launched under the layer at `path` (default
+    `MACHINE_LAYER`, read at call time): it holds `tools.shell.backgroundCompletionBehavior: "inject"`
+    and `experimental.modelSteering: true`. False for a missing, unreadable or non-JSON layer (§4.3)."""
+    try:
+        doc = json.loads((path or MACHINE_LAYER).read_text(encoding="utf-8"))
+        shell = doc["tools"]["shell"]["backgroundCompletionBehavior"]
+        steering = doc["experimental"]["modelSteering"]
+    except (OSError, ValueError, TypeError, KeyError):
+        return False
+    return shell == "inject" and steering is True
+
+
 def layer_reading(profile: Profile | None = None) -> list[dict]:
     """The machine's layer read against the wanted copy (`ao doctor`'s hooks check, design §4.7): one
     file for every Gemini profile, in the shape Claude Code's adapter reports, with `gemini` the reading."""
@@ -293,6 +310,10 @@ class GeminiAdapter:
             env["GEMINI_CLI_HOME"] = str(prof.config_dir)
         if name:
             env["CLI_TITLE"] = name  # the session's name, which the tool puts in its title
+        if layer_wakes():
+            # read again after `machine_reading`: a layer replaced between the two is the one the tool
+            # reads at launch; the hook asks the wait guard only where this is set (design §4.3)
+            env[WAKES_ENV] = "1"
         if start_context:
             # the hook reads it on every `SessionStart`, a resume's and a `/clear`'s too (design §4.3)
             env[START_CONTEXT_ENV] = str(write_context_file(adapter_id, start_context))
@@ -437,17 +458,28 @@ class GeminiAdapter:
         if r["state"] == "ok":
             return {"key": None}
         digest = hashlib.sha256(Path(r["wanted"]).read_bytes()).hexdigest()[:12]
-        words = {"missing": "is not installed", "insecure": "is not root-owned", "stale": "is stale"}.get(
+        words = {"missing": "is not installed", "insecure": "is not root-owned"}.get(
             r["state"], "names no hook command that resolves"
         )
-        refused = "" if r["state"] == "stale" else " and is refused"
+        stale = r["state"] == "stale"
+        # a stale layer still gives hooks; what it may lack is the wake (design §4.3 *The second adapter*)
+        wakes = layer_wakes(Path(r["path"])) if stale else True
+        if stale:
+            lead = "The Gemini layer is stale: the installed layer is not this install's."
+            if not wakes:
+                lead += (
+                    " Until it is reinstalled, a background command's end wakes no Gemini session launched "
+                    "under it, and its foreground CI watch is not refused."
+                )
+        else:
+            lead = f"The Gemini layer {words}, so a Gemini session gets no hooks and is refused."
         text = (
-            f"The Gemini layer {words}, so a Gemini session gets no hooks{refused}. "
-            f"Run this once on this machine:\n\n{INSTALL_LINE}\n\n"
+            f"{lead} Run this once on this machine:\n\n{INSTALL_LINE}\n\n"
             f"Gemini CLI reads its hooks only from a settings file root owns ({MACHINE_LAYER}: {r['why']}); "
             "ShiftLead writes the file it wants and never runs sudo (design §4.3)."
         )
-        return {"key": f"{digest}:{r['state']}", "text": text}
+        # the wake's reading in the key: a stale layer's wording refreshes when it changes
+        return {"key": f"{digest}:{r['state']}" + ("" if wakes else ":no-wake"), "text": text}
 
     def machine_layers(self, hook: str) -> list[tuple[str, str]]:
         """The machine layer a container node's root stage installs (design §4.3 *A container node needs

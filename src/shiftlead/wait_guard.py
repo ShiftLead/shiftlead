@@ -4,8 +4,9 @@ A session never waits inside its own turn: what it waits on outside mail runs as
 command, whose end wakes it. `waits` reads a shell command's shape and names a CI watch —
 `gh pr checks … --watch` or `gh run watch` — read as the kill guard reads a kill: the text masked,
 each command's word found past the same wrappers. A single `gh pr checks <n>`, a short `sleep` and a
-loop pass. Whether the call is refused is the hook's: only in the foreground, on the main thread, of
-an unattended record. It reads text only and calls nothing.
+loop pass. Whether the call is refused is the hook's: only in the foreground of an unattended record
+(Claude Code's hook also tests the main thread; Gemini CLI's carries no subagent marker). It reads text
+only and calls nothing.
 """
 
 from __future__ import annotations
@@ -15,6 +16,13 @@ from shiftlead.kill_guard import SEPARATORS, command_word, mask
 REASON = (
     "shiftlead: refused — a foreground CI watch in an unattended session; run the same command in the "
     "background (`run_in_background`) and end the turn: its end wakes you (design §4.10)"
+)
+
+# Gemini CLI's words (TD-1007): its background form is the call's `is_background`, whose end wakes the
+# session only under the layer's `inject` and `modelSteering` (design §4.3 *A wait the guard refuses*)
+GEMINI_REASON = (
+    "shiftlead: refused — a foreground CI watch in an unattended session; run the same command with "
+    "`is_background: true` and end the turn: its end wakes you (design §4.10)"
 )
 
 # `gh`'s own options before the subcommand that take the next word as their value.
