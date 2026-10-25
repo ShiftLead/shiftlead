@@ -1032,7 +1032,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      dev-cadence's SessionStart hook prints the new entries of `docs/cadence-changes.md` to a
      session that starts, so only a session that outlives a change needs telling, and the tick
      tells it as rule 6 tells lane news. For each registry root at the home whose checkout holds
-     `scripts/cadence_changes.py`, the home runs it `--json` on the reports' cadence — it reads
+     `scripts/cadence_changes.py` (in dev-cadence's source `files/scripts/cadence_changes.py`, §5 *The seams*) — every served repo's — the home runs it `--json` on the reports' cadence — it reads
      the file as merged, `origin/<default>`, as rule 7 reads a brief's file — taking each entry's
      `heading` and `landed`; a root without the script, or whose origin has no default branch
      (exit 2), gives no reading. On each supervised member record of that root, not a seat (every

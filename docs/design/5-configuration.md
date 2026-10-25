@@ -241,7 +241,12 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   **dev-cadence's own repo is its source**, not a consumer: a checkout whose root holds `sync.sh` and
   `files/` carries no lock and is at its own head, so its tree is itself (no lock, no `OLDEST` check)
   and its gate is its own `files/scripts/check_cadence.py --pr {pr} --json`; every rule below that
-  counts registered repos' locks (*Which dev-cadence*'s raise, TD-1016's) passes over it.
+  counts registered repos' locks (*Which dev-cadence*'s raise, TD-1016's) passes over it. **In the
+  source every dev-cadence path a reader names is under `files/`** — `files/docs/cadence.md`,
+  `files/scripts/check_cadence.py`, `ledger.py`, `cadence_changes.py`, `ledgerboard.py`,
+  `cadence_layer.py` — and every copy-era reader (the slots, rule 12's relay, the ledgerboard header,
+  the layer listing) and the resolver prefix it there, as §4.4's id counter reads
+  `files/scripts/ledger_next_id.py`.
 
   A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
   say which, each in its fixed words with its cure, the page and `ao doctor` sharing them:
