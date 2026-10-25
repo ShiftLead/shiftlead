@@ -313,9 +313,10 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   Convention notices (§6 rule 12) run in every served repo. The SessionStart line (§4.3) is carried by
   ShiftLead's launch for every session it starts (`CADENCE_HOOK_LINE`), so a repo whose own
   `.claude/settings.json` lacks it gets a warning on the Repo page, *no SessionStart line: a session
-  started outside ShiftLead misses the cadence's nudge*, and nothing more; it is read on the clients' side
-  (`shiftlead.doctor`, the Repo page), against the adapter's own `CADENCE_HOOK_LINE`, never by the host
-  agent. **Who reads them**: the host
+  started outside ShiftLead misses the cadence's nudge*, and nothing more. The host agent reads the
+  file's SessionStart commands into the repo facts as text (§4.4), so a client on another machine sees
+  them, and the clients (`shiftlead.doctor`, the Repo page) compare them with the adapter's own
+  `CADENCE_HOOK_LINE`, which the host agent never imports. **Who reads them**: the host
   agent, at the home, reads `ledger:`, `board:`, `worktree_setup:` and `settle:` and the three
   requirements as it reads `promote:` — for the repo facts (§4.4: the seam state and the lacks the
   Repo page and `ao doctor` draw), the gate run (§6 rule 10 runs at the home), the write-back (§4.4:
