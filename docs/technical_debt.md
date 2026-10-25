@@ -81,6 +81,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1000 | A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo | Medium | Open — build |
 | TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Built (#2333) — live check |
 | TD-1007 | Gemini CLI's layer wakes a session at a background command's end, and its hook refuses an unattended foreground CI watch | Low | Built (#2343) — live check |
+| TD-1009 | ShiftLead requires dev-cadence, and the person's briefs, start prompts and preferences live in their dev-cadence layer repo | Medium | Proposed — ADR 2026-10-25, for Paul's decision |
 
 ---
 
@@ -1671,3 +1672,22 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 - A live check, once live: with the layer reinstalled, an unattended Gemini session's `gh pr checks <n> --watch` with `is_background: true` ends its turn. The watch's end then starts a new turn (`BeforeAgent`, its prompt the steering wrapper, the record `working`) without a prompt typed. An `ao send` to a working Gemini session steers its turn.
 
 **Related:** TD-999 (its design), TD-991 / TD-992 (the wait guard in Claude Code), TD-785 (the kill guard in Gemini CLI), TD-871 (the machine's layer).
+
+## TD-1009: ShiftLead requires dev-cadence, and the person's briefs, start prompts and preferences live in their dev-cadence layer repo
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-25 (Paul, in the TD-993 conversation; drafted by ao-shiftlead-prompts)
+**Owner:** paul
+**Kind:** decision
+**Status:** Proposed — [ADR 2026-10-25](decisions/2026-10-25-shiftlead-requires-dev-cadence.md), with its dev-cadence companion (dev-cadence TD-129, *pinned, not synced*). The builds are filed once Paul decides.
+**Blocked by:** decision (paul) — the ADR's question: require dev-cadence in every served repo, and keep the person's ShiftLead texts in a `shiftlead/` directory of their layer repo
+**Location:** `docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md`; design §8 (*recommends dev-cadence and requires only a ledger*), §5 (*The layout slots*), §4.7 (`ao repo init`), §4.8 (brief supplements), §4.9b (TD-657's preference layers); `src/shiftlead/repoconfig.py` (`entry_text`, `layout`), `src/sessionorc/cadence.py`, `src/sessionorc/sync.py`
+
+**Why:** Paul, 2026-10-25, after TD-993 made the start context visible: *as soon as users can see it they will want the ability to modify it*; then *we talked previously about letting someone use a different cadence mechanism (other than dev-cadence) but I wonder if that is needless complication, especially given that we are building personal prefs into dev-cadence now*. ShiftLead keeps a path for a repo without dev-cadence that no repo uses, and has no home of the person's own for its briefs and start prompts (`entry.md` and `work.md` cannot be changed at all), while dev-cadence's personal layer (its TD-126) already follows the person across repos and machines.
+
+**Fix:** Paul decides the ADR. If decided: the design sections above change first, then one build entry each for the adopt-or-refuse in `ao repo add`, the removed fallbacks and `ao repo init`, the `shiftlead/` layer reader with the brief, entry and work additions, TD-657's preferences moved before TD-662 builds, and the Session card row's sources (with TD-993).
+
+**Done when** the ADR's Status reads decided (or rejected) and, if decided, its build entries are filed.
+
+**Related:** TD-993, TD-657, TD-662, TD-681, TD-588; dev-cadence TD-126, TD-128, TD-129; ADR 2026-10-12, ADR 2026-10-08.
