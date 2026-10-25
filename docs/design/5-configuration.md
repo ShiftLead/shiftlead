@@ -243,9 +243,14 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   dev-cadence (no docs/cadence-sync.lock)*, *unserved: no gate (no scripts/check_cadence.py)*,
   *unserved: no ledger at docs/technical_debt.md*, *unserved: the ledger at docs/technical_debt.md does
   not parse — <the reader's reason>*, *unserved: dev-cadence at <commit> is older than this build reads
-  (<oldest>)* — and the home runs nothing of it: no gate, sync or promote pass, no lane, no write-back,
-  no settle. `ao team start` refuses a team of an unserved repo, naming the lack, and the tick stops
-  nothing already running there but says so on the Repo page. A plain session in its directory starts
+  (<oldest>) — sync it* — and the home runs nothing of it but **the two passes that make it served**:
+  *Pull* (§6), which fast-forwards the checkout once an adoption or a sync has merged, and, for a repo
+  whose one lack is an older tree, *Sync* (§6), whose gate is there. No gate run of any other PR, no
+  promote, no lane, no write-back, no settle. `ao team start` refuses a team of an unserved repo,
+  naming the lack. A team already running there is not stopped (a stop is the person's): its lanes read
+  empty, each member's `ao repo` and lane note say *unserved: <the lack>*, so each declares out of
+  work as on any empty lane, and the person gets one `system` note when a served repo turns unserved,
+  *<repo> is unserved: <the lack> — team <t> has no lane until it is cured*. A plain session in its directory starts
   as in any directory (New session takes a path). No reader degrades silently and no slot has a
   sentence for dev-cadence's absence. An external tracker is mapped *into* the ledger by an importer,
   never read in its place. The rest are keys of this file, each with a default:
@@ -274,7 +279,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     absent, nothing runs and the Repo page says *no worktree setup* (TD-589). A setup that fails
     leaves the worktree and fails the create with its own words.
   - **`ledger:`** carries, beside the ledger, the `{ledger_check}` the briefs name: `python3
-    scripts/ledger.py --check`, dev-cadence's.
+    scripts/ledger.py --check`, dev-cadence's, which every tree at or after `OLDEST` ships.
   **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (the gate,
   `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as `<n>` after the rest), `{board}`
   (the board's path, whether or not the file is there: a missing board is the Repo page's warning,

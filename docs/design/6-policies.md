@@ -1300,7 +1300,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   pulls, and the promote's precondition (1) fails on any checkout no one has pulled since the merge,
   so the home's tick pulls them. It runs **at the home** (§4.4a), in the promote's pass and on its
   cadence (five minutes, the full readings, detached from the tick as the `gh` reads are), over
-  **every checkout in the home's registry**, `promote:` block or not — one `git fetch origin
+  **every checkout in the home's registry**, `promote:` block or not, served or not (§5 *The seams*: the pull is how an adoption or a sync lands in an unserved repo) — one `git fetch origin
   <default>` per repo per pass (the promote's own fetch where the repo has one, never a second),
   then `git merge --ff-only origin/<default>` when two things hold. **(1) Git allows**: the checkout
   is on its default branch (`origin/HEAD`'s); no merge, rebase, cherry-pick or index lock is under
@@ -1359,8 +1359,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   order follows at once (§4.4). A branch name alone vouches for nothing. It declines three kinds:
   - a forked PR: *forked*;
   - another login's: *author <login> is not the home's*;
-  - none in an **unserved** repo (§5 *The seams*): no pass runs there at all, and its PRs are the
-    person's, as an adoption PR is (§4.7 `ao repo add`).
+  - none in an **unserved** repo (§5 *The seams*) but one whose one lack is a tree older than
+    `OLDEST`, since the sync is its cure; any other unserved repo's PRs are the person's, as an
+    adoption PR is (§4.7 `ao repo add`).
 
   Each head is checked once:
   1. **The files are dev-cadence's.** The head lock's `source:` must equal the merge base's lock's,
