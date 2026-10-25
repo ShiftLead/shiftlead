@@ -86,7 +86,7 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
      `check_cadence.py`, and a repo's extra check is dev-cadence's precheck (cadence §4.12). The slots'
      absent-seam sentences for `{gate}`, `{board}`, `{ledger_check}` and `{cadence_rules}` go; §5's *a repo
      without dev-cadence is a repo like any other* and *a repo with a board needs no dev-cadence* go.
-   - A refusal, naming the sync, is kept for what ShiftLead cannot supply itself: no pin (or lock), no
+   - A refusal, naming the adopt (today the sync), is kept for what ShiftLead cannot supply itself: no pin (or lock), no
      gate, no ledger. The SessionStart line is not among them — ShiftLead's launch already carries it for
      every session it starts (`CADENCE_HOOK_LINE`) — so a repo whose own settings lack it gets a Repo-page
      warning at most.
@@ -94,7 +94,7 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
    - **Kept:** the slots for the repo's own commands (`{test}`, `{lint}`, `worktree_setup:`) and their
      sentences — they are the repo's, not the cadence's; the three layers; ledgerboard as the formats' one
      home; ADR 2026-10-08's rule that a dev-cadence file never calls `ao`.
-3. **How ShiftLead's readers find dev-cadence's code.** Today about nine readers each read a path in the
+3. **How ShiftLead's readers find dev-cadence's code.** Today several readers each read a path in the
    checkout. While the copy stands they keep doing so. Under the companion plan every one asks **one
    resolver** for **the command to run** — its argv and environment, `CADENCE_REPO_ROOT` included — so no
    reader sets that up itself. The resolver calls the launcher, which is a dependency of ShiftLead's install
@@ -108,7 +108,8 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
    ShiftLead reads, which cadence §7's parity table names, change only additively, and a breaking change
    waits for a ShiftLead release that reads it, with its `cadence-changes.md` entry saying so.
 5. **TD-681 is replaced, not trimmed.** Under the companion plan there is no lock and no copied file to
-   replay. The home's check of a bump proves the PR changes only the pin lines of `docs/cadence.toml`, that
+   replay. The home's check of a bump proves the PR changes only the pin lines of `docs/cadence.toml` (the plan's
+   *Decision* 1: the `ref` line and its tag comment), that
    `ref` is a full commit on the unchanged source's default branch, and that it descends from the old pin;
    it merges only on review evidence whose reviewer read the compare (the plan's *Decision* 7). A bump that
    changes `source` or anything else in the repo is refused by name as not routine, and is the person's to
@@ -132,8 +133,10 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
    §4.9b's floor (*Always ask me*, the Never list) stays the person's. With no layer set, ShiftLead uses the
    package's texts alone and points at dev-cadence's setup step; it writes nothing to `~/.shiftlead/` in its
    place. ShiftLead reads the `shiftlead/`
-   files itself; dev-cadence documents only that a tool may keep a directory of its own in a layer repo,
-   and never reads it (its publish check, which reads every tracked file, covers it too).
+   files itself; dev-cadence adds what that needs and no more — a `--json` listing of
+   each layer's repo root and kind (one's own, or followed at a pin), since ShiftLead cannot import the
+   reader from a pinned tree, and one line saying a tool may keep a directory of its own in a layer repo,
+   which dev-cadence never reads (a TD-126 slice, filed in dev-cadence when Q2 is decided) (its publish check, which reads every tracked file, covers it too).
    `~/.shiftlead/` keeps what belongs to this install (`org.yml`, `profiles.yml`, `settings.yml`).
 8. **Additions, never replacements, in one order.** The texts are joined in this order — the package's,
    then the person's layer, then the repo's (`.shiftlead.yml`, a definition's `brief:`) — and the session is
@@ -167,7 +170,8 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
   change: (Q1) the adoption offer in `ao repo add`; the refusals in place of the fallbacks, with the seams,
   sentences and `ao repo init` removed; the one resolver and the readers moved onto it (with the
   companion plan's build); the oldest-commit check; TD-681's replacement; the ledgerboard header check;
-  (Q2) the `shiftlead/` layer reader and the brief, entry and work additions; TD-657's preferences moved
+  (Q2) dev-cadence's `--json` listing of layer roots; the `shiftlead/` layer reader and the brief, entry
+  and work additions; the home's commits into the layer clone (Q2b, with TD-663); TD-657's preferences moved
   before TD-662; the Session card row's sources (with TD-993).
 - Out of bounds once decided: a repo served without dev-cadence (Q1), and a second home for the person's
   ShiftLead texts (Q2).
@@ -193,3 +197,7 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
   ShiftLead cannot supply (the SessionStart line is a warning); nodes get their trees from the home and read
   no layer; the newer-pin side is dev-cadence's additive promise; the precedence wording (joined in order,
   the later winning, nothing replaced); the readers' list and the parity mechanics left to the build.
+- **Round 3 (Sonnet, 2026-10-25): NOT READY — no BLOCK; 2 FIX and 2 NOTE here, all adopted.** *The pin
+  lines* as the plan defines them; the ledger entry's Fix lists every build named here; dev-cadence's
+  `--json` listing of layer roots named as the one interface Q2 needs from it; *naming the adopt*; *several
+  readers*.
