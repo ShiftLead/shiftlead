@@ -239,7 +239,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
 
   A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
-  say which, in fixed words that name the cure — `ao repo add <path> --adopt` (§4.7) for a missing tree, gate or ledger, the sync (today `sync.sh`, under dev-cadence TD-129 a bump PR) for a tree older than this build reads — *unserved: no
+  say which, in fixed words that name the cure — `ao repo add <path> --adopt` (§4.7) for a missing tree, gate or ledger (a ledger that is there and does not parse names its reader's reason instead), the sync (today `sync.sh`, under dev-cadence TD-129 a bump PR) for a tree older than this build reads — *unserved: no
   dev-cadence (no docs/cadence-sync.lock)*, *unserved: no gate (no scripts/check_cadence.py)*,
   *unserved: no ledger at docs/technical_debt.md*, *unserved: the ledger at docs/technical_debt.md does
   not parse — <the reader's reason>*, *unserved: dev-cadence at <commit> is older than this build reads
