@@ -407,6 +407,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     LEDGER_LISTS,  # noqa: F401
     LOCAL_ID,  # noqa: F401
     PRIORITY_RANK,  # noqa: F401
+    _parts,  # noqa: F401
     _stopped,  # noqa: F401
     _tid,  # noqa: F401
     compact_in,  # noqa: F401

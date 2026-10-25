@@ -4,9 +4,9 @@ status per row — so the home runs it on every `done` a supervised member repor
 what it read on the record's `checks`, and tells the member in fixed words. Nothing here is typed
 by a session, and the words name the script's `rule` field, never its `detail`.
 
-The gate is the repo's `gate:` (§5 *The seams*, TD-586): a configured command is judged by its exit
-code alone; the script above is only its default, where the checkout holds it; a repo with neither
-has no gate, and its PRs are recorded as *no gate: a person merges* in place of a verdict.
+The gate is dev-cadence's script (§5 *The seams*, TD-1011): there is no `gate:` key, and in
+dev-cadence's own source it is the script under `files/`. A checkout without it has no gate and is
+unserved (§5): the home runs nothing there and writes nothing on the record.
 
 The two reads (`head`, `check`) shell out and are called in a thread; the rest is pure."""
 
@@ -17,40 +17,36 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-import yaml
-
-from sessionorc import naming, paths
+from sessionorc import naming
 from sessionorc.models import PERSON, Session
 
 SCRIPT = "scripts/check_cadence.py"
 VERDICTS = ("pass", "fail", "unknown")
+SOURCE_SCRIPT = f"files/{SCRIPT}"
 DEFAULT_GATE = f"python3 {SCRIPT} --pr {{pr}} --json"
-NO_GATE = "no gate: a person merges"
-# the entry a repo with no gate leaves (§6 rule 10): not a verdict of the script's, and no row, line or clause
-NONE = {"verdict": "none", "failed": []}
+SOURCE_GATE = f"python3 {SOURCE_SCRIPT} --pr {{pr}} --json"
+
+
+def is_source(root: Path | str) -> bool:
+    """Whether `root` is dev-cadence's own source (§5 *The seams*): a root holding `sync.sh` and `files/`,
+    which carries no lock and whose every dev-cadence path is under `files/`."""
+    return (Path(root) / "sync.sh").is_file() and (Path(root) / "files").is_dir()
 
 
 def has_script(root: Path | str) -> bool:
-    """Whether `root` is a checkout the home can see that carries the script: a repo not on
-    dev-cadence, or a path that is not a directory here, gives no reading."""
-    return (Path(root) / SCRIPT).is_file()
+    """Whether `root` is a checkout the home can see that carries the script (under `files/` in
+    dev-cadence's source): a repo not on dev-cadence, or a path that is not a directory here, gives no
+    reading."""
+    return (Path(root) / (SOURCE_SCRIPT if is_source(root) else SCRIPT)).is_file()
 
 
-def gate(root: Path | str) -> tuple[str, str | None]:
-    """The checkout's merge gate (§5 *The seams*, TD-586): `("set", command)` for its `.shiftlead.yml`
-    `gate:`, `("defaulted", DEFAULT_GATE)` when the key is unset and the checkout holds the script,
-    `("absent", None)` otherwise. A file that cannot be read, or a key that is not a non-empty
-    string, is the key unset: the clients (`shiftlead.repoconfig`) refuse such a file by name."""
-    try:
-        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
-        doc = None
-    got = doc.get("gate") if isinstance(doc, dict) else None
-    if isinstance(got, str) and got.strip():
-        return "set", got.strip()
-    if has_script(root):
-        return "defaulted", DEFAULT_GATE
-    return "absent", None
+def gate(root: Path | str) -> str | None:
+    """The checkout's merge gate (§5 *The seams*, TD-1011): dev-cadence's script, `SOURCE_GATE` in
+    its source and `DEFAULT_GATE` elsewhere, when the checkout holds it; None otherwise — the repo is
+    then unserved. No key is read."""
+    if not has_script(root):
+        return None
+    return SOURCE_GATE if is_source(root) else DEFAULT_GATE
 
 
 STATES = ("open", "merged", "closed")
@@ -102,17 +98,14 @@ def settled(old: dict[str, Any] | None) -> bool:
 
 def check(root: Path | str, pr: int, timeout: float = 120.0) -> dict[str, Any] | None:
     """One run of the repo's gate on one PR in `root`: `{verdict, failed}`, or None for **no
-    reading** — no gate, or a run that could not be made. A configured `gate:` is `run`; the default
-    is the script: `failed` the `rule` of each row whose status is `fail`, in the script's order, and
-    no reading for an exit of 2 (no such PR) or output that is not the script's."""
-    kind, command = gate(root)
-    if kind == "set" and command:
-        return run(root, command, pr, timeout)
-    if kind != "defaulted":
+    reading** — no gate, or a run that could not be made. `failed` is the `rule` of each row whose
+    status is `fail`, in the script's order, and there is no reading for an exit of 2 (no such PR) or
+    output that is not the script's."""
+    if not has_script(root):
         return None
     try:
         cp = subprocess.run(
-            ["python3", SCRIPT, "--pr", str(pr), "--json"],
+            ["python3", SOURCE_SCRIPT if is_source(root) else SCRIPT, "--pr", str(pr), "--json"],
             capture_output=True, text=True, timeout=timeout, cwd=str(root),
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired):
@@ -120,20 +113,6 @@ def check(root: Path | str, pr: int, timeout: float = 120.0) -> dict[str, Any] |
     if cp.returncode == 2:
         return None
     return parse(cp.stdout, pr)
-
-
-def run(root: Path | str, command: str, pr: int, timeout: float = 120.0) -> dict[str, Any] | None:
-    """A configured gate, `{pr}` filled, run by the shell in `root` and judged by its exit code
-    alone: 0 is `pass`, anything else `fail` with one row, *gate: <the command> exited <n>*. None for
-    a run that could not be made or did not end inside `timeout`."""
-    filled = command.replace("{pr}", str(pr))
-    try:
-        cp = subprocess.run(["sh", "-c", filled], capture_output=True, text=True, timeout=timeout, cwd=str(root))
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    if cp.returncode == 0:
-        return {"verdict": "pass", "failed": []}
-    return {"verdict": "fail", "failed": [f"gate: {filled} exited {cp.returncode}"]}
 
 
 def parse(text: str, pr: int) -> dict[str, Any] | None:
@@ -168,8 +147,7 @@ def record(
     once it is closed unmerged), and
     the marks. **`pass`** removes `row` and `told`. **`fail`** on a merged PR — which no re-report
     cures — or read again after the member was told (`told`, whatever was read in between but a
-    pass) sets `row`, the Inbox row's mark. **`unknown`** tells nothing and changes no mark. A
-    repo's **no gate** (`NONE`) takes the marks away as a pass does: nothing failed.
+    pass) sets `row`, the Inbox row's mark. **`unknown`** tells nothing and changes no mark.
     `read_by` is carried."""
     new: dict[str, Any] = {"pr": pr, "at": at, "sha": sha, "verdict": got["verdict"], "failed": list(got["failed"])}
     if merged:
@@ -179,7 +157,7 @@ def record(
     for key in ("told", "row", "read_by"):
         if old and old.get(key):
             new[key] = old[key]
-    if got["verdict"] in ("pass", NONE["verdict"]):
+    if got["verdict"] == "pass":
         new.pop("row", None)
         new.pop("told", None)  # a fail after a pass is a first fail again, and told anew
     elif got["verdict"] == "fail" and (merged or new.get("told")):
@@ -246,9 +224,8 @@ def _bare(address: str) -> str:
 
 
 def said(c: dict[str, Any]) -> str:
-    """One check as `ao status -v` prints it: *#842 fail: review, ledger · review recorded*, and
-    *#842 no gate: a person merges* in place of a verdict for a repo with none."""
-    text = f"#{c.get('pr')} {NO_GATE if c.get('verdict') == NONE['verdict'] else c.get('verdict')}"
+    """One check as `ao status -v` prints it: *#842 fail: review, ledger · review recorded*."""
+    text = f"#{c.get('pr')} {c.get('verdict')}"
     if c.get("verdict") == "fail":
         text += f": {_what(c)}"
     who = c.get("read_by")

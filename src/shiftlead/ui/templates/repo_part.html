@@ -46,9 +46,9 @@
    repo by stage — For you, one column per worker stage of the servicing teams' flows, Review, Merged — under
    the Technical debt heading as it was. An entry is edited in its file. #}
 <section class="rsec" id="debt">
-  {#- a ledger that is not there, or does not parse, is one warning line in place of the ledger's part: its
-     heading and its columns (§4.5a *Repo page: missing seams*); Review and Merged stand #}
-  {% if seams and seams.ledger %}<div class="warn" id="noledger">{{ seams.ledger.text }}{% if seams.ledger.cure %} <code>{{ seams.ledger.cure }}</code>{% endif %}</div>
+  {#- an unserved repo (§5 *The seams*, TD-1011) is one warning line per lack, with its cure, in place of the
+     ledger's part: its heading and its columns (§4.5a *Repo page: missing seams*); Review and Merged stand #}
+  {% if seams and seams.unserved %}<div class="warn" id="unserved">{% for parts in seams.unserved %}<div class="unservedline">{% for text, code in parts %}{% if code %}<code>{{ text }}</code>{% else %}{{ text }}{% endif %}{% endfor %}</div>{% endfor %}</div>
   {% else %}
   <div class="row gap rsh"><span class="h2">Technical debt</span>
     <span class="meta">{% for l in lists %}{{ l.rows | length }} {{ l.label }}{{ ' · ' if not loop.last }}{% endfor %}</span>
@@ -65,7 +65,7 @@
   <div class="qwhy meta" id="qwhy" hidden></div>
   {% endif %}
   <div class="board" id="board" data-scope="{{ name }}" style="--bcols: {{ bd.stages | length + 3 }}">
-    {% if not (seams and seams.ledger) %}
+    {% if not (seams and seams.unserved) %}
     {% call col(bd.foryou) %}{% if bd.fold %}<details class="bfold"><summary class="meta">no lane takes these ({{ bd.fold | length }})</summary>{% for r, words in bd.fold %}{% if r.work_order %}{{ order_row(dict(r, repo_name=name), 'fold', false) }}{% else %}{{ qrow(r, name) }}{% endif %}{% if words and not r.ext.flag %}<div class="meta bflag">{{ words }}</div>{% endif %}{% endfor %}</details>{% endif %}{% endcall %}
     {% for c in bd.stages %}{{ col(c) }}{% endfor %}
     {% endif %}

@@ -59,6 +59,10 @@ class Adapter(Protocol):
     #                                                      permission, added by the adapter's own `launch`
     #                                                      under `permission_prompts: all` (§4.2a, TD-823);
     #                                                      unset, nothing is added
+    #   cadence_hook_line: str                            the SessionStart command the adapter's launch carries
+    #                                                      for dev-cadence (design §5 *The seams*): a repo whose
+    #                                                      `.claude/settings.json` lacks it is warned on the Repo
+    #                                                      page and in `ao doctor`; unset, the adapter has none
     #   agent: bool                                       False when what is typed at it is no prompt an agent
     #                                                      runs a turn on — `shell` and `command`; True where
     #                                                      unset. Read through `has_agent`, never an adapter's

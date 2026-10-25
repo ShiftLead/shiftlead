@@ -91,40 +91,26 @@ def test_no_script_is_no_reading(tmp_path):
     assert not cadence.has_script(tmp_path / "not-here")
 
 
-def test_the_gate_is_the_repos_key_the_script_its_default(tmp_path):
-    """TD-586, §5 *The seams* `gate:`: set, defaulted to the script, or absent — an unreadable file
-    or a key that is no command is the key unset."""
-    assert cadence.gate(tmp_path) == ("absent", None) and cadence.gate(tmp_path / "not-here") == ("absent", None)
+def test_the_gate_is_the_script_and_no_key_and_under_files_in_dev_cadences_source(tmp_path):
+    """TD-1011, §5 *The seams*: the gate is dev-cadence's script where the checkout holds it, None
+    otherwise; a `gate:` key is read by nothing; dev-cadence's own source runs the one under `files/`."""
+    assert cadence.gate(tmp_path) is None and cadence.gate(tmp_path / "not-here") is None
+    (tmp_path / ".shiftlead.yml").write_text("gate: 'true'\n")
+    assert cadence.gate(tmp_path) is None and cadence.check(tmp_path, 1) is None, "a gate: key is no gate"
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts" / "check_cadence.py").write_text("# here\n")
-    assert cadence.gate(tmp_path) == ("defaulted", "python3 scripts/check_cadence.py --pr {pr} --json")
-    for text in ("gate: ''\n", "gate: [a, b]\n", "gate: [\n", "- a list\n"):
-        (tmp_path / ".shiftlead.yml").write_text(text)
-        assert cadence.gate(tmp_path)[0] == "defaulted", text
-    (tmp_path / ".shiftlead.yml").write_text("gate: ' make gate PR={pr} '\n")
-    assert cadence.gate(tmp_path) == ("set", "make gate PR={pr}")
-
-
-def test_a_configured_gate_is_judged_by_its_exit_code_alone(tmp_path):
-    (tmp_path / "scripts").mkdir()
-    (tmp_path / "scripts" / "check_cadence.py").write_text("raise SystemExit('the default is never run')\n")
-    (tmp_path / ".shiftlead.yml").write_text('gate: "test {pr} = 842 && echo not read"\n')
-    assert cadence.check(tmp_path, 842) == {"verdict": "pass", "failed": []}
-    assert cadence.check(tmp_path, 7) == {"verdict": "fail", "failed": ["gate: test 7 = 842 && echo not read exited 1"]}
-    (tmp_path / ".shiftlead.yml").write_text('gate: "pwd > where; exit 3"\n')
-    assert cadence.check(tmp_path, 1) == {"verdict": "fail", "failed": ["gate: pwd > where; exit 3 exited 3"]}
-    assert (tmp_path / "where").read_text().strip() == str(tmp_path), "run in the checkout"
-    assert cadence.run(tmp_path, "sleep 5", 1, timeout=0.2) is None, "a run that does not end is no reading"
-
-
-def test_no_gate_is_said_in_place_of_a_verdict():
-    none = cadence.record(None, 842, "", False, cadence.NONE, "t1")
-    assert none == {"pr": 842, "at": "t1", "sha": "", "verdict": "none", "failed": []}
-    assert not cadence.untold(none) and cadence.rows([none]) == [] and cadence.clause([none]) == ""
-    assert cadence.said(none) == "#842 no gate: a person merges · review recorded"
-    marked = {**cadence.record(None, 843, "aaa", True, FAIL, "t1"), "told": "t1"}
-    dropped = cadence.record(marked, 843, "aaa", True, cadence.NONE, "t2")
-    assert "row" not in dropped and "told" not in dropped and cadence.rows([dropped]) == [], "a gate dropped: no row"
+    assert cadence.gate(tmp_path) == "python3 scripts/check_cadence.py --pr {pr} --json"
+    src = tmp_path / "dev-cadence"
+    (src / "files" / "scripts").mkdir(parents=True)
+    (src / "sync.sh").write_text("#!/bin/sh\n")
+    (src / "scripts").mkdir()
+    (src / "scripts" / "check_cadence.py").write_text("# not the source's\n")
+    assert cadence.is_source(src) and cadence.gate(src) is None, "the source's gate is under files/ alone"
+    (src / "files" / "scripts" / "check_cadence.py").write_text(
+        "import json, sys\nprint(json.dumps({'prs': [{'pr': int(sys.argv[2]), 'verdict': 'pass', 'rows': []}]}))\n"
+    )
+    assert cadence.gate(src) == "python3 files/scripts/check_cadence.py --pr {pr} --json"
+    assert cadence.check(src, 7) == {"verdict": "pass", "failed": []}, "run from files/ in the source"
 
 
 # ── the tick ────────────────────────────────────────────────────────────────────────────────────
@@ -288,8 +274,9 @@ async def test_a_merged_fail_marks_the_row_at_once_and_one_pr_is_read_a_run(
 
 @pytest.mark.integration
 async def test_who_is_read_and_who_is_told(agent, composerstubs, tmp_path, monkeypatch):
-    """No registry root, a seat, an unsupervised session: no reading. No gate: nothing run, *no
-    gate* recorded (TD-586). A working member and an attended one are told by the clause alone."""
+    """No registry root, a seat, an unsupervised session: no reading. No gate (an unserved repo,
+    TD-1011): nothing run, nothing written. A working member and an attended one are told by the
+    clause alone."""
     await park_ticks(agent)
     gh, now = _Gh(monkeypatch), datetime.now(UTC)
     root = _root(agent, tmp_path)
@@ -313,7 +300,6 @@ async def test_who_is_read_and_who_is_told(agent, composerstubs, tmp_path, monke
         for _ in range(3):
             await agent._cadence_pass(list(recs.values()))
         assert gh.ran == [] and gh.asked == []
-        assert [c["verdict"] for c in recs.pop("noscript").checks] == ["none"]
         assert all(r.checks == [] for r in recs.values())
 
         working = await _member(agent, person, tmp_path, root, name="working")
@@ -499,11 +485,11 @@ async def test_a_closed_pr_settles_and_an_open_ones_head_comes_from_the_repo_rea
 
 
 @pytest.mark.integration
-async def test_a_repo_with_no_gate_is_recorded_once_and_read_when_it_gains_one(
+async def test_a_repo_with_no_gate_is_unserved_nothing_written_and_read_when_it_gains_one(
     agent, composerstubs, tmp_path, monkeypatch
 ):
-    """TD-586, §6 rule 10: no `gate:` and no script — nothing is run or asked of `gh`, the PR is
-    recorded once as *no gate: a person merges*, and nobody is told. A gate the repo gains reads it."""
+    """TD-1011, §6 rule 10: no script — the repo is unserved, nothing is run or asked of `gh`, nothing
+    written on the record and nobody told. The script the repo gains reads it."""
     await park_ticks(agent)
     gh, root, now = _Gh(monkeypatch), _root(agent, tmp_path, script=False), datetime.now(UTC)
     async with LocalClient() as person:
@@ -511,18 +497,12 @@ async def test_a_repo_with_no_gate_is_recorded_once_and_read_when_it_gains_one(
         await agent.rpc_hook(rec.id, state="idle")
         _done(rec, "TD-257", 842)
         _done(rec, "TD-258", 843)
-        await agent._cadence_pass([rec])
-        assert [c["pr"] for c in rec.checks] == [842], "one PR per run"
-        await agent._cadence_pass([rec])
-        await agent._cadence_pass([rec])
-        assert {c["pr"]: c["verdict"] for c in rec.checks} == {842: "none", 843: "none"}
-        assert gh.ran == [] and gh.asked == []
-        at = {c["pr"]: c["at"] for c in rec.checks}
-        await agent._cadence_pass([rec])
-        assert {c["pr"]: c["at"] for c in rec.checks} == at, "recorded once"
+        for _ in range(3):
+            await agent._cadence_pass([rec])
+        assert rec.checks == [] and gh.ran == [] and gh.asked == []
         await agent._keep_running(now)
-        assert await _submitted(agent, rec.id) == [] and not any(c.get("told") for c in rec.checks)
-        (tmp_path / "repo" / ".shiftlead.yml").write_text("gate: 'true'\n")
+        assert await _submitted(agent, rec.id) == []
+        (tmp_path / "repo" / "scripts" / "check_cadence.py").write_text("# the stub stands in for it\n")
         gh.heads, gh.verdicts = {842: ("aaa", "open"), 843: ("bbb", "open")}, {842: PASS, 843: FAIL}
         await agent._cadence_pass([rec])
         await agent._cadence_pass([rec])

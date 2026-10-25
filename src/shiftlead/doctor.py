@@ -13,7 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import containers, ledgerboard
+from sessionorc import adapters, containers
+from sessionorc import seams as seams_mod
 from sessionorc.models import TOLD
 
 CHECKS = ("agent", "tmux", "hooks", "identity", "profiles", "nodes", "org", "repos", "route")
@@ -371,21 +372,39 @@ def org(
     return out or [_row("org", OK, f"org — {teams} team{'' if teams == 1 else 's'}")]
 
 
-# each seam's fixed sentence when the repo leaves it unset with no default file (design §5 *The seams*,
-# §4.5a *Repo page: missing seams*): the Repo page and the **repos** line say the same words
-SEAM_WORDS = {
-    "gate": "no gate: a person merges",
-    "board": "no board: the Inbox is the person's channel",
-    "worktree_setup": "no worktree setup",
-}
+NO_SESSION_START = "no SessionStart line: a session started outside ShiftLead misses the cadence's nudge"
+
+
+def _hook_lines(source: bool) -> set[str]:
+    """Each adapter's SessionStart line for dev-cadence (`cadence_hook_line`), its runner under `files/`
+    in dev-cadence's own source (§5 *The seams*)."""
+    lines = {getattr(adapters.get(n), "cadence_hook_line", None) for n in adapters.names()}
+    out = {x for x in lines if isinstance(x, str) and x}
+    return {x.replace("/scripts/cadence_hooks.sh", "/files/scripts/cadence_hooks.sh") for x in out} if source else out
+
+
+def lacks(seams: dict[str, Any] | None, root: Any = "") -> list[str]:
+    """The words of each lack that leaves the repo unserved (§5 *The seams*), as the reading names them;
+    none for a reading not taken yet, and only the ledger's for one an older host agent took, with no
+    `serve` (the reason is `sessionorc.seams.ledger_lack`'s)."""
+    seams = seams or {}
+    if "serve" not in seams:
+        lack = seams_mod.ledger_lack(seams.get("ledger"), root) if seams.get("ledger") else None
+        return [lack] if lack else []
+    return [str(x.get("words")) for x in seams["serve"].get("lacks") or [] if isinstance(x, dict) and x.get("words")]
 
 
 def missing_seams(seams: dict[str, Any] | None) -> list[str]:
-    """The fixed sentence of each seam the reading says is *absent*, in the page's order (gate, board,
-    worktree setup), then the ledgerboard warning (`ledgerboard_warning`); nothing for one set or
-    defaulted, or for a reading not taken yet."""
-    seams = seams or {}
-    out = [words for key, words in SEAM_WORDS.items() if (seams.get(key) or {}).get("state") == "absent"]
+    """The warnings of a repo's reading, one sentence each (§4.5a *Repo page: missing seams*): the host
+    agent's own, *no SessionStart line* when the checkout's SessionStart commands hold no adapter's line,
+    then the ledgerboard warning (`ledgerboard_warning`); nothing for a reading not taken yet."""
+    if not isinstance(seams, dict):
+        return []
+    out = [str(w) for w in seams.get("warnings") or []]
+    if "session_start" in seams:
+        hooks = _hook_lines(bool(seams.get("source")))
+        if hooks and not hooks & set(seams.get("session_start") or []):
+            out.append(NO_SESSION_START)
     lbw = ledgerboard_warning(seams.get("ledgerboard"))
     return [*out, lbw] if lbw else out
 
@@ -404,33 +423,10 @@ def ledgerboard_warning(lbr: dict[str, Any] | None) -> str | None:
     return None
 
 
-def ledger_lack(led: dict[str, Any] | None) -> str | None:
-    """What is wrong with the repo's ledger seam, with its cure, or None when it parses: *no ledger at
-    <path> (`ao repo init`)*, *ledger is Ledgerboard 2, this build reads 1 (sync)*, or the reader's
-    reason for a file it could not read."""
-    led = led or {}
-    state, path = led.get("state"), led.get("path") or "the ledger path"
-    if state in (None, "ok"):
-        return None
-    if state == "absent":
-        return f"no ledger at {path} (`ao repo init`)"
-    if state == "newer":
-        return f"ledger is Ledgerboard {led.get('major')}, this build reads {ledgerboard.FORMAT_MAJOR} (sync)"
-    return f"ledger unreadable: {led.get('why') or path}"
-
-
-def _gate_word(command: Any) -> str:
-    """The gate command's script, *check_cadence.py* of `python3 scripts/check_cadence.py --pr {pr}`; its
-    first word when no word of it is a path."""
-    words = str(command or "").split()
-    named = next((w for w in words if "/" in w or w.endswith((".py", ".sh"))), words[0] if words else "")
-    return Path(named).name or "set"
-
-
 def repos(readings: dict[str, Any]) -> list[dict[str, Any]]:
     """One line per registered repo (§4.7 **repos**), from the repo facts' `seams` and nothing read
-    here: a missing or unreadable ledger is a lack, since nothing of the repo can be read without it;
-    an unset seam is a warning naming it, since a repo may mean it."""
+    here: each lack that leaves the repo unserved is a lack, naming its cure (§5 *The seams*, TD-1011);
+    a warning is a warning, since a repo may mean it."""
     out: list[dict[str, Any]] = []
     for r in sorted(readings.values(), key=lambda v: str(v.get("name") or v.get("root") or "")):
         name, seams = r.get("name") or Path(str(r.get("root") or "")).name, r.get("seams")
@@ -438,15 +434,16 @@ def repos(readings: dict[str, Any]) -> list[dict[str, Any]]:
             text = f"repo {name} — seams not read yet"  # the host agent's first pass, or an older build
             out.append(_row("repos", WARNING, text, repo=name, seams=None))
             continue
-        lack, missing = ledger_lack(seams.get("ledger")), missing_seams(seams)
-        if lack:
-            out.append(_row("repos", LACKING, f"repo {name} — {' · '.join([lack, *missing])}", repo=name, seams=seams))
+        unserved, missing = lacks(seams, r.get("root") or name), missing_seams(seams)
+        if unserved:
+            text = f"repo {name} — {' · '.join([*unserved, *missing])}"
+            out.append(_row("repos", LACKING, text, repo=name, seams=seams))
         elif missing:
             out.append(_row("repos", WARNING, f"repo {name} — {' · '.join(missing)}", repo=name, seams=seams))
         else:
             n = (seams.get("ledger") or {}).get("entries")
-            gate = _gate_word((seams.get("gate") or {}).get("value"))
-            text = f"repo {name} — ledger {n} entr{'y' if n == 1 else 'ies'} · board · gate {gate} · worktree setup"
+            entries = f"ledger {n} entr{'y' if n == 1 else 'ies'}"
+            text = f"repo {name} — {entries} · board · gate check_cadence.py · worktree setup"
             out.append(_row("repos", OK, text, repo=name, seams=seams))
     return out or [_row("repos", OK, "repos — none registered")]
 
