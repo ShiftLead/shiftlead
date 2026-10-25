@@ -101,7 +101,9 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
    (the host agent finds it in its own venv, never on a login `PATH`, and it is pinned by the wheel, so a
    rollback of the live copy covers it). A container node has no network path to a private dev-cadence and
    no lasting cache, so the home ships the pinned trees a node needs with the wheel (`ao host up`). A repo
-   whose pin cannot be resolved is refused by name, never skipped.
+   whose pin cannot be resolved is refused by name, never skipped — including a pin that needs a newer
+   launcher interface than ShiftLead's, which a ShiftLead release cures (the breaking change *Decision* 4
+   has dev-cadence wait on).
 4. **Which dev-cadence ShiftLead works with.** ShiftLead names the oldest dev-cadence commit it reads and the
    launcher interface it needs, and refuses an older pin by name (under the copy, the lock's `files_commit`
    is checked the same way). The newer side is dev-cadence's promise: the `--json` shapes and fields
@@ -134,7 +136,8 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
    package's texts alone and points at dev-cadence's setup step; it writes nothing to `~/.shiftlead/` in its
    place. ShiftLead reads the `shiftlead/`
    files itself; dev-cadence adds what that needs and no more — a `--json` listing of
-   each layer's repo root and kind (one's own, or followed at a pin), since ShiftLead cannot import the
+   each layer's repo root and kind (one's own, or followed at a pin, with its `ref`), which the home runs
+   through the resolver under the session's repo, so the reader is that repo's pinned one, since ShiftLead cannot import the
    reader from a pinned tree, and one line saying a tool may keep a directory of its own in a layer repo,
    which dev-cadence never reads (a TD-126 slice, filed in dev-cadence when Q2 is decided) (its publish check, which reads every tracked file, covers it too).
    `~/.shiftlead/` keeps what belongs to this install (`org.yml`, `profiles.yml`, `settings.yml`).
@@ -201,3 +204,7 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
   lines* as the plan defines them; the ledger entry's Fix lists every build named here; dev-cadence's
   `--json` listing of layer roots named as the one interface Q2 needs from it; *naming the adopt*; *several
   readers*.
+- **Round 4 (Fable, 2026-10-25): READY — 2 NOTE, both adopted.** The layer listing run through the resolver
+  under the session's repo and carrying a followed layer's `ref`; a pin needing a newer launcher interface
+  is cured by a ShiftLead release. Sonnet's round 3 had said READY once its fixes were in; the two
+  reviewers agree.
