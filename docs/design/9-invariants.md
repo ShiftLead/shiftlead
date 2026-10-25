@@ -31,8 +31,9 @@
    the badge on each tick, never stored. **One named exception:** the message gate's sideways
    edge admits a session carrying the same `team` badge, and its cross-team edge one carrying the
    same `project` badge (§4.10; TD-582) — for a `manager: person` team the first is the only edge
-   between members, and the second is the only one between teams. It gates mail only; nothing that
-   acts keys on `team` or `project`.
+   between members, and the second is the only one between teams. Its question-seat edge admits an `ask`
+   from anywhere in the org to a record whose `seat` has `trigger: asks` — a field a start writes, as it
+   writes `team`, never a role (TD-995). It gates mail only; nothing that acts keys on `team` or `project`.
    **A flow is not on the record** (§4.9c): the host agent never reads a flow, the record gains
    no flow or stage field, and no rule keys on a flow or on a stage's `name` — a flow compiles,
    at a client, into fields a start already writes (`lane`, `review`, `prompt_from`), and the

@@ -4,7 +4,7 @@ Known issues, compromises, and deferred work. Add an entry any time a problem is
 
 **This file holds open work only.** The summary table below lists exactly the entries that have a body in this file — one row each, no history. When an entry is fully resolved, move the whole body to [`technical_debt_archive.md`](technical_debt_archive.md), delete its summary row, and replace **Fix** with the resolution date plus a pointer to whichever doc/code now carries the lasting content. An entry that is only *partly* resolved stays here, with what shipped and what remains spelled out in its **Status**.
 
-IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never reused. Priority is a field, never part of the ID.
+IDs are `TD-` plus a number zero-padded to three digits (four from TD-1000 on), assigned in order and never reused. Priority is a field, never part of the ID.
 
 Two header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`designer`, `grinder`, `paul`, `dev-cadence`; the anchor seat is retired, design §4.9b *No anchor seat*); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`). Every open entry carries them; keep them true when the Status changes. A third, **Waits**, is written only on an entry that is pickable and still waits on something no `Blocked by:` item names (TD-715, design §4.4 *An entry says what it waits for*): `until <date>` (*`**Waits:** until 2026-10-16 — CI runs on or after 10-16`*) or `event` (*`**Waits:** event — the next cadence-sync PR`*). What waits on the person is `Blocked by: decision (paul) — <what they must do>`, or `Owner: paul`, never a `Waits:` line. **Pickable is derived, never written** (cadence §2.4, TD-228): an entry is pickable while its `**Blocked by:**` names nothing still open and no decision, so what waits on another entry or on a person's word says so there, with its pointer; what nothing blocks and a grinder still cannot build — a live look, an evaluation, the person's edit — is said by its **Kind** or its **Owner**, and the Status says what is next. A `live-check` is followed on its line by its build's last merged PR — `**Kind:** live-check #<n>`, written by the PR that makes the entry a live check — and once that PR is live (`ao promote status`) the check is in a `free-pick` lane whose owner it has (design §4.9b, TD-320); cadence's script reads the word alone. A grinder's pick list is therefore `ao repo` (its pickable entries, a live check whose build is live among them), and `python3 scripts/ledger.py --list --pickable yes --owner grinder --kind build` lists the builds alone; the designer's is `--owner designer --kind design-first`. The line below is the one list of the **Owner** and **Kind** words (cadence §2.12): `scripts/ledger.py` flags a value outside it, and `tests/test_ledger.py` reads its sets from it and checks the two lines' shape, so a new word is added there and nowhere else.
 
@@ -74,10 +74,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Designed — builds TD-989, TD-990 |
 | TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Built (#2320) — the phone look with Paul |
-| TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Open — design first |
+| TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Designed — builds TD-1000, TD-1001 |
 | TD-997 | The Transcript draws a session's start context as its first entry — Paul's to keep or drop | Low | Open — waits on Paul |
 | TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Designed — builds TD-1004, TD-1005 |
 | TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Open — design first: a background shell's end wakes no Gemini session |
+| TD-1000 | A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo | Medium | Open — build |
+| TD-1001 | `ao msg` takes its options anywhere among the addressees and the text | Low | Open — build |
 | TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Built (#2333) — live check |
 
 ---
@@ -1469,7 +1471,8 @@ Verify it as a UI change (TD-290): Playwright with touch emulation at 390 px on 
 **Added:** 2026-10-24 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — reported from one live session; the fix direction is a suggestion, not decided.
+**Blocked by:** TD-1000, TD-1001
+**Status:** Designed 2026-10-24 (the designer, PR #2330): an org-wide `ask` edge to a question seat and its reply, `ao msg --team` / `--repo` resolved at the home from the records, and a session's `ao td add --repo X` for another repo as an `ask` carrying `entry`, not `handed` (design §4.10 *to a question seat*, *A team or a repo as the address*; §4.7). Steered to the techlead as m-33d1a7d42bdf. Built by TD-1000 and TD-1001 (the parser). Reviewed in nine rounds (Fable and Sonnet alternating; Sonnet READY at round 8, Fable's round 9 two follow-ons, adopted; design history §4.10). The steer lapsed to its default 2026-10-25.
 **Location:** design §4.10 *The message gate* (its edges: upward, downward, sideways, *across teams, by project*), §4.1 (a bare name resolves to a session *here*, else *no session named <name> here*), §4.7 *Entries* (`ao td add` is a person's only), §4.9b (the techlead seat, filled on a question), §4.4a (a node forwards mail to the home: `MAILBOX` in `src/sessionorc/modes.py`); `src/sessionorc/mail.py` (the gate), `src/shiftlead/cli.py` (`msg`'s parser: one `words` run of positionals, `nargs="*"`)
 
 **Why:** seen 2026-10-24 by contractmatch's interactive session `ao-contractmatch-cm-queue`, on the contractmatch container node, asked to send samscrape a ledger request. Every way it tried was closed:
@@ -1482,7 +1485,7 @@ So the session printed a command for the person to run on the home, which is the
 
 A smaller problem came up in the same session. `ao msg samscrape --kind note … "text"`, with the options after the addressee, failed with argparse's *unrecognized arguments*. The error scrolled off above the echoed text, so the send read as sent. The parser takes the addressees and the text as one run of positionals, and an option in the middle splits that run (memory *ao msg: options before recipients*; the same failure on 2026-10-01).
 
-**Fix:** design first. These are the reporter's directions, none decided:
+**Fix:** designed (§4.10, §4.7; TD-1000 and TD-1001 build it). The reporter's directions, as the design took them:
 1. **Address a repo or a team:** for example `ao msg --repo samscrape` (or `--team <team>`), delivered to that repo's or team's techlead seat through the home, filling the seat on the question as an `ask` fills it today. The design says whether this is a new edge of the gate and how it squares with *across teams, by project*: does it pass only within a project, or does a seat take questions from anywhere, since a seat acts on nothing and only answers or passes up? It also says what a repo with no techlead seat answers.
 2. **An entry for another repo, asked by a session:** instead of the refusal, `ao td add --repo X` from a session lands as an `ask` to X's techlead seat marked *session-originated*, or as one press for the person to approve. Either way §4.7's *a person's only* changes, and the design says which.
 3. **The parser:** `ao msg` accepts its options anywhere among the positionals (`parse_intermixed_args`, or a check that refuses with the corrected command on the last line). Either way an option after an addressee is no longer a silent-looking failure. This is a build on its own and can be split off when the design settles 1 and 2.
@@ -1550,6 +1553,96 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when** an unattended Gemini session's foreground `gh pr checks <n> --watch` is blocked with `wait_guard.REASON`, and one with `is_background` true, or on an interactive record, is not.
 
 **Related:** TD-992, TD-991, TD-785 (the kill guard in Gemini CLI).
+
+## TD-1000: A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-24 (the designer, from TD-995)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** design §4.10 *An entry handed to a seat* and §4.8's person-only list (the session's call for another repo); `src/sessionorc/mail.py` (`message_edge`, `message_gate`: the kind, the `pr`/`cites`, the thread and the sender's open asks join the call), `src/sessionorc/agent_mail.py` (the `msg` RPC: the gate per addressee after `follow`, the `team`/`repo` address), `src/sessionorc/agent_inbox.py` (`rpc_entry_add`: `person_only` gives way to *a session, for another repo*), `src/shiftlead/cli.py` (`msg`'s `--team` / `--repo`; `td add` from a session, `_td_repo`, `_org_here`; `resolve`'s refusal from `msg`), `src/shiftlead/briefs/techlead.md` (the entry section and who it takes questions from), `src/shiftlead/skill.md` (the mail paragraph and its edge list); design §4.10 *to a question seat*, *A team or a repo as the address*; §4.7 *Mail*, *Entries*; §4.9b *The seat*; §4.1; §9 invariant 9
+
+**Why:** TD-995: on 2026-10-24 contractmatch's session on the contractmatch node, asked to send samscrape a ledger request, found every way closed. `ao msg samscrape` resolved no session. The node could not read the org for an id. The gate would refuse another project anyway. `ao td add --repo` is a person's only. So it printed a command for the person to run.
+
+**Fix:**
+- **The edge.** `message_edge` gains `question seat`, tried after every existing edge:
+  - The target's `seat` has `trigger: asks`, and the message is an `ask` carrying neither `pr` nor `cites`.
+  - The sender has no open `ask` (no `closed_reason`) along this edge to the same seat, the sender's records along its `superseded_by` chain counted as one. The count is read in the target record's inbox (an open `ask` whose `from_` is a record of the chain), since a fill moves the seat's mail to its new record. A second one is refused naming the first; a reply, a lapse or a close frees it.
+  - Its reverse is a `reply` from a record whose own `seat` has `trigger: asks`, whose `reply_to` is an `ask` in the sender's own inbox (however that `ask` came). The target must be that ask's `from_`, or a record its `superseded_by` chain reaches, since `follow` rewrites the addressee before the gate runs.
+  - Both chain walks (this one and the count above) re-address a node record's `superseded_by` with `_from_host` to the `id@host` key `_graph()` uses; `follow` today reads the raw id and misses a node's chain, and is fixed to do the same.
+  - `message_gate` takes what it needs to read this, and its refusal names the new edge.
+- **The address.** `ao msg --team <team>` / `--repo <repo>` (mutually exclusive, and refused beside addressees, the text the only word) sends `team` or `repo` in the RPC's params in place of `to`, and the kind defaults to `ask`. The home resolves it from `_graph()`'s records:
+  - `--team` is the record of that `team` (team names are unique, `org.yml`'s `teams:` keys) whose `seat.trigger` is `asks`, which is not `superseded_by` and whose state is not `closed`. A live one wins over one on call.
+  - `--repo` is every such record whose `Path(repo).name` is the name given, read from the record, no registry needed. One record, or refused naming the teams.
+  - Registries are read only to word *no registered repo <repo>*: the home's `hosts.local_host().repos()` and each node's answer to the home's `repos` request over the mux (as `rpc_host_repos` does); a node that does not answer within its timeout is named as unread, never waited on past it.
+  - The resolved id is the record's `id@host` where it has one. The refusals are §4.10's words.
+  - The sender's own team or repo resolves the same way. An `ask` that passes an earlier edge (sideways, project) has no open-question limit; only an `ask` passing this edge alone is limited.
+  - A team with two `asks` seats resolves to the one whose `seat.tags` is true (the techlead seat); two and none such: refused naming them.
+- **The ledger request.** `rpc_entry_add` accepts a session caller when the repo it names is not the caller's own (own: the resolved seat record's `repo` equals the caller's record's `Session.repo` on the same host; a same-named repo on another host is another repo; a caller whose record has no `repo` counts every repo as another), resolving repo and seat as `--repo` does, from the records (`team` choosing, as `ao td add --team` does; a `team` with no seat record on that repo is refused naming the teams that have one). The session path is tried only for a caller `person_only` would refuse: the person's own shell (`as_person`, TD-801) keeps today's handed entry. It sends the `ask` from the session through `message_gate` (a helper shared with `rpc_msg`, so the open-question limit and `MAILBOX_DEPTH` hold) carrying `entry` and **not** `handed`, with **no bound** (as `agent_inbox.py`'s handed entry has none), so nothing makes the seat owe the person an outcome and the open `ask` keeps an exited seat refilled (`asks_waiting`) until it replies after the merge. For the caller's own repo it refuses as `person_only` does today, its words naming the branch and `ao finding`. A session's call carrying `draft` is refused in words.
+  - `ao td add` from a session with no `--repo` is refused at the client in the same words, reading no registry.
+  - `ao td add` from a session (`SHIFTLEAD_SESSION` set) sends `repo` as typed, and `team` where given, and skips `_td_repo`, `_org_here` and `teams.entry_teams`, which read what a node does not have.
+- **`techlead.md`**:
+  - Its entry section takes an `ask` carrying `entry` from a session too: another repo's session asking for an entry in this repo. The seat judges it, drafts the entry and lands it by PR, or replies why not. The seat replies once the PR is merged, naming it, or with why not; the open `ask` (no bound) is what holds it on call. What only the person can settle goes up with `ao msg --pass-up <id> --recommend "…"`, not the handed entry's `--thread`, which a session's request (not handed) is refused; a pass-up closes the seat's copy (`asked_person`) and the person's answer goes to the asker, so the seat's part ends there and the asker asks again if it still wants the entry.
+  - Its paragraph on whom it takes questions from names a question from another team's or project's session as a question to answer, not an instruction.
+  - Its sentence *except the entry the person hands you* widens to the entry a question asks for.
+- **The hint.** `resolve`'s *no session named <name> here*, raised for `ao msg`, ends *— a team or a repo is addressed with `--team` or `--repo`*.
+- **`skill.md`.** Its edge list gains the question seat. Its mail paragraph names `ao msg --team` / `--repo` for a question to another team or repo, and `ao td add --repo <X>` for another repo's ledger.
+
+**Done when:**
+- `message_gate` tests:
+  - An `ask` from a session of project A to a techlead seat of project B passes.
+  - A second `ask` from the same sender to that seat, the first open, is refused naming it; once the first lapses (or is replied to), a second passes; a resumed sender with its predecessor's ask open is refused; so is a second `--team` ask after the first filled the seat (a new record). A node sender resumed with its predecessor's ask open is refused too, and the seat's reply to that ask reaches the resumed node record (`id@host`).
+  - A `reply` to a cross-project session from a record whose seat is not `asks` is refused, even with `reply_to` an `ask` in its inbox.
+  - A second `ao td add --repo B` from the same session while its first entry request is open is refused naming the first.
+  - The seat's `reply` to a cross-project `ask` that has lapsed still passes and lands on the asker's thread.
+  - An `ask` there carrying `pr` or `cites` is refused, and a `note` and a `steer` there are refused.
+  - The seat's `reply` with `reply_to` that `ask` passes, also after the asker was resumed (`superseded_by`). Its `reply` to a different entry, or to a session that never asked, is refused.
+  - A seat whose trigger is not `asks` is refused an `ask` from another project.
+  - Every existing edge's test still passes.
+- `msg` RPC tests at the home:
+  - `team=` reaches the seat record that is not superseded (on call, so the `ask` fills it).
+  - `repo=` with one seat reaches it, a node's seat under `id@host` included; with two it is refused naming both teams.
+  - An unknown team, a team never started, a team with no question seat and an unregistered repo are each refused in the design's words.
+- `entry_add` tests:
+  - From a session in repo A for repo B, an `ask` from the session to B's seat carrying `entry`, with `handed` false and no bound; the seat's `--reply-to` closes it, and while it is open the seat's `asks_waiting` counts it.
+  - For repo A it is refused naming the branch and `ao finding`; a same-named repo whose seat is on another host is not A. With a `draft` it is refused.
+  - From the person it is unchanged, the person's own shell (`as_person`) included: still a handed entry.
+- CLI tests:
+  - `ao msg --team t "q"` and `ao msg --repo r "q"` send an `ask`.
+  - `ao msg x --team t "q"` is refused.
+  - `ao msg --repo <own repo> "q"` from a team member reaches its own seat.
+  - `ao msg nosuch "x"` ends with the `--team` / `--repo` hint.
+  - `ao td add --repo r "w"` with `SHIFTLEAD_SESSION` set sends `repo: "r"` without reading `org.yml`.
+- A live check on the home, once live: an interactive contractmatch session's `ao msg --repo samscrape "…"` reaches samscrape's techlead seat and fills it, and the seat's reply lands in the session's inbox.
+
+**Related:** TD-995 (its design), TD-1001 (the parser), TD-582 (the project edge), TD-218 / TD-219 (Hand to the techlead), TD-723.
+
+## TD-1001: `ao msg` takes its options anywhere among the addressees and the text
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (the designer, from TD-995)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/cli.py` (`main`, `build_parser`'s `msg` subparser, `cmd_msg`); `tests/test_cli.py`; design §4.7 *Mail*
+
+**Why:** TD-995: `ao msg samscrape --kind note … "text"` failed with argparse's *unrecognized arguments*, the error scrolling off above the echoed text, so the send read as sent (also 2026-10-01; memory *ao msg: options before recipients*).
+
+**Fix:**
+- `main` parses with `parse_known_args`, not `parse_args`. `parse_args` exits on the leftover words before anything could re-parse them; the top parser cannot use `parse_intermixed_args`, since a subparsers action is `nargs=PARSER`.
+- When the subcommand is `msg`, `main` re-parses the arguments after the `msg` token with the `msg` subparser's own `parse_intermixed_args`, passing `namespace=args` so the global options the top parser read (`--json`, whose subparser copy defaults to `SUPPRESS`) are kept.
+- Any other subcommand with leftovers keeps today's `parser.error`.
+
+**Done when:**
+- `ao msg x --kind note "t"`, `ao msg --kind note x "t"` and `ao msg x "t" --kind note` give the same params (a stubbed `call_sync`).
+- The `--pass-up` form still parses.
+- `ao --json msg x --about TD-1 "t"` keeps `--json`, and so does `ao msg x "t" --json` (the `msg` subparser's own `--json`).
+- An unknown option is still refused with argparse's usage line, and so is a leftover on another subcommand.
+
+**Related:** TD-995 (its design), TD-1000.
 
 ## TD-1004: The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node
 
