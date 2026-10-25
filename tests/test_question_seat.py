@@ -4,7 +4,7 @@ per seat counted along the sender's `superseded_by` chain, and that seat's `repl
 
 import pytest
 
-from sessionorc import mail, models
+from sessionorc import agent_mail, mail, models
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import MailEntry
 
@@ -160,3 +160,64 @@ async def test_a_node_askers_chain_is_read_as_the_home_keys_it(agent):
     finally:
         del agent.sessions[seat.id]
         del agent.remote["laptop"]
+
+
+async def test_a_team_or_a_repo_addresses_its_question_seat(agent, tmp_path, monkeypatch):
+    """`msg`'s `team=` / `repo=` (design §4.10 *A team or a repo as the address*, TD-1000 slice 2): resolved
+    at the home from the records, the kind an `ask` unless given, every refusal in the design's words."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        old = await mk("seat-old", team="beta", project="B", seat={"trigger": "asks", "tags": True})
+        seat = await mk("seat", team="beta", project="B", seat={"trigger": "asks", "tags": True})
+        asker = await mk("asker", team="alpha", project="A")
+        member = await mk("member", team="delta", project="D")
+        agent.sessions[old].state, agent.sessions[old].superseded_by = "closed", seat
+        agent.sessions[seat].state = "exited"  # on call: the ask fills it
+        agent.sessions[seat].repo = agent.sessions[old].repo = "/src/samscrape"
+        node = models.Session(id="ao-cm", name="cm-techlead", kind="claude", adapter="claude-code", dir="/w")
+        node.team, node.project, node.repo, node.host = "cm", "C", "/home/u/contractmatch", "laptop"
+        node.seat, node.state = {"trigger": "asks", "tags": True}, "idle"
+        agent.remote["laptop"] = {node.id: node}
+        try:
+            async with LocalClient(caller=asker) as a:
+                got = await a.call("msg", team="beta", text="may samscrape take an entry?")
+                assert got["entry"]["kind"] == "ask" and got["delivered"] == [seat]
+                assert "fills this seat" in got["read_when"][seat]
+                got = await a.call("msg", repo="contractmatch", text="and contractmatch?")
+                assert got["delivered"] == ["ao-cm@laptop"]
+                with pytest.raises(AgentError, match="no addressee beside it"):
+                    await a.call("msg", to=[member], team="beta", text="q?")
+                with pytest.raises(AgentError, match="--team or --repo, not both"):
+                    await a.call("msg", team="beta", repo="samscrape", text="q?")
+                with pytest.raises(
+                    AgentError, match=r"no team nosuch has a seat record: the teams with one are beta, cm"
+                ):
+                    await a.call("msg", team="nosuch", text="q?")
+                with pytest.raises(AgentError, match=r"delta has no question seat — ask the person"):
+                    await a.call("msg", team="delta", text="q?")
+                # a node whose registry is not read is named, never waited on
+                with pytest.raises(
+                    AgentError, match=r"no registered repo nosuch: the registries list .*not read: laptop"
+                ):
+                    await a.call("msg", repo="nosuch", text="q?")
+                # a repo a registry lists but no seat serves
+                monkeypatch.setattr(
+                    agent_mail.hosts, "local_host", lambda: type("H", (), {"repos": lambda self: ["/r/guardians"]})()
+                )
+                with pytest.raises(AgentError, match=r"guardians has no question seat"):
+                    await a.call("msg", repo="guardians", text="q?")
+                # a repo two teams serve is refused naming them
+                agent.sessions[member].seat, agent.sessions[member].repo = {"trigger": "asks"}, "/x/samscrape"
+                with pytest.raises(AgentError, match=r"samscrape is served by beta, delta: name one with --team"):
+                    await a.call("msg", repo="samscrape", text="q?")
+                # a team's two question seats resolve to its techlead seat, and none such is refused
+                second = await mk("second", team="delta", project="D", seat={"trigger": "asks"})
+                with pytest.raises(AgentError, match=r"delta has 2 question seats and no techlead seat"):
+                    await a.call("msg", team="delta", text="q?")
+                agent.sessions[second].seat = {"trigger": "asks", "tags": True}
+                got = await a.call("msg", team="delta", text="to the techlead?")
+                assert got["delivered"] == [second]
+        finally:
+            del agent.remote["laptop"]
+        for sid in (old, seat, asker, member, second):
+            await person.call("kill", id=sid)

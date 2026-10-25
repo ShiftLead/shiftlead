@@ -2522,3 +2522,32 @@ def test_the_grinder_preset_takes_a_decided_board_line_first_with_its_four_outco
     done = re.search(r"`(ao board edit done [^`]*)`", text).group(1)  # TD-588: no repo's script
     assert all(f in done for f in ("--line", "--expect", "--why"))
     assert "the board holds no decided line nobody has claimed" in text
+
+
+def test_msg_addresses_a_team_or_a_repo(monkeypatch, capsys):
+    """`ao msg --team <t>` / `--repo <r>` (design §4.10 *A team or a repo as the address*, TD-1000 slice 2):
+    sent as `team` / `repo` in place of `to`, an `ask` unless a kind is given, the text the only word;
+    a bare name that resolves to no session points at the two."""
+    sent = []
+
+    def fake(method, **params):
+        if method == "list":
+            return []
+        sent.append(params)
+        return {"entry": {"id": "m-1", "kind": params.get("kind")}, "delivered": ["ao-seat"]}
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    assert cli.main(["msg", "--team", "samscrape-grind", "may we file an entry?"]) == 0
+    assert (sent[-1]["team"], sent[-1]["to"], sent[-1]["kind"]) == ("samscrape-grind", None, "ask")
+    assert cli.main(["msg", "q?", "--repo", "samscrape"]) == 0
+    assert (sent[-1]["repo"], sent[-1]["text"], sent[-1]["kind"]) == ("samscrape", "q?", "ask")
+    assert cli.main(["msg", "--repo", "samscrape", "--kind", "note", "fyi"]) == 0
+    assert sent[-1]["kind"] == "note"
+    n = len(sent)
+    assert cli.main(["msg", "ao-x", "--team", "t", "q"]) == 2
+    assert "the text is the only word" in capsys.readouterr().err
+    assert cli.main(["msg", "--team", "t", "--repo", "r", "q"]) == 2
+    assert "--team or --repo, not both" in capsys.readouterr().err
+    assert len(sent) == n
+    assert cli.main(["msg", "nosuch", "x"]) == 1
+    assert "no session named nosuch here" in (err := capsys.readouterr().err) and "`--team` or `--repo`" in err
