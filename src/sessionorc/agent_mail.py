@@ -167,6 +167,13 @@ class MailMixin:
             self._remember_nonce(key, (result, None))
         return result
 
+    def _successor(self, _key: str, r: Session) -> str | None:
+        """A record's `superseded_by` as `_graph()` keys it (§4.10 *to a question seat*): a node
+        record's bare id re-addressed as `id@host`, this host's as stored."""
+        if not r.superseded_by:
+            return None
+        return self._from_host(r.superseded_by, r.host or self.host)
+
     @staticmethod
     def _question_to_take_up(me: Session | None, mid: str) -> MailEntry | None:
         """The caller's own **open** `ask` or `steer` to a session, which `--thread` takes to the
@@ -524,7 +531,7 @@ class MailMixin:
             for asked in ids:
                 sid, seen = asked, {asked}
                 while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
-                    sid = r.superseded_by
+                    sid = self._successor(sid, r) or sid
                     if sid in seen:
                         break
                     seen.add(sid)
@@ -542,7 +549,17 @@ class MailMixin:
             if sid != PERSON and not adapters.has_agent(records[sid].adapter):
                 # a shell's or a command run's inbox has no reader (§4.3 *A record with no agent*, TD-665)
                 raise RpcError(f"nothing reads {records[sid].name or sid}'s inbox — it runs no agent (design §4.3)")
-            if (reason := mail.message_gate(records, sender, sid, controllers=self._ctl)) is not None:
+            reason = mail.message_gate(
+                records,
+                sender,
+                sid,
+                controllers=self._ctl,
+                kind=kind,
+                carries=pr is not None or bool(cites),
+                replied=replied,
+                successor=self._successor,
+            )
+            if reason is not None:
                 raise RpcError(reason)
         cited: list[str] = []
         if cites:

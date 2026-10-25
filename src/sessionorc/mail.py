@@ -289,6 +289,31 @@ def _own(s: Session) -> list[str]:
     return s.controllers
 
 
+# A record's `superseded_by` as the reader addresses it (§4.4a): its key in the records and the record,
+# to the next key or None. The home re-addresses a node record's bare id as `id@host` (`_from_host`).
+Successor = Callable[[str, Session], "str | None"]
+
+
+def _raw_successor(_key: str, s: Session) -> str | None:
+    return s.superseded_by or None
+
+
+def chain(records: Mapping[str, Session], start: str, successor: Successor = _raw_successor) -> list[str]:
+    """`start` and every record its `superseded_by` chain reaches, in order: a resumed session is the
+    same conversation (design §4.10 *to a question seat*). A loop ends the walk."""
+    out, sid = [start], start
+    while (r := records.get(sid)) is not None and (nxt := successor(sid, r)) and nxt not in out:
+        out.append(nxt)
+        sid = nxt
+    return out
+
+
+def asks_seat(s: Session | None) -> bool:
+    """Does `s` hold a seat whose trigger is `asks` — the techlead seat, or any `seats:` entry given
+    that trigger (§4.9b)? Read from the record's `seat`, which a start writes."""
+    return s is not None and isinstance(s.seat, dict) and s.seat.get("trigger") == "asks"
+
+
 def self_decide_refusal(caller: Any) -> str:
     """TD-119, design §4.8: whatever it holds, a session never answers its own permission prompt."""
     return f"{caller} cannot decide itself: a session does not answer its own permission prompt (design §4.8)"
@@ -368,7 +393,15 @@ def act_gate(
 
 
 def message_edge(
-    records: Mapping[str, Session], sender: str, target: str, *, controllers: Controllers = _own
+    records: Mapping[str, Session],
+    sender: str,
+    target: str,
+    *,
+    controllers: Controllers = _own,
+    kind: str = "",
+    carries: bool = False,
+    replied: MailEntry | None = None,
+    successor: Successor = _raw_successor,
 ) -> str | None:
     """The edge that lets `sender` message `target` (design §4.10 "The message gate is weaker than
     `control`"), or None when there is none. No new list, no new grant: the graph is read on every
@@ -379,7 +412,11 @@ def message_edge(
     - **team**: both carry the same non-empty `team` badge;
     - **project**: both carry the same non-empty `project` badge, whatever their teams (TD-582) —
       with `team`, §9 invariant 9's named exception, for mail alone;
-    - **shared target**: some record names both in its `controllers` (two leads over one worker).
+    - **shared target**: some record names both in its `controllers` (two leads over one worker);
+    - **question seat**: tried last (TD-995) — an `ask` carrying no `pr` or `cites` (`carries`) to a
+      record whose seat's trigger is `asks`, from anywhere in the org; and that seat's `reply` to an
+      `ask` it holds (`replied`, from the sender's own inbox), to its asker or a record the asker's
+      `superseded_by` chain reaches.
     """
     me, it = records.get(sender), records.get(target)
     if me is None or it is None:
@@ -394,28 +431,68 @@ def message_edge(
         return "project"
     if any(sender in (c := controllers(r)) and target in c for r in records.values()):
         return "shared target"
+    if kind == "ask" and not carries and asks_seat(it):
+        return "question seat"
+    if (
+        kind == "reply"
+        and replied is not None
+        and replied.kind == "ask"
+        and asks_seat(me)
+        and target in chain(records, replied.from_, successor)
+    ):
+        return "question seat"
     return None
 
 
 def message_gate(
-    records: Mapping[str, Session], sender: str, target: str, *, controllers: Controllers = _own
+    records: Mapping[str, Session],
+    sender: str,
+    target: str,
+    *,
+    controllers: Controllers = _own,
+    kind: str = "",
+    carries: bool = False,
+    replied: MailEntry | None = None,
+    successor: Successor = _raw_successor,
 ) -> str | None:
     """Design §4.10: may `sender` message `target`? A person (`sender == PERSON`) always may — they
     are not a session and may message anyone (§4.8) — and any session may message the person
     inbox (`target == PERSON`). Otherwise a session may message along one of
-    `message_edge`'s five edges and nothing else, refused by naming §4.10's graph rather than
-    invariant 11: messaging is not acting. Returns the refusal, or None when the message may land."""
+    `message_edge`'s six edges and nothing else, refused by naming §4.10's graph rather than
+    invariant 11: messaging is not acting. An `ask` passing the question-seat edge alone is one open
+    question per sender per seat: the sender counted along its `superseded_by` chain, the count read
+    in the target's inbox, since a seat's mail moves with its fills (TD-995). Returns the refusal,
+    or None when the message may land."""
     if sender == PERSON or target == PERSON:
         return None  # the person inbox is ungated (§4.10 "A session reaches a person")
     if sender == target:
         return f"{sender} cannot message itself: a note to yourself is a ledger entry (design §4.10)"
     if sender not in records:
         return f"{sender} cannot message {target}: this host agent has no record of the sender (design §4.10)"
-    if message_edge(records, sender, target, controllers=controllers) is None:
+    edge = message_edge(
+        records,
+        sender,
+        target,
+        controllers=controllers,
+        kind=kind,
+        carries=carries,
+        replied=replied,
+        successor=successor,
+    )
+    if edge is None:
         return (
             f"{sender} cannot message {target}: not one of its controllers, its members, its team, "
-            f"its project, or a controller of a session it controls (design §4.10)"
+            f"its project, or a controller of a session it controls — nor an ask to a question seat, "
+            f"or that seat's reply to an ask it holds (design §4.10)"
         )
+    if edge == "question seat" and kind == "ask":
+        mine = {k for k in records if sender in chain(records, k, successor)}
+        first = next((e for e in records[target].inbox if e.kind == "ask" and e.open and e.from_ in mine), None)
+        if first is not None:
+            return (
+                f"{sender} cannot ask {target} again: its question {first.id} is still open — a reply, "
+                f"its lapse or the person's close frees it (design §4.10 *to a question seat*)"
+            )
     return None
 
 
