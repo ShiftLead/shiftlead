@@ -239,11 +239,13 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
 
   A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
-  say which, in fixed words that name the cure — `ao repo add <path> --adopt` (§4.7) for a missing tree, gate or ledger (a ledger that is there and does not parse names its reader's reason instead), the sync (today `sync.sh`, under dev-cadence TD-129 a bump PR) for a tree older than this build reads — *unserved: no
-  dev-cadence (no docs/cadence-sync.lock)*, *unserved: no gate (no scripts/check_cadence.py)*,
-  *unserved: no ledger at docs/technical_debt.md*, *unserved: the ledger at docs/technical_debt.md does
-  not parse — <the reader's reason>*, *unserved: dev-cadence at <commit> is older than this build reads
-  (<oldest>) — sync it* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
+  say which, each in its fixed words with its cure, the page and `ao doctor` sharing them:
+  *unserved: no dev-cadence (no docs/cadence-sync.lock) — `ao repo add <path> --adopt`*, *unserved: no
+  gate (no scripts/check_cadence.py) — `ao repo add <path> --adopt`*, *unserved: no ledger at
+  docs/technical_debt.md — `ao repo add <path> --adopt`*, *unserved: the ledger at
+  docs/technical_debt.md does not parse — <the reader's reason>* (no adopt cures it), *unserved:
+  dev-cadence at <commit> is older than this build reads (<oldest>) — sync it* (today `sync.sh`, under
+  dev-cadence TD-129 a bump PR); where an adoption PR is open, its cure reads *adoption PR #n open* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
   the PRs that show an adoption PR) and **the two passes that make it served**:
   *Pull* (§6), which fast-forwards the checkout once an adoption or a sync has merged, and, for a repo
   whose one lack is an older tree, *Sync* (§6), whose gate is there. No gate run of any other PR, no
