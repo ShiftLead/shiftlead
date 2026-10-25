@@ -60,9 +60,10 @@ class SyncMixin:
             return  # an outage is never zero PRs: nothing is pruned or judged on it
         prs = [p for p in prs_r.get("open") or [] if isinstance(p, dict)]
         old = reading.get("sync") or {}
-        gated = (await asyncio.to_thread(cadence.gate, root))[0] != "absent"
-        sync = sync_mod.prune(old, prs, gated)
-        if not auto:
+        sync = sync_mod.prune(old, prs)
+        if await asyncio.to_thread(cadence.gate, root) is None:
+            pass  # no gate: the repo is unserved, and its PRs are the person's — not read, nothing written (§6 *Sync*)
+        elif not auto:
             for pr in prs:
                 n, head = str(pr.get("number")), str(pr.get("head") or "")
                 e = sync.get(n) or {}
@@ -75,13 +76,13 @@ class SyncMixin:
             covered = True
             for pr in sync_mod.candidates(prs, sync, lambda p: self._sync_held_by(root, p)):
                 n, head = str(pr["number"]), str(pr["head"])
-                if gated and not self._sync_login:
+                if not self._sync_login:
                     self._sync_login = await asyncio.to_thread(sync_mod.gh_login)
                     if not self._sync_login:
                         log.warning("sync: the home's gh login could not be read; nothing judged this pass")
                         covered = False
                         break  # no reading: no verdict on anyone
-                if why := sync_mod.decline(pr, self._sync_login, gated):
+                if why := sync_mod.decline(pr, self._sync_login):
                     sync[n] = {"head": head, "verdict": "refused", "why": why, "tries": 0, "posted": False,
                                "at": now_iso()}  # fmt: skip
                     continue

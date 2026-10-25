@@ -9,6 +9,6 @@
   {% if teams %}<span class="meta">serviced by {% for t in teams %}<a href="/?team={{ t }}" data-team-link="{{ t }}">{{ t }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>
   {% else %}<span class="meta">no team services this repo</span>{% endif %}
 </div>
-{# missing seams (§4.5a, TD-591): one line per seam the repo leaves unset with no default file, display only #}
-{% if seams and seams.lines %}<div class="seams meta" id="seams">{% for ln in seams.lines %}<div class="seamline">{{ ln }}</div>{% endfor %}</div>{% endif %}
+{# missing seams (§4.5a, TD-591, TD-1011): one line per warning of the repo's seams, display only #}
+{% if seams and seams.lines %}<div class="seams meta" id="seams">{% for parts in seams.lines %}<div class="seamline">{% for text, code in parts %}{% if code %}<code>{{ text }}</code>{% else %}{{ text }}{% endif %}{% endfor %}</div>{% endfor %}</div>{% endif %}
 </div>

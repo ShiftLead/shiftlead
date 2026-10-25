@@ -11,22 +11,28 @@ from pathlib import Path
 
 import pytest
 
-from sessionorc import cadence, ledgerboard, seams
+from sessionorc import ledgerboard, seams
 from shiftlead import cli, doctor, repoinit
+from shiftlead.adapters.claude_code import CADENCE_HOOK_LINE
 from shiftlead.ui.repo import missing_seams
 
 pytestmark = pytest.mark.unit
 
-ABSENT = {"state": "absent", "value": None}
+
+CURE = "`<dev-cadence>/sync.sh /r/notes`, then a PR"
 
 
-def seam_reading(ledger=None, **over) -> dict:
-    """dev-cadence's shape: a parsing ledger of 412 entries and every seam defaulted."""
+def seam_reading(ledger=None, lacks=(), warnings=(), **over) -> dict:
+    """dev-cadence's shape: a parsing ledger of 412 entries, every seam defaulted, served, nothing warned,
+    and the adapter's SessionStart line in the checkout's settings."""
     r = {
         "ledger": ledger or {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 412, "why": None},
         "board": {"state": "defaulted", "value": "docs/user_attention.md"},
-        "gate": {"state": "defaulted", "value": cadence.DEFAULT_GATE},
         "worktree_setup": {"state": "defaulted", "value": "scripts/hydrate_worktree.sh"},
+        "serve": {"ok": not lacks, "lacks": [{"key": k, "words": w} for k, w in lacks]},
+        "warnings": list(warnings),
+        "session_start": [CADENCE_HOOK_LINE],
+        "source": False,
     }
     r.update(over)
     return r
@@ -40,52 +46,63 @@ def lines(rows):
     return [(r["verdict"], r["text"]) for r in rows]
 
 
-def test_every_seam_there_is_ok_an_unset_one_warns_and_a_missing_ledger_lacks():
-    absent = {"path": "docs/technical_debt.md", "state": "absent", "major": None, "entries": None, "why": "no ledger"}
-    newer = {**absent, "state": "newer", "major": 2, "why": "this file declares Ledgerboard: 2, …"}
+def test_a_served_repo_is_ok_a_warning_warns_and_each_lack_unserves_it():
+    """TD-1011, §4.7 **repos**: each lack in §5's words is a lack, naming its cure; a warning a warning."""
+    newer = {"path": "docs/technical_debt.md", "state": "newer", "major": 2, "entries": None, "why": "Ledgerboard: 2"}
+    gate = f"unserved: no gate (no scripts/check_cadence.py) — {CURE}"
     got = doctor.repos(
         {
             "/r/shiftlead": repo("shiftlead", seam_reading()),
-            "/r/samscrape": repo("samscrape", seam_reading(gate=ABSENT, worktree_setup=ABSENT)),
-            "/r/notes": repo("notes", seam_reading(absent, board=ABSENT, gate=ABSENT, worktree_setup=ABSENT)),
-            "/r/later": repo("later", seam_reading(newer)),
+            "/r/samscrape": repo("samscrape", seam_reading(warnings=["no worktree setup"])),
+            "/r/notes": repo(
+                "notes", seam_reading(lacks=[("gate", gate)], warnings=["no board at docs/user_attention.md"])
+            ),
+            "/r/later": repo("later", {k: v for k, v in seam_reading(newer).items() if k != "serve"}),
             "/r/old": repo("old", None),
         }
     )
     assert lines(got) == [
         ("lacking", f"repo later — ledger is Ledgerboard 2, this build reads {ledgerboard.FORMAT_MAJOR} (sync)"),
-        (
-            "lacking",
-            "repo notes — no ledger at docs/technical_debt.md (`ao repo init`) · no gate: a person merges · "
-            "no board: the Inbox is the person's channel · no worktree setup",
-        ),
+        ("lacking", f"repo notes — {gate} · no board at docs/user_attention.md"),
         ("warning", "repo old — seams not read yet"),
-        ("warning", "repo samscrape — no gate: a person merges · no worktree setup"),
+        ("warning", "repo samscrape — no worktree setup"),
         ("ok", "repo shiftlead — ledger 412 entries · board · gate check_cadence.py · worktree setup"),
     ]
     assert got[-1]["seams"]["ledger"]["entries"] == 412  # the raw reading rides beside the text (--json)
     assert lines(doctor.repos({})) == [("ok", "repos — none registered")]
 
 
-def test_a_configured_gate_is_named_by_its_script_or_its_first_word():
-    assert doctor._gate_word("python3 scripts/check_cadence.py --pr {pr} --json") == "check_cadence.py"
-    assert doctor._gate_word("make gate PR={pr}") == "make"
+def test_a_checkout_without_the_adapters_session_start_line_is_warned():
+    """§5 *The seams*: the reading carries the commands as text, the client compares them with the
+    adapter's `cadence_hook_line` — under `files/` in dev-cadence's source."""
+    words = "no SessionStart line: a session started outside ShiftLead misses the cadence's nudge"
+    assert doctor.missing_seams(seam_reading(session_start=["something else"])) == [words]
+    assert doctor.missing_seams(seam_reading(session_start=[])) == [words]
+    assert doctor.missing_seams(seam_reading()) == []
+    source_line = CADENCE_HOOK_LINE.replace("/scripts/cadence_hooks.sh", "/files/scripts/cadence_hooks.sh")
+    assert doctor.missing_seams(seam_reading(source=True, session_start=[source_line])) == []
+    assert doctor.missing_seams(seam_reading(source=True)) == [words]
+    older = {k: v for k, v in seam_reading().items() if k != "session_start"}
+    assert doctor.missing_seams(older) == [], "a reading of an older host agent says nothing of it"
 
 
-def test_the_repo_page_says_each_unset_seam_and_a_ledger_that_is_not_there():
-    assert missing_seams(repo("shiftlead", seam_reading())) == {"lines": [], "ledger": None}
-    assert missing_seams(repo("old", None)) == {"lines": [], "ledger": None}  # not read yet: nothing said
-    led = {"path": "notes/ledger.md", "state": "absent", "major": None, "entries": None, "why": "no ledger"}
-    got = missing_seams(repo("notes", seam_reading(led, board=ABSENT, gate=ABSENT, worktree_setup=ABSENT)))
+def test_the_repo_page_says_each_warning_and_each_lack_with_its_cure_as_code():
+    assert missing_seams(repo("shiftlead", seam_reading())) == {"lines": [], "unserved": []}
+    assert missing_seams(repo("old", None)) == {"lines": [], "unserved": []}  # not read yet: nothing said
+    led = f"unserved: no ledger at notes/ledger.md — {CURE}"
+    got = missing_seams(repo("notes", seam_reading(lacks=[("ledger", led)], warnings=["no worktree setup"])))
     assert got == {
-        "lines": ["no gate: a person merges", "no board: the Inbox is the person's channel", "no worktree setup"],
-        "ledger": {"text": "no ledger at notes/ledger.md —", "cure": "ao repo init"},
+        "lines": [[("no worktree setup", False)]],
+        "unserved": [
+            [
+                ("unserved: no ledger at notes/ledger.md — ", False),
+                ("<dev-cadence>/sync.sh /r/notes", True),
+                (", then a PR", False),
+            ]
+        ],
     }
-    bad = {**led, "state": "unreadable", "why": "notes/ledger.md does not parse: boom"}
-    assert missing_seams(repo("n", seam_reading(bad)))["ledger"] == {
-        "text": "the ledger at notes/ledger.md does not parse — notes/ledger.md does not parse: boom",
-        "cure": None,
-    }
+    bad = "unserved: the ledger at notes/ledger.md does not parse — boom"
+    assert missing_seams(repo("n", seam_reading(lacks=[("ledger", bad)])))["unserved"] == [[(bad, False)]]
 
 
 def git_repo(tmp_path: Path, name: str = "bare") -> Path:
@@ -199,7 +216,7 @@ def test_a_ledgerboard_release_other_than_the_wheels_warns_on_the_repos_line_and
     got = doctor.repos(
         {
             "/r/a": repo("a", seam_reading(ledgerboard=same)),
-            "/r/b": repo("b", seam_reading(ledgerboard=older, worktree_setup=ABSENT)),
+            "/r/b": repo("b", seam_reading(ledgerboard=older, warnings=["no worktree setup"])),
             "/r/c": repo("c", seam_reading(ledgerboard=bare)),
             "/r/d": repo("d", seam_reading()),  # an older host agent's reading carries no ledgerboard
         }
@@ -211,8 +228,8 @@ def test_a_ledgerboard_release_other_than_the_wheels_warns_on_the_repos_line_and
         ("ok", "repo d — ledger 412 entries · board · gate check_cadence.py · worktree setup"),
     ]
     assert missing_seams(repo("b", seam_reading(ledgerboard=older)))["lines"] == [
-        "ledgerboard v1.2 here, v1.3 in this build"
+        [("ledgerboard v1.2 here, v1.3 in this build", False)]
     ]
-    assert missing_seams(repo("a", seam_reading(ledgerboard=same))) == {"lines": [], "ledger": None}
+    assert missing_seams(repo("a", seam_reading(ledgerboard=same))) == {"lines": [], "unserved": []}
     # a wheel whose header could not be read: every headed copy warns, the build's release unknown
     assert doctor.ledgerboard_warning({"release": "1.3", "wheel": None}) == "ledgerboard v1.3 here, v? in this build"

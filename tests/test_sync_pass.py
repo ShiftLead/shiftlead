@@ -48,7 +48,7 @@ def gh(monkeypatch):
         "merge": None,
         "head": (HEAD, "open"),
         "login": "eyecantell",
-        "gated": "defaulted",
+        "gated": cadence.DEFAULT_GATE,
         "calls": [],
     }
 
@@ -65,7 +65,7 @@ def gh(monkeypatch):
     monkeypatch.setattr(sync, "merge", record("merge", "merge"))
     monkeypatch.setattr(cadence, "head", record("head", "head"))
     monkeypatch.setattr(sync, "gh_login", record("login", "login"))
-    monkeypatch.setattr(cadence, "gate", lambda root: (state["gated"], None))
+    monkeypatch.setattr(cadence, "gate", lambda root: state["gated"])
     monkeypatch.setattr(sync, "held_globs", lambda root: [])
     return state
 
@@ -110,25 +110,23 @@ def test_candidates_are_green_unheld_unjudged_sync_prs():
     assert [p["number"] for p in got] == [8], "held, draft, conflicting, pending, not_run, no flag, judged: out"
 
 
-def test_decline_the_gate_first_then_a_fork_then_another_login():
-    assert sync.decline(_pr(), "eyecantell", False) == "no gate: a person merges"
-    assert sync.decline(_pr(fork=True), "eyecantell", True) == "forked"
-    assert sync.decline(_pr(author="mallory"), "eyecantell", True) == "author mallory is not the home's"
-    assert sync.decline(_pr(author="EyeCantell"), "eyecantell", True) is None, "logins are case-insensitive"
+def test_decline_a_fork_then_another_login():
+    assert sync.decline(_pr(fork=True), "eyecantell") == "forked"
+    assert sync.decline(_pr(author="mallory"), "eyecantell") == "author mallory is not the home's"
+    assert sync.decline(_pr(author="EyeCantell"), "eyecantell") is None, "logins are case-insensitive"
 
 
-def test_prune_keeps_the_open_prs_and_judges_a_no_gate_refusal_again_once_gated():
-    kept = {"1": {"head": HEAD, "verdict": "refused", "why": cadence.NO_GATE}, "2": {"head": HEAD}, "9": {}}
-    assert set(sync.prune(kept, [_pr(1), _pr(2)], False)) == {"1", "2"}
-    assert set(sync.prune(kept, [_pr(1), _pr(2)], True)) == {"2"}
+def test_prune_keeps_the_open_prs_and_drops_an_older_builds_no_gate_refusal():
+    kept = {"1": {"head": HEAD, "verdict": "refused", "why": "no gate: a person merges"}, "2": {"head": HEAD}, "9": {}}
+    assert set(sync.prune(kept, [_pr(1), _pr(2)])) == {"2"}
     # the newest *merged* entry outlives its PR, for the Repos card (§4.5a); an older one does not
     kept = {
         "5": {"head": HEAD, "verdict": "merged", "at": "2026-10-15T01:00:00Z"},
         "6": {"head": HEAD, "verdict": "merged", "at": "2026-10-15T02:00:00Z"},
         "7": {"head": HEAD, "verdict": "refused", "at": "2026-10-15T03:00:00Z"},
     }
-    assert set(sync.prune(kept, [], True)) == {"6"}
-    assert [p["number"] for p in sync.candidates([_pr(1)], sync.prune(kept, [], True), lambda p: False)] == [1]
+    assert set(sync.prune(kept, [])) == {"6"}
+    assert [p["number"] for p in sync.candidates([_pr(1)], sync.prune(kept, []), lambda p: False)] == [1]
 
 
 def test_mark_the_homes_prs_are_no_order_and_a_verdicts_why_is_the_context():
@@ -240,11 +238,15 @@ async def test_another_login_is_refused_at_once_with_no_comment_and_the_order_sa
 
 
 @pytest.mark.integration
-async def test_no_gate_is_refused_and_the_gate_is_looked_up_first(agent, gh):
-    gh["gated"] = "absent"
+async def test_a_repo_with_no_gate_is_unserved_its_sync_pr_not_read_and_nothing_written(agent, gh):
+    """§6 *Sync*, TD-1011: an unserved repo's PR is the person's — not read, nothing written, off or on."""
+    gh["gated"] = None
     _reading(agent, _pr(author="mallory"))
     await agent._sync_pass()
-    assert agent._repos[ROOT]["sync"]["1097"]["why"] == "no gate: a person merges" and gh["calls"] == []
+    assert agent._repos[ROOT].get("sync", {}) == {} and gh["calls"] == []
+    settings_mod.save({"repos": {"samscrape": {"sync": {"auto": False}}}})
+    await agent._sync_pass()
+    assert agent._repos[ROOT].get("sync", {}) == {} and gh["calls"] == []
 
 
 @pytest.mark.integration

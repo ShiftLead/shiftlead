@@ -522,6 +522,7 @@ class ClaudeCodeAdapter:
     start_context = True  # `--append-system-prompt-file`, given at every launch of the conversation (§4.3, TD-283)
     permission_channel = True  # a pending permission is answered through the hook's decision (§4.3, §4.5a)
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
+    cadence_hook_line = CADENCE_HOOK_LINE  # the repo's own SessionStart is compared with it (§5 *The seams*)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
     # session of this tool is handed its mail by a pane write (§4.10)
     implements = frozenset({"background", "composer", "context", "links", "prompts", "spend", "title", "usage_report"})

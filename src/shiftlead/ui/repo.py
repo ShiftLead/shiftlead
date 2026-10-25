@@ -188,23 +188,22 @@ def design_builds(
 
 
 def missing_seams(r: Mapping[str, Any]) -> dict[str, Any]:
-    """**missing seams** (§4.5a *Repo page: missing seams*, TD-591): from the repo facts' `seams` and
-    nothing read here — `lines`, the fixed sentence of each seam left unset with no default file (the
-    words `ao doctor`'s **repos** line says, the ledgerboard release warning among them), and `ledger`,
-    the line drawn in the warning colour in place of Technical debt when the ledger is absent or does
-    not parse — `{text, cure}`, `cure` the command
-    drawn as code (`ao repo init` for an absent one, else None), the reader's reason in `text` — None
-    when it parses or the seams are not read yet."""
-    seams = r.get("seams") if isinstance(r.get("seams"), dict) else {}
-    led = seams.get("ledger") or {}
-    state, path = led.get("state"), led.get("path") or "the ledger path"
-    if state == "absent":
-        ledger_line = {"text": f"no ledger at {path} —", "cure": "ao repo init"}
-    elif state in ("unreadable", "newer"):
-        ledger_line = {"text": f"the ledger at {path} does not parse — {led.get('why') or state}", "cure": None}
-    else:
-        ledger_line = None
-    return {"lines": doctor.missing_seams(seams), "ledger": ledger_line}
+    """**missing seams** (§4.5a *Repo page: missing seams*, TD-591, TD-1011): from the repo facts' `seams`
+    and nothing read here, the words `ao doctor`'s **repos** line says — `lines`, one per warning (the
+    ledgerboard release warning among them), drawn under the title, and `unserved`, one per lack that
+    leaves the repo unserved, drawn in the warning colour in place of Technical debt: each a list of
+    `(text, code)` parts, a back-quoted cure drawn as code. Both empty when the repo is served and nothing
+    warns, or the seams are not read yet."""
+    seams = r.get("seams") if isinstance(r.get("seams"), dict) else None
+    return {
+        "lines": [_parts(w) for w in doctor.missing_seams(seams)],
+        "unserved": [_parts(w) for w in doctor.lacks(seams, r.get("root") or "")],
+    }
+
+
+def _parts(words: str) -> list[tuple[str, bool]]:
+    """`words` as `(text, code)` parts, each back-quoted span a code part."""
+    return [(part, i % 2 == 1) for i, part in enumerate(words.split("`")) if part]
 
 
 def pr_rows(

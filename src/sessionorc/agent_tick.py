@@ -1435,11 +1435,10 @@ class TickMixin:
         """Rule 10's read (design §6, TD-258), detached on the reports' cadence: for each supervised
         member, not a seat, each `progress` entry `done` with a `pr` — declared or derived — whose
         `checks` entry is missing, `unknown`, older than the `done`, or read at another head, the
-        repo's gate (§5 *The seams* `gate:`, TD-586; the script by default) is run in the registry
-        root the record's `repo` names, **one PR per run**, the one longest unread first. A root with
-        no gate is recorded once as *no gate: a person merges* (`cadence.NONE`) and nothing is run. A
-        root the home holds no reading of, a head `gh` cannot give and a run with no reading write
-        nothing."""
+        repo's gate (§5 *The seams*, TD-1011: dev-cadence's script) is run in the registry root the
+        record's `repo` names, **one PR per run**, the one longest unread first. A root with no gate is
+        unserved: nothing is run there and nothing written. A root the home holds no reading of, a head
+        `gh` cannot give and a run with no reading write nothing."""
         try:
             due: list[tuple[str, Session, int, str]] = []
             for s in records:
@@ -1457,27 +1456,13 @@ class TickMixin:
                         continue  # a merged or closed PR's head no longer moves: the read stands
                     due.append((str((old or {}).get("at") or ""), s, pr, done_at))
             due.sort(key=lambda d: (d[0], d[2]))
-            gates: dict[str, str] = {}
+            gates: dict[str, str | None] = {}
             for _, s, pr, done_at in due:
                 root = str(s.repo)
                 if root not in gates:
-                    gates[root] = (await asyncio.to_thread(cadence_mod.gate, root))[0]
-                if gates[root] == "absent":
-                    old = cadence_mod.entry_of(s.checks, pr)
-                    if (
-                        old
-                        and old.get("verdict") == cadence_mod.NONE["verdict"]
-                        and not cadence_mod.stale(old, done_at)
-                    ):
-                        continue  # recorded already: a gate the repo gains later reads it again
-                    if not self._is_record(s) or not self._cadence_member(s):
-                        continue
-                    sha, merged = str((old or {}).get("sha") or ""), bool((old or {}).get("merged"))
-                    new = cadence_mod.record(old, pr, sha, merged, cadence_mod.NONE, now_iso())
-                    s.checks = [*(c for c in s.checks if c.get("pr") != pr), new]
-                    log.info("%s: PR #%s: %s", self._address(s), pr, cadence_mod.NO_GATE)
-                    self._save(s)
-                    break  # one PR per run
+                    gates[root] = await asyncio.to_thread(cadence_mod.gate, root)
+                if gates[root] is None:
+                    continue  # unserved (§5): no gate run, nothing written
                 # the repo reading's head first (TD-332): `gh` is asked only for a PR that reading lacks
                 head = cadence_mod.head_from((self._repos.get(root) or {}).get("prs"), pr)
                 if head is None:

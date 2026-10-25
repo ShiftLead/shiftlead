@@ -66,6 +66,9 @@ def test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing(tmp_path):
         # the fixture board, read by the reader the fixture repo carries; its lines name TD-001, so they are
         # drawn on that entry's Queue card (design §4.5 screen 6 *Where a row is drawn*, TD-771)
         assert "A fixture act line." in queue
+        # the fixture repo is served (§5 *The seams*, TD-1011): its ledger is drawn, no lack in its place
+        repo = urllib.request.urlopen(url + "repo/repo", timeout=30).read().decode()
+        assert 'id="unserved"' not in repo and "Technical debt" in repo
     finally:
         proc.send_signal(signal.SIGTERM)
         assert proc.wait(timeout=30) == 0

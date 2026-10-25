@@ -146,6 +146,9 @@ def write_fixtures(home: Path) -> Path:
     (repo / "scripts").mkdir()
     shutil.copy2(ROOT / "scripts" / "nudge_user_attention.py", repo / "scripts" / "nudge_user_attention.py")
     shutil.copy2(ROOT / "scripts" / "ledgerboard.py", repo / "scripts" / "ledgerboard.py")  # the reader imports it
+    # served (design §5 *The seams*, TD-1011): dev-cadence's lock and its gate, this checkout's copies
+    shutil.copy2(ROOT / "docs" / "cadence-sync.lock", repo / "docs" / "cadence-sync.lock")
+    shutil.copy2(ROOT / "scripts" / "check_cadence.py", repo / "scripts" / "check_cadence.py")
     git = ["git", "-C", str(repo), "-c", "user.name=look", "-c", "user.email=look@localhost"]
     subprocess.run([*git, "init", "-q", "-b", "main"], check=True)
     subprocess.run([*git, "add", "-A"], check=True)

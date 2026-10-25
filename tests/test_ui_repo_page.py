@@ -354,28 +354,36 @@ def test_the_repo_page_draws_a_stopped_teams_card_as_the_org_draws_it(tmp_path, 
     assert "TDs in motion (0)" not in top and '<span class="kind">Doing</span>' not in top
 
 
-def test_the_missing_seams_draw_under_the_title_and_a_missing_ledger_in_place_of_technical_debt(tmp_path, monkeypatch):
-    """TD-591 slice 2 (§4.5a *Repo page: missing seams*): from the repo facts' `seams` alone — each unset
-    seam's fixed words under the title, and no ledger is one warning line where Technical debt was."""
+def test_the_warnings_draw_under_the_title_and_each_lack_in_place_of_technical_debt(tmp_path, monkeypatch):
+    """TD-591 slice 2, TD-1011 (§4.5a *Repo page: missing seams*): from the repo facts' `seams` alone — each
+    warning under the title, and each lack that leaves the repo unserved one warning line where Technical
+    debt was, its cure drawn as code."""
     root = str(tmp_path / "samscrape")
-    absent = {"state": "absent", "value": None}
+    cure = f"`<dev-cadence>/sync.sh {root}`, then a PR"
     r = reading(root)
     r["seams"] = {
         "ledger": {"path": "docs/technical_debt.md", "state": "absent", "major": None, "entries": None, "why": "no ledger"},
         "board": {"state": "defaulted", "value": "docs/user_attention.md"},
-        "gate": absent,
-        "worktree_setup": absent,
+        "worktree_setup": {"state": "absent", "value": None},
+        "serve": {"ok": False, "lacks": [
+            {"key": "gate", "words": f"unserved: no gate (no scripts/check_cadence.py) — {cure}"},
+            {"key": "ledger", "words": f"unserved: no ledger at docs/technical_debt.md — {cure}"},
+        ]},
+        "warnings": ["no worktree setup"],
     }  # fmt: skip
     html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
     seams = html[html.index('id="seams"') : html.index('id="groups"')]
-    assert re.findall(r'class="seamline">([^<]*)<', seams) == ["no gate: a person merges", "no worktree setup"]
-    # the ledger's part of the board is the warning; Review and Merged stand (TD-903)
+    assert re.findall(r'class="seamline">([^<]*)<', seams) == ["no worktree setup"]
+    # each lack, its cure as code, is the warning in place of the ledger's part; Review and Merged stand (TD-903)
     debt = html[html.index('id="debt"') : html.index('id="prs"')]
-    assert 'id="noledger"' in debt and "no ledger at docs/technical_debt.md — <code>ao repo init</code>" in debt
+    assert re.findall(r'class="unservedline">(.*?)</div>', debt) == [
+        f"unserved: no gate (no scripts/check_cadence.py) — <code>&lt;dev-cadence&gt;/sync.sh {root}</code>, then a PR",
+        f"unserved: no ledger at docs/technical_debt.md — <code>&lt;dev-cadence&gt;/sync.sh {root}</code>, then a PR",
+    ]
     assert "Technical debt" not in debt and "TD-301" not in debt
-    r["seams"] = {**r["seams"], "ledger": {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 7, "why": None}, "gate": {"state": "set", "value": "make gate"}, "worktree_setup": {"state": "set", "value": "x"}}  # fmt: skip
+    r["seams"] = {**r["seams"], "ledger": {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 7, "why": None}, "serve": {"ok": True, "lacks": []}, "warnings": []}  # fmt: skip
     html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
-    assert 'id="seams"' not in html and 'id="noledger"' not in html and "TD-301" in html
+    assert 'id="seams"' not in html and 'id="unserved"' not in html and "TD-301" in html
     # a vendored ledgerboard at another release than the wheel's is one more line there (TD-1013)
     r["seams"] = {**r["seams"], "ledgerboard": {"release": "1.2", "wheel": "1.3"}}
     html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
