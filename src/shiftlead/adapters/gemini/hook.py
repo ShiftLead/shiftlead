@@ -7,6 +7,9 @@ Claude Code's hook does. No event waits: no Gemini hook answers a confirmation, 
 reported as `needs-you` and answered in the terminal (§4.3 *Permissions: no channel*). A `BeforeTool` of
 `run_shell_command` whose command the kill guard refuses exits 2 with the reason on stderr, the tool's
 own block, with no call to the host agent: the tool never runs, and its turn's `AfterAgent` reports.
+One the kill guard passes that is a foreground CI watch (`wait_guard`), in a session launched under a
+layer whose background end wakes it (`WAKES_ENV`), goes with `wait: true`, and is blocked the same way
+when the reply says the record is unattended (`refuse_wait`, design §4.3 *A wait the guard refuses*).
 
 Two events hand the tool context as `additionalContext`, the one stdout the tool reads as context
 rather than an on-screen message: `SessionStart` the launch's start context and the repo's start hooks'
@@ -30,6 +33,7 @@ from typing import Any
 
 from sessionorc.mail import unread_line
 from sessionorc.store import EventQueue
+from shiftlead import wait_guard
 from shiftlead.adapters.claude_code.hook import Refused, call_agent, capture
 from shiftlead.kill_guard import refuse
 
@@ -44,6 +48,9 @@ BLOCK = 2  # the exit code that blocks the tool's action, its stderr the reason
 # the launch's start-context file (design §4.3 `start_context`), which `SessionStart` hands the tool as
 # `additionalContext`: a path in the environment, never the text in the argv (§4.1, TD-339)
 START_CONTEXT_ENV = "SHIFTLEAD_START_CONTEXT_FILE"
+# `1` when the launch read a layer under which a background command's end wakes the session (design §4.3
+# *A wait the guard refuses*): the tool reads its settings once, at launch, so the hook reads this, never the file
+WAKES_ENV = "SHIFTLEAD_GEMINI_WAKES"
 # dev-cadence's runner (design §4.3 *A repo's start hooks are every adapter's to run*), the main checkout's
 START_HOOKS = ("scripts", "cadence_hooks.sh")
 START_HOOKS_TIMEOUT = 150  # seconds: the runner's own bound, > 5 children × its 25 s child timeout
@@ -94,6 +101,19 @@ def refused_command(payload: dict[str, Any]) -> str | None:
         return None
     command = (payload.get("tool_input") or {}).get("command")
     return refuse(command) if isinstance(command, str) else None
+
+
+def waits_in_the_foreground(payload: dict[str, Any]) -> bool:
+    """A `BeforeTool` of `run_shell_command` that runs a CI watch in the foreground (§4.3): its
+    `is_background` not the JSON `true` (missing, or a string, is the foreground), in a session whose
+    launch layer wakes it. No main-thread test: Gemini CLI's `BeforeTool` carries no subagent marker."""
+    if payload.get("hook_event_name") != "BeforeTool" or payload.get("tool_name") != SHELL_TOOL:
+        return False
+    ti = payload.get("tool_input") or {}
+    command = ti.get("command") if isinstance(ti, dict) else None
+    if not isinstance(command, str) or ti.get("is_background") is True:
+        return False
+    return wait_guard.waits(command) and os.environ.get(WAKES_ENV) == "1"
 
 
 def start_context(payload: dict[str, Any]) -> str:
@@ -153,7 +173,8 @@ def report(params: dict[str, Any], session: str) -> Any:
     except Refused as e:
         print(f"shiftlead-hook: {session}: the host agent refused the event: {e}", file=sys.stderr)
     except Exception:  # noqa: BLE001
-        queued = {k: v for k, v in params.items() if k not in ("session", "mail")}
+        # the queued copy carries no `mail` and no `wait`: a drained event is applied unanswered (§4.3)
+        queued = {k: v for k, v in params.items() if k not in ("session", "mail", "wait")}
         with contextlib.suppress(OSError):
             EventQueue().append(session, {**queued, "at": time.time()})
     return None
@@ -184,7 +205,13 @@ def main() -> int:
     params["session"] = session
     if ev == "BeforeAgent":
         params["mail"] = True
+    ask_wait = waits_in_the_foreground(payload)
+    if ask_wait:
+        params["wait"] = True
     reply = report(params, session)
+    if ask_wait and isinstance(reply, dict) and reply.get("refuse_wait"):
+        print(wait_guard.GEMINI_REASON, file=sys.stderr)
+        return BLOCK
     if ev == "BeforeAgent":
         context = mail_context(payload, reply)
     if context:

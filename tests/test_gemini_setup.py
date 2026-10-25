@@ -76,7 +76,73 @@ async def test_a_start_with_no_layer_notes_the_line_once_and_again_when_the_copy
         (stale,) = await start()
     finally:
         gemini.LAYER_SETTINGS["ui"]["hideTips"] = True
-    assert stale.startswith("The Gemini layer is stale, so a Gemini session gets no hooks. Run this once")
+    # stale for a setting other than the wake: hooks still run, and nothing is said of the wake (TD-1007)
+    assert stale.startswith("The Gemini layer is stale: the installed layer is not this install's. Run this once")
+    assert "no hooks" not in stale and "wakes no" not in stale
+
+
+def _layer_without_the_wake() -> dict:
+    doc = json.loads(gemini.wanted_file().read_text())
+    del doc["tools"], doc["experimental"]
+    return doc
+
+
+async def test_a_stale_layer_without_the_wake_says_so_in_its_note(home, start):
+    """TD-1007 (design §4.3 *The second adapter*): a layer installed before the two settings is stale,
+    and its note says a background end wakes no Gemini session and the foreground watch is not
+    refused; the key carries the reading, so the wording refreshes once the layer holds them."""
+    gemini.write_layer()
+    gemini.MACHINE_LAYER.write_text(json.dumps(_layer_without_the_wake()))
+    note = GeminiAdapter(binary="gemini").setup_note()
+    assert note["key"].endswith(":stale:no-wake")
+    assert note["text"].startswith(
+        "The Gemini layer is stale: the installed layer is not this install's. Until it is reinstalled, a "
+        "background command's end wakes no Gemini session launched under it, and its foreground CI watch is "
+        "not refused. Run this once on this machine:"
+    )
+    assert "no hooks" not in note["text"]
+    (said,) = await start()
+    assert "wakes no Gemini session" in said
+
+
+def test_a_launch_says_in_its_env_whether_its_layer_wakes(home):
+    """TD-1007: a layer written from `layer_settings()` puts `SHIFTLEAD_GEMINI_WAKES=1` in the launch's
+    env; a stale copy without the two settings does not, and `layer_wakes` reads each layer so."""
+    from shiftlead.adapters.gemini import hook
+
+    ad = GeminiAdapter(binary="gemini")
+    gemini.MACHINE_LAYER.write_text(gemini.write_layer().read_text())
+    assert gemini.layer_wakes()
+    assert ad.launch(profile="gem", resume=None, prompt=None, unattended=True, cwd=home).env[hook.WAKES_ENV] == "1"
+    gemini.MACHINE_LAYER.write_text(json.dumps(_layer_without_the_wake()))
+    assert not gemini.layer_wakes()
+    assert hook.WAKES_ENV not in ad.launch(profile="gem", resume=None, prompt=None, unattended=True, cwd=home).env
+
+
+def test_layer_wakes_is_false_for_a_missing_unreadable_or_keyless_layer(home, tmp_path):
+    wanted = gemini.write_layer()
+    assert gemini.layer_wakes(wanted)
+    assert not gemini.layer_wakes(tmp_path / "nowhere.json")  # missing
+    assert not gemini.layer_wakes(tmp_path)  # unreadable: a directory
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json")
+    assert not gemini.layer_wakes(bad)
+    bad.write_text("[1, 2]")
+    assert not gemini.layer_wakes(bad)
+    bad.write_text(
+        json.dumps(
+            {"tools": {"shell": {"backgroundCompletionBehavior": "silent"}}, "experimental": {"modelSteering": True}}
+        )
+    )
+    assert not gemini.layer_wakes(bad)
+    bad.write_text(
+        json.dumps(
+            {"tools": {"shell": {"backgroundCompletionBehavior": "inject"}}, "experimental": {"modelSteering": "true"}}
+        )
+    )
+    assert not gemini.layer_wakes(bad)
+    gemini.MACHINE_LAYER.write_text(wanted.read_text())
+    assert gemini.layer_wakes()  # the default path, read at call time
 
 
 async def test_no_gemini_profile_no_note_and_a_profile_gained_is_read_on_the_next_tick(home, start):

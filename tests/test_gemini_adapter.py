@@ -76,6 +76,10 @@ def test_launch_argv_and_env(home):
         "hideWindowTitle": False,
         "showStatusInTitle": False,
     }
+    # a background command's end wakes the session (TD-1007, design §4.3 *A wait the guard refuses*)
+    assert layer["tools"] == {"shell": {"backgroundCompletionBehavior": "inject"}}
+    assert layer["experimental"] == {"modelSteering": True}
+    assert gemini.layer_wakes() and env[hook.WAKES_ENV] == "1"
 
 
 def test_a_resume_an_unattended_launch_and_ask(home):
@@ -169,6 +173,77 @@ def test_the_kill_guard_blocks_a_shell_command_with_exit_2(home, monkeypatch, ca
     assert sent and sent[0]["state"] == "working" and sent[0]["session"] == "ao-x-g"  # a call it passes reports
     other = {**payload, "tool_name": "write_file", "tool_input": {"command": "pkill -f x"}}
     assert hook.refused_command(other) is None
+
+
+WATCH = "timeout 1800 gh pr checks 12 --watch"
+
+
+def _shell(monkeypatch, command: str, **tool_input) -> None:
+    payload = {
+        "hook_event_name": "BeforeTool",
+        "tool_name": "run_shell_command",
+        "tool_input": {"command": command, **tool_input},
+    }
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+
+
+def test_the_wait_guard_blocks_an_unattended_foreground_ci_watch(home, monkeypatch, capsys):
+    """TD-1007 (design §4.3 *A wait the guard refuses*): a foreground CI watch goes with `wait: true`,
+    and the reply's `refuse_wait` blocks it with Gemini's words; `is_background: true`, an interactive
+    record, no reply, and a launch under a layer that does not wake let it run; a command the kill
+    guard refuses is refused for that alone, and the wait is not asked."""
+    from shiftlead import wait_guard
+
+    sent: list[dict] = []
+    reply: dict = {"refuse_wait": True}
+
+    def agent(params, timeout):
+        sent.append(params)
+        return reply
+
+    monkeypatch.setattr(hook, "call_agent", agent)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-g")
+    monkeypatch.setenv(hook.WAKES_ENV, "1")
+    for extra in ({}, {"is_background": False}, {"is_background": "true"}):
+        _shell(monkeypatch, WATCH, **extra)
+        assert hook.main() == hook.BLOCK
+        out = capsys.readouterr()
+        assert out.err.strip() == wait_guard.GEMINI_REASON and out.out == ""
+        assert sent[-1]["wait"] is True and sent[-1]["state"] == "working"
+    assert "`is_background: true`" in wait_guard.GEMINI_REASON and wait_guard.REASON != wait_guard.GEMINI_REASON
+    sent.clear()
+    _shell(monkeypatch, WATCH, is_background=True)  # the background form: run, unasked
+    assert hook.main() == 0 and "wait" not in sent[-1]
+    reply = {}  # an interactive record: the host agent sends no `refuse_wait`
+    _shell(monkeypatch, WATCH)
+    assert hook.main() == 0 and sent[-1]["wait"] is True
+    reply = None  # no reply (past the wait): the watch runs
+    _shell(monkeypatch, WATCH)
+    assert hook.main() == 0
+    reply = {"refuse_wait": True}
+    _shell(monkeypatch, "gh pr checks 12")  # one poll is no watch
+    assert hook.main() == 0 and "wait" not in sent[-1]
+    sent.clear()
+    _shell(monkeypatch, f"pkill -f x; {WATCH}")  # the kill guard's refusal alone, nothing sent
+    assert hook.main() == hook.BLOCK
+    assert capsys.readouterr().err.strip() == REASON and sent == []
+    monkeypatch.delenv(hook.WAKES_ENV)  # launched under a layer whose background end wakes nothing
+    _shell(monkeypatch, WATCH)
+    assert hook.main() == 0 and "wait" not in sent[-1]
+
+
+def test_an_unreached_host_agent_queues_the_watch_without_wait(home, monkeypatch):
+    def down(params, timeout):
+        raise OSError("no socket")
+
+    queued: list[tuple] = []
+    monkeypatch.setattr(hook, "call_agent", down)
+    monkeypatch.setattr(hook.EventQueue, "append", lambda self, sid, ev: queued.append((sid, ev)))
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-g")
+    monkeypatch.setenv(hook.WAKES_ENV, "1")
+    _shell(monkeypatch, WATCH)
+    assert hook.main() == 0  # a wait, not a kill: the call runs
+    assert queued and queued[0][1]["state"] == "working" and "wait" not in queued[0][1]
 
 
 def test_an_unreached_host_agent_queues_the_event(home, monkeypatch):
