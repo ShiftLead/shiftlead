@@ -5,15 +5,18 @@ state it reads is the agent's.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import secrets
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from sessionorc import (
     adapters,
     agent_common,
+    hosts,
     mail,
 )
 from sessionorc.agent_common import (
@@ -87,7 +90,7 @@ class MailMixin:
         self,
         text: str,
         to: list[str] | str | None = None,
-        kind: str = "note",
+        kind: str | None = None,
         about: str | None = None,
         reply_to: str | None = None,
         bound: float | None = None,
@@ -105,6 +108,8 @@ class MailMixin:
         shots: Any = None,
         verdict: Any = None,
         subject: str | None = None,
+        team: str | None = None,
+        repo: str | None = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -118,8 +123,12 @@ class MailMixin:
         of the one a reply picked (§4.10 *Suggested answers*, 2026-09-20, TD-070). A retry carrying
         the same `nonce` returns the first send's verdict. `source` is where a reply's answer is
         written down (§4.9b): such a reply is filed to the person as *answered for you*. The reply
-        names what landed, what was copied, and what was forwarded to a resumed successor."""
+        names what landed, what was copied, and what was forwarded to a resumed successor.
+        `team` or `repo` in place of `to` addresses that team's or repo's question seat, resolved here
+        from the records (§4.10 *A team or a repo as the address*, TD-1000), and the kind is then an
+        `ask` unless given."""
         sender = PERSON if mail.is_person(caller) else str(caller)
+        kind = kind or ("ask" if team or repo else "note")
         key = (sender, str(nonce)) if nonce else None
         if key and key in self._nonces:
             result, error = self._nonces[key]
@@ -128,6 +137,10 @@ class MailMixin:
             return dict(result or {})
         try:
             # TD-658: a PR handed to its reader is green first — read before anything is written
+            if team or repo:
+                if to:
+                    raise RpcError("a team or a repo is the whole address: name no addressee beside it (design §4.10)")
+                to = [await self._question_seat(team=team, repo=repo)]
             said = await self._checks_at_ask(sender, kind, pr)
             if key and key in self._nonces:
                 # a retry of this nonce landed while the read was out: the first send's verdict stands
@@ -166,6 +179,89 @@ class MailMixin:
         if key:
             self._remember_nonce(key, (result, None))
         return result
+
+    async def _question_seat(self, team: str | None = None, repo: str | None = None) -> str:
+        """The question seat `--team` or `--repo` names (§4.10 *A team or a repo as the address*,
+        TD-1000), read from the org's records alone: a record of that team, or of a repo of that name
+        (`Path(repo).name`), holding a seat whose trigger is `asks`, neither superseded nor closed — on
+        call or live. A team's two such seats resolve to its techlead seat (`tags: true`), and a live
+        record wins over one on call; a repo served by two teams is refused naming them. Registries
+        are read only to word a refusal. Returns the record's address, `id@host` where it has one."""
+        if team and repo:
+            raise RpcError("--team or --repo, not both: each is the whole address (design §4.10)")
+        want = str(team or repo or "").strip()
+        if not want:
+            raise RpcError("--team and --repo each name a team or a repo (design §4.10)")
+        records = self._graph()
+        seats = [
+            (a, r)
+            for a, r in records.items()
+            if mail.asks_seat(r) and not r.superseded_by and r.state != "closed" and str(r.team or "").strip()
+        ]
+        teams = sorted({r.team for _a, r in seats})
+        if team:
+            mine = [(a, r) for a, r in seats if r.team == want]
+            if not mine:
+                # a team running with no `asks` seat; one whose records are all closed was never started, or stopped
+                if any(r.team == want and r.state != "closed" and not r.superseded_by for r in records.values()):
+                    raise RpcError(f'{want} has no question seat — ask the person: `ao msg person "…"` (design §4.10)')
+                raise RpcError(
+                    f"no team {want} has a seat record: the teams with one are {', '.join(teams) or 'none'} "
+                    "(a team never started has none; design §4.10)"
+                )
+            return self._address(self._one_seat(want, [r for _a, r in mine]))
+        mine = [(a, r) for a, r in seats if r.repo and Path(r.repo).name == want]
+        if not mine:
+            await self._no_seat_for_repo(want, records)
+        by_team: dict[str, list[Session]] = {}
+        for _a, r in mine:
+            by_team.setdefault(r.team, []).append(r)
+        if len(by_team) > 1:
+            raise RpcError(
+                f"{want} is served by {', '.join(sorted(by_team))}: name one with --team <team> (design §4.10)"
+            )
+        ((name, recs),) = by_team.items()
+        return self._address(self._one_seat(name, recs))
+
+    @staticmethod
+    def _one_seat(team: str, recs: list[Session]) -> Session:
+        """One team's question seat among its records (§4.10): the techlead seat (`tags: true`) of
+        two, then a live record over one on call; two left is refused naming them."""
+        if len(recs) > 1:
+            tagged = [r for r in recs if (r.seat or {}).get("tags") is True]
+            if not tagged:
+                names = ", ".join(sorted(r.name for r in recs))
+                raise RpcError(f"{team} has {len(recs)} question seats and no techlead seat among them: {names}")
+            recs = [r for r in tagged if r.state != "exited"] or tagged
+        if len(recs) > 1:
+            names = ", ".join(sorted(r.name for r in recs))
+            raise RpcError(f"{team} has {len(recs)} question seats: {names}")
+        return recs[0]
+
+    async def _no_seat_for_repo(self, want: str, records: dict[str, Session]) -> None:
+        """The refusal for a `--repo` no seat record serves (§4.10): *no registered repo* where no
+        registry lists it — the home's own, and each node's that answers its `repos` request, one
+        that does not named as unread — else *has no question seat*."""
+        names = {Path(r).name for r in await asyncio.to_thread(lambda: hosts.local_host().repos())}
+        unread: list[str] = []
+        if self.mode == "home":
+            nodes = sorted(set(hosts.nodes()) | set(self.remote))
+
+            async def ask(host: str) -> list[str] | None:
+                try:
+                    return list((await self.rpc_host_repos(host))["repos"])
+                except RpcError:
+                    return None
+
+            for host, got in zip(nodes, await asyncio.gather(*(ask(h) for h in nodes)), strict=True):
+                if got is None:
+                    unread.append(host)
+                else:
+                    names |= {Path(r).name for r in got}
+        if want in names:
+            raise RpcError(f'{want} has no question seat — ask the person: `ao msg person "…"` (design §4.10)')
+        tail = f"; not read: {', '.join(unread)}" if unread else ""
+        raise RpcError(f"no registered repo {want}: the registries list {', '.join(sorted(names)) or 'none'}{tail}")
 
     def _successor(self, _key: str, r: Session) -> str | None:
         """A record's `superseded_by` as `_graph()` keys it (§4.10 *to a question seat*): a node

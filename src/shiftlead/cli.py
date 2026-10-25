@@ -3645,6 +3645,17 @@ def shape_warning(text: str) -> str | None:
     )
 
 
+def _addressee(name: str) -> str:
+    """An `ao msg` addressee resolved as `resolve` does, its *no session named* refusal pointing at
+    the team and repo address (design §4.10 *A team or a repo as the address*, TD-1000)."""
+    try:
+        return resolve(name)
+    except AgentError as e:
+        if str(e).startswith("no session named"):
+            raise AgentError(f"{e} — a team or a repo is addressed with `--team` or `--repo`") from None
+        raise
+
+
 def cmd_msg(args: argparse.Namespace) -> int:
     """`ao msg <to>… "<text>"` (design §4.10): an attributed entry in each addressee's inbox, nothing
     typed anywhere. `person` is the org's person inbox. With `--reply-to` the addressee may be left
@@ -3653,6 +3664,9 @@ def cmd_msg(args: argparse.Namespace) -> int:
     (from 1) and sends that answer's own text, any words given following it after a blank line.
     Refusals print as the host agent words them."""
     words = list(args.words)
+    if (args.team or args.repo) and (args.pass_up or args.reply_to or args.pick is not None):
+        # design §4.10 *A team or a repo as the address* (TD-1000): it opens a question, never answers one
+        return fail(args, "--team and --repo address a new question: not with --reply-to, --pick or --pass-up", 2)
     if args.pass_up:
         return _pass_up(args, words)
     if args.recommend:
@@ -3674,16 +3688,26 @@ def cmd_msg(args: argparse.Namespace) -> int:
         text, answer = offered[args.pick - 1], args.pick - 1
         if more.strip():
             text = f"{text}\n\n{more}"
+    elif args.team or args.repo:
+        # design §4.10 *A team or a repo as the address* (TD-1000): the address is the whole of it
+        if args.team and args.repo:
+            return fail(args, "--team or --repo, not both: each is the whole address", 2)
+        if len(words) != 1:
+            flag = "--team" if args.team else "--repo"
+            return fail(args, f'ao msg {flag} <name> "<text>": the text is the only word, with no addressee', 2)
+        to, text = [], words[0]
     else:
         if not words:
             return fail(args, 'ao msg <to>… "<text>": name who the message is for (or --reply-to <id>)', 2)
         *to, text = words
-    if not to and not args.reply_to:
+    if not to and not args.reply_to and not (args.team or args.repo):
         return fail(args, 'ao msg <to>… "<text>": name who the message is for (or --reply-to <id>)', 2)
     params: dict[str, Any] = {
-        "to": [t if t == "person" else resolve(t) for t in to],
+        "to": [t if t == "person" else _addressee(t) for t in to] or None,
+        "team": args.team,
+        "repo": args.repo,
         "text": text,
-        "kind": args.kind or ("reply" if args.reply_to else "note"),
+        "kind": args.kind or ("reply" if args.reply_to else "ask" if args.team or args.repo else "note"),
         "about": args.about,
         "reply_to": args.reply_to,
         "bound": args.bound,
@@ -3713,7 +3737,7 @@ def cmd_msg(args: argparse.Namespace) -> int:
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
     # design §4.10: a message the person reads — to `person`, or a `--source` reply, which the home
     # files to the person as *answered for you* — is checked for its shape once it has been sent
-    if "person" in params["to"] or args.source:
+    if "person" in (params["to"] or ()) or args.source:
         warn = shape_warning(text)
         if warn:
             print(warn, file=sys.stderr)
@@ -4874,10 +4898,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--kind",
         type=_msg_kind,
         choices=["note", "ask", "steer", "reply"],
-        help="default: note (reply with --reply-to)",
+        help="default: note (reply with --reply-to, ask with --team or --repo)",
     )
     p.add_argument("--about", help="the reference it concerns: a session id, a TD-NNN, a PR")
     p.add_argument("--reply-to", dest="reply_to", help="the entry this answers (the addressee defaults to its sender)")
+    # design §4.10 *A team or a repo as the address* (TD-1000): another team's or repo's question seat
+    p.add_argument("--team", metavar="TEAM", help="address the team's question seat, in place of addressees (an ask)")
+    p.add_argument(
+        "--repo", metavar="REPO", help="address the question seat of the team serving the repo, in place of addressees"
+    )
     p.add_argument("--default", help="a steer: the one line you will go with unless told otherwise (required on it)")
     p.add_argument(
         "--bound",
