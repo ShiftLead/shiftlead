@@ -190,8 +190,9 @@ def design_builds(
 def missing_seams(r: Mapping[str, Any]) -> dict[str, Any]:
     """**missing seams** (§4.5a *Repo page: missing seams*, TD-591): from the repo facts' `seams` and
     nothing read here — `lines`, the fixed sentence of each seam left unset with no default file (the
-    words `ao doctor`'s **repos** line says), and `ledger`, the line drawn in the warning colour in place
-    of Technical debt when the ledger is absent or does not parse — `{text, cure}`, `cure` the command
+    words `ao doctor`'s **repos** line says, the ledgerboard release warning among them), and `ledger`,
+    the line drawn in the warning colour in place of Technical debt when the ledger is absent or does
+    not parse — `{text, cure}`, `cure` the command
     drawn as code (`ao repo init` for an absent one, else None), the reader's reason in `text` — None
     when it parses or the seams are not read yet."""
     seams = r.get("seams") if isinstance(r.get("seams"), dict) else {}

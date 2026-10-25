@@ -171,3 +171,48 @@ def test_on_a_node_the_repos_line_reads_the_nodes_own_checkouts(tmp_path, monkey
     monkeypatch.setattr(cli.hosts, "local_host", lambda: Host())
     assert list(cli._doctor_repos(node=True)) == [str(mine)]
     assert list(cli._doctor_repos(node=False)) == [str(mine), str(theirs)]
+
+
+def test_the_wheels_ledgerboard_names_its_release_and_a_vendored_copy_is_read_by_its_header(tmp_path):
+    wheel = seams.wheel_release()
+    first = Path(ledgerboard.__file__).read_text(encoding="utf-8").split("\n", 1)[0]
+    assert wheel and first.startswith(f"# ledgerboard v{wheel} sha256:")
+    assert seams.ledgerboard_release(first + "\nrest") == wheel
+    assert seams.ledgerboard_release("# ledgerboard v1.2\n") is None  # no hash: not a release header
+    older, bare, none, source = (tmp_path / n for n in ("older", "bare", "none", "source"))
+    (older / "scripts").mkdir(parents=True)
+    (older / "scripts/ledgerboard.py").write_text("# ledgerboard v1.2 sha256:" + "a" * 64 + "\nx = 1\n")
+    (bare / "scripts").mkdir(parents=True)
+    (bare / "scripts/ledgerboard.py").write_text("# SYNCED FILE\nx = 1\n")
+    none.mkdir()
+    (source / "files/scripts").mkdir(parents=True)  # dev-cadence's own source
+    (source / "files/scripts/ledgerboard.py").write_text(first + "\n")
+    assert seams.ledgerboard(older) == {"release": "1.2", "wheel": wheel}
+    assert seams.ledgerboard(bare) == {"release": None, "wheel": wheel}
+    assert seams.ledgerboard(none) == {"release": None, "wheel": wheel}
+    assert seams.ledgerboard(source) == {"release": wheel, "wheel": wheel}
+    assert seams.reading(older)["ledgerboard"] == {"release": "1.2", "wheel": wheel}
+
+
+def test_a_ledgerboard_release_other_than_the_wheels_warns_on_the_repos_line_and_the_repo_page():
+    same, older, bare = ({"release": r, "wheel": "1.3"} for r in ("1.3", "1.2", None))
+    got = doctor.repos(
+        {
+            "/r/a": repo("a", seam_reading(ledgerboard=same)),
+            "/r/b": repo("b", seam_reading(ledgerboard=older, worktree_setup=ABSENT)),
+            "/r/c": repo("c", seam_reading(ledgerboard=bare)),
+            "/r/d": repo("d", seam_reading()),  # an older host agent's reading carries no ledgerboard
+        }
+    )
+    assert lines(got) == [
+        ("ok", "repo a — ledger 412 entries · board · gate check_cadence.py · worktree setup"),
+        ("warning", "repo b — no worktree setup · ledgerboard v1.2 here, v1.3 in this build"),
+        ("warning", "repo c — ledgerboard has no release header"),
+        ("ok", "repo d — ledger 412 entries · board · gate check_cadence.py · worktree setup"),
+    ]
+    assert missing_seams(repo("b", seam_reading(ledgerboard=older)))["lines"] == [
+        "ledgerboard v1.2 here, v1.3 in this build"
+    ]
+    assert missing_seams(repo("a", seam_reading(ledgerboard=same))) == {"lines": [], "ledger": None}
+    # a wheel whose header could not be read: every headed copy warns, the build's release unknown
+    assert doctor.ledgerboard_warning({"release": "1.3", "wheel": None}) == "ledgerboard v1.3 here, v? in this build"

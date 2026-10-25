@@ -376,3 +376,8 @@ def test_the_missing_seams_draw_under_the_title_and_a_missing_ledger_in_place_of
     r["seams"] = {**r["seams"], "ledger": {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 7, "why": None}, "gate": {"state": "set", "value": "make gate"}, "worktree_setup": {"state": "set", "value": "x"}}  # fmt: skip
     html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
     assert 'id="seams"' not in html and 'id="noledger"' not in html and "TD-301" in html
+    # a vendored ledgerboard at another release than the wheel's is one more line there (TD-1013)
+    r["seams"] = {**r["seams"], "ledgerboard": {"release": "1.2", "wheel": "1.3"}}
+    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    seams = html[html.index('id="seams"') : html.index('id="groups"')]
+    assert re.findall(r'class="seamline">([^<]*)<', seams) == ["ledgerboard v1.2 here, v1.3 in this build"]
