@@ -167,47 +167,47 @@ def test_a_repo_brief_is_read_relative_to_the_repo(tmp_path):
 
 
 def test_a_brief_names_the_repos_layout_through_its_slots(tmp_path):
-    """TD-588, design §5 *The seams*: a supplement's (or a template's) layout slots fill from the repo —
-    its `.shiftlead.yml` keys, else dev-cadence's file where the checkout holds it, else the seam's
-    sentence, never empty — `{pr}` inside `{gate}` after them, each recorded as a text slot."""
+    """TD-588, TD-1011, design §5 *The seams*: a supplement's (or a template's) layout slots fill — the
+    cadence's with dev-cadence's paths and no sentence (an unserved repo composes no brief), `board:` and
+    `ledger:` where the file sets them; `{test}`, `{lint}` and `{design_dir}` the repo's own, else the
+    seam's sentence, never empty — `{pr}` inside `{gate}` after them, each recorded as a text slot."""
     (tmp_path / "briefs").mkdir()
     words = "{test} | {lint} | {gate} | {board} | {ledger} | {ledger_check} | {design_dir} | {cadence_rules}"
     (tmp_path / "briefs" / "g.md").write_text(words + "\n")
     (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {brief: briefs/g.md}}\n")
+    cadence = (
+        " | python3 scripts/check_cadence.py --pr <n> | docs/user_attention.md | docs/technical_debt.md"
+        " | python3 scripts/ledger.py --check | "
+    )
     bare = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
     assert (
-        "\n\n"
-        + " | ".join(
-            (
-                repoconfig.NO_TEST,
-                repoconfig.NO_LINT,
-                repoconfig.NO_GATE,
-                "no board: the Inbox is the person's channel",
-                "docs/technical_debt.md",
-                repoconfig.NO_LEDGER_CHECK,
-                repoconfig.NO_DESIGN_DIR,
-                repoconfig.NO_CADENCE,
-            )
-        )
-        + "\n\n"
+        f"\n\n{repoconfig.NO_TEST} | {repoconfig.NO_LINT}{cadence}{repoconfig.NO_DESIGN_DIR}"
+        " | read docs/cadence.md §1–§4\n\n"
     ) in bare[0]
-    for rel in ("scripts/check_cadence.py", "scripts/ledger.py", "docs/cadence.md", "docs/user_attention.md"):
-        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
-        (tmp_path / rel).write_text("x\n")
-    (tmp_path / "docs" / "design").mkdir()
-    cadence = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    (tmp_path / "docs" / "design").mkdir(parents=True)
+    designed = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    assert f"{cadence}docs/design/ | read docs/cadence.md §1–§4\n" in designed[0]
+    # dev-cadence's own source: every dev-cadence path under `files/`
+    (tmp_path / "sync.sh").write_text("x\n")
+    (tmp_path / "files").mkdir()
+    source = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
     assert (
-        "no test command: run what the repo's README says | no lint command: keep to the style of the code around"
-        " the change | python3 scripts/check_cadence.py --pr <n> | docs/user_attention.md | docs/technical_debt.md"
-        " | python3 scripts/ledger.py --check | docs/design/ | read docs/cadence.md §1–§4\n"
-    ) in cadence[0]
+        "| python3 files/scripts/check_cadence.py --pr <n> | docs/user_attention.md | docs/technical_debt.md"
+        " | python3 files/scripts/ledger.py --check | docs/design/ | read files/docs/cadence.md §1–§4\n"
+    ) in source[0]
+    (tmp_path / "sync.sh").unlink()
     (tmp_path / ".shiftlead.yml").write_text(
         "roles: {grinder: {brief: briefs/g.md}}\ncommands: {test: make test, lint: make lint}\n"
         "gate: ./gate {pr}\nboard: notes/board.md\nledger: notes/ledger.md\n"
     )
     text, made = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
-    assert "make test | make lint | ./gate <n> | notes/board.md | notes/ledger.md | python3" in text
-    assert made["slots"]["{gate}"] == {"text": "./gate {pr}"} and made["slots"]["{pr}"] == {"text": "<n>"}
+    assert (
+        "make test | make lint | python3 scripts/check_cadence.py --pr <n> | notes/board.md | notes/ledger.md" in text
+    )
+    assert made["slots"]["{gate}"] == {
+        "text": "python3 scripts/check_cadence.py --pr {pr}"
+    }  # `gate:` is read by nothing
+    assert made["slots"]["{pr}"] == {"text": "<n>"}
     assert list(made["slots"])[-1] == "{pr}"  # after `{gate}`, so a replay fills it the same way
     # a brief naming none reads nothing for them and records none: a role with no package template,
     # whose brief is its whole text (every built-in template names some since TD-588 slice 2)
@@ -226,10 +226,12 @@ def test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_othe
             rel = path.relative_to(tmp_path).as_posix()
             if rel == "docs/design":
                 raise OSError(f"devenv: {rel}: not a regular file")
-            if rel == "docs/cadence.md":
-                raise OSError(f"devenv: {rel}: over 262144 bytes, which is not a repo config or a brief")
-            if refusal and rel == "scripts/ledger.py":
+            if rel == "files":
+                raise OSError(f"devenv: {rel}: not a regular file")
+            if refusal and rel == "sync.sh":
                 raise OSError("devenv: the host is not answering")
+            if rel == "sync.sh":
+                raise OSError(f"devenv: {rel}: over 262144 bytes, which is not a repo config or a brief")
             return None
 
         return read
@@ -237,8 +239,7 @@ def test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_othe
     cfg = repoconfig.load_text(None, tmp_path)
     cfg.read = node(refusal=False)
     got = repoconfig.layout(cfg)
-    assert got["{design_dir}"] == "docs/design/" and got["{cadence_rules}"] == "read docs/cadence.md §1–§4"
-    assert got["{ledger_check}"] == repoconfig.NO_LEDGER_CHECK  # None: not there
+    assert got["{design_dir}"] == "docs/design/" and got["{cadence_rules}"] == "read files/docs/cadence.md §1–§4"
     cfg.read = node(refusal=True)
     with pytest.raises(OSError, match="not answering"):
         repoconfig.layout(cfg)
@@ -509,13 +510,12 @@ def test_a_role_has_saved_prompts_replaced_whole_per_layer(tmp_path):
             repoconfig.load(tmp_path)
 
 
-def test_the_gate_is_a_command(tmp_path):
-    """TD-586, §5 *The seams*: `gate:` is accepted, a command, and refused as anything else."""
-    assert repoconfig.load_text("gate: make gate PR={pr}\n", tmp_path).gate == "make gate PR={pr}"
-    assert repoconfig.load_text("ledger: docs/debt.md\n", tmp_path).gate is None
-    for text in ("gate: ''\n", "gate: [a]\n", "gate: 3\n"):
-        with pytest.raises(ValueError, match="must be a command"):
-            repoconfig.load_text(text, tmp_path)
+def test_a_gate_key_is_accepted_and_read_by_nothing(tmp_path):
+    """TD-1011, §5 *The seams*: the gate is dev-cadence's script, no key — a `gate:` left in the file
+    loads, whatever it holds, and is kept only as gone, for `ao org check` to name."""
+    for text in ("gate: make gate PR={pr}\n", "gate: ''\n", "gate: [a]\n"):
+        assert repoconfig.load_text(text, tmp_path).gone == ["gate"]
+    assert repoconfig.load_text("ledger: docs/debt.md\n", tmp_path).gone == []
 
 
 def test_the_worktree_setup_is_a_command(tmp_path):

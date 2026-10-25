@@ -43,11 +43,11 @@ that gets exit 3 stops there and says so: **it never starts one** (`ao --skill`)
 ao doctor repos
 ```
 
-One line per registered repo: its ledger and how many entries it holds, its board, its gate and its
-worktree setup — `ok`, or a `warning` naming what is missing. A repo with no ledger yet gets one with
-`ao repo init` in its checkout (or `ao repo init --repo <name>`): an empty ledger and its archive,
-written on the branch you are on and committed by nobody — commit them as any other change. A repo
-the doctor does not list is not registered on this host; that is the person's to fix, not yours.
+One line per registered repo: whether it is served — dev-cadence's tree, its gate and its ledger,
+each lack named with its cure — and the warnings (a missing board, no worktree setup, dev-cadence's
+per-clone setup not run). An unserved repo gets no team (`ao team start` refuses it); its ledger and
+gate come from dev-cadence's adoption, which is the person's to run, not yours (design §5 *The seams*).
+A repo the doctor does not list is not registered on this host; that is the person's to fix, not yours.
 
 **What the repo needs before a team can pick anything.** A worker picks by an entry's header lines,
 never its prose (design §6 rule 6), so the ledger's entries carry them first:
@@ -58,8 +58,8 @@ never its prose (design §6 rule 6), so the ledger's entries carry them first:
 - **`**Kind:**`** — `build`, or none, is a `free-pick` lane's (and a `live-check` once its build is
   live); `design-first` is a designer's.
 - **`**Owner:**`** — the word a lane's `owner:` matches (*What a lane takes*, step 3). `paul` is the
-  person's owner word (`PERSON_OWNER` in `sessionorc/ledger.py`, as `ao repo init`'s `Fields:` line
-  declares it), and keeps an entry from every lane that carries an `owner:` word. **To keep an
+  person's owner word (`PERSON_OWNER` in `sessionorc/ledger.py`, as dev-cadence's seeded ledger's
+  `Fields:` line declares it), and keeps an entry from every lane that carries an `owner:` word. **To keep an
   entry from every worker, whatever its lanes**, block it: `**Blocked by:** decision (paul)`.
 - **The rules a PR lands by**, written down — dev-cadence's review and merge rules (its §4) where the repo
   uses them (branch → PR → independent review → the gate → merge), else in the briefs (step 4). A team
@@ -342,10 +342,11 @@ The built-in templates hold every shiftlead mechanic — the lane loop, claims a
 cadence review and merge, asking and outcomes, the declarations a run ends with, the usage gate's
 pause, the never-list of `ao` verbs — and move with the package on every promote. They name no
 repo's layout: where a brief needs one it holds a slot — `{gate}`, `{board}`, `{ledger}`,
-`{ledger_check}`, `{test}`, `{lint}`, `{design_dir}`, `{cadence_rules}` — filled at the start from the
-repo's `.shiftlead.yml` (`gate`, `board`, `ledger`, `commands`), else dev-cadence's file where the
-checkout holds it, else the seam's own sentence (*no gate: a person merges*), never empty (design §5
-*The seams*). **A repo whose standing rules, scratch tools or reviewers differ says so in its own
+`{ledger_check}`, `{test}`, `{lint}`, `{design_dir}`, `{cadence_rules}` — filled at the start: the cadence's
+(`{gate}`, `{board}`, `{ledger}`, `{ledger_check}`, `{cadence_rules}`) with dev-cadence's paths and the
+repo's `.shiftlead.yml` `board` and `ledger`, the repo's own (`{test}`, `{lint}`, `{design_dir}`) from its
+`commands` or its checkout, else the seam's own sentence (*no test command: run what the repo's README
+says*), never empty (design §5 *The seams*). **A repo whose standing rules, scratch tools or reviewers differ says so in its own
 brief**, and only that. Wherever it is given — a member's or manager's
 `brief:` in the team definition (which takes the slot in place of the role's), a repo's
 `roles.<name>.brief`, or `ao new --role <r> --brief <path>` — it is filled under *This repo's
@@ -359,7 +360,7 @@ A skeleton — one short section each, and nothing the template already says:
 - **First reads** — the files to read before anything, beyond `CLAUDE.md` and the cadence rules.
 - **Where it works** — the branch naming, the default branch, anything about worktrees the repo
   does differently.
-- **The gate** — what a PR needs beyond `commands:` and `gate:`: who reviews and who merges which
+- **The gate** — what a PR needs beyond `commands:` and dev-cadence's gate: who reviews and who merges which
   PRs (e.g. *anything under `src/core/` waits for the techlead*).
 - **Standing rules** — what is never done here: deploys, destructive data operations, files with
   their own line endings, what waits on the person, whole areas the team leaves alone.

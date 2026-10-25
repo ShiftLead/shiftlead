@@ -54,14 +54,18 @@ def test_the_built_ins_name_no_repos_layout():
 @pytest.mark.parametrize("role", ROLES)
 def test_a_bare_repos_brief_says_each_seam_in_its_own_words(tmp_path, role):
     text, made = repoconfig.resolve_role(repoconfig.load(tmp_path), role).compose()
-    # the ledger is the one seam a repo must have: `{ledger}` is its path, the default's included
-    rest = text.replace(repoconfig.DEFAULT_LEDGER, "{ledger}") if "{ledger}" in made["slots"] else text
+    # the cadence's slots and `{ledger}` are dev-cadence's paths in any repo (an unserved one composes no
+    # brief, TD-1011); outside the slots the text names no layout
+    rest = text
+    for slot in ("{gate}", "{board}", "{ledger}", "{ledger_check}", "{cadence_rules}"):
+        if slot in made["slots"]:
+            rest = rest.replace(made["slots"][slot]["text"].replace("{pr}", "<n>"), slot)
     assert not LITERALS.search(rest), LITERALS.search(rest)
     assert not re.search(r"\{(gate|board|ledger|ledger_check|test|lint|design_dir|cadence_rules|pr)\}", text)
     named = {s for s in repoconfig.LAYOUT_SLOTS if s in made["slots"]}
     assert named == NAMED[role]
     if "{gate}" in named:
-        assert repoconfig.NO_GATE in text and made["slots"]["{pr}"] == {"text": "<n>"}
+        assert "python3 scripts/check_cadence.py --pr <n>" in text and made["slots"]["{pr}"] == {"text": "<n>"}
 
 
 @pytest.mark.parametrize("role", ROLES)

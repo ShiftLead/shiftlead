@@ -19,6 +19,8 @@ from shiftlead import org as orgmod
 
 GIT_TIMEOUT = 5.0
 OLD_REPO_FILE = ".agentorc.yml"  # a repo's file before the rename (TD-060): read by nothing, named by the check
+# a `.shiftlead.yml` key accepted and read by nothing (`repoconfig.RepoConfig.gone`), and what the check says
+GONE = {"gate": "gate: is gone — a repo's extra check is dev-cadence's precheck"}
 
 
 def where(org: orgmod.Org, team: orgmod.TeamDef, here: str) -> tuple[str, str]:
@@ -154,6 +156,16 @@ def checkout_warnings(root: Path) -> list[str]:
     if info.dirty:
         out.append(f"{root}: holds {info.dirty} change{'' if info.dirty == 1 else 's'} — the org reads it as it stands")
     return out
+
+
+def gone_keys(root: Path) -> list[str]:
+    """The checkout's `.shiftlead.yml` keys that are read by nothing, each in its words (design §5
+    *The seams*, TD-1011); none for a file that does not load, which its own readers name."""
+    try:
+        cfg = repoconfig.load(root)
+    except (ValueError, OSError):
+        return []
+    return [GONE[key] for key in cfg.gone if key in GONE]
 
 
 def _git_path(directory: Path, *args: str) -> Path | None:
@@ -300,6 +312,7 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
                 )
             if at is None:  # `<dir>` is on a branch by design, and the checkout it stands for is not read
                 warnings.extend(checkout_warnings(path))
+            warnings.extend(f"{path if at is not None else root}: {line}" for line in gone_keys(path))
     elsewhere, unread = held_elsewhere(roots, linked, repos_of)
     warnings.extend(held_line(row, here) for row in elsewhere)
     warnings.extend(unread)

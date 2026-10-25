@@ -487,14 +487,9 @@ def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
     assert cli.main(["team", "start", "ao-grind"]) == 0
     asked = [p for m, p in state["calls"] if m == "host_files"]
     assert asked and all(p["host"] == "devenv" and p["dir"] == there for p in asked)
-    # the repo's file and brief, then the dev-cadence files the layout slots look for (TD-588)
-    layout = {
-        "scripts/check_cadence.py",
-        "scripts/ledger.py",
-        "docs/cadence.md",
-        "docs/user_attention.md",
-        "docs/design",
-    }
+    # the repo's file and brief, then what the layout slots look for: whether it is dev-cadence's source
+    # (`sync.sh`, then `files/`, TD-1011) and its design directory (TD-588)
+    layout = {"sync.sh", "docs/design"}
     assert {x for p in asked for x in p["paths"]} == {".shiftlead.yml", "docs/grind.md", *layout}
     made = {p["name"]: p for p in creates(state)}
     assert "grind on the node: free-pick" in made["grind-1"]["prompt"] and made["grind-1"]["profile"] == "repo-grind"
@@ -1424,14 +1419,15 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_loader_refuses(tmp_pa
 
 def test_the_recipe_covers_a_repos_first_team():
     """TD-683: a repo's own session standing up its first team is told to check the repo first
-    (`ao doctor repos`, `ao repo init`), what a repo with an empty ledger runs, that a public repo's
-    team goes in `org.yml`, and the closing rules are for any tool's agent, not Claude's alone."""
+    (`ao doctor repos`, and that an unserved repo gets no team, TD-1011), what a repo with an empty
+    ledger runs, that a public repo's team goes in `org.yml`, and the closing rules are for any tool's
+    agent, not Claude's alone."""
     from shiftlead.cli import team_skill_text
     from shiftlead.repoconfig import PRESETS
 
     text = team_skill_text()
     step = text[text.index("## 0b. Is the repo ready?") : text.index("## 1. Decide where the team runs")]
-    assert "ao doctor repos" in step and "ao repo init" in step
+    assert "ao doctor repos" in step and "`ao team start` refuses it" in step and " init" not in step
     assert "**A repo with little or no work**" in text and "--anyway" in text
     # no anchor seat (§4.9b *No anchor seat*, TD-757): the recipe says none, and no preset is one
     assert "anchor" not in PRESETS and "anchor seat" not in text

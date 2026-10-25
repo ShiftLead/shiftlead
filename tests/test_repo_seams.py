@@ -1,18 +1,15 @@
-"""TD-591 slice 2 (design §4.7 `ao doctor` **repos** and `ao repo init`, §4.5a *Repo page: missing
-seams*, §5 *The seams*): the client's lines over the repo facts' `seams` — `ao doctor`'s one line per
-repo and the Repo page's lines under its title, each drawn from the reading and reading nothing
-itself — and `ao repo init`'s empty ledger, which the host agent's seam reading then reads as *ok*."""
+"""TD-591 slice 2, TD-1011 (design §4.7 `ao doctor` **repos**, §4.5a *Repo page: missing seams*, §5 *The
+seams*): the client's lines over the repo facts' `seams` — `ao doctor`'s one line per repo and the Repo
+page's lines under its title, each drawn from the reading and reading nothing itself."""
 
 from __future__ import annotations
 
-import json
-import subprocess
 from pathlib import Path
 
 import pytest
 
 from sessionorc import ledgerboard, seams
-from shiftlead import cli, doctor, repoinit
+from shiftlead import cli, doctor
 from shiftlead.adapters.claude_code import CADENCE_HOOK_LINE
 from shiftlead.ui.repo import missing_seams
 
@@ -105,75 +102,16 @@ def test_the_repo_page_says_each_warning_and_each_lack_with_its_cure_as_code():
     assert missing_seams(repo("n", seam_reading(lacks=[("ledger", bad)])))["unserved"] == [[(bad, False)]]
 
 
-def git_repo(tmp_path: Path, name: str = "bare") -> Path:
-    root = tmp_path / name
-    root.mkdir()
-    subprocess.run(["git", "init", "-q", str(root)], check=True)
-    return root
-
-
-def test_repo_init_writes_a_ledger_the_seam_reading_reads_and_refuses_a_second_time(tmp_path, monkeypatch, capsys):
-    root = git_repo(tmp_path)
-    (root / "sub").mkdir()
-    monkeypatch.chdir(root / "sub")  # the checkout this directory is in, from anywhere inside it
+def test_init_is_read_as_a_repo_name(monkeypatch, capsys):
+    """TD-1011, design §4.7: `ao repo` has no `init` word — a repo's ledger comes from dev-cadence's seeds —
+    so `init` is a repo's name like any word but `add`, and `--repo` is no option of `ao repo`."""
+    got = {"/r/init": {"name": "init", "root": "/r/init", "prs": {}, "ledger": {}}}
+    monkeypatch.setattr(cli, "call_sync", lambda method, **kw: got if method == "repos" else [])
     assert cli.main(["--json", "repo", "init"]) == 0
-    got = json.loads(capsys.readouterr().out)
-    assert got["wrote"] == ["docs/technical_debt.md", "docs/technical_debt_archive.md"]
-    text = (root / "docs/technical_debt.md").read_text()
-    assert ledgerboard.entries(text) == [] and "| ID | Title | Priority | Status |" in text
-    assert ledgerboard.declared(text) == (
-        {
-            "owner": ("designer", "grinder", "paul"),
-            "kind": ("build", "design-first", "live-check", "evaluation", "decision"),
-        },
-        [],
-    )
-    assert seams.reading(root)["ledger"]["state"] == "ok"  # a ledger ShiftLead reads
-    assert "technical_debt.md" in (root / "docs/technical_debt_archive.md").read_text()
-    assert subprocess.run(["git", "-C", str(root), "log"], capture_output=True).returncode != 0  # nothing committed
-    assert cli.main(["repo", "init"]) == 1
-    assert "a ledger is there: docs/technical_debt.md" in capsys.readouterr().err
-
-
-def test_repo_init_follows_ledger_and_refuses_an_archive_alone_and_a_path_outside(tmp_path):
-    root = git_repo(tmp_path)
-    (root / ".shiftlead.yml").write_text("ledger: work/ledger.md\n")
-    assert repoinit.init(root) == ["work/ledger.md", "work/ledger_archive.md"]
-    assert seams.reading(root)["ledger"] == {
-        "path": "work/ledger.md",
-        "state": "ok",
-        "major": 1,
-        "entries": 0,
-        "why": None,
-    }
-    other = git_repo(tmp_path, "other")
-    (other / "docs").mkdir()
-    (other / "docs/technical_debt_archive.md").write_text("# old\n")
-    with pytest.raises(ValueError, match="an archive is there: docs/technical_debt_archive.md"):
-        repoinit.init(other)
-    assert not (other / "docs/technical_debt.md").exists()
-    (other / ".shiftlead.yml").write_text("ledger: ../elsewhere.md\n")
-    with pytest.raises(ValueError, match="not a path inside the repo"):
-        repoinit.init(other)
-
-
-def test_repo_init_names_a_registered_repo_and_refuses_outside_a_git_repo(tmp_path, monkeypatch, capsys):
-    root = git_repo(tmp_path, "named")
-
-    class Host:
-        def repos(self):
-            return [str(root)]
-
-    monkeypatch.setattr(cli.hosts, "local_host", lambda: Host())
-    monkeypatch.chdir(tmp_path)
-    assert cli.main(["repo", "init", "--repo", "named"]) == 0
-    assert (root / "docs/technical_debt.md").is_file()
-    assert cli.main(["repo", "init", "--repo", "nope"]) == 1
-    assert "no registered repo is named 'nope'" in capsys.readouterr().err
-    assert cli.main(["repo", "init"]) == 1
-    assert "not in a git repo" in capsys.readouterr().err
-    assert cli.main(["repo", "--repo", "named"]) == 1
-    assert "--repo is `ao repo init`'s" in capsys.readouterr().err
+    out = capsys.readouterr().out
+    assert '"name": "init"' in out, out
+    with pytest.raises(SystemExit):
+        cli.main(["repo", "--repo", "x"])
 
 
 def test_on_a_node_the_repos_line_reads_the_nodes_own_checkouts(tmp_path, monkeypatch):
