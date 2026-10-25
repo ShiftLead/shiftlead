@@ -1792,7 +1792,8 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
-- 2026-10-25 (TD-1009's review, round 14, Sonnet, on round 13's delta, 1 finding and 1 minor, adopted; the loop ends here, Fable's round 13 having only follow-ons and Sonnet READY at round 12 with this delta's two points the only change since): TD-1010's roster test keeps the roster outside every temp root and proves the guard with a second clone; the temp roots are named.
+- 2026-10-25 (TD-1009's review, round 15, Sonnet, READY): the loop ends here — Sonnet READY, and Fable's last round (13) had only follow-ons of round 11's adoption.
+- 2026-10-25 (TD-1009's review, round 14, Sonnet, on round 13's delta, 1 finding and 1 minor, adopted): TD-1010's roster test keeps the roster outside every temp root and proves the guard with a second clone; the temp roots are named.
 - 2026-10-25 (TD-1009's review, round 13, Fable, NOT READY, 3 follow-ons of round 11, adopted): `sync.sh` does append its target to dev-cadence's roster, unless under a temp root (round 11 had said it never writes it), so the scratch clone must be under `$TMPDIR`, and the person's `sync.sh <checkout>` run is the one cure for both the hook-shim and the roster warnings; the Director card row reads *not pushed* / *behind* from the clone; §5 and `ao doctor` name the two warnings.
 - 2026-10-25 (TD-1009's review, round 12, Sonnet, READY, 1 minor adopted): TD-1010's first bullet takes dev-cadence's source as well as a lock-holding checkout.
 - 2026-10-25 (TD-1009's review, round 11, Fable, READY, 1 gap and 2 follow-ons, adopted): an adopted repo is told to join dev-cadence's own roster, which ShiftLead never writes, and the Repo page warns while a served repo is missing from it; the Director card's *unpushed* / *behind* is read from the layer clone itself; TD-1016's listing reads exit 0 with `[]` as no layer, not an error.
