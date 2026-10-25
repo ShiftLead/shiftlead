@@ -140,7 +140,9 @@ class MailMixin:
             if team or repo:
                 if to:
                     raise RpcError("a team or a repo is the whole address: name no addressee beside it (design §4.10)")
-                to = [await self._question_seat(team=team, repo=repo)]
+                if team and repo:
+                    raise RpcError("--team or --repo, not both: each is the whole address (design §4.10)")
+                to = [self._address(await self._question_seat(team=team, repo=repo))]
             said = await self._checks_at_ask(sender, kind, pr)
             if key and key in self._nonces:
                 # a retry of this nonce landed while the read was out: the first send's verdict stands
@@ -180,16 +182,17 @@ class MailMixin:
             self._remember_nonce(key, (result, None))
         return result
 
-    async def _question_seat(self, team: str | None = None, repo: str | None = None) -> str:
+    async def _question_seat(self, team: str | None = None, repo: str | None = None) -> Session:
         """The question seat `--team` or `--repo` names (§4.10 *A team or a repo as the address*,
         TD-1000), read from the org's records alone: a record of that team, or of a repo of that name
         (`Path(repo).name`), holding a seat whose trigger is `asks`, neither superseded nor closed — on
         call or live. A team's two such seats resolve to its techlead seat (`tags: true`), and a live
         record wins over one on call; a repo served by two teams is refused naming them. Registries
-        are read only to word a refusal. Returns the record's address, `id@host` where it has one."""
-        if team and repo:
-            raise RpcError("--team or --repo, not both: each is the whole address (design §4.10)")
-        want = str(team or repo or "").strip()
+        are read only to word a refusal. Returns the record. Given both — a ledger request's `--team`
+        (§4.7 *Entries*) — the team chooses among the repo's: one with no seat record on it is refused
+        naming those that have one."""
+        team, repo = str(team or "").strip(), str(repo or "").strip()
+        want = repo or team
         if not want:
             raise RpcError("--team and --repo each name a team or a repo (design §4.10)")
         records = self._graph()
@@ -199,7 +202,7 @@ class MailMixin:
             if mail.asks_seat(r) and not r.superseded_by and r.state != "closed" and str(r.team or "").strip()
         ]
         teams = sorted({r.team for _a, r in seats})
-        if team:
+        if not repo:
             mine = [(a, r) for a, r in seats if r.team == want]
             if not mine:
                 # a team running with no `asks` seat; one whose records are all closed was never started, or stopped
@@ -209,19 +212,24 @@ class MailMixin:
                     f"no team {want} has a seat record: the teams with one are {', '.join(teams) or 'none'} "
                     "(a team never started has none; design §4.10)"
                 )
-            return self._address(self._one_seat(want, [r for _a, r in mine]))
+            return self._one_seat(want, [r for _a, r in mine])
         mine = [(a, r) for a, r in seats if r.repo and Path(r.repo).name == want]
         if not mine:
             await self._no_seat_for_repo(want, records)
         by_team: dict[str, list[Session]] = {}
         for _a, r in mine:
             by_team.setdefault(r.team, []).append(r)
+        if team:
+            if team not in by_team:
+                names = ", ".join(sorted(by_team))
+                raise RpcError(f"{team} has no seat record on {want}: the teams with one are {names} (design §4.10)")
+            return self._one_seat(team, by_team[team])
         if len(by_team) > 1:
             raise RpcError(
                 f"{want} is served by {', '.join(sorted(by_team))}: name one with --team <team> (design §4.10)"
             )
         ((name, recs),) = by_team.items()
-        return self._address(self._one_seat(name, recs))
+        return self._one_seat(name, recs)
 
     @staticmethod
     def _one_seat(team: str, recs: list[Session]) -> Session:
