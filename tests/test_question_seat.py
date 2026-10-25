@@ -254,6 +254,14 @@ async def test_a_session_asks_another_repos_seat_for_a_ledger_entry(agent, tmp_p
                 AgentError, match=r"cannot add an entry to the ledger this way .*on its branch.*ao finding"
             ):
                 await a.call("entry_add", repo="contractmatch", type="debt", text="mine")
+            # served by no seat, its own repo is still its branch's (a trailing slash is the same path)
+            own_seat = agent.sessions[mine]
+            own_seat.repo = "/src/contractmatch/"
+            with pytest.raises(AgentError, match=r"cannot add an entry to the ledger this way"):
+                await a.call("entry_add", repo="contractmatch", type="debt", text="mine")
+            own_seat.seat = None
+            with pytest.raises(AgentError, match=r"cannot add an entry to the ledger this way"):
+                await a.call("entry_add", repo="contractmatch", type="debt", text="mine")
             with pytest.raises(AgentError, match=r"a draft folder is the person's form's"):
                 await a.call("entry_add", repo="samscrape", type="debt", text="w", draft="draft-0123abcd")
             with pytest.raises(AgentError, match=r"a person's own act"):
@@ -270,8 +278,10 @@ async def test_a_session_asks_another_repos_seat_for_a_ledger_entry(agent, tmp_p
             async with LocalClient(caller=asker) as a:
                 got = await a.call("entry_add", repo="contractmatch", team="cm-node", type="feature", text="w")
                 assert got["to"] == "ao-cm@laptop" and got["team"] == "cm-node"
-                with pytest.raises(AgentError, match=r"ops has no seat record on contractmatch: the teams with one"):
-                    await a.call("entry_add", repo="contractmatch", team="ops", type="debt", text="w")
+                with pytest.raises(
+                    AgentError, match=r"ops has no seat record on samscrape: the teams with one are ss-grind"
+                ):
+                    await a.call("entry_add", repo="samscrape", team="ops", type="debt", text="w")
         finally:
             del agent.remote["laptop"]
         for sid in (seat, asker, mine):

@@ -7,6 +7,7 @@ dismiss, pause, resume, go with it, the attention store — as a mixin `HostAgen
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -508,8 +509,15 @@ class InboxMixin:
         words = str(text or "").strip()
         if not words:
             raise RpcError("the entry has no words: say what it is — a title is enough")
-        seat = await self._question_seat(team=team, repo=repo)
-        if me.repo and seat.repo == me.repo and (seat.host or self.host) == (me.host or self.host):
+        own = me.repo and os.path.normpath(me.repo)
+        try:
+            seat = await self._question_seat(team=team, repo=repo)
+        except RpcError:
+            # a repo of its own name that resolves to no one seat is its own first: the branch is the answer
+            if own and Path(own).name == str(repo).strip():
+                agent_common.person_only(me.id, ENTRY_ACT, "§4.9 *Add an entry to the ledger*", {})
+            raise
+        if own and os.path.normpath(seat.repo or "") == own and (seat.host or self.host) == (me.host or self.host):
             agent_common.person_only(me.id, ENTRY_ACT, "§4.9 *Add an entry to the ledger*", {})
         sender = self._address(me)
         sent = await self._msg(sender, words, [self._address(seat)], "ask", None, None, None, None)
