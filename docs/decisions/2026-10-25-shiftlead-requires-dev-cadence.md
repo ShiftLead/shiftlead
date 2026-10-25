@@ -74,14 +74,15 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
 
 **Q1 — what requiring it means.**
 
-1. **Adoption is a PR the person sees.** `ao repo add` on a repo with no dev-cadence offers to adopt it:
+1. **Adoption is a PR the person sees.** Registering a repo with ShiftLead (today a line in the home's `repos.txt`, design §5; a new
+   `ao repo` word for it is part of the build) offers, for a repo with no dev-cadence, to adopt it:
    it shows what dev-cadence's adopt writes (the seeds and, under the companion plan, the pin; today
    `sync.sh`'s files) and, on the person's yes, opens that as a PR in the repo, as any change lands —
    never a push, and never written silently. ShiftLead serves the repo once the adoption merges. A repo
    whose owners will not take the PR is not served (*Revisit triggers*). The adopt is dev-cadence's
    command, never ShiftLead's code.
 2. **What changes in the design and the 2026-10-12 ADR.**
-   - *ShiftLead requires only a ledger* (2026-10-12's section, design §8) → *requires dev-cadence*.
+   - *recommends dev-cadence and requires only a ledger* (design §8; 2026-10-12's *Requires: a ledger*) → *requires dev-cadence*.
    - §5 *The seams*: the cadence's own seams are fixed to dev-cadence. `gate:` goes — the gate is
      `check_cadence.py`, and a repo's extra check is dev-cadence's precheck (cadence §4.12). The slots'
      absent-seam sentences for `{gate}`, `{board}`, `{ledger_check}` and `{cadence_rules}` go; §5's *a repo
@@ -170,7 +171,7 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
 - **Harder:** serving a repo whose owners do not use the cadence — they must take the adoption PR or go
   unserved.
 - Builds follow the decision, each its own entry, after design §4.7, §4.8, §4.9, §4.9b, §5, §6 and §8
-  change: (Q1) the adoption offer in `ao repo add`; the refusals in place of the fallbacks, with the seams,
+  change: (Q1) the adoption offer when a repo is registered; the refusals in place of the fallbacks, with the seams,
   sentences and `ao repo init` removed; the one resolver and the readers moved onto it (with the
   companion plan's build); the oldest-commit check; TD-681's replacement; the ledgerboard header check;
   (Q2) dev-cadence's `--json` listing of layer roots; the `shiftlead/` layer reader and the brief, entry
