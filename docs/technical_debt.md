@@ -85,7 +85,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1010 | `ao repo add <path> [--adopt]` registers a repo, and offers dev-cadence's adoption as a PR for one without it | Medium | Open — build |
 | TD-1011 | A repo that lacks dev-cadence's tree, the gate or the ledger is unserved, named with its cure; `gate:`, the slots' absent-seam sentences and `ao repo init` go | Medium | Open — build |
 | TD-1012 | ShiftLead names the oldest dev-cadence commit it reads, and a repo whose lock is older is unserved by name | Low | Open — build |
-| TD-1013 | Each vendored `ledgerboard.py` is read by its header, and the home warns when a served repo's names another release than the wheel's | Low | Open — build |
 | TD-1014 | One resolver gives every reader the command to run dev-cadence's pinned code, and the home ships a node's pinned trees with the wheel | Medium | Open — build |
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
@@ -1786,26 +1785,6 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when:** seams tests with a temp dev-cadence repo of three commits: a lock at the middle one with `OLDEST` at the first reads served, with `OLDEST` at the third reads the lack in those words; no dev-cadence checkout and a failing `gh` stub reads the warning.
 
 **Related:** TD-1009, TD-1011, TD-1014 (the pin's interface, the same check under TD-129).
-
-## TD-1013: Each vendored `ledgerboard.py` is read by its header, and the home warns when a served repo's names another release than the wheel's
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-25 (the designer, from TD-1009)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/ledgerboard.py`'s first line (read, never edited: a synced file), `src/sessionorc/seams.py` (the header's release), `src/shiftlead/doctor.py`, `src/shiftlead/ui/repo.py`; `tests/test_repo_seams.py`; design §5 *ledgerboard by its header*
-
-**Why:** TD-1009 (ADR 2026-10-25, *Decision* 6): parity rests on a copy in the repo, which the pin (dev-cadence TD-129) removes.
-
-**Fix:**
-- `seams.ledgerboard_release(text) -> str | None` reads `^# ledgerboard v(\S+) sha256:([0-9a-f]{64})$` from a file's first line; the reading carries the repo's `scripts/ledgerboard.py` release (in dev-cadence's source `files/scripts/ledgerboard.py`; a repo with neither file warns *ledgerboard has no release header*) and the wheel's (`sessionorc/ledgerboard.py`, read once).
-- A release other than the wheel's, or a header missing, is a warning: *ledgerboard v1.2 here, v1.3 in this build* / *ledgerboard has no release header*.
-
-**Done when:** tests: the wheel's own file parses to its release; a temp repo's copy at another release and one without a header each read their warning; an equal release reads nothing; the Repo page and `ao doctor` draw the warning.
-
-**Related:** TD-1009, TD-969 (ledgerboard v1.3 vendored).
 
 ## TD-1014: One resolver gives every reader the command to run dev-cadence's pinned code, and the home ships a node's pinned trees with the wheel
 

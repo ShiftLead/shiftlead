@@ -19442,3 +19442,25 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Related:** TD-995 (its design), TD-1000.
 
 **Resolved:** 2026-10-25 (grinder-ao-1, PR #2338) — built as §4.7 *Mail* says: `main` parses with `parse_known_args` and re-parses what follows `msg` with `msg`'s own `parse_intermixed_args`, any other leftover refused as before; the re-parse goes into a namespace of the top parser's own values (`json`, `cmd`), since one into `args` would append each `--answer` and `--shot` twice. TD-995 archives with TD-1000.
+
+## TD-1013: Each vendored `ledgerboard.py` is read by its header, and the home warns when a served repo's names another release than the wheel's
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/ledgerboard.py`'s first line (read, never edited: a synced file), `src/sessionorc/seams.py` (the header's release), `src/shiftlead/doctor.py`, `src/shiftlead/ui/repo.py`; `tests/test_repo_seams.py`; design §5 *ledgerboard by its header*
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 6): parity rests on a copy in the repo, which the pin (dev-cadence TD-129) removes.
+
+**Fix:**
+- `seams.ledgerboard_release(text) -> str | None` reads `^# ledgerboard v(\S+) sha256:([0-9a-f]{64})$` from a file's first line; the reading carries the repo's `scripts/ledgerboard.py` release (in dev-cadence's source `files/scripts/ledgerboard.py`; a repo with neither file warns *ledgerboard has no release header*) and the wheel's (`sessionorc/ledgerboard.py`, read once).
+- A release other than the wheel's, or a header missing, is a warning: *ledgerboard v1.2 here, v1.3 in this build* / *ledgerboard has no release header*.
+
+**Done when:** tests: the wheel's own file parses to its release; a temp repo's copy at another release and one without a header each read their warning; an equal release reads nothing; the Repo page and `ao doctor` draw the warning.
+
+**Related:** TD-1009, TD-969 (ledgerboard v1.3 vendored).
+
+**Resolved:** 2026-10-25 (grinder-ao-2, PR #2347) — built as §5 *ledgerboard by its header* says: `seams.ledgerboard_release` reads the first line's release, `seams.reading` carries the repo's copy's (`scripts/`, else dev-cadence's `files/scripts/`) beside the wheel's, read once, and `doctor.missing_seams` appends *ledgerboard v1.2 here, v1.3 in this build* / *ledgerboard has no release header*, so `ao doctor`'s **repos** line and the Repo page say the same words; an older reading or an equal release says nothing. Tests in `tests/test_repo_seams.py` and `tests/test_ui_repo_page.py`; a scratch home's Repo page and `ao doctor` read the line (the PR's UI check).
