@@ -1710,19 +1710,19 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Location:** `src/shiftlead/cli.py` (`cmd_repo`: the `add` word, beside `init`'s dispatch), `src/sessionorc/hosts.py` (`repos.txt` under the home), `src/sessionorc/gitinfo.py` (a scratch worktree); `tests/test_cli_repo.py` (or beside `cmd_repo_init`'s tests); design §4.7 **`ao repo add`**, §5 *Repos*
+**Location:** `src/shiftlead/cli.py` (`cmd_repo`: the `add` word, beside `init`'s dispatch; the adopt's run and the PR), a new `add_repo` RPC at the home (`agent_serve`, person-only through `agent_common.person_only`), `src/sessionorc/hosts.py` (`default_repos_registry()`, the home's `repos.txt`), `src/sessionorc/gitinfo.py` (a scratch worktree); `tests/test_cli_repo.py` (or beside `cmd_repo_init`'s tests); design §4.7 **`ao repo add`**, §5 *Repos*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 1): adoption is a PR the person sees, and registering a repo today is a hand-edited line in `repos.txt`.
 
 **Fix:**
-- `ao repo add <path> [--adopt]`, a person's own (refused to a session as `set_settings` is). The path is resolved to its main checkout (`git rev-parse --path-format=absolute --git-common-dir`'s parent); one already in the home's roster (or the imported dev-cadence roster) is refused as there, except `--adopt` on an unserved one.
-- A checkout holding `docs/cadence-sync.lock` is appended to the home's `repos.txt` (`hosts.home_roster()`), *added <name>*, and read on the host agent's next repo reading.
+- `ao repo add <path> [--adopt]`, a person's own: the RPC refuses a session's caller as `set_settings` is. The path is resolved to its main checkout (`git rev-parse --path-format=absolute --git-common-dir`'s parent); one already in the home's roster (or the imported dev-cadence roster) is refused as there, except `--adopt` on an unserved one.
+- A checkout holding `docs/cadence-sync.lock` is appended to the home's `repos.txt` (`hosts.default_repos_registry()`, or `repos_registry` where `hosts.yml` names one) by the `add_repo` RPC, person-only (`mail.PERSON_ONLY`), which then reads the repo at once; *added <name>*. The client calls the RPC; it never writes the file itself.
 - One without: the dev-cadence checkout is the roster's checkout whose root holds `sync.sh` and `files/` (none: refuse, *no dev-cadence checkout in the roster: clone ShiftLead/dev-cadence and add it first*). A scratch worktree of the repo, detached at `origin/<default>` after a fetch, runs `<dev-cadence>/sync.sh <worktree>` under a `timeout`; the reply lists `git status --porcelain`'s paths and ends *`ao repo add <path> --adopt` opens these n files as a PR*; the worktree is removed and nothing is added.
 - `--adopt`: the same run, then `git switch -c cadence-adopt`, one commit (*adopt dev-cadence <commit>*), `git push -u origin cadence-adopt` and `gh pr create --body-file` naming dev-cadence's commit; never a push to the default branch. The path is appended to `repos.txt`; the reply names the PR. The worktree is removed (the branch stays on the remote).
 - `add` is a word of `ao repo` as `init` is: a repo directory called `add` is read by its path.
 
 **Done when:**
-- Tests, with a temp home and two temp repos (one with a lock, one without) and a stub dev-cadence checkout whose `sync.sh` writes two files: the first is added to `repos.txt`; the second is offered (the two paths listed, nothing added, no worktree left); `--adopt` commits on `cadence-adopt` and calls a stubbed `gh pr create` with a body file, and adds the line; a session caller is refused; a path already listed is refused; no dev-cadence checkout is refused in the words above.
+- Tests, with a temp home and two temp repos (one with a lock, one without) and a stub dev-cadence checkout whose `sync.sh` writes two files: the first is added to `repos.txt`; the second is offered (the two paths listed, nothing added, no worktree left); `--adopt` commits on `cadence-adopt` and calls a stubbed `gh pr create` with a body file, and adds the line; the RPC refuses a session's caller; the home never merges the `cadence-adopt` PR (it is the person's); a path already listed is refused; no dev-cadence checkout is refused in the words above.
 - `ao repo --help` lists `add`.
 
 **Related:** TD-1009 (its design), TD-1011 (the unserved words name this cure), TD-590 (the roster).
@@ -1736,7 +1736,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Kind:** build
 **Status:** Open — build
 **Blocked by:** TD-1010
-**Location:** `src/sessionorc/seams.py` (`reading`), `src/sessionorc/cadence.py` (`gate`), `src/shiftlead/repoconfig.py` (`layout`, the slot sentences), `src/shiftlead/doctor.py` (`repos`, `missing_seams`, `ledger_lack`), `src/shiftlead/ui/repo.py` (`missing_seams`), `src/shiftlead/cli.py` (`cmd_repo_init` removed; `ao team start`), the home's passes that act on a repo (`agent_sync`, the promote pass, the lanes' reading, the write-back, `settle`), `src/shiftlead/org.py` (`ao org check`: a `gate:` named); their tests (`tests/test_repo_seams.py`, `tests/test_cadence_policy.py`, `tests/test_sync_pass.py`, `tests/test_ui_repo_page.py`, `tests/test_ui_repo_org.py`, `tests/test_cli_teams.py`, `tests/test_repoconfig.py`, `tests/test_briefs_layout.py`); design §5 *The seams*, §6 rule 10 and *Sync*, §4.4 *The seams*, §4.5a *Repo page: missing seams*, §4.7 `ao doctor` **repos**
+**Location:** `src/sessionorc/seams.py` (`reading`), `src/sessionorc/cadence.py` (`gate`), `src/shiftlead/repoconfig.py` (`layout`, the slot sentences), `src/shiftlead/doctor.py` (`repos`, `missing_seams`, `ledger_lack`), `src/shiftlead/ui/repo.py` (`missing_seams`), `src/shiftlead/cli.py` (`cmd_repo_init` removed; `ao team start`), the home's passes that act on a repo (`agent_sync`, the promote pass, the lanes' reading, the write-back, `settle`), `src/shiftlead/org.py` (`ao org check`: a `gate:` named), `src/shiftlead/briefs/grinder.stage.md` (its *where that reads no gate* clause goes); their tests (`tests/test_repo_seams.py`, `tests/test_cadence_policy.py`, `tests/test_sync_pass.py`, `tests/test_ui_repo_page.py`, `tests/test_ui_repo_org.py`, `tests/test_cli_teams.py`, `tests/test_repoconfig.py`, `tests/test_briefs_layout.py`); design §5 *The seams*, §6 rule 10 and *Sync*, §4.4 *The seams*, §4.5a *Repo page: missing seams*, §4.7 `ao doctor` **repos**
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 2): ShiftLead requires dev-cadence, so the path for a repo without it — the fallbacks, `gate:`, the absent-seam sentences, `ao repo init` — is kept right for no repo.
 
@@ -1752,7 +1752,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 - Seams tests: a temp repo lacking each of the three reads `serve.ok` false with that lack's words; with all three, true; the three warnings each read.
 - Pass tests: an unserved repo gets no gate run, no sync verdict, no promote, no pickable entries and no write-back; `ao team start` on its team is refused naming the lack.
 - Layout tests: the four cadence slots fill with dev-cadence's values in a served repo and carry no sentence; `{test}`, `{lint}`, `{design_dir}` keep theirs.
-- `grep -rn "no gate: a person merges\|repo init\|\"gate:\"" src tests` finds nothing but `ao org check`'s warning and its test.
+- `grep -rn "no gate\|repo init\|\"gate:\"" src tests` finds nothing but `ao org check`'s warning and its test.
 - The live roster (samscrape, contractmatch, pneuma-ops, shiftlead, guardians-devenv, ledgerboard, dev-cadence) reads served on the Repo page after the promote — a live check.
 
 **Related:** TD-1009, TD-1010, TD-1012, TD-584 / TD-586 / TD-588 / TD-591 (what this removes).
@@ -1773,7 +1773,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Fix:**
 - `cadence.OLDEST`: the full sha of the oldest dev-cadence commit whose files this build reads, with a comment naming why that commit (the newest `--json` shape or file it needs); raised only in the PR that needs the newer one.
 - The lack: the lock's `files_commit` (else `commit`) does not descend from `OLDEST`. Ancestry is read in the roster's dev-cadence checkout (`git merge-base --is-ancestor`, after the host's own fetch); with none in the roster, from `gh api repos/<source>/compare/<OLDEST>...<files_commit>` (`status` `ahead` or `identical`), cached per `files_commit` on the reading; a reading that cannot be made is a warning (*dev-cadence's age not read: <why>*), never a lack.
-- Words: *unserved: dev-cadence at <short> is older than this build reads (<short OLDEST>)*, cure *sync it*.
+- Words: *unserved: dev-cadence at <short> is older than this build reads (<short OLDEST>) — sync it* (today `sync.sh`, under TD-129 a bump PR; §5 *The seams*).
 
 **Done when:** seams tests with a temp dev-cadence repo of three commits: a lock at the middle one with `OLDEST` at the first reads served, with `OLDEST` at the third reads the lack in those words; no dev-cadence checkout and a failing `gh` stub reads the warning.
 
@@ -1845,12 +1845,13 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Blocked by:** dev-cadence#TD-132
-**Location:** new `src/shiftlead/layers.py` (the listing and the reads), `src/sessionorc/brief.py` (`fill`: the `{person}` slot and its `sources`), `src/shiftlead/briefs/*.md` (the slot and the sentence before *This repo's rules*), `src/shiftlead/repoconfig.py` (`entry_text`, `work_text`: the additions), `src/shiftlead/cli.py` (`ao prefs`'s layer line); tests beside `tests/test_brief_replay.py` and `tests/test_repoconfig.py`; design §4.8 *The person's own additions*, §4.9b *Preferences, in layers*
+**Blocked by:** dev-cadence#TD-132, TD-1012
+**Location:** new `src/shiftlead/layers.py` (the listing and the reads), `src/sessionorc/cadence.py` (`OLDEST` raised), `src/sessionorc/brief.py` (`fill`: the `{person}` slot and its `sources`), `src/shiftlead/briefs/*.md` (the slot and the sentence before *This repo's rules*), `src/shiftlead/repoconfig.py` (`entry_text`, `work_text`: the additions), `src/shiftlead/cli.py` (`ao prefs`'s layer line); tests beside `tests/test_brief_replay.py` and `tests/test_repoconfig.py`; design §4.8 *The person's own additions*, §4.9b *Preferences, in layers*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 7–9, Q2a): the person's texts get one home that follows them, their dev-cadence layer; `entry.md` and `work.md` cannot be changed at all today.
 
 **Fix:**
+- `cadence.OLDEST` (TD-1012) is raised to the dev-cadence commit that ships the listing, so a repo whose copy lacks it is unserved by name rather than every start there failing.
 - `layers.listing(repo_root) -> [{root, kind: own|followed, ref}]`: dev-cadence's `--json` listing (TD-132), run at the home under the session's repo with the home's `cadence.toml` (today the checkout's `scripts/cadence_layer.py`, under TD-1014 the resolver's command), in its order; a failure is the start's error by name, never an empty list.
 - `layers.read(entry, rel) -> (text, sha) | None`: one's own from the working tree, a followed layer's by `git -C <root> show <ref>:shiftlead/<rel>`; `preferences.md` is read from the `own` layer alone.
 - Briefs: the templates gain `{person}`, a section *Your own rules* just before *This repo's rules*, and the sentence before them says the later wins (§4.8); `fill` joins each layer's `shiftlead/briefs/<role>.md` in listing order, each file among the brief's `sources` (path and sha), *none* when no layer has one.

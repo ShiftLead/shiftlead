@@ -170,8 +170,7 @@ roles:                                # §4.8 presets; every key optional, built
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to: a ledger in ledgerboard format (*The seams*)
-board: docs/user_attention.md         # the person's board, optional (*The seams*); unset: the Inbox is the person's channel
-gate: python3 scripts/check_cadence.py --pr {pr} --json   # the merge gate, a command judged by its exit code (*The seams*)
+board: docs/user_attention.md         # the person's board, dev-cadence's seed (*The seams*); missing: a warning, the Inbox the channel
 worktree_setup: scripts/hydrate_worktree.sh   # run in every new worktree (*The seams*)
 held: ["src/sessionorc/**"]           # §4.9c: the paths a review stage holds (the `build` flow holds nothing)
 
@@ -240,7 +239,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
 
   A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
-  say which, in fixed words that name the cure, `ao repo add <path> --adopt` (§4.7) — *unserved: no
+  say which, in fixed words that name the cure — `ao repo add <path> --adopt` (§4.7) for a missing tree, gate or ledger, the sync (today `sync.sh`, under dev-cadence TD-129 a bump PR) for a tree older than this build reads — *unserved: no
   dev-cadence (no docs/cadence-sync.lock)*, *unserved: no gate (no scripts/check_cadence.py)*,
   *unserved: no ledger at docs/technical_debt.md*, *unserved: the ledger at docs/technical_debt.md does
   not parse — <the reader's reason>*, *unserved: dev-cadence at <commit> is older than this build reads
@@ -278,7 +277,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     scripts/ledger.py --check`, dev-cadence's.
   **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (the gate,
   `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as `<n>` after the rest), `{board}`
-  (the board's path), `{ledger}`, `{ledger_check}`, `{cadence_rules}` (*read docs/cadence.md §1–§4*) —
+  (the board's path, whether or not the file is there: a missing board is the Repo page's warning,
+  and the board's own reader says the Inbox is then the channel), `{ledger}`, `{ledger_check}`, `{cadence_rules}` (*read docs/cadence.md §1–§4*) —
   the cadence's, with no sentence for an absent one, since an unserved repo composes no brief —
   and the repo's own, each with its sentence: `{test}` (*no test command: run what the repo's README
   says*), `{lint}` (*no lint command: keep to the style of the code around the change*) and

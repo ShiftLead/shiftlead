@@ -1350,7 +1350,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   `branch`, `head` and `author`). It looks at a sync PR that no live record holds (§4.4's test),
   that is not a draft and not `conflicting`, and whose `checks` read *green*. Only one that is
   **not cross-repository**, whose **author is the home's own `gh` login** (the account `sync-all.sh`
-  pushes as), and whose repo has a gate goes on to the steps.
+  pushes as), in a served repo (§5 *The seams*), goes on to the steps.
 
   It waits on *pending*, leaves a `not_run` PR alone with no verdict (§4.4 *CI that never started
   is the person's*: it waits for the person, with no timeout), and leaves red, conflicting and draft
@@ -1359,8 +1359,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   order follows at once (§4.4). A branch name alone vouches for nothing. It declines three kinds:
   - a forked PR: *forked*;
   - another login's: *author <login> is not the home's*;
-  - one in an **unserved** repo (§5 *The seams*): no pass runs there at all, so its sync PR is the
-    team's, as any PR of it is.
+  - none in an **unserved** repo (§5 *The seams*): no pass runs there at all, and its PRs are the
+    person's, as an adoption PR is (§4.7 `ao repo add`).
 
   Each head is checked once:
   1. **The files are dev-cadence's.** The head lock's `source:` must equal the merge base's lock's,
