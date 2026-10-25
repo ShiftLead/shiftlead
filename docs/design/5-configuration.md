@@ -240,12 +240,14 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
 
   A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
   say which, each in its fixed words with its cure, the page and `ao doctor` sharing them:
-  *unserved: no dev-cadence (no docs/cadence-sync.lock) — `ao repo add <path> --adopt`*, *unserved: no
+  *unserved: no dev-cadence (no docs/cadence-sync.lock) — `ao repo add <path> --adopt`*, *unserved:
+  dev-cadence's lock does not parse — <the reader's reason> — `ao repo add <path> --adopt`*, *unserved: no
   gate (no scripts/check_cadence.py) — `ao repo add <path> --adopt`*, *unserved: no ledger at
   docs/technical_debt.md — `ao repo add <path> --adopt`*, *unserved: the ledger at
   docs/technical_debt.md does not parse — <the reader's reason>* (no adopt cures it), *unserved:
   dev-cadence at <commit> is older than this build reads (<oldest>) — sync it* (today `sync.sh`, under
-  dev-cadence TD-129 a bump PR); where an adoption PR is open, its cure reads *adoption PR #n open* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
+  dev-cadence TD-129 a bump PR); where an adoption PR is open (the repo's PR reading's open PR whose
+  head is `cadence-adopt`, §4.4), its cure reads *adoption PR #n open* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
   the PRs that show an adoption PR) and **the two passes that make it served**:
   *Pull* (§6), which fast-forwards the checkout once an adoption or a sync has merged, and, for a repo
   whose one lack is an older tree, *Sync* (§6), whose gate is there. No gate run of any other PR, no
@@ -301,7 +303,9 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   Convention notices (§6 rule 12) run in every served repo. The SessionStart line (§4.3) is carried by
   ShiftLead's launch for every session it starts (`CADENCE_HOOK_LINE`), so a repo whose own
   `.claude/settings.json` lacks it gets a warning on the Repo page, *no SessionStart line: a session
-  started outside ShiftLead misses the cadence's nudge*, and nothing more. **Who reads them**: the host
+  started outside ShiftLead misses the cadence's nudge*, and nothing more; it is read on the clients' side
+  (`shiftlead.doctor`, the Repo page), against the adapter's own `CADENCE_HOOK_LINE`, never by the host
+  agent. **Who reads them**: the host
   agent, at the home, reads `ledger:`, `board:`, `worktree_setup:` and `settle:` and the three
   requirements as it reads `promote:` — for the repo facts (§4.4: the seam state and the lacks the
   Repo page and `ao doctor` draw), the gate run (§6 rule 10 runs at the home), the write-back (§4.4:
@@ -329,7 +333,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   it. **ledgerboard by its header** (*Decision* 6, TD-1013): each vendored `ledgerboard.py` opens with
   `# ledgerboard v<release> sha256:<hash>`, the tagged release it was vendored from; the Repo page and
   `ao doctor` warn when a served repo's copy names a release other than the wheel's (*ledgerboard v1.2
-  here, v1.3 in this build*), so parity no longer rests on a copy in the repo.
+  here, v1.3 in this build*; a copy with no such first line, *ledgerboard has no release header*), so
+  parity no longer rests on a copy in the repo.
 
 - Org (§4.9): the teams each registered repo defines in its own `.shiftlead.yml`, aggregated with
   the org file, which holds what no one repo can: the project headings over repos, a team kept out of its repo's file, `place:`
