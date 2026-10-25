@@ -313,7 +313,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   Convention notices (§6 rule 12) run in every served repo. The SessionStart line (§4.3) is carried by
   ShiftLead's launch for every session it starts (`CADENCE_HOOK_LINE`), so a repo whose own
   `.claude/settings.json` lacks it gets a warning on the Repo page, *no SessionStart line: a session
-  started outside ShiftLead misses the cadence's nudge*, and nothing more. The host agent reads the
+  started outside ShiftLead misses the cadence's nudge*, and nothing more. Two more warnings come from dev-cadence's per-clone setup: a checkout without its hook shim and one missing from dev-cadence's own roster, each cured by the person's `<dev-cadence>/sync.sh <checkout>` run (§4.7 `ao repo add`). The host agent reads the
   file's SessionStart commands into the repo facts as text (§4.4), so a client on another machine sees
   them, and the clients (`shiftlead.doctor`, the Repo page) compare them with the adapter's own
   `CADENCE_HOOK_LINE`, which the host agent never imports. **Who reads them**: the host
