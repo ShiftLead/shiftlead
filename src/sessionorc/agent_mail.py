@@ -202,7 +202,8 @@ class MailMixin:
         if team:
             mine = [(a, r) for a, r in seats if r.team == want]
             if not mine:
-                if any(r.team == want for r in records.values()):
+                # a team running with no `asks` seat; one whose records are all closed was never started, or stopped
+                if any(r.team == want and r.state != "closed" and not r.superseded_by for r in records.values()):
                     raise RpcError(f'{want} has no question seat — ask the person: `ao msg person "…"` (design §4.10)')
                 raise RpcError(
                     f"no team {want} has a seat record: the teams with one are {', '.join(teams) or 'none'} "

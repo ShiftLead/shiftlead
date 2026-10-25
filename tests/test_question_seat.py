@@ -193,6 +193,11 @@ async def test_a_team_or_a_repo_addresses_its_question_seat(agent, tmp_path, mon
                     AgentError, match=r"no team nosuch has a seat record: the teams with one are beta, cm"
                 ):
                     await a.call("msg", team="nosuch", text="q?")
+                # a team whose seat was closed (stopped) has no seat record, not *no question seat*
+                with pytest.raises(AgentError, match=r"no team beta-old has a seat record"):
+                    agent.sessions[old].team = "beta-old"
+                    await a.call("msg", team="beta-old", text="q?")
+                agent.sessions[old].team = "beta"
                 with pytest.raises(AgentError, match=r"delta has no question seat — ask the person"):
                     await a.call("msg", team="delta", text="q?")
                 # a node whose registry is not read is named, never waited on

@@ -2548,6 +2548,9 @@ def test_msg_addresses_a_team_or_a_repo(monkeypatch, capsys):
     assert "the text is the only word" in capsys.readouterr().err
     assert cli.main(["msg", "--team", "t", "--repo", "r", "q"]) == 2
     assert "--team or --repo, not both" in capsys.readouterr().err
+    for extra in (["--reply-to", "m-2"], ["--reply-to", "m-2", "--pick", "1"], ["--pass-up", "m-2"]):
+        assert cli.main(["msg", "--team", "t", "q", *extra]) == 2
+        assert "not with --reply-to, --pick or --pass-up" in capsys.readouterr().err
     assert len(sent) == n
     assert cli.main(["msg", "nosuch", "x"]) == 1
     assert "no session named nosuch here" in (err := capsys.readouterr().err) and "`--team` or `--repo`" in err

@@ -3664,6 +3664,9 @@ def cmd_msg(args: argparse.Namespace) -> int:
     (from 1) and sends that answer's own text, any words given following it after a blank line.
     Refusals print as the host agent words them."""
     words = list(args.words)
+    if (args.team or args.repo) and (args.pass_up or args.reply_to or args.pick is not None):
+        # design §4.10 *A team or a repo as the address* (TD-1000): it opens a question, never answers one
+        return fail(args, "--team and --repo address a new question: not with --reply-to, --pick or --pass-up", 2)
     if args.pass_up:
         return _pass_up(args, words)
     if args.recommend:
