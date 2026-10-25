@@ -1,6 +1,6 @@
 # ADR 2026-10-12: three repos — ledgerboard holds the ledger and board formats once, dev-cadence is how a repo works, ShiftLead is how sessions are run
 
-**Status:** decided 2026-10-12 by Paul ("ADR is approved", session `ao-dc-decouple`), after four Fable rounds and four Sonnet rounds reached READY. The name `ledgerboard` is Paul's (drafted as `records`).
+**Status:** decided 2026-10-12 by Paul ("ADR is approved", session `ao-dc-decouple`), after four Fable rounds and four Sonnet rounds reached READY. The name `ledgerboard` is Paul's (drafted as `records`). Superseded in part by [ADR 2026-10-25](2026-10-25-shiftlead-requires-dev-cadence.md) (ShiftLead requires dev-cadence); the rest stands.
 **Date:** 2026-10-12
 **Supersedes:** the placement of the ledger and board formats in [ADR 2026-10-08](2026-10-08-agentorc-dev-cadence-split.md);
 the rest of that ADR stands. Its Status line gains "superseded in part by ADR 2026-10-12 (the formats'

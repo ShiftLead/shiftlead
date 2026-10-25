@@ -1,8 +1,8 @@
 # ADR 2026-10-25: ShiftLead requires dev-cadence, and the person's own texts live in their dev-cadence layer
 
-**Status:** proposed — for Paul's decision (drafted with him, 2026-10-25, session `ao-shiftlead-prompts`)
+**Status:** decided 2026-10-25 by Paul (*Go with your recommendations*): option 4 — Q1 yes, Q2 yes, Q2a and Q2b as recommended (drafted with him, session `ao-shiftlead-prompts`, after two Sonnet and two Fable rounds reached READY)
 **Date:** 2026-10-25
-**Supersedes, if decided:** in [ADR 2026-10-12](2026-10-12-ledgerboard-dev-cadence-shiftlead.md), the layer
+**Supersedes:** in [ADR 2026-10-12](2026-10-12-ledgerboard-dev-cadence-shiftlead.md), the layer
 table's *never owns … a requirement that dev-cadence be installed* and its section *What ShiftLead requires of
 a repo, and what it only uses*, as listed under *Decision* 2; the rest of that ADR (the three layers,
 ledgerboard) stands.
@@ -140,7 +140,7 @@ Proposed: **4**, as two questions for Paul, since the second stands without the 
    each layer's repo root and kind (one's own, or followed at a pin, with its `ref`), which the home runs
    through the resolver under the session's repo, so the reader is that repo's pinned one, since ShiftLead cannot import the
    reader from a pinned tree, and one line saying a tool may keep a directory of its own in a layer repo,
-   which dev-cadence never reads (a TD-126 slice, filed in dev-cadence when Q2 is decided) (its publish check, which reads every tracked file, covers it too).
+   which dev-cadence never reads (dev-cadence TD-132) (its publish check, which reads every tracked file, covers it too).
    `~/.shiftlead/` keeps what belongs to this install (`org.yml`, `profiles.yml`, `settings.yml`).
 8. **Additions, never replacements, in one order.** The texts are joined in this order — the package's,
    then the person's layer, then the repo's (`.shiftlead.yml`, a definition's `brief:`) — and the session is
