@@ -79,7 +79,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Designed — builds TD-1004, TD-1005 |
 | TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Open — design first: a background shell's end wakes no Gemini session |
 | TD-1000 | A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo | Medium | Open — build |
-| TD-1001 | `ao msg` takes its options anywhere among the addressees and the text | Low | Open — build |
 | TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Built (#2333) — live check |
 
 ---
@@ -1618,31 +1617,6 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 - A live check on the home, once live: an interactive contractmatch session's `ao msg --repo samscrape "…"` reaches samscrape's techlead seat and fills it, and the seat's reply lands in the session's inbox.
 
 **Related:** TD-995 (its design), TD-1001 (the parser), TD-582 (the project edge), TD-218 / TD-219 (Hand to the techlead), TD-723.
-
-## TD-1001: `ao msg` takes its options anywhere among the addressees and the text
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-24 (the designer, from TD-995)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/cli.py` (`main`, `build_parser`'s `msg` subparser, `cmd_msg`); `tests/test_cli.py`; design §4.7 *Mail*
-
-**Why:** TD-995: `ao msg samscrape --kind note … "text"` failed with argparse's *unrecognized arguments*, the error scrolling off above the echoed text, so the send read as sent (also 2026-10-01; memory *ao msg: options before recipients*).
-
-**Fix:**
-- `main` parses with `parse_known_args`, not `parse_args`. `parse_args` exits on the leftover words before anything could re-parse them; the top parser cannot use `parse_intermixed_args`, since a subparsers action is `nargs=PARSER`.
-- When the subcommand is `msg`, `main` re-parses the arguments after the `msg` token with the `msg` subparser's own `parse_intermixed_args`, passing `namespace=args` so the global options the top parser read (`--json`, whose subparser copy defaults to `SUPPRESS`) are kept.
-- Any other subcommand with leftovers keeps today's `parser.error`.
-
-**Done when:**
-- `ao msg x --kind note "t"`, `ao msg --kind note x "t"` and `ao msg x "t" --kind note` give the same params (a stubbed `call_sync`).
-- The `--pass-up` form still parses.
-- `ao --json msg x --about TD-1 "t"` keeps `--json`, and so does `ao msg x "t" --json` (the `msg` subparser's own `--json`).
-- An unknown option is still refused with argparse's usage line, and so is a leftover on another subcommand.
-
-**Related:** TD-995 (its design), TD-1000.
 
 ## TD-1004: The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node
 
