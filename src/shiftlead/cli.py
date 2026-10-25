@@ -5053,7 +5053,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    args = _parse(argv)
     clientmod.last_mail = None
     clientmod.last_ignored = []
     try:
@@ -5061,6 +5061,26 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         skew_line(args)
         unread_line(args)
+
+
+def _parse(argv: list[str] | None) -> argparse.Namespace:
+    """The command line, `msg`'s options anywhere among its addressees and text (design §4.7 *Mail*,
+    TD-1001): `ao msg x --kind note "t"` once failed as *unrecognized arguments*, the error scrolling
+    off above the echoed text. The top parser cannot parse intermixed (a subparsers action is
+    `nargs=PARSER`), so what it leaves over on `msg` is parsed again by `msg`'s own parser; a leftover
+    on any other subcommand is refused as before."""
+    parser = build_parser()
+    argv = sys.argv[1:] if argv is None else list(argv)
+    args, rest = parser.parse_known_args(argv)
+    if not rest:
+        return args
+    if args.cmd != "msg":
+        parser.error(f"unrecognized arguments: {' '.join(rest)}")
+    sub = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction)).choices["msg"]
+    # a fresh namespace with the top parser's own values: a re-parse into `args` would append each
+    # `--answer` and `--shot` a second time; `msg`'s `--json` defaults to SUPPRESS, so the global one stands
+    top = argparse.Namespace(json=args.json, cmd=args.cmd)
+    return sub.parse_intermixed_args(argv[argv.index("msg") + 1 :], namespace=top)
 
 
 def _run(args: argparse.Namespace) -> int:

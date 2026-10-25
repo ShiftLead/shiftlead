@@ -1163,6 +1163,47 @@ def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():
     assert "restart it once with `ao new`" not in text
 
 
+def test_msg_takes_its_options_anywhere_among_the_addressees_and_the_text(monkeypatch, capsys):
+    """TD-1001 (design §4.7 *Mail*): `ao msg x --kind note "t"` once failed as *unrecognized
+    arguments*, the error scrolling off above the echoed text, so the send read as sent. An option
+    before, among or after the words gives the same send; each `--answer` is sent once; the global
+    `--json` and `msg`'s own are both kept; an unknown option, and a leftover on another subcommand,
+    are still refused with argparse's usage line."""
+    sent = []
+
+    def fake(method, **params):
+        if method == "msg":
+            sent.append(params)
+        return {"entry": {"id": "m-1", "kind": params.get("kind")}, "delivered": ["ao-x"]}
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    for argv in (
+        ["msg", "ao-x", "--kind", "note", "t"],
+        ["msg", "--kind", "note", "ao-x", "t"],
+        ["msg", "ao-x", "t", "--kind", "note"],
+    ):
+        assert cli.main(argv) == 0
+    assert sent[0] == sent[1] == sent[2] and (sent[0]["to"], sent[0]["text"]) == (["ao-x"], "t")
+    capsys.readouterr()
+    assert cli.main(["msg", "ao-x", "--answer", "a", "t", "--answer", "b", "--kind", "ask"]) == 0
+    assert sent[-1]["answers"] == ["a", "b"] and sent[-1]["text"] == "t"
+    capsys.readouterr()
+    for argv in (["--json", "msg", "ao-x", "--about", "TD-1", "t"], ["msg", "ao-x", "--about", "TD-1", "t", "--json"]):
+        assert cli.main(argv) == 0
+        assert json.loads(capsys.readouterr().out)["entry"]["id"] == "m-1"
+        assert sent[-1]["about"] == "TD-1" and sent[-1]["text"] == "t"
+    up = cli._parse(["msg", "ao-x", "--pass-up", "m-9", "--recommend", "go"])
+    assert (up.words, up.pass_up, up.recommend, up.fn) == (["ao-x"], "m-9", "go", cli.cmd_msg)
+    with pytest.raises(SystemExit):
+        cli.main(["msg", "ao-x", "--bogus", "t"])
+    err = capsys.readouterr().err
+    assert "usage: ao msg" in err and "unrecognized arguments: --bogus" in err
+    with pytest.raises(SystemExit):
+        cli.main(["status", "extra"])
+    err = capsys.readouterr().err
+    assert "usage: ao" in err and "unrecognized arguments: extra" in err
+
+
 def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-052 step 2 (design §4.10 "Surface"): `ao msg` prints what landed and refusals as the host
     agent words them; `ao inbox` opens with the fixed header, names who sent the last keystrokes,
