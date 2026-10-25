@@ -49,6 +49,15 @@ async def test_an_ask_reaches_another_projects_question_seat_once_at_a_time_and_
             # a seat whose trigger is not `asks` is no question seat
             with pytest.raises(AgentError, match=GRAPH):
                 await a.call("msg", to=mgr, text="q?", kind="ask")
+            # an ask citing `sends` is not this edge's: the `msg` RPC reads `cites` as the gate's `carries`
+            with pytest.raises(AgentError, match=GRAPH):
+                await a.call("msg", to=seat, text="which?", kind="ask", cites=["s-1"])
+        # an ask passing an earlier edge (the seat's own team) has no open-question limit
+        mate = await mk("mate", team="beta", project="B")
+        async with LocalClient(caller=mate) as m:
+            await m.call("msg", to=seat, text="one?", kind="ask")
+            await m.call("msg", to=seat, text="two?", kind="ask")
+        async with LocalClient(caller=asker) as a, LocalClient(caller=seat) as s:
             # the seat's reply lands on the asker's thread, and frees the sender
             reply = (await s.call("msg", text="yes", kind="reply", reply_to=first["id"]))["entry"]
             assert reply["to"] == [asker] and reply["root"] == first["id"]
@@ -74,7 +83,7 @@ async def test_an_ask_reaches_another_projects_question_seat_once_at_a_time_and_
         async with LocalClient(caller=mgr) as m:
             with pytest.raises(AgentError, match=GRAPH):
                 await m.call("msg", text="answer", kind="reply", reply_to=held.id)
-        for sid in (seat, asker, mgr):
+        for sid in (seat, asker, mgr, mate):
             await person.call("kill", id=sid)
 
 
