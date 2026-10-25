@@ -16,9 +16,10 @@ from sessionorc.agent import HostAgent
 from sessionorc.agent_common import RpcError, person_only
 from sessionorc.models import Session
 
-# what each RPC's first statement may call to make the check: the check, or one of the two
-# helpers that make it and keep what else each does (the entry lookup, *runs at the home*)
-CHECKS = {"agent_common.person_only", "self._person_entry", "self._promote_person"}
+# what each RPC's first statement may call to make the check: the check, or one of the helpers
+# that make it and keep what else each does (the entry lookup, *runs at the home*, and `entry_add`'s
+# session call for another repo, TD-995)
+CHECKS = {"agent_common.person_only", "self._person_entry", "self._promote_person", "self._entry_session"}
 
 
 def _first_call(fn) -> str | None:

@@ -3511,16 +3511,30 @@ def cmd_td_add(args: argparse.Namespace) -> int:
     `handed`; a `--team` that does not service the repo is refused with the repo's team names. `--priority` is
     the form's **Priority** pick, `entry.priority`, *medium* without it (TD-851). The repo
     defaults to the one the command is run in, and it is the **main checkout** that is handed, by path: a
-    worktree's path is not in the registry. A person's only: a session is
-    refused here before its standard input is read, and by the host agent whatever this says — but
-    the person's own shell (§4.8 *The person's own shell is the person*, TD-580), as the agent lets it by."""
-    if (sid := os.environ.get("SHIFTLEAD_SESSION")) and not mailmod.person_shell(
+    worktree's path is not in the registry. A person's own — the person's own shell too (§4.8 *The
+    person's own shell is the person*, TD-580) — but for a session's call for **another repo** (TD-995,
+    §4.7 *Entries*): sent with `repo` as typed and `team` where given, reading no registry and no
+    `org.yml`, which a node does not have, and resolved at the home as `ao msg --repo` is. A session
+    with no `--repo` is refused here before its standard input is read: the repo it runs in is its own."""
+    session = (sid := os.environ.get("SHIFTLEAD_SESSION")) and not mailmod.person_shell(
         Session.from_dict(call_sync("get", id=sid))
-    ):
+    )
+    if session and not args.repo:
         raise AgentError(
-            f"{sid} cannot add an entry this way: it is a person's own act (design §4.9 *Add an entry to the "
-            "ledger*) — a session writes the entry on its branch (cadence §2), or files `ao finding`"
+            f"{sid} cannot add an entry to its own ledger this way: it is a person's own act (design §4.9 *Add an "
+            "entry to the ledger*) — a session writes the entry on its branch (cadence §2), or files `ao finding`; "
+            "another repo's ledger takes `--repo <name>`"
         )
+    if session:
+        got = call_sync(
+            "entry_add",
+            repo=args.repo,
+            type=args.type,
+            text=_entry_words(args),
+            team=args.team or None,
+            priority=args.priority,
+        )
+        return emit(args, got, lambda: _entry_prose(got, got.get("to")))
     root = _td_repo(args.repo)[1]
     try:
         org = _org_here()
@@ -3550,32 +3564,35 @@ def cmd_td_add(args: argparse.Namespace) -> int:
     # the team defines whose home has no checkout on its host reads to `entry_add` as no seat at all
     if servicing and not servicing[0]["seat"] and servicing[0]["techlead"]:
         raise AgentError(f"{servicing[0]['techlead']}: the techlead seat has no checkout on its host")
-    if args.words:
-        words = " ".join(args.words).strip()
-    else:
-        if sys.stdin.isatty():
-            print("the entry's words, then Ctrl-D:", file=sys.stderr)
-        try:
-            words = sys.stdin.read().strip()
-        except (UnicodeDecodeError, OSError) as e:
-            raise AgentError(f"standard input could not be read as the entry's words: {e}") from None
     got = call_sync(
         "entry_add",
         repo=root,
         type=args.type,
-        text=words,
+        text=_entry_words(args),
         teams=[{"team": t["team"], "seat": t["seat"]} for t in servicing],
         team=pick,
         priority=args.priority,
     )
+    name = servicing[0]["name"] if got.get("to") == servicing[0]["seat"] else got.get("to")
+    return emit(args, got, lambda: _entry_prose(got, name, "handed to"))
 
-    def prose() -> None:
-        name = servicing[0]["name"] if got.get("to") == servicing[0]["seat"] else got.get("to")
-        print(f"{got['id']} handed to {name or got.get('to')} ({got.get('repo')}, {got.get('type')})")
-        if got.get("read_when"):  # design §4.10 *When it is read*, as `ao msg` ends
-            print(f"{got.get('to')}: {got['read_when']}")
 
-    return emit(args, got, prose)
+def _entry_words(args: argparse.Namespace) -> str:
+    """`ao td add`'s words: the argument, or standard input when there is none."""
+    if args.words:
+        return " ".join(args.words).strip()
+    if sys.stdin.isatty():
+        print("the entry's words, then Ctrl-D:", file=sys.stderr)
+    try:
+        return sys.stdin.read().strip()
+    except (UnicodeDecodeError, OSError) as e:
+        raise AgentError(f"standard input could not be read as the entry's words: {e}") from None
+
+
+def _entry_prose(got: dict[str, Any], name: Any, verb: str = "asked") -> None:
+    print(f"{got['id']} {verb} {name or got.get('to')} ({got.get('repo')}, {got.get('type')})")
+    if got.get("read_when"):  # design §4.10 *When it is read*, as `ao msg` ends
+        print(f"{got.get('to')}: {got['read_when']}")
 
 
 def cmd_finding(args: argparse.Namespace) -> int:

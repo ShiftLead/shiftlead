@@ -2033,6 +2033,8 @@ def _td_world(world, monkeypatch, *, seat=True, declared=None):
             return {root: {"name": "shiftlead", "root": root, "ledger": {"declared_teams": declared}}}
         assert method == "entry_add", method
         handed.append(params)
+        if "teams" not in params:  # a session's call for another repo (TD-995): resolved at the home
+            return {"id": "m-1", "to": "ao-seat", "repo": params["repo"], "type": params["type"]}
         if not params["teams"]:
             raise cli.AgentError("no team services shiftlead: there is no techlead seat to hand it to (design §4.10)")
         if not params["teams"][0]["seat"]:
@@ -2119,10 +2121,11 @@ def test_td_add_priority_carries_the_pick_and_medium_without_it(world, capsys, m
     assert len(handed) == 2
 
 
-def test_td_add_runs_from_the_persons_own_shell_and_is_refused_to_a_session(world, capsys, monkeypatch):
+def test_td_add_runs_from_the_persons_own_shell_and_a_session_names_another_repo(world, capsys, monkeypatch):
     """§4.8 *The person's own shell is the person* (TD-580): inside a pane the record decides — a shell
-    with no role, team or controller is handed on as the person is; any other session is refused here,
-    before its standard input is read."""
+    with no role, team or controller is handed on as the person is. Any other session (§4.7 *Entries*,
+    TD-995) sends `repo` as typed and `team` where given, reading no registry and no `org.yml`; with no
+    `--repo` it is refused here, before its standard input is read."""
     tmp_path, handed = _td_world(world, monkeypatch)
     fake = cli.call_sync
     records = {
@@ -2135,8 +2138,21 @@ def test_td_add_runs_from_the_persons_own_shell_and_is_refused_to_a_session(worl
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-sh")
     assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 0 and handed[-1]["text"] == "words"
     monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-w")
-    assert cli.main(["td", "add", "--repo", "shiftlead", "more"]) == 1
-    assert "ao-w cannot add an entry this way" in capsys.readouterr().err and len(handed) == 1
+    assert cli.main(["td", "add", "more"]) == 1
+    assert "ao-w cannot add an entry to its own ledger this way" in capsys.readouterr().err and len(handed) == 1
+
+    def no_org():
+        raise AssertionError("a session's call reads no org.yml")
+
+    monkeypatch.setattr(cli, "_org_here", no_org)
+    monkeypatch.setattr(cli, "_td_repo", lambda _r: no_org())
+    assert cli.main(["td", "add", "--repo", "samscrape", "--team", "ss-grind", "more"]) == 0
+    assert {k: handed[-1].get(k) for k in ("repo", "team", "text", "teams")} == {
+        "repo": "samscrape",
+        "team": "ss-grind",
+        "text": "more",
+        "teams": None,
+    }
 
 
 def test_td_add_says_when_standard_input_cannot_be_read(world, capsys, monkeypatch):
@@ -2199,9 +2215,9 @@ def test_td_add_is_a_persons_only_and_a_session_is_refused_before_stdin_is_read(
             raise AssertionError("a session's standard input was read")
 
     monkeypatch.setattr(sys, "stdin", Unread())
-    assert cli.main(["td", "add", "--repo", "shiftlead"]) == 1
+    assert cli.main(["td", "add"]) == 1  # its own repo: another takes `--repo` (TD-995)
     err = capsys.readouterr().err
-    assert "a person's own act" in err and "ao finding" in err and not handed
+    assert "a person's own act" in err and "ao finding" in err and "--repo <name>" in err and not handed
 
 
 # ── the balance rule's words in the terminal (design §4.7, §6 *Balance*, TD-239 slice 4) ───────

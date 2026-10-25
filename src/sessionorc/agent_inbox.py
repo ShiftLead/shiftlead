@@ -39,6 +39,7 @@ from sessionorc.models import (
     ATTENTION_KINDS,
     PERSON,
     MailEntry,
+    Session,
     normalize_ref,
     now_iso,
 )
@@ -74,6 +75,13 @@ def board_refs(refs: list[str] | None) -> list[str]:
         if r not in out:
             out.append(r)
     return out
+
+
+# What a session may not do with `entry_add` but for another repo (design §4.9, §4.7 *Entries*): its own
+# ledger's entry is written on its branch, and reported with `ao finding`
+ENTRY_ACT = (
+    "add an entry to the ledger this way — a session writes one on its branch (cadence §2), or files `ao finding`"
+)
 
 
 class InboxMixin:
@@ -400,14 +408,12 @@ class InboxMixin:
         `{id, to, team, repo, type, priority, read_when}`, `team` the team handed to.
         `draft`, where the form attached files (§4.4 *The Add entry form's draft*, TD-630): refused
         before the send unless it is this host's and unclaimed, then claimed for the ask
-        (`claimed.json` `{by: hand:<its id>, at}`) and carried in the envelope beside `entry`."""
-        agent_common.person_only(
-            caller,
-            "add an entry to the ledger this way — a session writes one on its branch (cadence §2), "
-            "or files `ao finding`",
-            "§4.9 *Add an entry to the ledger*",
-            self._graph(),
-        )
+        (`claimed.json` `{by: hand:<its id>, at}`) and carried in the envelope beside `entry`.
+        A session's call, for another repo only, is its own `ask` to that repo's question seat
+        (`_entry_request`, TD-995)."""
+        me = self._entry_session(caller, repo, draft)
+        if me is not None:
+            return await self._entry_request(me, repo, type, text, team, priority)
         want = str(repo or "").strip()
         roots = hosts.local_host().repos()
         found = [r for r in roots if want and (want in (Path(r).name, r) or Path(r).resolve() == Path(want).resolve())]
@@ -464,6 +470,67 @@ class InboxMixin:
             "type": kind,
             "priority": rank,
             "read_when": self._entry_read_when(seat),
+        }
+
+    def _entry_session(self, caller: Any, repo: Any, draft: Any) -> Session | None:
+        """Who calls `entry_add` (design §4.10 *An entry handed to a seat*, §4.7 *Entries*): None for
+        the person, the person's own shell included — the handed entry; the caller's record for a
+        session naming a repo, which `_entry_request` serves only for another repo than its own. Any
+        other session is refused as a person's own act, and a session's call carrying a draft in words."""
+        graph = self._graph()
+        if mail.as_person(caller, graph):
+            return None
+        me = graph.get(str(caller))  # as `msg` reads its sender: a forwarded caller is `id@host` already
+        if me is None or not str(repo or "").strip():
+            agent_common.person_only(caller, ENTRY_ACT, "§4.9 *Add an entry to the ledger*", graph)
+        if draft:
+            raise RpcError(
+                f"{caller} cannot attach a draft: a draft folder is the person's form's (design §4.7 *Entries*)"
+            )
+        return me
+
+    async def _entry_request(
+        self, me: Session, repo: str, type: str, text: str, team: str, priority: str
+    ) -> dict[str, Any]:
+        """A session's ledger request for another repo (design §4.7 *Entries*, §4.10 *An entry handed
+        to a seat*; TD-995, TD-1000 slice 3): its own `ask` to the repo's question seat, resolved from
+        the records as `ao msg --repo` is (`team` choosing), through the same gate as `msg` — so the
+        open-question limit and every depth bound hold — carrying `entry` and **not** `handed`, with
+        no bound: the seat replies once its PR is merged, and the open `ask` holds it on call. The
+        caller's own repo — the seat record's `repo` is the caller's, on the same host — is refused
+        as the person's own act is: a session writes its own entry on its branch."""
+        kind = str(type or "").strip().lower()
+        if kind not in ENTRY_TYPES:
+            raise RpcError(f"an entry is {' or '.join(ENTRY_TYPES)}, not {type!r} (cadence §2.11)")
+        rank = str(priority or "").strip().lower() or "medium"
+        if rank not in ENTRY_PRIORITIES:
+            raise RpcError(f"an entry's priority is {', '.join(ENTRY_PRIORITIES)}, not {priority!r} (design §4.10)")
+        words = str(text or "").strip()
+        if not words:
+            raise RpcError("the entry has no words: say what it is — a title is enough")
+        seat = await self._question_seat(team=team, repo=repo)
+        if me.repo and seat.repo == me.repo and (seat.host or self.host) == (me.host or self.host):
+            agent_common.person_only(me.id, ENTRY_ACT, "§4.9 *Add an entry to the ledger*", {})
+        sender = self._address(me)
+        sent = await self._msg(sender, words, [self._address(seat)], "ask", None, None, None, None)
+        mid = (sent.get("entry") or {}).get("id")
+        if not mid:
+            raise RpcError(f"the entry request was not delivered to {self._address(seat)}")
+        to = next(iter(sent.get("delivered") or ()), self._address(seat))
+        name = Path(str(seat.repo)).name
+        self._mark(
+            mid, entry={"repo": name, "type": kind, "team": str(team or "").strip(), "priority": rank}, bound=None
+        )
+        await self._push_changes()
+        log.info("entry_add: %s asked %s for an entry in %s (%s)", sender, to, name, kind)
+        return {
+            "id": mid,
+            "to": to,
+            "team": seat.team,
+            "repo": name,
+            "type": kind,
+            "priority": rank,
+            "read_when": self._entry_read_when(to),
         }
 
     def _entry_read_when(self, seat: str) -> str:

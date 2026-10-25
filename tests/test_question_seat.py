@@ -226,3 +226,53 @@ async def test_a_team_or_a_repo_addresses_its_question_seat(agent, tmp_path, mon
             del agent.remote["laptop"]
         for sid in (old, seat, asker, member, second):
             await person.call("kill", id=sid)
+
+
+async def test_a_session_asks_another_repos_seat_for_a_ledger_entry(agent, tmp_path):
+    """`entry_add` from a session (design §4.7 *Entries*, §4.10 *An entry handed to a seat*, TD-1000 slice 3):
+    for another repo, the session's own `ask` to its question seat carrying `entry`, not `handed`, with no
+    bound, through the gate's open-question limit; for its own repo, or with a draft, refused in words."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        seat = await mk("seat", team="ss-grind", project="S", seat={"trigger": "asks", "tags": True})
+        asker = await mk("asker", team="cm-grind", project="C")
+        agent.sessions[seat].repo, agent.sessions[asker].repo = "/src/samscrape", "/src/contractmatch"
+        mine = await mk("mine", team="cm-grind", project="C", seat={"trigger": "asks", "tags": True})
+        agent.sessions[mine].repo = "/src/contractmatch"
+        async with LocalClient(caller=asker) as a, LocalClient(caller=seat) as s:
+            got = await a.call("entry_add", repo="samscrape", type="debt", text="parse the new feed", priority="high")
+            assert (got["to"], got["repo"], got["team"], got["priority"]) == (seat, "samscrape", "ss-grind", "high")
+            held = _ask_in(agent.sessions[seat], got["id"])
+            assert held.kind == "ask" and held.from_ == asker and not held.handed and held.bound is None
+            assert held.entry == {"repo": "samscrape", "type": "debt", "team": "", "priority": "high"}
+            assert agent.sessions[seat].asks_waiting(home=agent.host) == 1
+            # one open question to the seat: a second request is refused naming the first
+            with pytest.raises(AgentError, match=rf"{got['id']} is still open"):
+                await a.call("entry_add", repo="samscrape", type="debt", text="and another")
+            # its own repo is written on its branch; a draft is the person's form's
+            with pytest.raises(
+                AgentError, match=r"cannot add an entry to the ledger this way .*on its branch.*ao finding"
+            ):
+                await a.call("entry_add", repo="contractmatch", type="debt", text="mine")
+            with pytest.raises(AgentError, match=r"a draft folder is the person's form's"):
+                await a.call("entry_add", repo="samscrape", type="debt", text="w", draft="draft-0123abcd")
+            with pytest.raises(AgentError, match=r"a person's own act"):
+                await a.call("entry_add", type="debt", text="no repo")
+            # the seat's reply closes it, after its PR merged
+            await s.call("msg", text="merged #12 as TD-40", kind="reply", reply_to=got["id"])
+            assert not held.open and agent.sessions[seat].asks_waiting(home=agent.host) == 0
+        # a same-named repo whose seat is on another host is another repo
+        node = models.Session(id="ao-cm", name="cm-techlead", kind="claude", adapter="claude-code", dir="/w")
+        node.team, node.project, node.repo, node.host = "cm-node", "N", "/src/contractmatch", "laptop"
+        node.seat, node.state = {"trigger": "asks", "tags": True}, "idle"
+        agent.remote["laptop"] = {node.id: node}
+        try:
+            async with LocalClient(caller=asker) as a:
+                got = await a.call("entry_add", repo="contractmatch", team="cm-node", type="feature", text="w")
+                assert got["to"] == "ao-cm@laptop" and got["team"] == "cm-node"
+                with pytest.raises(AgentError, match=r"ops has no seat record on contractmatch: the teams with one"):
+                    await a.call("entry_add", repo="contractmatch", team="ops", type="debt", text="w")
+        finally:
+            del agent.remote["laptop"]
+        for sid in (seat, asker, mine):
+            await person.call("kill", id=sid)
