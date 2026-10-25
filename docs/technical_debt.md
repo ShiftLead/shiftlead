@@ -81,7 +81,15 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1000 | A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo | Medium | Open — build |
 | TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Built (#2333) — live check |
 | TD-1007 | Gemini CLI's layer wakes a session at a background command's end, and its hook refuses an unattended foreground CI watch | Low | Built (#2343) — live check |
-| TD-1009 | ShiftLead requires dev-cadence, and the person's briefs, start prompts and preferences live in their dev-cadence layer repo | Medium | Decided 2026-10-25 (ADR) — design first |
+| TD-1009 | ShiftLead requires dev-cadence, and the person's briefs, start prompts and preferences live in their dev-cadence layer repo | Medium | Designed — builds TD-1010–TD-1017 |
+| TD-1010 | `ao repo add <path> [--adopt]` registers a repo, and offers dev-cadence's adoption as a PR for one without it | Medium | Open — build |
+| TD-1011 | A repo that lacks dev-cadence's tree, the gate or the ledger is unserved, named with its cure; `gate:`, the slots' absent-seam sentences and `ao repo init` go | Medium | Open — build |
+| TD-1012 | ShiftLead names the oldest dev-cadence commit it reads, and a repo whose lock is older is unserved by name | Low | Open — build |
+| TD-1013 | Each vendored `ledgerboard.py` is read by its header, and the home warns when a served repo's names another release than the wheel's | Low | Open — build |
+| TD-1014 | One resolver gives every reader the command to run dev-cadence's pinned code, and the home ships a node's pinned trees with the wheel | Medium | Open — build |
+| TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
+| TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
+| TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
 
 ---
 
@@ -642,19 +650,20 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-642
+**Blocked by:** TD-642, TD-1016
 **Location:** design §4.9b *The director answers what is passed up to it* (*Preferences, in layers*, *Its first read*, *A level the person sets*), §4.5a (Settings page **Director** card, *Inbox row: answered for you*), §4.7 `ao prefs`, §5 `settings.yml` `director:`; `src/shiftlead/briefs/` (new `preferences.md`; `director.md`), `src/sessionorc/brief.py` (`fill`: `{preferences}`), `src/sessionorc/settings.py` (the keys), `src/sessionorc/agent_mail.py` (`answered.level`), `src/shiftlead/cli.py`, `src/shiftlead/ui/` (Settings, Inbox)
 
 **Why:** TD-657: Paul, 2026-10-13 — *preferences per repo … with some set of defaults like we do for briefs*; *conservative … reasonably extrapolated, or answer liberally*; *a button for the user to be able to open the pref file in an editor*.
 
 **Fix:**
 1. `src/shiftlead/briefs/preferences.md`: the package's defaults, under the topic headings (*Spending*, *Scope*, *Risk*, *Style*, *Always ask me*, *Permissions*), short.
-2. Two file slots in `director.md`, `{preferences}` (the package's) and `{my_preferences}` (`~/.shiftlead/preferences.md`, read by the home), filled by rule 7's fill so both are in `sources`; `brief.fill` (`src/sessionorc/brief.py` ~L84) lets this one slot be missing and fill *none written*, where a missing file raises `Unreadable` today. The director's *filled for* line names the absolute paths of the asking repo's `.shiftlead/preferences.md` and primer in the home's checkout of it. `director.md` states the order, the floor, the three levels, the citation form, and that it never reads `~/.shiftlead`.
+2. Two file slots in `director.md`, `{preferences}` (the package's) and `{my_preferences}` (the person's dev-cadence layer's `shiftlead/preferences.md`, read by the home through TD-1016's `layers.read`, from their own layer alone), filled by rule 7's fill so both are in `sources`; `brief.fill` (`src/sessionorc/brief.py` ~L84) lets this one slot be missing and fill *none written*, where a missing file raises `Unreadable` today. The director's *filled for* line names the absolute paths of the asking repo's `.shiftlead/preferences.md` and primer in the home's checkout of it. `director.md` states the order, the floor, the three levels, the citation form, and that it never reads `~/.shiftlead`.
 2a. `director.md`'s prompt half reads a prompt against the preferences' *Permissions* as well as its own rules, at the level in force, under the floor; the level is handed on a prompt fill as on a question's. A start refuses a `director:` whose profile is `permission_prompts: ask`.
 3. `settings.yml` `director: {level, groom}` and `repos.<repo>.director.level`, validated (`conservative|extrapolate|liberal`; a duration or `off`), written by `set_settings`; the level in force handed on the fill and recorded on a sourced reply as `answered.level`.
 4. The *answered for you* row names the level and draws **Open file** on a source that is a preferences file.
 5. The Settings page's **Director** card (level, per-repo picks, groom every, the layers with Open file and *create it*), drawn when `org.yml` defines `director:`; `ao prefs` (the listing).
 6. Tests: the fill carries both layers in order, and fills with the person's file absent (*none written*); a change to the person's file is seen as a source change; a prompt fill carries the level; a director on an `ask` profile is refused at the start; a bad level is refused by `set_settings`; a repo's override wins for its questions; `answered.level` is written and drawn; the card's Save writes both keys.
+- **The person's layer is their dev-cadence layer's `shiftlead/preferences.md`** (TD-1009, design §4.9b *Preferences, in layers*): `{my_preferences}` reads it through `layers.read` (TD-1016) from the person's own layer alone, never a followed one, *none written* with no layer; nothing reads `~/.shiftlead/preferences.md`.
 
 **Done when** the director's fill carries the package's and the person's preferences and names the repo's, the level is set per org and per repo and shown on every answer, the Director card and `ao prefs` show the layers, and the tests above pass.
 
@@ -670,19 +679,20 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-661, TD-662
+**Blocked by:** TD-661, TD-662, TD-1016
 **Location:** design §4.9b *The director answers what is passed up to it* (*Grown and groomed*, *Remember this*, *The interview*), §4.5a (*Inbox row: preferences proposed*, *Inbox row: passed up*'s Remember this, the Director card's Groom now and Interview), §4.7 `ao prefs`, §4.9 *What is left at the home has a history*, §6 rule 3 (`groom`); `src/sessionorc/agent_settings.py` (`_commit_defs` ~L326 / `rpc_commit_defs` ~L312: `preferences.md` tracked; new `prefs_propose`, `prefs_accept`, `prefs_discard`), `src/sessionorc/agent_tick.py` (the `groom` cause), `src/sessionorc/agent_mail.py` (`remember` on a reply, kept until a pass concludes), `src/shiftlead/briefs/` (new `interview.md`; `director.md`'s groom half), `src/shiftlead/cli.py`, `src/shiftlead/ui/`
 
 **Why:** TD-657: Paul, 2026-10-13 — *we would want the preferences routinely groomed so that it becomes general sentiments instead of specifics*; *would we need an interview to set those up?*
 
 **Fix:**
-1. The home's work tree tracks `preferences.md`; a hand edit is committed *edited by hand* as the other definitions are.
+1. The person's `preferences.md` is their dev-cadence layer's `shiftlead/preferences.md` (TD-1009): the home's work tree does not track it, and a hand edit is the person's to commit in their layer.
 2. `prefs_propose {text, why}` from the director seat or an interactive session (refused from any other): writes `~/.shiftlead/preferences.proposed.md` (a newer replaces it) and the *preferences proposed* row; `prefs_accept` / `prefs_discard`, a person's own — accept moves it over and commits *preferences: <why>* — and either concludes the groom pass.
 3. Rule 3's `groom` on the director: due `director.groom` after the last conclusion (none yet: at the first tick the seat exists), or on `ao prefs groom` / **Groom now**; never while a proposal stands, so a pass that proposed is not refilled until Accept or Discard.
 4. `director.md`'s groom half: read the file, the remembered answers and, the first pass or with the file empty, the seed (every registered repo's board `Decided:` lines, the person's dated quotes in its ledger and design history); write general sentiments, a remembered line about one repo under its `## <repo>` heading; name the gaps in `--why`.
 5. **Remember this** on the compose of the person's reply to a question whose `passes` name the director, and of an **Overrule** of a director's sourced answer: `remember: true` on the reply entry; its copy in the director's inbox kept until a groom pass concludes; the Director card counts them (*3 remembered*).
 6. `ao prefs interview` / **Interview**: the person's interactive session with `interview.md` (the layers, the last gaps), ending in `ao prefs propose`.
 7. Tests: a proposal from the director writes the row and a member's is refused; Accept commits and Discard deletes, each concluding the pass; `groom` is due at the seat's first tick, on the interval and on the press, and not while a proposal stands (no refill loop); a remembered reply survives the inbox's aging until the pass concludes; a hand edit is committed.
+- **The home commits, the person pushes** (TD-1009 Q2b, design §4.9b *Grown and groomed*): **Accept** moves the proposal over the layer's `shiftlead/preferences.md` and commits *preferences: <why>* in the layer clone, never pushing; it refuses, naming why, while that file has uncommitted edits or the clone is behind its upstream. The home's own work tree (§4.9) no longer tracks a `preferences.md`; the proposal stays `~/.shiftlead/preferences.proposed.md`.
 
 **Done when** the director grooms the person's file on its interval and on a press, seeding it the first time, a remembered answer reaches the next pass, the interview proposes, every change reaches the file only by the person's Accept or hand edit, and the tests above pass.
 
@@ -1680,7 +1690,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-25 (Paul, in the TD-993 conversation; drafted by ao-shiftlead-prompts)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Decided 2026-10-25 by Paul (*Go with your recommendations*): [ADR 2026-10-25](decisions/2026-10-25-shiftlead-requires-dev-cadence.md), option 4, Q1 and Q2 yes, Q2a and Q2b as recommended; its dev-cadence companion (dev-cadence TD-129, *pinned, not synced*) decided the same day as option C. Next: the design round changes §4.7, §4.8, §4.9, §4.9b, §5, §6 and §8 and files the builds below. The Q1 builds that read pinned code wait on dev-cadence TD-129's build; the Q2 builds wait on dev-cadence TD-132 (the layer-roots listing).
+**Status:** Designed 2026-10-25 (the designer): design §5 *The seams* (ShiftLead requires dev-cadence; a repo lacking its tree, gate or ledger is *unserved*; *How the readers find dev-cadence*, *Which dev-cadence*, *ledgerboard by its header*), §4.7 `ao repo add`, §4.8 *The person's own additions*, §4.9b (the preferences in the layer; the home commits, the person pushes), §6 rule 10 and *Sync*, §4.4, §4.4a, §4.5a, §4.9, §8, the glossary's *unserved*. Builds: TD-1010 (`ao repo add`), TD-1011 (unserved; `gate:`, the sentences and `ao repo init` gone), TD-1012 (`OLDEST`), TD-1013 (the ledgerboard header), TD-1014 (the resolver; dev-cadence TD-129), TD-1015 (TD-681's replacement), TD-1016 (the layer's `shiftlead/` texts; dev-cadence TD-132), TD-1017 (the *told at start* sources); TD-662 and TD-663 are blocked by TD-1016 for the preferences' new home. Before: decided 2026-10-25 by Paul (*Go with your recommendations*): [ADR 2026-10-25](decisions/2026-10-25-shiftlead-requires-dev-cadence.md), option 4, Q1 and Q2 yes, Q2a and Q2b as recommended; its dev-cadence companion (dev-cadence TD-129, *pinned, not synced*) decided the same day as option C.
+**Blocked by:** TD-1010, TD-1011, TD-1012, TD-1013, TD-1014, TD-1015, TD-1016, TD-1017
 **Location:** `docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md`; design §8 (*recommends dev-cadence and requires only a ledger*), §5 (*The layout slots*), §4.7 (`ao repo init`), §4.8 (brief supplements), §4.9b (TD-657's preference layers); `src/shiftlead/repoconfig.py` (`entry_text`, `layout`), `src/sessionorc/cadence.py`, `src/sessionorc/sync.py`
 
 **Why:** Paul, 2026-10-25, after TD-993 made the start context visible: *as soon as users can see it they will want the ability to modify it*; then *we talked previously about letting someone use a different cadence mechanism (other than dev-cadence) but I wonder if that is needless complication, especially given that we are building personal prefs into dev-cadence now*. ShiftLead keeps a path for a repo without dev-cadence that no repo uses, and has no home of the person's own for its briefs and start prompts (`entry.md` and `work.md` cannot be changed at all), while dev-cadence's personal layer (its TD-126) already follows the person across repos and machines.
@@ -1690,3 +1701,182 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when** the design sections say what the ADR decided and every build entry named above is filed, each with its `Blocked by:`.
 
 **Related:** TD-993, TD-657, TD-662, TD-681, TD-588; dev-cadence TD-126, TD-128, TD-129, TD-130 (following another's layer: Q2a's rule applies), TD-132, TD-133; ADR 2026-10-12, ADR 2026-10-08.
+
+## TD-1010: `ao repo add <path> [--adopt]` registers a repo, and offers dev-cadence's adoption as a PR for one without it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/cli.py` (`cmd_repo`: the `add` word, beside `init`'s dispatch), `src/sessionorc/hosts.py` (`repos.txt` under the home), `src/sessionorc/gitinfo.py` (a scratch worktree); `tests/test_cli_repo.py` (or beside `cmd_repo_init`'s tests); design §4.7 **`ao repo add`**, §5 *Repos*
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 1): adoption is a PR the person sees, and registering a repo today is a hand-edited line in `repos.txt`.
+
+**Fix:**
+- `ao repo add <path> [--adopt]`, a person's own (refused to a session as `set_settings` is). The path is resolved to its main checkout (`git rev-parse --path-format=absolute --git-common-dir`'s parent); one already in the home's roster (or the imported dev-cadence roster) is refused as there, except `--adopt` on an unserved one.
+- A checkout holding `docs/cadence-sync.lock` is appended to the home's `repos.txt` (`hosts.home_roster()`), *added <name>*, and read on the host agent's next repo reading.
+- One without: the dev-cadence checkout is the roster's checkout whose root holds `sync.sh` and `files/` (none: refuse, *no dev-cadence checkout in the roster: clone ShiftLead/dev-cadence and add it first*). A scratch worktree of the repo, detached at `origin/<default>` after a fetch, runs `<dev-cadence>/sync.sh <worktree>` under a `timeout`; the reply lists `git status --porcelain`'s paths and ends *`ao repo add <path> --adopt` opens these n files as a PR*; the worktree is removed and nothing is added.
+- `--adopt`: the same run, then `git switch -c cadence-adopt`, one commit (*adopt dev-cadence <commit>*), `git push -u origin cadence-adopt` and `gh pr create --body-file` naming dev-cadence's commit; never a push to the default branch. The path is appended to `repos.txt`; the reply names the PR. The worktree is removed (the branch stays on the remote).
+- `add` is a word of `ao repo` as `init` is: a repo directory called `add` is read by its path.
+
+**Done when:**
+- Tests, with a temp home and two temp repos (one with a lock, one without) and a stub dev-cadence checkout whose `sync.sh` writes two files: the first is added to `repos.txt`; the second is offered (the two paths listed, nothing added, no worktree left); `--adopt` commits on `cadence-adopt` and calls a stubbed `gh pr create` with a body file, and adds the line; a session caller is refused; a path already listed is refused; no dev-cadence checkout is refused in the words above.
+- `ao repo --help` lists `add`.
+
+**Related:** TD-1009 (its design), TD-1011 (the unserved words name this cure), TD-590 (the roster).
+
+## TD-1011: A repo that lacks dev-cadence's tree, the gate or the ledger is unserved, named with its cure; `gate:`, the slots' absent-seam sentences and `ao repo init` go
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1010
+**Location:** `src/sessionorc/seams.py` (`reading`), `src/sessionorc/cadence.py` (`gate`), `src/shiftlead/repoconfig.py` (`layout`, the slot sentences), `src/shiftlead/doctor.py` (`repos`, `missing_seams`, `ledger_lack`), `src/shiftlead/ui/repo.py` (`missing_seams`), `src/shiftlead/cli.py` (`cmd_repo_init` removed; `ao team start`), the home's passes that act on a repo (`agent_sync`, the promote pass, the lanes' reading, the write-back, `settle`), `src/shiftlead/org.py` (`ao org check`: a `gate:` named); their tests (`tests/test_repo_seams.py`, `tests/test_cadence_policy.py`, `tests/test_sync_pass.py`, `tests/test_ui_repo_page.py`, `tests/test_ui_repo_org.py`, `tests/test_cli_teams.py`, `tests/test_repoconfig.py`, `tests/test_briefs_layout.py`); design §5 *The seams*, §6 rule 10 and *Sync*, §4.4 *The seams*, §4.5a *Repo page: missing seams*, §4.7 `ao doctor` **repos**
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 2): ShiftLead requires dev-cadence, so the path for a repo without it — the fallbacks, `gate:`, the absent-seam sentences, `ao repo init` — is kept right for no repo.
+
+**Fix:**
+- `seams.reading` gains `serve: {ok: bool, lacks: [{key, words}]}`: `cadence` (no `docs/cadence-sync.lock`), `gate` (no `scripts/check_cadence.py`), `ledger` (absent, or not parsing — `ledger_lack`'s reason), and `oldest` once TD-1012 lands; and warnings for a missing board, `worktree_setup` absent, and `.claude/settings.json` lacking the SessionStart line (`CADENCE_HOOK_LINE`'s command). `gate:` leaves the reading; `cadence.gate` returns the script's command or `None` and reads no key.
+- Every pass that acts on a repo skips an unserved one (the gate run, the sync pass, the promote pass, the lanes' pickable reading and its notes, the board write-back, `settle`), and `ao team start` refuses a team of it, naming each lack's words. A running team is not stopped; the Repo page says *unserved* above it.
+- The words are §5's (*unserved: no dev-cadence (no docs/cadence-sync.lock)* …), each lack ending with the cure `ao repo add <path> --adopt`, or *adoption PR #n open* where an open PR's head is `cadence-adopt`. `ao doctor`'s **repos** line makes each a lack and the warnings warnings; the Repo page draws them as §4.5a says.
+- `repoconfig.layout`: `{gate}`, `{board}`, `{ledger_check}` and `{cadence_rules}` fill their dev-cadence values and have no sentence; `{test}`, `{lint}` and `{design_dir}` keep theirs.
+- `gate:` in a `.shiftlead.yml` is read by nothing; `ao org check` warns *gate: is gone — a repo's extra check is dev-cadence's precheck*. The record's `verdict: none` and *no gate: a person merges* go, with their tests.
+- `ao repo init` and `cmd_repo_init` go; `init` is then read as a repo name, as any word but `add` is.
+
+**Done when:**
+- Seams tests: a temp repo lacking each of the three reads `serve.ok` false with that lack's words; with all three, true; the three warnings each read.
+- Pass tests: an unserved repo gets no gate run, no sync verdict, no promote, no pickable entries and no write-back; `ao team start` on its team is refused naming the lack.
+- Layout tests: the four cadence slots fill with dev-cadence's values in a served repo and carry no sentence; `{test}`, `{lint}`, `{design_dir}` keep theirs.
+- `grep -rn "no gate: a person merges\|repo init\|\"gate:\"" src tests` finds nothing but `ao org check`'s warning and its test.
+- The live roster (samscrape, contractmatch, pneuma-ops, shiftlead, guardians-devenv, ledgerboard, dev-cadence) reads served on the Repo page after the promote — a live check.
+
+**Related:** TD-1009, TD-1010, TD-1012, TD-584 / TD-586 / TD-588 / TD-591 (what this removes).
+
+## TD-1012: ShiftLead names the oldest dev-cadence commit it reads, and a repo whose lock is older is unserved by name
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1011
+**Location:** `src/sessionorc/cadence.py` (new `OLDEST`), `src/sessionorc/sync.py` (`lock`'s `files_commit`), `src/sessionorc/seams.py` (the `oldest` lack); `tests/test_repo_seams.py`; design §5 *Which dev-cadence*
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 4): dev-cadence has no versions, so the build must say which commits it can read.
+
+**Fix:**
+- `cadence.OLDEST`: the full sha of the oldest dev-cadence commit whose files this build reads, with a comment naming why that commit (the newest `--json` shape or file it needs); raised only in the PR that needs the newer one.
+- The lack: the lock's `files_commit` (else `commit`) does not descend from `OLDEST`. Ancestry is read in the roster's dev-cadence checkout (`git merge-base --is-ancestor`, after the host's own fetch); with none in the roster, from `gh api repos/<source>/compare/<OLDEST>...<files_commit>` (`status` `ahead` or `identical`), cached per `files_commit` on the reading; a reading that cannot be made is a warning (*dev-cadence's age not read: <why>*), never a lack.
+- Words: *unserved: dev-cadence at <short> is older than this build reads (<short OLDEST>)*, cure *sync it*.
+
+**Done when:** seams tests with a temp dev-cadence repo of three commits: a lock at the middle one with `OLDEST` at the first reads served, with `OLDEST` at the third reads the lack in those words; no dev-cadence checkout and a failing `gh` stub reads the warning.
+
+**Related:** TD-1009, TD-1011, TD-1014 (the pin's interface, the same check under TD-129).
+
+## TD-1013: Each vendored `ledgerboard.py` is read by its header, and the home warns when a served repo's names another release than the wheel's
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/ledgerboard.py`'s first line (read, never edited: a synced file), `src/sessionorc/seams.py` (the header's release), `src/shiftlead/doctor.py`, `src/shiftlead/ui/repo.py`; `tests/test_repo_seams.py`; design §5 *ledgerboard by its header*
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 6): parity rests on a copy in the repo, which the pin (dev-cadence TD-129) removes.
+
+**Fix:**
+- `seams.ledgerboard_release(text) -> str | None` reads `^# ledgerboard v(\S+) sha256:([0-9a-f]{64})$` from a file's first line; the reading carries the repo's `scripts/ledgerboard.py` release and the wheel's (`sessionorc/ledgerboard.py`, read once).
+- A release other than the wheel's, or a header missing, is a warning: *ledgerboard v1.2 here, v1.3 in this build* / *ledgerboard has no release header*.
+
+**Done when:** tests: the wheel's own file parses to its release; a temp repo's copy at another release and one without a header each read their warning; an equal release reads nothing; the Repo page and `ao doctor` draw the warning.
+
+**Related:** TD-1009, TD-969 (ledgerboard v1.3 vendored).
+
+## TD-1014: One resolver gives every reader the command to run dev-cadence's pinned code, and the home ships a node's pinned trees with the wheel
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** dev-cadence#TD-129, TD-1011
+**Location:** `src/sessionorc/cadence.py` (new `command(repo, word, *args) -> (argv, env)`), every reader of a dev-cadence path (`cadence.gate`, `sync`, `seams`, `repoconfig.layout`'s `{gate}` / `{ledger_check}` / `{cadence_rules}`, the convention notices, the layer listing of TD-1016), `pyproject.toml` (the launcher as a dependency), `src/sessionorc/containers.py` / `ao host up` (the trees beside the wheel); design §5 *How the readers find dev-cadence*, §4.4a
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 3): under dev-cadence TD-129 a repo carries a pin, not the files, so no reader can read a path in the checkout.
+
+**Fix:** as §5 says — the resolver calls the launcher from the host agent's own venv (`sys.prefix`, never a login `PATH`), returns argv and env with `CADENCE_REPO_ROOT`; a pin it cannot resolve, or one needing a newer launcher interface, is an unserved lack by name; the readers move onto it one by one, the copy's paths read while a repo still has a lock; `ao host up` copies the pinned trees the node's repos name into `~/.shiftlead/nodes/<name>/cadence/<commit>/` and the container's cache. The exact launcher interface is TD-129's and is read from its build when this is picked.
+
+**Done when:** every reader above calls `cadence.command` and none builds a dev-cadence path itself (`grep -rn "check_cadence.py\|cadence.md\|cadence-sync.lock" src` finds only `cadence.py`); a temp repo with a pin and a stub launcher runs the gate through it; a node is provisioned with the tree its repo pins.
+
+**Related:** TD-1009, dev-cadence TD-129 and its plan 2026-10-25, TD-1015, TD-1016.
+
+## TD-1015: The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1014
+**Location:** `src/sessionorc/sync.py` (`check`, the pass), `agent_sync`; `tests/test_sync_pass.py`; design §6 *Sync: a mechanical sync PR is merged at the home*
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 5): with a pin there is no lock and no copied file to replay; TD-681 is replaced, not trimmed.
+
+**Fix:** the pass's steps 1–2 (the lock, the files, `post_sync`'s replay) give way to: the PR's diff changes only the pin lines of `docs/cadence.toml` (the plan's *Decision* 1: the `ref` line and its tag comment); the new `ref` is a full commit on the unchanged `source`'s default branch and descends from the old pin; it merges only on review evidence whose reviewer read the compare (the plan's *Decision* 7). A bump that changes `source` or anything else is refused by name as not routine (*not a routine bump: <path> changed*) and is the person's. The rest of the pass (holders, CI, the gate, the pinned merge, the notes) stands. §6 *Sync* is rewritten to match in this PR.
+
+**Done when:** tests with a temp repo and a stub dev-cadence history: a pin-only bump that descends merges; one that changes `source`, another file, or a ref that does not descend is refused with its words; the lock path is gone from `sync.check` once no served repo has a lock.
+
+**Related:** TD-1009, TD-681 / TD-684 / TD-685 (what it replaces), dev-cadence TD-129.
+
+## TD-1016: The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** dev-cadence#TD-132
+**Location:** new `src/shiftlead/layers.py` (the listing and the reads), `src/sessionorc/brief.py` (`fill`: the `{person}` slot and its `sources`), `src/shiftlead/briefs/*.md` (the slot and the sentence before *This repo's rules*), `src/shiftlead/repoconfig.py` (`entry_text`, `work_text`: the additions), `src/shiftlead/cli.py` (`ao prefs`'s layer line); tests beside `tests/test_brief_replay.py` and `tests/test_repoconfig.py`; design §4.8 *The person's own additions*, §4.9b *Preferences, in layers*
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 7–9, Q2a): the person's texts get one home that follows them, their dev-cadence layer; `entry.md` and `work.md` cannot be changed at all today.
+
+**Fix:**
+- `layers.listing(repo_root) -> [{root, kind: own|followed, ref}]`: dev-cadence's `--json` listing (TD-132), run at the home under the session's repo with the home's `cadence.toml` (today the checkout's `scripts/cadence_layer.py`, under TD-1014 the resolver's command), in its order; a failure is the start's error by name, never an empty list.
+- `layers.read(entry, rel) -> (text, sha) | None`: one's own from the working tree, a followed layer's by `git -C <root> show <ref>:shiftlead/<rel>`; `preferences.md` is read from the `own` layer alone.
+- Briefs: the templates gain `{person}`, a section *Your own rules* just before *This repo's rules*, and the sentence before them says the later wins (§4.8); `fill` joins each layer's `shiftlead/briefs/<role>.md` in listing order, each file among the brief's `sources` (path and sha), *none* when no layer has one.
+- `entry_text` and `work_text` append each layer's `shiftlead/entry.md` / `work.md` after the package's text, each under a line naming its source.
+- With no layer set, everything reads the package's alone and `ao prefs` prints *no dev-cadence layer: the package's texts alone*; nothing is written under `~/.shiftlead/`.
+- Never on a node: a node member's brief is composed at the home.
+
+**Done when:** tests with a temp layer repo (own) and a second at a pinned `ref` (followed) holding `shiftlead/briefs/grinder.md`, `entry.md`, `work.md` and `preferences.md`: a grinder brief holds both additions in order under *Your own rules*, before *This repo's rules*, with both files in `sources`; entry and work texts append both; the followed layer's `preferences.md` is never read; no layer reads the package's alone; an edit to a layer file marks a running member's brief changed (§6 rule 7).
+
+**Related:** TD-1009, dev-cadence TD-126 / TD-132, TD-662 and TD-663 (the preferences' reader and writer), TD-1017.
+
+## TD-1017: The Session card's *told at start* row heads each part of the text with its source
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-25 (the designer, from TD-1009)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1016
+**Location:** the start context on the record (§4.3; its parts and their sources), `src/shiftlead/ui/` (the Session card's *told at start* row, TD-996); its UI test; design §4.5a *Focus side panel, Session card: told at start*
+
+**Why:** TD-1009 (ADR 2026-10-25, *Decision* 9): once a layer adds to the text, the person must see which part came from where.
+
+**Fix:** the start context keeps its parts as `[{source: package|layer|repo, path, commit, text}]` beside the joined text; the open fold heads each part with its source in the muted style (*package*, *layer ~/cadence-layer @ 3f2a1c9*), and with no layer a last line *no dev-cadence layer: the package's texts alone*. A record from before keeps drawing its one text.
+
+**Done when:** a UI test draws a two-part context with both heads and a one-part one with the no-layer line; a record holding only the joined text draws as before; a look (shot) is sent with the PR (design §4.9b).
+
+**Related:** TD-1009, TD-993 / TD-996 (the row), TD-1016.

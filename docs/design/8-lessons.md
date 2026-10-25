@@ -18,13 +18,17 @@ machine: cadence.md's rules, the seeds, the git hooks, the gate (`check_cadence.
 session-start nudge, worktree and anchor rules, `sync.sh`, the machine roster. **shiftlead** owns how
 many sessions are run: the host agent, session state, teams, lanes, claims, policies, the Inbox and
 every UI, what a field is *for* (`Owner`, `Kind`, lanes), its own roster, and the board write-back's
-fetch, commit, push and locking — and it recommends dev-cadence and requires only a ledger (§5 *The
-seams*).
+fetch, commit, push and locking — and it **requires dev-cadence** in every repo it serves, while
+dev-cadence stays usable with no shiftlead on the machine: the dependency runs one way, dev-cadence never
+calls `ao` and never reads a layer's `shiftlead/` directory (§5 *The seams*; [ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md),
+superseding [ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md)'s *never owns a requirement that dev-cadence be installed*). The person's
+own texts — brief, entry and work additions, the director's preferences — live in their dev-cadence
+layer repo, the one personal home (§4.8 *The person's own additions*).
 - **No second parser.** Every reader and writer of a ledger or board, in any repo, calls
   `ledgerboard.py`; a regex that recognises a ledger or board line shape outside it is a finding, and
   a diff walker uses its line predicates. shiftlead carries the module twice, the synced
   `scripts/ledgerboard.py` and the wheel's `src/sessionorc/ledgerboard.py`, held byte-equal by a test
-  and renewed together in the one sync PR; a field's value past its first word (but the `Answers:`
+  and renewed together in the one sync PR while the copy stands (under dev-cadence TD-129 the repo carries none, and each copy's `# ledgerboard v<release> sha256:<hash>` header is the parity, §5 *The seams*, TD-1013); a field's value past its first word (but the `Answers:`
   grammar) is the consumer's to read; a behaviour that needs a new line shape is a ledgerboard change
   first. "A second reader held equal by a parity test" is retired: cadence §7's ledger and board rows
   read *both read through `ledgerboard.py`*.

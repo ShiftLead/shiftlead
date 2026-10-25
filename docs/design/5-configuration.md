@@ -142,8 +142,10 @@ reach:                                        # §4.5b *The setting*: the person
   comments), read first; **dev-cadence's `~/.config/dev-cadence/repos.txt` is imported** into the
   reading when it exists, so a host that runs the cadence lists both and one without it lists what
   ShiftLead was given; `hosts.yml`'s `repos_registry` names one file in place of the home's
-  ([ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), *Its own roster*; TD-584, built by TD-590). A repo without
-  dev-cadence is a repo like any other: what ShiftLead requires of it is *The seams*, below. Directories that are not
+  ([ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), *Its own roster*; TD-584, built by TD-590). A repo is
+  registered with `ao repo add` (§4.7, TD-1010), which offers dev-cadence's adoption as a PR for a repo
+  without it, and a registered repo that lacks what *The seams*, below, require is unserved until it has
+  it ([ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md), TD-1009). Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
   ones per host in `~/.shiftlead/recent_dirs`.
 - Per repo: `.shiftlead.yml` (checked in). A repo's `.agentorc.yml`, its name while the project was
@@ -223,67 +225,103 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   runs; the seams below are read there for the same reason, and the rest of the file is the clients'.
   `ledger:` travels on the record as well, because it is a session's.
 
-  **The seams** ([ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), *What ShiftLead requires of a repo, and what it only uses*; TD-584).
-  ShiftLead **requires** one thing of a repo: a ledger in ledgerboard format at `ledger:` (default
-  `docs/technical_debt.md`), the format `ShiftLead/ledgerboard`'s `SPEC.md` defines and its
-  `ledgerboard.py` reads — the one parser, vendored as `src/sessionorc/ledgerboard.py` and held
-  byte-equal to the synced `scripts/ledgerboard.py` where both exist (§8 *Which side a thing lives
-  on*). `ao repo init` writes an empty one (§4.7). An external tracker is mapped *into* the ledger by
-  an importer, never read in its place. Everything else is **used when present, and named when not**
-  — a seam is a key of this file, each with a default that is dev-cadence's file when the checkout
-  holds it, and a fixed sentence the Repo page, `ao doctor` and the briefs say when neither is there,
-  never empty text or a silent fallback (§4.5a *Repo page: missing seams*, §4.7 `ao doctor` **repos**):
-  - **`board:`** — the person's board, default `docs/user_attention.md` when that file exists; unset
-    and absent, the person's channel is the Inbox alone (*no board: the Inbox is the person's channel*;
-    every reader, `workorders.board_path`, built by TD-587).
-    With one, the Inbox reads it in-process through `ledgerboard.py` — the checkout's file and
+  **The seams** ([ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md), *Decision* 2–6, superseding [ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md)'s *What ShiftLead requires of a repo, and what it only uses*; TD-584, TD-1009).
+  ShiftLead **requires dev-cadence** in every repo it serves, and dev-cadence stays usable alone: the
+  dependency runs one way. Of a repo it requires the three things it cannot supply itself, each read
+  through dev-cadence:
+  - **dev-cadence's tree** — today the synced files and their lock, `docs/cadence-sync.lock`, whose
+    `files_commit` is at or after the oldest dev-cadence commit this build reads (*Which dev-cadence*,
+    below); under dev-cadence TD-129, the pin in `docs/cadence.toml`, resolved (*How the readers find
+    dev-cadence*, below);
+  - **the gate**, dev-cadence's `check_cadence.py` (§6 rule 10);
+  - **the ledger**, in ledgerboard format at `ledger:` (default `docs/technical_debt.md`), the format
+    `ShiftLead/ledgerboard`'s `SPEC.md` defines and its `ledgerboard.py` reads — the one parser,
+    vendored as `src/sessionorc/ledgerboard.py` and held byte-equal to the synced
+    `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
+
+  A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
+  say which, in fixed words that name the cure, `ao repo add <path> --adopt` (§4.7) — *unserved: no
+  dev-cadence (no docs/cadence-sync.lock)*, *unserved: no gate (no scripts/check_cadence.py)*,
+  *unserved: no ledger at docs/technical_debt.md*, *unserved: the ledger at docs/technical_debt.md does
+  not parse — <the reader's reason>*, *unserved: dev-cadence at <commit> is older than this build reads
+  (<oldest>)* — and the home runs nothing of it: no gate, sync or promote pass, no lane, no write-back,
+  no settle. `ao team start` refuses a team of an unserved repo, naming the lack, and the tick stops
+  nothing already running there but says so on the Repo page. A plain session in its directory starts
+  as in any directory (New session takes a path). No reader degrades silently and no slot has a
+  sentence for dev-cadence's absence. An external tracker is mapped *into* the ledger by an importer,
+  never read in its place. The rest are keys of this file, each with a default:
+  - **`board:`** — the person's board, default `docs/user_attention.md`, dev-cadence's seed.
+    The Inbox reads it in-process through `ledgerboard.py` — the checkout's file and
     `origin/<default>`'s after the host's own fetch, the origin note derived from the two (§4.5 screen 6
-    *Boards are read against origin*) — and runs no dev-cadence script; a repo with a board needs no
-    dev-cadence. A session's own edit of a line is `ao board edit` on its branch (§4.7); the person's
+    *Boards are read against origin*) — and runs no dev-cadence script. A board missing at its path is
+    a warning, never a lack (*no board at docs/user_attention.md*, on the Repo page and in `ao doctor`),
+    and the Inbox is then that repo's one channel to the person (`workorders.board_path`, built by
+    TD-587). A session's own edit of a line is `ao board edit` on its branch (§4.7); the person's
     presses are the write-back (§4.4).
-  - **`gate:`** — the merge gate, a command with `{pr}` filled that exits 0 for a mergeable PR, judged
-    by its exit code alone; default, when `scripts/check_cadence.py` exists, that script run `--pr {pr}
-    --json`, the one shape whose rows the record's checks entry keeps (§6 rule 10). Unset and absent:
-    **the review stage never merges on its own**, the record's entry reads `verdict: none` and
-    `ao status -v` prints *no gate: a person merges* (§6 rule 10); the Repo page (TD-591) and the
-    briefs (§4.9c, TD-588) say the same.
+  - **The gate is no key** (TD-1011): it is `python3 scripts/check_cadence.py --pr {pr} --json`, run in
+    the checkout and judged by its exit code, its rows kept on the record's checks entry (§6 rule 10).
+    A repo's own extra check is dev-cadence's precheck (cadence §4.12), which the gate reads. A `gate:`
+    left in a `.shiftlead.yml` is read by nothing, and `ao org check` names it (*gate: is gone — a
+    repo's extra check is dev-cadence's precheck*).
   - **`commands:`** — a mapping; `test` and `lint` fill `{test}` and `{lint}` in the built-in briefs and
     flows (§4.8 *A repo's brief*), each unset one filling with its seam's sentence (*no test command:
-    run what the repo's README says*). This repo's own `pdm run …` lives here and in its own brief,
-    not in the built-ins, which name no repo's layout ([ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md),
-    *Briefs and flows name no repo's layout*; TD-588).
+    run what the repo's README says*): they are the repo's commands, not the cadence's. This repo's own
+    `pdm run …` lives here and in its own brief, not in the built-ins, which name no repo's layout
+    ([ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), *Briefs and flows
+    name no repo's layout*; TD-588).
   - **`worktree_setup:`** — a command run by the shell in each new worktree, its path `$1`, after it is created
     (`sessionorc.gitinfo.ensure_worktree`; a worktree reused is not set up again), default
     `scripts/hydrate_worktree.sh` when present and executable, given the worktree's path; unset and
     absent, nothing runs and the Repo page says *no worktree setup* (TD-589). A setup that fails
     leaves the worktree and fails the create with its own words.
   - **`ledger:`** carries, beside the ledger, the `{ledger_check}` the briefs name: `python3
-    scripts/ledger.py --check` when that script exists, else the seam's sentence.
-  **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (*no gate: a person
-  merges*; dev-cadence's default `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as
-  `<n>` after the rest), `{board}` (*no board: the Inbox is the person's channel*), `{ledger}`,
-  `{ledger_check}` (*no ledger check: keep each entry in the shape the ledger's other entries have*),
-  `{test}` (*no test command: run what the repo's README says*), `{lint}` (*no lint command: keep to the
-  style of the code around the change*), and two that are no key, dev-cadence's file or the sentence:
+    scripts/ledger.py --check`, dev-cadence's.
+  **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (the gate,
+  `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as `<n>` after the rest), `{board}`
+  (the board's path), `{ledger}`, `{ledger_check}`, `{cadence_rules}` (*read docs/cadence.md §1–§4*) —
+  the cadence's, with no sentence for an absent one, since an unserved repo composes no brief —
+  and the repo's own, each with its sentence: `{test}` (*no test command: run what the repo's README
+  says*), `{lint}` (*no lint command: keep to the style of the code around the change*) and
   `{design_dir}` (`docs/design/` where the checkout holds it, else *no design directory: the README and
-  the code say what is true*) and `{cadence_rules}` (*read docs/cadence.md §1–§4* where it exists, else
-  *no cadence rules: the repo's README says how a change lands*). They are read only when the brief
+  the code say what is true*). Under dev-cadence TD-129 `{gate}`, `{ledger_check}` and
+  `{cadence_rules}` name what the resolver gives (below). They are read only when the brief
   being composed names one — a node's files are asked across the link, where a directory or a file
   past the cap is refused by name and is there, and any other failure stops the start rather than tell
   the brief a seam is absent — after every other slot, and fill a supplement's text as they fill the
   template's. `commands:` is also read in its older list form, `[{name, run}]`.
-  Convention notices (§6 rule 12) and the SessionStart line (§4.3) run only in a dev-cadence repo:
-  features of one, never requirements. **Who reads them**: the host agent, at the home, reads
-  `ledger:`, `board:`, `gate:`, `worktree_setup:` and `settle:` as it reads `promote:` — for the repo facts
-  (§4.4: the seam state the Repo page and `ao doctor` draw), the gate run (§6 rule 10 runs at the
-  home), the write-back (§4.4: the board's path) and a worktree's creation — and the clients
-  (`repoconfig.py`) read every key for the briefs, `ao board edit` and `ao repo init`; `commands:`
-  and the rest of the file are the clients' alone.
+  Convention notices (§6 rule 12) run in every served repo. The SessionStart line (§4.3) is carried by
+  ShiftLead's launch for every session it starts (`CADENCE_HOOK_LINE`), so a repo whose own
+  `.claude/settings.json` lacks it gets a warning on the Repo page, *no SessionStart line: a session
+  started outside ShiftLead misses the cadence's nudge*, and nothing more. **Who reads them**: the host
+  agent, at the home, reads `ledger:`, `board:`, `worktree_setup:` and `settle:` and the three
+  requirements as it reads `promote:` — for the repo facts (§4.4: the seam state and the lacks the
+  Repo page and `ao doctor` draw), the gate run (§6 rule 10 runs at the home), the write-back (§4.4:
+  the board's path) and a worktree's creation — and the clients (`repoconfig.py`) read every key for
+  the briefs and `ao board edit`; `commands:` and the rest of the file are the clients' alone.
+
+  **How the readers find dev-cadence** (*Decision* 3, TD-1014). While the copy stands, each reader
+  reads its path in the checkout (`scripts/check_cadence.py`, `docs/cadence.md`, the lock). Under
+  dev-cadence TD-129 every reader asks **one resolver**, `sessionorc.cadence.command(repo, word,
+  *args)`, for **the command to run** — its argv and environment, `CADENCE_REPO_ROOT` included — so no
+  reader sets that up itself. The resolver calls dev-cadence's launcher, a dependency of ShiftLead's
+  install: the host agent finds it in its own venv, never on a login `PATH`, and the wheel pins it, so a
+  rollback of the live copy covers it. A container node has no network path to a private dev-cadence
+  and no lasting cache, so the home ships the pinned trees a node needs with the wheel (`ao host up`,
+  §4.4a). A pin that cannot be resolved — one that needs a newer launcher interface than this build's
+  included, which a ShiftLead release cures — makes the repo unserved by name, never skipped.
+  **Which dev-cadence** (*Decision* 4, TD-1012): the build names the oldest dev-cadence commit it reads
+  (`sessionorc.cadence.OLDEST`) and, under TD-129, the launcher interface it needs; a lock's
+  `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. The newer side is
+  dev-cadence's promise: the `--json` shapes and fields ShiftLead reads, which cadence §7's parity
+  table names, change only additively, and a breaking change waits for a ShiftLead release that reads
+  it. **ledgerboard by its header** (*Decision* 6, TD-1013): each vendored `ledgerboard.py` opens with
+  `# ledgerboard v<release> sha256:<hash>`, the tagged release it was vendored from; the Repo page and
+  `ao doctor` warn when a served repo's copy names a release other than the wheel's (*ledgerboard v1.2
+  here, v1.3 in this build*), so parity no longer rests on a copy in the repo.
 
 - Org (§4.9): the teams each registered repo defines in its own `.shiftlead.yml`, aggregated with
   the org file, which holds what no one repo can: the project headings over repos, a team kept out of its repo's file, `place:`
-  and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` (and the
-  person's `preferences.md`, §4.9b, TD-657) are tracked by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
+  and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` are tracked by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
   left at the home has a history*).
   The org file: `~/.shiftlead/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
