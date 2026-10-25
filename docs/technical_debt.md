@@ -1681,7 +1681,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Owner:** paul
 **Kind:** decision
 **Status:** Proposed — [ADR 2026-10-25](decisions/2026-10-25-shiftlead-requires-dev-cadence.md), with its dev-cadence companion (dev-cadence TD-129, *pinned, not synced*). The builds are filed once Paul decides.
-**Blocked by:** decision (paul) — the ADR's question: require dev-cadence in every served repo, and keep the person's ShiftLead texts in a `shiftlead/` directory of their layer repo
+**Blocked by:** decision (paul) — the ADR's two questions: Q1 require dev-cadence in every served repo; Q2 keep the person's ShiftLead texts in a `shiftlead/` directory of their layer repo
 **Location:** `docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md`; design §8 (*recommends dev-cadence and requires only a ledger*), §5 (*The layout slots*), §4.7 (`ao repo init`), §4.8 (brief supplements), §4.9b (TD-657's preference layers); `src/shiftlead/repoconfig.py` (`entry_text`, `layout`), `src/sessionorc/cadence.py`, `src/sessionorc/sync.py`
 
 **Why:** Paul, 2026-10-25, after TD-993 made the start context visible: *as soon as users can see it they will want the ability to modify it*; then *we talked previously about letting someone use a different cadence mechanism (other than dev-cadence) but I wonder if that is needless complication, especially given that we are building personal prefs into dev-cadence now*. ShiftLead keeps a path for a repo without dev-cadence that no repo uses, and has no home of the person's own for its briefs and start prompts (`entry.md` and `work.md` cannot be changed at all), while dev-cadence's personal layer (its TD-126) already follows the person across repos and machines.
