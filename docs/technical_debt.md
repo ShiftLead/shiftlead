@@ -80,7 +80,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Designed — build TD-1007 |
 | TD-1000 | A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo | Medium | Open — build |
 | TD-1004 | The generated node Dockerfile links `/usr/local/bin/ao` to the venv's `ao`, so `ao` is on `PATH` in a container node | Low | Built (#2333) — live check |
-| TD-1007 | Gemini CLI's layer wakes a session at a background command's end, and its hook refuses an unattended foreground CI watch | Low | Open — build |
+| TD-1007 | Gemini CLI's layer wakes a session at a background command's end, and its hook refuses an unattended foreground CI watch | Low | Built (#2343) — live check |
 
 ---
 
@@ -1649,8 +1649,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Type:** debt
 **Added:** 2026-10-24 (the designer, from TD-999)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — build
+**Kind:** live-check #2343
+**Status:** Built 2026-10-25 (grinder-ao-1, #2343): `LAYER_SETTINGS` holds `inject` and `modelSteering`; `gemini/hook.py`'s `waits_in_the_foreground` sends `wait: true` only under `SHIFTLEAD_GEMINI_WAKES=1`, which `launch` sets when `layer_wakes()` holds, and blocks with `wait_guard.GEMINI_REASON` on `refuse_wait`; the stale note names the missing wake only for a layer without the two settings. Left: the live check in *Done when*, once #2343 is live and the person has re-run the layer's `sudo install` line.
 **Location:** `src/shiftlead/adapters/gemini/__init__.py` (`LAYER_SETTINGS`, `layer_wakes`, `launch`, the doctor note), `src/shiftlead/adapters/gemini/hook.py` (`WAKES_ENV`, `refused_command`, `main`), `src/shiftlead/wait_guard.py` (the reason's words per background form); `tests/test_gemini_adapter.py` (the hook, beside the kill guard's), `tests/test_gemini_setup.py` (the launch with the `home` fixture's temp `MACHINE_LAYER`, the stale note) and `tests/test_gemini_guards.py` (its note assertion); design §4.3 *A wait the guard refuses*, *The second adapter: Gemini CLI*
 
 **Why:** TD-999: in Gemini CLI 0.65.0 a background command's end wakes nothing by default, so the refusal's *its end wakes you* would be untrue there. With `inject` the completion is queued, and an idle session takes it as a turn only with `experimental.modelSteering` on.
