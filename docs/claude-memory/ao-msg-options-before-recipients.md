@@ -8,7 +8,7 @@ metadata:
   modified: 2026-10-01T17:41:59.929Z
 ---
 
-`ao msg` takes `to… "text"` as one run of positionals, so an option placed after the first recipient (`ao msg person --kind note "…"`) splits it and argparse exits 2 with `unrecognized arguments: <the text>`. Put the options first: `ao msg --kind note person "…"`, and `ao --json` before the subcommand.
+`ao msg` takes `to… "text"` as one run of positionals, so an option placed after the first recipient (`ao msg person --kind note "…"`) splits it and argparse exits 2 with `unrecognized arguments: <the text>`. Put the options first: `ao msg --kind note person "…"`, and `ao --json` before the subcommand. **Since TD-1001 (PR on 2026-10-25), once promoted,** `msg`'s options go anywhere among the addressees and the text; until `ao promote status` shows it live, keep them first.
 
 **Why:** On 2026-10-01 the manager's wind-down note to Paul was "sent" with `| tail -3`; the tail showed only the end of the echoed text, which looked like a delivered message. It had not been sent. Found by looking for it in the person inbox; the resend with the options first returned `delivered: ['person']`.
 

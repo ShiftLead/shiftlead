@@ -36,7 +36,7 @@
 - [Designer run lessons 2026-09-28](designer-run-lessons-2026-09-28.md) — `ao msg`'s id is `.entry.id` and a warning is not a refusal; run test_ledger.py; re-check a "number taken" live; the host agent never moves the person's checkout
 - [Gate everything after a merge on its state](gate-everything-after-a-merge-on-its-state.md) — check `MERGED` before deleting the branch or reporting; a deleted branch closes the PR for good (2026-09-28, #727 → #730)
 - [The primer is a held path](primer-is-a-held-path.md) — docs/briefs/techlead-context.md is under docs/briefs/**; a design PR leaves it to the build entry's briefs slice
-- [ao msg: options before recipients](ao-msg-options-before-recipients.md) — `ao msg person --kind note "…"` exits 2; put options first, and never pipe a send through `tail`
+- [ao msg: options before recipients](ao-msg-options-before-recipients.md) — `ao msg person --kind note "…"` exited 2 until TD-1001 is live (options anywhere after it); never pipe a send through `tail`
 - [A designed entry needs a Blocked by line](designed-entry-needs-blocked-by.md) — pickable is derived from Blocked by and no Pickable line is written; name the build entries (2026-10-01)
 - [Steer replies land on the board](steer-replies-land-on-the-board.md) — Paul's Reply to a steer reaches main's board via the anchor, not a new run's inbox; grep the board for each open steer id before merging at a bound
 - [Edit scripts assert before writing](edit-script-asserts-before-writing.md) — check every replacement count first, then write, re-reading per replacement; never chain `git commit` after an edit script

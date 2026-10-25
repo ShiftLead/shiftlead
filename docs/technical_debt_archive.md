@@ -19415,3 +19415,30 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Why:** main's CI on #2332 (run 40131019237, a design-only change) failed on Python 3.12 at `assert _jumped(ws) is True`, and the promote waits on green checks. The test typed `echo JUMP-ROW-$((40+2)); seq 1 60; echo JUMP-DONE` and waited for `JUMP-DONE` in the pane's bytes, but the typed line itself holds that literal, so the wait could end on the echo of the keystrokes, before the shell had printed `JUMP-ROW-42`. The jump then found no such row and answered `false`.
 
 **Resolved:** 2026-10-24 (grinder-ao-2, this PR) — the test waits for `JUMP-DONE-2`, printed by `echo JUMP-DONE-$((1+1))`, which only the shell's output holds, as the file's other socket tests wait for `STILL-$((1+1))`. Three local runs pass.
+
+## TD-1001: `ao msg` takes its options anywhere among the addressees and the text
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-24 (the designer, from TD-995)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/cli.py` (`main`, `build_parser`'s `msg` subparser, `cmd_msg`); `tests/test_cli.py`; design §4.7 *Mail*
+
+**Why:** TD-995: `ao msg samscrape --kind note … "text"` failed with argparse's *unrecognized arguments*, the error scrolling off above the echoed text, so the send read as sent (also 2026-10-01; memory *ao msg: options before recipients*).
+
+**Fix:**
+- `main` parses with `parse_known_args`, not `parse_args`. `parse_args` exits on the leftover words before anything could re-parse them; the top parser cannot use `parse_intermixed_args`, since a subparsers action is `nargs=PARSER`.
+- When the subcommand is `msg`, `main` re-parses the arguments after the `msg` token with the `msg` subparser's own `parse_intermixed_args`, passing `namespace=args` so the global options the top parser read (`--json`, whose subparser copy defaults to `SUPPRESS`) are kept.
+- Any other subcommand with leftovers keeps today's `parser.error`.
+
+**Done when:**
+- `ao msg x --kind note "t"`, `ao msg --kind note x "t"` and `ao msg x "t" --kind note` give the same params (a stubbed `call_sync`).
+- The `--pass-up` form still parses.
+- `ao --json msg x --about TD-1 "t"` keeps `--json`, and so does `ao msg x "t" --json` (the `msg` subparser's own `--json`).
+- An unknown option is still refused with argparse's usage line, and so is a leftover on another subcommand.
+
+**Related:** TD-995 (its design), TD-1000.
+
+**Resolved:** 2026-10-25 (grinder-ao-1, PR #2338) — built as §4.7 *Mail* says: `main` parses with `parse_known_args` and re-parses what follows `msg` with `msg`'s own `parse_intermixed_args`, any other leftover refused as before; the re-parse goes into a namespace of the top parser's own values (`json`, `cmd`), since one into `args` would append each `--answer` and `--shot` twice. TD-995 archives with TD-1000.
