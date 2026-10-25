@@ -1350,18 +1350,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   `branch`, `head` and `author`). It looks at a sync PR that no live record holds (§4.4's test),
   that is not a draft and not `conflicting`, and whose `checks` read *green*. Only one that is
   **not cross-repository**, whose **author is the home's own `gh` login** (the account `sync-all.sh`
-  pushes as), in a served repo (§5 *The seams*), goes on to the steps.
+  pushes as), in a served repo, or an unserved one whose one lack is a tree older than `OLDEST` (§5 *The seams*: the sync is its cure), goes on to the steps; any other unserved repo's PR is the person's, as an adoption PR is (§4.7 `ao repo add`) — not read, nothing written.
 
   It waits on *pending*, leaves a `not_run` PR alone with no verdict (§4.4 *CI that never started
   is the person's*: it waits for the person, with no timeout), and leaves red, conflicting and draft
   PRs to the team (§4.4). A green sync
   PR it declines is written as verdict *refused* at its head, and nothing is posted, so the team's
-  order follows at once (§4.4). A branch name alone vouches for nothing. It declines three kinds:
+  order follows at once (§4.4). A branch name alone vouches for nothing. It declines two kinds:
   - a forked PR: *forked*;
   - another login's: *author <login> is not the home's*;
-  - none in an **unserved** repo (§5 *The seams*) but one whose one lack is a tree older than
-    `OLDEST`, since the sync is its cure; any other unserved repo's PRs are the person's, as an
-    adoption PR is (§4.7 `ao repo add`).
 
   Each head is checked once:
   1. **The files are dev-cadence's.** The head lock's `source:` must equal the merge base's lock's,
@@ -1418,7 +1415,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      just as rule 10 never says *verified*.
   4. **The gate** is rule 10's: `scripts/check_cadence.py --pr <n>`. It is run in the
      registry checkout, as rule 10 runs it: the default branch's copy of the script,
-     never the replay tree, which proves content and never judges. **Its exit decides one of three
+     never the replay tree, which proves content and never judges. In a repo whose tree is older than
+     `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
+     its rows are kept only when they parse. **Its exit decides one of three
      things.** A pass (exit 0) merges. A **fail** (the script's exit 1) gets a second comment, `cadence-review: BLOCK · sync-check · code · 1
      findings`, with the gate's line. The script reads the first comment as the review, and a latest
      BLOCK outvotes it, so the PR stays blocked until a session posts its own review after its fix.

@@ -192,8 +192,8 @@ not mix:
 - **UI host** — the machine running `shiftlead[ui]`. — *proposed*.
 - **unserved** — a registered repo that lacks what ShiftLead requires of it — dev-cadence's tree (at or
   after the oldest commit the build reads), its gate, or a ledger that parses — so the home runs nothing
-  of it and its Repo page names the lack and the cure, `ao repo add <path> --adopt` (design §5 *The
-  seams*). *Not:* a repo without dev-cadence served by fallbacks, which no longer exists. — *proposed*
+  of it but its readings, *Pull* and, for an older tree, *Sync*, and its Repo page names the lack and
+  the cure, `ao repo add <path> --adopt` or, for an older tree, the sync (design §5 *The seams*). *Not:* a repo without dev-cadence served by fallbacks, which no longer exists. — *proposed*
   2026-10-25 (TD-1009).
 - **home** (host agent) — the one host agent that holds the org's session graph and mail; kmaster
   on Paul's machines. *Not:* hub, master, server. — **decided** 2026-09-16 (Paul, design §4.4a).

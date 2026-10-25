@@ -243,12 +243,14 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   dev-cadence (no docs/cadence-sync.lock)*, *unserved: no gate (no scripts/check_cadence.py)*,
   *unserved: no ledger at docs/technical_debt.md*, *unserved: the ledger at docs/technical_debt.md does
   not parse — <the reader's reason>*, *unserved: dev-cadence at <commit> is older than this build reads
-  (<oldest>) — sync it* — and the home runs nothing of it but **the two passes that make it served**:
+  (<oldest>) — sync it* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
+  the PRs that show an adoption PR) and **the two passes that make it served**:
   *Pull* (§6), which fast-forwards the checkout once an adoption or a sync has merged, and, for a repo
   whose one lack is an older tree, *Sync* (§6), whose gate is there. No gate run of any other PR, no
   promote, no lane, no write-back, no settle. `ao team start` refuses a team of an unserved repo,
-  naming the lack. A team already running there is not stopped (a stop is the person's): its lanes read
-  empty, each member's `ao repo` and lane note say *unserved: <the lack>*, so each declares out of
+  naming the lack (§4.7 *Teams*). A team already running there is not stopped (a stop is the person's): its lanes read
+  empty, `ao repo`'s first line and each member's lane note say *unserved: <the lack>* (§4.7 `ao repo`,
+  `--json` `serve` on the repo), so each declares out of
   work as on any empty lane, and the person gets one `system` note when a served repo turns unserved,
   *<repo> is unserved: <the lack> — team <t> has no lane until it is cured*. A plain session in its directory starts
   as in any directory (New session takes a path). No reader degrades silently and no slot has a
@@ -316,7 +318,10 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   included, which a ShiftLead release cures — makes the repo unserved by name, never skipped.
   **Which dev-cadence** (*Decision* 4, TD-1012): the build names the oldest dev-cadence commit it reads
   (`sessionorc.cadence.OLDEST`) and, under TD-129, the launcher interface it needs; a lock's
-  `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. The newer side is
+  `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. Ancestry is read in
+  the roster's dev-cadence checkout after its fetch (`git merge-base --is-ancestor`), else through the
+  forge's compare of the two commits; an age that cannot be read is a warning, *dev-cadence's age not
+  read: <why>*, never a lack, so a missing clone unserves nothing. The newer side is
   dev-cadence's promise: the `--json` shapes and fields ShiftLead reads, which cadence §7's parity
   table names, change only additively, and a breaking change waits for a ShiftLead release that reads
   it. **ledgerboard by its header** (*Decision* 6, TD-1013): each vendored `ledgerboard.py` opens with
