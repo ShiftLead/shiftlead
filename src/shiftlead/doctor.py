@@ -382,9 +382,26 @@ SEAM_WORDS = {
 
 def missing_seams(seams: dict[str, Any] | None) -> list[str]:
     """The fixed sentence of each seam the reading says is *absent*, in the page's order (gate, board,
-    worktree setup); nothing for one set or defaulted, or for a reading not taken yet."""
+    worktree setup), then the ledgerboard warning (`ledgerboard_warning`); nothing for one set or
+    defaulted, or for a reading not taken yet."""
     seams = seams or {}
-    return [words for key, words in SEAM_WORDS.items() if (seams.get(key) or {}).get("state") == "absent"]
+    out = [words for key, words in SEAM_WORDS.items() if (seams.get(key) or {}).get("state") == "absent"]
+    lbw = ledgerboard_warning(seams.get("ledgerboard"))
+    return [*out, lbw] if lbw else out
+
+
+def ledgerboard_warning(lbr: dict[str, Any] | None) -> str | None:
+    """The repo's vendored `ledgerboard.py` against the wheel's (§5 *ledgerboard by its header*, TD-1013):
+    *ledgerboard v1.2 here, v1.3 in this build*, *ledgerboard has no release header* for a copy without
+    one (or no copy), None when the releases are equal or the reading carries none (an older host agent)."""
+    if not isinstance(lbr, dict):
+        return None
+    here, wheel = lbr.get("release"), lbr.get("wheel")
+    if not here:
+        return "ledgerboard has no release header"
+    if here != wheel:
+        return f"ledgerboard v{here} here, v{wheel or '?'} in this build"
+    return None
 
 
 def ledger_lack(led: dict[str, Any] | None) -> str | None:
