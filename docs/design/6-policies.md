@@ -365,7 +365,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      does next is its own, and a member still idle another `IDLE_NUDGE` later reads *idle · open
      work* in the slot for a person or its manager to judge.
   **What is left is judgement, and a seat holds it.** Four of the manager's round's jobs read
-  fields and scripts and no screen — the cadence check (the repo's gate, §5 `gate:`; its default
+  fields and scripts and no screen — the cadence check (dev-cadence's gate, §5 *The seams*;
   `check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files against `held:`, the reader's reply in a
   mailbox the home holds), the relay of `docs/cadence-changes.md` (a file as merged, a list of
   headings) and the chase of an owed outcome (the record's `owed()`) — and they are rules 10, 11
@@ -973,18 +973,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      status -v` prints the record's last check per PR; a member on a node is checked as any (the
      script runs at the home) and told by the clause alone, as rule 5 tells it. **Not this
      rule's**: a PR from a session with no `progress` entry naming it (a person's anchor — the
-     cadence is theirs to run). **The gate is the repo's `gate:`** (§5 *The seams*; [ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-584, built by TD-586): a configured command, `{pr}` filled, is run by the shell in the
-     checkout and judged by its exit code alone — `verdict` PASS or FAIL, one row, *gate: <the
-     command, filled> exited <n>*, and a run that does not end in the script's time is no reading;
-     the default, when the checkout holds `scripts/check_cadence.py`, is that script `--json` as
-     above, its rows kept. **A repo with no gate** — the key unset and no script — is not checked,
-     and the review stage never merges on its own: the home writes the record's checks entry once a
-     PR, with nothing run and nothing asked of `gh`, as `verdict: none` — no line, no clause, no
-     row — and `ao status -v` prints it as *#842 no gate: a person merges*, where before the home
-     returned no reading and said nothing; a gate the repo gains later reads the PR as any. Nothing
-     on the page draws the entry: the Repo page's *no gate: a person merges* line (§4.5a *Repo page:
-     missing seams*) is the repo's, built by TD-591, and the member's brief saying the same (§4.9c,
-     §4.8 *A repo's brief*) is TD-588's.
+     cadence is theirs to run). **The gate is dev-cadence's `check_cadence.py`** (§5 *The seams*; [ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md), *Decision* 2; TD-1011): `scripts/check_cadence.py --pr <n> --json`, run by the shell in
+     the checkout (under dev-cadence TD-129, the resolver's command, §5 *How the readers find
+     dev-cadence*), its rows kept as above, and a run that does not end in the script's time is no
+     reading. There is no `gate:` key and no repo without a gate: a repo that lacks the script is
+     unserved (§5), so the home runs no gate there and its review stage never merges; the Repo page
+     and `ao doctor` say *unserved: no gate*, and nothing is written on the record.
   11. **Merged without its read** (`sessionorc.held`, the tick's `_held_pass` and `_held_line`;
      the Inbox row from `ui/inbox.py` `held_mark`). `ao pr held <n>` is the author's own read of
      its record's `review` against the PR's files (§4.9b *The reader*); whether a held PR merged
@@ -1038,7 +1032,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      dev-cadence's SessionStart hook prints the new entries of `docs/cadence-changes.md` to a
      session that starts, so only a session that outlives a change needs telling, and the tick
      tells it as rule 6 tells lane news. For each registry root at the home whose checkout holds
-     `scripts/cadence_changes.py`, the home runs it `--json` on the reports' cadence — it reads
+     `scripts/cadence_changes.py` (in dev-cadence's source `files/scripts/cadence_changes.py`, §5 *The seams*) — every served repo's — the home runs it `--json` on the reports' cadence — it reads
      the file as merged, `origin/<default>`, as rule 7 reads a brief's file — taking each entry's
      `heading` and `landed`; a root without the script, or whose origin has no default branch
      (exit 2), gives no reading. On each supervised member record of that root, not a seat (every
@@ -1306,7 +1300,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   pulls, and the promote's precondition (1) fails on any checkout no one has pulled since the merge,
   so the home's tick pulls them. It runs **at the home** (§4.4a), in the promote's pass and on its
   cadence (five minutes, the full readings, detached from the tick as the `gh` reads are), over
-  **every checkout in the home's registry**, `promote:` block or not — one `git fetch origin
+  **every checkout in the home's registry**, `promote:` block or not, served or not (§5 *The seams*: the pull is how an adoption or a sync lands in an unserved repo) — one `git fetch origin
   <default>` per repo per pass (the promote's own fetch where the repo has one, never a second),
   then `git merge --ff-only origin/<default>` when two things hold. **(1) Git allows**: the checkout
   is on its default branch (`origin/HEAD`'s); no merge, rebase, cherry-pick or index lock is under
@@ -1356,17 +1350,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   `branch`, `head` and `author`). It looks at a sync PR that no live record holds (§4.4's test),
   that is not a draft and not `conflicting`, and whose `checks` read *green*. Only one that is
   **not cross-repository**, whose **author is the home's own `gh` login** (the account `sync-all.sh`
-  pushes as), and whose repo has a gate goes on to the steps.
+  pushes as), in a served repo, or an unserved one whose one lack is a tree older than `OLDEST` (§5 *The seams*: the sync is its cure), goes on to the steps; any other unserved repo's PR is the person's, as an adoption PR is (§4.7 `ao repo add`) — not read, nothing written.
 
   It waits on *pending*, leaves a `not_run` PR alone with no verdict (§4.4 *CI that never started
   is the person's*: it waits for the person, with no timeout), and leaves red, conflicting and draft
   PRs to the team (§4.4). A green sync
   PR it declines is written as verdict *refused* at its head, and nothing is posted, so the team's
-  order follows at once (§4.4). A branch name alone vouches for nothing. It declines three kinds:
+  order follows at once (§4.4). A branch name alone vouches for nothing. It declines two kinds:
   - a forked PR: *forked*;
   - another login's: *author <login> is not the home's*;
-  - one in a repo with **no gate**: *no gate: a person merges*, rule 10. The gate is looked up
-    here, before anything else.
 
   Each head is checked once:
   1. **The files are dev-cadence's.** The head lock's `source:` must equal the merge base's lock's,
@@ -1421,18 +1413,19 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      body is the lock's `commit:`, the files checked against dev-cadence, *post_sync replayed* or
      *no post_sync*, and the head it checked. The reviewer is named for what it is, never a model,
      just as rule 10 never says *verified*.
-  4. **The gate** is rule 10's: `gate:`, else `scripts/check_cadence.py --pr <n>`. It is run in the
-     registry checkout, as rule 10 runs it: the default branch's copy of the script and of `gate:`,
-     never the replay tree, which proves content and never judges. **Its exit decides one of three
-     things.** A pass (exit 0) merges. A **fail** (a configured `gate:`'s non-zero exit, or the
-     script's exit 1) gets a second comment, `cadence-review: BLOCK · sync-check · code · 1
+  4. **The gate** is rule 10's: `scripts/check_cadence.py --pr <n>`. It is run in the
+     registry checkout, as rule 10 runs it: the default branch's copy of the script,
+     never the replay tree, which proves content and never judges. In a repo whose tree is older than
+     `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
+     its rows are kept only when they parse. **Its exit decides one of three
+     things.** A pass (exit 0) merges. A **fail** (the script's exit 1) gets a second comment, `cadence-review: BLOCK · sync-check · code · 1
      findings`, with the gate's line. The script reads the first comment as the review, and a latest
      BLOCK outvotes it, so the PR stays blocked until a session posts its own review after its fix.
      The verdict is then *gate*, and the PR goes to the team. **No reading** — the script's exit 2
      or 3 (nothing could be checked, a row *unknown*), a run past its time, or the home's own error
      (the tree, `gh`, the clone) — posts nothing and is tried again on the next pass. After
      `SYNC_TRIES` (three) passes at the same head it is verdict *error* with the last reason, and
-     the PR goes to the team. A repo with no gate never reaches this step (declined above).
+     the PR goes to the team. An unserved repo never reaches this step (above).
   5. **The merge is pinned.** Just before it, the home reads the PR's head and the holders again
      (§4.4's test, over the live records). A head that moved means the PR was not checked: the pass
      drops it, and the next pass checks the new head. A record that now holds it means the merge is
@@ -1447,8 +1440,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   at}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, or the reason from step 1
   or 2), *gate* (the gate's line), *error* (no reading after `SYNC_TRIES`) or *off*, and it is empty
   while a retry is counted. A PR's entry is dropped once it leaves the open list, except the newest
-  *merged* one, which the Repos card names (§4.5a) and which neither the pass nor the order reads, and a *refused*
-  *no gate* entry is dropped once the repo has a gate, so the PR is judged again. So a head with a
+  *merged* one, which the Repos card names (§4.5a) and which neither the pass nor the order reads. So a head with a
   verdict is never checked again, a new head is checked again, and the team's order says `why`
   (§4.4), *sync is off* for an *off* one. **The home holds a green sync PR with no verdict at its
   head** out of the team's order only while the switch is on and a pass covered the repo whole within
