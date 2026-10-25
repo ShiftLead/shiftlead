@@ -238,6 +238,11 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     vendored as `src/sessionorc/ledgerboard.py` and held byte-equal to the synced
     `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
 
+  **dev-cadence's own repo is its source**, not a consumer: a checkout whose root holds `sync.sh` and
+  `files/` carries no lock and is at its own head, so its tree is itself (no lock, no `OLDEST` check)
+  and its gate is its own `files/scripts/check_cadence.py --pr {pr} --json`; every rule below that
+  counts registered repos' locks (*Which dev-cadence*'s raise, TD-1016's) passes over it.
+
   A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
   say which, each in its fixed words with its cure, the page and `ao doctor` sharing them:
   *unserved: no dev-cadence (no docs/cadence-sync.lock) — `ao repo add <path> --adopt`*, *unserved:
