@@ -175,6 +175,21 @@ def test_a_checkout_holding_only_the_old_agentorc_file_is_lacking_naming_the_ren
     assert not [x for x in got["lacks"] if ".agentorc.yml" in x]
 
 
+def test_a_gate_key_is_warned_as_gone(world, capsys):
+    """TD-1011, design §5 *The seams*: a `gate:` left in a `.shiftlead.yml` is read by nothing, and the
+    check names it as a warning — the repo's extra check is dev-cadence's precheck."""
+    tmp_path, home, _ = world
+    old = tmp_path / "gated"
+    old.mkdir()
+    (old / ".shiftlead.yml").write_text("gate: make gate PR={pr}\n")
+    (home / "repos.txt").write_text(f"{tmp_path / 'alpha'}\n{tmp_path / 'beta'}\n{old}\n")
+    _, got = check(capsys)
+    assert [x for x in got["warnings"] if "gate:" in x] == [
+        f"{old}: gate: is gone — a repo's extra check is dev-cadence's precheck"
+    ]
+    assert not [x for x in got["lacks"] if "gate:" in x]
+
+
 def test_a_settings_team_no_definition_names_is_lacking(world, capsys):
     _, home, _ = world
     kept = {"alpha-grind": {"reserve": 5}, "old": {"reserve": 5}}

@@ -165,10 +165,11 @@ HANDED_ENTRY = {
 }
 
 
-# The layout slots (design §5 *The seams*, TD-588): what a built-in brief names of a repo's layout, never a
-# literal of one repo's. Each fills with the repo's own (its `.shiftlead.yml` key, else dev-cadence's file
-# where the checkout holds it) or with its seam's fixed sentence, never empty text; `{pr}` inside `{gate}`
-# is filled after them. Recorded as text slots, so a replay fills them as the launch did (§6 rule 7).
+# The layout slots (design §5 *The seams*, TD-588, TD-1011): what a built-in brief names of a repo's layout,
+# never a literal of one repo's. The cadence's four (`{gate}`, `{board}`, `{ledger_check}`, `{cadence_rules}`)
+# and `{ledger}` fill with dev-cadence's values and have no sentence, since an unserved repo composes no brief;
+# the repo's own three fill with its own or with the seam's fixed sentence, never empty text. `{pr}` inside
+# `{gate}` is filled after them. Recorded as text slots, so a replay fills them as the launch did (§6 rule 7).
 LAYOUT_SLOTS = (
     "{gate}",
     "{board}",
@@ -185,12 +186,10 @@ CHECK_CADENCE = "scripts/check_cadence.py"
 LEDGER_SCRIPT = "scripts/ledger.py"
 DESIGN_DIR = "docs/design/"
 CADENCE_DOC = "docs/cadence.md"
-NO_GATE = "no gate: a person merges"
-NO_LEDGER_CHECK = "no ledger check: keep each entry in the shape the ledger's other entries have"
+SOURCE_PREFIX = "files/"  # dev-cadence's own source holds every dev-cadence path under it (§5 *The seams*)
 NO_TEST = "no test command: run what the repo's README says"
 NO_LINT = "no lint command: keep to the style of the code around the change"
 NO_DESIGN_DIR = "no design directory: the README and the code say what is true"
-NO_CADENCE = "no cadence rules: the repo's README says how a change lands"
 
 
 # How a node's checkout refuses a path that is there (`sessionorc.agent_common._read_capped`): a directory,
@@ -199,10 +198,11 @@ THERE_REFUSALS = (": not a regular file", " bytes, which is not a repo config or
 
 
 def layout(cfg: RepoConfig) -> dict[str, str]:
-    """Each of `LAYOUT_SLOTS` for `cfg`'s repo (design §5 *The seams*): `gate:`, `board:`, `ledger:` and
-    `commands:`'s `test` and `lint` where the file sets them, else dev-cadence's file where the checkout
-    holds it (read the way the file was, `cfg.read`), else the seam's sentence. `{gate}` still holds
-    `{pr}`: the brief's text fills it last."""
+    """Each of `LAYOUT_SLOTS` for `cfg`'s repo (design §5 *The seams*, TD-1011): the cadence's slots
+    dev-cadence's paths — under `files/` in dev-cadence's own source (a root holding `sync.sh` and `files/`),
+    read the way the file was, `cfg.read` — and `board:` and `ledger:` where the file sets them; `{test}`
+    and `{lint}` `commands:`'s, `{design_dir}` the directory where the checkout holds it, each else its
+    seam's sentence. `{gate}` still holds `{pr}`: the brief's text fills it last."""
 
     def there(rel: str) -> bool:
         if cfg.root is None:
@@ -222,17 +222,16 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
                 return True
             raise
 
-    gate = cfg.gate or (f"python3 {CHECK_CADENCE} --pr {PR_PLACEHOLDER}" if there(CHECK_CADENCE) else NO_GATE)
-    board = cfg.board or (str(workorders.BOARD) if there(str(workorders.BOARD)) else workorders.NO_BOARD)
+    pre = SOURCE_PREFIX if there("sync.sh") and there(SOURCE_PREFIX.rstrip("/")) else ""
     return {
-        "{gate}": gate,
-        "{board}": board,
+        "{gate}": f"python3 {pre}{CHECK_CADENCE} --pr {PR_PLACEHOLDER}",
+        "{board}": cfg.board or str(workorders.BOARD),
         "{ledger}": cfg.ledger,
-        "{ledger_check}": f"python3 {LEDGER_SCRIPT} --check" if there(LEDGER_SCRIPT) else NO_LEDGER_CHECK,
+        "{ledger_check}": f"python3 {pre}{LEDGER_SCRIPT} --check",
         "{test}": cfg.commands.get("test") or NO_TEST,
         "{lint}": cfg.commands.get("lint") or NO_LINT,
         "{design_dir}": DESIGN_DIR if there(DESIGN_DIR) else NO_DESIGN_DIR,
-        "{cadence_rules}": f"read {CADENCE_DOC} §1–§4" if there(CADENCE_DOC) else NO_CADENCE,
+        "{cadence_rules}": f"read {pre}{CADENCE_DOC} §1–§4",
     }
 
 
@@ -626,9 +625,8 @@ class RepoConfig:
     # §5 `promote:` (§6 *Promote*, TD-120): `{run, check}`, accepted and checked now so writing the
     # designed block does not break `ao new` in that repo; `sessionorc.promote` runs it at the home (TD-132)
     promote: dict[str, str] | None = None
-    # §5 *The seams* `gate:` (TD-586): the merge gate's command, `{pr}` filled; `sessionorc.cadence` runs it
-    # at the home (§6 rule 10). None: unset — the default is `scripts/check_cadence.py` where it exists
-    gate: str | None = None
+    # §5 *The seams*: keys accepted and read by nothing, which `ao org check` names — `gate:` (TD-1011)
+    gone: list[str] = field(default_factory=list)
     # §5 *The seams* `worktree_setup:` (TD-589): the command run in each new worktree; `sessionorc.gitinfo`
     # runs it at the worktree's creation. None: unset — the default is `scripts/hydrate_worktree.sh` where it exists
     worktree_setup: str | None = None
@@ -739,9 +737,7 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
     elif key == "promote":
         cfg.promote = _promote(value, where)
     elif key == "gate":
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"{where} must be a command, `{{pr}}` where the PR's number goes (design §5 *The seams*)")
-        cfg.gate = value.strip()
+        cfg.gone.append(key)  # the gate is dev-cadence's script, no key (§5 *The seams*, TD-1011)
     elif key == "board":
         if not isinstance(value, str) or not value.strip() or not workorders.inside(Path(value.strip())):
             raise ValueError(
