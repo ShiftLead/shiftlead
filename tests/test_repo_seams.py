@@ -214,3 +214,5 @@ def test_a_ledgerboard_release_other_than_the_wheels_warns_on_the_repos_line_and
         "ledgerboard v1.2 here, v1.3 in this build"
     ]
     assert missing_seams(repo("a", seam_reading(ledgerboard=same))) == {"lines": [], "ledger": None}
+    # a wheel whose header could not be read: every headed copy warns, the build's release unknown
+    assert doctor.ledgerboard_warning({"release": "1.3", "wheel": None}) == "ledgerboard v1.3 here, v? in this build"
