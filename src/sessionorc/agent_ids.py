@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import agent_common, hosts, mail, paths
+from sessionorc import agent_common, cadence, hosts, mail, paths
 from sessionorc import ledger as ledger_mod
 from sessionorc import settle as settle_mod
 from sessionorc.agent_common import RpcError, log
@@ -38,6 +38,7 @@ COUNT_MAX = 10
 WHY_CHARS = 200  # a hold's words and a drop notice's, one line (TD-905)
 ADDED = re.compile(r"^\+## TD-(\d+):", re.M)
 SCRIPTS = ("scripts/ledger_next_id.py", "files/scripts/ledger_next_id.py")  # a syncing repo's; dev-cadence's own
+IDS_SCRIPT = "ledger_next_id.py"  # as a pinned tree's `files/scripts/` holds it
 SCRIPT_SLACK = 5.0  # the script's race ends this far before the call's deadline
 TID = re.compile(r"TD-\d+")
 GITHUB = re.compile(
@@ -105,8 +106,17 @@ def _why(err: str, fallback: str) -> str:
     return ((err or "").strip().splitlines() or [fallback])[-1][:200]
 
 
-def ids_script(root: str) -> Path | None:
-    """The synced `ledger_next_id.py` the checkout serving a `td_next` has, the first of `SCRIPTS` found."""
+def ids_script(root: str, timeout: float = cadence.TREE_TIMEOUT) -> Path | None:
+    """The `ledger_next_id.py` the checkout serving a `td_next` has: in a pinned repo the pinned tree's (§5 *How
+    the readers find dev-cadence*, TD-1014) — a pin that does not resolve, or a tree with no id script, refused,
+    never the home's own road, which reads no counter; else the first of `SCRIPTS` found."""
+    if cadence.pinned(root):
+        payload, why = cadence.tree(root, timeout)
+        if payload is None:
+            raise RpcError(f"{Path(root).name}'s dev-cadence pin did not resolve ({why}): no id script to run")
+        if not (script := payload / "scripts" / IDS_SCRIPT).is_file():
+            raise RpcError(f"{Path(root).name}'s pinned dev-cadence has no {IDS_SCRIPT}: bump the pin")
+        return script
     return next((Path(root) / s for s in SCRIPTS if (Path(root) / s).is_file()), None)
 
 
@@ -275,7 +285,8 @@ class IdsMixin:
         except TimeoutError:
             raise RpcError(f"{name}'s ids are being handed out to another caller: busy, ask again") from None
         try:
-            if script := await asyncio.to_thread(ids_script, root):
+            left = max(0.1, start + BUDGET - time.monotonic())
+            if script := await asyncio.to_thread(ids_script, root, left):
                 got = await self._ids_script(root, key, name, script, count, start, caller)
             else:
                 ids, unread = await self._ids_give(root, key, count, start, caller)
@@ -348,17 +359,22 @@ class IdsMixin:
         self, root: str, key: str, name: str, script: Path, count: int, start: float, caller: Any
     ) -> dict[str, Any]:
         """The road over origin's counter (design §4.4 *A ledger entry's id is handed out by the home*, TD-970): the
-        synced script, run in the checkout with this interpreter, the home's last given as its `--floor`, and killed
-        with its group at the call's deadline. It fetches and reads what it needs; the home reads no PR here."""
+        synced script, run in the checkout with this interpreter — a pinned repo's through the resolver (TD-1014) —
+        the home's last given as its `--floor`, and killed with its group at the call's deadline. It fetches and
+        reads what it needs; the home reads no PR here."""
         rel = await asyncio.to_thread(ledger_mod.ledger_path, root)
         by = PERSON if caller is None or mail.is_person(caller) else str(caller)
         floor = await asyncio.to_thread(_last, key)
         left = start + BUDGET - time.monotonic()
-        argv = [
-            sys.executable, str(script), "--count", str(count), "--by", by, "--floor", str(floor),
+        args = [
+            "--count", str(count), "--by", by, "--floor", str(floor),
             "--ledger", rel, "--archive", ledger_mod.archive_path(rel), "--json",
         ]  # fmt: skip
-        env = {**os.environ, "LEDGER_IDS_RACE_SECONDS": f"{max(1.0, left - SCRIPT_SLACK):g}"}
+        if script.is_relative_to(root):
+            argv, env, said = [sys.executable, str(script), *args], dict(os.environ), str(script.relative_to(root))
+        else:  # the pinned tree's, which the launcher runs by its name
+            (argv, env), said = cadence.command(root, "run", script.name, *args), f"the pinned tree's {script.name}"
+        env["LEDGER_IDS_RACE_SECONDS"] = f"{max(1.0, left - SCRIPT_SLACK):g}"
         rc, out, err = await _run(argv, root, left, env=env, group=True)
         if (rc, out, err) == (-1, "", "timed out"):
             raise RpcError(f"{name}'s id script did not answer within the call's {BUDGET:g} s: budget, ask again")
@@ -373,7 +389,7 @@ class IdsMixin:
         )
         if not ok or rc not in (0, 2, 3) or (rc != 2 and not res["ids"]):
             first = ((err or "").strip().splitlines() or ["nothing on standard error"])[0][:200]
-            raise RpcError(f"{script.relative_to(root)} did not answer with its JSON (exit {rc}): {first}")
+            raise RpcError(f"{said} did not answer with its JSON (exit {rc}): {first}")
         why = " ".join(str(res.get("why") or "").split())[:200]
         if rc == 2:
             raise RpcError(f"{name}'s ids were not given: {why or 'the script refused'}")
