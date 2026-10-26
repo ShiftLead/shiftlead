@@ -90,6 +90,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Designed — builds TD-1023, TD-1024 |
 | TD-1023 | The layer's SessionStart line is dev-cadence's pinned seed, verbatim and parity-tested; Gemini's start hooks and the repo's own line follow the pin | High | Open — build |
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
+| TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Open — design |
 | TD-1026 | Two team lessons from the memory harvest are not in the role briefs: a steer's default waits for its bound, and `--author @me` is not "my PRs"; the designer brief lacks the never-`SendMessage` line | Low | Open — from the 2026-10-26 memory harvest |
 | TD-1027 | `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit) | Low | Open — build |
 | TD-1028 | `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit) | Low | Open — build |
@@ -1713,7 +1714,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-25 (the designer, from TD-1009)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build; slice 1 (the resolver: the launcher vendored frozen as `sessionorc/dev_cadence.py`, dev-cadence 8008a10; `cadence.pin`/`pinned`/`command`/`tree`; a pinned repo with no lock served, its gate run through the resolver, its age its pin's `ref`, its ledgerboard release the pinned tree's; the pin's lacks by name) merged as #2365; slice 2 (`repoconfig.layout`'s `{gate}`, `{ledger_check}` and `{cadence_rules}` for a pinned repo: `cadence.typed`, the resolver's argv without `-C`) in its PR. Left: (3) the convention notices (`conventions.py`, `cadence_changes.py`) and `sync`'s other readers through it; (4) `ao repo add` reads a pinned repo as adopted — `agent_settings.py`'s `holds = lock or is_source` (the `add_repo` RPC) and `shiftlead/adopt.py`; (5) `ao host up` ships the pinned trees a node's repos name, and a node's brief names the node's own interpreter and launcher (`containers.INSIDE_VENV`), where slice 2's `cadence.typed` names the home's, since `layout` cannot tell a node's path from a home's; then the Done-when grep (no reader builds a dev-cadence path outside `cadence.py` and `sync.py`). Noted by slice 1's review: a cold pin's first fetch can hold one repo-read pass up to `cadence.TREE_TIMEOUT` (330 s), since the pass reads repos in turn.
+**Status:** Open — build; slice 1 (the resolver: the launcher vendored frozen as `sessionorc/dev_cadence.py`, dev-cadence 8008a10; `cadence.pin`/`pinned`/`command`/`tree`; a pinned repo with no lock served, its gate run through the resolver, its age its pin's `ref`, its ledgerboard release the pinned tree's; the pin's lacks by name) merged as #2365; slice 2 (`repoconfig.layout`'s `{gate}`, `{ledger_check}` and `{cadence_rules}` for a pinned repo: `cadence.typed`, the resolver's argv without `-C`) merged as #2368; slice 3 (the convention notices: `conventions.has_script` and `read` run the pinned tree's `cadence_changes.py` through the resolver, `has_script` in the tick's thread; a pinned repo tells no one until TD-1025) in its PR; `sync`'s other readers are the lock era's and leave with TD-1015, and `adopt`'s and `add_repo`'s are (4). Left: (4) `ao repo add` reads a pinned repo as adopted — `agent_settings.py`'s `holds = lock or is_source` (the `add_repo` RPC) and `shiftlead/adopt.py`; (5) `ao host up` ships the pinned trees a node's repos name, and a node's brief names the node's own interpreter and launcher (`containers.INSIDE_VENV`), where slice 2's `cadence.typed` names the home's, since `layout` cannot tell a node's path from a home's; then the Done-when grep (no reader builds a dev-cadence path outside `cadence.py` and `sync.py`). Noted by slice 1's review: a cold pin's first fetch can hold one repo-read pass up to `cadence.TREE_TIMEOUT` (330 s), since the pass reads repos in turn.
 **Blocked by:** TD-1011
 **Location:** `src/sessionorc/cadence.py` (new `command(repo, word, *args) -> (argv, env)`), every reader of a dev-cadence path (`cadence.gate`, `sync`, `seams`, `repoconfig.layout`'s `{gate}` / `{ledger_check}` / `{cadence_rules}`, the convention notices), `src/sessionorc/dev_cadence.py` (the launcher, vendored), `src/sessionorc/containers.py` / `ao host up` (the trees beside the wheel); design §5 *How the readers find dev-cadence*, §4.4a
 
@@ -1914,6 +1915,28 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** a pinned temp repo carrying the current line, the TD-129 shim and a roster line warns neither *no SessionStart line* nor `sync.sh` / `sync-all`; the same repo with the 2026-09-25 line warns *predates the pin*, with a pre-pin shim the launcher's shim cure, and off the roster the `adopt` cure; an unpinned repo's three warnings are today's words; a line with one byte changed warns *not one this build knows*, and not also *no SessionStart line*, and the same beside the current line warns nothing; a shim text taken from dev-cadence 2cc2b88 (pre-pin) in a pinned repo warns, one from ddd2f99 does not; the 2026-09-25 line beside the current one warns no *predates the pin*; a temp root with `files/` and `launcher/INTERFACE` and no `sync.sh` reads `is_source` and is `adopt.dev_cadence`'s pick, and `ao repo add` (with and without `--adopt`) against it gives the refusal and makes no clone, and `seams.descends` finds it as the roster's dev-cadence checkout; a copied repo's cures still name `sync.sh` (the copy era has it); a reading without `hook_pinned` warns as today. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1022, TD-1023, TD-1010 (the roster warning), TD-1014.
+
+---
+
+## TD-1025: Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-26 (grinder-ao-1, met on TD-1014 slice 3; filed as the techlead's answer m-4991dd3be25e said)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design. Found while moving rule 12's reader onto the resolver (TD-1014 slice 3).
+**Location:** `src/sessionorc/conventions.py`, the tick's `_conventions_pass`; design §6 rule 12, §5 *How the readers find dev-cadence*
+
+**Why:** design §6 rule 12 tells a member that outlives a convention change by running `cadence_changes.py --json`, which reads `docs/cadence-changes.md` on the repo's `origin/<default>`. A pinned repo (dev-cadence TD-129) carries no such file once migrated. The pinned tree's script, run through the resolver from the repo's root, sits outside the root, so it takes the consumer layout and reads the repo's own file on origin: nothing, so a member in a pinned repo is never told, or only a migrated repo's stale copy, if it still tracks one. Under dev-cadence's plan (`docs/plans/2026-10-25-pinned-not-synced.md`) the changes between two pins travel in the bump PR's body (its *Decision* 7). What a member has not seen is therefore the entries between the pin it started under and the pin now merged.
+
+**Fix:** design how rule 12 reads a pinned repo's changes. One shape: read the pinned tree's `docs/cadence-changes.md` at the merged pin and compare its headings to `conventions_seen` as today, with `landed` read as the bump's merge time, not the entry's commit in dev-cadence. The first question is whether dev-cadence's `cadence_changes.py --json` should give that itself (a dev-cadence entry) or the home should read the tree's file. TD-1022 and TD-1023 (the SessionStart line in the pin era) are the neighbours: the hook tells a starting session, and this entry tells a running one.
+
+**Done when:** the design says what rule 12 reads in a pinned repo, and this entry's **Blocked by** names its build entries.
+
+**Related:** TD-1014, TD-1022, TD-1023, TD-258, dev-cadence TD-129.
+
+---
 
 ## TD-1026: Two team lessons from the memory harvest are not in the role briefs: a steer's default waits for its bound, and `--author @me` is not "my PRs"; the designer brief lacks the never-`SendMessage` line
 

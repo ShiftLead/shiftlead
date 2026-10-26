@@ -6,7 +6,11 @@ record the headings it has seen, and sends one `note` from `system` for those th
 the record was created. Nothing here is typed by a session, and the words are the script's `date`
 and `title` fields.
 
-The read (`read`) shells out and is called in a thread; the rest is pure."""
+A pinned repo (§5 *How the readers find dev-cadence*, TD-1014) carries no copy: the script is the pinned
+tree's, run through the resolver, `cadence.command`.
+
+The reads (`has_script`, which may resolve a pinned tree, and `read`) shell out and are called in a thread;
+the rest is pure."""
 
 from __future__ import annotations
 
@@ -16,12 +20,19 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sessionorc import cadence
+
 SCRIPT = "scripts/cadence_changes.py"
+PINNED_SCRIPT = "cadence_changes.py"  # as the pinned tree's `files/scripts/` holds it
 NAMED = 3  # the entries one note names; the rest are *and n more*
 
 
 def has_script(root: Path | str) -> bool:
-    """Whether `root` is a checkout the home can see that carries the script."""
+    """Whether `root` is a checkout the home can see that carries the script — in the pinned tree, for a
+    pinned repo."""
+    if cadence.pinned(root):
+        payload, _ = cadence.tree(root)
+        return payload is not None and (payload / "scripts" / PINNED_SCRIPT).is_file()
     return (Path(root) / SCRIPT).is_file()
 
 
@@ -31,10 +42,12 @@ def read(root: Path | str, timeout: float = 180.0) -> dict[str, Any] | None:
     the script's. The script asks git once per entry for its `landed`, hence the long timeout."""
     if not has_script(root):
         return None
+    if cadence.pinned(root):  # the pinned tree's script, through the resolver (TD-1014)
+        argv, env = cadence.command(root, "run", PINNED_SCRIPT, "--json")
+    else:
+        argv, env = ["python3", SCRIPT, "--json"], None
     try:
-        cp = subprocess.run(
-            ["python3", SCRIPT, "--json"], capture_output=True, text=True, timeout=timeout, cwd=str(root)
-        )
+        cp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=str(root), env=env)
     except (OSError, subprocess.TimeoutExpired):
         return None
     if cp.returncode != 0:

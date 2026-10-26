@@ -1561,11 +1561,11 @@ class TickMixin:
                 if self._conventions_member(s) and s.repo and s.repo in self._repos:
                     by_root.setdefault(str(s.repo), []).append(s)
             for root, members in by_root.items():
-                if not conventions_mod.has_script(root):
+                if not await asyncio.to_thread(conventions_mod.has_script, root):  # a pinned tree may fetch
                     continue
                 got = await asyncio.to_thread(conventions_mod.read, root)
                 if got is None:
-                    log.info("%s: %s gave no reading", root, conventions_mod.SCRIPT)
+                    log.info("%s: %s gave no reading", root, conventions_mod.PINNED_SCRIPT)
                     continue
                 for s in members:
                     if not self._is_record(s) or not self._conventions_member(s):
