@@ -1077,8 +1077,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   (a hand-run workflow that failed beside a green precheck is still *failed*, as dev-cadence's `ci`
   row folds it), except that runs that **never started** are outranked by a green precheck — they
   checked nothing, and with `precheck` set the precheck is the check — so a repo whose push workflow
-  can no longer start reads green on its precheck (the cure for the never-started runs is removing
-  the trigger, as TD-1035 does here): with none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
+  can no longer start reads green on its precheck, and its reading carries no `checks_not_run`, so
+  the *CI not starting* row does not name main (the cure for the never-started runs is removing the
+  trigger, as TD-1035 does here). The outrank is the home's own rule: dev-cadence's `ci` row reads a
+  never-started run as *unknown* whatever else passed. With none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
   the home's own run on it is going (*The precheck on main*, below), as dev-cadence's `ci` row reads
   an open PR's head. *When main moved*
   is its head's committer time (a squash merge stamps it), so the settle and the row's age survive a
@@ -1333,16 +1335,19 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     commit and records a `cadence/precheck` commit status there, so the verdict outlives the home and
     is the one any reader sees. Its output goes to `~/.shiftlead/promotes/<repo>/precheck-<sha7>.log`
     (pruned with the run logs), and **`~/.shiftlead/promotes/<repo>/precheck.json`** — `{sha, at, pid,
-    started, log}`, the process's start time beside its pid as the intent keeps it — is written before
+    started, log, kind}`, `kind` *main* here and *pr* (with `pr`) for the sync pass's run (*Sync* step 4),
+    one file per repo, so the two never run at once — the process's start time beside its pid as the
+    intent keeps it — is written before
     the start, so a restarted home finds a run going and never starts a second, and never kills a pid
     taken again; a file whose `pid` is null (the home died between the write and the start) is a run
     that never started, started again while its sha is main's head and dropped once it is not. The
     file is kept after the run ends — it is how *has run on that commit* is known — and replaced only
     by the next sha's. `PRECHECK_BOUND` (twenty minutes; CI's job had fifteen) kills a run still going:
     the process group (TERM, then KILL after a few seconds), since `pdm run test` is a grandchild, and
-    only while the start time matches. A kill skips `precheck.py`'s own cleanup, so the home then runs
-    `git worktree prune` in the checkout and removes the run's `precheck-*` directory under the temp
-    root.
+    only while the start time matches. A kill skips `precheck.py`'s own cleanup, so the home then
+    finds the run's worktree in `git worktree list --porcelain` (the entry at the sha under the temp
+    root whose directory starts `precheck-`, its suffix being `mkdtemp`'s), removes it with `git
+    worktree remove --force` and then prunes, as `drop_tree` does for the promote's tree.
   - **How it ends.** The status is the verdict, read on the next pass like any other, and it wins over
     the file: a status on the sha ends the run whatever the file says. Green, and the promote goes on
     by the rules above. **Failed is told**: main's head is red, and with every PR prechecked behind
@@ -1492,17 +1497,18 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      never the replay tree, which proves content and never judges. In a repo whose tree is older than
      `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
      its rows are kept only when they parse. **Where the repo sets `precheck`** (dev-cadence §4.12)
-     and the head carries no `cadence/precheck` status, the home first runs `python3
-     scripts/precheck.py --pr <n>` the same way, in the registry checkout under `PRECHECK_BOUND`
-     (TD-1033, *The precheck on main* above): the head's bytes are the ones step 1 proved, so it is
-     the gate's own trust. It runs only while the registry checkout is on `origin/<default>` with a clean
-     tree, since `precheck.py` reads the command from the tree it runs in; otherwise step 4 waits, a
-     pass not counted toward `SYNC_TRIES`. It is the repo's one precheck at a time: while main's run goes, step 4
-     waits, a pass that is no reading and not counted toward `SYNC_TRIES`. The sync pass holds its
-     task while the run goes, so another repo's sync waits behind it; sync PRs are few, and that is
-     accepted. Its exit 1 records a failure the gate then reads as one; its exit 2 or 3
-     and a kill at the bound are no reading, as below; a status already on the head is never run
-     again on a retry. **Its exit decides one of three
+     and the head carries no `cadence/precheck` status, step 4 first starts `python3
+     scripts/precheck.py --pr <n>` as main's run is started (TD-1033, *The precheck on main* above):
+     detached, in the registry checkout, its intent the repo's one `precheck.json` (`kind: pr` and
+     `pr: <n>` beside the sha), under `PRECHECK_BOUND`. The head's bytes are the ones step 1 proved, so
+     it is the gate's own trust. It starts only while the registry checkout is on `origin/<default>`
+     with a clean tree, since `precheck.py` reads the command from the tree it runs in, and only while
+     no precheck of the repo runs, main's or another PR's. A pass that finds it cannot start, or finds
+     the run going, waits: no reading, not counted toward `SYNC_TRIES`, the pass going on to the next
+     repo, so no task is held and no repo's cover lapses behind it. The run's verdict is the status the
+     gate reads on a later pass, whatever its exit (precheck's exit 1 also covers a failure it could not
+     record); a run that ends with no status is no reading, counted as below, and a status already on
+     the head is never run again. **Its exit decides one of three
      things.** A pass (exit 0) merges. A **fail** (the script's exit 1) gets a second comment, `cadence-review: BLOCK · sync-check · code · 1
      findings`, with the gate's line. The script reads the first comment as the review, and a latest
      BLOCK outvotes it, so the PR stays blocked until a session posts its own review after its fix.
