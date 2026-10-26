@@ -338,6 +338,14 @@ async def test_an_unserved_repo_is_promoted_by_no_pass(agent, checkout, monkeypa
     agent._promote_read_at = float("-inf")
     await agent._refresh_promotes()
     assert seen == [{"repo": False}, {"repo": True}]
+    # nor the person's press, a promote or a rollback: it is refused naming the lack
+    agent._repos[str(checkout)]["seams"] = {"serve": {"ok": False, "lacks": lacks}}
+    async with LocalClient() as person:
+        for kw in ({}, {"back": True}, {"sha": "abc1234"}):
+            with pytest.raises(
+                AgentError, match="repo is unserved: no gate .* promotes nothing of it until it is cured"
+            ):
+                await person.call("promote", repo="repo", **kw)
 
 
 # ── slice 2: the press, Dismiss's half, and `ao promote` (§4.7, §6) ────────────────────────────

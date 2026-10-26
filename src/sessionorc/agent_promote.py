@@ -125,10 +125,13 @@ class PromoteMixin:
         by = "person" if mail.is_person(caller) else str(caller)  # a person's own shell is named (§4.8, TD-580)
         if sha and back:
             raise RpcError("promote takes --sha or --back, not both")
-        if sha or back:
-            return await self._rollback(repo, sha, back, by)
         root = self._promote_root(repo)
         name = Path(root).name
+        # the home runs no promote of an unserved repo, a press or a rollback (§5 *The seams*, TD-1011)
+        if lacks := seams_mod.unserved(self._repos.get(str(root))):
+            raise RpcError(f"{name} is {lacks[0]}; the home promotes nothing of it until it is cured")
+        if sha or back:
+            return await self._rollback(repo, sha, back, by)
         async with self._promote_lock:
             readings, notes, bad = await asyncio.to_thread(promote_mod.survey, [root], {}, True, {}, datetime.now(UTC))
             # a run that reached its commit just now is concluded by this reading: its note is filed
