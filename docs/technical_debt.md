@@ -100,6 +100,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
 | TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
+| TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
 
 ---
 
@@ -2106,3 +2107,22 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Done when** a test starts a session through each route on a repo listed under a project and reads that project on the record, and a test of `message_edge` lets a `note` through between two such sessions of different teams on one project.
 
 **Related:** TD-1042 (the person's sessions across projects); TD-582, TD-722.
+
+## TD-1048: `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-26 (ao-dev-cadence-dc-grinder, through `ao td add --repo shiftlead`; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design, once dev-cadence TD-145 slice 2 gives `ledger_next_id.py` its `--branch` and its *Taken by* line
+**Blocked by:** dev-cadence#TD-145
+**Location:** `src/sessionorc/agent_ids.py` (`_ids_script`: the script's argv is `--count`, `--by`, `--floor`, `--ledger`, `--archive`, `--json`, with no `--branch`, and the reply relays `ids`, `unread`, `reserved`, `why`, `warnings`, with no `taken_by`); `src/shiftlead/cli.py` (`ao td next`'s output); design §4.4 *A ledger entry's id is handed out by the home* (*The run*), §4.7 (`ao td next`, its `--json` keys)
+
+**Why:** dev-cadence TD-145 (after ShiftLead/shiftlead#2370 typed TD-1028 by hand and the counter then gave TD-1028 to another session) makes the cadence check's `ledger` row fail a new entry whose `**Taken by:**` is not its take's `by`, and warn on one with none. The line is to be copied from the front end, never typed from memory, but `ao td next` is shiftlead's front end and prints no such line. It also runs the script in the home's checkout, which stays on `main` (§4.4 *The run*), so a take records that checkout's branch, never the branch of the session the id is for, and a branch mismatch cannot be checked. Without both, every shiftlead session's entry is warned on, and fails once the row reads the by and the branch.
+
+**Fix:** design first: `td_next` passes `--branch <the asking session's branch>` where it has one, and the round decides where that branch is read (the caller's record or its directory, on the home or a node). `ao td next` prints the script's *Taken by* line, and `--json` gives `taken_by`. The round also checks that this ledger's `Fields:` line, and ledgerboard's reading of it, accept `Taken by` before any entry carries it, since an undeclared field fails `ledger.py --check --since`.
+
+**Done when** the design names the flag, the line and the key, and the build entries are filed.
+
+**Related:** dev-cadence TD-145, TD-124 (the counter); TD-970, TD-1014, TD-1034 (`td_next`'s script road); ShiftLead/shiftlead#2370.
