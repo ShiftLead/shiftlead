@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
 | TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Open — design |
 | TD-1026 | Two team lessons from the memory harvest are not in the role briefs: a steer's default waits for its bound, and `--author @me` is not "my PRs"; the designer brief lacks the never-`SendMessage` line | Low | Designed — builds TD-1030 |
-| TD-1027 | `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit) | Low | Open — build |
 | TD-1028 | `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit) | Low | Open — build |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 | TD-1030 | The role briefs carry the steer-before-bound, own-PRs and claim-area lessons (TD-1026) | Low | Open — build |
@@ -1939,24 +1938,6 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Done when** (1)–(3) are in the briefs and (4) is decided, here or in the brief.
 
 **Related:** dev-cadence TD-125 (the harvest), ADR 2026-10-25 *ShiftLead requires dev-cadence* (Decision 7, the person's `shiftlead/` directory — where a lesson only Paul wants would go instead).
-
-## TD-1027: `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2368)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/repoconfig.py` (`layout`'s inner `pinned()`), `tests/test_repoconfig.py` (`test_a_pinned_repos_layout_names_the_resolvers_command`)
-
-**Why:** #2368 (TD-1014 slice 2) wrote `pinned()` to say a pin the launcher would refuse "is pinned still", and to read a refused-by-name `OSError` across the link as there. Probed on `origin/main` 0a24e16f4 with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_repoconfig.py tests/test_cli_teams.py`: (a) replacing `return PIN_HEADER in (line.strip() for line in text.splitlines())` (the `TOMLDecodeError` fallback) with `return False` leaves 143 passed; (b) replacing the `except OSError` body's `if any(why in str(e) for why in THERE_REFUSALS): return True` with a bare `raise` leaves 143 passed. The test's only TOML cases are a valid table, a valid table with odd spacing and a comment, and `[other]`, so neither branch runs; `test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_otherwise` covers `there()`'s refusals, not `pinned()`'s own copy of them. A node's repo whose pin is half-edited would then brief a session the copy's `python3 scripts/…` paths, which a pinned repo has not got, with nothing to say so.
-
-**Fix:** add to the test (or beside it) a pin whose text is not TOML but holds a `[dev-cadence]` line (layout reads the resolver's command), one whose text is not TOML and has none (reads the copy's paths), and a `cfg.read` that raises an `OSError` of a refusal named in `THERE_REFUSALS` (pinned) and of another kind (raised).
-
-**Done when:** each of the two reverts above fails a test; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1014, TD-1011.
 
 ## TD-1028: `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit)
 

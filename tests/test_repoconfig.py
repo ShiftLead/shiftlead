@@ -263,6 +263,35 @@ def test_a_pinned_repos_layout_names_the_resolvers_command(tmp_path):
     )
 
 
+def test_a_pin_the_launcher_would_refuse_or_a_refused_read_of_it_is_pinned_still(tmp_path):
+    """TD-1027: a pin that is not TOML is pinned while it holds a `[dev-cadence]` line, else it is no pin;
+    across the link the pin's file refused by name is there and pinned, and any other failure goes up."""
+    (tmp_path / "docs").mkdir()
+    pin = tmp_path / "docs" / "cadence.toml"
+    resolver = f"{shlex.quote(sys.executable)} {shlex.quote(str(cadence.LAUNCHER))} run ledger.py --check"
+    pin.write_text('[dev-cadence]\nsource = \nref = "half-edited\n', encoding="utf-8")
+    assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{ledger_check}"] == resolver
+    pin.write_text("source = \n[other]\n# [dev-cadence] in a comment\n", encoding="utf-8")
+    assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{ledger_check}"] == (
+        "python3 scripts/ledger.py --check"
+    )
+
+    def node(why):
+        def read(path):
+            if path == pin:
+                raise OSError(f"devenv: docs/cadence.toml{why}")
+            return None
+
+        return read
+
+    cfg = repoconfig.load_text(None, tmp_path)
+    cfg.read = node(": over 262144 bytes, which is not a repo config or a brief")
+    assert repoconfig.layout(cfg)["{ledger_check}"] == resolver
+    cfg.read = node(": the host is not answering")
+    with pytest.raises(OSError, match="not answering"):
+        repoconfig.layout(cfg)
+
+
 def test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_otherwise(tmp_path):
     """Review of #1737: a node's checkout refuses a directory, or a file past its cap, by name — the
     path is there; any other failure of the link goes up rather than tell the brief a seam is absent."""
