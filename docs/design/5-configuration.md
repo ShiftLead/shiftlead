@@ -250,13 +250,17 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
 
   A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
   say which, each in its fixed words with its cure, the page and `ao doctor` sharing them:
-  *unserved: no dev-cadence (no docs/cadence-sync.lock) — `ao repo add <path> --adopt`*, *unserved:
-  dev-cadence's lock does not parse — <the reader's reason> — `ao repo add <path> --adopt`*, *unserved: no
-  gate (no scripts/check_cadence.py) — `ao repo add <path> --adopt`*, *unserved: no ledger at
+  *unserved: no dev-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — `ao repo add <path>
+  --adopt`*, *unserved: dev-cadence's lock does not parse — <the reader's reason> — `ao repo add <path>
+  --adopt`*, *unserved: dev-cadence's pin does not parse — <the launcher's reason> — `ao repo add <path>
+  --adopt`*, *unserved: dev-cadence's pin does not resolve — <the launcher's reason>* (a pin needing a newer
+  launcher interface reads *it needs launcher interface <n>, this build carries <m> — a newer ShiftLead*),
+  *unserved: no gate (no scripts/check_cadence.py) — `ao repo add <path> --adopt`*, *unserved: no gate (no
+  check_cadence.py in the pinned tree) — bump the pin*, *unserved: no ledger at
   docs/technical_debt.md — `ao repo add <path> --adopt`*, *unserved: the ledger at
   docs/technical_debt.md does not parse — <the reader's reason>* (no adopt cures it), *unserved:
-  dev-cadence at <commit> is older than this build reads (<oldest>) — sync it* (today `sync.sh`, under
-  dev-cadence TD-129 a bump PR); where an adoption PR is open (the repo's PR reading's open PR whose
+  dev-cadence at <commit> is older than this build reads (<oldest>) — sync it* (`sync.sh`; for a pinned
+  repo, whose pin's `ref` is the commit, *— bump the pin*, a bump PR); where an adoption PR is open (the repo's PR reading's open PR whose
   head is `cadence-adopt`, §4.4), its cure reads *adoption PR #n open* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
   the PRs that show an adoption PR) and **the two passes that make it served**:
   *Pull* (§6), which fast-forwards the checkout once an adoption or a sync has merged, and, for a repo
@@ -328,8 +332,14 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   dev-cadence TD-129 every reader asks **one resolver**, `sessionorc.cadence.command(repo, word,
   *args)`, for **the command to run** — its argv and environment, `CADENCE_REPO_ROOT` included — so no
   reader sets that up itself. The resolver calls dev-cadence's launcher, a dependency of ShiftLead's
-  install: the host agent finds it in its own venv, never on a login `PATH`, and the wheel pins it, so a
-  rollback of the live copy covers it. A container node has no network path to a private dev-cadence
+  install: the wheel vendors it frozen (`sessionorc/dev_cadence.py`, from dev-cadence's
+  `launcher/dev_cadence.py` at the commit `cadence.LAUNCHER_COMMIT` names) and the host agent runs it under
+  its own venv's Python, never one on a login `PATH`, so a rollback of the live copy covers it. A repo is
+  **pinned** when its `docs/cadence.toml` holds `[dev-cadence]` and it has no lock; while it still has the
+  lock, its copy is read. A pinned repo holds dev-cadence by its pin (read as the launcher reads it), its
+  gate is the pinned tree's `check_cadence.py` run as `dev-cadence run check_cadence.py --pr <n> --json`,
+  and its ledgerboard release is the pinned tree's, so a pin with no copy is warned of for no absent file.
+  The tree is the launcher's `path` (its cache, local after the first fetch), asked once a minute at most. A container node has no network path to a private dev-cadence
   and no lasting cache, so the home ships the pinned trees a node needs with the wheel (`ao host up`,
   §4.4a). A pin that cannot be resolved — one that needs a newer launcher interface than this build's
   included, which a ShiftLead release cures — makes the repo unserved by name, never skipped.

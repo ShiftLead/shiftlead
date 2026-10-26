@@ -1794,6 +1794,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-26 (TD-1014 slice 1, grinder-ao-1): *How the readers find dev-cadence* — the launcher is vendored frozen into the wheel (`sessionorc/dev_cadence.py`, dev-cadence 8008a10) and run under the host agent's own Python, since dev-cadence ships it as one stdlib script, not a package; a repo is pinned by `[dev-cadence]` with no lock; a pinned repo's tree, gate and ledgerboard release are the pinned tree's; the fixed words gain the pin's three lacks and *no dev-cadence* names both the pin and the lock; a pinned repo's older-tree cure is *bump the pin*.
 - 2026-10-25 (TD-1009's review, round 15, Sonnet, READY): the loop ends here — Sonnet READY, and Fable's last round (13) had only follow-ons of round 11's adoption.
 - 2026-10-25 (TD-1009's review, round 14, Sonnet, on round 13's delta, 1 finding and 1 minor, adopted): TD-1010's roster test keeps the roster outside every temp root and proves the guard with a second clone; the temp roots are named.
 - 2026-10-25 (TD-1009's review, round 13, Fable, NOT READY, 3 follow-ons of round 11, adopted): `sync.sh` does append its target to dev-cadence's roster, unless under a temp root (round 11 had said it never writes it), so the scratch clone must be under `$TMPDIR`, and the person's `sync.sh <checkout>` run is the one cure for both the hook-shim and the roster warnings; the Director card row reads *not pushed* / *behind* from the clone; §5 and `ao doctor` name the two warnings.

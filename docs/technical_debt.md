@@ -1707,7 +1707,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-25 (the designer, from TD-1009)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build
+**Status:** Open — build; slice 1 (the resolver: the launcher vendored frozen as `sessionorc/dev_cadence.py`, dev-cadence 8008a10; `cadence.pin`/`pinned`/`command`/`tree`; a pinned repo with no lock served, its gate run through the resolver, its age its pin's `ref`, its ledgerboard release the pinned tree's; the pin's lacks by name) in #2365. Left: (2) `repoconfig.layout`'s `{gate}`, `{ledger_check}` and `{cadence_rules}` from the resolver for a pinned repo; (3) the convention notices (`conventions.py`, `cadence_changes.py`) and `sync`'s other readers through it; (4) `ao repo add` reads a pinned repo as adopted — `agent_settings.py`'s `holds = lock or is_source` (the `add_repo` RPC) and `shiftlead/adopt.py`; (5) `ao host up` ships the pinned trees a node's repos name; then the Done-when grep (no reader builds a dev-cadence path outside `cadence.py` and `sync.py`). Noted by slice 1's review: a cold pin's first fetch can hold one repo-read pass up to `cadence.TREE_TIMEOUT` (330 s), since the pass reads repos in turn.
 **Blocked by:** TD-1011
 **Location:** `src/sessionorc/cadence.py` (new `command(repo, word, *args) -> (argv, env)`), every reader of a dev-cadence path (`cadence.gate`, `sync`, `seams`, `repoconfig.layout`'s `{gate}` / `{ledger_check}` / `{cadence_rules}`, the convention notices), `pyproject.toml` (the launcher as a dependency), `src/sessionorc/containers.py` / `ao host up` (the trees beside the wheel); design §5 *How the readers find dev-cadence*, §4.4a
 
