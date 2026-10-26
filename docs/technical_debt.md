@@ -90,6 +90,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Designed — builds TD-1023, TD-1024 |
 | TD-1023 | The layer's SessionStart line is dev-cadence's pinned seed, verbatim and parity-tested; Gemini's start hooks and the repo's own line follow the pin | High | Open — build |
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
+| TD-1026 | Four team lessons sessions saved as memories in other repos are not in the role briefs: claim before editing, a steer's default waits for its bound, message peers through `ao msg`, and `--author @me` is not "my PRs" | Low | Open — from the 2026-10-26 memory harvest |
 
 ---
 
@@ -1909,3 +1910,27 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** a pinned temp repo carrying the current line, the TD-129 shim and a roster line warns neither *no SessionStart line* nor `sync.sh` / `sync-all`; the same repo with the 2026-09-25 line warns *predates the pin*, with a pre-pin shim the launcher's shim cure, and off the roster the `adopt` cure; an unpinned repo's three warnings are today's words; a line with one byte changed warns *not one this build knows*, and not also *no SessionStart line*, and the same beside the current line warns nothing; a shim text taken from dev-cadence 2cc2b88 (pre-pin) in a pinned repo warns, one from ddd2f99 does not; the 2026-09-25 line beside the current one warns no *predates the pin*; a temp root with `files/` and `launcher/INTERFACE` and no `sync.sh` reads `is_source` and is `adopt.dev_cadence`'s pick, and `ao repo add` (with and without `--adopt`) against it gives the refusal and makes no clone, and `seams.descends` finds it as the roster's dev-cadence checkout; a copied repo's cures still name `sync.sh` (the copy era has it); a reading without `hook_pinned` warns as today. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1022, TD-1023, TD-1010 (the roster warning), TD-1014.
+
+## TD-1026: Four team lessons sessions saved as memories in other repos are not in the role briefs: claim before editing, a steer's default waits for its bound, message peers through `ao msg`, and `--author @me` is not "my PRs"
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through the memory harvest; drafted by session `memory-vs-cadence`)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — found by Paul's first memory harvest (dev-cadence TD-125, archived); Paul chose a ShiftLead entry for these rather than his own layer.
+**Location:** `src/shiftlead/briefs/grinder.md`, `designer.md`, `auditor.md` (the role briefs' *steer*, mail and pick bullets); `src/shiftlead/team_skill.md` (`ao team --skill`); design §4.9b; the source memories under each repo's `docs/claude-memory/`
+
+**Why:** the harvest read every memory on Paul's roster. Four lessons are about working as a ShiftLead team member, not about the cadence or one repo, so neither dev-cadence nor Paul's own layer is their home: they hold for every ShiftLead user, which makes them the role briefs' text. Each was found the hard way:
+- **Claim before the first edit** (samscrape `feedback_announce_the_claim_before_working`): three concurrent grind sessions picked one TD, and the one that deferred announcing until it had a green implementation lost to a peer's announced claim and binned the work. Announcing the TD *and the files* lets a peer take an adjacent slice instead of yielding. ShiftLead's lanes may now prevent most such collisions, so whether the brief needs it is the design question.
+- **A steer's default licenses acting only after its bound** (samscrape `feedback_a_steer_default_holds_only_after_its_bound`): a session sent a `steer` with default *proceed* and merged about 15 minutes later, pre-empting the techlead's pass-up to Paul. The briefs say *at its bound you do what you said*, but not that before the bound only reversible, private steps (branch, PR, review) are taken.
+- **Message a team session with `ao msg`, not a cross-session agent message** (samscrape `feedback_peer_message_can_block_the_receiver`): an agent `SendMessage` to a session in a different permission mode is held behind a Deliver/Deny prompt for a human, and the receiver sits blocked, reading as idle.
+- **`--author @me` is not "my PRs"** when several sessions push as one account (shiftlead `shiftlead-td-grind-mechanics`): ownership is which worktree has the branch checked out and what the session itself opened.
+
+Today the last two sit in Paul's `craft.md` (his layer repo) and the first two stay in samscrape's memory, so a new ShiftLead user, or a team in a repo without those memories, meets each again.
+
+**Fix:** decide, per lesson, whether it is still live under today's mechanics (lanes, `ao claim` if any, `steer` bounds, `ao msg`), and for each that is, add one line to the role briefs that need it (grinder and designer at least) or to `ao team --skill`, citing the source memory. Reword the steer bullets so the bound's meaning is explicit: before it, reversible private steps only; merge or anything others see waits for a reply or the bound. When a lesson lands, the source repos' memories can be trimmed to a pointer (samscrape TD-464's follow-up, or a line added to it).
+
+**Done when** each of the four is either in a brief or the team skill, or recorded here as no longer live with the mechanism that made it so.
+
+**Related:** dev-cadence TD-125 (the harvest), ADR 2026-10-25 *ShiftLead requires dev-cadence* (Decision 7, the person's `shiftlead/` directory — where a lesson only Paul wants would go instead).
