@@ -303,6 +303,27 @@ async def test_where_the_repo_sets_precheck_a_head_without_it_refuses_the_done_w
     views[843] = _view(_run("test"))
     got = await w.call("progress", id=sid, ref="TD-2", status="done", pr=843)
     assert got["checks_said"] == "PR #843: checks unknown: docs/cadence.toml does not parse"
+    # a merged PR is not read for it, so a file that does not parse leaves it merged; a slice too
+    await w.call("progress", id=sid, ref="TD-3")
+    views[844] = _view(state="MERGED", merged="2026-10-26T00:00:00Z")
+    got = await w.call("progress", id=sid, ref="TD-3", status="done", pr=844, slice=True)
+    assert "stays claimed" in got["slice"]
+    with pytest.raises(AgentError, match="a slice is a merged PR — #843 is open"):
+        await w.call("progress", id=sid, ref="TD-3", status="done", pr=843, slice=True)
+
+
+async def test_a_cadence_toml_not_read_is_no_precheck_and_the_fold_runs_as_before(worker):
+    """A rev that is not there, or a read that timed out, is not *unknown* (TD-1036): only a file that
+    does not parse is."""
+    w, sid, rec, views = worker
+    for why in ("docs/cadence.toml could not be read: no origin/main here", "docs/cadence.toml could not be read: X"):
+        views[PRECHECK] = (None, why)
+        views[842] = _view(_run("test", conclusion="FAILURE"))
+        with pytest.raises(AgentError, match=r"required checks failed on 9c1e0f2: test — fix them"):
+            await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+        views[842] = _view(_run("test"))
+        got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+        assert got["checks_said"] == "PR #842: checks green on 9c1e0f2"
 
 
 # -- the hand-off: an `ask` carrying `pr` (design §4.9b *The reader*, TD-658) ------------------------
@@ -318,6 +339,13 @@ async def test_an_ask_with_a_pr_whose_head_carries_no_precheck_is_refused_with_i
         r"then ask again$",
     ):
         await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)
+    views[842] = _view(_run("test", "IN_PROGRESS", ""))
+    with pytest.raises(AgentError) as e:
+        await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842, nonce="n-3")
+    assert str(e.value).endswith(
+        "still running on 9c1e0f2: test, cadence/precheck — run `python3 scripts/precheck.py --pr 842` "
+        "(in the background), then ask again"
+    )
     assert rec.outbox == [] and agent.person_inbox == []
     views[842] = _view(_run("test"), _status(reports.PRECHECK_CONTEXT, "SUCCESS"))
     got = await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)

@@ -83,6 +83,15 @@ async def test_where_the_repo_sets_precheck_a_head_without_it_stays_none_with_it
         agent._repos[root] = _reading(root, [{**_row(checks="green"), "prechecked": True}], now)
         got = await c.call("pr_wait", root=root, pr=7, timeout=5)
         assert (got["word"], got["precheck"]) == ("green", None)
+        # a reading taken before rows carried `prechecked`: green stays green, none says the line
+        agent._repos[root] = _reading(root, [_row(checks="green")], now)
+        assert (await c.call("pr_wait", root=root, pr=7, timeout=5))["word"] == "green"
+        agent._repos[root] = _reading(root, [_row(checks="none")], now)
+        got = await c.call("pr_wait", root=root, pr=7, timeout=5)
+        assert (got["word"], got["precheck"]) == ("none", "python3 scripts/precheck.py --pr 7")
+        agent._repos[root] = _reading(root, [{**_row(checks="pending"), "prechecked": False}], now)
+        got = await c.call("pr_wait", root=root, pr=7, timeout=0.1)
+        assert (got["word"], got["precheck"]) == ("timeout", None)
         sets[0] = (None, None)
         agent._repos[root] = _reading(root, [{**_row(checks="green"), "prechecked": False}], now)
         got = await c.call("pr_wait", root=root, pr=7, timeout=5)
