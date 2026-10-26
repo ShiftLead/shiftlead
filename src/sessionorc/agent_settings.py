@@ -204,6 +204,8 @@ class SettingsMixin:
             here = (await asyncio.to_thread(gitinfo.main_checkout, Path(path).expanduser())).resolve()
         except gitinfo.WorktreeError:
             raise RpcError(f"{path} is not in a git checkout") from None
+        if not (here / ".git").exists():  # a bare repo's parent, or a submodule's `.git/modules`
+            raise RpcError(f"{path} is not in a checkout with a work tree")
         root = str(here)
         host = hosts.local_host()
         if any(Path(r).expanduser().resolve() == here for r in host.repos()):
@@ -212,9 +214,14 @@ class SettingsMixin:
         if not (served or adopted):
             raise RpcError(f"{root} holds no dev-cadence ({sync_mod.LOCK}): its adoption comes first (design §4.7)")
         reg = host.repos_registry
-        reg.parent.mkdir(parents=True, exist_ok=True)
-        before = reg.read_text(encoding="utf-8") if reg.exists() else ""
-        reg.write_text(before + ("" if not before or before.endswith("\n") else "\n") + f"{root}\n", encoding="utf-8")
+        try:
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            with reg.open("ab+") as f:  # appended, never rewritten: nothing of the roster is lost
+                f.seek(0, 2)
+                ends = f.tell() == 0 or (f.seek(-1, 2), f.read(1))[1] == b"\n"
+                f.write((b"" if ends else b"\n") + f"{root}\n".encode())
+        except OSError as e:
+            raise RpcError(f"could not write the roster {reg}: {e}") from None
         log.info("add_repo: %s added to %s by %s", root, reg, caller)
         return {"root": root, "name": here.name, "served": served}
 
