@@ -1131,7 +1131,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   outcome is read from `check` on later ticks, never from the run's exit code** (`check` read every
   fifteen seconds, `PROMOTE_WATCH`, while it is in flight), and the agent that judges it need not be
   the one that started it — a restart mid-run finds the file and carries on. Live reads the wanted
-  commit → done (where the run's tree's block has `smoke:`, once the smoke passes, *The smoke* below): the file cleared and a `system` note to the person inbox, *promoted `<repo>`
+  commit **and the run has ended** (`alive(pid, started)` false, TD-1031: *The smoke*, *When and
+  where*) → done (where the run's tree's block has `smoke:`, once the smoke passes, *The smoke* below): the file cleared and a `system` note to the person inbox, *promoted `<repo>`
   `<sha>` — n commits* (FYI, uncounted, §4.10); the wheel and the nodes follow §4.4a. The process
   gone with live still elsewhere, or `PROMOTE_BOUND` (twenty minutes) passed — the process killed at
   the bound as the stop time kills, and only while it is still the run: the intent keeps the
@@ -1156,8 +1157,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     when it names no commit or more than one, when it is **not an ancestor of `origin/main`** (a
     branch is never promoted, CLAUDE.md; a hotfix is a merge and then a press), and when it is live
     already. Main's head is the plain press, by the path above. `--back` is `from` in
-    `~/.shiftlead/promotes/<repo>/last.json` — `{sha, from, at, by, kind}`, written when a promote
-    concludes, `from` being what `check` read before the run — and is refused when there is no such
+    `~/.shiftlead/promotes/<repo>/last.json` — `{sha, from, at, by, kind}`, written on the first pass whose
+    `check` reads the run's commit (*The smoke*, *When and where*: `read_at`), `from` being what
+    `check` read before the run — so a run killed at the bound after that reading leaves it, and
+    `--back` then goes to its `from` — and is refused when there is no such
     record or its `from` was never read, and **while a hold stands**: the last promote was then the
     rollback, and its `from` is the commit the person went back from.
   - **How it reaches `run`.** The checkout stays where the person left it. The home adds a detached
@@ -1204,12 +1207,50 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   **The smoke** (TD-804). CI judges a commit on fixtures, so a build that breaks only on the person's
   real state passes it. A repo's block may carry **`smoke:`** (§5), a command the home runs **after
   `check` reads the new commit**, to say whether what is now live works.
-  - **When and where.** It starts on the pass whose `check` reads the run's commit, for a promote
-    and a rollback alike. It runs in the tree `run` was started in: the checkout for a promote,
+  - **When and where.** It starts on the pass whose `check` reads the run's commit **and whose run
+    has ended** (`alive(pid, started)` false; TD-1031), for a promote and a rollback alike. A `run`
+    may change what `check` reads before it restarts what serves the pages — this repo's `pip install`
+    writes the build record `check` reads, and its `ao service install` restarts the units after —
+    so a smoke started on `check` alone met a UI going down (three failed smokes, 2026-10-20 to
+    2026-10-26, each a rollback and a hold). The wait is **every promote's**, not the smoke's alone: a
+    repo with no `smoke:` concludes on `check` and the run's end too, so it is never told *promoted*
+    while its run is still restarting. Until the run ends the promote stays in flight as a run — the
+    row and `ao promote status` keep *promoting `<sha7>` · started <t>* — and `PROMOTE_BOUND` kills
+    one still alive as ever: a run killed there after `check` read its commit is a failure as any
+    other — its why the existing *still running after 20 minutes: killed* with *(live read `<sha7>`)* after it —
+    keyed on `read_at` standing, not on that pass's live, so a pass reading live unknown still says it, live left where it
+    reads, and never a smoke's failure, so no smoke rollback follows it; a rollback killed so fails
+    beside its hold. *The run has ended* is `alive(pid, started)` false; an intent with no `started`
+    (one written before it was kept) is judged by its pid alone, as before, and a `pid` that is null
+    is ended — a gap accepted for a home that died between the intent's two writes, whose run may
+    still be going. **Once `read_at` stands, a pass whose `check` cannot read** (live *unknown*, as
+    while `pip` replaces the package) waits for a reading within `PROMOTE_BOUND`, as `auto` does, and is never
+    the *run ended and live unknown* failure: the commit was read once. Past the bound with live
+    still unread it fails plainly — *live still unknown after 20 minutes — <live_why>*, nothing to
+    kill, never a smoke failure, a rollback failing beside its hold. A reading of another commit
+    after `read_at`, the run ended, fails as before (*the run ended and live is …*), `last.json`
+    standing. **What the first reading writes**: `last.json`, and a rollback's
+    `held.json`, are written once, on the first pass whose `check` reads the commit, the run ended or
+    not: the same pass sets the intent's `read_at` and writes `inflight.json` right after the two
+    files, so a later pass, or a home restarted between the reading and the run's end, does not
+    rewrite them — save a home that died between the two writes, which writes them again, their `at` the
+    later pass's. The build chip (§4.5a) then names the commit *promoted* from `last.json` through
+    the window while the row says *promoting*: accepted, since live does read it — a rollback whose run
+    then hangs to the bound fails beside its hold, never without one. `check` stays the installed
+    copy's build (the repo's choice, §5), and the home reads no exit code, so a run that installed and
+    then failed its restart (this repo's `ao service install` after `pip install`) ends reading its
+    commit with the old units serving: the smoke is what catches that, and this repo's compares the
+    running build — `ao status --json`'s `build.built_from.commit` — with the full
+    `SHIFTLEAD_PROMOTE_SHA`, failing on a null `build` or a missing commit, its last line *running
+    build <sha7> is not the promoted <sha7>* or *running build unknown* (TD-1041) — read from the
+    smoke's own `ao status --json` read, and skipped with a line saying so when
+    `SHIFTLEAD_PROMOTE_SHA` is unset (a smoke run by hand). A repo with
+    no smoke accepts the gap. It runs in the tree `run` was started in: the checkout for a promote,
     `promotes/<repo>/tree` for a rollback. **`smoke:` is read from that tree's own `.shiftlead.yml`
     when the run starts**, not from the checkout's, and is kept on the intent. So the smoke that runs is
     the one that commit carries, and a pull that moves the checkout during the run changes nothing.
-    A repo whose checkout's block has no `smoke:` concludes on `check` with its note unchanged. Where
+    A repo whose checkout's block has no `smoke:` concludes on `check` and the run's end with its
+    note unchanged. Where
     the checkout's block has one but the tree's does not (a rollback to a commit older than the
     smoke; a tree with no `.shiftlead.yml` reads as no block), no smoke runs and the note says
     *no smoke in `<sha7>`*. A tree whose file or block cannot be read runs none either: *no smoke
@@ -1229,16 +1270,16 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       but only while the pid is still the smoke. Once the smoke starts, the run's `PROMOTE_BOUND`
       no longer applies: the run reached its commit, and `SMOKE_BOUND` from the smoke's start is
       the only clock.
-    - A repo with no `smoke:` concludes as before, on `check` alone. So does a rollback to a
+    - A repo with no `smoke:` concludes as before, with no smoke, on `check` and the run's end. So does a rollback to a
       commit older than its repo's smoke, whose tree's block names none.
   - **The promote is in flight until the smoke ends.** The intent stays in `inflight.json`, with
     `phase: smoke` and the smoke's pid, start time and `at`. So precondition (3) refuses a press,
     `--back` included, and `auto` waits through the smoke.
-    - When `check` reads the commit, `last.json` is written, as before, and so is a rollback's
-      `held.json`. A restart of the home mid-smoke therefore finds both, and a rollback's failed
+    - When `check` first reads the commit, `last.json` is written, once (*When and where*: `read_at`),
+      and so is a rollback's `held.json`. A restart of the home mid-smoke therefore finds both, and a rollback's failed
       smoke stands as a failure beside its hold.
-    - **A plain promote's hold is cleared only when its smoke passes** (at the `check` reading for a
-      block with no `smoke:`), since that is when it concludes. So under a hold, a press whose smoke
+    - **A plain promote's hold is cleared only when its smoke passes** (at the `check` reading and the
+      run's end for a block with no `smoke:`), since that is when it concludes. So under a hold, a press whose smoke
       fails rewrites the standing hold, and a smoke rollback that cannot start leaves the hold beside
       the failure.
     - The note waits for the smoke: *promoted `<repo>` `<sha7>` — n commits · smoke passed in
