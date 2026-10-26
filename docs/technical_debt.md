@@ -86,7 +86,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
-| TD-1021 | Memory harvest 2026-10-26: 6 passages contradict the cadence, 10 memories repeat it, 12 more wait on dev-cadence, and 6 need tidying | Low | Open — (1), (2), (4) now; (3) waits on dev-cadence TD-136–TD-139 |
+| TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) now; (3) waits on dev-cadence TD-136–TD-139 |
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Open |
 
 ---
@@ -1811,7 +1811,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 
 **Related:** dev-cadence TD-129 (slice 5, #335; slice 11, #341), TD-1009, TD-1010 (part 3, the roster warning), TD-1014 (the pin era's other readers), TD-507 (the doctor's reading of dev-cadence's line of any vintage).
 
-## TD-1021: Memory harvest 2026-10-26: 6 passages contradict the cadence, 10 memories repeat it, 12 more wait on dev-cadence, and 6 need tidying
+## TD-1021: Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying
 
 **Priority:** Low
 **Type:** debt
@@ -1825,8 +1825,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 
 **Fix:**
 
-**(1) Remove these passages. Each contradicts the cadence:**
-- `cloud-design-round.md` ("renumber by hand").
+**(1) Remove or correct these passages. Each contradicts the cadence:**
+- `cloud-design-round.md` ("renumber by hand", and its `Pickable: yes`).
 - `designer-run-lessons-2026-09-25.md` (number from `sort | tail -1`).
 - `designer-run-lessons-2026-10-12.md` (number from the highest TD).
 - `shiftlead-td-grind-mechanics.md` (renumber from origin/main's highest).
@@ -1847,7 +1847,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 - `td-ids-live-in-pr-diffs.md`: §2.10.
 
 **(3) After dev-cadence lands the rule, and the PR bringing it here has merged, trim to a pointer:**
-- `alternate-review-rounds.md` and `reviewer-prompts-keep-out-of-the-anchor.md`: dev-cadence#TD-136, §4.8.
+- `alternate-review-rounds.md`, `reviewer-prompts-keep-out-of-the-anchor.md`, and the point-reviewers-at-refs lessons in `designer-run-lessons-2026-09-25.md`, `designer-run-lessons-2026-10-04.md` and `shiftlead-td-grind-mechanics.md`: dev-cadence#TD-136, §4.8.
 - `check-in-flight-before-a-td-step.md`, `check-open-prs-before-a-design-round.md`, `open-the-pr-before-writing-its-number.md`, the PR-number lesson in `dates-and-pr-numbers-are-local-and-real.md`, `summary-table-conflicts-resolve-row-wise.md`, and the template-regex, archive-tail and PR-number lessons in `shiftlead-td-grind-mechanics.md`: dev-cadence#TD-137, §2.5, §2.8, §2.9, §2.12.
 - `a-park-is-a-merged-pr.md`: dev-cadence#TD-137 and TD-138, §2.9 and §3.6.
 - `no-vscode-windows-for-agent-worktrees.md`: dev-cadence#TD-139, §1.1.
