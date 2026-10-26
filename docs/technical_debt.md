@@ -87,6 +87,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
 | TD-1019 | `ao repo add --adopt`'s re-run, stray-branch and already-adopted outcomes, and its refusal on a served repo, have no line in design §4.7 | Low | Open — build |
+| TD-1020 | `_read_repo` passes the registry as the seams' roster (TD-1012) and no test would catch it going back | Low | Open — build |
 
 ---
 
@@ -1812,3 +1813,20 @@ Probe: `grep -rn "holds dev-cadence already\|no open PR\|nothing to adopt\|open 
 **Done when:** the grep in **Why** finds each outcome's words in `docs/design/4.7-cli.md`, and the doc-bound tests pass.
 
 **Related:** TD-1010 (#2356), TD-1009.
+
+## TD-1020: `_read_repo` passes the registry as the seams' roster (TD-1012), and no test would catch it going back
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-25 (test-audit-ao-1, auditing #2348–#2357)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+
+**Location:** `src/sessionorc/agent_tick.py` (`_read_repos` → `_read_repo`, the `seams_mod.reading(root, roster or [root], seams)` line); tests `tests/test_repo_seams.py`, `tests/test_seams.py`
+
+**Why:** #2354 (TD-1012) made the seams read a lock's age against the *roster's* dev-cadence checkout (`seams.reading(root, roster, old)`), and wired it in `_read_repo` with `roster=registry if registry is not None else roots`, carrying `old["seams"]` as `old`. Every new test calls `seams.reading(root, roster)` directly, so the wiring the home actually runs is untested. Probe: in a worktree on `origin/main`, change that line to `seams = seams_mod.reading(root)` (roster and carried age dropped, so every consumer's age is read from the forge, or not at all, and never carried), then `pdm run pytest -q tests/test_seams.py tests/test_repo_facts.py tests/test_sync_pass.py tests/test_repo_adopt.py tests/test_ledger_derived.py tests/test_live_check_lane.py` — 115 passed. `grep -rn "_read_repo\b" tests` finds only a monkeypatch (`test_seams.py:102`) and docstrings.
+
+**Fix:** one test that runs a tick's repo read (`TickMixin._read_repos`, as `test_workorders.py` or `test_repo_facts.py` do) over a consumer whose lock is older than `cadence.OLDEST` plus a dev-cadence checkout in the registry, and asserts `seams.cadence_age.descends` is False with no `gh` call, and that a second read carries the age; it fails with the line above reverted.
+
+**Done when:** that test exists and fails against the reverted line.
