@@ -1349,7 +1349,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     the process group (TERM, then KILL after a few seconds), since `pdm run test` is a grandchild, and
     only while the start time matches. A kill skips `precheck.py`'s own cleanup, so the home then
     finds the run's worktree in `git worktree list --porcelain` — `precheck.py` makes it as `head`
-    inside a `mkdtemp` directory named `precheck-…` under the temp root, so the entry at the sha whose
+    inside a `mkdtemp` directory named `precheck-…` under the temp root (`tempfile.gettempdir()` in the
+    environment the home starts it with, `TMPDIR` inherited), so the entry at the sha whose
     path is `<temp root>/precheck-*/head` — removes it with `git worktree remove --force`, prunes, as
     `drop_tree` does for the promote's tree, and removes the `precheck-*` directory around it.
   - **How it ends.** The status is the verdict, read on the next pass like any other, and it wins over
@@ -1503,8 +1504,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      its rows are kept only when they parse. **Where the repo sets `precheck`** (dev-cadence §4.12)
      and the head carries no `cadence/precheck` status, step 4 first starts `python3
      scripts/precheck.py --pr <n>` as main's run is started (TD-1033, *The precheck on main* above):
-     detached, in the registry checkout, its intent the repo's one `precheck.json` (`kind: pr` and
-     `pr: <n>` beside the sha), under `PRECHECK_BOUND`. The head's bytes are the ones step 1 proved, so
+     detached, in the registry checkout, under `PRECHECK_BOUND`, its own intent file below. The head's bytes are the ones step 1 proved, so
      it is the gate's own trust. It starts only while the registry checkout is on `origin/<default>`
      with a clean tree, since `precheck.py` reads the command from the tree it runs in, and only while
      no precheck of the repo runs, main's or another PR's (*The precheck on main*: one at a time). A pass
@@ -1519,7 +1519,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      with no reading, counted toward `SYNC_TRIES` once (the file marked `counted`), after which a later
      pass may start a new run, replacing the file; a head that moved or a PR no longer open kills a
      live run (the group, only while its start time matches) and drops the file. The cleanup after a
-     kill is main's. **Its exit decides one of three
+     kill is main's. **Who ends it**: the readings' pass judges `precheck-pr.json`'s bound and kills at
+     it as it does main's (it already reads both files under the lock), so a run outlives no bound
+     when the sync pass skips the repo; the sync pass judges the head, the PR's state and `counted`.
+     **The gate's exit decides one of three
      things.** A pass (exit 0) merges. A **fail** (the script's exit 1) gets a second comment, `cadence-review: BLOCK · sync-check · code · 1
      findings`, with the gate's line. The script reads the first comment as the review, and a latest
      BLOCK outvotes it, so the PR stays blocked until a session posts its own review after its fix.
