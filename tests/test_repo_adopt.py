@@ -32,6 +32,7 @@ git -C "$t" config dev-cadence.shim on
 echo '.cadence-scratch' >> "$t/.git/info/exclude"
 """
 GH = """#!/bin/sh
+if [ "$2" = list ]; then cat "$GH_OPEN" 2>/dev/null || echo '[]'; exit 0; fi
 printf '%s\\n' "$@" > "$GH_LOG"
 while [ $# -gt 0 ]; do [ "$1" = --body-file ] && cp "$2" "$GH_LOG.body"; shift; done
 echo https://github.com/t/notes/pull/7
@@ -77,6 +78,7 @@ def world(tmp_path, monkeypatch):
     _exe(tmp_path / "bin" / "gh", GH)
     monkeypatch.setenv("PATH", f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("GH_LOG", str(tmp_path / "gh.log"))
+    monkeypatch.setenv("GH_OPEN", str(tmp_path / "gh-open.json"))  # what `gh pr list` answers: none
     scratch = tmp_path / "tmp"
     scratch.mkdir()
     monkeypatch.setenv("TMPDIR", str(scratch))
@@ -180,6 +182,49 @@ async def test_adopt_refuses_a_served_repo_no_dev_cadence_checkout_and_an_origin
     assert not world["log"].exists()
     assert cli.main(["repo", "notes", "--adopt"]) != 0
     assert "--adopt goes with `ao repo add <path>`" in capsys.readouterr().err
+
+
+async def test_a_rerun_finds_the_open_adoption_pr_and_adds_the_repo_and_a_stale_branch_is_refused(
+    agent, world, capsys, monkeypatch, tmp_path
+):
+    """The PR opened and `add_repo` failed: the re-run pushes nothing, names the PR and adds the repo."""
+    await park_ticks(agent)
+    checkout = world["checkout"].resolve()
+
+    def down(method, **kw):
+        raise cli.AgentError("the host agent is not answering")
+
+    with monkeypatch.context() as m:
+        m.setattr(cli, "call_sync", down)
+        assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
+    assert "not answering" in capsys.readouterr().err
+    assert _roster() == [str(world["dc"])]
+    first = git(world["origin"], "rev-parse", "cadence-adopt")
+    world["log"].unlink()
+    (tmp_path / "gh-open.json").write_text('[{"number": 7, "url": "https://github.com/t/notes/pull/7"}]')
+    assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("adoption PR #7 is open already: https://github.com/t/notes/pull/7\nadded notes")
+    assert git(world["origin"], "rev-parse", "cadence-adopt") == first and not world["log"].exists()
+    assert _roster() == [str(world["dc"]), str(checkout)]
+    (tmp_path / "gh-open.json").write_text("[]")  # the PR closed, the branch left behind
+    assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
+    assert "holds a branch cadence-adopt with no open PR" in capsys.readouterr().err
+
+
+def test_the_paths_are_read_whole_and_the_clone_goes_under_cadences_own_temp_root(world, tmp_path, monkeypatch):
+    """A path with a space comes back unquoted, and with `CADENCE_TEMP_ROOTS` set the clone is made under
+    its first root, the one `sync.sh` then counts as temporary."""
+    dc = world["dc"]
+    (dc / "sync.sh").write_text(SYNC + 'echo x > "$t/a b.md"\necho "$t" > "$CLONE_AT"\n')
+    roots = tmp_path / "roots"
+    roots.mkdir()
+    monkeypatch.setenv("CADENCE_TEMP_ROOTS", f"{roots}:/var/tmp")
+    monkeypatch.setenv("CLONE_AT", str(tmp_path / "clone-at"))
+    got = adopt.offer(world["checkout"].resolve(), dc)
+    assert sorted(got["paths"]) == ["a b.md", "docs/cadence-sync.lock", "scripts/check_cadence.py"]
+    assert (tmp_path / "clone-at").read_text().startswith(f"{roots}/ao-adopt-")
+    assert list(roots.iterdir()) == []
 
 
 def test_an_open_adoption_pr_is_the_cure_its_lacks_name():

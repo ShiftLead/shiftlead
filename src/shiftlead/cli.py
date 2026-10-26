@@ -1575,7 +1575,10 @@ def cmd_repo_add(args: argparse.Namespace) -> int:
 
     def prose() -> None:
         n = len(got["paths"])
-        print(f"adoption PR {pr} open: {got['url']} — dev-cadence {got['commit']}, {n} file{'s' if n != 1 else ''}")
+        if got.get("open"):  # a re-run: the PR stands, nothing pushed
+            print(f"adoption PR {pr} is open already: {got['url']}")
+        else:
+            print(f"adoption PR {pr} open: {got['url']} — dev-cadence {got['commit']}, {n} file{'s' if n != 1 else ''}")
         print(
             f"{root.name} is unserved until it merges" if registered else f"added {root.name}, unserved until it merges"
         )

@@ -9,6 +9,8 @@ branch and opens it as a PR, never touching the default branch. The clone is rem
 from __future__ import annotations
 
 import contextlib
+import json
+import os
 import re
 import shutil
 import subprocess
@@ -62,12 +64,18 @@ def origin(root: Path) -> str:
     raise AdoptError(f"{root} has no origin: ao repo add adopts dev-cadence on origin's default branch")
 
 
+def temp_root() -> str | None:
+    """Where the scratch clone is made: `$CADENCE_TEMP_ROOTS`'s first root where it is set, since `sync.sh`
+    then counts those alone as temporary, else None — `$TMPDIR`, which it counts (its TD-068)."""
+    return next((r for r in os.environ.get("CADENCE_TEMP_ROOTS", "").split(":") if r), None)
+
+
 @contextlib.contextmanager
 def scratch_clone(root: Path) -> Iterator[tuple[Path, str]]:
     """A `--shared` clone of `root` under `$TMPDIR`, its `origin` the checkout's own, fetched and
     detached at `origin/<default>`; yields `(clone, default)` and removes it after, whatever happened."""
     url, default = origin(root), workorders.default_branch(root)
-    tmp = Path(tempfile.mkdtemp(prefix="ao-adopt-"))  # $TMPDIR: a dev-cadence temp root (its TD-068)
+    tmp = Path(tempfile.mkdtemp(prefix="ao-adopt-", dir=temp_root()))  # a dev-cadence temp root (its TD-068)
     try:
         clone = tmp / root.name
         _run(["git", "clone", "-q", "--shared", "--no-checkout", str(root), str(clone)], None)
@@ -80,10 +88,38 @@ def scratch_clone(root: Path) -> Iterator[tuple[Path, str]]:
 
 
 def _sync(dc: Path, clone: Path) -> list[str]:
-    """dev-cadence's adopt in the clone; the paths it wrote, as `git status --porcelain` names them."""
+    """dev-cadence's adopt in the clone; the paths it wrote, as `git status --porcelain -z` names them (a
+    rename's new path alone)."""
     _run([str(dc / "sync.sh"), str(clone)], clone, SYNC_TIMEOUT)
-    status = _run(["git", "status", "--porcelain", "--untracked-files=all"], clone)
-    return [line[3:] for line in status.splitlines() if line[3:]]
+    records = iter(_run(["git", "status", "--porcelain", "-z", "--untracked-files=all"], clone).split("\0"))
+    out: list[str] = []
+    for rec in records:
+        if len(rec) > 3:
+            out.append(rec[3:])
+            if "R" in rec[:2] or "C" in rec[:2]:
+                next(records, None)  # the path it was renamed or copied from
+    return out
+
+
+def _identity(root: Path) -> list[str]:
+    """`-c` options carrying the checkout's own `user.name` and `user.email`, which a clone does not inherit
+    where they are set in the checkout's config alone."""
+    out: list[str] = []
+    for key in ("user.name", "user.email"):
+        with contextlib.suppress(AdoptError):
+            if value := _run(["git", "-C", str(root), "config", "--get", key], None).strip():
+                out += ["-c", f"{key}={value}"]
+    return out
+
+
+def open_pr(clone: Path, gh: str) -> dict[str, Any] | None:
+    """The open PR whose head is `cadence-adopt`, `{number, url}`, or None."""
+    out = _run([gh, "pr", "list", "--head", ADOPT_BRANCH, "--state", "open", "--json", "number,url"], clone)
+    try:
+        prs = json.loads(out or "[]")
+    except json.JSONDecodeError:
+        raise AdoptError("gh pr list printed something that is not JSON") from None
+    return next((p for p in prs if isinstance(p, dict) and isinstance(p.get("number"), int)), None)
 
 
 def offer(root: Path, dc: Path) -> dict[str, Any]:
@@ -108,11 +144,21 @@ def body(commit: str, dc: Path, root: Path) -> str:
 def adopt(root: Path, dc: Path, gh: str = "gh") -> dict[str, Any]:
     """`ao repo add <path> --adopt`: the offer's run committed on `cadence-adopt`, pushed, and opened as a
     PR against the default branch; `{root, name, paths, commit, pr, url}`. An `origin` not on GitHub is
-    refused, as is a default branch that already holds what the adopt writes."""
+    refused, as is a default branch that already holds what the adopt writes. Where origin holds
+    `cadence-adopt` already, its open PR is the answer, `open` true and nothing pushed (a re-run, or one
+    whose `add_repo` failed after the PR was opened); a `cadence-adopt` with no open PR is refused."""
     url = origin(root)
     if not reports.GITHUB_ORIGIN.search(url):
         raise AdoptError(f"ao repo add opens its PR on GitHub: {root}'s origin is {url}")
     with scratch_clone(root) as (clone, default):
+        if _run(["git", "branch", "-r", "--list", f"origin/{ADOPT_BRANCH}"], clone).strip():
+            if pr := open_pr(clone, gh):
+                return {"root": str(root), "name": root.name, "paths": [], "commit": None, "pr": pr["number"],
+                        "url": str(pr.get("url") or ""), "open": True}  # fmt: skip
+            raise AdoptError(
+                f"origin of {root} holds a branch {ADOPT_BRANCH} with no open PR: open its PR or delete the branch,"
+                " then run this again"
+            )
         paths = _sync(dc, clone)
         if not paths:
             raise AdoptError(f"origin/{default} of {root} holds dev-cadence already: pull the checkout")
@@ -122,7 +168,7 @@ def adopt(root: Path, dc: Path, gh: str = "gh") -> dict[str, Any]:
         commit = (lock or {}).get("commit") or "?"
         _run(["git", "switch", "-q", "-c", ADOPT_BRANCH], clone)
         _run(["git", "add", "-A"], clone)
-        _run(["git", "commit", "-q", "-m", f"adopt dev-cadence {commit}"], clone)
+        _run(["git", *_identity(root), "commit", "-q", "-m", f"adopt dev-cadence {commit}"], clone)
         _run(["git", "push", "-q", "-u", "origin", ADOPT_BRANCH], clone)
         note = clone.parent / "pr-body.md"
         note.write_text(body(commit, dc, root), encoding="utf-8")
