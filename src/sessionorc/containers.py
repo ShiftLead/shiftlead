@@ -49,7 +49,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import adapters, hosts, identity, paths
+from sessionorc import adapters, cadence, hosts, identity, paths
 from sessionorc.tmux import attach_argv as tmux_attach_argv
 
 INSIDE = "/shiftlead"  # the node's volume, inside
@@ -62,6 +62,7 @@ INSIDE_LINK = f"{INSIDE}/link"
 INSIDE_WHEELS = f"{INSIDE}/wheels"
 INSIDE_PROFILES = f"{INSIDE}/profiles"
 INSIDE_ENV = f"{INSIDE}/env"
+INSIDE_CADENCE = f"{INSIDE}/cadence"  # the pinned dev-cadence trees the home ships (§4.4a, TD-1014)
 ID_LABEL = "dev.shiftlead.node"  # the id label `devcontainer up` keys the container on: ours, never VS Code's
 PIDFILE = f"{INSIDE_HOME}/agent.pid"
 AGENT_LOG = f"{INSIDE_HOME}/agent.log"
@@ -627,11 +628,55 @@ def provision(n: ContainerNode, r: Runner, cid: str, user: str) -> Path:
         )
     )
     write_node_config(n)
+    ship_cadence(n, r, cid, user)
     if n.env_file.is_file():
         cp = r.run(exec_cmd(cid, user, "sh", "-c", "command -v gh", env_file=n.env_file), check=False)
         if cp.returncode == 0:
             r.run(exec_cmd(cid, user, "gh", "auth", "setup-git", env_file=n.env_file), check=False)
     return dest
+
+
+# into the launcher's cache inside, as the container's user: `$1` the shipped tree, `$2` its commit.
+# The launcher takes a tree under `trees/<commit>` as made and never fetches it (§4.4a, TD-1014).
+CADENCE_INTO_CACHE = """set -e
+d="${XDG_CACHE_HOME:-$HOME/.cache}/dev-cadence/trees"
+[ -d "$d/$2" ] && exit 0
+mkdir -p "$d"
+if [ -e "$d/.ship-$2" ]; then chmod -R u+w "$d/.ship-$2"; rm -rf "$d/.ship-$2"; fi
+cp -a "$1" "$d/.ship-$2"
+mv "$d/.ship-$2" "$d/$2"
+"""
+
+
+def ship_cadence(n: ContainerNode, r: Runner, cid: str, user: str) -> str | None:
+    """The pinned dev-cadence tree of the node's checkout, shipped beside the wheel (§4.4a, TD-1014): a
+    container has no network path to a private dev-cadence and no lasting cache, so the home resolves the
+    pin, copies the tree to `~/.shiftlead/nodes/<name>/cadence/<commit>/` and from there into the
+    container's own launcher cache. The commit shipped, or None: a checkout that pins nothing ships
+    nothing, and a pin the home cannot resolve is said by name and leaves the repo unserved on the node."""
+    if not cadence.pinned(n.devcontainer):
+        return None
+    payload, why = cadence.tree(n.devcontainer)
+    try:
+        ref = (cadence.pin(n.devcontainer) or ("", ""))[1]
+    except cadence.PinError as e:
+        ref, why = "", str(e)
+    from sessionorc import dev_cadence as launcher
+
+    src = Path(launcher.cache_dir()) / "trees" / ref
+    if payload is None or not ref or not src.is_dir():
+        r.log(f"dev-cadence's pin in {n.devcontainer} does not resolve here — {why or f'no tree at {src}'}; "
+              f"{n.name} reads it unserved until it does")  # fmt: skip
+        return None
+    dest = n.node_dir / "cadence" / ref
+    if not dest.is_dir():
+        r.log(f"shipping dev-cadence {ref[:7]} to {n.name} …")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_name(f".ship-{ref}-{os.getpid()}")
+        shutil.copytree(src, tmp, symlinks=True)
+        tmp.rename(dest)
+    r.run(exec_cmd(cid, user, "sh", "-c", CADENCE_INTO_CACHE, "sh", f"{INSIDE_CADENCE}/{ref}", ref))
+    return ref
 
 
 def write_node_config(n: ContainerNode) -> None:

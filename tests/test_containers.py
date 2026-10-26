@@ -341,6 +341,81 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
     assert start and "--env-file" in start[0]
 
 
+def _pinned_node(monkeypatch, tmp_path, *, resolves=True):
+    """The node's checkout pins dev-cadence at `ref`, whose tree the home's launcher cache holds (or not)."""
+    ref = "c" * 40
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    tree = tmp_path / "cache" / "dev-cadence" / "trees" / ref
+    if resolves:
+        (tree / "files" / "scripts").mkdir(parents=True)
+        (tree / "files" / "scripts" / "check_cadence.py").write_text("x = 1\n")
+        (tree / "launcher").mkdir()
+        (tree / "launcher" / "INTERFACE").write_text("1\n")
+        os.chmod(tree / "files" / "scripts" / "check_cadence.py", 0o444)
+    from sessionorc import cadence
+
+    monkeypatch.setattr(cadence, "pinned", lambda root: True)
+    monkeypatch.setattr(cadence, "pin", lambda root: ("git@example.com:o/dev-cadence.git", ref))
+    got = (tree / "files", None) if resolves else (None, "commit cccc is not in the source")
+    monkeypatch.setattr(cadence, "tree", lambda root, timeout=0: got)
+    return ref
+
+
+def test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache(home, tmp_path, monkeypatch):
+    """§4.4a, TD-1014 (5): the home copies the tree the node's checkout pins to the node's volume, then
+    into the container's launcher cache, where the launcher takes it as made and fetches nothing."""
+    ref = _pinned_node(monkeypatch, tmp_path)
+    r = Fake()
+    containers.host_up("contractmatch", r)
+    n = containers.node("contractmatch")
+    shipped = n.node_dir / "cadence" / ref
+    assert (shipped / "files" / "scripts" / "check_cadence.py").read_text() == "x = 1\n"
+    assert (shipped / "launcher" / "INTERFACE").is_file()
+    into = r.execs(containers.CADENCE_INTO_CACHE)
+    assert len(into) == 1 and into[0][into[0].index("-u") + 1] == "developer"
+    assert into[0][-2:] == [f"/shiftlead/cadence/{ref}", ref]
+    containers.host_up("contractmatch", Fake())  # shipped once: a second run copies nothing new
+    assert sorted(p.name for p in shipped.parent.iterdir()) == [ref]
+
+
+def test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once(tmp_path):
+    """The script run inside, here against a scratch `$HOME`: the tree lands at the launcher's
+    `trees/<commit>`, read-only as the launcher leaves its own, and a second run leaves it be."""
+    ref = "d" * 40
+    src = tmp_path / "shipped" / ref
+    (src / "files").mkdir(parents=True)
+    (src / "files" / "a.txt").write_text("a\n")
+    os.chmod(src / "files" / "a.txt", 0o444)
+    os.chmod(src / "files", 0o555)
+    env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path / "home")}
+    for _ in range(2):
+        subprocess.run(["sh", "-c", containers.CADENCE_INTO_CACHE, "sh", str(src), ref], env=env, check=True)
+    trees = tmp_path / "home" / ".cache" / "dev-cadence" / "trees"
+    assert [p.name for p in trees.iterdir()] == [ref]
+    assert (trees / ref / "files" / "a.txt").read_text() == "a\n"
+    assert not os.access(trees / ref / "files" / "a.txt", os.W_OK)
+    os.chmod(src / "files", 0o755)  # for pytest's own cleanup
+    for d in (trees / ref / "files", trees / ref):
+        os.chmod(d, 0o755)
+
+
+def test_a_pin_the_home_cannot_resolve_ships_nothing_and_is_said(home, tmp_path, monkeypatch):
+    _pinned_node(monkeypatch, tmp_path, resolves=False)
+    said = []
+    r = Fake()
+    r.log = said.append
+    containers.host_up("contractmatch", r)
+    assert not r.execs(containers.CADENCE_INTO_CACHE)
+    assert not (containers.node("contractmatch").node_dir / "cadence").exists()
+    assert any("does not resolve here — commit cccc is not in the source" in s for s in said)
+
+
+def test_a_checkout_that_pins_nothing_ships_nothing(home):
+    r = Fake()
+    containers.host_up("contractmatch", r)
+    assert not r.execs(containers.CADENCE_INTO_CACHE)
+
+
 @pytest.mark.parametrize(
     ("answers", "words"),
     [
