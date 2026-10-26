@@ -93,6 +93,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by decision (paul): file dev-cadence's `precheck.py --commit` |
 | TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — build |
+| TD-1054 | TD-1036 and TD-1039 still say `Blocked by: TD-1037`, which #2396 built and archived, so they read blocked on a done entry (docs audit) | Low | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
 | TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | In progress (slice 1 #2409); left: drop the stopgaps (samscrape#1121, shiftlead#2391) |
@@ -2246,3 +2247,20 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1014.
+## TD-1054: TD-1036 and TD-1039 still say `Blocked by: TD-1037`, which #2396 built and archived, so they read blocked on a done entry
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (docs-audit-ao-1, auditing #2387–#2400)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `docs/technical_debt.md`, the `**Blocked by:**` lines of TD-1036 and TD-1039
+
+**Why:** #2396 built TD-1037 and moved it to the archive, and edited the summary table so TD-1036 and TD-1039 read `Open — build` (their `blocked by TD-1037` dropped). Their bodies were not touched: both still carry `**Blocked by:** TD-1037` (`awk '/^## TD-1036:/{p=1;print;next} /^## /{p=0} p' docs/technical_debt.md | grep Blocked`, likewise TD-1039), so the row says pickable and the body says blocked on an entry the archive holds as resolved (cadence §2.4: pickable is derived from `Blocked by`). TD-1038's `Blocked by:` still names TD-1037 beside its open decision (paul) and says the same.
+
+**Fix:** drop TD-1037 from the `Blocked by:` lines of TD-1036 and TD-1039 (the line goes, there is nothing else on it) and from TD-1038's, leaving its decision (paul); the `Fix:` text's "(TD-1037)" references stay, they name what built the helper.
+
+**Done when:** no open entry's `Blocked by:` names TD-1037; `python3 scripts/check_cadence.py` passes.
+
+**Related:** TD-1037, TD-1036, TD-1038, TD-1039, #2396.
