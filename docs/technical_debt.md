@@ -2202,7 +2202,7 @@ It files each as a build entry, or as live checks where the design already holds
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `exec_cmd(..., env_file=n.env_file)`, comment *the agent's own environment, so the cache written is the one its launcher reads*), `tests/test_containers.py` (`test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache`)
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `exec_cmd(..., env_file=n.env_file)`, comment *the agent's own environment (its env file), so the cache written is the one its launcher reads*), `tests/test_containers.py` (`test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache`)
 
 **Why:** #2390 (TD-1014 part 5) passes `env_file=n.env_file` so the cache script runs with the agent's `XDG_CACHE_HOME`. Probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_containers.py`: dropping `env_file=n.env_file` leaves 55 passed. No shipping test gives the node an env file or looks for `--env-file` on the cache exec, so a node whose env moves the cache would get the tree in a cache its launcher never reads.
 
@@ -2258,7 +2258,7 @@ It files each as a build entry, or as live checks where the design already holds
 **Status:** Open — build
 **Location:** `src/sessionorc/containers.py` (`ship_cadence`: `shutil.copytree(src, tmp, symlinks=True)`), `tests/test_containers.py` (`_pinned_node`)
 
-**Why:** Probed on `origin/main`: dropping `symlinks=True` leaves `tests/test_containers.py` at 55 passed. `_pinned_node`'s tree is two files and two directories; a dev-cadence tree with a link (or a dangling one) would be followed or fail the copy, and the test says nothing of it.
+**Why:** Probed on `origin/main`: dropping `symlinks=True` leaves `tests/test_containers.py` at 55 passed. `_pinned_node`'s tree is two files in three directories; a dev-cadence tree with a link (or a dangling one) would be followed or fail the copy, and the test says nothing of it.
 
 **Fix:** add a relative and a dangling symlink to `_pinned_node`'s tree and assert the shipped tree holds them as links.
 
