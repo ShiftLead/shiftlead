@@ -24,6 +24,7 @@ from sessionorc import client as clientmod
 from sessionorc import hosts, naming, promote, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
+from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc.adapters import short_model
@@ -959,6 +960,8 @@ def cmd_team_start(args: argparse.Namespace) -> int:
     # person may know better
     here = hosts.local_host().name
     picks = teamrun.lanes(call_sync, org, args.name, here)
+    if picks and picks.get("unserved"):  # its lanes read empty for that reason, which --anyway does not pass (TD-1011)
+        return fail(args, picks["unserved"], 1, lanes=picks)
     if picks and picks["empty"] and not args.anyway:
         return fail(args, f"{teamrun.NOTHING_TO_PICK} ({picks['line']}) — --anyway starts it", 1, lanes=picks)
     if picks and not args.json:
@@ -1565,7 +1568,9 @@ def _repo_line(r: dict[str, Any]) -> str:
         )
         if led.get("error"):
             led_part += f" (could not look: {led['error']})"
-    return f"{r.get('name') or r.get('root')}  {pr_part} · {led_part} · read {_age(str(r.get('at') or ''))} ago"
+    # an unserved repo says so before its counts (§4.7 `ao repo`, §5 *The seams*, TD-1011)
+    lack = "".join(f"{w} · " for w in seams_mod.unserved(r))
+    return f"{r.get('name') or r.get('root')}  {lack}{pr_part} · {led_part} · read {_age(str(r.get('at') or ''))} ago"
 
 
 DOING_SHOWN = 10  # `ao repo`'s doing lines; `--json` carries the whole log of the servicing teams
@@ -1631,6 +1636,24 @@ def _org_order(names: set[str], members: list[dict[str, Any]]) -> list[str]:
 
 
 PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+UNSERVED_KINDS = ("pickable", "design", "live-check")  # what an unserved repo's lanes do not hold
+
+
+def _unserved_lanes(r: dict[str, Any]) -> None:
+    """An unserved repo's lanes read empty (§5 *The seams*, TD-1011): no entry of `r`'s reading is
+    pickable, design or a live check — each is `for_page: unserved`, `pickable: no`, and the counts say
+    so — so a member reading its lane here finds nothing in it, and the first line's *unserved: <the
+    lack>* is its lane note. The PRs, the board and the doing log are read as in any repo."""
+    led = r.get("ledger") or {}
+    kinds = led.get("by_kind")
+    for e in led.get("entries") or []:
+        if isinstance(e, dict) and (page := e.get("for_page")) in UNSERVED_KINDS:
+            e["for_page"], e["pickable"] = "unserved", "no"
+            if isinstance(kinds, dict):
+                kinds[page] = max(0, int(kinds.get(page) or 0) - 1)
+                kinds["unserved"] = int(kinds.get("unserved") or 0) + 1
 
 
 def _repo_list(e: dict[str, Any]) -> str:
@@ -1790,6 +1813,11 @@ def cmd_repo(args: argparse.Namespace) -> int:
         picked = [r for r in got.values() if here and str(pathlib.Path(r.get("root") or "").resolve()) == here]
         if not picked:
             raise AgentError("this directory is not in a registered repo; name one, or ao repo --all")
+    for r in picked:
+        # whether the home serves it, as `--json` carries it (§4.7 `ao repo`, §5 *The seams*, TD-1011)
+        r["serve"] = (r.get("seams") or {}).get("serve")
+        if seams_mod.unserved(r):
+            _unserved_lanes(r)
     if not args.all:
         # what the servicing teams hold and say (§4.8 *the doing log*), the reader's standing on
         # each open PR (§4.9b), and the board items due (§4.4) — TD-176 slice 6

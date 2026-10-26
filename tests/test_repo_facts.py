@@ -609,6 +609,58 @@ def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypat
     assert "a build" in out and "live check #" not in out.split("TD-010")[1].split("\n")[0]
 
 
+def test_ao_repo_says_an_unserved_repo_first_and_carries_serve(repo, monkeypatch, capsys):
+    """§4.7 `ao repo`, §5 *The seams* (TD-1011): an unserved repo's first line is *unserved: <the lack>*
+    before its counts, and `--json` carries `serve: {ok, lacks}` on the repo; a served one says nothing."""
+    from shiftlead import cli
+
+    lack = "unserved: no gate (no scripts/check_cadence.py) — sync it"
+    serve = {"ok": False, "lacks": [{"key": "gate", "words": lack}]}
+    reading = {
+        str(repo): {
+            "name": "r",
+            "root": str(repo),
+            "prs": {"open": []},
+            "ledger": {
+                "entries": [
+                    {"id": "TD-1", "title": "a build", "for_page": "pickable", "pickable": "yes"},
+                    {"id": "TD-2", "title": "a design", "for_page": "design", "pickable": "yes"},
+                    {"id": "TD-3", "title": "a check", "for_page": "live-check", "pickable": "yes", "live": "yes"},
+                    {"id": "TD-4", "title": "for paul", "for_page": "for-you", "pickable": "no"},
+                ],
+                "by_kind": {"pickable": 1, "design": 1, "live-check": 1, "for-you": 1},
+            },
+            "seams": {"serve": serve},
+        }
+    }
+    monkeypatch.setattr(
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
+    )
+    monkeypatch.chdir(repo)
+    original = json.loads(json.dumps(reading))
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(f"r  {lack} · 0 open PRs")
+    # its lanes read empty: nothing listed pickable, design or a live check, and the counts say 0 (TD-1011)
+    assert "4 open entries: 0 pickable, 0 design, 1 for you, 0 live check" in out
+    assert not any(f"TD-{i}" in out for i in (1, 2, 3))
+    reading.clear()
+    reading.update(json.loads(json.dumps(original)))
+    assert cli.main(["--json", "repo"]) == 0
+    got = json.loads(capsys.readouterr().out)[0]
+    assert got["serve"] == serve
+    pages = [(e["for_page"], e["pickable"]) for e in got["ledger"]["entries"]]
+    assert pages == [("unserved", "no")] * 3 + [("for-you", "no")]
+    reading.clear()
+    reading.update(json.loads(json.dumps(original)))
+    reading[str(repo)]["seams"] = {"serve": {"ok": True, "lacks": []}}
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("r  0 open PRs") and "pickable     TD-1" in out and "design       TD-2" in out
+
+
 def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monkeypatch, capsys):
     """TD-368 slice 2 (design §4.7, TD-367): a build on `decision (designer)` is on the design list
     and says *decision* after its owner; a `Kind: design-first` row does not."""
@@ -1004,6 +1056,10 @@ def test_a_red_prs_order_is_every_free_pick_lanes_as_a_board_line_is(repo):
     r2 = {**r, "ledger": {"entries": [td]}, "pr_orders": {"orders": [red, sync], "told": {}}}
     assert [e["id"] for e in teamrun.lane_entries(r2)] == ["pr:8", "TD-001", "board:00aa11bb", "pr:7"]
     assert teamrun.pr_orders({"pr_orders": None}) == [] and teamrun.pr_orders(None) == []
+    # an unserved repo's lanes read empty and it has no order (§5 *The seams*, TD-1011)
+    bare = {"ok": False, "lacks": [{"key": "gate", "words": "unserved: no gate"}]}
+    r3 = {**r2, "seams": {"serve": bare}}
+    assert teamrun.lane_entries(r3) == [] and teamrun.pr_orders(r3) == [] and teamrun.work_orders(r3) == []
 
 
 def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_of_work(repo, monkeypatch, capsys):
