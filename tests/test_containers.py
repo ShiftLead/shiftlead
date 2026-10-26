@@ -137,6 +137,12 @@ def test_the_dockerfile_links_ao_onto_path_after_tmux_and_before_the_images_user
     assert tmux < at < lines.index("USER developer") and lines.index("USER root") < at
     # the target is the venv's, whatever INSIDE_VENV names
     assert f"ln -s {containers.INSIDE_VENV}/bin/ao " in link
+    # dev-cadence's launcher by the same guarded rule, right after it (TD-1014)
+    dc = (
+        "RUN [ -e /usr/local/bin/dev-cadence ] || [ -L /usr/local/bin/dev-cadence ] || { install -d -o root -g root"
+        " -m 0755 /usr/local/bin && ln -s /shiftlead/venv/bin/dev-cadence /usr/local/bin/dev-cadence; }"
+    )
+    assert lines.count(dc) == 1 and lines.index(dc) == at + 1
 
 
 def test_the_repos_features_and_image_go_to_the_base_and_a_string_mount_is_understood(tmp_path):

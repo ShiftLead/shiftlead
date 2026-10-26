@@ -56,6 +56,7 @@ INSIDE = "/shiftlead"  # the node's volume, inside
 INSIDE_HOME = f"{INSIDE}/home"
 INSIDE_VENV = f"{INSIDE}/venv"
 PATH_AO = "/usr/local/bin/ao"  # the link to the venv's `ao` the node's Dockerfile makes
+PATH_DEV_CADENCE = "/usr/local/bin/dev-cadence"  # and to its `dev-cadence`, the vendored launcher (TD-1014)
 log = logging.getLogger("sessionorc.containers")
 INSIDE_LINK = f"{INSIDE}/link"
 INSIDE_WHEELS = f"{INSIDE}/wheels"
@@ -300,11 +301,13 @@ def dockerfile_text(base_image: str, image_user: str, layers: list[tuple[str, st
             f" && install -o root -g root -m 0644 {tmp} {dest} && rm -f {tmp}",
         ]
     # `ao` on every shell's PATH, a login shell's included; a base image's own `ao` (a dangling link
-    # too) is kept, and `ao doctor` on the node says so (design §4.4a, TD-998)
-    lines.append(
-        f"RUN [ -e {PATH_AO} ] || [ -L {PATH_AO} ] || {{ install -d -o root -g root -m 0755"
-        f" {os.path.dirname(PATH_AO)} && ln -s {INSIDE_VENV}/bin/ao {PATH_AO}; }}"
-    )
+    # too) is kept, and `ao doctor` on the node says so (design §4.4a, TD-998); `dev-cadence` by the same
+    # rule, for dev-cadence's SessionStart line and git hook shims in a pinned repo (TD-1014)
+    for link, name in ((PATH_AO, "ao"), (PATH_DEV_CADENCE, "dev-cadence")):
+        lines.append(
+            f"RUN [ -e {link} ] || [ -L {link} ] || {{ install -d -o root -g root -m 0755"
+            f" {os.path.dirname(link)} && ln -s {INSIDE_VENV}/bin/{name} {link}; }}"
+        )
     if image_user:
         lines.append(f"USER {image_user}")
     return "\n".join(lines) + "\n"

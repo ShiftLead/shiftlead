@@ -26,6 +26,7 @@ shiftlead-agent = "sessionorc.agent:main"
 shiftlead-hook = "shiftlead.hook_entry:main"
 shiftlead-ui = "shiftlead.ui.app:main"
 shiftlead-watch = "shiftlead.watch:main"
+dev-cadence = "sessionorc.dev_cadence_entry:main"
 
 [project.entry-points."shiftlead.adapters"]
 claude-code = "shiftlead.adapters.claude_code:ClaudeCodeAdapter"

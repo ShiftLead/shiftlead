@@ -234,3 +234,18 @@ def test_a_pinned_repos_conventions_run_the_pinned_trees_script_through_the_reso
     # a lock beside the pin keeps the copy's script, which this checkout lacks
     (root / "docs" / "cadence-sync.lock").write_text("files_commit=x\n")
     assert not conventions.has_script(root)
+
+
+def test_the_dev_cadence_console_script_runs_the_vendored_launcher(tmp_path):
+    """Design §4.4a, TD-1014: `pyproject.toml` declares `dev-cadence` over `dev_cadence_entry.main`, which runs
+    the vendored launcher and says a refusal on stderr with exit 2, as the launcher's own `__main__` does."""
+    import tomllib
+
+    scripts = tomllib.loads((Path(__file__).parent.parent / "pyproject.toml").read_text())["project"]["scripts"]
+    assert scripts["dev-cadence"] == "sessionorc.dev_cadence_entry:main"
+    run = [sys.executable, "-c", "from sessionorc.dev_cadence_entry import main; main()"]
+    cp = subprocess.run([*run, "--interface"], capture_output=True, text=True)
+    assert (cp.returncode, cp.stdout.strip()) == (0, "1")
+    _git(tmp_path, "init", "-q", str(tmp_path / "bare"))
+    cp = subprocess.run([*run, "-C", str(tmp_path / "bare"), "words"], capture_output=True, text=True)
+    assert cp.returncode == 2 and cp.stderr.startswith("dev-cadence: ") and "Traceback" not in cp.stderr
