@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -92,6 +93,13 @@ def command(repo: Path | str, word: str, *args: str) -> tuple[list[str], dict[st
     own Python (the host agent's venv), never one found on a login `PATH`."""
     argv = [sys.executable, str(LAUNCHER), "-C", str(repo), word, *args]
     return argv, {**os.environ, "CADENCE_REPO_ROOT": str(repo)}
+
+
+def typed(word: str, *args: str) -> str:
+    """The resolver's command for `word` as a brief names it for a session to type (§5 *The seams*): the
+    vendored launcher under this install's Python, with no `-C`, so it resolves the checkout the session
+    runs in — a worktree's own ledger, a bump branch's own pin — and sets `CADENCE_REPO_ROOT` itself."""
+    return shlex.join([sys.executable, str(LAUNCHER), word, *args])
 
 
 def _launcher_words(text: str) -> str:

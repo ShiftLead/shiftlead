@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import copy
 import re
+import tomllib
 from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -38,7 +39,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import paths, workorders
+from sessionorc import cadence, paths, workorders
 from sessionorc import settle as settle_mod
 from sessionorc.models import GRANTS, normalize_context, normalize_review, owner_word
 
@@ -186,6 +187,7 @@ CHECK_CADENCE = "scripts/check_cadence.py"
 LEDGER_SCRIPT = "scripts/ledger.py"
 DESIGN_DIR = "docs/design/"
 CADENCE_DOC = "docs/cadence.md"
+PIN_HEADER = "[dev-cadence]"  # a pinned repo's `docs/cadence.toml` table (dev-cadence TD-129)
 SOURCE_PREFIX = "files/"  # dev-cadence's own source holds every dev-cadence path under it (§5 *The seams*)
 NO_TEST = "no test command: run what the repo's README says"
 NO_LINT = "no lint command: keep to the style of the code around the change"
@@ -200,9 +202,10 @@ THERE_REFUSALS = (": not a regular file", " bytes, which is not a repo config or
 def layout(cfg: RepoConfig) -> dict[str, str]:
     """Each of `LAYOUT_SLOTS` for `cfg`'s repo (design §5 *The seams*, TD-1011): the cadence's slots
     dev-cadence's paths — under `files/` in dev-cadence's own source (a root holding `sync.sh` and `files/`),
-    read the way the file was, `cfg.read` — and `board:` and `ledger:` where the file sets them; `{test}`
-    and `{lint}` `commands:`'s, `{design_dir}` the directory where the checkout holds it, each else its
-    seam's sentence. `{gate}` still holds `{pr}`: the brief's text fills it last."""
+    read the way the file was, `cfg.read`; in a pinned repo (`[dev-cadence]` in its `docs/cadence.toml`, no lock)
+    the resolver's command as a session types it, `cadence.typed` (TD-1014) — and `board:` and `ledger:` where
+    the file sets them; `{test}` and `{lint}` `commands:`'s, `{design_dir}` the directory where the checkout
+    holds it, each else its seam's sentence. `{gate}` still holds `{pr}`: the brief's text fills it last."""
 
     def there(rel: str) -> bool:
         if cfg.root is None:
@@ -222,16 +225,45 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
                 return True
             raise
 
+    def pinned() -> bool:
+        # `[dev-cadence]` in the pin's file as the launcher reads it (TOML), and no lock, which keeps the copy read;
+        # a pin it would refuse is pinned still, as `cadence.pinned` says — that repo is unserved and briefs no one
+        if cfg.root is None or there(cadence.LOCK):
+            return False
+        path = cfg.root / cadence.PIN
+        try:
+            text = path.read_text(encoding="utf-8") if cfg.read is None else cfg.read(path)
+        except (FileNotFoundError, IsADirectoryError, UnicodeDecodeError):
+            return False
+        except OSError as e:
+            if any(why in str(e) for why in THERE_REFUSALS):
+                return True
+            raise
+        if text is None:
+            return False
+        try:
+            return "dev-cadence" in tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            return PIN_HEADER in (line.strip() for line in text.splitlines())
+
     pre = SOURCE_PREFIX if there("sync.sh") and there(SOURCE_PREFIX.rstrip("/")) else ""
+    if not pre and pinned():  # the resolver's command, as the session types it (TD-1014)
+        gate = f"{cadence.typed('run', cadence.GATE_SCRIPT)} --pr {PR_PLACEHOLDER}"
+        ledger_check = cadence.typed("run", Path(LEDGER_SCRIPT).name, "--check")
+        rules = f"read the file `{cadence.typed('path', Path(CADENCE_DOC).name)}` prints, §1–§4"
+    else:
+        gate = f"python3 {pre}{CHECK_CADENCE} --pr {PR_PLACEHOLDER}"
+        ledger_check = f"python3 {pre}{LEDGER_SCRIPT} --check"
+        rules = f"read {pre}{CADENCE_DOC} §1–§4"
     return {
-        "{gate}": f"python3 {pre}{CHECK_CADENCE} --pr {PR_PLACEHOLDER}",
+        "{gate}": gate,
         "{board}": cfg.board or str(workorders.BOARD),
         "{ledger}": cfg.ledger,
-        "{ledger_check}": f"python3 {pre}{LEDGER_SCRIPT} --check",
+        "{ledger_check}": ledger_check,
         "{test}": cfg.commands.get("test") or NO_TEST,
         "{lint}": cfg.commands.get("lint") or NO_LINT,
         "{design_dir}": DESIGN_DIR if there(DESIGN_DIR) else NO_DESIGN_DIR,
-        "{cadence_rules}": f"read {pre}{CADENCE_DOC} §1–§4",
+        "{cadence_rules}": rules,
     }
 
 
