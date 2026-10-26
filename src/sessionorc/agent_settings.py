@@ -21,6 +21,7 @@ from sessionorc import (
     hosts,
 )
 from sessionorc import cadence as cadence_mod
+from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
@@ -194,7 +195,8 @@ class SettingsMixin:
         here, since its adoption is offered by the client, unless `adopted` (its adoption PR is open: the
         repo is unserved until it merges, §5 *The seams*). A path already in the roster is refused. The
         next tick reads a checkout new to the roster whole, at once (`_refresh_repos`). Returns `{root,
-        name, served}`, `served` whether the checkout holds what serves it."""
+        name, served}`, `served` as the seams reading finds it (§5 *The seams*: the tree, the gate and the
+        ledger), whatever let it be added."""
         agent_common.person_only(caller, "add a repo", "§4.7 ao repo add", self._graph())
         if self.mode != "home":
             raise RpcError("ao repo add runs at the home (design §4.7): run ao repo add on the home")
@@ -210,8 +212,8 @@ class SettingsMixin:
         host = hosts.local_host()
         if any(Path(r).expanduser().resolve() == here for r in host.repos()):
             raise RpcError(f"{root} is in the roster already (design §5 Repos)")
-        served = (here / sync_mod.LOCK).is_file() or cadence_mod.is_source(here)
-        if not (served or adopted):
+        holds = (here / sync_mod.LOCK).is_file() or cadence_mod.is_source(here)
+        if not (holds or adopted):
             raise RpcError(f"{root} holds no dev-cadence ({sync_mod.LOCK}): its adoption comes first (design §4.7)")
         reg = host.repos_registry
         try:
@@ -223,6 +225,7 @@ class SettingsMixin:
         except OSError as e:
             raise RpcError(f"could not write the roster {reg}: {e}") from None
         log.info("add_repo: %s added to %s by %s", root, reg, caller)
+        served = await asyncio.to_thread(lambda: seams_mod.serve(here, seams_mod.ledger(here))["ok"])
         return {"root": root, "name": here.name, "served": served}
 
     async def rpc_set_settings(

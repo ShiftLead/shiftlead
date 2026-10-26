@@ -59,7 +59,10 @@ async def test_dev_cadences_source_is_added_and_a_checkout_without_dev_cadence_i
     await park_ticks(agent)
     source = _repo(tmp_path / "dev-cadence")
     (source / "sync.sh").write_text("#!/bin/sh\n")
-    (source / "files").mkdir()
+    (source / "files" / "scripts").mkdir(parents=True)
+    (source / "files" / "scripts" / "check_cadence.py").write_text("x = 1\n")  # its gate
+    (source / "docs").mkdir()
+    (source / "docs" / "technical_debt.md").write_text("# Technical debt\n")
     bare = _repo(tmp_path / "notes")
     async with LocalClient() as person:
         assert (await person.call("add_repo", path=str(source)))["served"] is True
@@ -71,6 +74,17 @@ async def test_dev_cadences_source_is_added_and_a_checkout_without_dev_cadence_i
         with pytest.raises(AgentError, match="is not in a git checkout"):
             await person.call("add_repo", path=str(tmp_path))
     assert _roster() == [str(source.resolve()), str(bare.resolve())]
+
+
+async def test_served_is_the_seams_reading_whatever_let_the_checkout_be_added(agent, tmp_path):
+    """§4.7: a checkout holding the lock is added, and is served or unserved as the reading finds it."""
+    await park_ticks(agent)
+    root = _repo(tmp_path / "r")
+    served(root)
+    (root / "docs" / "technical_debt.md").unlink()  # the lock and the gate, no ledger
+    async with LocalClient() as person:
+        assert (await person.call("add_repo", path=str(root)))["served"] is False
+    assert _roster() == [str(root.resolve())]
 
 
 async def test_add_repo_is_a_persons_own_and_the_homes(agent, tmp_path):
