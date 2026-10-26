@@ -1,3 +1,10 @@
+---
+name: ui-review-screenshots
+description: An interactive UI/UX review with Paul makes significant changes visible — screenshots, renderings or a design page, kept under docs/mockups/reviews/ and sent into the chat
+metadata:
+  type: feedback
+---
+
 # An interactive UI/UX review makes the change visible
 
 **Written 2026-09-25** at Paul's ask, after TD-156 (the Focus screen) and TD-176 (the repo strip

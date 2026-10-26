@@ -1,3 +1,10 @@
+---
+name: check-open-prs-before-a-design-round
+description: Before designing an entry, list its open PRs (a restarted run's own too) and reconcile against one that exists; never design twice
+metadata:
+  type: feedback
+---
+
 # Check open PRs before a design round
 
 **2026-09-25 (Paul).** Before designing a ledger entry — in a cloud session or anywhere — list the repo's
