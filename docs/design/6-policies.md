@@ -1034,7 +1034,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      dev-cadence's SessionStart hook prints the new entries of `docs/cadence-changes.md` to a
      session that starts, so only a session that outlives a change needs telling, and the tick
      tells it as rule 6 tells lane news. For each registry root at the home whose checkout holds
-     `scripts/cadence_changes.py` (in dev-cadence's source `files/scripts/cadence_changes.py`, §5 *The seams*; in a pinned repo the pinned tree's, run through the resolver, §5 *How the readers find dev-cadence*, which reads the repo's own `docs/cadence-changes.md` on origin, and a pinned repo carries none once migrated, so it tells no one until TD-1025 says how a bump's changes are relayed) — every served repo's — the home runs it `--json` on the reports' cadence — it reads
+     `scripts/cadence_changes.py` (in dev-cadence's source `files/scripts/cadence_changes.py`, §5 *The seams*; in a pinned repo the pinned tree's, run through the resolver, §5 *How the readers find dev-cadence*, which reads dev-cadence's own changes, *In a pinned repo* below) — every served repo's — the home runs it `--json` on the reports' cadence — it reads
      the file as merged, `origin/<default>`, as rule 7 reads a brief's file — taking each entry's
      `heading` and `landed`; a root without the script, or whose origin has no default branch
      (exit 2), gives no reading. On each supervised member record of that root, not a seat (every
@@ -1054,6 +1054,105 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      any mail reaches it. A member restarted by any rule starts with no `conventions_seen`, is
      written afresh at its create, and the hook has told it. **The manager's `relayed.json` is
      gone**: nothing reads it, and neither the preset nor this repo's supplement names the step.
+     **In a pinned repo** (TD-1025) the changes are dev-cadence's own and arrive by a bump: the
+     repo carries no `docs/cadence-changes.md` once migrated, and the bump PR's body lists the entries
+     between the two pins for its reviewer alone (dev-cadence's plan, *Decision* 7). **The script reads
+     them, not the home**, and the home's call is the same: the resolver runs the script from the tree
+     of the *checkout's* pin (§5), and the script reads the pin on **`origin/<default>`**
+     (`docs/cadence.toml` there, as rule 7 reads a brief's file) and the `cadence-changes.md` of the
+     dev-cadence commit it names, from the launcher's bare clone of the source, never the repo — reached
+     through the pinned tree's own cache code under the cache's lock (a function beside
+     `_source_clone` in the tree's `launcher/words.py`, which the script imports when it runs from a
+     tree — `launcher/words.py` at its `../../`, as dev-cadence's own checkout has it too; in a tree
+     with no pin on origin it reads as today, the repo's own file; the launcher itself is frozen — outside a tree, a synced copy, the pin on origin is
+     not read: origin's file is the repo's own path as today, so once migrated it gives none, never exit
+     2, in `--json` and `--hook` alike, with no *behind* line; that copy runs only while the main
+     checkout is unpinned, since the hooks run the main checkout's pin, so a worktree branched before the migration runs the pinned tree's script once the main
+     checkout pins — in a session ShiftLead starts, or on the seed's current SessionStart line; under an
+     older line nothing runs, or the worktree's own copy, which says nothing (dev-cadence TD-149) — and
+     the wordings below for it stand), the lock taken only to clone or fetch (origin's pin commit absent, or no clone),
+     non-blocking with a 20-second deadline, a miss exit 2 — the walk's object reads take none, as
+     `--hook`'s do; `source` and `ref` both come from origin's `[dev-cadence]` table, parsed with `tomllib` and
+     checked by the launcher's own patterns, a table that fails either read as no pin; the clone is origin's source's,
+     and a walk commit naming another source is skipped as one the clone lacks,
+     never a path computed beside it. In `--json`, when origin's pin commit is not in the clone, or there is no
+     clone, it is one fetch of the source bounded at 60 seconds (the cache's lock is held for it,
+     so this bound, not the launcher's 300, is what other launchers on the machine may wait), or with no clone one clone at the launcher's bound, once a run; one that
+     fails, or after which that commit is still absent, is exit 2, no reading this pass (an earlier
+     commit of the walk the clone lacks is skipped, never fetched for); its `ref` stays the repo's
+     `origin/<default>`; and a pinned root's run is bounded at the resolver's tree bound
+     (`cadence.TREE_TIMEOUT`, 330, which covers the lock's 20-second wait and a first clone's 300 seconds together, a fetch being 60; a first clone that
+     overruns the bound with the walk is retried on the next pass, which finds the clone made, accepted) rather than the 180 seconds an unpinned one keeps, a run past it no reading — per call: the
+     resolve that finds the tree is bounded on its own, so the first pass after a bump may spend both. A source that cannot be reached is tried again on each pass, each costing that root, and any launcher
+     waiting on the lock, up to the fetch's 60 seconds, or a
+     clone's 300 while there is none; passes never overlap (the tick starts one
+     only once the last is done), so it delays only this rule, which is accepted.
+     Its `--json` keeps today's shape, each `landed` being when the entry reached the repo — the commit
+     time, on `origin/<default>`, of the commit whose pin last brought it in (the migration's merge, a bump's, or the adopt
+     commit of a repo adopted pinned, which plays the migration's part throughout). It is read in one walk: the first-parent commits that change `docs/cadence.toml` on
+     `origin/<default>`, oldest first (so a bump merged with a merge commit lands at the merge), each pinned commit's file read once — the walk assigns `landed` only; the
+     entries listed are the headings of the file at origin's current pin — each heading given the commit where it last
+     came in — the first of its latest run of presence in the walk — so an entry withdrawn by a
+     rollback and brought back lands again at the rebump, and a member created inside the rollback is
+     told it, while one that already holds it in `conventions_seen` is not told twice. A commit in the walk that has no `[dev-cadence]` table, a ref that does
+     not parse, a pinned commit the clone cannot give (a force-pushed source), or one lacking
+     `files/docs/cadence-changes.md` is skipped, and a skipped commit neither starts nor ends a run: runs are over the readable commits, so a
+     heading first present at a skipped commit lands at the next readable one — later than it came, a
+     member created between the two told what its SessionStart hook may have printed, accepted. So `conventions_seen`, `created` and `sort` are read
+     exactly as above, and a member that outlives a bump is told what the bump brought. Every entry the
+     retired copy carried lands at the migration's merge: a member whose `conventions_seen` was written
+     from the copy holds those headings already, and one created before the migration whose first
+     reading falls after it — a window of one reading — is told them in one note, three named and *and n more*. The window is that one reading — or a first reading taken from a lagging, unpinned checkout, which
+     gives none — however long
+     the checkout lags: `sort` only adds to `conventions_seen`, so an empty reading from a lagging
+     checkout clears nothing, and a member created after the migration holds those headings untold as
+     landed before its `created`. One script serves both ends. Its `--hook` keeps today's
+     rule, a heading of origin's file not in the worktree's own, or dated within its 14 days — or absent from the file of the pin before the oldest bump commit within them
+     (a first-parent commit on `origin/<default>` whose `docs/cadence.toml` names another `ref` than its
+     parent's readable pin — so the migration and an adopt, whose parent has none, are never bump commits — by committer date — a settings edit to the same file is passed over), so the entries of
+     every bump in the window, written long before it, reach a session started after it (one `git log
+     --first-parent --since` of the file, each commit's `ref` against its parent's, one `git show` of the
+     oldest's parent's file, one clone object read); where the clone lacks that parent's pinned commit the clause adds
+     nothing —
+     less its per-worktree marker: origin's file is that of origin's pin, and the worktree's own is its pin's (the
+     tree on disk, else the clone's object), or, in a worktree branched before the migration, its retired copy
+     (a worktree that holds a pin reads its pin's, origin pinned or not — where the script runs
+     outside a tree, as the main checkout's synced copy does before the migration merges, that is the
+     tree on disk at the launcher's frozen cache layout, `trees/<ref>/files/docs/cadence-changes.md`, no
+     clone object read, and with none the 14-day rule — so the migration PR's own
+     worktree is not printed the history; no *behind* line prints while origin holds no pin), so a migration tells only what it brought and a bump what it brought, with no walk of
+     every pin commit, only the bump lookup above; a
+     worktree whose own file cannot be read is told only what is dated within the 14 days.
+     Its *behind* line is the worktree's pin against origin's (*this worktree pins `<old7>`, `origin/main` pins `<new7>` — rebase; `dev-cadence path cadence.md` prints the path of the rules it runs now*, before the migration *this worktree carries its own copy; `origin/main` pins `<new7>` — rebase*, and
+     before an adopt *this worktree runs no dev-cadence; `origin/main` pins `<new7>` — rebase*),
+     printed when the two pins differ unless the clone proves origin's pin an ancestor of the worktree's
+     (a clone lacking either commit proves nothing, so the line prints), entries or none, once per worktree per origin pin
+     (the pin joins the marker, printed or not). It fetches no source (the repo's own fetch,
+     TD-044, as today) and takes no lock (its child is stopped at 25 seconds; reading the clone's
+     objects needs none), so a commit the clone lacks says nothing there: a session starting while the
+     clone lacks origin's pin is told nothing but its *behind* line, and the home's
+     first reading, after its `created`, records those headings untold — accepted, as the checkout's lag is — while a member that predates
+     the bump is told by the home; the heading's format stays dev-cadence's (its parity row), never parsed a
+     second time here. That reading is dev-cadence's change, filed in its ledger; ShiftLead's half is
+     the note (TD-1046). Since the repo holds no file, and a member's worktree branched before the bump
+     resolves the old pin, **a pinned repo's note carries each told entry's `body`** (dev-cadence holds
+     an entry to three lines; the note names three at most, each body's lines joined by a space, a body over 300 characters cut to its first 300 and *…*), and names the file by the resolver's typed command (§5 *The seams*,
+     as the brief slots name the gate): *dev-cadence's cadence-changes.md gained 1 entry since you
+     started: "2026-10-27 — …": <its body> — after rebasing onto `origin/main`, `<python> <launcher>
+     path cadence-changes.md` prints its path; go on* — for a member on a node (`host` not the
+     home's), whose container has neither path, the command is `dev-cadence path cadence-changes.md`,
+     the link `ao host up` puts on its `PATH`. **The checkout's pin selects the script**, and
+     the home never moves the checkout: while it is pinned before dev-cadence's change, or has not yet pulled the migration (unpinned, its copy reads a file origin no longer has),
+     or holds a pin beside a `docs/cadence-sync.lock` (`cadence.pinned` false while the lock stands, so
+     its copy is read, though the hooks, by `cadence.hook_pinned`, run the tree), the old script
+     runs, gives no entries, and nobody is told — nor is a member created in that window told later of
+     what landed before its `created`. Once the checkout's pin carries the change, every later bump is
+     read from origin however far the checkout lags, so the lag matters once. Nothing warns of it, since
+     the same pin's SessionStart hook tells a starting session nothing either; the home logs a root's empty reading (entries, none) at info, pinned or
+     not, once per root while it lasts; no reading at all keeps today's line, now
+     carrying its reason (every exit 2 prints one as its last stderr line), and a pinned root whose tree cannot
+     be made, which today passes silently, logs *pinned, no tree: <why>* (the why from `cadence.tree`)
+     once per root and line.
 - **Promote**: a repo's live copy — the host agent and every session's `ao` for this repo, a cluster
   for samscrape — is made from `main` by **a person's press or this policy, never by a session**
   (CLAUDE.md: a worker never promotes; the `promote` RPC is refused to a session as `set_settings`
