@@ -86,6 +86,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
+| TD-1021 | Memory harvest 2026-10-26: 6 passages contradict the cadence, 10 memories repeat it, 12 more wait on dev-cadence, and 6 need tidying | Low | Open — (1), (2), (4) now; (3) waits on dev-cadence TD-136–TD-139 |
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Open |
 
 ---
@@ -1809,3 +1810,52 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when:** the design PR is merged with its build entries filed; those builds' Done when hold a pinned temp repo whose ShiftLead-started session runs `dev-cadence hook session-start` through a stub launcher, and the Repo page warning neither *no SessionStart line* nor `sync.sh` / `sync-all` for it.
 
 **Related:** dev-cadence TD-129 (slice 5, #335; slice 11, #341), TD-1009, TD-1010 (part 3, the roster warning), TD-1014 (the pin era's other readers), TD-507 (the doctor's reading of dev-cadence's line of any vintage).
+
+## TD-1021: Memory harvest 2026-10-26: 6 passages contradict the cadence, 10 memories repeat it, 12 more wait on dev-cadence, and 6 need tidying
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through the memory harvest; drafted by session `memory-vs-cadence`)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open. Items (1), (2) and (4) can start now; (3) waits on dev-cadence TD-136 to TD-139.
+**Location:** `docs/claude-memory/`
+
+**Why:** Paul's first memory harvest (dev-cadence TD-125, 2026-10-26) judged every memory in `docs/claude-memory/` against dev-cadence's cadence and his own cadence layer. Some memories now contradict the cadence. A wrong memory is worse than none (cadence §7.1): a session follows it. Most of the wrong ones teach numbering TD ids by hand. Others repeat a rule cadence.md now holds, so the copies drift as the cadence changes. Other people will work in this repo, so memories whose lessons went only into Paul's personal layer or his `craft.md` stay here as they are. That includes `agree-the-layout-before-model-reviews` and `hold-a-design-until-its-round-ends`.
+
+**Fix:**
+
+**(1) Remove these passages. Each contradicts the cadence:**
+- `cloud-design-round.md` ("renumber by hand").
+- `designer-run-lessons-2026-09-25.md` (number from `sort | tail -1`).
+- `designer-run-lessons-2026-10-12.md` (number from the highest TD).
+- `shiftlead-td-grind-mechanics.md` (renumber from origin/main's highest).
+- All four break §2.10: ids, and renumbers, come from `ao td next`.
+- `designer-run-lessons-2026-09-28.md` (write `**Pickable:**` lines): §2.4 says Pickable is derived, never written.
+- `shiftlead-td-grind-mechanics.md` (the review verdict "only on a comment's first line"): §4.9 reads it on any line.
+- `read-inbox-before-merging.md`: fix the same first-line claim.
+- `td-ids-live-in-pr-diffs.md`: fix the stale "§2.10 still teaches the hand rule".
+
+**(2) Trim to a one-line pointer, or delete. The cadence says it:**
+- `design-goals-effective-non-intrusive.md`: §3.7.
+- `design-review-loop-with-sonnet.md`: its round-count lesson is §4.8; keep its second lesson.
+- `designed-entry-needs-blocked-by.md`: §2.4.
+- `designer-run-lessons-2026-09-28.md` (a "TD number taken" reading) and `designer-run-lessons-2026-10-04.md` (ids): §2.10.
+- `gate-a-merge-on-the-checks-exit-code.md`: the cadence procedure's step 5.
+- `gate-everything-after-a-merge-on-its-state.md`: §1.4.
+- `shiftlead-td-grind-mechanics.md`: its archive-format and verdict-word lessons are §2.8 and §4.9.
+- `td-ids-live-in-pr-diffs.md`: §2.10.
+
+**(3) After dev-cadence lands the rule, and the PR bringing it here has merged, trim to a pointer:**
+- `alternate-review-rounds.md` and `reviewer-prompts-keep-out-of-the-anchor.md`: dev-cadence#TD-136, §4.8.
+- `check-in-flight-before-a-td-step.md`, `check-open-prs-before-a-design-round.md`, `open-the-pr-before-writing-its-number.md`, the PR-number lesson in `dates-and-pr-numbers-are-local-and-real.md`, `summary-table-conflicts-resolve-row-wise.md`, and the template-regex, archive-tail and PR-number lessons in `shiftlead-td-grind-mechanics.md`: dev-cadence#TD-137, §2.5, §2.8, §2.9, §2.12.
+- `a-park-is-a-merged-pr.md`: dev-cadence#TD-137 and TD-138, §2.9 and §3.6.
+- `no-vscode-windows-for-agent-worktrees.md`: dev-cadence#TD-139, §1.1.
+
+Trimming before the rule arrives here loses it (§2.4).
+
+**(4) Tidy:**
+- `live-system-restart-authorized.md` was a one-time authorization, done 2026-09-13. Delete it.
+- `a-park-is-a-merged-pr.md`, `check-open-prs-before-a-design-round.md`, `cloud-design-round.md` and `ui-review-screenshots.md` have no frontmatter. Add `name`, `description` and `type`.
+
+**Done when:** (1), (2) and (4) are done, and (3) is done after dev-cadence TD-136, TD-137, TD-138 and TD-139 have reached this repo.
