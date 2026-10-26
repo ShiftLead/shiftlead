@@ -184,6 +184,28 @@ async def test_adopt_refuses_a_served_repo_no_dev_cadence_checkout_and_an_origin
     assert "--adopt goes with `ao repo add <path>`" in capsys.readouterr().err
 
 
+async def test_a_dev_cadence_checkout_without_sync_sh_is_picked_and_refused_before_any_clone(agent, world, capsys):
+    """TD-1024, §4.7 `ao repo add`: once `sync.sh` retires, a dev-cadence checkout with `launcher/INTERFACE`
+    is still the roster's pick, and the adopt — which runs `sync.sh` — refuses it by name, offer and
+    `--adopt` alike, with no scratch clone made and nothing pushed."""
+    await park_ticks(agent)
+    checkout = world["checkout"].resolve()
+    dc = world["dc"]
+    (dc / "sync.sh").unlink()
+    (dc / "launcher").mkdir()
+    (dc / "launcher" / "INTERFACE").write_text("1\n")
+    assert adopt.dev_cadence(_roster(), checkout) == dc.resolve()
+    words = (
+        f"dev-cadence at {dc.resolve()} has no sync.sh: run `dev-cadence -C {dc.resolve()} adopt {checkout}` yourself"
+    )
+    for argv in (["repo", "add", str(checkout)], ["repo", "add", str(checkout), "--adopt"]):
+        assert await asyncio.to_thread(cli.main, argv) != 0
+        assert words in capsys.readouterr().err
+        assert list(world["tmp"].iterdir()) == [], "no scratch clone"
+    assert not world["log"].exists() and "cadence-adopt" not in git(world["origin"], "branch")
+    assert _roster() == [str(dc)], "nothing added"
+
+
 async def test_a_rerun_finds_the_open_adoption_pr_and_adds_the_repo_and_a_stale_branch_is_refused(
     agent, world, capsys, monkeypatch, tmp_path
 ):

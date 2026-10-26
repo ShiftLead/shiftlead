@@ -79,7 +79,9 @@ def test_a_checkout_without_the_adapters_session_start_line_is_warned():
     assert doctor.missing_seams(seam_reading()) == []
     source_line = CADENCE_HOOK_LINE.replace("/scripts/cadence_hooks.sh", "/files/scripts/cadence_hooks.sh")
     assert doctor.missing_seams(seam_reading(source=True, session_start=[source_line])) == []
-    assert doctor.missing_seams(seam_reading(source=True)) == [words]
+    # the consumer's line in the source names the runner but is no vintage there (TD-1024)
+    assert doctor.missing_seams(seam_reading(source=True)) == [doctor.UNKNOWN_SESSION_START]
+    assert doctor.missing_seams(seam_reading(source=True, session_start=["echo hi"])) == [words]
     older = {k: v for k, v in seam_reading().items() if k != "session_start"}
     assert doctor.missing_seams(older) == [], "a reading of an older host agent says nothing of it"
 

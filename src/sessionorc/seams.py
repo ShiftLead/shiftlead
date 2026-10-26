@@ -92,6 +92,9 @@ def ledger(root: Path | str) -> dict[str, Any]:
 
 # dev-cadence's shim in a checkout's common hooks (dev-cadence TD-055): its per-clone setup was run
 SHIM_MARKER = "dev-cadence hook shim (TD-055)"
+# the launcher call only dev-cadence TD-129's shim makes (`dev-cadence hook "${0##*/}"`): the bare
+# `dev-cadence hook` is in every shim's SHIM_MARKER, so it tells no era (TD-1024)
+PINNED_SHIM = 'dev-cadence hook "'
 
 
 ADOPT_BRANCH = "cadence-adopt"  # the head `ao repo add --adopt` opens its PR from (§4.7 `ao repo add`)
@@ -258,16 +261,19 @@ def unserved(r: Any, but: tuple[str, ...] = ()) -> list[str]:
     return [str(x.get("words") or x.get("key")) for x in lacks]
 
 
-def shimmed(root: Path | str) -> bool | None:
-    """Whether the checkout's common `.git/hooks/pre-push` carries dev-cadence's shim marker; None
-    where the checkout has no `.git` directory to read (a worktree, or no checkout here)."""
+def shimmed(root: Path | str, pinned: bool = False) -> bool | None:
+    """Whether the checkout's common `.git/hooks/pre-push` carries dev-cadence's shim marker — in a `pinned`
+    repo (`cadence.hook_pinned`) the TD-129 shim's launcher call too, since an older shim runs a copied hook
+    that is gone (TD-1024); None where the checkout has no `.git` directory to read (a worktree, or no
+    checkout here)."""
     hooks = Path(root) / ".git" / "hooks"
     if not hooks.parent.is_dir():
         return None
     try:
-        return SHIM_MARKER in (hooks / "pre-push").read_text(encoding="utf-8", errors="replace")
+        text = (hooks / "pre-push").read_text(encoding="utf-8", errors="replace")
     except OSError:
         return False
+    return SHIM_MARKER in text and (not pinned or PINNED_SHIM in text)
 
 
 def session_start(root: Path | str) -> list[str]:
@@ -304,33 +310,42 @@ def warnings(
     setup: dict[str, Any],
     dc_age: dict[str, Any] | None = None,
     served: bool = False,
+    pinned: bool = False,
 ) -> list[str]:
     """The warnings the host agent can read itself (§5 *The seams*), each one sentence: a missing board,
     no worktree setup, a checkout without dev-cadence's hook shim, dev-cadence's age where it could not
     be read (§5 *Which dev-cadence*), and a `served` repo missing from dev-cadence's own roster (§4.7 `ao
-    repo add`, TD-1010) — never dev-cadence's source, which no sync reaches. A repo is served whatever
-    they say."""
+    repo add`, TD-1010) — never dev-cadence's source, which no sync reaches. The two per-clone cures are the
+    era's: `sync.sh` on the copy, the launcher in a `pinned` repo (`cadence.hook_pinned`, TD-1024). A repo is
+    served whatever they say."""
     out: list[str] = []
     if board.get("state") == "absent" or (board.get("value") and not (Path(root) / board["value"]).is_file()):
         out.append(f"no board at {board.get('value') or workorders.BOARD}")
     if setup.get("state") == "absent":
         out.append("no worktree setup")
-    if shimmed(root) is False:
-        out.append(f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh {root}`")
+    if shimmed(root, pinned) is False:
+        cure = f"dev-cadence -C {root} run install_git_hooks.sh" if pinned else f"<dev-cadence>/sync.sh {root}"
+        out.append(f"dev-cadence's per-clone setup not run in this checkout — `{cure}`")
     if dc_age and dc_age.get("why"):
         out.append(f"dev-cadence's age not read: {dc_age['why']}")
     if served and not cadence.is_source(root) and on_cadence_roster(root) is False:
-        out.append(f"not on dev-cadence's roster: sync-all will not reach it — `<dev-cadence>/sync.sh {root}`")
+        if pinned:
+            cure = f"its gc may remove the tree this repo pins — `dev-cadence -C <dev-cadence> adopt {root}`"
+        else:
+            cure = f"sync-all will not reach it — `<dev-cadence>/sync.sh {root}`"
+        out.append(f"not on dev-cadence's roster: {cure}")
     return out
 
 
 def reading(root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, Any] | None = None) -> dict[str, Any]:
-    """The repo's seams: `{ledger, board, worktree_setup, cadence_age, serve, warnings, session_start,
-    ledgerboard, source}` — `ledger` as `ledger()` gives it, `board` and `worktree_setup` each `{state,
-    value}`, `value` the board's path or the command (None when *absent*), `cadence_age` as `age()` reads
-    it against the `roster` (the home's checkouts; `old` the last reading, whose age it carries), `serve`
-    as `serve()` gives it, `ledgerboard` as `ledgerboard()` does, `source` whether the root is
-    dev-cadence's own source (its every dev-cadence path under `files/`)."""
+    """The repo's seams: `{ledger, board, worktree_setup, cadence_age, serve, hook_pinned, warnings,
+    session_start, ledgerboard, source}` — `ledger` as `ledger()` gives it, `board` and `worktree_setup`
+    each `{state, value}`, `value` the board's path or the command (None when *absent*), `cadence_age` as
+    `age()` reads it against the `roster` (the home's checkouts; `old` the last reading, whose age it
+    carries), `serve` as `serve()` gives it, `hook_pinned` as `cadence.hook_pinned` (the SessionStart line's
+    mode, §4.2, which picks the per-clone cures and the clients' *predates the pin*, TD-1024),
+    `ledgerboard` as `ledgerboard()` does, `source` whether the root is dev-cadence's own source (its every
+    dev-cadence path under `files/`)."""
     board_state, board_rel = workorders.board_path(root)
     state, value = gitinfo.worktree_setup(root)
     out: dict[str, Any] = {
@@ -340,7 +355,10 @@ def reading(root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, 
     }
     out["cadence_age"] = age(root, roster, (old or {}).get("cadence_age"))
     out["serve"] = serve(root, out["ledger"], out["cadence_age"])
-    out["warnings"] = warnings(root, out["board"], out["worktree_setup"], out["cadence_age"], out["serve"]["ok"])
+    out["hook_pinned"] = cadence.hook_pinned(root)
+    out["warnings"] = warnings(
+        root, out["board"], out["worktree_setup"], out["cadence_age"], out["serve"]["ok"], out["hook_pinned"]
+    )
     out["session_start"] = session_start(root)
     out["ledgerboard"] = ledgerboard(root)
     out["source"] = cadence.is_source(root)

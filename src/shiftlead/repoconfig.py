@@ -201,7 +201,7 @@ THERE_REFUSALS = (": not a regular file", " bytes, which is not a repo config or
 
 def layout(cfg: RepoConfig) -> dict[str, str]:
     """Each of `LAYOUT_SLOTS` for `cfg`'s repo (design §5 *The seams*, TD-1011): the cadence's slots
-    dev-cadence's paths — under `files/` in dev-cadence's own source (a root holding `sync.sh` and `files/`),
+    dev-cadence's paths — under `files/` in dev-cadence's own source (`cadence.is_source`'s test, read with `there`),
     read the way the file was, `cfg.read`; in a pinned repo (`[dev-cadence]` in its `docs/cadence.toml`, no lock)
     the resolver's command as a session types it, `cadence.typed` (TD-1014) — and `board:` and `ledger:` where
     the file sets them; `{test}` and `{lint}` `commands:`'s, `{design_dir}` the directory where the checkout
@@ -246,7 +246,8 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
         except tomllib.TOMLDecodeError:
             return PIN_HEADER in (line.strip() for line in text.splitlines())
 
-    pre = SOURCE_PREFIX if there("sync.sh") and there(SOURCE_PREFIX.rstrip("/")) else ""
+    source = any(there(mark) for mark in cadence.SOURCE_MARKS) and there(SOURCE_PREFIX.rstrip("/"))
+    pre = SOURCE_PREFIX if source else ""
     if not pre and pinned():  # the resolver's command, as the session types it (TD-1014)
         gate = f"{cadence.typed('run', cadence.GATE_SCRIPT)} --pr {PR_PLACEHOLDER}"
         ledger_check = cadence.typed("run", Path(LEDGER_SCRIPT).name, "--check")
