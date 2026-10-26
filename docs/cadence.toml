@@ -27,7 +27,7 @@
 # worktree-root = ".claude/worktrees"
 
 # The repo's own checks, as one command (§4.12, TD-1035). GitHub Actions stopped on the shared
-# account (TD-1033), so a PR is gated on this: scripts/precheck.py --pr N runs it on the PR's head
+# account (TD-1033), so a PR is gated on this: `dev-cadence run precheck.py --pr N` runs it on the PR's head
 # in a clean worktree and records a cadence/precheck status, and the home runs it on main's head
 # (design §6 *The precheck on main*). The worktree has nothing installed, so it installs first. The
 # interpreter is pinned to the machine's python3 (3.13 on kmaster, the live copy's), since pdm
