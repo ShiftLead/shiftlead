@@ -24,6 +24,7 @@ import shlex
 import subprocess
 import sys
 import time
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -201,6 +202,57 @@ def gate(root: Path | str) -> str | None:
     if is_source(root):
         return SOURCE_GATE
     return PINNED_GATE if pinned(root) else DEFAULT_GATE
+
+
+PRECHECK_SCRIPT = "precheck.py"  # dev-cadence's local precheck (dev-cadence §4.12), in each layout's `scripts/`
+PRECHECK_READ = 20.0
+
+
+def precheck_command(root: Path | str, rev: str) -> tuple[str | None, str | None]:
+    """The repo's `precheck` from `docs/cadence.toml` at `rev` (design §6 *Where `precheck` is read*, TD-1037):
+    `(command, None)`, `(None, None)` where it sets none — no file at `rev`, or a value that is not a
+    non-empty string — or `(None, why)` where `rev` is not there, or the file cannot be read or does not parse. As
+    `sync.post_sync_command` reads `post_sync`: `tomllib` on the blob, no script, so a pinned repo reads it too."""
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(root), "cat-file", "blob", f"{rev}:{PIN}"],
+            capture_output=True, timeout=PRECHECK_READ, stdin=subprocess.DEVNULL,
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, f"{PIN} could not be read: {type(e).__name__}"
+    if cp.returncode != 0:  # no file at `rev` is no `precheck`; no `rev` at all is not known
+        try:
+            there = subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--verify", "-q", f"{rev}^{{commit}}"],
+                capture_output=True, timeout=PRECHECK_READ, stdin=subprocess.DEVNULL,
+            ).returncode == 0  # fmt: skip
+        except (OSError, subprocess.TimeoutExpired):
+            there = False
+        return None, (None if there else f"{PIN} could not be read: no {rev} here")
+    try:
+        got = tomllib.loads(cp.stdout.decode(errors="replace")).get("precheck")
+    except tomllib.TOMLDecodeError:
+        return None, f"{PIN} does not parse"
+    return (got.strip(), None) if isinstance(got, str) and got.strip() else (None, None)
+
+
+def precheck_script(root: Path | str) -> tuple[tuple[list[str], dict[str, str] | None] | None, str | None]:
+    """How to start dev-cadence's `precheck.py` for `root` (design §6 *What runs*, TD-1037): `((argv, env), None)`
+    in the gate's three layouts — dev-cadence's own `files/scripts/`, the resolver's `dev-cadence run` in a
+    pinned repo (its env `command`'s, as the pinned gate runs), the checkout's `scripts/` — env None but in the
+    pinned one; `(None, why)` where the script is absent, as in a pinned tree older than it."""
+    absent = f"no {PRECHECK_SCRIPT} here"
+    if pinned(root):
+        payload, why = tree(root)
+        if payload is None:
+            return None, why
+        if not (payload / "scripts" / PRECHECK_SCRIPT).is_file():
+            return None, absent
+        return command(root, "run", PRECHECK_SCRIPT), None
+    rel = f"files/scripts/{PRECHECK_SCRIPT}" if is_source(root) else f"scripts/{PRECHECK_SCRIPT}"
+    if not (Path(root) / rel).is_file():
+        return None, absent
+    return (["python3", rel], None), None
 
 
 STATES = ("open", "merged", "closed")

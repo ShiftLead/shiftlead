@@ -56,7 +56,7 @@ def checkout(tmp_path, monkeypatch):
     first = _commit(root, "a")
     _git(root, "push", "-q", "origin", "main")
     live.write_text(first + "\n")
-    monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("green", "", None))
+    monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("green", "", None, None))
     return root
 
 
@@ -116,24 +116,101 @@ def test_main_is_read_after_a_fetch_and_the_tree_is_precondition_one(checkout):
     assert promote.read_main(checkout)["tree"].startswith("the checkout is on td1-x at ")
 
 
-def test_the_checks_verdict(monkeypatch, tmp_path):
-    def fake(runs, rc=0, err=""):
-        out = json.dumps({"check_runs": runs})
-        monkeypatch.setattr(
-            promote.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, rc, stdout=out, stderr=err)
-        )
+def _fake_gh(monkeypatch, runs, statuses=(), rc=0, err="", status_rc=0, toml=(None, None)):
+    """`gh api`'s check runs and commit statuses, each by its path; the repo's `precheck` is `toml`."""
+    calls = []
 
+    def run(argv, **kw):
+        calls.append(argv[2])
+        if argv[2].split("?")[0].endswith("/status"):
+            out = json.dumps({"state": "pending", "statuses": list(statuses)})
+            return subprocess.CompletedProcess(argv, status_rc, stdout=out, stderr="HTTP 502" if status_rc else "")
+        return subprocess.CompletedProcess(argv, rc, stdout=json.dumps({"check_runs": runs}), stderr=err)
+
+    monkeypatch.setattr(promote.subprocess, "run", run)
+    monkeypatch.setattr(promote.cadence, "precheck_command", lambda root, rev: toml)
+    from sessionorc import board
+
+    monkeypatch.setattr(board, "default_branch", lambda root: "main")
+    return calls
+
+
+def test_the_checks_verdict(monkeypatch, tmp_path):
     done = {"status": "completed", "conclusion": "success"}
-    fake([done, {"status": "completed", "conclusion": "skipped"}])
-    assert promote.read_checks(tmp_path, "f" * 40) == ("green", "", None)
-    fake([done, {"status": "in_progress", "conclusion": None}])
-    assert promote.read_checks(tmp_path, "f" * 40) == ("pending", "", None)
-    fake([{"status": "in_progress"}, {"status": "completed", "conclusion": "failure"}])
-    assert promote.read_checks(tmp_path, "f" * 40) == ("failed", "", None)
-    fake([])
-    assert promote.read_checks(tmp_path, "f" * 40) == ("unknown", "no check runs on fffffff", None)
-    fake([], rc=1, err="HTTP 403: API rate limit exceeded")
-    assert promote.read_checks(tmp_path, "f" * 40) == ("unknown", "HTTP 403: API rate limit exceeded", None)
+    _fake_gh(monkeypatch, [done, {"status": "completed", "conclusion": "skipped"}])
+    assert promote.read_checks(tmp_path, "f" * 40) == ("green", "", None, None)
+    _fake_gh(monkeypatch, [done, {"status": "in_progress", "conclusion": None}])
+    assert promote.read_checks(tmp_path, "f" * 40) == ("pending", "", None, None)
+    _fake_gh(monkeypatch, [{"status": "in_progress"}, {"status": "completed", "conclusion": "failure"}])
+    assert promote.read_checks(tmp_path, "f" * 40) == ("failed", "", None, None)
+    _fake_gh(monkeypatch, [])
+    assert promote.read_checks(tmp_path, "f" * 40) == ("unknown", "no check runs on fffffff", None, None)
+    _fake_gh(monkeypatch, [], rc=1, err="HTTP 403: API rate limit exceeded")
+    assert promote.read_checks(tmp_path, "f" * 40) == ("unknown", "HTTP 403: API rate limit exceeded", None, None)
+
+
+def _status(state: str, context: str = "cadence/precheck") -> dict:
+    return {"context": context, "state": state}
+
+
+def test_the_commit_statuses_fold_in_beside_the_runs(monkeypatch, tmp_path):
+    """TD-1037: a status's `failure` or `error` fails, `pending` keeps it pending, and statuses alone are read."""
+    done = {"status": "completed", "conclusion": "success"}
+    sha = "f" * 40
+    calls = _fake_gh(monkeypatch, [], [_status("success", "ci/x")])  # statuses only
+    assert promote.read_checks(tmp_path, sha) == ("green", "", None, None)
+    assert calls == [
+        "repos/{owner}/{repo}/commits/" + sha + "/check-runs?per_page=100",
+        "repos/{owner}/{repo}/commits/" + sha + "/status?per_page=100",
+    ]
+    _fake_gh(monkeypatch, [done], [_status("success", "ci/x")])  # both
+    assert promote.read_checks(tmp_path, sha)[0] == "green"
+    for state in ("failure", "error"):
+        _fake_gh(monkeypatch, [done], [_status(state, "ci/x")])
+        assert promote.read_checks(tmp_path, sha)[0] == "failed"
+    _fake_gh(monkeypatch, [done], [_status("pending", "ci/x")])
+    assert promote.read_checks(tmp_path, sha)[0] == "pending"
+    # the combined `state` (pending for no status at all) is never read
+    _fake_gh(monkeypatch, [done], [])
+    assert promote.read_checks(tmp_path, sha)[0] == "green"
+    _fake_gh(monkeypatch, [done], status_rc=1)
+    assert promote.read_checks(tmp_path, sha) == ("unknown", "HTTP 502", None, None)
+
+
+def test_main_needs_a_green_precheck_where_the_repo_sets_one(monkeypatch, tmp_path):
+    """TD-1037: with `precheck` set, main's head is green only beside a successful `cadence/precheck`; the
+    reading's `precheck` field says what the status read found."""
+    done = {"status": "completed", "conclusion": "success"}
+    sha, set_ = "a" * 40, ("pdm run test", None)
+    _fake_gh(monkeypatch, [done], toml=set_)
+    assert promote.read_checks(tmp_path, sha) == ("unknown", "no cadence/precheck on aaaaaaa", None, "absent")
+    _fake_gh(monkeypatch, [], toml=set_)  # nothing at all: still the precheck's absence
+    assert promote.read_checks(tmp_path, sha) == ("unknown", "no cadence/precheck on aaaaaaa", None, "absent")
+    _fake_gh(monkeypatch, [done], [_status("success")], toml=set_)
+    assert promote.read_checks(tmp_path, sha) == ("green", "", None, "success")
+    _fake_gh(monkeypatch, [], [_status("success")], toml=set_)
+    assert promote.read_checks(tmp_path, sha) == ("green", "", None, "success")
+    for state, field in (("failure", "failure"), ("error", "failure")):
+        _fake_gh(monkeypatch, [done], [_status(state)], toml=set_)
+        assert promote.read_checks(tmp_path, sha) == ("failed", "", None, field)
+    _fake_gh(monkeypatch, [done], [_status("pending")], toml=set_)
+    assert promote.read_checks(tmp_path, sha) == ("pending", "", None, "pending")
+    _fake_gh(monkeypatch, [{"status": "completed", "conclusion": "failure"}], [_status("success")], toml=set_)
+    assert promote.read_checks(tmp_path, sha) == ("failed", "", None, "success")  # a failed run beside it
+    _fake_gh(monkeypatch, [done], status_rc=1, toml=set_)
+    assert promote.read_checks(tmp_path, sha) == ("unknown", "HTTP 502", None, "unread")
+    _fake_gh(monkeypatch, [], rc=1, err="HTTP 403: API rate limit exceeded", toml=set_)  # the runs' read failed first
+    assert promote.read_checks(tmp_path, sha) == ("unknown", "HTTP 403: API rate limit exceeded", None, "unread")
+    # a file that does not parse leaves it unknown with that why, and `precheck` null
+    _fake_gh(monkeypatch, [done], [_status("success")], toml=(None, "docs/cadence.toml does not parse"))
+    assert promote.read_checks(tmp_path, sha) == ("unknown", "docs/cadence.toml does not parse", None, None)
+    # unset: as before, the precheck's status read as any other
+    _fake_gh(monkeypatch, [done])
+    assert promote.read_checks(tmp_path, sha) == ("green", "", None, None)
+    # a rollback's commit (`keep=False`) never reads the rule: `precheck_command` is not asked
+    _fake_gh(monkeypatch, [done], toml=set_)
+    monkeypatch.setattr(promote.cadence, "precheck_command", lambda root, rev: pytest.fail("asked"))
+    assert promote.read_checks(tmp_path, sha, False) == ("green", "", None, None)
 
 
 def test_the_preconditions_in_order_and_the_press_goes_through_the_checks():
@@ -372,7 +449,7 @@ async def test_the_persons_own_shell_presses_and_the_press_is_recorded_as_the_sh
     await park_ticks(agent)
     _register(checkout)
     main = _merge(checkout, "b")
-    monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("pending", "", None))
+    monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("pending", "", None, None))
     shell = Session(id="ao-repo-sh", name="sh", kind="interactive", adapter="shell", dir=str(checkout))
     agent.sessions[shell.id] = shell
     async with LocalClient(caller=shell.id) as sh:
@@ -399,7 +476,7 @@ async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(ag
         with pytest.raises(AgentError, match="uncommitted change.*precondition: tree"):
             await person.call("promote", repo=str(checkout))
         _git(checkout, "checkout", "-q", "--", "b")
-        monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("pending", "", None))
+        monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("pending", "", None, None))
         got = await person.call("promote", repo="repo")
         assert got["sha"] == main and got["checks"] == "pending" and got["log"].endswith(f"{main}.log")
         assert agent._promotes["repo"]["inflight"]["by"] == "person"
@@ -1311,3 +1388,14 @@ def test_what_a_passing_smoke_told_rides_the_note(checkout):
         (d / "smoke.json").write_text(json.dumps(result))
         _, notes, _ = promote.survey([str(checkout)], {}, False, {}, at)
         assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in 48 s{note}"]
+
+
+def test_precheck_is_read_on_the_checkouts_default_branch(monkeypatch, tmp_path):
+    """TD-1037 (review): `precheck` is read from `origin/<default>`, so a repo on `trunk` is not read as unset."""
+    from sessionorc import board
+
+    _fake_gh(monkeypatch, [{"status": "completed", "conclusion": "success"}])
+    revs = []
+    monkeypatch.setattr(board, "default_branch", lambda root: "trunk")
+    monkeypatch.setattr(promote.cadence, "precheck_command", lambda root, rev: revs.append(rev) or ("x", None))
+    assert promote.read_checks(tmp_path, "a" * 40)[3] == "absent" and revs == ["origin/trunk"]
