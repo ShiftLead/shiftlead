@@ -48,6 +48,7 @@ from sessionorc import (
     work,
 )
 from sessionorc import balance as balance_mod
+from sessionorc import cadence as cadence_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import seats as seats_mod
 from sessionorc import settings as settings_mod
@@ -1005,6 +1006,7 @@ class HostAgent(
         want_head = str(head or "").strip().lower()
         if fresh:
             self._repos_fresh = True  # the next tick reads every repo's PRs, this one's among them
+        precheck = (await asyncio.to_thread(self._precheck_set, key))[0]
         row: dict[str, Any] | None = None
         at = ""
         while True:
@@ -1025,6 +1027,8 @@ class HostAgent(
                     break
                 ours = got is not None and str(got.get("head") or "").lower().startswith(want_head)
                 if ours and (word := reports.pr_wait_word(got)) != "pending":
+                    if word == "green" and precheck and got.get("prechecked") is False:
+                        word = "none"  # nothing else will check it (§4.7, TD-1036)
                     break
             if loop.time() >= deadline:
                 word = "timeout"
@@ -1043,6 +1047,10 @@ class HostAgent(
             "read_at": at or None,
             # the last read failed (`gh` offline, a lapsed token): the reading is the one before it
             "read_error": str(prs.get("error") or "") or None,
+            # the line to run where the repo sets `precheck` and the head carries none (TD-1036)
+            "precheck": cadence_mod.precheck_typed(key, int(pr))
+            if word == "none" and precheck and row.get("prechecked") is not True
+            else None,
         }
 
     async def rpc_queue(self, omit: list[str] | None = None) -> dict[str, Any]:
@@ -3416,18 +3424,33 @@ class HostAgent(
             view = await asyncio.to_thread(reports.pr_view, root, pr, GH_TIMEOUT)
         if isinstance(view, str):
             return {"word": "unknown", "why": view}
+        precheck, why = await asyncio.to_thread(self._precheck_set, root)
+        if why:
+            return {"word": "unknown", "why": why}
         base = str(view.get("baseRefName") or "")
         reading = (self._repos.get(root) or {}).get("prs") or {}
         required = reading.get("required") or {}
         names = required.get(base) if isinstance(required.get(base), list) else None
         row = next((p for p in reading.get("open") or [] if isinstance(p, dict) and p.get("number") == pr), {})
         verdicts = await asyncio.to_thread(reports.done_verdicts, root, view, names, row.get("jobs"), GH_TIMEOUT)
-        got = reports.at_done(view, names, verdicts)
+        got = reports.at_done(view, names, verdicts, precheck)
+        if got.get("precheck_absent"):
+            got["hint"] = cadence_mod.precheck_typed(root, pr)
         if got["word"] == "not_run":
             got["owner"] = reports.github_owner(row.get("url")) or reports.github_owner(
                 await asyncio.to_thread(reports.git_origin, root)
             )
         return {**got, "names": names, "rollup": bool(view.get("statusCheckRollup"))}
+
+    @staticmethod
+    def _precheck_set(root: str) -> tuple[bool, str | None]:
+        """Whether the repo at `root` sets `precheck` (design §4.8, TD-1036): `docs/cadence.toml` on
+        `origin/<default>` in the registry checkout, as the gate on main reads it (§6 *Where `precheck`
+        is read*); `(False, why)` for a file that cannot be read or parsed."""
+        from sessionorc import board  # the checkout's default branch, as the pull reads it
+
+        command, why = cadence_mod.precheck_command(root, f"origin/{board.default_branch(Path(root))}")
+        return command is not None, why
 
     @staticmethod
     def _not_run_refusal(pr: int, ref: str, got: dict[str, Any]) -> RpcError:
@@ -3451,6 +3474,15 @@ class HostAgent(
         if got["word"] not in ("refused", "pending"):
             return None
         sha7 = got["sha"][:7]
+        if got["word"] == "pending" and got.get("precheck_absent"):  # the precheck line, never `--watch` (TD-1036)
+            run = f"run `{got['hint']}` (in the background), then {failed}"
+            if got["running"] == [reports.PRECHECK_CONTEXT]:
+                return RpcError(
+                    f"PR #{pr}'s head {sha7} carries no {reports.PRECHECK_CONTEXT} — {run}",
+                    running=got["running"],
+                    sha=got["sha"],
+                )
+            running = run
         unknown = " — required set unknown, every check read" if got["names"] is None else ""
         if got["word"] == "refused":
             return RpcError(

@@ -2855,6 +2855,8 @@ def _pr_wait(args: argparse.Namespace) -> int:
             if (want := str(got.get("want_head") or "")) and not str(got.get("head") or "").startswith(want):
                 tail += f", not yet {want[:7]}"  # the reading never reached the commit asked for
         print(f"PR #{args.n} {word}{tail}")
+        if got.get("precheck"):
+            print(f"run `{got['precheck']}` (in the background): nothing else checks this head")
         if got.get("read_error"):
             print(f"the home's last read of the PRs failed: {got['read_error']}")
 
