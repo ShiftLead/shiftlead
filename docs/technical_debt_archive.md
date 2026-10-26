@@ -19909,7 +19909,7 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Added:** 2026-10-26 (the designer, from TD-1033)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done — #2407. The live run, a promote under `auto` on a precheck the home ran, is the designer's look once dev-cadence's `precheck.py --commit` lands (its Done when).
+**Status:** Done — #2407. The live run, a promote under `auto` on a precheck the home ran, is the designer's look once dev-cadence's `precheck.py --commit` lands (its Done when); filed 2026-10-26 as dev-cadence#TD-151 (dev-cadence #371).
 **Location:** `src/sessionorc/promote.py` (`survey`, `acts`, `acts_words`, the intent files), `src/sessionorc/agent_promote.py`, `src/sessionorc/cadence.py` (`precheck_script`, TD-1037's); the Inbox row's words (`ui/inbox.py`); design §6 *The precheck on main*, §4.5a *Inbox row: promote*
 
 **Why:** TD-1033: a squash merge's commit carries no status, and its tree is its PR's head's only when the PR was current with main, which the cadence does not ask — so with no CI on main, main's head would never be green.
