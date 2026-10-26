@@ -83,11 +83,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1007 | Gemini CLI's layer wakes a session at a background command's end, and its hook refuses an unattended foreground CI watch | Low | Built (#2343) — live check |
 | TD-1009 | ShiftLead requires dev-cadence, and the person's briefs, start prompts and preferences live in their dev-cadence layer repo | Medium | Designed — builds TD-1010–TD-1017 |
 | TD-1010 | `ao repo add <path> [--adopt]` registers a repo, and offers dev-cadence's adoption as a PR for one without it | Medium | Open — build |
-| TD-1012 | ShiftLead names the oldest dev-cadence commit it reads, and a repo whose lock is older is unserved by name | Low | Open — build |
 | TD-1014 | One resolver gives every reader the command to run dev-cadence's pinned code, and the home ships a node's pinned trees with the wheel | Medium | Open — build |
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
+| TD-1018 | The sync pass judges a sync PR in any repo with a gate, though §6 *Sync* lets it judge one in an unserved repo only when its one lack is an older tree | Low | Open |
 
 ---
 
@@ -1732,28 +1732,6 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 
 **Related:** TD-1009 (its design), TD-1011 (the unserved words name this cure), TD-590 (the roster).
 
-## TD-1012: ShiftLead names the oldest dev-cadence commit it reads, and a repo whose lock is older is unserved by name
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-25 (the designer, from TD-1009)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1011
-**Location:** `src/sessionorc/cadence.py` (new `OLDEST`), `src/sessionorc/sync.py` (`parse_lock`'s `files_commit`), `src/sessionorc/seams.py` (the `oldest` lack); `tests/test_repo_seams.py`; design §5 *Which dev-cadence*
-
-**Why:** TD-1009 (ADR 2026-10-25, *Decision* 4): dev-cadence has no versions, so the build must say which commits it can read.
-
-**Fix:**
-- `cadence.OLDEST`: the full sha of the oldest dev-cadence commit whose files this build reads, with a comment naming why that commit (the newest `--json` shape or file it needs); raised only in the PR that needs the newer one, and only once every registered consumer repo's lock (dev-cadence's source has none and is passed over) is at or after it (a raise past the roster unserves it; the PR says so).
-- The lack: the lock's `files_commit` (else `commit`) does not descend from `OLDEST`. Ancestry is read in the roster's dev-cadence checkout (`git merge-base --is-ancestor`, after the host's own fetch); with none in the roster, from `gh api repos/<source>/compare/<OLDEST>...<files_commit>` (`status` `ahead` or `identical`), cached per `files_commit` on the reading; a reading that cannot be made is a warning (*dev-cadence's age not read: <why>*), never a lack.
-- Words: *unserved: dev-cadence at <short> is older than this build reads (<short OLDEST>) — sync it* (today `sync.sh`, under TD-129 a bump PR; §5 *The seams*).
-
-**Done when:** seams tests with a temp dev-cadence repo of three commits: a lock at the middle one with `OLDEST` at the first reads served, with `OLDEST` at the third reads the lack in those words; no dev-cadence checkout and a failing `gh` stub reads the warning.
-
-**Related:** TD-1009, TD-1011, TD-1014 (the pin's interface, the same check under TD-129).
-
 ## TD-1014: One resolver gives every reader the command to run dev-cadence's pinned code, and the home ships a node's pinned trees with the wheel
 
 **Priority:** Medium
@@ -1842,3 +1820,21 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when:** a UI test draws a two-part context with both heads and a one-part one with the no-layer line; a record holding only the joined text draws as before; a look (shot) is sent with the PR (design §4.9b).
 
 **Related:** TD-1009, TD-993 / TD-996 (the row), TD-1016.
+
+## TD-1018: The sync pass judges a sync PR in any repo with a gate, though §6 *Sync* lets it judge one in an unserved repo only when its one lack is an older tree
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-25 (grinder-ao-2, found building TD-1012)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_sync.py` (`_sync_repo`: the `cadence.gate(root) is None` test); `tests/test_sync_pass.py`; design §6 *Sync*, §4.4 *Work orders*
+
+**Why:** §6 *Sync* says a sync PR goes on to the steps only *in a served repo, or an unserved one whose one lack is a tree older than `OLDEST`*; any other unserved repo's PR is the person's, not read, nothing written. `_sync_repo` skips only a repo with no gate, so a repo that has the gate but no lock, a lock that does not parse, or no ledger still has its sync PRs judged and merged.
+
+**Fix:** skip the repo when `seams.unserved` names a lack whose key is not `age` (TD-1012's key for the older tree), reading `serve.lacks` from the repo facts; keep the gate test for a repo with no reading yet.
+
+**Done when:** a sync-pass test: a repo with the gate and no ledger has its green sync PR left unread and nothing written; one whose only lack is `age` has it judged.
+
+**Related:** TD-1011, TD-1012.

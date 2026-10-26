@@ -4,11 +4,12 @@ page's lines under its title, each drawn from the reading and reading nothing it
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from sessionorc import ledgerboard, seams
+from sessionorc import cadence, ledgerboard, seams
 from shiftlead import cli, doctor
 from shiftlead.adapters.claude_code import CADENCE_HOOK_LINE
 from shiftlead.ui.repo import missing_seams
@@ -171,3 +172,94 @@ def test_a_ledgerboard_release_other_than_the_wheels_warns_on_the_repos_line_and
     assert missing_seams(repo("a", seam_reading(ledgerboard=same))) == {"lines": [], "unserved": []}
     # a wheel whose header could not be read: every headed copy warns, the build's release unknown
     assert doctor.ledgerboard_warning({"release": "1.3", "wheel": None}) == "ledgerboard v1.3 here, v? in this build"
+
+
+def _git(root: Path, *args: str) -> str:
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True).stdout.strip()
+
+
+def _dev_cadence(tmp_path: Path) -> tuple[Path, list[str]]:
+    """dev-cadence's source (a root holding `sync.sh` and `files/`) with three commits, oldest first."""
+    src = tmp_path / "dev-cadence"
+    (src / "files").mkdir(parents=True)
+    (src / "sync.sh").write_text("#!/bin/sh\n")
+    _git(tmp_path, "init", "-q", "-b", "main", str(src))
+    shas = []
+    for n in range(3):
+        (src / "files" / "n").write_text(f"{n}\n")
+        _git(src, "add", "-A")
+        _git(src, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", f"c{n}")
+        shas.append(_git(src, "rev-parse", "HEAD"))
+    return src, shas
+
+
+def _consumer(tmp_path: Path, files_commit: str) -> Path:
+    root = tmp_path / "notes"
+    (root / "docs").mkdir(parents=True)
+    (root / "scripts").mkdir()
+    (root / "scripts" / "check_cadence.py").write_text("x = 1\n")
+    (root / "docs" / "technical_debt.md").write_text("# Technical debt\n")
+    lock = (
+        f"source: https://github.com/ShiftLead/dev-cadence\ncommit: {files_commit[:7]}\nfiles_commit: {files_commit}\n"
+    )
+    (root / "docs" / "cadence-sync.lock").write_text(lock)
+    return root
+
+
+def test_a_lock_older_than_the_builds_oldest_is_unserved_by_name(tmp_path, monkeypatch):
+    """TD-1012, §5 *Which dev-cadence*: a lock at the middle of three commits is served with `OLDEST` at
+    the first, and unserved in the fixed words with it at the third; ancestry read in the roster's
+    dev-cadence checkout."""
+    src, (first, middle, third) = _dev_cadence(tmp_path)
+    root = _consumer(tmp_path, middle)
+    roster = [root, src]
+    monkeypatch.setattr(cadence, "OLDEST", first)
+    got = seams.reading(root, roster)
+    assert got["serve"] == {"ok": True, "lacks": []}
+    assert got["cadence_age"] == {"commit": middle, "oldest": first, "descends": True, "why": None}
+    assert not [w for w in got["warnings"] if "age" in w]
+    monkeypatch.setattr(cadence, "OLDEST", third)
+    got = seams.reading(root, roster)
+    words = f"unserved: dev-cadence at {middle[:7]} is older than this build reads ({third[:7]}) — sync it"
+    assert got["serve"] == {"ok": False, "lacks": [{"key": "age", "words": words}]}
+    assert seams.unserved({"seams": got}) == [words]
+    assert missing_seams(repo("notes", got))["unserved"] == [[(words, False)]]
+    assert seams.reading(src, roster)["cadence_age"] is None, "dev-cadence's source carries no lock to age"
+    # a +dirty tree is read at the commit it was synced from
+    (root / "docs" / "cadence-sync.lock").write_text(f"files_commit: {middle}+dirty\n")
+    assert seams.reading(root, roster)["serve"]["lacks"][0]["key"] == "age"
+    # a commit the checkout does not hold, and a source not on GitHub: a warning, never a lack
+    (root / "docs" / "cadence-sync.lock").write_text("files_commit: " + "f" * 40 + "\n")
+    got = seams.reading(root, roster)
+    assert got["serve"]["ok"] is True
+    why = f"{src} does not hold fffffff and {third[:7]}, and its source (none) is not on GitHub"
+    assert f"dev-cadence's age not read: {why}" in got["warnings"]
+
+
+def test_with_no_dev_cadence_checkout_the_forge_compares_and_a_failure_is_a_warning(tmp_path, monkeypatch):
+    """TD-1012: no dev-cadence checkout in the roster reads the forge's compare on the lock's source; a
+    `gh` that fails is *dev-cadence's age not read: <why>*, never a lack; a read age is carried."""
+    root = _consumer(tmp_path, "a" * 40)
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    gh = bin_ / "gh"
+    gh.write_text('#!/bin/sh\necho "$@" >> "$0.calls"\necho "gh: HTTP 503: unavailable" >&2\nexit 1\n')
+    gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_}:/usr/bin:/bin")
+    got = seams.reading(root, [root])
+    assert got["serve"] == {"ok": True, "lacks": []}
+    assert (
+        "dev-cadence's age not read: no dev-cadence checkout in the roster; gh: HTTP 503: unavailable"
+        in got["warnings"]
+    )
+    calls = (bin_ / "gh.calls").read_text()
+    assert f"api repos/shiftlead/dev-cadence/compare/{cadence.OLDEST}...{'a' * 40}" in calls
+    gh.write_text('#!/bin/sh\necho \'{"status": "ahead"}\'\n')
+    assert seams.reading(root, [root])["serve"]["ok"] is True
+    gh.write_text('#!/bin/sh\necho "$@" >> "$0.calls"\necho \'{"status": "diverged"}\'\n')
+    got = seams.reading(root, [root], got)
+    assert got["serve"]["ok"] is False and got["cadence_age"]["descends"] is False
+    gh.write_text("#!/bin/sh\nexit 1\n")
+    again = seams.reading(root, [root], got)
+    assert again["cadence_age"] == got["cadence_age"], "the age of two commits is read once"
+    assert again["serve"] == got["serve"]

@@ -14,13 +14,15 @@ from __future__ import annotations
 import functools
 import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from sessionorc import cadence, gitinfo, sync, workorders
+from sessionorc import cadence, gitinfo, reports, sync, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 
+AGE_TIMEOUT = 20.0  # the bound of one ancestry read, git's or the forge's
 # a vendored copy's first line: the tagged release it came from and the hash of every byte after it
 RELEASE_HEADER = re.compile(r"^# ledgerboard v(\S+) sha256:([0-9a-f]{64})$")
 # where a repo keeps its copy: a consumer's, then dev-cadence's own source
@@ -106,30 +108,89 @@ def ledger_lack(led: dict[str, Any] | None, root: Path | str) -> str | None:
     return f"unserved: the ledger at {path} does not parse — {led.get('why') or state}"
 
 
-def _lock_lack(root: Path) -> str | None:
-    """The tree's lack (§5 *The seams*): no lock, or one that does not parse; None for dev-cadence's
-    own source, which carries none."""
+def _lock(root: Path) -> tuple[dict[str, Any] | None, str | None]:
+    """The checkout's lock and the tree's lack (§5 *The seams*): no lock, or one that does not parse;
+    `(None, None)` for dev-cadence's own source, which carries none."""
     if cadence.is_source(root):
-        return None
+        return None, None
     path = root / sync.LOCK
     if not path.is_file():
-        return f"unserved: no dev-cadence (no {sync.LOCK}) — {cure(root)}"
+        return None, f"unserved: no dev-cadence (no {sync.LOCK}) — {cure(root)}"
     try:
         lock = sync.parse_lock(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError) as e:
-        return f"unserved: dev-cadence's lock does not parse — {getattr(e, 'strerror', None) or e} — {cure(root)}"
+        return None, f"unserved: dev-cadence's lock does not parse — {getattr(e, 'strerror', None) or e} — {cure(root)}"
     if not (lock or {}).get("files_commit"):
-        return f"unserved: dev-cadence's lock does not parse — it has no files_commit line — {cure(root)}"
-    return None
+        return None, f"unserved: dev-cadence's lock does not parse — it has no files_commit line — {cure(root)}"
+    return lock, None
 
 
-def serve(root: Path | str, led: dict[str, Any]) -> dict[str, Any]:
-    """`{ok, lacks: [{key, words}]}`: `cadence` (dev-cadence's tree), `gate` (its script) and `ledger`,
-    each lack in §5's fixed words with its cure; `ok` when there is none."""
+def _forge_repo(source: str) -> str | None:
+    """`owner/name` of a lock's `source:` on GitHub, or None for a source elsewhere."""
+    host, _, rest = sync._norm_url(source).partition("/")
+    return rest if host == "github.com" and rest.count("/") == 1 else None
+
+
+def descends(commit: str, roster: Iterable[Path | str], source: str = "") -> tuple[bool | None, str | None]:
+    """Whether `commit` descends from `cadence.OLDEST` (§5 *Which dev-cadence*, TD-1012): `(True|False,
+    None)`, or `(None, why)` when it cannot be read. Read in the roster's dev-cadence checkout (its source,
+    as the host's own fetch left it) with `git merge-base --is-ancestor`; with none there, or one that
+    does not hold both commits (a fetch not yet made), through the forge's compare of the two commits on
+    the lock's `source:`. A `+dirty` tree is read at the commit it was synced from."""
+    commit = commit.removesuffix("+dirty")
+    checkout = next((Path(r) for r in roster if cadence.is_source(r)), None)
+    first = "no dev-cadence checkout in the roster"
+    if checkout is not None:
+        try:
+            cp = sync._git(checkout, "merge-base", "--is-ancestor", cadence.OLDEST, commit, timeout=AGE_TIMEOUT)
+        except sync._Error as e:
+            return None, str(e)
+        if cp.returncode in (0, 1):
+            return cp.returncode == 0, None
+        first = f"{checkout} does not hold {commit[:7]} and {cadence.OLDEST[:7]}"
+    repo = _forge_repo(source)
+    if repo is None:
+        return None, f"{first}, and its source {source or '(none)'} is not on GitHub"
+    got, why = reports._gh_api(Path.home(), f"repos/{repo}/compare/{cadence.OLDEST}...{commit}", AGE_TIMEOUT)
+    if why is not None:
+        return None, f"{first}; {why}"
+    status = got.get("status") if isinstance(got, dict) else None
+    if status in ("ahead", "identical"):
+        return True, None
+    if status in ("behind", "diverged"):
+        return False, None
+    return None, f"the compare read no status ({status!r})"
+
+
+def age(
+    root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, Any] | None = None
+) -> dict[str, Any] | None:
+    """The lock's age (§5 *Which dev-cadence*): `{commit, oldest, descends, why}`, `commit` the lock's
+    `files_commit` (else `commit`), `descends` whether it is at or after `cadence.OLDEST` (None with `why`
+    when that could not be read); None for dev-cadence's source or a lock that is lacking already. A read
+    `old` made of the same two commits is carried: their ancestry never changes."""
+    lock, lack = _lock(Path(root))
+    commit = (lock or {}).get("files_commit") or (lock or {}).get("commit")
+    if lack or not commit:
+        return None
+    same = isinstance(old, dict) and (old.get("commit"), old.get("oldest")) == (commit, cadence.OLDEST)
+    if same and old.get("descends") is not None:
+        return old
+    got, why = descends(commit, roster, str(lock.get("source") or ""))
+    return {"commit": commit, "oldest": cadence.OLDEST, "descends": got, "why": why}
+
+
+def serve(root: Path | str, led: dict[str, Any], dc_age: dict[str, Any] | None = None) -> dict[str, Any]:
+    """`{ok, lacks: [{key, words}]}`: `cadence` (dev-cadence's tree: no lock, or one that does not parse),
+    `age` (a tree older than `cadence.OLDEST`, as `age()` read it: the one lack a sync cures, §6 *Sync*),
+    `gate` (its script) and `ledger`, each lack in §5's fixed words with its cure; `ok` when there is none."""
     root = Path(root)
     lacks: list[dict[str, str]] = []
-    if words := _lock_lack(root):
+    if words := _lock(root)[1]:
         lacks.append({"key": "cadence", "words": words})
+    elif dc_age and dc_age.get("descends") is False:
+        words = f"unserved: dev-cadence at {dc_age['commit'][:7]} is older than this build reads"
+        lacks.append({"key": "age", "words": f"{words} ({dc_age['oldest'][:7]}) — sync it"})
     if cadence.gate(root) is None:
         script = cadence.SOURCE_SCRIPT if cadence.is_source(root) else cadence.SCRIPT
         lacks.append({"key": "gate", "words": f"unserved: no gate (no {script}) — {cure(root)}"})
@@ -177,9 +238,12 @@ def session_start(root: Path | str) -> list[str]:
     return out
 
 
-def warnings(root: Path | str, board: dict[str, Any], setup: dict[str, Any]) -> list[str]:
+def warnings(
+    root: Path | str, board: dict[str, Any], setup: dict[str, Any], dc_age: dict[str, Any] | None = None
+) -> list[str]:
     """The warnings the host agent can read itself (§5 *The seams*), each one sentence: a missing board,
-    no worktree setup, and a checkout without dev-cadence's hook shim. A repo is served whatever they say."""
+    no worktree setup, a checkout without dev-cadence's hook shim, and dev-cadence's age where it could
+    not be read (§5 *Which dev-cadence*). A repo is served whatever they say."""
     out: list[str] = []
     if board.get("state") == "absent" or (board.get("value") and not (Path(root) / board["value"]).is_file()):
         out.append(f"no board at {board.get('value') or workorders.BOARD}")
@@ -187,15 +251,18 @@ def warnings(root: Path | str, board: dict[str, Any], setup: dict[str, Any]) -> 
         out.append("no worktree setup")
     if shimmed(root) is False:
         out.append(f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh {root}`")
+    if dc_age and dc_age.get("why"):
+        out.append(f"dev-cadence's age not read: {dc_age['why']}")
     return out
 
 
-def reading(root: Path | str) -> dict[str, Any]:
-    """The repo's seams: `{ledger, board, worktree_setup, serve, warnings, session_start, ledgerboard,
-    source}` — `ledger` as `ledger()` gives it, `board` and `worktree_setup` each `{state, value}`,
-    `value` the board's path or the command (None when *absent*), `serve` as `serve()` gives it,
-    `ledgerboard` as `ledgerboard()` does, `source` whether the root is dev-cadence's own source (its
-    every dev-cadence path under `files/`)."""
+def reading(root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The repo's seams: `{ledger, board, worktree_setup, cadence_age, serve, warnings, session_start,
+    ledgerboard, source}` — `ledger` as `ledger()` gives it, `board` and `worktree_setup` each `{state,
+    value}`, `value` the board's path or the command (None when *absent*), `cadence_age` as `age()` reads
+    it against the `roster` (the home's checkouts; `old` the last reading, whose age it carries), `serve`
+    as `serve()` gives it, `ledgerboard` as `ledgerboard()` does, `source` whether the root is
+    dev-cadence's own source (its every dev-cadence path under `files/`)."""
     board_state, board_rel = workorders.board_path(root)
     state, value = gitinfo.worktree_setup(root)
     out: dict[str, Any] = {
@@ -203,8 +270,9 @@ def reading(root: Path | str) -> dict[str, Any]:
         "board": {"state": board_state, "value": board_rel.as_posix() if board_rel is not None else None},
         "worktree_setup": {"state": state, "value": value},
     }
-    out["serve"] = serve(root, out["ledger"])
-    out["warnings"] = warnings(root, out["board"], out["worktree_setup"])
+    out["cadence_age"] = age(root, roster, (old or {}).get("cadence_age"))
+    out["serve"] = serve(root, out["ledger"], out["cadence_age"])
+    out["warnings"] = warnings(root, out["board"], out["worktree_setup"], out["cadence_age"])
     out["session_start"] = session_start(root)
     out["ledgerboard"] = ledgerboard(root)
     out["source"] = cadence.is_source(root)

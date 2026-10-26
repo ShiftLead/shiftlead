@@ -25,6 +25,11 @@ VERDICTS = ("pass", "fail", "unknown")
 SOURCE_SCRIPT = f"files/{SCRIPT}"
 DEFAULT_GATE = f"python3 {SCRIPT} --pr {{pr}} --json"
 SOURCE_GATE = f"python3 {SOURCE_SCRIPT} --pr {{pr}} --json"
+# The oldest dev-cadence commit whose files this build reads (§5 *Which dev-cadence*, TD-1012): dev-cadence
+# TD-106 (#241), the vendoring of ledgerboard v1.0, from which its scripts read and write the ledger and the
+# board in the ledgerboard format `seams.ledger` reads. Raised only by the PR that needs a newer one, and only
+# once every registered consumer's lock is at or after it (a raise past the roster unserves it).
+OLDEST = "6d92209da67410546a258a467e3ff292fb20166d"
 
 
 def is_source(root: Path | str) -> bool:
