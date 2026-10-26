@@ -100,6 +100,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
 | TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
+| TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Open — design |
 
 ---
 
@@ -2103,3 +2104,39 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Done when** the design names the flag, the line and the key, and the build entries are filed.
 
 **Related:** dev-cadence TD-145, TD-124 (the counter); TD-970, TD-1014, TD-1034 (`td_next`'s script road); ShiftLead/shiftlead#2370.
+
+## TD-1051: A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (ao-contractmatch-cm-mcp, through `ao td add --repo shiftlead`; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.10 *A question about a reference outlives its asker* (the orphaned question and where its answer goes), §4.9b (the techlead's pass-up, whose answer goes to the asker), §4.10's `read_when` table (*rung within a tick*), §4.9a and §6 rule 8 (a finished member, *A question's end is work*), §4.8a (identity by the `ppid` chain); `src/shiftlead/ui/templates/inbox_row.html` and `src/shiftlead/ui/inbox.py` (`asker_gone_quiet`: *its asker closed without reporting what came of your answer — only you, or its manager, can find out*); `src/shiftlead/teamrun.py` (the stop's *finished (out of work), nothing sent*); `src/sessionorc/mail.py` (`read_when`)
+
+**Why:** contractmatch's cm-grind made no progress for about 22 hours (2026-10-24 to 2026-10-26), as ao-contractmatch-cm-mcp reports:
+1. designer-cm-1 asked techlead-cm-1 a question on TD-060 (ADR 017, contractmatch PR #203), then declared out of work while holding TD-060, to be woken when it resolved.
+2. techlead-cm-1 did not pass the question up. It sent the person a `steer` of its own (m-67da098c4b93) and a reply on the designer's thread, then closed.
+3. Paul answered the steer on 2026-10-25. The answer went to techlead-cm-1, which was closed, and the row read *its asker closed without reporting what came of your answer — only you, or its manager, can find out*. The manager was not running, so nothing reached the designer. grinder-cm-1, waiting on a techlead-cm-1 reply about TD-063, stalled too.
+4. The recovery failed four ways:
+   - (a) mail from cm-mcp to the designer and the grinder (m-65e9fefa15ef, m-8fbab927bd04) said *rung within a tick*, yet no doorbell line appeared in either pane for more than two minutes; both run on contractmatch's container node.
+   - (b) `ao team stop cm-grind` read the designer as *finished (out of work), nothing sent*, though it had unread mail.
+   - (c) `ao team start` refused while that designer stayed registered as idle.
+   - (d) Paul's `! ao team stop`, typed in a Claude Code session, ran as that session (§4.8a: identity by ancestry) and was refused for lack of the control grant.
+5. `ao team status cm-grind` lists the interactive cm-mcp session with role *techlead*, which may be why no real techlead seat was running.
+
+The design already routes some of this. A pass-up's answer goes to the asker (§4.9b). An orphaned question about a reference goes to the board and to its lease holders (§4.10). What failed is the relay: an answer to a techlead's own `steer` reaches only the closed techlead, and nothing ties it to the member whose question it was.
+
+**Fix:** design first. The round reads m-67da098c4b93's envelope (its `about`, whether it orphaned) and the cm-grind records to settle which rule missed, then decides:
+- how a seat's answer, or its relay, reaches the member waiting on it after the seat closes;
+- whether a finished member with unread mail counts as having work for `team stop`, `team start` and the lane's wake;
+- why a node's doorbell said *rung* and typed nothing, and what `read_when` says when it cannot know;
+- whether a person's `!` command in a session should act as the person;
+- whether an interactive session may hold a team's techlead role.
+
+It files each as a build entry, or as live checks where the design already holds.
+
+**Done when** the design says how the waiting member gets the answer after its relaying seat closes, and how a finished member with unread mail is woken or counted as having work, and the build entries are filed. A doorbell that cannot be delivered is said as a failure, not *rung*.
+
+**Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
