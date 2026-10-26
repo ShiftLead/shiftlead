@@ -359,7 +359,7 @@ def test_the_warnings_draw_under_the_title_and_each_lack_in_place_of_technical_d
     warning under the title, and each lack that leaves the repo unserved one warning line where Technical
     debt was, its cure drawn as code."""
     root = str(tmp_path / "samscrape")
-    cure = f"`<dev-cadence>/sync.sh {root}`, then a PR"
+    cure = f"`ao repo add {root} --adopt`"
     r = reading(root)
     r["seams"] = {
         "ledger": {"path": "docs/technical_debt.md", "state": "absent", "major": None, "entries": None, "why": "no ledger"},
@@ -377,8 +377,8 @@ def test_the_warnings_draw_under_the_title_and_each_lack_in_place_of_technical_d
     # each lack, its cure as code, is the warning in place of the ledger's part; Review and Merged stand (TD-903)
     debt = html[html.index('id="debt"') : html.index('id="prs"')]
     assert re.findall(r'class="unservedline">(.*?)</div>', debt) == [
-        f"unserved: no gate (no scripts/check_cadence.py) — <code>&lt;dev-cadence&gt;/sync.sh {root}</code>, then a PR",
-        f"unserved: no ledger at docs/technical_debt.md — <code>&lt;dev-cadence&gt;/sync.sh {root}</code>, then a PR",
+        f"unserved: no gate (no scripts/check_cadence.py) — <code>ao repo add {root} --adopt</code>",
+        f"unserved: no ledger at docs/technical_debt.md — <code>ao repo add {root} --adopt</code>",
     ]
     assert "Technical debt" not in debt and "TD-301" not in debt
     r["seams"] = {**r["seams"], "ledger": {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 7, "why": None}, "serve": {"ok": True, "lacks": []}, "warnings": []}  # fmt: skip

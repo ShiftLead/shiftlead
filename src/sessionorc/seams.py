@@ -88,9 +88,27 @@ def ledger(root: Path | str) -> dict[str, Any]:
 SHIM_MARKER = "dev-cadence hook shim (TD-055)"
 
 
+ADOPT_BRANCH = "cadence-adopt"  # the head `ao repo add --adopt` opens its PR from (§4.7 `ao repo add`)
+
+
 def cure(root: Path | str) -> str:
-    """The cure of a lack dev-cadence's adoption supplies (§5 *The seams*), until `ao repo add` (TD-1010)."""
-    return f"`<dev-cadence>/sync.sh {root}`, then a PR"
+    """The cure of a lack dev-cadence's adoption supplies (§5 *The seams*, TD-1010)."""
+    return f"`ao repo add {root} --adopt`"
+
+
+def with_adoption(seams: dict[str, Any] | None, root: Path | str, prs: dict[str, Any] | None) -> dict[str, Any] | None:
+    """The reading with each adopt cure read as *adoption PR #n open* while the repo's PR reading holds
+    an open PR whose head is `ADOPT_BRANCH` (§5 *The seams*); the reading itself where none is open."""
+    pr = next(
+        (p for p in (prs or {}).get("open") or [] if isinstance(p, dict) and p.get("branch") == ADOPT_BRANCH),
+        None,
+    )
+    serve = (seams or {}).get("serve")
+    if pr is None or not isinstance(serve, dict):
+        return seams
+    was, now = cure(root), f"adoption PR #{pr.get('number')} open"
+    lacks = [{**x, "words": str(x.get("words") or "").replace(was, now)} for x in serve.get("lacks") or []]
+    return {**(seams or {}), "serve": {**serve, "lacks": lacks}}
 
 
 def ledger_lack(led: dict[str, Any] | None, root: Path | str) -> str | None:

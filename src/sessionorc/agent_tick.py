@@ -3501,6 +3501,7 @@ class TickMixin:
                 seams = seams_mod.reading(root, roster or [root], seams)
             except Exception:  # noqa: BLE001 — a seam that cannot be read keeps the last reading
                 log.exception("reading the seams of %s failed", root)
+            seams = seams_mod.with_adoption(seams, root, prs)  # *adoption PR #n open* (§5 *The seams*, TD-1010)
         if isinstance(led.get("entries"), list) and not seams_mod.unserved({"seams": seams}):
             # the settle clock (§4.4 *A new entry settles before it is pickable*, TD-710): a fresh reading is
             # recorded and marked, a carried one marked again, so a window ends when its time does; an
