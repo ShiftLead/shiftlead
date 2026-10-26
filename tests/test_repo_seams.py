@@ -225,11 +225,15 @@ def test_a_lock_older_than_the_builds_oldest_is_unserved_by_name(tmp_path, monke
     assert seams.unserved({"seams": got}) == [words]
     assert missing_seams(repo("notes", got))["unserved"] == [[(words, False)]]
     assert seams.reading(src, roster)["cadence_age"] is None, "dev-cadence's source carries no lock to age"
-    # a commit the checkout does not hold is a warning, never a lack
+    # a +dirty tree is read at the commit it was synced from
+    (root / "docs" / "cadence-sync.lock").write_text(f"files_commit: {middle}+dirty\n")
+    assert seams.reading(root, roster)["serve"]["lacks"][0]["key"] == "age"
+    # a commit the checkout does not hold, and a source not on GitHub: a warning, never a lack
     (root / "docs" / "cadence-sync.lock").write_text("files_commit: " + "f" * 40 + "\n")
     got = seams.reading(root, roster)
     assert got["serve"]["ok"] is True
-    assert f"dev-cadence's age not read: fffffff is not a commit of {src}" in got["warnings"]
+    why = f"{src} does not hold fffffff and {third[:7]}, and its source (none) is not on GitHub"
+    assert f"dev-cadence's age not read: {why}" in got["warnings"]
 
 
 def test_with_no_dev_cadence_checkout_the_forge_compares_and_a_failure_is_a_warning(tmp_path, monkeypatch):
@@ -244,10 +248,15 @@ def test_with_no_dev_cadence_checkout_the_forge_compares_and_a_failure_is_a_warn
     monkeypatch.setenv("PATH", f"{bin_}:/usr/bin:/bin")
     got = seams.reading(root, [root])
     assert got["serve"] == {"ok": True, "lacks": []}
-    assert "dev-cadence's age not read: gh: HTTP 503: unavailable" in got["warnings"]
+    assert (
+        "dev-cadence's age not read: no dev-cadence checkout in the roster; gh: HTTP 503: unavailable"
+        in got["warnings"]
+    )
     calls = (bin_ / "gh.calls").read_text()
     assert f"api repos/shiftlead/dev-cadence/compare/{cadence.OLDEST}...{'a' * 40}" in calls
-    gh.write_text('#!/bin/sh\necho "$@" >> "$0.calls"\necho \'{"status": "behind"}\'\n')
+    gh.write_text('#!/bin/sh\necho \'{"status": "ahead"}\'\n')
+    assert seams.reading(root, [root])["serve"]["ok"] is True
+    gh.write_text('#!/bin/sh\necho "$@" >> "$0.calls"\necho \'{"status": "diverged"}\'\n')
     got = seams.reading(root, [root], got)
     assert got["serve"]["ok"] is False and got["cadence_age"]["descends"] is False
     gh.write_text("#!/bin/sh\nexit 1\n")

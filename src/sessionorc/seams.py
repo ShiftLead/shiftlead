@@ -134,9 +134,12 @@ def _forge_repo(source: str) -> str | None:
 def descends(commit: str, roster: Iterable[Path | str], source: str = "") -> tuple[bool | None, str | None]:
     """Whether `commit` descends from `cadence.OLDEST` (§5 *Which dev-cadence*, TD-1012): `(True|False,
     None)`, or `(None, why)` when it cannot be read. Read in the roster's dev-cadence checkout (its source,
-    as the host's own fetch left it) with `git merge-base --is-ancestor`; with none there, through the
-    forge's compare of the two commits on the lock's `source:`."""
+    as the host's own fetch left it) with `git merge-base --is-ancestor`; with none there, or one that
+    does not hold both commits (a fetch not yet made), through the forge's compare of the two commits on
+    the lock's `source:`. A `+dirty` tree is read at the commit it was synced from."""
+    commit = commit.removesuffix("+dirty")
     checkout = next((Path(r) for r in roster if cadence.is_source(r)), None)
+    first = "no dev-cadence checkout in the roster"
     if checkout is not None:
         try:
             cp = sync._git(checkout, "merge-base", "--is-ancestor", cadence.OLDEST, commit, timeout=AGE_TIMEOUT)
@@ -144,13 +147,13 @@ def descends(commit: str, roster: Iterable[Path | str], source: str = "") -> tup
             return None, str(e)
         if cp.returncode in (0, 1):
             return cp.returncode == 0, None
-        return None, f"{commit[:7]} is not a commit of {checkout}"
+        first = f"{checkout} does not hold {commit[:7]} and {cadence.OLDEST[:7]}"
     repo = _forge_repo(source)
     if repo is None:
-        return None, f"no dev-cadence checkout in the roster, and its source {source or '(none)'} is not on GitHub"
+        return None, f"{first}, and its source {source or '(none)'} is not on GitHub"
     got, why = reports._gh_api(Path.home(), f"repos/{repo}/compare/{cadence.OLDEST}...{commit}", AGE_TIMEOUT)
     if why is not None:
-        return None, why
+        return None, f"{first}; {why}"
     status = got.get("status") if isinstance(got, dict) else None
     if status in ("ahead", "identical"):
         return True, None
