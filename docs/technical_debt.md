@@ -96,6 +96,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Open |
 | TD-1032 | A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts | Medium | Open |
+| TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Open — decided 2026-10-26 (Paul: every repo moves to precheck) |
 
 ---
 
@@ -2027,3 +2028,19 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Done when** a test appends a line to the log after the smoke's own last line and the failure's why is still the smoke's; and a test of `ao promote status` against a host reply from an agent with no first pass prints the not-yet-read line, not the no-block one.
 
 **Related:** TD-1031 (the race that put the run's lines after the smoke's).
+
+## TD-1033: PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (Paul; drafted by session `memory-vs-cadence`)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `.github/workflows/ci.yml` (`pull_request` and push to `main`: tmux, `pdm sync -G ui -G dev`, `pdm run lint`, `pdm run test -vv`); `docs/cadence.toml` (no `precheck`); `ao promote` (it waits on *checks on main*: `ao promote status` read *not now: checks on main are pending* on 2026-10-26); the merge rules in `docs/briefs/` and `AGENTS.md`; dev-cadence `cadence.md` §4.12 and TD-148
+
+**Why:** GitHub Actions stopped on the shared account (the ShiftLead org from 2026-10-26: *recent account payments have failed or your spending limit needs to be increased*), and Paul decided every repo gates on a local `precheck` instead (dev-cadence TD-148): the minutes are one pool across all the repos, kept for what has to run on GitHub. This repo's CI runs lint and the full test suite on every pull request and every push to `main`, so it is the largest spender, and its PRs now read red for a reason that says nothing about the code. It cannot simply drop the main-branch run: `ao promote` waits for checks on `main` before it promotes, so with no check it would never promote, and with a failed one it would never promote either.
+
+**Fix:** (1) `precheck = "pdm run lint && pdm run test"` in `docs/cadence.toml` (needs `tmux` on the machine, as CI installs it), so the merge gate records `cadence/precheck` on each PR's head. (2) Design: what promotion waits on instead — the squash commit on `main` carries no status of its own; options are running the precheck at promote time on `main`'s head and recording `cadence/precheck` there, or accepting the merged PR's head status when its tree equals `main`'s. (3) `ci.yml` keeps only `workflow_dispatch`. (4) The briefs and `AGENTS.md` say the gate is `cadence/precheck`. Done when a PR's gate and a promote both read a local check and no workflow runs on `pull_request` or push.
+
+**Related:** dev-cadence TD-148 (the convention), samscrape TD-465, ledgerboard TD-003.
