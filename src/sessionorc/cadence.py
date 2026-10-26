@@ -128,8 +128,10 @@ def _tree(root: Path | str, timeout: float) -> tuple[Path | None, str | None]:
     except OSError as e:
         return None, f"the launcher could not run: {e.strerror or e}"
     out = cp.stdout.strip()
-    if cp.returncode != 0 or not out or not Path(out).is_dir():
+    if cp.returncode != 0:
         return None, _launcher_words(cp.stderr)
+    if not out or not Path(out).is_dir():
+        return None, f"the launcher named {out or 'no tree'}, which is not a directory here"
     return Path(out), None
 
 
