@@ -115,6 +115,12 @@ def hook_pinned(root: Path | str) -> bool:
     return PIN_HEADER_RE.search(text) is not None
 
 
+def holds(root: Path | str) -> bool:
+    """Whether the checkout holds dev-cadence (design §4.7 **`ao repo add`**): its lock, its pin, or dev-cadence's
+    own source. A pin the launcher would refuse is held still: the reading says it is unserved, and why."""
+    return (Path(root) / LOCK).is_file() or is_source(root) or pinned(root)
+
+
 def command(repo: Path | str, word: str, *args: str) -> tuple[list[str], dict[str, str]]:
     """The command to run dev-cadence's `word` for `repo` (§5 *How the readers find dev-cadence*): the
     argv and environment, `CADENCE_REPO_ROOT` included. The vendored launcher runs under this process's
