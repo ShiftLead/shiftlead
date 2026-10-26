@@ -15,7 +15,9 @@ entries read (§4.10).
   `PAGE_BOUND`, and in the browser half an uncaught script error or a `load` that never fires.
 - Where `settings.yml` has `reach:`, the Sessions page and the Queue load once more through `reach.url`: told in the
   log, failing nothing.
-- `ao status --json`, `ao repo --json` and `ao promote status --json` must each exit 0 with JSON.
+- `ao status --json`, `ao repo --json`, `ao promote status --json` and `ao service status --json` must each exit 0
+  with JSON, and the last's `build.built_from.commit` must be the full `SHIFTLEAD_PROMOTE_SHA` (TD-1041): a run that
+  installed and then failed its restart leaves the old units serving. Skipped, with a line, when it is unset.
 - Each page is loaded twice, the first printed *cold* and the second judged against §4.5 *Page loads*'
   budget (`BUDGET`, `WIRE_BUDGET`, `DOM_BUDGET`, TD-805): a page over it is told on the last line, naming
   the page and its longest `Server-Timing` step, and fails nothing (TD-881).
@@ -54,7 +56,12 @@ from typing import Any
 
 PAGES = (("Sessions", "/"), ("Inbox", "/inbox"), ("Queue", "/queue"), ("Repo", "/repo/shiftlead"), ("Settings", "/settings"))
 REACH_PAGES = (("Sessions", "/"), ("Queue", "/queue"))  # the route the person uses: told, failing nothing
-AO_READS = (("status", "--json"), ("repo", "--json"), ("promote", "status", "--json"))  # never `ao inbox`
+AO_READS = (
+    ("status", "--json"),
+    ("repo", "--json"),
+    ("promote", "status", "--json"),
+    ("service", "status", "--json"),  # the running build (TD-1041)
+)  # never `ao inbox`
 PAGE_BOUND = 20.0  # seconds a load may take: the smoke's own, not a page budget (those are TD-805's)
 WAIT_BOUND = 90.0  # seconds for the UI's port to answer: the run restarts the UI after the agent
 AO_BOUND = 60.0
@@ -211,9 +218,10 @@ def reach_url(settings: Path | None = None) -> str | None:
     return (reach or {}).get("url") or None
 
 
-def ao_reads(ao: str) -> list[str]:
-    """Each read must exit 0 with JSON; raises Failed on the first that does not. Returns its log lines."""
-    out = []
+def ao_reads(ao: str) -> tuple[list[str], dict[str, Any]]:
+    """Each read must exit 0 with JSON; raises Failed on the first that does not. Returns its log lines and
+    each read's JSON by its command."""
+    out, got = [], {}
     for args in AO_READS:
         cmd = f"ao {' '.join(args)}"
         try:
@@ -224,11 +232,28 @@ def ao_reads(ao: str) -> list[str]:
             last = next((ln for ln in reversed((p.stderr or p.stdout).splitlines()) if ln.strip()), "")
             raise Failed(f"{cmd} exited {p.returncode}: {last}")
         try:
-            json.loads(p.stdout)
+            got[cmd] = json.loads(p.stdout)
         except ValueError:
             raise Failed(f"{cmd}: its output is not JSON") from None
         out.append(f"{cmd} · exit 0 · {len(p.stdout)} bytes of JSON")
-    return out
+    return out, got
+
+
+def build_check(sha: str | None, read: Any) -> str:
+    """The running host agent's build — `ao service status --json`'s `build.built_from.commit` — against
+    the promoted commit (design §6 *The smoke*, TD-1041): `check` reads the installed copy, so a run that
+    installed and then failed its restart reads its commit with the old units serving. Returns the log
+    line; raises Failed on another build, or on none. Skipped with no `sha` (a smoke run by hand)."""
+    if not sha:
+        return "build check skipped: no SHIFTLEAD_PROMOTE_SHA (a smoke run by hand)"
+    b = read.get("build") if isinstance(read, dict) else None
+    frm = b.get("built_from") if isinstance(b, dict) else None
+    commit = frm.get("commit") if isinstance(frm, dict) else None
+    if not isinstance(commit, str) or not commit:
+        raise Failed("running build unknown")
+    if commit != sha:
+        raise Failed(f"running build {commit[:7]} is not the promoted {sha[:7]}")
+    return f"running build {commit[:7]} is the promoted one"
 
 
 def browser(
@@ -326,10 +351,12 @@ def smoke(
     venv: Path = SMOKE_VENV,
     ao: str | None = None,
     reach: str | None = None,
+    sha: str | None = None,
     wait_bound: float = WAIT_BOUND,
     bound: float = PAGE_BOUND,
 ) -> int:
-    """The smoke: prints its log lines, and its verdict as the last line. 0 when everything passed."""
+    """The smoke: prints its log lines, and its verdict as the last line. 0 when everything passed. `sha` is
+    the promoted commit the running build must be, None to skip that check."""
     ao = ao or str(Path(sys.executable).with_name("ao"))
     told: list[str] = []
     loads: list[dict[str, Any]] = []  # each page's two loads, printed once the browser half's DOM ready is in
@@ -360,8 +387,10 @@ def smoke(
             if why:
                 told.append(f"reach refused {route}: {why.split(': ', 1)[-1]}")
                 print(f"reach (fails nothing): {why}", flush=True)
-        for line in ao_reads(ao):
+        lines, got = ao_reads(ao)
+        for line in lines:
             print(line, flush=True)
+        print(build_check(sha, got.get("ao service status --json")), flush=True)
         python = venv / "bin" / "python"
         if python.exists():
             lines, why, dom = browser(python, base, bound)
@@ -393,7 +422,7 @@ def main(argv: list[str] | None = None) -> int:
         return setup()
     if args.browser:
         return browse(args.browser)
-    return smoke(reach=reach_url())
+    return smoke(reach=reach_url(), sha=os.environ.get("SHIFTLEAD_PROMOTE_SHA") or None)
 
 
 if __name__ == "__main__":

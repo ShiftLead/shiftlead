@@ -12,11 +12,12 @@ import subprocess
 import pytest
 from conftest import park_ticks
 
-from sessionorc import reports
+from sessionorc import cadence, reports
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import report_line
 
 SHA = "9c1e0f2aaaabbbbccccdddd"
+PRECHECK = 0  # `views`' key for what `cadence.precheck_command` answers
 
 
 def _run(name: str, status: str = "COMPLETED", conclusion: str = "SUCCESS") -> dict:
@@ -76,6 +77,40 @@ def test_with_nothing_required_or_the_set_never_read_every_check_counts():
     for required in (None, []):
         got = reports.at_done(_view(_run("anything", conclusion="TIMED_OUT")), required)
         assert (got["word"], got["failed"]) == ("refused", ["anything"])
+
+
+def test_where_the_repo_sets_precheck_it_is_required_on_an_open_head():
+    """TD-1036: absent, it is still running, named last; failed, a required failure; a real failure and
+    a run never started outrank its absence; green with it, accepted; not set, as before."""
+    pre = _status(reports.PRECHECK_CONTEXT, "SUCCESS")
+    got = reports.at_done(_view(_run("test")), ["test"], precheck=True)
+    assert (got["word"], got["running"], got["precheck_absent"]) == ("pending", ["cadence/precheck"], True)
+    got = reports.at_done(_view(_run("test", "IN_PROGRESS", "")), None, precheck=True)
+    assert (got["word"], got["running"]) == ("pending", ["test", "cadence/precheck"])
+    got = reports.at_done(_view(_run("test"), _status(reports.PRECHECK_CONTEXT, "FAILURE")), ["test"], precheck=True)
+    assert (got["word"], got["failed"], got["other"]) == ("refused", ["cadence/precheck"], [])
+    got = reports.at_done(_view(_run("test", conclusion="FAILURE")), ["test"], precheck=True)
+    assert (got["word"], got["failed"]) == ("refused", ["test"])
+    got = reports.at_done(_view(_run("test", conclusion="FAILURE")), ["test"], {}, precheck=True)
+    assert got["word"] == "refused"
+    for required in (["test"], None, []):
+        got = reports.at_done(_view(_run("test"), pre), required, precheck=True)
+        assert (got["word"], got["running"], "precheck_absent" in got) == ("green", [], False)
+    assert reports.at_done(_view(), [], precheck=True)["word"] == "pending"  # no checks at all is no precheck
+    # not set: the status is one more check, outside a required set
+    got = reports.at_done(_view(_run("test"), _status(reports.PRECHECK_CONTEXT, "FAILURE")), ["test"])
+    assert (got["word"], got["other"]) == ("green", ["cadence/precheck"])
+    assert reports.at_done(_view(_run("test")), ["test"])["word"] == "green"
+    # merged and closed are as they were
+    merged = _view(state="MERGED", merged="2026-10-26T00:00:00Z")
+    assert reports.at_done(merged, ["test"], precheck=True)["word"] == "merged"
+    assert reports.at_done(_view(state="CLOSED"), ["test"], precheck=True)["word"] == "closed"
+
+
+def test_a_never_started_run_outranks_an_absent_precheck():
+    view = _view(_job_run("test", 11))
+    got = reports.at_done(view, ["test"], {"11": {"started": False, "reason": "billing", "kind": "billing"}}, True)
+    assert (got["word"], got["not_run"], got["running"]) == ("not_run", ["test"], ["cadence/precheck"])
 
 
 # -- the required set, read with the repo reading ---------------------------------------------------
@@ -142,6 +177,8 @@ async def worker(agent, tmp_path, monkeypatch):
     await park_ticks(agent)
     views: dict[int, dict | str] = {}
     monkeypatch.setattr(reports, "pr_view", lambda root, pr, timeout=30.0: views.get(pr, "no such PR"))
+    # the repo's `precheck` on origin/<default> (TD-1036): none set unless a test says, under `PRECHECK`
+    monkeypatch.setattr(cadence, "precheck_command", lambda root, rev: views.get(PRECHECK, (None, None)))
     made = {
         "dir": str(tmp_path),
         "adapter": "agentshell",
@@ -233,7 +270,86 @@ async def test_a_slice_on_a_pr_not_merged_is_refused(worker):
     assert "stays claimed" in got["slice"] and [x["pr"] for x in rec.progress[0].slices] == [842]
 
 
+async def test_where_the_repo_sets_precheck_a_head_without_it_refuses_the_done_with_its_line(worker):
+    """TD-1036, design §4.8: absent alone, *carries no cadence/precheck* and the line to run; beside a
+    required check still running, the still-running refusal with that line, never `--watch`; failed, a
+    required failure; present and green, accepted; a `docs/cadence.toml` that does not parse, unknown."""
+    w, sid, rec, views = worker
+    await w.call("progress", id=sid, ref="TD-1")
+    views[PRECHECK] = ("pdm run test", None)
+    views[842] = _view(_run("test"))
+    with pytest.raises(
+        AgentError,
+        match=r"PR #842's head 9c1e0f2 carries no cadence/precheck — run `python3 scripts/precheck.py --pr 842` "
+        r"\(in the background\), then report done again \(ao progress done TD-001 --pr 842\)$",
+    ):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    views[842] = _view(_run("test", "IN_PROGRESS", ""))
+    with pytest.raises(AgentError) as e:
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert "still running on 9c1e0f2: test, cadence/precheck — run `python3 scripts/precheck.py --pr 842`" in str(
+        e.value
+    )
+    assert "--watch" not in str(e.value)
+    views[842] = _view(_run("test"), _status(reports.PRECHECK_CONTEXT, "FAILURE"))
+    with pytest.raises(AgentError, match=r"required checks failed on 9c1e0f2: cadence/precheck — fix them"):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    (e,) = rec.progress
+    assert (e.status, e.pr) == ("claimed", None)
+    views[842] = _view(_run("test"), _status(reports.PRECHECK_CONTEXT, "SUCCESS"))
+    got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert got["checks_said"] == "PR #842: checks green on 9c1e0f2"
+    views[PRECHECK] = (None, "docs/cadence.toml does not parse")
+    views[843] = _view(_run("test"))
+    got = await w.call("progress", id=sid, ref="TD-2", status="done", pr=843)
+    assert got["checks_said"] == "PR #843: checks unknown: docs/cadence.toml does not parse"
+    # a merged PR is not read for it, so a file that does not parse leaves it merged; a slice too
+    await w.call("progress", id=sid, ref="TD-3")
+    views[844] = _view(state="MERGED", merged="2026-10-26T00:00:00Z")
+    got = await w.call("progress", id=sid, ref="TD-3", status="done", pr=844, slice=True)
+    assert "stays claimed" in got["slice"]
+    with pytest.raises(AgentError, match="a slice is a merged PR — #843 is open"):
+        await w.call("progress", id=sid, ref="TD-3", status="done", pr=843, slice=True)
+
+
+async def test_a_cadence_toml_not_read_is_no_precheck_and_the_fold_runs_as_before(worker):
+    """A rev that is not there, or a read that timed out, is not *unknown* (TD-1036): only a file that
+    does not parse is."""
+    w, sid, rec, views = worker
+    for why in ("docs/cadence.toml could not be read: no origin/main here", "docs/cadence.toml could not be read: X"):
+        views[PRECHECK] = (None, why)
+        views[842] = _view(_run("test", conclusion="FAILURE"))
+        with pytest.raises(AgentError, match=r"required checks failed on 9c1e0f2: test — fix them"):
+            await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+        views[842] = _view(_run("test"))
+        got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+        assert got["checks_said"] == "PR #842: checks green on 9c1e0f2"
+
+
 # -- the hand-off: an `ask` carrying `pr` (design §4.9b *The reader*, TD-658) ------------------------
+
+
+async def test_an_ask_with_a_pr_whose_head_carries_no_precheck_is_refused_with_its_line(worker, agent):
+    w, sid, rec, views = worker
+    views[PRECHECK] = ("pdm run test", None)
+    views[842] = _view(_run("test"))
+    with pytest.raises(
+        AgentError,
+        match=r"carries no cadence/precheck — run `python3 scripts/precheck.py --pr 842` \(in the background\), "
+        r"then ask again$",
+    ):
+        await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)
+    views[842] = _view(_run("test", "IN_PROGRESS", ""))
+    with pytest.raises(AgentError) as e:
+        await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842, nonce="n-3")
+    assert str(e.value).endswith(
+        "still running on 9c1e0f2: test, cadence/precheck — run `python3 scripts/precheck.py --pr 842` "
+        "(in the background), then ask again"
+    )
+    assert rec.outbox == [] and agent.person_inbox == []
+    views[842] = _view(_run("test"), _status(reports.PRECHECK_CONTEXT, "SUCCESS"))
+    got = await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)
+    assert got["entry"]["pr"] == 842 and "checks_said" not in got
 
 
 async def test_an_ask_with_a_pr_is_refused_on_failed_and_on_pending_and_sends_nothing(worker, agent):

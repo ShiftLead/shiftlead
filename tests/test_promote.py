@@ -1399,3 +1399,173 @@ def test_precheck_is_read_on_the_checkouts_default_branch(monkeypatch, tmp_path)
     monkeypatch.setattr(board, "default_branch", lambda root: "trunk")
     monkeypatch.setattr(promote.cadence, "precheck_command", lambda root, rev: revs.append(rev) or ("x", None))
     assert promote.read_checks(tmp_path, "a" * 40)[3] == "absent" and revs == ["origin/trunk"]
+
+
+# -- TD-1041: a promote concludes, and its smoke starts, only once its run has ended --------------
+
+
+def _gated_block(checkout: Path, smoke: bool = False) -> Path:
+    """The fixture's block with a `run` that makes live its commit at once and then goes on until the
+    test creates `gate` (a run that restarts what serves after writing what `check` reads); the
+    smoke, where asked, passes. Returns the gate."""
+    live, gate = checkout.parent / "live", checkout.parent / "gate"
+    run = f"git rev-parse HEAD > {live}; i=0; while [ ! -e {gate} ] && [ $i -lt 600 ]; do sleep 0.05; i=$((i+1)); done"
+    b = {"run": run, "check": f"cat {live}"} | ({"smoke": "echo smoke says 0"} if smoke else {})
+    (checkout / ".shiftlead.yml").write_text(yaml.safe_dump({"promote": b}))
+    _git(checkout, "add", "-A")
+    _git(checkout, "commit", "-q", "-m", "gated block")
+    _git(checkout, "push", "-q", "origin", "main")
+    live.write_text(_git(checkout, "rev-parse", "HEAD") + "\n")
+    return gate
+
+
+def _live_reads(checkout: Path, sha: str) -> None:
+    """Wait for the gated run to have written its commit, so the next pass's `check` reads it."""
+    deadline = time.monotonic() + 10
+    while (checkout.parent / "live").read_text().strip() != sha and time.monotonic() < deadline:
+        time.sleep(0.05)
+
+
+def _seen(checkout: Path, readings: dict, now: datetime | None = None) -> tuple[dict, list[str]]:
+    """One watch pass with the run still going: `_pass` without the wait."""
+    readings, notes, _ = promote.survey([str(checkout)], readings, False, {}, now or datetime.now(UTC))
+    return readings, notes
+
+
+@pytest.mark.parametrize("smoke", [False, True])
+def test_check_reading_the_commit_with_the_run_alive_starts_no_smoke_and_concludes_nothing(checkout, smoke):
+    gate = _gated_block(checkout, smoke)
+    frm = _git(checkout, "rev-parse", "HEAD")
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main, frm=frm)
+    _live_reads(checkout, main)
+    readings, notes = _seen(checkout, readings)
+    r, f = readings["repo"], readings["repo"]["inflight"]
+    assert notes == [] and r["failed"] is None and r["live"] == r["main"] == main  # the window: live is main
+    assert f is not None and "phase" not in f and f["read_at"] and promote.alive(f["pid"], f["started"])
+    assert promote.inflight("repo")["read_at"] == f["read_at"]  # set on the file, beside last.json
+    assert promote.last("repo")["sha"] == main and promote.acts(r, datetime.now(UTC)) is None
+    assert promote.unmet(r, press=True)[0] == "inflight"
+    at = promote.last("repo")["at"]
+    readings, notes = _seen(checkout, readings, datetime.now(UTC) + timedelta(seconds=30))
+    assert notes == [] and promote.last("repo")["at"] == at  # written once, on the first reading
+    gate.write_text("")
+    readings, notes = _pass(checkout, readings)
+    if smoke:  # the run ended: the smoke starts now, and concludes on its own pass
+        assert notes == [] and readings["repo"]["inflight"]["phase"] == "smoke"
+        readings, notes = _pass(checkout, readings)
+        assert notes[0].startswith(f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in ")
+        log = (promote.repo_dir("repo") / f"{main}.log").read_text().splitlines()
+        assert log[-2:] == ["── smoke ──", "smoke says 0"]
+    else:
+        assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit"]
+    assert readings["repo"]["inflight"] is None and promote.last("repo")["at"] == at
+
+
+def test_a_rollback_writes_its_hold_on_the_first_reading_and_concludes_on_the_runs_end(checkout):
+    gate = _gated_block(checkout)
+    old = _git(checkout, "rev-parse", "HEAD")
+    new = _merge(checkout, "b")
+    (checkout.parent / "live").write_text(new + "\n")
+    readings = _press(checkout, old, "rollback", new)
+    _live_reads(checkout, old)
+    readings, notes = _seen(checkout, readings)
+    assert notes == [] and readings["repo"]["inflight"]["read_at"]
+    hold = promote.held("repo")
+    assert (hold["sha"], hold["from"]) == (old, new) and promote.last("repo")["kind"] == "rollback"
+    readings, notes = _seen(checkout, readings, datetime.now(UTC) + timedelta(seconds=30))
+    assert notes == [] and promote.held("repo") == hold  # not rewritten
+    gate.write_text("")
+    readings, notes = _pass(checkout, readings)
+    assert notes[0].startswith(f"rolled back `repo` to `{old[:7]}` from `{new[:7]}`")
+    assert readings["repo"]["inflight"] is None and promote.held("repo") == hold
+
+
+def test_a_home_restarted_between_the_reading_and_the_runs_end_rewrites_nothing(checkout):
+    gate = _gated_block(checkout)
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main, frm=_git(checkout, "rev-parse", "HEAD~1"))
+    _live_reads(checkout, main)
+    readings, _ = _seen(checkout, readings)
+    at = promote.last("repo")["at"]
+    later = datetime.now(UTC) + timedelta(seconds=30)
+    readings, notes = _seen(checkout, {}, later)  # a fresh home: no readings kept, the intent from its file
+    assert notes == [] and readings["repo"]["inflight"]["read_at"] and promote.last("repo")["at"] == at
+    gate.write_text("")
+    readings, notes = _pass(checkout, readings, later)
+    assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit"] and promote.last("repo")["at"] == at
+
+
+@pytest.mark.parametrize("kind", ["promote", "rollback"])
+def test_a_run_killed_at_the_bound_after_the_reading_says_so_and_rolls_nothing_back(checkout, kind):
+    _gated_block(checkout, smoke=True)
+    old = _git(checkout, "rev-parse", "HEAD")
+    new = _merge(checkout, "b")
+    if kind == "rollback":
+        (checkout.parent / "live").write_text(new + "\n")
+    sha, frm = (new, old) if kind == "promote" else (old, new)
+    readings = _press(checkout, sha, kind, frm)
+    _live_reads(checkout, sha)
+    readings, _ = _seen(checkout, readings)
+    pid = readings["repo"]["inflight"]["pid"]
+    (checkout.parent / "live").unlink()  # this pass's live is unknown: the why keys on read_at, not on it
+    later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_BOUND + 1)
+    readings, notes = _seen(checkout, readings, later)
+    f = readings["repo"]["failed"]
+    assert notes == [] and f["why"] == f"still running after 20 minutes: killed (live read `{sha[:7]}`)"
+    assert readings["repo"]["inflight"] is None  # a plain failure: no smoke rollback started
+    assert (promote.held("repo") or {}).get("sha") == (old if kind == "rollback" else None)  # beside its hold
+    _wait_gone(pid)
+    assert not promote.alive(pid)
+
+
+def test_live_unknown_after_the_reading_waits_and_fails_past_the_bound(checkout):
+    gate = _gated_block(checkout)
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main, frm=_git(checkout, "rev-parse", "HEAD~1"))
+    _live_reads(checkout, main)
+    readings, _ = _seen(checkout, readings)
+    (checkout.parent / "live").unlink()  # as while pip replaces the package
+    gate.write_text("")
+    readings, notes = _pass(checkout, readings)
+    r = readings["repo"]
+    assert notes == [] and r["failed"] is None and r["inflight"]["read_at"] and r["live_why"]  # waits, not *run ended*
+    later = datetime.now(UTC) + timedelta(seconds=promote.PROMOTE_BOUND + 1)
+    readings, notes = _pass(checkout, readings, later)
+    f = readings["repo"]["failed"]
+    assert notes == [] and f["why"] == f"live still unknown after 20 minutes — {r['live_why']}"
+    assert readings["repo"]["inflight"] is None
+
+
+def _conclude_intent(tmp_path: Path, monkeypatch, **kw) -> tuple[dict, dict]:
+    """An intent whose commit `check` reads, handed to `_conclude` as a pass would."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    tmp_path.mkdir(exist_ok=True)
+    log = tmp_path / "run.log"
+    log.write_text("the run\n")
+    intent = {"sha": "a" * 40, "from": None, "kind": "promote", "by": "person", "log": str(log), "ahead": 1}
+    intent |= {"at": datetime.now(UTC).isoformat()} | kw
+    promote.repo_dir("repo").mkdir(parents=True)
+    (promote.repo_dir("repo") / "inflight.json").write_text(json.dumps(intent))
+    r = {"inflight": intent, "live": intent["sha"], "live_why": None, "root": str(tmp_path), "main": intent["sha"]}
+    return intent, r
+
+
+def test_a_null_pid_is_ended_and_a_pid_taken_again_is_not_the_run(tmp_path, monkeypatch):
+    _, r = _conclude_intent(tmp_path, monkeypatch, pid=None)  # a home that died between the intent's writes
+    assert promote._conclude("repo", r, datetime.now(UTC)) == (None, f"promoted `repo` `{'a' * 7}` — 1 commit")
+    me = os.getpid()  # alive, but started at another time: another process holds the number now
+    _, r = _conclude_intent(tmp_path / "b", monkeypatch, pid=me, started=promote.proc_start(me) + 1)
+    assert promote._conclude("repo", r, datetime.now(UTC))[1] == f"promoted `repo` `{'a' * 7}` — 1 commit"
+
+
+def test_an_intent_with_no_start_time_is_judged_by_its_pid_alone(tmp_path, monkeypatch):
+    p = subprocess.Popen(["sleep", "60"], start_new_session=True)  # not this module's child: signalled
+    try:
+        _, r = _conclude_intent(tmp_path, monkeypatch, pid=p.pid)
+        assert promote._conclude("repo", r, datetime.now(UTC)) == (None, None)
+        assert r["inflight"]["read_at"] and promote.last("repo")["sha"] == "a" * 40
+    finally:
+        p.kill()
+        p.wait()
+    assert promote._conclude("repo", r, datetime.now(UTC))[1] == f"promoted `repo` `{'a' * 7}` — 1 commit"

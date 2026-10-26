@@ -53,7 +53,7 @@ HEX_RE = re.compile(r"^[0-9a-f]{7,40}$")  # a rollback's commit: its hex in full
 # dropped Popen is reaped by the next `subprocess.run` and its status lost), polled for `exit`
 _procs: dict[int, subprocess.Popen[bytes]] = {}
 _exits: dict[int, int] = {}
-PRECHECK_CONTEXT = "cadence/precheck"  # the commit status `precheck.py` records (design §6 *The precheck on main*)
+PRECHECK_CONTEXT = reports.PRECHECK_CONTEXT  # the status `precheck.py` records (design §6 *The precheck on main*)
 FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"}
 # the verdicts on main's head's failing jobs, by checkout: `{head, read}` (`reports.classify_failing`,
 # TD-686) — one sha's per checkout, so a job is read once and a new head reads afresh
@@ -702,32 +702,46 @@ def _conclude(
     """The run's outcome, read from `check` and never from its exit code (for this repo the agent
     judging it need not be the one that started it): `(failed or None, note or None)`, clearing
     the intent file whichever way it ended. Still running and inside the bound: `(None, None)`.
-    Where the intent carries a `smoke`, the reading of its commit starts it and the promote stays in
-    flight until it ends (§6 *The smoke*); `run` is the checkout's, for the rollback a failed one starts."""
+    It concludes, or starts the intent's `smoke`, only on a pass whose `check` reads its commit
+    **and** whose run has ended (§6 *The smoke*, *When and where*; TD-1041): a `run` may write what
+    `check` reads before it restarts what serves. The first reading writes `last.json` (and a
+    rollback's hold) once, and `read_at` on the intent; after it a live `check` cannot read waits
+    within the bound. `run` is the checkout's, for the rollback a failed smoke starts."""
     intent = r["inflight"]
     if intent.get("phase") == "smoke":
         return _judge_smoke(repo, r, intent, now, run)
-    if r.get("live") == intent.get("sha") and not r.get("live_why"):
-        alive(intent.get("pid"))  # reaped if it was this agent's child: a done run leaves no zombie
-        _exits.pop(intent.get("pid"), None)
+    pid, sha7 = intent.get("pid"), str(intent.get("sha"))[:7]
+    reads = r.get("live") == intent.get("sha") and not r.get("live_why")
+    if reads and not intent.get("read_at"):
         _concluded(repo, intent, r.get("main"), now)
+        intent["read_at"] = now.isoformat()
+        _write(repo_dir(repo) / "inflight.json", intent)
+    ended = not alive(pid, intent.get("started"))  # reaped if it was this agent's child: no zombie
+    if reads and ended:
+        _exits.pop(pid, None)
         if intent.get("smoke"):
             try:
                 start_smoke(r["root"], repo, intent)
             except OSError as e:
-                return _smoke_failed(repo, r, intent, f"smoke failed on {str(intent.get('sha'))[:7]}: {e}", None, run)
+                return _smoke_failed(repo, r, intent, f"smoke failed on {sha7}: {e}", None, run)
             return None, None
         return None, _passed(repo, r, intent)
-    if not alive(intent.get("pid"), intent.get("started")):
-        live = r.get("live_why") and f"live unknown — {r['live_why']}" or f"live is {str(r.get('live'))[:7]}"
-        return fail(repo, intent, f"the run ended and {live}, not {str(intent.get('sha'))[:7]}"), None
     try:
         at = datetime.fromisoformat(str(intent.get("at")))
     except ValueError:
         at = now
-    if (now - at).total_seconds() > PROMOTE_BOUND:
-        kill(intent.get("pid"), intent.get("started"))
-        return fail(repo, intent, f"still running after {PROMOTE_BOUND / 60:g} minutes: killed"), None
+    past = (now - at).total_seconds() > PROMOTE_BOUND
+    if ended and intent.get("read_at") and r.get("live_why"):  # read once: an unread pass waits for a reading
+        if not past:
+            return None, None
+        return fail(repo, intent, f"live still unknown after {PROMOTE_BOUND / 60:g} minutes — {r['live_why']}"), None
+    if ended:
+        live = r.get("live_why") and f"live unknown — {r['live_why']}" or f"live is {str(r.get('live'))[:7]}"
+        return fail(repo, intent, f"the run ended and {live}, not {sha7}"), None
+    if past:
+        kill(pid, intent.get("started"))
+        read = f" (live read `{sha7}`)" if intent.get("read_at") else ""
+        return fail(repo, intent, f"still running after {PROMOTE_BOUND / 60:g} minutes: killed{read}"), None
     return None, None
 
 
@@ -838,7 +852,8 @@ def _last_line(intent: dict[str, Any], cap: int = 200) -> str:
 
 
 def _concluded(repo: str, intent: dict[str, Any], main: str | None, now: datetime) -> None:
-    """What a run that reached its commit leaves, written when `check` reads it (before a smoke):
+    """What a run that reached its commit leaves, written once, on the first pass whose `check` reads it
+    (`read_at`; before the run's end and a smoke):
     `last.json` for every promote; a rollback writes the hold, with `by` and `why` when a failed smoke
     started it, and a second one under a hold keeps its `from` — what the person first went back from
     is what the row goes on naming. A plain promote ends the hold when it concludes (`_passed`)."""

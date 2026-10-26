@@ -19858,3 +19858,46 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Done when:** tests pin `precheck_command` (set, unset, empty, non-string, unparseable), `precheck_script` (each layout, absent), the `precheck` field's five values and null, `keep=False` unaffected, the fold (runs only, statuses only, both, a failed status, a pending status, none) and the precheck rule (set: no status `unknown`, green status green, green beside never-started runs green with no `checks_not_run` (the third return None), green beside a failed run failed; unset: as today); `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1033, TD-686.
+
+## TD-1043: A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2394
+**Location:** `src/shiftlead/ui/app.py` (`api_entry_session`, `api_ledger_start`: each passes `team=` to the new session and no `project=`; `new_submit` passes both); design §4.9 (the `project` badge: its team's repo's project, the repo's own name where no project lists it, TD-722), §4.10 *across teams, by project*
+
+**Why:** on 2026-10-26, `ao status -v` read six open records with a `team` and an empty `project`. Among them were ao-shiftlead-prompts (`ao-grind`, started by Add entry), ao-dev-cadence-memory-vs-cadence and ao-dev-cadence-td-126 (`dc-grind`), and ao-contractmatch-cm-mcp (`cm-grind`). Two kinds of mail are refused to such a session, though the design lets both through:
+- mail from another team on the same project;
+- mail to a same-project session of another team.
+The project edge (TD-582) compares the `project` badges, and an empty one matches nothing.
+
+**Fix:** both routes derive the badge as `new_submit` does: the directory's repo's project, from `teams.reach_block(org, dir, host)`'s first value. The badge alone is wanted, not the Project block, which `new_submit` adds to the prompt. A record already started keeps its badge until its next start.
+
+**Done when** a test starts a session through each route on a repo listed under a project and reads that project on the record, and a test of `message_edge` lets a `note` through between two such sessions of different teams on one project.
+
+**Related:** TD-1042 (the person's sessions across projects); TD-582, TD-722.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2394) — `api_entry_session` and `api_ledger_start` pass `project=` from `teams.reach_block`, as `new_submit` does; `tests/test_ui_entry.py`'s `test_two_open_a_session_starts_of_different_teams_on_one_project_may_mail_each_other` reads the badge on both records and the `project` edge between them, and both routes' tests read `project` on the create.
+
+## TD-1036: A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck`
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (the designer, from TD-1033)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2405
+**Location:** `src/sessionorc/agent.py` (`_pr_checks`, `_not_green`), `src/sessionorc/reports.py` (`at_done`), the `pr_wait` RPC and `ao pr wait`'s line; design §4.8 *A `done` with a PR is told what its checks read*, §4.7 `ao pr wait`, §4.9b (the `ask --pr` read)
+
+**Why:** TD-1033: with no workflow on a PR, its rollup is empty and a `done` or `ask --pr` reads *no checks at all* and is accepted before any check ran.
+
+**Fix:** as §4.8 now says: where the repo sets `precheck` — read through `sessionorc.cadence.precheck_command` (TD-1037) on `origin/<default>` in the registry checkout, never the record's worktree — `cadence/precheck` is required on an open PR's head beside the required set — failed, it is a required check that failed; absent, refused as one still running with *PR #842's head 9c1e0f2 carries no cadence/precheck — run `python3 scripts/precheck.py --pr 842` (in the background), then report done again*. `cadence/precheck` joins the wanted names whenever a required set is read; an absent one is added to the still-running names after `at_done`'s fold, so a real failure and `not_run` outrank it; in such a repo the still-running refusal's hint is the `precheck.py` line, never `gh pr checks --watch`. `ask --pr` reads the same (§4.9b). `ao pr wait` keeps *none* (`3`) for such a head, its line saying *run `scripts/precheck.py --pr <n>`* (§4.7). A merged PR is accepted as now. A file that does not parse is *checks unknown*, never a refusal.
+
+**Done when:** tests pin the cases (precheck set and absent on the head: refused with those words; set and failed: refused as failed; absent beside a real failure or `not_run`: those win; set and green: accepted; not set: as today) for `done` and `ask --pr`, and `ao pr wait`'s line; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1033, TD-639.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2405) — `reports.at_done(..., precheck=)` requires `cadence/precheck` on an open head (joining a read required set; absent, still running after the fold, `precheck_absent`); `agent._pr_checks` reads `precheck_command` on `origin/<default>` (unreadable: *checks unknown*); the `done` and `ask --pr` refusal names `cadence.precheck_typed`'s line (the resolver's in a pinned repo), never `--watch`; `ao pr wait` reads a head with no precheck as *none* with a `precheck` line.

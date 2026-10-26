@@ -92,15 +92,22 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
-| TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — build |
 | TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by decision (paul): file dev-cadence's `precheck.py --commit` |
 | TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
-| TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
+| TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | Open — stopgap set per repo (samscrape#1121, shiftlead#2391) |
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
+| TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Open — design |
+| TD-1052 | Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own | Medium | Open |
 | TD-1053 | 47 `tempfile.mkdtemp()` calls in the tests leave a directory in /tmp on every run; 105,000 of them filled kmaster's /tmp inodes and stopped every session | High | Open — the day's runs still leak; the old ones were cleared |
+| TD-1055 | `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit) | Medium | Open — build |
+| TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
+| TD-1057 | `ship_cadence` gives the cache step the node's env file, and no test would notice if it did not (test audit) | Medium | Open — build |
+| TD-1058 | `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit) | Low | Open — build |
+| TD-1059 | `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit) | Low | Open — build |
+| TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
 
 ---
 
@@ -1947,25 +1954,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1014, TD-970.
 
-## TD-1036: A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck`
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1033)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1037
-**Location:** `src/sessionorc/agent.py` (`_pr_checks`, `_not_green`), `src/sessionorc/reports.py` (`at_done`), the `pr_wait` RPC and `ao pr wait`'s line; design §4.8 *A `done` with a PR is told what its checks read*, §4.7 `ao pr wait`, §4.9b (the `ask --pr` read)
-
-**Why:** TD-1033: with no workflow on a PR, its rollup is empty and a `done` or `ask --pr` reads *no checks at all* and is accepted before any check ran.
-
-**Fix:** as §4.8 now says: where the repo sets `precheck` — read through `sessionorc.cadence.precheck_command` (TD-1037) on `origin/<default>` in the registry checkout, never the record's worktree — `cadence/precheck` is required on an open PR's head beside the required set — failed, it is a required check that failed; absent, refused as one still running with *PR #842's head 9c1e0f2 carries no cadence/precheck — run `python3 scripts/precheck.py --pr 842` (in the background), then report done again*. `cadence/precheck` joins the wanted names whenever a required set is read; an absent one is added to the still-running names after `at_done`'s fold, so a real failure and `not_run` outrank it; in such a repo the still-running refusal's hint is the `precheck.py` line, never `gh pr checks --watch`. `ask --pr` reads the same (§4.9b). `ao pr wait` keeps *none* (`3`) for such a head, its line saying *run `scripts/precheck.py --pr <n>`* (§4.7). A merged PR is accepted as now. A file that does not parse is *checks unknown*, never a refusal.
-
-**Done when:** tests pin the cases (precheck set and absent on the head: refused with those words; set and failed: refused as failed; absent beside a real failure or `not_run`: those win; set and green: accepted; not set: as today) for `done` and `ask --pr`, and `ao pr wait`'s line; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1033, TD-639.
-
 ## TD-1038: Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes
 
 **Priority:** High
@@ -1973,8 +1961,7 @@ Trimming before the rule arrives here loses it (§2.4).
 **Added:** 2026-10-26 (the designer, from TD-1033)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build; waits on dev-cadence's `precheck.py --commit`, which Paul files there (dev-cadence has no question seat, so `ao td add --repo dev-cadence` is refused)
-**Blocked by:** TD-1037, decision (paul) — file in dev-cadence's ledger: *`precheck.py --commit <sha>`: run the repo's precheck on a commit of origin's default branch and record `cadence/precheck` on it, as `--pr` does on a PR's head — the same command from the checkout's `docs/cadence.toml`, the same clean detached worktree, context and exit codes; refused (exit 2) when the commit is not an ancestor of `origin/<default>`. Its temp directory named `precheck-<sha7>-…` with the worktree `head` inside it, as `--pr`'s is. For shiftlead TD-1038 (design §6 *The precheck on main*)*; then this line names that entry (`dev-cadence#TD-NNN`)
+**Status:** Open — build. Paul lifted the `decision (paul)` hold, *go ahead* (2026-10-26, board:5b422cc0), so it is built now with `precheck.py --commit` faked. The live run still waits on dev-cadence's `precheck.py --commit`, which Paul files there (dev-cadence has no question seat, so `ao td add --repo dev-cadence` is refused; the board's act line of 2026-10-26, due 2026-10-29), its text: *`precheck.py --commit <sha>`: run the repo's precheck on a commit of origin's default branch and record `cadence/precheck` on it, as `--pr` does on a PR's head — the same command from the checkout's `docs/cadence.toml`, the same clean detached worktree, context and exit codes; refused (exit 2) when the commit is not an ancestor of `origin/<default>`. Its temp directory named `precheck-<sha7>-…` with the worktree `head` inside it, as `--pr`'s is. For shiftlead TD-1038 (design §6 *The precheck on main*)*; once filed, this Status names that entry (`dev-cadence#TD-NNN`)
 **Location:** `src/sessionorc/promote.py` (`survey`, `acts`, `acts_words`, the intent files), `src/sessionorc/agent_promote.py`, `src/sessionorc/cadence.py` (`precheck_script`, TD-1037's); the Inbox row's words (`ui/inbox.py`); design §6 *The precheck on main*, §4.5a *Inbox row: promote*
 
 **Why:** TD-1033: a squash merge's commit carries no status, and its tree is its PR's head's only when the PR was current with main, which the cadence does not ask — so with no CI on main, main's head would never be green.
@@ -2010,8 +1997,8 @@ Trimming before the rule arrives here loses it (§2.4).
 **Type:** debt
 **Added:** 2026-10-26 (the designer, from TD-1031)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — build
+**Kind:** live-check #2402
+**Status:** Open — built in #2402: `_conclude` waits for the run's end after `check` reads the commit, and the smoke checks the running build. The live read: the next promote of shiftlead's main after #2402 is live (`ao promote status`) — its log (`~/.shiftlead/promotes/shiftlead/<sha>.log`, read only) has `── smoke ──` after the run's last line (`ao service install`'s), the smoke's log has *running build <sha7> is the promoted one*, and the note says *smoke passed*
 **Location:** `src/sessionorc/promote.py` (`_conclude`'s first branch, `start_smoke`, `_concluded`), `scripts/smoke.py` (this repo's smoke), `src/shiftlead/ui/inbox.py` and `ao promote status` (the window's words, if they key on live); design §6 *Promote* (*Live reads the wanted commit and the run has ended*), *The smoke* (*When and where*, *The promote is in flight until the smoke ends*)
 
 **Why:** TD-1031: shiftlead's `run` writes the build record `check` reads before it restarts the units, so the smoke started on `check` alone met a UI going down three times, each a rollback and a hold.
@@ -2047,26 +2034,23 @@ Then file the build entries.
 
 **Related:** TD-1043 (the empty `project` badge); TD-582, TD-995, TD-1000 (the edges built so far); TD-064, TD-102 (Claude Code's own peer messages, which stay forbidden).
 
-## TD-1043: A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it
+## TD-1044: A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes
 
-**Priority:** Medium
+**Priority:** High
 **Type:** debt
-**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Added:** 2026-10-26 (Paul, during dev-cadence TD-129's rollout; drafted by session `memory-vs-cadence`)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`api_entry_session`, `api_ledger_start`: each passes `team=` to the new session and no `project=`; `new_submit` passes both); design §4.9 (the `project` badge: its team's repo's project, the repo's own name where no project lists it, TD-722), §4.10 *across teams, by project*
+**Status:** Open — found pinning samscrape (ContractMatch/samscrape#1115, merged 2026-10-26); stopgap: samscrape#1121 and this repo's pin PR (#2391) set `worktree_setup` to the pinned hydrate.
+**Location:** `src/sessionorc/gitinfo.py` (`HYDRATE = "scripts/hydrate_worktree.sh"`; `worktree_setup()`, which reads `absent` when the file is missing, and the create path that then skips setup; the reaper's `hydrate` lookup, about line 499); `src/shiftlead/repoconfig.py` (the key's parse; its comment, about line 664, states the default); `src/sessionorc/cadence.py` (`command(repo, word, *args)`, TD-1014's resolver); `src/shiftlead/team_skill.md` (`worktree_setup`, about line 210: unset, dev-cadence's `hydrate_worktree.sh` where the checkout holds it)
 
-**Why:** on 2026-10-26, `ao status -v` read six open records with a `team` and an empty `project`. Among them were ao-shiftlead-prompts (`ao-grind`, started by Add entry), ao-dev-cadence-memory-vs-cadence and ao-dev-cadence-td-126 (`dc-grind`), and ao-contractmatch-cm-mcp (`cm-grind`). Two kinds of mail are refused to such a session, though the design lets both through:
-- mail from another team on the same project;
-- mail to a same-project session of another team.
-The project edge (TD-582) compares the `project` badges, and an empty one matches nothing.
+**Why:** dev-cadence TD-129 pins a repo's dev-cadence instead of copying it, so a pinned repo has no `scripts/hydrate_worktree.sh`. The home's default `worktree_setup` is exactly that file, and a missing one reads as `absent`, so a worktree the home makes in a pinned repo gets no setup and says nothing: no `.claude/settings.local.json` (the worktree's `autoMemoryDirectory`, so its session's memories land outside the repo, the TD-080 failure), and no nested repos from `docs/nested-repos.txt`. pneuma-ops, ledgerboard and samscrape were pinned on 2026-10-26; samscrape has a team, so its worktrees were affected from that merge until the stopgap. The reaper reads the same path for its `--dehydrate`, so a pinned repo's nested worktrees would not be taken out through their own repos before removal. TD-1014's Done-when (*every reader above calls `cadence.command` and none builds a dev-cadence path in code itself*) should have caught `HYDRATE`, though its list of names (`check_cadence.py`, `cadence.md`, the lock) does not include `hydrate_worktree.sh` — add it there.
 
-**Fix:** both routes derive the badge as `new_submit` does: the directory's repo's project, from `teams.reach_block(org, dir, host)`'s first value. The badge alone is wanted, not the Project block, which `new_submit` adds to the prompt. A record already started keeps its badge until its next start.
+**Fix:** where `cadence.pinned(repo)`, the default setup is `cadence.command(repo, "run", "hydrate_worktree.sh", <path>)` (cwd the new worktree), and the reaper's dehydrate the same with `--dehydrate`; a synced repo keeps today's path; a pin that does not resolve raises `WorktreeError` as a failed setup does today (`ensure_worktree`), never a silent skip. `team_skill.md` and design §5 *The seams* say it. Then drop the stopgap `worktree_setup` lines (samscrape, this repo). Tests: a pinned fixture repo's new worktree gets `settings.local.json`; an unresolvable pin warns.
 
-**Done when** a test starts a session through each route on a repo listed under a project and reads that project on the record, and a test of `message_edge` lets a `note` through between two such sessions of different teams on one project.
+**Done when** a worktree the home makes in a pinned repo with no `worktree_setup` is hydrated, and the stopgaps are removed.
 
-**Related:** TD-1042 (the person's sessions across projects); TD-582, TD-722.
+**Related:** TD-1014 (the resolver), dev-cadence TD-129, TD-149; samscrape#1121.
 
 ## TD-1048: `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take
 
@@ -2086,6 +2070,22 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Done when** the design names the flag, the line and the key, and the build entries are filed.
 
 **Related:** dev-cadence TD-145, TD-124 (the counter); TD-970, TD-1014, TD-1034 (`td_next`'s script road); ShiftLead/shiftlead#2370.
+
+## TD-1050: A container test waits five seconds for the node's provision, and a slow CI runner fails it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_containers.py` (`test_the_home_derives_a_container_nodes_reach_when_it_dials_in`, its `wait_for(…, timeout=5.0)` on `"cm" not in agent.supervision and node.config.is_file()`)
+
+**Why:** on #2394's CI (run 40400754079, 2026-10-26), `test (3.12)` failed this test with `assert False` while `test (3.13)` and the local suite passed it, on a change that touches no container code; a rerun of the job was needed. The same evening two more fixed waits failed #2394's local precheck (4d188f8) under several prechecks' load and passed alone: `tests/test_agent.py::test_send_confirms_the_submit` (*the composer child never painted its prompt*, a 5 s `_poll`) and `tests/test_doorbell.py::test_the_doorbell_rings_only_where_it_may` (`tmux load-buffer`: *error connecting to /tmp/tmux-1000/ao-test-…*, the private server gone). The Fix covers all three. The wait's own comment says a slow CI runner already once read the node before the supervisor's provision wrote its definition (TD-285): five seconds is the bound that ran out. A red run that says nothing about the code costs a rerun and a reader's doubt, and with the local `precheck` (TD-1035) the same wait now gates every PR on kmaster's load too.
+
+**Fix:** find what the wait is waiting on (the supervisor's provision of `cm` in the fixture) and wait on that event, or raise the bound well past the slowest runner seen, keeping the test's assertion; run it under load (`pytest -p no:randomly --count` or a loop beside a busy suite) to show it holds.
+
+**Done when:** the test waits on the provision itself or on a bound shown to hold under load; `pdm run test` and `pdm run lint` pass.
 
 ## TD-1051: A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it
 
@@ -2123,6 +2123,22 @@ It files each as a build entry, or as live checks where the design already holds
 
 **Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
 
+## TD-1052: Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/cadence.toml` (`precheck`); `scripts/precheck.py` (synced: its worktree under `tempfile.mkdtemp`, so `/tmp`); the suite's `tmp_path` (`/tmp/pytest-of-kmaster`)
+
+**Why:** the first evening of the local precheck gate (TD-1035, #2389), `precheck.py --pr 2394` recorded *failure* on 2abed34: 4 failed, 2548 errors, nearly all `OSError: [Errno 28] No space left on device` under `/tmp` or pytest's *could not create numbered dir*. `/tmp` on kmaster is a 16 GB tmpfs (RAM); several sessions' prechecks were running at once (`/tmp/precheck-2397-…`, `-2398-…` beside it), each a fresh `.venv` plus the suite's temp homes, and minutes later `/tmp` was back to 49 %. Each session now runs the suite for every PR, so concurrency is the common case: a red status from a full disk says nothing about the code, costs a 12-minute rerun, and could be read as the PR's fault.
+
+**Fix:** pick one or both: the `precheck` command sets `TMPDIR` (and so pytest's base temp) to a disk-backed directory of its own, e.g. under `~/.cache/`, cleaned at its end; and/or a bound on prechecks running at once on the machine (a lock the command takes). Measure a precheck's peak `/tmp` use first. A `TMPDIR` must stay short: one under `~/.cache/aopre2` failed 38 link and container tests with *Connection refused*, their unix sockets' paths past the ~108-byte cap (read 2026-10-26 on #2394). `precheck.py` is dev-cadence's (SYNCED): a change there is `dev-cadence#` work, filed with `ao td add --repo dev-cadence`.
+
+**Done when:** three prechecks run at once on kmaster pass, `/tmp` staying well under full; `pdm run test` and `pdm run lint` pass.
+
 ## TD-1053: 47 `tempfile.mkdtemp()` calls in the tests leave a directory in /tmp on every run; 105,000 of them filled kmaster's /tmp inodes and stopped every session
 
 **Priority:** High
@@ -2140,3 +2156,111 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when** a full suite run leaves no new directory at /tmp's top level, and the guard test fails on a planted `tempfile.mkdtemp()`.
 
 **Related:** TD-1033 (precheck runs the suite per PR).
+
+## TD-1055: `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`survey`: `r["checks"], why, r["checks_not_run"], r["precheck"] = read_checks(root, r["main"])`), `tests/test_promote.py`, `tests/test_ci_not_run.py`
+
+**Why:** #2396 (TD-1037) made `read_checks` return a fourth value and `survey` keep it as the reading's `precheck`, which TD-1036 and TD-1038 are to read. Probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ci_not_run.py tests/test_promote.py tests/test_cadence_pin.py`: replacing `r["precheck"]` with `_` in that line leaves 102 passed. The `read_checks` tests pin the tuple, and the `survey` tests (`tests/test_promote.py` 229–297) never read `precheck`, so the field TD-1037's *Done when* names ("the `precheck` field's five values and null") is pinned at `read_checks` only and never reaches the reading.
+
+**Fix:** add a `survey` test with `read_checks` faked to each of `absent`, `success`, `failure`, `pending`, `unread` and None, asserting `readings[0]["precheck"]` for each.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1037, TD-1033.
+
+## TD-1056: The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`read_checks`: `state = str(mine[0].get("state") ...)`, comment *newest first, one per context*), `tests/test_promote.py` (`test_the_commit_statuses_fold_in_beside_the_runs`, `test_main_needs_a_green_precheck_where_the_repo_sets_one`)
+
+**Why:** #2396 reads the head's `cadence/precheck` as `mine[0]`, relying on GitHub's newest-first order of `commits/<sha>/status`; a re-run's `success` after an earlier `failure` is the case that matters. Probed on `origin/main`: changing `mine[0]` to `mine[-1]` leaves 102 passed in `tests/test_ci_not_run.py tests/test_promote.py tests/test_cadence_pin.py`. No test's fake statuses list holds two statuses of that context.
+
+**Fix:** add a case with two `cadence/precheck` statuses, newest `success` over older `failure` and the reverse, asserting `precheck` is the first's.
+
+**Done when:** the `mine[-1]` probe fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1037, TD-1033.
+
+## TD-1057: `ship_cadence` gives the cache step the node's env file, and no test would notice if it did not (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `exec_cmd(..., env_file=n.env_file)`, comment *the agent's own environment (its env file), so the cache written is the one its launcher reads*), `tests/test_containers.py` (`test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache`)
+
+**Why:** #2390 (TD-1014 part 5) passes `env_file=n.env_file` so the cache script runs with the agent's `XDG_CACHE_HOME`. Probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_containers.py`: dropping `env_file=n.env_file` leaves 55 passed. No shipping test gives the node an env file or looks for `--env-file` on the cache exec, so a node whose env moves the cache would get the tree in a cache its launcher never reads.
+
+**Fix:** give the node an env file with an `XDG_CACHE_HOME` in the shipping test and assert the cache exec carries `--env-file` (as `test_host_up_is_idempotent_and_an_env_file_reaches_the_agent` does for the agent).
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+## TD-1058: `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `if not dest.is_dir():`), `tests/test_containers.py` (`test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache`)
+
+**Why:** The test's comment says *shipped once: a second run copies nothing new* and asserts `sorted(p.name for p in shipped.parent.iterdir()) == [ref]`. Probed on `origin/main`: replacing `if not dest.is_dir():` with `if True:` leaves `tests/test_containers.py` at 55 passed: the second copy fails on the existing `dest` (`tmp.rename`), is caught as `OSError`, and the run logs *could not be shipped* and returns None, with the listing unchanged.
+
+**Fix:** assert the second `host_up`'s log carries no *shipping dev-cadence* or *could not be shipped* line, and that `ship_cadence` returns the commit.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+## TD-1059: `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`CADENCE_INTO_CACHE`: `if [ -e "$d/.ship-$2" ]; then chmod -R u+w ...; rm -rf ...; fi`), `tests/test_containers.py` (`test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once`)
+
+**Why:** The script's second line of defence is a read-only `.ship-<commit>` left by an interrupted run, which `cp -a` would otherwise copy into. Probed on `origin/main`: replacing that whole `if` line with `:` leaves `tests/test_containers.py` at 55 passed; the script test runs the script twice on a clean `$HOME` and never plants a stale `.ship-`.
+
+**Fix:** plant a read-only `trees/.ship-<ref>` with a stray file before the run and assert the result holds only the shipped tree.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+## TD-1060: `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `shutil.copytree(src, tmp, symlinks=True)`), `tests/test_containers.py` (`_pinned_node`)
+
+**Why:** Probed on `origin/main`: dropping `symlinks=True` leaves `tests/test_containers.py` at 55 passed. `_pinned_node`'s tree is two files in three directories; a dev-cadence tree with a link (or a dangling one) would be followed or fail the copy, and the test says nothing of it.
+
+**Fix:** add a relative and a dangling symlink to `_pinned_node`'s tree and assert the shipped tree holds them as links.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
