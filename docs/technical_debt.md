@@ -102,6 +102,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Open — design |
 | TD-1052 | Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own | Medium | Open |
+| TD-1055 | `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit) | Medium | Open — build |
+| TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
+| TD-1057 | `ship_cadence` gives the cache step the node's env file, and no test would notice if it did not (test audit) | Medium | Open — build |
+| TD-1058 | `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit) | Low | Open — build |
+| TD-1059 | `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit) | Low | Open — build |
+| TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
 
 ---
 
@@ -2151,3 +2157,111 @@ It files each as a build entry, or as live checks where the design already holds
 **Fix:** pick one or both: the `precheck` command sets `TMPDIR` (and so pytest's base temp) to a disk-backed directory of its own, e.g. under `~/.cache/`, cleaned at its end; and/or a bound on prechecks running at once on the machine (a lock the command takes). Measure a precheck's peak `/tmp` use first. A `TMPDIR` must stay short: one under `~/.cache/aopre2` failed 38 link and container tests with *Connection refused*, their unix sockets' paths past the ~108-byte cap (read 2026-10-26 on #2394). `precheck.py` is dev-cadence's (SYNCED): a change there is `dev-cadence#` work, filed with `ao td add --repo dev-cadence`.
 
 **Done when:** three prechecks run at once on kmaster pass, `/tmp` staying well under full; `pdm run test` and `pdm run lint` pass.
+
+## TD-1055: `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`survey`: `r["checks"], why, r["checks_not_run"], r["precheck"] = read_checks(root, r["main"])`), `tests/test_promote.py`, `tests/test_ci_not_run.py`
+
+**Why:** #2396 (TD-1037) made `read_checks` return a fourth value and `survey` keep it as the reading's `precheck`, which TD-1036 and TD-1038 are to read. Probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ci_not_run.py tests/test_promote.py tests/test_cadence_pin.py`: replacing `r["precheck"]` with `_` in that line leaves 102 passed. The `read_checks` tests pin the tuple, and the `survey` tests (`tests/test_promote.py` 229–297) never read `precheck`, so the field TD-1037's *Done when* names ("the `precheck` field's five values and null") is pinned at `read_checks` only and never reaches the reading.
+
+**Fix:** add a `survey` test with `read_checks` faked to each of `absent`, `success`, `failure`, `pending`, `unread` and None, asserting `readings[0]["precheck"]` for each.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1037, TD-1033.
+
+## TD-1056: The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`read_checks`: `state = str(mine[0].get("state") ...)`, comment *newest first, one per context*), `tests/test_promote.py` (`test_the_commit_statuses_fold_in_beside_the_runs`, `test_main_needs_a_green_precheck_where_the_repo_sets_one`)
+
+**Why:** #2396 reads the head's `cadence/precheck` as `mine[0]`, relying on GitHub's newest-first order of `commits/<sha>/status`; a re-run's `success` after an earlier `failure` is the case that matters. Probed on `origin/main`: changing `mine[0]` to `mine[-1]` leaves 102 passed in `tests/test_ci_not_run.py tests/test_promote.py tests/test_cadence_pin.py`. No test's fake statuses list holds two statuses of that context.
+
+**Fix:** add a case with two `cadence/precheck` statuses, newest `success` over older `failure` and the reverse, asserting `precheck` is the first's.
+
+**Done when:** the `mine[-1]` probe fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1037, TD-1033.
+
+## TD-1057: `ship_cadence` gives the cache step the node's env file, and no test would notice if it did not (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `exec_cmd(..., env_file=n.env_file)`, comment *the agent's own environment, so the cache written is the one its launcher reads*), `tests/test_containers.py` (`test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache`)
+
+**Why:** #2390 (TD-1014 part 5) passes `env_file=n.env_file` so the cache script runs with the agent's `XDG_CACHE_HOME`. Probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_containers.py`: dropping `env_file=n.env_file` leaves 55 passed. No shipping test gives the node an env file or looks for `--env-file` on the cache exec, so a node whose env moves the cache would get the tree in a cache its launcher never reads.
+
+**Fix:** give the node an env file with an `XDG_CACHE_HOME` in the shipping test and assert the cache exec carries `--env-file` (as `test_host_up_is_idempotent_and_an_env_file_reaches_the_agent` does for the agent).
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+## TD-1058: `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `if not dest.is_dir():`), `tests/test_containers.py` (`test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache`)
+
+**Why:** The test's comment says *shipped once: a second run copies nothing new* and asserts `sorted(p.name for p in shipped.parent.iterdir()) == [ref]`. Probed on `origin/main`: replacing `if not dest.is_dir():` with `if True:` leaves `tests/test_containers.py` at 55 passed: the second copy fails on the existing `dest` (`tmp.rename`), is caught as `OSError`, and the run logs *could not be shipped* and returns None, with the listing unchanged.
+
+**Fix:** assert the second `host_up`'s log carries no *shipping dev-cadence* or *could not be shipped* line, and that `ship_cadence` returns the commit.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+## TD-1059: `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`CADENCE_INTO_CACHE`: `if [ -e "$d/.ship-$2" ]; then chmod -R u+w ...; rm -rf ...; fi`), `tests/test_containers.py` (`test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once`)
+
+**Why:** The script's second line of defence is a read-only `.ship-<commit>` left by an interrupted run, which `cp -a` would otherwise copy into. Probed on `origin/main`: replacing that whole `if` line with `:` leaves `tests/test_containers.py` at 55 passed; the script test runs the script twice on a clean `$HOME` and never plants a stale `.ship-`.
+
+**Fix:** plant a read-only `trees/.ship-<ref>` with a stray file before the run and assert the result holds only the shipped tree.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+## TD-1060: `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `shutil.copytree(src, tmp, symlinks=True)`), `tests/test_containers.py` (`_pinned_node`)
+
+**Why:** Probed on `origin/main`: dropping `symlinks=True` leaves `tests/test_containers.py` at 55 passed. `_pinned_node`'s tree is two files and two directories; a dev-cadence tree with a link (or a dangling one) would be followed or fail the copy, and the test says nothing of it.
+
+**Fix:** add a relative and a dangling symlink to `_pinned_node`'s tree and assert the shipped tree holds them as links.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
