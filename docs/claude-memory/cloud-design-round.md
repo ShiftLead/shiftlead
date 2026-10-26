@@ -1,3 +1,10 @@
+---
+name: cloud-design-round
+description: How a design round runs from a claude.ai/code cloud session — park on the board first and wait for the park PR to merge, propose in chat, Sonnet rounds to READY, a fact-check on the PR, one branch
+metadata:
+  type: feedback
+---
+
 # How a design round runs from a cloud session
 
 **Written 2026-09-25** after four rounds in one session (TD-129, TD-127, TD-126, TD-130, TD-100 (4)),
@@ -25,13 +32,15 @@ tense, every control in §4.5a, glossary if a word changes, `docs/mockups/gen.py
 the artboards rendered (headless Chromium: `/opt/pw-browsers/chromium --headless=new
 --screenshot` on the `<x-dc>` body pulled out of the artboard; see the session that built
 `InboxRail`), history bullets per section, the entry's Status → designed, build entries
-`Owner: grinder / Kind: build / Pickable: yes` with a *Done when*, the board line off.
+`Owner: grinder / Kind: build` with a *Done when* and no Pickable line (pickable is derived, cadence
+§2.4), the board line off.
 `PYTHONPATH=src python3 -m pytest -q tests/test_ledger.py tests/test_primer.py` (pytest via
 `pip install pytest pyyaml`; pdm is absent) before every push.
 
 **Numbers move under you.** A TD number can be taken on main while the branch is open, and a
 regex renumber flips pre-existing citations too (an archived TD-145 became TD-146 once). Check
-`docs/technical_debt_archive.md` as well as the open ledger, and renumber by hand.
+`docs/technical_debt_archive.md` as well as the open ledger; take the new id from cadence §2.10's
+front end (`ao td next`), else `scripts/ledger_next_id.py`, and never renumber by hand.
 
 **Review.** For a plan or a design with decisions in it, run Sonnet rounds (a fresh agent each
 round, told what earlier rounds verified) until READY, recording each round in the ADR or the

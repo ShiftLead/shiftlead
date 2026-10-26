@@ -86,7 +86,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
-| TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) now; (3) waits on dev-cadence TD-136–TD-139 |
+| TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) done (#PRNUM); (3) waits on dev-cadence TD-136–TD-139 |
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Designed — builds TD-1023, TD-1024 |
 | TD-1023 | The layer's SessionStart line is dev-cadence's pinned seed, verbatim and parity-tested; Gemini's start hooks and the repo's own line follow the pin | High | Open — build |
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
@@ -1800,7 +1800,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-26 (Paul, through the memory harvest; drafted by session `memory-vs-cadence`)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open. Items (1), (2) and (4) can start now; (3) waits on dev-cadence TD-136 to TD-139.
+**Status:** Open — items (1), (2) and (4) done in #PRNUM (grinder-ao-2, 2026-10-26): the passages corrected, the copies trimmed to a pointer at the cadence rule (`gate-everything-after-a-merge-on-its-state` keeps its reopen-at-the-same-sha cure, which no rule says), `live-system-restart-authorized` deleted, the four files given frontmatter, `MEMORY.md`'s lines to match. Item (3) is left: it waits on dev-cadence TD-136 to TD-139 being archived there and synced here.
+**Blocked by:** dev-cadence#TD-136, dev-cadence#TD-137, dev-cadence#TD-138, dev-cadence#TD-139
 **Location:** `docs/claude-memory/`
 
 **Why:** Paul's first memory harvest (dev-cadence TD-125, 2026-10-26) judged every memory in `docs/claude-memory/` against dev-cadence's cadence and his own cadence layer. Some memories now contradict the cadence. A wrong memory is worse than none (cadence §7.1): a session follows it. Most of the wrong ones teach numbering TD ids by hand. Others repeat a rule cadence.md now holds, so the copies drift as the cadence changes. Other people will work in this repo, so memories whose lessons went only into Paul's personal layer or his `craft.md` stay here as they are. That includes `agree-the-layout-before-model-reviews` and `hold-a-design-until-its-round-ends`.
