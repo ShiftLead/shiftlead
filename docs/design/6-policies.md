@@ -1082,7 +1082,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   trigger, as TD-1035 does here). The outrank is the home's own rule: dev-cadence's `ci` row reads a
   never-started run as *unknown* whatever else passed. The reading keeps what the status read found
   as a field of its own, **`precheck`**: `absent`, `success`, `failure`, `pending` or `unread` (the
-  read failed), and null where the repo sets no `precheck` — the rules below key on it, never on the
+  read failed), and null where the repo sets no `precheck` or its `docs/cadence.toml` does not parse (the
+  reading then `unknown` with that why, as §4.8's *checks unknown*) — the rules below key on it, never on the
   `why` text. The rule is main's head's alone: a rollback's commit (`read_checks`' `keep=False`) is
   read as before, since an old commit never carries one. With none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
   the home's own run on it is going (*The precheck on main*, below), as dev-cadence's `ci` row reads
@@ -1337,10 +1338,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     the row says nothing of a precheck, until main's own run starts. Main moving during a run leaves it
     running on its commit, and the new head is checked on the pass after it ends.
   - **What runs.** `python3 scripts/precheck.py --commit <sha>` (dev-cadence's, the commit form of its
-    `--pr`; asked of dev-cadence by TD-1038), located by `sessionorc.cadence.precheck_script(root)` —
-    the argv for the three layouts the gate has (the checkout's `scripts/`, dev-cadence's own
-    `files/scripts/`, the resolver's `dev-cadence run` in a pinned repo), or `(None, why)` when the
-    script is absent, as in a pinned tree older than it; then nothing starts and main's reading is
+    `--pr`; asked of dev-cadence by TD-1038), located by `sessionorc.cadence.precheck_script(root)` →
+    `((argv, env) | None, why | None)`: the three layouts the gate has (the checkout's `scripts/`,
+    dev-cadence's own `files/scripts/`, the resolver's `dev-cadence run` in a pinned repo, whose `env`
+    is `cadence.command`'s, as the pinned gate is run with it; None in the other two), or None with a
+    why when the script is absent, as in a pinned tree older than it; then nothing starts and main's reading is
     `unknown`, *no precheck.py here*, as step 4 waits uncounted — started by the shell in the checkout, stdin closed, in a session of its
     own (`start_new_session`) and detached from the tick as the promote's run is. It runs the command in a clean detached worktree of its own at the
     commit and records a `cadence/precheck` commit status there, so the verdict outlives the home and
@@ -1360,8 +1362,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     home starts it with, `TMPDIR` inherited), named by its exact prefix: `precheck-<sha7>-` for a
     `--commit` run, `precheck-<pr>-` for a `--pr` one — so the entry at the sha whose path is
     `<temp root>/<prefix>*/head`, a session's own run on another PR or commit never matching — removes it
-    with `git worktree remove --force`, removes every directory with that prefix whether or not an
-    entry was found (a kill between `mkdtemp` and the `worktree add` leaves one empty), and then runs
+    with `git worktree remove --force`, removes any **empty** directory with that prefix (a kill between `mkdtemp` and the `worktree add`
+    leaves one; a non-empty one the list does not name at the sha is a session's own run, left
+    alone), and then runs
     `git worktree prune`, as `drop_tree` does for the promote's tree.
   - **How it ends.** The status is the verdict, read on the next pass like any other, and it wins over
     the file: a status on the sha ends the run whatever the file says. Green, and the promote goes on
@@ -1529,10 +1532,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      with no reading, counted toward `SYNC_TRIES` once (the file marked `counted`), after which a later
      pass may start a new run, replacing the file; a head that moved or a PR no longer open kills a
      live run (the group, only while its start time matches) and drops the file. The cleanup after a
-     kill is main's. **A wait has a bound**: a sync PR that has waited `SYNC_PRECHECK_WAIT` (a day) at one head — the
-     checkout off `origin/<default>` or dirty, or no `precheck.py` there — becomes the team's order as
-     a declined one does, its reason the wait's (*precheck waited a day: the checkout is not clean on
-     origin/<default>*), so a sync PR never waits unseen. **Who ends it**: the readings' pass judges `precheck-pr.json`'s bound and kills at
+     kill is main's. **A wait has a bound**: the PR's `sync` entry at the head keeps **`waiting_since`**, set on the
+     first waiting pass at that head (its verdict empty, so it is not settled) and reset by a new head;
+     once it is `SYNC_PRECHECK_WAIT` (a day) old the verdict is *refused* and the PR the team's order as
+     a declined one is, its reason the last pass's wait — *precheck waited a day:* and the checkout
+     off `origin/<default>` or dirty, a run going, or *no precheck.py here* — so a sync PR never waits
+     unseen. **Who ends it**: the readings' pass judges `precheck-pr.json`'s bound and kills at
      it as it does main's (it already reads both files under the lock), so a run outlives no bound
      when the sync pass skips the repo; the sync pass judges the head, the PR's state and `counted`.
      **The gate's exit decides one of three
@@ -1555,8 +1560,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      <commit>, n files*.
 
   The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, posted,
-  at}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, or the reason from step 1
-  or 2), *gate* (the gate's line), *error* (no reading after `SYNC_TRIES`) or *off*, and it is empty
+  at, waiting_since}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, the reason from step 1
+  or 2, or `SYNC_PRECHECK_WAIT` run out in step 4), *gate* (the gate's line), *error* (no reading after `SYNC_TRIES`) or *off*, and it is empty
   while a retry is counted. A PR's entry is dropped once it leaves the open list, except the newest
   *merged* one, which the Repos card names (§4.5a) and which neither the pass nor the order reads. So a head with a
   verdict is never checked again, a new head is checked again, and the team's order says `why`
