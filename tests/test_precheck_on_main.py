@@ -13,6 +13,7 @@ import sys
 import time
 from contextlib import suppress
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from test_promote import _commit, _git, _merge, checkout  # noqa: F401 — the fixture, shared
@@ -203,7 +204,8 @@ def test_a_run_past_the_bound_is_killed_by_group_and_its_worktree_removed(checko
     (tmp / f"precheck-{sha[:7]}-empty").mkdir()  # a kill between mkdtemp and the worktree add
     other = tmp / f"precheck-{sha[:7]}-session"
     (other / "head").mkdir(parents=True)  # a non-empty one the list does not name at the sha: a session's own
-    fake["then"] = "trap '' TERM; sleep 30"  # deaf to TERM: the KILL after the grace ends it
+    # the leader obeys the TERM, a child deaf to it (the suite) is left: the group's KILL ends it
+    fake["then"] = f"(trap '' TERM; echo $$ > {tmp_path / 'child'}; exec sleep 30) & wait"
     monkeypatch.setattr(promote, "PRECHECK_GRACE", 0.5)
     promote.precheck_on_main(root, "r", _reading(main=sha), NOW)
     f = promote.precheck_run("r")
@@ -212,6 +214,20 @@ def test_a_run_past_the_bound_is_killed_by_group_and_its_worktree_removed(checko
     r = _reading(main=sha)
     promote.precheck_on_main(root, "r", r, later)
     assert not promote.alive(f["pid"], f["started"])
+    child = int((tmp_path / "child").read_text().split()[0])
+    deadline = time.monotonic() + 5
+    while Path(f"/proc/{child}").exists() and time.monotonic() < deadline:
+        state = (
+            Path(f"/proc/{child}/stat").read_text().split(")")[-1].split()[0]
+            if Path(f"/proc/{child}").exists()
+            else "Z"
+        )
+        if state == "Z":
+            break
+        time.sleep(0.05)
+    assert (
+        not Path(f"/proc/{child}").exists() or Path(f"/proc/{child}/stat").read_text().split(")")[-1].split()[0] == "Z"
+    )
     assert not run.exists() and not (tmp / f"precheck-{sha[:7]}-empty").exists() and other.exists()
     assert str(run / "head") not in _git(root, "worktree", "list", "--porcelain")
     assert r["checks"] == "unknown" and "ended and recorded nothing" in r["checks_why"]
@@ -246,6 +262,10 @@ def test_a_failed_precheck_on_mains_head_is_a_needs_you_row_whatever_auto_says()
         assert not row["fyi"] and not row["auto_row"]
         assert row["text"].endswith(f"checks failed on {SHA[:7]}") or f"checks failed on {SHA[:7]} ·" in row["text"]
         assert row["precheck_failed"]["tail"] == log
+    # a promote in flight beside it (a press going through): still Needs you
+    r = {**base, "auto": False, "inflight": {"sha": SHA, "at": "x"}, "precheck_failed": {"sha": SHA, "tail": log}}
+    (row,) = inbox.promote_rows({"shiftlead": r})
+    assert not row["fyi"]
     # main moved: the failure was another head's, and the row is what it was
     r = {**base, "checks": "pending", "auto": True, "precheck_failed": {"sha": OTHER, "tail": log}}
     (row,) = inbox.promote_rows({"shiftlead": r})

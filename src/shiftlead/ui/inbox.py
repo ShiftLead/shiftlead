@@ -689,7 +689,7 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
                 "held": held,
                 "precheck_failed": pre,
                 "inflight": flight,
-                "fyi": (bool(flight) and not failed) or auto_row,
+                "fyi": (bool(flight) and not failed and not pre) or auto_row,
                 "find": " ".join(x for x in (repo, "promote", text, (failed or {}).get("why") or "") if x),
             }
         )

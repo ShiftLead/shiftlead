@@ -665,6 +665,10 @@ def kill_precheck(root: str | Path, f: dict[str, Any]) -> None:
         deadline = time.monotonic() + PRECHECK_GRACE
         while alive(pid, started) and time.monotonic() < deadline:
             time.sleep(0.2)
+        # the group's KILL whether or not its leader went on the TERM: a grandchild deaf to it (the
+        # suite) outlives a leader that obeyed; the group was read as the run's a grace ago
+        with suppress(OSError):
+            os.killpg(pid, signal.SIGKILL)
         kill(pid, started)
     drop_precheck_tree(root, str(f.get("sha") or ""))
 
