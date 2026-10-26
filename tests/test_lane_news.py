@@ -638,7 +638,7 @@ async def test_an_unserved_repos_lane_reads_empty_and_a_turn_to_unserved_is_told
     served repo with a team running turns unserved."""
     await park_ticks(agent)
     now = datetime.now(UTC)
-    lack = "unserved: no dev-cadence (no docs/cadence-sync.lock) — `<dev-cadence>/sync.sh /r`, then a PR"
+    lack = "unserved: no dev-cadence (no docs/cadence-sync.lock) — `ao repo add /r --adopt`"
     unserved = {"serve": {"ok": False, "lacks": [{"key": "cadence", "words": lack}]}}
     async with LocalClient() as person:
         sid = await _finished(agent, person, tmp_path, "w", ["free-pick"], [_e("TD-001")])

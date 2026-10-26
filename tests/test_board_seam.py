@@ -173,7 +173,7 @@ async def test_an_unserved_repos_board_is_written_by_no_press(agent, tmp_path, f
     home.mkdir(exist_ok=True)
     (home / "repos.txt").write_text(f"{root}\n")
     (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
-    lack = "unserved: no gate (no scripts/check_cadence.py) — `<dev-cadence>/sync.sh /r`, then a PR"
+    lack = "unserved: no gate (no scripts/check_cadence.py) — `ao repo add /r --adopt`"
     agent._repos[str(root)] = {"name": "repo", "root": str(root), "seams": {"serve": {"ok": False, "lacks": [
         {"key": "gate", "words": lack}]}}}  # fmt: skip
     before = (root / REL).read_text()

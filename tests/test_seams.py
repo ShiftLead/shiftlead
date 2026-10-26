@@ -119,7 +119,7 @@ def test_a_repo_lacking_each_of_the_three_is_unserved_in_its_words(tmp_path):
     with its cure; with all three the repo is served."""
     root = served(tmp_path)
     assert seams.reading(root)["serve"] == {"ok": True, "lacks": []}
-    cure = f"`<dev-cadence>/sync.sh {root}`, then a PR"
+    cure = f"`ao repo add {root} --adopt`"
     (root / "docs" / "cadence-sync.lock").unlink()
     assert seams.reading(root)["serve"] == {
         "ok": False,
@@ -157,7 +157,7 @@ def test_dev_cadences_source_is_served_with_no_lock_and_its_gate_under_files(tmp
     (root / "files" / "scripts").mkdir(parents=True)
     got = seams.reading(root)
     assert got["source"] is True
-    words = f"unserved: no gate (no files/scripts/check_cadence.py) — `<dev-cadence>/sync.sh {root}`, then a PR"
+    words = f"unserved: no gate (no files/scripts/check_cadence.py) — `ao repo add {root} --adopt`"
     assert got["serve"]["lacks"] == [{"key": "gate", "words": words}]
     (root / "files" / cadence.SCRIPT).write_text("")
     assert seams.reading(root)["serve"] == {"ok": True, "lacks": []}

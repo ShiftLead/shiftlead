@@ -17,7 +17,7 @@ from shiftlead.ui.repo import missing_seams
 pytestmark = pytest.mark.unit
 
 
-CURE = "`<dev-cadence>/sync.sh /r/notes`, then a PR"
+CURE = "`ao repo add /r/notes --adopt`"
 
 
 def seam_reading(ledger=None, lacks=(), warnings=(), **over) -> dict:
@@ -94,8 +94,7 @@ def test_the_repo_page_says_each_warning_and_each_lack_with_its_cure_as_code():
         "unserved": [
             [
                 ("unserved: no ledger at notes/ledger.md — ", False),
-                ("<dev-cadence>/sync.sh /r/notes", True),
-                (", then a PR", False),
+                ("ao repo add /r/notes --adopt", True),
             ]
         ],
     }

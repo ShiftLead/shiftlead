@@ -114,6 +114,7 @@ def test_the_word_calls_the_rpc_with_the_resolved_path_and_is_refused_on_a_node(
     monkeypatch.setattr(cli, "call_sync", call)
     monkeypatch.setattr(hosts, "is_node", lambda: False)
     monkeypatch.chdir(tmp_path)
+    served(_repo(tmp_path / "notes"))  # it holds dev-cadence: the RPC's to add
     assert cli.main(["repo", "add", "notes"]) == 0
     assert calls == [("add_repo", {"path": str((tmp_path / "notes").resolve())})]
     assert capsys.readouterr().out.startswith("added notes")

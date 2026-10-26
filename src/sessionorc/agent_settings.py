@@ -225,7 +225,8 @@ class SettingsMixin:
         except OSError as e:
             raise RpcError(f"could not write the roster {reg}: {e}") from None
         log.info("add_repo: %s added to %s by %s", root, reg, caller)
-        served = await asyncio.to_thread(lambda: seams_mod.serve(here, seams_mod.ledger(here))["ok"])
+        roster = [*host.repos(), root]  # the age lack reads dev-cadence's checkout among them (TD-1012)
+        served = (await asyncio.to_thread(seams_mod.reading, here, roster))["serve"]["ok"]
         return {"root": root, "name": here.name, "served": served}
 
     async def rpc_set_settings(
