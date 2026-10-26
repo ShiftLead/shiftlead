@@ -553,6 +553,24 @@ async def test_the_home_tells_an_idle_holder_and_lists_an_unheld_red_pr(agent, t
     assert [o["id"] for o in _orders(agent._repos[root])] == ["pr:2"]
 
 
+async def test_an_unserved_repo_has_no_red_pr_order_and_tells_no_holder(agent, tmp_path):
+    """TD-1011, design §5 *The seams*: no order in an unserved repo, and no idle holder told."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    holder = _rec("ao-holder", git={"branch": "b1"}, repo=root, host=agent.host)
+    agent.sessions[holder.id] = holder
+    lacks = [{"key": "gate", "words": "unserved: no gate (no scripts/check_cadence.py) — cure"}]
+    agent._repos[root] = {
+        "name": "repo", "root": root, "prs": {"open": [_red(1, branch="b1"), _red(2, branch="b2")]},
+        "seams": {"serve": {"ok": False, "lacks": lacks}},
+    }  # fmt: skip
+    await agent._red_prs(T0 + HOUR)
+    assert not (agent._repos[root].get("pr_orders") or {}).get("orders")
+    assert not [e for e in agent.sessions["ao-holder"].inbox if e.from_ == "system"]
+
+
 async def test_an_idle_holder_on_a_node_is_told_at_its_address(agent, tmp_path):
     from conftest import park_ticks
 

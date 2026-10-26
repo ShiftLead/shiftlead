@@ -1691,9 +1691,10 @@ class TickMixin:
         where the history cannot be read, the reading at this tick, the log saying which."""
         if not (s.supervised and s.out_of_work) or s.seat is not None or s.superseded_by:
             return
-        led = (self._repos.get(s.repo or "") or {}).get("ledger") or {}
-        if "error" in led or not isinstance(led.get("entries"), list):
-            return
+        facts = self._repos.get(s.repo or "") or {}
+        led = facts.get("ledger") or {}
+        if "error" in led or not isinstance(led.get("entries"), list) or seams_mod.unserved(facts):
+            return  # an unserved repo's lane reads empty (§5 *The seams*, TD-1011)
 
         def matching(got: list[Any]) -> list[str]:
             return [
@@ -1798,9 +1799,10 @@ class TickMixin:
         # both marked by the settle clock as it stands, so an entry still settling is not seen now and is told
         # once it settles (§4.4, TD-710); `then` as the clock stood at `at`, so one settling then is told when
         # it settles
-        remote = str((self._repos.get(s.repo or "") or {}).get("remote") or "")
+        facts = self._repos.get(s.repo or "") or {}
+        remote = str(facts.get("remote") or "")
         for got, when in ((then, at), (tip, datetime.now(UTC))):
-            if got is not None:
+            if got is not None and not seams_mod.unserved(facts):  # no settle in an unserved repo (TD-1011)
                 TickMixin._settle(root, remote, got, when, fresh=False)
         return then, why, tip
 
@@ -1962,6 +1964,8 @@ class TickMixin:
                 continue  # live, or not finished: rule 6's, or nobody's
             if r.id in fresh:
                 continue  # its baseline was written on this tick: news from the next one (TD-781)
+            if seams_mod.unserved(self._repos.get(r.repo or "")):
+                continue  # an unserved repo's lane reads empty: nothing in it starts its team (§5, TD-1011)
             led = (self._repos.get(r.repo or "") or {}).get("ledger") or {}
             if "error" in led or not isinstance(led.get("entries"), list):
                 if isinstance(old, dict):
@@ -3066,6 +3070,20 @@ class TickMixin:
             and not s.pending
         )
 
+    def _turned_unserved(self, root: str, old: Any, new: dict[str, Any]) -> None:
+        """A served repo that turns unserved (§5 *The seams*, TD-1011): the person gets one `system` note
+        for each team running there, naming the first lack — the reading before said `ok`, so a repo read
+        unserved from the first is told nothing, and the next turn is told once more."""
+        was = ((old or {}).get("seams") or {}).get("serve") if isinstance(old, dict) else None
+        lacks = seams_mod.unserved(new)
+        if not (lacks and isinstance(was, dict) and was.get("ok") is True):
+            return
+        live = {s.team for s in self._graph().values() if s.team and s.repo == root and s.state not in work_mod.DEAD}
+        for team in sorted(live):
+            text = f"{Path(root).name} is {lacks[0]} — team {team} has no lane until it is cured"
+            log.info("%s", text)
+            self._system_note(PERSON, text)
+
     async def _refresh_repos(self) -> None:
         """The repo facts (design §4.4 *Repo facts*, TD-176): for every checkout the repos registry
         lists, the PRs and the ledger with its history every `REPOS_EVERY`, and the ledger alone on
@@ -3110,6 +3128,8 @@ class TickMixin:
                 if self._boards_pressed.get(r, float("-inf")) >= began and r in self._repos:
                     v.update({k: self._repos[r][k] for k in ("boards", "work_orders") if k in self._repos[r]})
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
+            for r, v in changed.items():
+                self._turned_unserved(r, self._repos.get(r), v)
             for r in gone:
                 self._repos.pop(r, None)
                 self._ledger_mtime.pop(r, None)
@@ -3148,7 +3168,10 @@ class TickMixin:
                 )
                 old = r.get("pr_orders") or {}
                 mine = [x for x in records if x.repo == root]
-                orders, told, notes = workorders.red_prs(prs, mine, now, old.get("told") or {}, ORPHAN_AFTER)
+                if seams_mod.unserved(r):  # no order in an unserved repo (§5 *The seams*, TD-1011)
+                    orders, told, notes = [], old.get("told") or {}, []
+                else:
+                    orders, told, notes = workorders.red_prs(prs, mine, now, old.get("told") or {}, ORPHAN_AFTER)
                 by_id = {x.id: x for x in mine}
                 for sid, pr in notes:
                     rec = by_id[sid]  # addressed as mail is: a node's record as `<id>@<host>`
@@ -3470,17 +3493,18 @@ class TickMixin:
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs
-        if isinstance(led.get("entries"), list):
-            # the settle clock (§4.4 *A new entry settles before it is pickable*, TD-710): a fresh reading is
-            # recorded and marked, a carried one marked again, so a window ends when its time does
-            TickMixin._settle(root, remote, led["entries"], now, fresh=ledger and "error" not in led)
-        bds, wos = TickMixin._read_boards(root, old, due, boards, stamp)
         seams = old.get("seams")
         if due or seams is None:  # §4.4 *The seams*: on the repo reading's own cadence
             try:
                 seams = seams_mod.reading(root)
             except Exception:  # noqa: BLE001 — a seam that cannot be read keeps the last reading
                 log.exception("reading the seams of %s failed", root)
+        if isinstance(led.get("entries"), list) and not seams_mod.unserved({"seams": seams}):
+            # the settle clock (§4.4 *A new entry settles before it is pickable*, TD-710): a fresh reading is
+            # recorded and marked, a carried one marked again, so a window ends when its time does; an
+            # unserved repo has none (§5 *The seams*, TD-1011)
+            TickMixin._settle(root, remote, led["entries"], now, fresh=ledger and "error" not in led)
+        bds, wos = TickMixin._read_boards(root, old, due, boards, stamp)
         return {
             "name": Path(root).name,
             "root": root,

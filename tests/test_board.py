@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from conftest import served
 
 from sessionorc import board, ledgerboard
 from sessionorc.client import AgentError, LocalClient
@@ -1363,6 +1364,7 @@ def keyed(tmp_path, forge) -> Path:
     git(root, "config", "user.email", "t@example.com")
     git(root, "config", "user.name", "t")
     (root / board.BOARD).write_text(BOARD_TEXT)
+    served(root)
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "init")
     forge(root)

@@ -506,3 +506,15 @@ def with_origin(root: Path) -> Path:
     run("-C", str(root), "fetch", "-q", "origin")
     run("-C", str(root), "remote", "set-head", "origin", "main")
     return bare
+
+
+def served(root) -> None:
+    """dev-cadence's tree, its gate and a ledger in `root`, so the home reads it served (§5 *The seams*,
+    TD-1011): a registered test repo without them is unserved, and the home writes nothing there."""
+    root = Path(root)
+    (root / "docs").mkdir(parents=True, exist_ok=True)
+    (root / "scripts").mkdir(exist_ok=True)
+    (root / "docs" / "cadence-sync.lock").write_text("source: dev-cadence\ncommit: abc1234\nfiles_commit: abc1234\n")
+    (root / "scripts" / "check_cadence.py").write_text("x = 1\n")
+    if not (root / "docs" / "technical_debt.md").exists():
+        (root / "docs" / "technical_debt.md").write_text("# Technical debt\n")

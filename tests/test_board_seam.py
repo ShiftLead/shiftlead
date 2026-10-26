@@ -162,3 +162,27 @@ def test_a_board_outside_the_repo_is_the_key_unset_so_the_write_back_never_edits
     assert workorders.board_path(root) == ("absent", None)
     assert workorders.board_rel(root) == workorders.BOARD
     assert workorders.read_boards(root, fetch=False) == {"boards": []}
+
+
+async def test_an_unserved_repos_board_is_written_by_no_press(agent, tmp_path, forge):
+    """TD-1011, design §5 *The seams*: the home runs no write-back for an unserved repo — a Done, a Reply
+    and an add are refused naming the first lack, and the board is left as it was."""
+    root = make_repo(tmp_path)
+    forge(root)
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{root}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    lack = "unserved: no gate (no scripts/check_cadence.py) — `<dev-cadence>/sync.sh /r`, then a PR"
+    agent._repos[str(root)] = {"name": "repo", "root": str(root), "seams": {"serve": {"ok": False, "lacks": [
+        {"key": "gate", "words": lack}]}}}  # fmt: skip
+    before = (root / REL).read_text()
+    async with LocalClient() as me:
+        for call, kw in (
+            ("board_edit", {"line": 5, "text": ITEM, "action": "done"}),
+            ("board_edit", {"text": "a new line", "action": "add", "due": "2026-10-30"}),
+            ("board_reply", {"line": 5, "text": ITEM, "reply": "later"}),
+        ):
+            with pytest.raises(AgentError, match="repo is unserved: no gate"):
+                await me.call(call, board=str(root / REL), **kw)
+    assert (root / REL).read_text() == before

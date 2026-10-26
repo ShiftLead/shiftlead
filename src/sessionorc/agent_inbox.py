@@ -25,6 +25,7 @@ from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
     ENTRY_PRIORITIES,
@@ -321,6 +322,7 @@ class InboxMixin:
         else typed is a Reply."""
         agent_common.person_only(caller, "edit the board", "§4.4", self._graph())
         root, want = self._board_root(board)
+        self._board_served(root)
         if action == "reply":
             raise RpcError("a reply on a board line is board_reply, which says where it went (design §4.4)")
         if action == "add":
@@ -380,6 +382,11 @@ class InboxMixin:
         if root is None:
             raise RpcError(f"{board} is not the board of a repo this host knows (its repos registry)")
         return root, want
+
+    def _board_served(self, root: Path) -> None:
+        """Refuse a write-back to an unserved repo's board (§5 *The seams*, TD-1011), naming its lack."""
+        if lacks := seams_mod.unserved(self._repos.get(str(root))):
+            raise RpcError(f"{root.name} is {lacks[0]}; the home writes nothing to its board until it is cured")
 
     async def rpc_entry_add(
         self,
@@ -578,6 +585,7 @@ class InboxMixin:
         ref}]`, `session` the holder's name."""
         agent_common.person_only(caller, "reply on the board", "§4.4", self._graph())
         root, want = self._board_root(board)
+        self._board_served(root)
         if line is None and not key:
             raise RpcError("a board reply names the item's line or its id (design §4.4)")
         try:

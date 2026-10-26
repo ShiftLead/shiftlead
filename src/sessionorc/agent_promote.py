@@ -14,6 +14,7 @@ from typing import Any
 
 from sessionorc import agent_common, hosts, mail
 from sessionorc import promote as promote_mod
+from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import RpcError, log
 from sessionorc.models import PERSON
@@ -34,6 +35,8 @@ class PromoteMixin:
             self._promote_watch_at = now_m
             roots = hosts.local_host().repos()
             auto, pull_on = await asyncio.to_thread(self._promote_auto), await asyncio.to_thread(self._pull_on)
+            # an unserved repo is pulled and read, and promoted by nobody's pass (§5 *The seams*, TD-1011)
+            auto.update({Path(r).name: False for r in roots if seams_mod.unserved(self._repos.get(str(r)))})
             async with self._promote_lock:  # a press and the pass never start two runs of one repo
                 fetched = None
                 if full:  # the pull rides the full readings' cadence and fetches for them (§6 *Pull*)
