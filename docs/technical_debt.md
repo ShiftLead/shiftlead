@@ -100,6 +100,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
 | TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
+| TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | Open — stopgap set per repo (samscrape#1121, shiftlead#2391) |
 
 ---
 
@@ -2106,3 +2107,21 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Done when** a test starts a session through each route on a repo listed under a project and reads that project on the record, and a test of `message_edge` lets a `note` through between two such sessions of different teams on one project.
 
 **Related:** TD-1042 (the person's sessions across projects); TD-582, TD-722.
+
+## TD-1044: A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (Paul, during dev-cadence TD-129's rollout; drafted by session `memory-vs-cadence`)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — found pinning samscrape (ContractMatch/samscrape#1115, merged 2026-10-26); stopgap: samscrape#1121 and this repo's pin PR (#2391) set `worktree_setup` to the pinned hydrate.
+**Location:** `src/sessionorc/gitinfo.py` (`HYDRATE = "scripts/hydrate_worktree.sh"`; `worktree_setup()`, which reads `absent` when the file is missing, and the create path that then skips setup; the reaper's `hydrate` lookup, about line 499); `src/shiftlead/repoconfig.py` (`worktree_setup`'s default); `src/sessionorc/cadence.py` (`command(repo, word, *args)`, TD-1014's resolver); `src/shiftlead/team_skill.md` (*unset, dev-cadence's `hydrate_worktree.sh` where present*)
+
+**Why:** dev-cadence TD-129 pins a repo's dev-cadence instead of copying it, so a pinned repo has no `scripts/hydrate_worktree.sh`. The home's default `worktree_setup` is exactly that file, and a missing one reads as `absent`, so a worktree the home makes in a pinned repo gets no setup and says nothing: no `.claude/settings.local.json` (the worktree's `autoMemoryDirectory`, so its session's memories land outside the repo, the TD-080 failure), and no nested repos from `docs/nested-repos.txt`. pneuma-ops, ledgerboard and samscrape were pinned on 2026-10-26; samscrape has a team, so its worktrees were affected from that merge until the stopgap. The reaper reads the same path for its `--dehydrate`, so a pinned repo's nested worktrees would not be taken out through their own repos before removal. TD-1014's Done-when — no reader builds a dev-cadence path outside `cadence.py` and `sync.py` — would have caught `HYDRATE`.
+
+**Fix:** where `cadence.pinned(repo)`, the default setup is `cadence.command(repo, "run", "hydrate_worktree.sh", <path>)` (cwd the new worktree), and the reaper's dehydrate the same with `--dehydrate`; a synced repo keeps today's path; a pin that does not resolve is a warning on the record, never a silent skip. `team_skill.md` and design §5 *The seams* say it. Then drop the stopgap `worktree_setup` lines (samscrape, this repo). Tests: a pinned fixture repo's new worktree gets `settings.local.json`; an unresolvable pin warns.
+
+**Done when** a worktree the home makes in a pinned repo with no `worktree_setup` is hydrated, and the stopgaps are removed.
+
+**Related:** TD-1014 (the resolver), dev-cadence TD-129, TD-149; samscrape#1121.
