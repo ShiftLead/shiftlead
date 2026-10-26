@@ -90,10 +90,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Designed — builds TD-1023, TD-1024 |
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
 | TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Open — design |
-| TD-1026 | Two team lessons from the memory harvest are not in the role briefs: a steer's default waits for its bound, and `--author @me` is not "my PRs"; the designer brief lacks the never-`SendMessage` line | Low | Open — from the 2026-10-26 memory harvest |
+| TD-1026 | Two team lessons from the memory harvest are not in the role briefs: a steer's default waits for its bound, and `--author @me` is not "my PRs"; the designer brief lacks the never-`SendMessage` line | Low | Designed — builds TD-1030 |
 | TD-1027 | `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit) | Low | Open — build |
 | TD-1028 | `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit) | Low | Open — build |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
+| TD-1030 | The role briefs carry the steer-before-bound, own-PRs and claim-area lessons (TD-1026) | Low | Open — build |
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Open |
 | TD-1032 | A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts | Medium | Open |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Open — decided 2026-10-26 (Paul: every repo moves to precheck) |
@@ -1923,8 +1924,9 @@ Trimming before the rule arrives here loses it (§2.4).
 **Added:** 2026-10-26 (Paul, through the memory harvest; drafted by session `memory-vs-cadence`)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — found by Paul's first memory harvest (dev-cadence TD-125, archived); Paul chose a ShiftLead entry for team lessons rather than his own layer.
-**Location:** `src/shiftlead/briefs/grinder.md`, `designer.md`, `hunter.md` (the *steer* bullets: *at its bound you do what you said*); `src/shiftlead/briefs/designer.md` (no never-`SendMessage` line, which `grinder.md`, `auditor.md` and `hunter.md` carry); the briefs' *Declare before the first edit (`ao progress claim <ref>`)*; the source memories under samscrape's and shiftlead's `docs/claude-memory/`
+**Status:** Designed (2026-10-26, the designer) — §4.10 *Steering* (before the bound only reversible private steps), §6 rule 5 (a new run's own PRs: its carried claims' `pr`/`review_pr` and its worktree's branch, never `--author @me`), §4.8 (4) decided: a claim's first `ao doing` line names, in a few words, the area it expects to touch, no new field. (3) was already done: `designer.md` carries the never-`SendMessage` line. Built by TD-1030. Was: Open — found by Paul's first memory harvest (dev-cadence TD-125, archived); Paul chose a ShiftLead entry for team lessons rather than his own layer.
+**Blocked by:** TD-1030
+**Location:** `src/shiftlead/briefs/grinder.md`, `designer.md`, `hunter.md` (the *steer* bullets: *at its bound you do what you said*); `src/shiftlead/briefs/designer.md` (its never-`SendMessage` line, found present at line 35 by the design); the briefs' *Declare before the first edit (`ao progress claim <ref>`)*; the source memories under samscrape's and shiftlead's `docs/claude-memory/`
 
 **Why:** the harvest read every memory on Paul's roster and found four lessons about working as a ShiftLead team member. Two are already in the briefs: *declare before the first edit* with `ao progress claim` (a lease, refused while another live session holds the ref; samscrape `feedback_announce_the_claim_before_working`), and *never message another session through `SendMessage`; use `ao msg`* (samscrape `feedback_peer_message_can_block_the_receiver`) — though `designer.md` lacks that second line, and the claim lesson's one extra point, naming the files you expect to touch so a peer can take an adjacent slice, is in no brief. Two are in none:
 - **A steer's default licenses acting only after its bound** (samscrape `feedback_a_steer_default_holds_only_after_its_bound`): a session sent a `steer` with default *proceed* on TD-436 and merged about 15 minutes later, pre-empting the techlead's pass-up to Paul. The briefs say *at its bound you do what you said*, but not that before the bound only reversible, private steps (branch, PR, review) are taken.
@@ -1992,6 +1994,28 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Done when** dev-cadence's harvest, run over a repo with `.shiftlead.yml`, offers a ShiftLead-team lesson this ledger or the person's `shiftlead/` directory as its destination.
 
 **Related:** TD-1026 (the lessons filed by hand); dev-cadence TD-125, TD-144.
+
+## TD-1030: The role briefs carry the steer-before-bound, own-PRs and claim-area lessons (TD-1026)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (the designer, from TD-1026)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/briefs/grinder.md`, `designer.md`, `hunter.md`, `manager.md`, `auditor.md`, `manager_on_call.md` (the steer bullets), `grinder.md` and `designer.md` (the claim lines), `designer.md` (the next run's *open PRs (`gh pr list`)*), any other brief under `src/shiftlead/briefs/` that tells a member to find its own PRs or to steer; (no test pins these words today: `tests/test_briefs_layout.py` pins slots and the cadence line only); design §4.10 *Steering*, §6 rule 5, §4.8 *the claim's first `ao doing` line*
+
+**Why:** TD-1026: two team lessons from Paul's memory harvest live only in samscrape's memory and Paul's own layer, so a new ShiftLead user or a team in another repo meets each again.
+
+**Fix:** as the design now says —
+- Each brief whose steer bullet says *at its bound you do what you said* adds: before the bound, only steps you can take back (branch, commits, PR, its review); what rests on the steered choice and others see — its merge, a send that acts on it, a deploy — waits for the reply or the lapse, and other work goes on. `hunter.md`, which merges nothing, says it shorter: nothing others see until the reply or the lapse. The steer senders are `grinder.md`, `designer.md`, `hunter.md`, `manager.md`, `auditor.md` and `manager_on_call.md` (the last two steer the techlead, worded differently): each gets the clause beside its steer line; `techlead.md` answers steers and is untouched.
+- `designer.md`'s next run reads its own PRs — its carried claims' `pr` and `review_pr`, and the branch its worktree holds — in place of `gh pr list`, with the reason in a clause: every session pushes as the person's one account, so `--author @me` is all of theirs. Any other brief with the same read gets the same words.
+- `grinder.md`'s and `designer.md`'s claim lines (*`ao doing` when you claim*): the first line also names, in a few words, the area the work expects to touch (kept under the 200-character cap by shortening the area, never the passed-over reason), and before claiming the member reads, in `ao repo`, each sibling's held ref (`holds`: an entry's ledger `**Location:**`, a `pr:<n>` order's PR files, a `board:<key>` order by its `doing` line alone) and newest `doing` line naming an area, and passes over an entry that overlaps one, saying so as a passed-over reason (§4.8's fifth). No code changes: `ao repo` already prints `holds` and the `doing` log (§4.7). `hunter.md`, `auditor.md`, `techlead.md` and the managers' briefs claim no ledger slices beside siblings and are untouched by this bullet.
+- Each new line cites its source in the commit message (samscrape `feedback_a_steer_default_holds_only_after_its_bound`, shiftlead `shiftlead-td-grind-mechanics`), never in the brief.
+
+**Done when:** the steer clause is in `grinder.md`, `designer.md`, `hunter.md`, `manager.md`, `auditor.md` and `manager_on_call.md`; the claim-area words and the sibling read in `grinder.md` and `designer.md`; the own-PRs read in `designer.md` (and in any brief a grep for `gh pr list` finds reading its own PRs); the tests that pin briefs pass; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1026, dev-cadence TD-125.
 
 ## TD-1031: A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down
 

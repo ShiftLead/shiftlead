@@ -437,7 +437,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the claims that were not waiting, and a person's **Restart** still starts fresh (rule 2). A
      steer that lapses or is answered meanwhile reaches the new run by the kept mail (§4.10 *A
      question about a reference outlives its asker*). The new run reads its carried claims first
-     (`ao status --json`, its own `progress`) and finishes each from its PR, its thread and the
+     (`ao status --json`, its own `progress`) and its own PRs — its carried claims' `pr` and `review_pr`, and
+     the branch its worktree holds; never `gh pr list --author @me`, which is every
+     session's, since all push as the person's one account (TD-1026) — and finishes each from its PR, its thread and the
      entry, which hold everything the old run knew of it; a run holding only waiting claims with
      nothing to pick declares `none` beside them (§4.9a) and ends its turn, woken by the reply or
      the lapse. A member that is `working`
