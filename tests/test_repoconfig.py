@@ -1,8 +1,12 @@
 """`.shiftlead.yml` (design §5) and the role presets over it (§4.8): defaults, the per-key merge,
 a malformed file, the brief templates."""
 
+import shlex
+import sys
+
 import pytest
 
+from sessionorc import cadence
 from shiftlead import repoconfig
 
 pytestmark = pytest.mark.unit
@@ -215,6 +219,35 @@ def test_a_brief_names_the_repos_layout_through_its_slots(tmp_path):
     (tmp_path / ".shiftlead.yml").write_text("roles: {plain: {brief: briefs/g.md}}\n")
     _, made = repoconfig.resolve_role(repoconfig.load(tmp_path), "plain").compose()
     assert not set(made["slots"]) & {*repoconfig.LAYOUT_SLOTS, "{pr}"}
+
+
+def test_a_pinned_repos_layout_names_the_resolvers_command(tmp_path):
+    """TD-1014, design §5 *The seams*: a repo whose `docs/cadence.toml` holds `[dev-cadence]` and no lock has
+    its cadence slots from the resolver — the vendored launcher under this Python, no `-C`, so the session's
+    own checkout resolves; a lock beside the pin keeps the copy's paths; read across the link as any seam."""
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "cadence.toml").write_text(
+        f'[dev-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n', encoding="utf-8"
+    )
+    launcher = f"{shlex.quote(sys.executable)} {shlex.quote(str(cadence.LAUNCHER))}"
+    got = repoconfig.layout(repoconfig.load_text(None, tmp_path))
+    assert got["{gate}"] == f"{launcher} run check_cadence.py --pr {{pr}}"
+    assert got["{ledger_check}"] == f"{launcher} run ledger.py --check"
+    assert got["{cadence_rules}"] == f"read the file `{launcher} path cadence.md` prints, §1–§4"
+    assert "-C" not in got["{gate}"].split()
+    # the same pin read across the link
+    cfg = repoconfig.load_text(None, tmp_path)
+    seen = []
+    cfg.read = lambda path: seen.append(path) or (path.read_text(encoding="utf-8") if path.is_file() else None)
+    assert repoconfig.layout(cfg)["{gate}"] == got["{gate}"] and tmp_path / "docs" / "cadence.toml" in seen
+    # a lock keeps the copy read; a toml with no `[dev-cadence]` is no pin
+    (tmp_path / "docs" / "cadence-sync.lock").write_text("files_commit=x\n")
+    assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{gate}"].startswith("python3 scripts/")
+    (tmp_path / "docs" / "cadence-sync.lock").unlink()
+    (tmp_path / "docs" / "cadence.toml").write_text("[other]\nx = 1\n")
+    assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{ledger_check}"] == (
+        "python3 scripts/ledger.py --check"
+    )
 
 
 def test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_otherwise(tmp_path):

@@ -308,8 +308,12 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   and the repo's own, each with its sentence: `{test}` (*no test command: run what the repo's README
   says*), `{lint}` (*no lint command: keep to the style of the code around the change*) and
   `{design_dir}` (`docs/design/` where the checkout holds it, else *no design directory: the README and
-  the code say what is true*). Under dev-cadence TD-129 `{gate}`, `{ledger_check}` and
-  `{cadence_rules}` name what the resolver gives (below). They are read only when the brief
+  the code say what is true*). In a pinned repo (below) `{gate}`, `{ledger_check}` and
+  `{cadence_rules}` name what the resolver gives, as a session types it (`cadence.typed`): the vendored
+  launcher under the host agent's own Python, its argv without `-C`, so the session's own checkout
+  resolves — a worktree's ledger is the one checked, a bump branch runs its own pin — as
+  `<python> <launcher> run check_cadence.py --pr {pr}`, `… run ledger.py --check` and *read the file
+  `… path cadence.md` prints, §1–§4*; a lock beside the pin keeps the copy's paths. They are read only when the brief
   being composed names one — a node's files are asked across the link, where a directory or a file
   past the cap is refused by name and is there, and any other failure stops the start rather than tell
   the brief a seam is absent — after every other slot, and fill a supplement's text as they fill the
