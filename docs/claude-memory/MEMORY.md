@@ -23,7 +23,7 @@
 - [Dates are local, PR numbers are real](dates-and-pr-numbers-are-local-and-real.md) — `date` before a dated ledger edit; open the PR before writing its number
 - [Read inbox before merging](read-inbox-before-merging.md) — merge rights change by mail; a held-path PR (`ao pr held N`) is handed over: its author sends the techlead seat the `ask --pr` once green, or it sits unasked (#1842)
 - [No checks means conflicting](no-checks-means-conflicting.md) — `gh pr checks` empty after a push: the PR conflicts with main, so no pull_request run; rebase
-- [Gate a merge on the check's exit code](gate-a-merge-on-the-checks-exit-code.md) — the cadence procedure's step 5: merge on the check's own exit code, never through `| head`
+- [Gate a merge on the check's exit code](gate-a-merge-on-the-checks-exit-code.md) — step 5 merges on exit 0; capture it from the check itself, never through `| head`
 - [Reviewer prompts keep out of the anchor](reviewer-prompts-keep-out-of-the-anchor.md) — a reviewer given `git -C /home/kmaster/shiftlead` ran a checkout there; worktree paths only
 - [Scratch-worktree tests import the main checkout](scratch-worktree-tests-import-main-checkout.md) — run a branch's tests with `PYTHONPATH=$PWD/src` and the main venv
 - [Retarget a stacked PR with the API](retarget-a-stacked-pr-with-the-api.md) — `gh pr edit` (--base, --body-file) fails on projectCards; PATCH pulls/N, rebase --onto, delete the base last
