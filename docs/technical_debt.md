@@ -90,6 +90,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Designed — builds TD-1023, TD-1024 |
 | TD-1023 | The layer's SessionStart line is dev-cadence's pinned seed, verbatim and parity-tested; Gemini's start hooks and the repo's own line follow the pin | High | Open — build |
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
+| TD-1027 | `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit) | Low | Open — build |
+| TD-1028 | `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit) | Low | Open — build |
 
 ---
 
@@ -1909,3 +1911,39 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** a pinned temp repo carrying the current line, the TD-129 shim and a roster line warns neither *no SessionStart line* nor `sync.sh` / `sync-all`; the same repo with the 2026-09-25 line warns *predates the pin*, with a pre-pin shim the launcher's shim cure, and off the roster the `adopt` cure; an unpinned repo's three warnings are today's words; a line with one byte changed warns *not one this build knows*, and not also *no SessionStart line*, and the same beside the current line warns nothing; a shim text taken from dev-cadence 2cc2b88 (pre-pin) in a pinned repo warns, one from ddd2f99 does not; the 2026-09-25 line beside the current one warns no *predates the pin*; a temp root with `files/` and `launcher/INTERFACE` and no `sync.sh` reads `is_source` and is `adopt.dev_cadence`'s pick, and `ao repo add` (with and without `--adopt`) against it gives the refusal and makes no clone, and `seams.descends` finds it as the roster's dev-cadence checkout; a copied repo's cures still name `sync.sh` (the copy era has it); a reading without `hook_pinned` warns as today. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1022, TD-1023, TD-1010 (the roster warning), TD-1014.
+
+## TD-1027: `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2368)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/repoconfig.py` (`layout`'s inner `pinned()`), `tests/test_repoconfig.py` (`test_a_pinned_repos_layout_names_the_resolvers_command`)
+
+**Why:** #2368 (TD-1014 slice 2) wrote `pinned()` to say a pin the launcher would refuse "is pinned still", and to read a refused-by-name `OSError` across the link as there. Probed on `origin/main` 0a24e16f4 with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_repoconfig.py tests/test_cli_teams.py`: (a) replacing `return PIN_HEADER in (line.strip() for line in text.splitlines())` (the `TOMLDecodeError` fallback) with `return False` leaves 143 passed; (b) replacing the `except OSError` body's `if any(why in str(e) for why in THERE_REFUSALS): return True` with a bare `raise` leaves 143 passed. The test's only TOML cases are a valid table, a valid table with odd spacing and a comment, and `[other]`, so neither branch runs; `test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_otherwise` covers `there()`'s refusals, not `pinned()`'s own copy of them. A node's repo whose pin is half-edited would then brief a session the copy's `python3 scripts/…` paths, which a pinned repo has not got, with nothing to say so.
+
+**Fix:** add to the test (or beside it) a pin whose text is not TOML but holds a `[dev-cadence]` line (layout reads the resolver's command), one whose text is not TOML and has none (reads the copy's paths), and a `cfg.read` that raises an `OSError` of a refusal named in `THERE_REFUSALS` (pinned) and of another kind (raised).
+
+**Done when:** each of the two reverts above fails a test; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014, TD-1011.
+
+## TD-1028: `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2365)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/cadence.py` (`_tree`, `_launcher_words`), `tests/test_cadence_pin.py`
+
+**Why:** #2365 (TD-1014 slice 1) made `_tree` answer `(None, why)` in words a repo's lack then prints (§5 *How the readers find dev-cadence*). Probed on `origin/main` 0a24e16f4 with `PYTHONPATH=$PWD/src pdm run pytest -q -x tests/test_cadence_pin.py tests/test_seams.py tests/test_lane_news.py tests/test_cadence_policy.py`: replacing the text of `the launcher gave no answer in {timeout:.0f}s`, of `the launcher could not run: …`, or the guard `if not out or not Path(out).is_dir():` (made `if False:`) each leaves 56 passed, and so does reading the first line of the launcher's stderr, not the last, in `_launcher_words`. `grep -rn "gave no answer\|could not run\|not a directory here" tests` finds none of the three. `test_a_pin_the_launcher_refuses_or_cannot_resolve_is_a_lack_by_name` covers only a non-zero exit with one stderr line.
+
+**Fix:** a stub launcher (`_stub` in the module) that sleeps past a small `timeout`, an `argv` that cannot execute, one that exits 0 printing a path that is not a directory or nothing, and a refusal on several stderr lines whose last is the reason; each asserted as the words a lack carries.
+
+**Done when:** each of the four reverts above fails a test; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
