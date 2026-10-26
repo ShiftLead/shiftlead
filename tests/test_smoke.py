@@ -135,7 +135,13 @@ def test_a_healthy_ui_passes_with_a_line_per_load_and_the_browser_half_skipped(t
     assert inbox[0].startswith("Inbox /inbox · cold · 200 · first byte ")
     assert inbox[1].startswith("Inbox /inbox · 200 · first byte ")
     assert all(ln.endswith(f"· {len(PAGE)} bytes · {steps}") for ln in inbox) and len(inbox) == 2
-    assert (tmp_path / "ao.log").read_text().splitlines() == ["status --json", "repo --json", "promote status --json"]
+    assert (tmp_path / "ao.log").read_text().splitlines() == [
+        "status --json",
+        "repo --json",
+        "promote status --json",
+        "service status --json",
+    ]
+    assert "build check skipped: no SHIFTLEAD_PROMOTE_SHA (a smoke run by hand)" in lines
 
 
 @pytest.mark.parametrize(
@@ -332,7 +338,10 @@ def test_the_reach_url_is_read_from_settings_and_handed_to_the_smoke(tmp_path, m
     assert sm.reach_url() == "https://home.example.ts.net"
     got: dict = {}
     monkeypatch.setattr(sm, "smoke", lambda **kw: got.update(kw) or 0)
-    assert sm.main([]) == 0 and got == {"reach": "https://home.example.ts.net"}
+    monkeypatch.delenv("SHIFTLEAD_PROMOTE_SHA", raising=False)  # a smoke run by hand
+    assert sm.main([]) == 0 and got == {"reach": "https://home.example.ts.net", "sha": None}
+    monkeypatch.setenv("SHIFTLEAD_PROMOTE_SHA", "a" * 40)  # the promote's: the running build is checked against it
+    assert sm.main([]) == 0 and got["sha"] == "a" * 40
     settings.write_text("reach: {route: tailscale, url: 'http://home.example.ts.net', allow: [paul]}\n")
     assert sm.reach_url() is None  # a malformed route: no reach loads, failing nothing
     settings.write_text("other: 1\n")
@@ -418,3 +427,27 @@ def test_browse_that_cannot_launch_is_unavailable_with_its_first_line(monkeypatc
     assert sm.browse("http://ui") == sm.UNAVAILABLE
     out = capsys.readouterr()
     assert out.out == "" and out.err.strip() == "RuntimeError: Executable doesn't exist at /x/chrome"
+
+
+def test_the_running_build_must_be_the_promoted_commit(tmp_path, stub, capsys):
+    """design §6 *The smoke* (TD-1041): `check` reads the installed copy, so a run that installed and then
+    failed its restart leaves the old units serving; the smoke compares the running build."""
+    sha, other = "a" * 40, "b" * 40
+
+    def read(commit):
+        return {"status": "", "build": {"built_from": {"commit": commit}}}
+
+    assert sm.build_check(sha, read(sha)) == "running build aaaaaaa is the promoted one"
+    assert sm.build_check(None, read(other)).startswith("build check skipped: no SHIFTLEAD_PROMOTE_SHA")
+    for got, why in (
+        (read(other), "running build bbbbbbb is not the promoted aaaaaaa"),
+        (read(sha[:7]), "running build aaaaaaa is not the promoted aaaaaaa"),  # the full commit, never a prefix
+        ({"status": "", "build": None}, "running build unknown"),
+        (read(None), "running build unknown"),
+        (None, "running build unknown"),
+    ):
+        with pytest.raises(sm.Failed, match=f"^{why}$"):
+            sm.build_check(sha, got)
+    port, _, _ = stub
+    code, lines = _run(tmp_path, port, capsys, sha=sha)  # the stub `ao` answers no build
+    assert code == 1 and lines[-1] == "smoke failed: running build unknown"
