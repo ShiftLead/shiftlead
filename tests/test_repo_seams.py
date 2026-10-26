@@ -262,3 +262,31 @@ def test_with_no_dev_cadence_checkout_the_forge_compares_and_a_failure_is_a_warn
     again = seams.reading(root, [root], got)
     assert again["cadence_age"] == got["cadence_age"], "the age of two commits is read once"
     assert again["serve"] == got["serve"]
+
+
+def test_the_tick_reads_the_age_against_the_registry_and_carries_it(tmp_path, monkeypatch):
+    """TD-1020: the home's own repo read (`TickMixin._read_repos`) passes the registry to the seams as their
+    roster, so a lock older than `OLDEST` is read in the registry's dev-cadence checkout with no `gh`, and
+    the next read carries that age without the checkout and without the forge."""
+    from sessionorc.agent_tick import TickMixin
+
+    src, (first, middle, third) = _dev_cadence(tmp_path)
+    root = _consumer(tmp_path, middle)
+    _git(tmp_path, "init", "-q", "-b", "main", str(root))
+    monkeypatch.setattr(cadence, "OLDEST", third)
+    bin_ = tmp_path / "bin"
+    bin_.mkdir()
+    gh = bin_ / "gh"
+    gh.write_text('#!/bin/sh\necho "$@" >> "$0.calls"\nexit 1\n')
+    gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_}:/usr/bin:/bin")
+    r = str(root)
+    got = TickMixin._read_repos([r], {}, set(), registry=[r, str(src)])
+    age = got[r]["seams"]["cadence_age"]
+    assert age == {"commit": middle, "oldest": third, "descends": False, "why": None}
+    assert got[r]["seams"]["serve"]["lacks"][0]["key"] == "age"
+    # the five-minute read, the registry without dev-cadence: the age is carried, the forge never asked
+    again = TickMixin._read_repos([r], got, {r}, registry=[r])
+    assert again[r]["seams"]["cadence_age"] == age
+    calls = (bin_ / "gh.calls").read_text() if (bin_ / "gh.calls").exists() else ""
+    assert "compare" not in calls
