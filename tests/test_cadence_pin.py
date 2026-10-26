@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from sessionorc import cadence, seams
+from sessionorc import cadence, conventions, seams
 from sessionorc import ledgerboard as lb
 from shiftlead import doctor
 
@@ -39,6 +39,9 @@ if args == ["path"]:
 elif args[:2] == ["run", "check_cadence.py"]:
     pr = int(args[3])
     print(json.dumps({"prs": [{"pr": pr, "verdict": "fail", "rows": [{"rule": "review", "status": "fail"}]}]}))
+elif args == ["run", "cadence_changes.py", "--json"]:
+    entry = {"heading": "### 2026-10-26 — pinned", "date": "2026-10-26", "title": "pinned", "landed": None}
+    print(json.dumps({"ref": "origin/main", "entries": [entry]}))
 else:
     sys.exit(2)
 """
@@ -209,3 +212,25 @@ def test_a_repo_with_neither_pin_nor_lock_names_both(tmp_path):
         "words": "unserved: no dev-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — "
         + seams.cure(root),
     }
+
+
+def test_a_pinned_repos_conventions_run_the_pinned_trees_script_through_the_resolver(tmp_path, monkeypatch):
+    """Design §6 rule 12 (TD-1014 slice 3): a pinned repo has no `scripts/cadence_changes.py`; the relay
+    runs the pinned tree's through the resolver, and a tree without it gives no reading."""
+    payload = _payload(tmp_path)
+    stub = _stub(tmp_path, monkeypatch, payload)
+    root = _pinned(tmp_path, "a" * 40)
+    assert not conventions.has_script(root) and conventions.read(root) is None, "the tree carries no script"
+    (payload / "scripts" / "cadence_changes.py").write_text("x = 1\n")
+    cadence._trees.clear()
+    assert conventions.has_script(root)
+    got = conventions.read(root)
+    assert got == {
+        "ref": "origin/main",
+        "entries": [{"heading": "### 2026-10-26 — pinned", "date": "2026-10-26", "title": "pinned", "landed": None}],
+    }
+    ran = [c for c in _calls(stub) if c["argv"][2:3] == ["run"]]
+    assert ran == [{"argv": ["-C", str(root), "run", "cadence_changes.py", "--json"], "root": str(root)}]
+    # a lock beside the pin keeps the copy's script, which this checkout lacks
+    (root / "docs" / "cadence-sync.lock").write_text("files_commit=x\n")
+    assert not conventions.has_script(root)
