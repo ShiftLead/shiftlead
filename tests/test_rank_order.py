@@ -11,12 +11,13 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from conftest import pinned_script
+
 from sessionorc import ledger
 from sessionorc import ledgerboard as lb
 from shiftlead import cli
 
 ROOT = Path(__file__).parents[1]
-SCRIPT = ROOT / "scripts" / "ledger.py"
 
 LEDGER = """# Technical Debt
 
@@ -120,7 +121,7 @@ def test_ao_repos_order_is_ledger_py_pickables_from_the_rank_file_alone(tmp_path
     rank = lb.set_rank("", {"TD-010": lb.midpoint("1|0|000013", "2|0|000012"), "TD-011": lb.midpoint(None, "1")})
     (tmp_path / "docs" / "technical_debt_rank.yml").write_text(rank, encoding="utf-8")
     cp = subprocess.run(
-        [sys.executable, str(SCRIPT), "--pickable", "--json"],
+        [sys.executable, str(pinned_script("ledger.py")), "--pickable", "--json"],
         cwd=tmp_path, env={"DEV_CADENCE_REG_DIR": str(tmp_path / "no-roster"), "PATH": "/usr/bin:/bin"},
         capture_output=True, text=True, timeout=60, check=True,
     )  # fmt: skip

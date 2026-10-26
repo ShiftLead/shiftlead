@@ -142,13 +142,22 @@ def write_fixtures(home: Path) -> Path:
     today = time.strftime("%Y-%m-%d")
     (repo / "docs" / "user_attention.md").write_text(BOARD.format(today=today), encoding="utf-8")
     (repo / "docs" / "technical_debt.md").write_text(LEDGER, encoding="utf-8")
-    # the Inbox runs the board reader a registered repo carries: this checkout's copy
+    # the Inbox runs the board reader a registered repo carries. This checkout pins dev-cadence (TD-129) and
+    # carries no copies, so the fixture repo is a synced one made from the pinned tree's files
+    sys.path.insert(0, str(SRC))
+    from sessionorc import cadence
+
+    tree, why = cadence.tree(ROOT)
+    if tree is None:
+        raise SystemExit(f"look_home: dev-cadence's pinned tree did not resolve: {why}")
+    source, ref = cadence.pin(ROOT)
     (repo / "scripts").mkdir()
-    shutil.copy2(ROOT / "scripts" / "nudge_user_attention.py", repo / "scripts" / "nudge_user_attention.py")
-    shutil.copy2(ROOT / "scripts" / "ledgerboard.py", repo / "scripts" / "ledgerboard.py")  # the reader imports it
-    # served (design §5 *The seams*, TD-1011): dev-cadence's lock and its gate, this checkout's copies
-    shutil.copy2(ROOT / "docs" / "cadence-sync.lock", repo / "docs" / "cadence-sync.lock")
-    shutil.copy2(ROOT / "scripts" / "check_cadence.py", repo / "scripts" / "check_cadence.py")
+    shutil.copy2(tree / "scripts" / "nudge_user_attention.py", repo / "scripts" / "nudge_user_attention.py")
+    shutil.copy2(tree / "scripts" / "ledgerboard.py", repo / "scripts" / "ledgerboard.py")  # the reader imports it
+    # served (design §5 *The seams*, TD-1011): a lock at the pinned commit, and the pinned tree's gate
+    lock = f"source: {source}\ncommit: {ref[:7]}\nfiles_commit: {ref}\n"
+    (repo / "docs" / "cadence-sync.lock").write_text(lock, encoding="utf-8")
+    shutil.copy2(tree / "scripts" / "check_cadence.py", repo / "scripts" / "check_cadence.py")
     git = ["git", "-C", str(repo), "-c", "user.name=look", "-c", "user.email=look@localhost"]
     subprocess.run([*git, "init", "-q", "-b", "main"], check=True)
     subprocess.run([*git, "add", "-A"], check=True)

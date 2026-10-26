@@ -98,8 +98,9 @@ filterwarnings = [
 line-length = 120
 target-version = "py312"
 # the vendored ledgerboard and its fixtures are read, never formatted: its release header hashes its
-# body and a test holds it byte-equal to scripts/ledgerboard.py (ADR 2026-10-12, TD-585); dev-cadence's
-# launcher is vendored frozen, its hash held by a test (§5 *How the readers find dev-cadence*, TD-1014)
+# body and a test holds it byte-equal to the pinned dev-cadence tree's scripts/ledgerboard.py (ADR
+# 2026-10-12, TD-585); dev-cadence's launcher is vendored frozen, its hash held by a test (§5 *How the
+# readers find dev-cadence*, TD-1014)
 extend-exclude = ["scripts", "docs", "src/sessionorc/ledgerboard.py", "src/sessionorc/dev_cadence.py", "tests/ledgerboard"]
 
 [tool.ruff.lint]

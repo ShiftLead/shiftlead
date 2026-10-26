@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import served
+from conftest import pinned_script, served
 
 from sessionorc import board, ledgerboard
 from sessionorc.client import AgentError, LocalClient
@@ -730,9 +730,6 @@ def test_a_decide_writes_the_field_at_the_lines_end_and_its_message():
             bad()
 
 
-READER = Path(__file__).parents[1] / "scripts" / "nudge_user_attention.py"
-
-
 def read_back(tmp_path: Path, line: str) -> dict:
     """What dev-cadence's own reader makes of `line`: the fields the Inbox draws."""
     import json
@@ -742,7 +739,7 @@ def read_back(tmp_path: Path, line: str) -> dict:
     path = tmp_path / board.BOARD
     path.write_text(f"# b\n\n## Needs the user\n\n{line}\n")
     out = subprocess.run(
-        [sys.executable, str(READER), "--board", str(path), "--report", "--json"],
+        [sys.executable, str(pinned_script("nudge_user_attention.py")), "--board", str(path), "--report", "--json"],
         capture_output=True, text=True, check=True,
     ).stdout  # fmt: skip
     return json.loads(out)["boards"][0]["items"][0]
@@ -1094,8 +1091,8 @@ def test_a_ledger_answer_is_one_decided_line_the_reader_reads_as_a_work_order(tm
     root = tmp_path / "r"
     (root / "docs").mkdir(parents=True)
     (root / "scripts").mkdir()
-    shutil.copy2(Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py", root / "scripts")
-    shutil.copy2(Path(__file__).resolve().parent.parent / "scripts" / "ledgerboard.py", root / "scripts")
+    shutil.copy2(pinned_script("nudge_user_attention.py"), root / "scripts")
+    shutil.copy2(pinned_script("ledgerboard.py"), root / "scripts")
     (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{line}"))
     (o,) = workorders.read(root, fetch=False)["orders"]
     assert o["decided"] == {"text": "At the reset", "date": "2026-10-12"} and "TD-133" in o["refs"]
@@ -1357,7 +1354,7 @@ def keyed(tmp_path, forge) -> Path:
     root = tmp_path / "keyed"
     (root / "docs").mkdir(parents=True)
     (root / "scripts").mkdir()
-    reader = Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py"
+    reader = pinned_script("nudge_user_attention.py")
     (root / "scripts" / "nudge_user_attention.py").write_text(reader.read_text())
     # the reader imports its sibling: without it, it loads only where an earlier test left one importable
     (root / "scripts" / "ledgerboard.py").write_text(reader.with_name("ledgerboard.py").read_text())

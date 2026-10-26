@@ -13,6 +13,10 @@ import pathlib
 import re
 import sys
 from collections import Counter
+from typing import NamedTuple
+
+import pytest
+from conftest import pinned_script
 
 from sessionorc import ledger
 from sessionorc import ledgerboard as lb
@@ -143,33 +147,45 @@ def test_the_open_file_holds_open_work_only():
 
 
 def _script():
-    """dev-cadence's `scripts/ledger.py`, loaded from its file: the reader of the preamble's `Fields:` line."""
-    spec = importlib.util.spec_from_file_location("cadence_ledger", DOCS.parent / "scripts" / "ledger.py")
+    """dev-cadence's `scripts/ledger.py`, loaded from the pinned tree: the reader of the preamble's `Fields:` line."""
+    spec = importlib.util.spec_from_file_location("cadence_ledger", pinned_script("ledger.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod  # its dataclasses look their module up by name
     spec.loader.exec_module(mod)
     return mod
 
 
-# TD-248: one list of words, not two. The ledger's preamble declares them (cadence §2.12) and the
-# synced script reads them, so the test and the script cannot disagree about what an Owner is.
-DECLARED, DECLARED_FLAGS = _script().declared(OPEN.read_text())
-OWNERS = set(DECLARED.get("owner", ()))
-KINDS = set(DECLARED.get("kind", ()))
+# TD-248: one list of words, not two. The ledger's preamble declares them (cadence §2.12) and
+# dev-cadence's script reads them, so the test and the script cannot disagree about what an Owner is.
+# A fixture, not a module constant: where the pinned tree does not resolve, its tests skip, not the file.
+class Declared(NamedTuple):
+    words: dict
+    flags: list
+    owners: set
+    kinds: set
+
+
+@pytest.fixture(scope="module")
+def declared() -> Declared:
+    words, flags = _script().declared(OPEN.read_text())
+    return Declared(words, flags, set(words.get("owner", ())), set(words.get("kind", ())))
+
+
 HEADER = re.compile(
     r"^\*\*Added:\*\*[^\n]*\n\*\*Owner:\*\* (?P<owner>\S+)\n\*\*Kind:\*\* (?P<kind>\S+)(?P<rest>[^\n]*)\n",
     re.M,
 )
 
 
-def test_the_preamble_declares_the_owner_and_kind_words():
+def test_the_preamble_declares_the_owner_and_kind_words(declared):
     """TD-248: the `Fields:` line is read whole, and it is where both sets come from.
 
     A line the script cannot read is a flag there and an empty set here, which would fail every
     entry below with *unknown Owner* and hide the cause; this says it first. The words of the
     paragraph above the line are prose, so they are held to the line too.
     """
-    assert not DECLARED_FLAGS, DECLARED_FLAGS
+    DECLARED, OWNERS, KINDS = declared.words, declared.owners, declared.kinds
+    assert not declared.flags, declared.flags
     assert OWNERS and KINDS, f"the preamble's Fields: line declares Owner and Kind, read as {DECLARED}"
     pre = OPEN.read_text().split("\n## ", 1)[0]
     prose = {"Owner": OWNERS, "Kind": KINDS}
@@ -179,12 +195,13 @@ def test_the_preamble_declares_the_owner_and_kind_words():
         assert set(re.findall(r"`([^`]+)`", said[1])) == words, f"{name}: the paragraph and the Fields: line differ"
 
 
-def test_every_open_entry_carries_the_header_in_order_with_known_values():
+def test_every_open_entry_carries_the_header_in_order_with_known_values(declared):
     """TD-118: `Owner` and `Kind` after `Added`, so an out-of-work search filters on them.
 
     Every open entry has both, right after `Added`, with a value from the preamble's list — a
     missing header or a typo'd owner would drop an entry out of every filter silently.
     """
+    OWNERS, KINDS = declared.owners, declared.kinds
     for id_, body in entries(OPEN):
         m = HEADER.search(body)
         assert m, f"{id_}: Owner and Kind go together, in that order, right after Added"
@@ -198,7 +215,7 @@ def test_every_open_entry_carries_the_header_in_order_with_known_values():
         )
 
 
-def test_no_entry_writes_a_pickable_line():
+def test_no_entry_writes_a_pickable_line(declared):
     """TD-228 slice 3: pickable is derived from `Blocked by:` (cadence §2.4), never written.
 
     A written `**Pickable:** no` with no blocker hid two entries from every lane (TD-248); a line
@@ -207,4 +224,4 @@ def test_no_entry_writes_a_pickable_line():
     """
     lines = [ln for ln in OPEN.read_text().splitlines() if ln.startswith("**Pickable:**")]
     assert not lines, f"the ledger writes Pickable on {len(lines)} line(s): say what blocks it as Blocked by"
-    assert "pickable" not in DECLARED, "the preamble's Fields: line declares no Pickable words"
+    assert "pickable" not in declared.words, "the preamble's Fields: line declares no Pickable words"

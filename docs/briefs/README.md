@@ -21,7 +21,7 @@ agent's now — the usage gate pauses and resumes unattended sessions against th
 
 `manager-ao-1.md` is the team's manager (design §4.8): a session holding the
 `control` grant that keeps the unattended workers going and runs the cadence check
-(`scripts/check_cadence.py`, cadence §4) on what they call done. **By hand** — which is what this
+(`dev-cadence run check_cadence.py`, cadence §4) on what they call done. **By hand** — which is what this
 file is about — launch it **after** the workers and attach it to them in the same step; see
 Membership below, which is the part that is easy to forget and looks like a broken lead when it
 is. (`ao team start` does both for you, in the right order, and is the ordinary way in.)

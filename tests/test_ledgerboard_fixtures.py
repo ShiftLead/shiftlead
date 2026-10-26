@@ -1,7 +1,8 @@
 """The vendored ledgerboard (ADR 2026-10-12 *How ledgerboard is consumed*, design §8, TD-585): the
 wheel's `src/sessionorc/ledgerboard.py` is an intact release — the one `tests/ledgerboard/MANIFEST`
-names — byte-equal to the synced `scripts/ledgerboard.py` where both exist, every vendored file is as
-`scripts/vendor_ledgerboard.sh` wrote it, and the release's own fixtures pass against it."""
+names — byte-equal to `scripts/ledgerboard.py` in the dev-cadence tree this repo pins (dev-cadence TD-129;
+before the pin, the synced copy), every vendored file is as `scripts/vendor_ledgerboard.sh` wrote it, and
+the release's own fixtures pass against it."""
 
 from __future__ import annotations
 
@@ -10,11 +11,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
+from conftest import pinned_script
 
 ROOT = Path(__file__).resolve().parent.parent
 WHEEL = ROOT / "src" / "sessionorc" / "ledgerboard.py"
-SYNCED = ROOT / "scripts" / "ledgerboard.py"
 FIXTURES = ROOT / "tests" / "ledgerboard"
 MANIFEST = FIXTURES / "MANIFEST"
 
@@ -37,12 +37,12 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
     )  # fmt: skip
 
 
-def test_the_wheels_copy_is_byte_equal_to_the_synced_one():
-    """One release in the repo: a sync that brings a new `scripts/ledgerboard.py` runs
-    `vendor_ledgerboard.sh` in the same PR, or this fails — never two versions."""
-    if not SYNCED.is_file():
-        pytest.skip("no synced scripts/ledgerboard.py (a repo without dev-cadence has the wheel's alone)")
-    assert WHEEL.read_bytes() == SYNCED.read_bytes(), "run scripts/vendor_ledgerboard.sh <the synced header's tag>"
+def test_the_wheels_copy_is_byte_equal_to_the_pinned_one():
+    """One release in the repo: a dev-cadence bump that brings a new `scripts/ledgerboard.py` runs
+    `vendor_ledgerboard.sh` in the same PR, or this fails — never two versions (TD-1014: a pinned repo's
+    ledgerboard release is its pinned tree's)."""
+    pinned = pinned_script("ledgerboard.py")
+    assert WHEEL.read_bytes() == pinned.read_bytes(), "run scripts/vendor_ledgerboard.sh <the pinned header's tag>"
 
 
 def test_the_release_header_is_intact_and_names_the_manifests_tag():

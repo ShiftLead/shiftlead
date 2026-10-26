@@ -518,3 +518,19 @@ def served(root) -> None:
     (root / "scripts" / "check_cadence.py").write_text("x = 1\n")
     if not (root / "docs" / "technical_debt.md").exists():
         (root / "docs" / "technical_debt.md").write_text("# Technical debt\n")
+
+
+def pinned_script(name: str) -> Path:
+    """dev-cadence's `scripts/<name>` in the tree this checkout pins (`docs/cadence.toml`'s `[dev-cadence]`,
+    dev-cadence TD-129): ShiftLead carries no synced copies, so a test that runs or loads one of
+    dev-cadence's scripts — a parity test of the home's reader, a reader as a fixture — takes it from the
+    pinned tree, through the same resolver the home uses (`cadence.tree`). Where the pin does not
+    resolve (no network, or no token for a private source) the test skips, naming why."""
+    from sessionorc import cadence
+
+    payload, why = cadence.tree(Path(__file__).resolve().parents[1])
+    if payload is None:
+        pytest.skip(f"dev-cadence's pinned tree did not resolve: {why}")
+    script = payload / "scripts" / name
+    assert script.is_file(), f"the pinned dev-cadence tree has no scripts/{name}"
+    return script
