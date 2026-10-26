@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
 | TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Open — design |
 | TD-1026 | Two team lessons from the memory harvest are not in the role briefs: a steer's default waits for its bound, and `--author @me` is not "my PRs"; the designer brief lacks the never-`SendMessage` line | Low | Designed — builds TD-1030 |
-| TD-1028 | `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit) | Low | Open — build |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 | TD-1030 | The role briefs carry the steer-before-bound, own-PRs and claim-area lessons (TD-1026) | Low | Open — build |
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Open |
@@ -1938,24 +1937,6 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Done when** (1)–(3) are in the briefs and (4) is decided, here or in the brief.
 
 **Related:** dev-cadence TD-125 (the harvest), ADR 2026-10-25 *ShiftLead requires dev-cadence* (Decision 7, the person's `shiftlead/` directory — where a lesson only Paul wants would go instead).
-
-## TD-1028: `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2365)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/cadence.py` (`_tree`, `_launcher_words`), `tests/test_cadence_pin.py`
-
-**Why:** #2365 (TD-1014 slice 1) made `_tree` answer `(None, why)` in words a repo's lack then prints (§5 *How the readers find dev-cadence*). Probed on `origin/main` 0a24e16f4 with `PYTHONPATH=$PWD/src pdm run pytest -q -x tests/test_cadence_pin.py tests/test_seams.py tests/test_lane_news.py tests/test_cadence_policy.py`: replacing the text of `the launcher gave no answer in {timeout:.0f}s`, of `the launcher could not run: …`, or the guard `if not out or not Path(out).is_dir():` (made `if False:`) each leaves 56 passed, and so does reading the first line of the launcher's stderr, not the last, in `_launcher_words`. `grep -rn "gave no answer\|could not run\|not a directory here" tests` finds none of the three (one unrelated docstring in test_cli_teams.py matches "not a directory here"). `test_a_pin_the_launcher_refuses_or_cannot_resolve_is_a_lack_by_name` covers only a non-zero exit with one stderr line.
-
-**Fix:** a stub launcher (`_stub` in the module) that sleeps past a small `timeout`, an `argv` that cannot execute, one that exits 0 printing a path that is not a directory or nothing, and a refusal on several stderr lines whose last is the reason; each asserted as the words a lack carries.
-
-**Done when:** each of the four reverts above fails a test; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1014.
 
 ## TD-1029: Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory
 
