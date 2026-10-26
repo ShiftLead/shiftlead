@@ -19598,4 +19598,4 @@ Probe: `grep -rn "holds dev-cadence already\|no open PR\|nothing to adopt\|open 
 
 **Related:** TD-1010 (#2356), TD-1009.
 
-**Resolved:** 2026-10-25 (grinder-ao-2, PR #PRNUM) — design §4.7 **`ao repo add`** states the served-repo refusal of `--adopt`, the re-run answered by the open `cadence-adopt` PR, the stray-branch refusal and the already-adopted refusal in the code's words, with a dated line in `docs/design-history.md` under §4.7; the title and message stay in TD-1010's Fix. The **Why**'s grep finds each.
+**Resolved:** 2026-10-25 (grinder-ao-2, PR #2359) — design §4.7 **`ao repo add`** states the served-repo refusal of `--adopt`, the re-run answered by the open `cadence-adopt` PR, the stray-branch refusal and the already-adopted refusal in the code's words, with a dated line in `docs/design-history.md` under §4.7; the title and message stay in TD-1010's Fix. The **Why**'s grep finds each.
