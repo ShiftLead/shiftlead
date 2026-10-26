@@ -19520,3 +19520,23 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Related:** TD-1009, TD-1011, TD-1014 (the pin's interface, the same check under TD-129).
 
 **Resolved:** 2026-10-25 (grinder-ao-2, PR #2354) — built as §5 *Which dev-cadence* says: `cadence.OLDEST` is dev-cadence `6d92209` (TD-106, ledgerboard v1.0 vendored; every live roster lock is at or after it), `seams.age` reads the lock's `files_commit` (else `commit`, `+dirty` stripped) against it in the roster's dev-cadence checkout, else through `gh api …/compare`, carried on the reading as `cadence_age`; an older tree is the `age` lack in §5's words, an unread age the warning *dev-cadence's age not read: <why>*. Tests in `tests/test_repo_seams.py`.
+
+## TD-1018: The sync pass judges a sync PR in any repo with a gate, though §6 *Sync* lets it judge one in an unserved repo only when its one lack is an older tree
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-25 (grinder-ao-2, found building TD-1012)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/agent_sync.py` (`_sync_repo`: the `cadence.gate(root) is None` test); `tests/test_sync_pass.py`; design §6 *Sync*, §4.4 *Work orders*
+
+**Why:** §6 *Sync* says a sync PR goes on to the steps only *in a served repo, or an unserved one whose one lack is a tree older than `OLDEST`*; any other unserved repo's PR is the person's, not read, nothing written. `_sync_repo` skips only a repo with no gate, so a repo that has the gate but no lock, a lock that does not parse, or no ledger still has its sync PRs judged and merged.
+
+**Fix:** skip the repo when `seams.unserved` names a lack whose key is not `age` (TD-1012's key for the older tree), reading `serve.lacks` from the repo facts; keep the gate test for a repo with no reading yet.
+
+**Done when:** a sync-pass test: a repo with the gate and no ledger has its green sync PR left unread and nothing written; one whose only lack is `age` has it judged.
+
+**Related:** TD-1011, TD-1012.
+
+**Resolved:** 2026-10-25 (grinder-ao-2, PR #PRNUM) — `agent_sync._sync_repo` passes over a repo that has no gate or that `seams.unserved(reading, but=("age",))` names any lack of, so only a served repo or one whose one lack is an older tree (TD-1012's `age`) has its sync PRs judged; test in `tests/test_sync_pass.py`.

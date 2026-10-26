@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import cadence, hosts, workorders
+from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import sync as sync_mod
 from sessionorc.agent_common import log
@@ -61,8 +62,10 @@ class SyncMixin:
         prs = [p for p in prs_r.get("open") or [] if isinstance(p, dict)]
         old = reading.get("sync") or {}
         sync = sync_mod.prune(old, prs)
-        if await asyncio.to_thread(cadence.gate, root) is None:
-            pass  # no gate: the repo is unserved, and its PRs are the person's — not read, nothing written (§6 *Sync*)
+        if await asyncio.to_thread(cadence.gate, root) is None or seams_mod.unserved(reading, but=("age",)):
+            # unserved by any lack but an older tree, which the sync cures: its PRs are the person's — not read,
+            # nothing written (§6 *Sync*, TD-1018)
+            pass
         elif not auto:
             for pr in prs:
                 n, head = str(pr.get("number")), str(pr.get("head") or "")
