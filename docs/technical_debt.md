@@ -89,7 +89,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) done (#2366); (3) waits on the sync of dev-cadence TD-136–TD-139 |
 | TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Open — design |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
-| TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Open |
+| TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1032 | A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts | Medium | Open |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
 | TD-1035 | This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so | High | Open — build |
@@ -97,6 +97,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1037 | The promote's checks reading folds commit statuses in, and requires `cadence/precheck` on main's head where the repo sets `precheck` | High | Open — build |
 | TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by TD-1037, decision (paul): file dev-cadence's `precheck.py --commit` |
 | TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — blocked by TD-1037 (the shared `precheck` read) |
+| TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
 | TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
 
@@ -1898,7 +1899,8 @@ Trimming before the rule arrives here loses it (§2.4).
 **Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed (2026-10-26) — design §6 *The smoke* (*When and where*): the smoke starts once `check` reads the commit and the run has ended; `check` stays the installed copy's build. Builds TD-1041.
+**Blocked by:** TD-1041
 **Location:** `src/sessionorc/promote.py` (`_conclude`'s first branch: `start_smoke` on `r["live"] == intent["sha"]` while the run's pid may be alive; `read_live`), `.shiftlead.yml` (`promote:`'s `run` and `check`); design §6 *Promote*, *The smoke* (*When and where*: "It starts on the pass whose `check` reads the run's commit")
 
 **Why:** shiftlead's `check` reads the installed package's build record, which changes once `run`'s `pip install` has written the new files (in 9acc3fc's log the smoke starts even before pip's `Successfully installed` line) — before the same run's `ao service install` restarts the units. The smoke therefore starts on a UI that is about to go down, and the restart refuses it mid-pass. Seen three times: cca336d on 2026-10-20 (`Sessions /: [Errno 104] Connection reset by peer`), bd90d4e on 2026-10-25 (`Inbox /inbox: [Errno 111] Connection refused`, the units stopped at 21:16:12 inside the smoke) and Paul's press of 9acc3fc on 2026-10-26 (`Repo /repo/shiftlead: [Errno 111] Connection refused`). All three logs show `── smoke ──` before the run's own `wrote … units` lines; the other 447 logs under `~/.shiftlead/promotes/shiftlead/` have them the other way round. Each failure rolls live back and writes a hold, so nothing is promoted until the person presses again, and a press fails the same way — main (21 commits, among them TD-1014's resolver) cannot go live while the race stands.
@@ -2040,6 +2042,24 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** tests pin the *none* candidate and its wait (not an order), the run before the gate, the skip when a status stands or `precheck` is unset, the uncounted wait on a checkout off `origin/<default>` or dirty and on a run going (main's or another PR's), the pass going on to the next repo, a run's end with a status and with none (counted once), a `pid: null` file, the kill on a moved head or a closed PR, and the day's wait becoming an order; `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1033, TD-681.
+
+## TD-1041: A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (the designer, from TD-1031)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`_conclude`'s first branch, `start_smoke`, `_concluded`), `scripts/smoke.py` (this repo's smoke), `src/shiftlead/ui/inbox.py` and `ao promote status` (the window's words, if they key on live); design §6 *Promote* (*Live reads the wanted commit and the run has ended*), *The smoke* (*When and where*, *The promote is in flight until the smoke ends*)
+
+**Why:** TD-1031: shiftlead's `run` writes the build record `check` reads before it restarts the units, so the smoke started on `check` alone met a UI going down three times, each a rollback and a hold.
+
+**Fix:** as §6 now says: (1) in `_conclude`, the reaping call (`alive(intent.get("pid"))`) becomes the ended test, and the pass that finds the run ended pops `_exits[pid]` before `start_smoke` or concluding, as today; `live == sha` with the run's process still alive (`alive(pid, started)`, passing `started` — `_conclude`'s first branch calls `alive(intent.get("pid"))` alone) starts no smoke and concludes nothing, for every promote and rollback, smoke or not: the promote stays in flight as a run, the row keeping *promoting …*, `PROMOTE_BOUND` killing it as now (a failure, live where it reads); the pass that finds `live == sha` and the run ended starts the smoke, or with no `smoke:` concludes. (2) `last.json` and a rollback's `held.json` are written once, on the first pass whose `check` reads the commit, run ended or not; the same pass sets `read_at` on the intent and writes `inflight.json` right after the two, so no later pass and no restarted home rewrites them. (3) The bound: `live == sha` with the run alive falls through to `PROMOTE_BOUND`'s check (the first branch must not return before it); its why the existing *still running after 20 minutes: killed* with *(live read `<sha7>`)* appended whenever `read_at` stands, whatever that pass's live reads; a plain failure, never `_smoke_failed`, so no smoke rollback; a rollback fails beside its hold. *Ended*: `alive(pid, started)` false; no `started` judged by pid alone; `pid: null` ended (the gap accepted). Once `read_at` stands, a pass with live unknown waits within `PROMOTE_BOUND`, never failing as *run ended and live unknown*; past the bound, run ended and live unread, a plain failure *live still unknown after 20 minutes — <live_why>* (nothing to kill, no smoke rollback, a rollback beside its hold). (4) `scripts/smoke.py` reads `ao status --json`'s `build.built_from.commit` and fails unless it equals the full `SHIFTLEAD_PROMOTE_SHA`, on a null `build` or a missing commit too, reusing its existing `ao status --json` read and skipping the check (with a line) when the variable is unset — last lines *running build <sha7> is not the promoted <sha7>* / *running build unknown*. (5) The row stays *promoting …* through the window (§4.5a), the reading still carrying `inflight` though live may equal main.
+
+**Done when:** tests run `_conclude` with `live == sha` and the run's pid alive and start no smoke and conclude nothing (smoke and no-smoke), then with the pid ended and start it or conclude; a rollback alike; `last.json`/`held.json` written once on the first reading (`read_at`), a restart between the reading and the run's end rewriting nothing; the bound's kill after the reading (its why, no smoke rollback; a rollback beside its hold); the window's reading still carrying `inflight` with live equal to main; an intent with no `started`, and `pid: null`; live unknown after `read_at` with the run ended waiting, not failing, and failing past the bound with that why; the smoke's build check skipped with no `SHIFTLEAD_PROMOTE_SHA`; a restarted home with the recorded pid ended and reused by another process (`started` differing) reads the run ended; the smoke's build check passes on an equal build and fails on another; `pdm run test` and `pdm run lint` pass. The live look — a promote of shiftlead's main whose log has `── smoke ──` after the run's last line — is the next promote's.
+
+**Related:** TD-1031, TD-1032, TD-804.
 
 ## TD-1042: Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand
 
