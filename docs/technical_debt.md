@@ -92,6 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1032 | A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts | Medium | Open |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
+| TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1035 | This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so | High | Open — build |
 | TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — blocked by TD-1037 (the shared `precheck` read) |
 | TD-1037 | The promote's checks reading folds commit statuses in, and requires `cadence/precheck` on main's head where the repo sets `precheck` | High | Open — build |
@@ -1945,6 +1946,24 @@ Trimming before the rule arrives here loses it (§2.4).
 **Fix:** (1) `precheck = "pdm sync -G ui -G dev && pdm run lint && pdm run test"` in `docs/cadence.toml` — the clean worktree has nothing installed (§4.12: the command installs what it needs) — on the machine's Python, where CI ran a 3.12/3.13 matrix (say which, or run both); `tmux` must be on the machine, as CI installs it. The merge gate records `cadence/precheck` on each PR's head. (2) Design: what promotion waits on instead — `promote.py`'s `read_checks` reads only `commits/{sha}/check-runs`, where a `cadence/precheck` commit status never appears (no check runs reads as `unknown`), so it must read commit statuses too; then the squash commit on `main` carries no status of its own; options are running the precheck at promote time on `main`'s head and recording `cadence/precheck` there, or accepting the merged PR's head status when its tree equals `main`'s. (3) `ci.yml` keeps only `workflow_dispatch`. (4) The briefs and `AGENTS.md` say the gate is `cadence/precheck`. Done when a PR's gate and a promote both read a local check and no workflow runs on `pull_request` or push.
 
 **Related:** dev-cadence TD-148 (the convention), samscrape TD-465, ledgerboard TD-003.
+
+## TD-1034: `rpc_td_next` hands `ids_script` the call's remaining budget, and no test would notice if it did not (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2379)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/agent_ids.py` (`rpc_td_next`: `left = max(0.1, start + BUDGET - time.monotonic())`, `ids_script(root, left)`), `tests/test_td_next.py` (`test_a_pinned_repo_runs_the_pinned_trees_script_through_the_resolver`, `test_a_pin_that_does_not_resolve_refuses_in_the_launchers_words`)
+
+**Why:** #2379 (TD-1014 slice 6) added the `timeout` argument to `ids_script` and passes it the call's remaining `BUDGET`, so a pin whose first fetch is slow cannot hold a `td_next` past its 45 s answer (the default is `cadence.TREE_TIMEOUT`, 330 s). Probed on `origin/main` 27a8c0254 with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_td_next.py`: replacing `asyncio.to_thread(ids_script, root, left)` with `asyncio.to_thread(ids_script, root)` leaves 42 passed. The stub launcher answers at once, so no test sees the timeout reach `cadence.tree`, and none has a tree resolve slower than the budget. Reverted, a stuck fetch would hold the per-repo id lock for 330 s while every other caller is told "busy".
+
+**Fix:** add a test that monkeypatches `cadence.tree` to record the `timeout` it is called with (or a stub launcher that sleeps past a monkeypatched small `BUDGET`) and asserts the call is bounded by the budget, not `TREE_TIMEOUT`.
+
+**Done when:** the revert above fails a test; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014, TD-970.
 
 ## TD-1035: This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so
 
