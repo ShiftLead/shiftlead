@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import copy
 import re
+import tomllib
 from collections.abc import Callable, Collection, Iterable
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -225,7 +226,8 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
             raise
 
     def pinned() -> bool:
-        # the pin's header as dev-cadence's `adopt` writes it, and the shims detect it; a lock keeps the copy read
+        # `[dev-cadence]` in the pin's file as the launcher reads it (TOML), and no lock, which keeps the copy read;
+        # a pin it would refuse is pinned still, as `cadence.pinned` says — that repo is unserved and briefs no one
         if cfg.root is None or there(cadence.LOCK):
             return False
         path = cfg.root / cadence.PIN
@@ -233,7 +235,16 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
             text = path.read_text(encoding="utf-8") if cfg.read is None else cfg.read(path)
         except (FileNotFoundError, IsADirectoryError, UnicodeDecodeError):
             return False
-        return text is not None and PIN_HEADER in text.splitlines()
+        except OSError as e:
+            if any(why in str(e) for why in THERE_REFUSALS):
+                return True
+            raise
+        if text is None:
+            return False
+        try:
+            return "dev-cadence" in tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            return PIN_HEADER in (line.strip() for line in text.splitlines())
 
     pre = SOURCE_PREFIX if there("sync.sh") and there(SOURCE_PREFIX.rstrip("/")) else ""
     if not pre and pinned():  # the resolver's command, as the session types it (TD-1014)

@@ -240,6 +240,19 @@ def test_a_pinned_repos_layout_names_the_resolvers_command(tmp_path):
     seen = []
     cfg.read = lambda path: seen.append(path) or (path.read_text(encoding="utf-8") if path.is_file() else None)
     assert repoconfig.layout(cfg)["{gate}"] == got["{gate}"] and tmp_path / "docs" / "cadence.toml" in seen
+    # the table as TOML reads it, whatever its spacing or comment
+    (tmp_path / "docs" / "cadence.toml").write_text(f'[ dev-cadence ]  # v1\nsource = "/src"\nref = "{"a" * 40}"\n')
+    assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{gate}"] == got["{gate}"]
+    # composed, the `{pr}` is the brief's `<n>`
+    (tmp_path / "b.md").write_text("gate: {gate}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {plain: {brief: b.md}}\n")
+    text, _ = repoconfig.resolve_role(repoconfig.load(tmp_path), "plain").compose()
+    assert f"gate: {launcher} run check_cadence.py --pr <n>" in text
+    # dev-cadence's own source keeps its `files/` paths, pin or not
+    (tmp_path / "sync.sh").write_text("x\n")
+    (tmp_path / "files").mkdir()
+    assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{gate}"].startswith("python3 files/scripts/")
+    (tmp_path / "sync.sh").unlink()
     # a lock keeps the copy read; a toml with no `[dev-cadence]` is no pin
     (tmp_path / "docs" / "cadence-sync.lock").write_text("files_commit=x\n")
     assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{gate}"].startswith("python3 scripts/")
