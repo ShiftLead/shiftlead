@@ -75,7 +75,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Designed — builds TD-989, TD-990 |
 | TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Built (#2320) — the phone look with Paul |
 | TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Designed — builds TD-1000, TD-1001 |
-| TD-997 | The Transcript draws a session's start context as its first entry — Paul's to keep or drop | Low | Open — waits on Paul |
 | TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Designed — builds TD-1004, TD-1005 |
 | TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Designed — build TD-1007 |
 | TD-1000 | A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo | Medium | Open — build |
@@ -1521,23 +1520,6 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when** the design says how a session reaches another repo's or team's techlead (or says it does not, and why), and its build is merged. A session on a node can then put a ledger request to another repo without the person running a command, and `ao msg <to> --kind note "…"` either sends or ends with a refusal naming the fix.
 
 **Related:** TD-723 (samscrape and contractmatch under one project, which opens the project edge between them), TD-582 (the cross-team edge), TD-299 (the container nodes).
-
-## TD-997: The Transcript draws a session's start context as its first entry, marked *told at start* — Paul's to keep or drop
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-24 (the designer, from TD-993 part 2)
-**Owner:** designer
-**Kind:** design-first
-**Blocked by:** decision (paul) — his answer to the ask m-7f566ce663c2
-**Status:** Open — waits on Paul's word whether the Transcript should show it.
-**Location:** `src/shiftlead/ui/transcript.py`, the Claude Code adapter's transcript read (`src/shiftlead/adapters/claude_code/transcript.py`, which skips every line type it does not list, the `SessionStart` hook's attachment among them), the Gemini adapter's (TD-786); design §4.5 the Transcript, §4.3 `start_context`
-
-**Why:** TD-993 part 2, the drafting session's suggestion: the start context is already in the conversation file, as the `SessionStart` hook's attachment, and the Transcript drops it; drawn as the conversation's first entry it would make the Transcript the whole record of what the session was given, for a closed session too. TD-993 designed the Session card's row (TD-996) and left this to Paul, since it is his to keep or drop.
-
-**Fix:** design first, once Paul says yes: the entry's mark and style, set apart from the prompts; what an adapter whose start context reaches the conversation another way shows (§4.1 `mail.start_context_file_text`); whether the Session card's row then also links to it.
-
-**Related:** TD-993, TD-996, TD-154 (the Transcript).
 
 ## TD-998: `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao`
 
