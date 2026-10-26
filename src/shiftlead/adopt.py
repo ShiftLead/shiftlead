@@ -87,6 +87,13 @@ def scratch_clone(root: Path) -> Iterator[tuple[Path, str]]:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _unpinned(clone: Path, root: Path, default: str) -> None:
+    """Refuses a clone whose `origin/<default>` pins dev-cadence already, before `sync.sh` writes a copy beside
+    the pin (TD-1014): the checkout is behind its origin."""
+    if cadence.pinned(clone):
+        raise AdoptError(f"origin/{default} of {root} pins dev-cadence already ({cadence.PIN}): pull the checkout")
+
+
 def _sync(dc: Path, clone: Path) -> list[str]:
     """dev-cadence's adopt in the clone; the paths it wrote, as `git status --porcelain -z` names them (a
     rename's new path alone)."""
@@ -125,7 +132,8 @@ def open_pr(clone: Path, gh: str) -> dict[str, Any] | None:
 def offer(root: Path, dc: Path) -> dict[str, Any]:
     """`ao repo add <path>` on a checkout without dev-cadence: what its adoption would write, `{root, name,
     paths}`; nothing is committed, pushed or added."""
-    with scratch_clone(root) as (clone, _):
+    with scratch_clone(root) as (clone, default):
+        _unpinned(clone, root, default)
         paths = _sync(dc, clone)
     return {"root": str(root), "name": root.name, "paths": paths}
 
@@ -159,6 +167,7 @@ def adopt(root: Path, dc: Path, gh: str = "gh") -> dict[str, Any]:
                 f"origin of {root} holds a branch {ADOPT_BRANCH} with no open PR: open its PR or delete the branch,"
                 " then run this again"
             )
+        _unpinned(clone, root, default)
         paths = _sync(dc, clone)
         if not paths:
             raise AdoptError(f"origin/{default} of {root} holds dev-cadence already: pull the checkout")

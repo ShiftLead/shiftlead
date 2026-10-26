@@ -267,3 +267,38 @@ def test_the_offer_leaves_dev_cadences_roster_as_it_was_and_the_temp_root_is_the
     subprocess.run([str(DEV_CADENCE / "sync.sh"), str(outside)], check=True, capture_output=True, timeout=300)
     assert roster.read_text().splitlines() == ["/somewhere/else", str(outside.resolve())]
     shutil.rmtree(outside)
+
+
+async def test_a_pinned_checkout_is_added_and_an_adopt_over_a_pinned_origin_is_refused(
+    agent, world, capsys, monkeypatch
+):
+    """TD-1014 (design §4.7 **`ao repo add`**): a checkout holding dev-cadence by its pin (`docs/cadence.toml`'s
+    `[dev-cadence]`, no lock) is added as one holding the lock is, served or not as the reading finds it; an
+    adopt run where origin's default branch pins dev-cadence is refused before `sync.sh` writes a copy."""
+    from sessionorc import cadence
+
+    await park_ticks(agent)
+    monkeypatch.setattr(cadence, "tree", lambda root, timeout=0: (None, "no tree in this test"))
+    seed, checkout = world["seed"], world["checkout"].resolve()
+    (seed / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n')
+    git(seed, "add", "-A")
+    git(seed, "commit", "-qm", "the pin")
+    git(seed, "push", "-q", "origin", "HEAD:main")
+    git(checkout, "pull", "-q", "--ff-only")
+    assert cadence.holds(checkout) and not cadence.holds(world["origin"])
+    lock = checkout / "docs" / "cadence-sync.lock"
+    lock.write_text(LOCK)  # a lock beside the pin: held by the lock, and the copy read
+    assert cadence.holds(checkout) and not cadence.pinned(checkout)
+    lock.unlink()
+    with pytest.raises(
+        adopt.AdoptError,
+        match=rf"origin/main of {checkout} pins dev-cadence already \(docs/cadence.toml\): pull the checkout",
+    ):
+        await asyncio.to_thread(adopt.offer, checkout, world["dc"])
+    assert list(world["tmp"].iterdir()) == []
+    assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout)]) == 0  # it holds the pin: added
+    capsys.readouterr()
+    assert _roster() == [str(world["dc"]), str(checkout)]
+    assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
+    assert "pins dev-cadence already" in capsys.readouterr().err
+    assert not world["log"].exists()  # no PR

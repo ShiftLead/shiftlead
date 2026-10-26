@@ -25,7 +25,6 @@ from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
-from sessionorc import sync as sync_mod
 from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     RpcError,
@@ -212,9 +211,11 @@ class SettingsMixin:
         host = hosts.local_host()
         if any(Path(r).expanduser().resolve() == here for r in host.repos()):
             raise RpcError(f"{root} is in the roster already (design §5 Repos)")
-        holds = (here / sync_mod.LOCK).is_file() or cadence_mod.is_source(here)
-        if not (holds or adopted):
-            raise RpcError(f"{root} holds no dev-cadence ({sync_mod.LOCK}): its adoption comes first (design §4.7)")
+        if not (await asyncio.to_thread(cadence_mod.holds, here) or adopted):
+            raise RpcError(
+                f"{root} holds no dev-cadence (no pin in {cadence_mod.PIN}, no {cadence_mod.LOCK}): its adoption comes"
+                " first (design §4.7)"
+            )
         reg = host.repos_registry
         try:
             reg.parent.mkdir(parents=True, exist_ok=True)

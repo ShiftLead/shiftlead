@@ -1523,7 +1523,6 @@ def cmd_repo_add(args: argparse.Namespace) -> int:
     unserved repo, opens the PR alone."""
     from sessionorc import cadence as cadence_mod
     from sessionorc import gitinfo
-    from sessionorc import sync as sync_mod
     from shiftlead import adopt as adopt_mod
 
     if not args.path:
@@ -1537,7 +1536,7 @@ def cmd_repo_add(args: argparse.Namespace) -> int:
         raise AgentError(f"{path} is not in a git checkout") from None
     roster = hosts.local_host().repos()
     registered = any(pathlib.Path(r).expanduser().resolve() == root for r in roster)
-    holds = (root / sync_mod.LOCK).is_file() or cadence_mod.is_source(root)
+    holds = cadence_mod.holds(root)
     if not args.adopt or holds and not registered:
         if not (holds or registered):  # the offer: what the adoption would write, nothing added
             dc = adopt_mod.dev_cadence(roster, root)
