@@ -1,9 +1,9 @@
 name: ci
 
+# Run by hand only (TD-1035): Actions stopped on the shared account (TD-1033), and PRs and main are
+# gated on the local `precheck` in docs/cadence.toml instead. The matrix still keeps the 3.12 floor.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
