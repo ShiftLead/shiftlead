@@ -295,7 +295,10 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     name no repo's layout*; TD-588).
   - **`worktree_setup:`** — a command run by the shell in each new worktree, its path `$1`, after it is created
     (`sessionorc.gitinfo.ensure_worktree`; a worktree reused is not set up again), default
-    `scripts/hydrate_worktree.sh` when present and executable, given the worktree's path; unset and
+    `scripts/hydrate_worktree.sh` when present and executable, given the worktree's path — in a pinned
+    repo the pinned tree's, run through the resolver (`cadence.command(repo, "run", "hydrate_worktree.sh",
+    <path>)`, said *dev-cadence run hydrate_worktree.sh*), as the reaper's `--check` and `--dehydrate` are
+    (TD-1044), and a pin the launcher refuses fails the create in its words; unset and
     absent, nothing runs and the Repo page says *no worktree setup* (TD-589). A setup that fails
     leaves the worktree and fails the create with its own words.
   - **`ledger:`** carries, beside the ledger, the `{ledger_check}` the briefs name: `python3

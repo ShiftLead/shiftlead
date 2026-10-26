@@ -1,5 +1,6 @@
 """porcelain v2 parsing against a real repo: spaces in paths, renames, ahead/behind, untracked."""
 
+import os
 import subprocess
 
 from sessionorc.gitinfo import git_info
@@ -307,3 +308,54 @@ def test_a_new_worktree_is_set_up_by_the_repos_worktree_setup(tmp_path):
     with pytest.raises(WorktreeError, match=r"but echo no npm >&2; exit 4 failed: no npm"):
         ensure_worktree(repo, "broken")
     assert (repo / ".claude" / "worktrees" / "broken" / "f").is_file(), "the worktree is kept"
+
+
+def _pinned_repo(tmp_path, ref: str):
+    """A repo pinned to dev-cadence (`docs/cadence.toml`'s `[dev-cadence]`, no lock), with no
+    `scripts/hydrate_worktree.sh` of its own — the pin removed it (dev-cadence TD-129)."""
+    repo = tmp_path / "pinned"
+    (repo / "docs").mkdir(parents=True)
+    run("git", "init", "-q", "-b", "main", cwd=repo)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    (repo / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/nowhere/dev-cadence.git"\nref = "{ref}"\n')
+    run("git", "add", "docs", cwd=repo)
+    run("git", "commit", "-q", "-m", "one", cwd=repo)
+    return repo
+
+
+def test_a_pinned_repos_new_worktree_is_hydrated_by_the_pinned_tree(tmp_path, monkeypatch):
+    """TD-1044, §5 *The seams* `worktree_setup:`: unset in a pinned repo, the default is the pinned tree's
+    `hydrate_worktree.sh`, run through the resolver (`cadence.command`) with the worktree's path, so the new
+    worktree gets its `.claude/settings.local.json`."""
+    from sessionorc import cadence, gitinfo
+    from sessionorc.gitinfo import ensure_worktree, worktree_setup
+
+    repo = _pinned_repo(tmp_path, "a" * 40)
+    launcher = tmp_path / "launcher.sh"
+    launcher.write_text(
+        '#!/bin/sh\necho "$CADENCE_REPO_ROOT $*" >> "$CADENCE_REPO_ROOT/launched"\n'
+        'eval wt=\\${$#}\nmkdir -p "$wt/.claude" && echo "{}" > "$wt/.claude/settings.local.json"\n'
+    )
+    launcher.chmod(0o755)
+    monkeypatch.setattr(
+        cadence, "command", lambda r, word, *a: ([str(launcher), word, *a], {**os.environ, "CADENCE_REPO_ROOT": str(r)})
+    )
+    assert worktree_setup(repo) == ("defaulted", gitinfo.PINNED_HYDRATE)
+    wt, created = ensure_worktree(repo, "hydrated")
+    assert created and (wt / ".claude" / "settings.local.json").is_file()
+    assert (repo / "launched").read_text().split() == [str(repo), "run", "hydrate_worktree.sh", str(wt)]
+
+
+def test_a_pinned_repo_whose_pin_does_not_resolve_fails_the_create_by_name(tmp_path):
+    """TD-1044: a pin the launcher refuses is a failed setup, never a silent skip — the worktree stays and the
+    create says the launcher's words. The real launcher, refusing before any fetch (a ref that is no commit)."""
+    import pytest
+
+    from sessionorc.gitinfo import WorktreeError, ensure_worktree, worktree_setup
+
+    repo = _pinned_repo(tmp_path, "main")
+    assert worktree_setup(repo)[0] == "defaulted"
+    with pytest.raises(WorktreeError, match="hydrate_worktree.sh failed: .*ref must be a full 40-hex commit"):
+        ensure_worktree(repo, "unresolved")
+    assert (repo / ".claude" / "worktrees" / "unresolved" / ".git").is_file()

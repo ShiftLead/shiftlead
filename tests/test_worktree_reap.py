@@ -154,7 +154,9 @@ def test_no_step_starts_past_the_deadline(repo, monkeypatch):
     wt, _ = ensure_worktree(repo, "ao-w")
     calls = []
     real = gitinfo._run
-    monkeypatch.setattr(gitinfo, "_run", lambda argv, timeout, cwd=None: calls.append(argv) or real(argv, timeout, cwd))
+    monkeypatch.setattr(
+        gitinfo, "_run", lambda argv, timeout, cwd=None, env=None: calls.append(argv) or real(argv, timeout, cwd, env)
+    )
     assert reap(wt, "ao-w", deadline=time.monotonic() - 1) == {"kept": "timed out"}
     assert wt.is_dir() and calls == []
     # the tests pass inside the deadline, and it runs out before the remove: nothing removed, nothing stamped
@@ -206,6 +208,22 @@ def test_nested_work_the_hydrate_check_refuses_keeps_the_worktree_and_a_failed_r
     got = reap(wt, "ao-w", on_reaping=stamped.append)
     assert "contains modified or untracked files" in got["kept"] and wt.is_dir() and stamped == ["ao-w"]
     assert _calls(repo)[-2:] == [f"--dehydrate --quiet {wt}", f"--quiet {wt}"]
+
+
+def test_a_pinned_repos_reap_runs_the_pinned_trees_hydrate(repo, monkeypatch):
+    """TD-1044: in a pinned repo (no `scripts/hydrate_worktree.sh`), the reaper's `--check` and `--dehydrate`
+    are the pinned tree's, through the resolver."""
+    from sessionorc import cadence
+
+    wt, _ = ensure_worktree(repo, "ao-w")
+    (repo / "docs").mkdir()
+    (repo / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/nowhere"\nref = "{"a" * 40}"\n')
+    stub = repo.parent / "launcher.sh"
+    stub.write_text(f'#!/bin/sh\nshift 2\necho "$@" >> "{repo}/hydrate.log"\n')
+    stub.chmod(0o755)
+    monkeypatch.setattr(cadence, "command", lambda r, word, *a: ([str(stub), word, *a], dict(os.environ)))
+    assert reap(wt, "ao-w")["reaped"] and not wt.exists()
+    assert _calls(repo) == [f"--check --quiet {wt}", f"--dehydrate --quiet {wt}"]
 
 
 # -- the branches ---------------------------------------------------------------------------------------
@@ -337,8 +355,8 @@ def test_a_failing_git_read_keeps_the_branch_as_could_not_be_weighed(repo, monke
     git(repo, "branch", "spare", "origin/main")
     real = gitinfo._run
 
-    def failing(argv, timeout, cwd=None):
-        return None if "rev-list" in argv else real(argv, timeout, cwd)
+    def failing(argv, timeout, cwd=None, env=None):
+        return None if "rev-list" in argv else real(argv, timeout, cwd, env)
 
     monkeypatch.setattr(gitinfo, "_run", failing)
     assert weigh_branches(repo, ["spare"]) == ([], {"spare": "could not be weighed"})
