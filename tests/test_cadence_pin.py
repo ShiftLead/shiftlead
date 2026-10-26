@@ -290,13 +290,19 @@ def test_precheck_is_read_from_the_toml_at_a_rev_with_no_script(tmp_path):
     (root / "docs").mkdir(parents=True)
     _git(tmp_path, "init", "-q", "-b", "main", str(root))
     toml = root / cadence.PIN
-    assert cadence.precheck_command(root, "HEAD") == (None, None)  # no commit, no file: unset
+    # no commit yet: the rev is not there, which is not known — never read as unset
+    assert cadence.precheck_command(root, "HEAD") == (None, "docs/cadence.toml could not be read: no HEAD here")
 
     def commit(text: str) -> None:
         toml.write_text(text)
         _git(root, "add", "-A")
         _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "c")
 
+    commit("# nothing yet\n")
+    toml.unlink()
+    _git(root, "add", "-A")
+    _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "no file")
+    assert cadence.precheck_command(root, "HEAD") == (None, None)  # no file at the rev: unset
     commit('precheck = "  pdm run test  "\n')
     assert cadence.precheck_command(root, "HEAD") == ("pdm run test", None)
     toml.write_text("# the working tree is never read\n")

@@ -129,6 +129,9 @@ def _fake_gh(monkeypatch, runs, statuses=(), rc=0, err="", status_rc=0, toml=(No
 
     monkeypatch.setattr(promote.subprocess, "run", run)
     monkeypatch.setattr(promote.cadence, "precheck_command", lambda root, rev: toml)
+    from sessionorc import board
+
+    monkeypatch.setattr(board, "default_branch", lambda root: "main")
     return calls
 
 
@@ -196,6 +199,8 @@ def test_main_needs_a_green_precheck_where_the_repo_sets_one(monkeypatch, tmp_pa
     assert promote.read_checks(tmp_path, sha) == ("failed", "", None, "success")  # a failed run beside it
     _fake_gh(monkeypatch, [done], status_rc=1, toml=set_)
     assert promote.read_checks(tmp_path, sha) == ("unknown", "HTTP 502", None, "unread")
+    _fake_gh(monkeypatch, [], rc=1, err="HTTP 403: API rate limit exceeded", toml=set_)  # the runs' read failed first
+    assert promote.read_checks(tmp_path, sha) == ("unknown", "HTTP 403: API rate limit exceeded", None, "unread")
     # a file that does not parse leaves it unknown with that why, and `precheck` null
     _fake_gh(monkeypatch, [done], [_status("success")], toml=(None, "docs/cadence.toml does not parse"))
     assert promote.read_checks(tmp_path, sha) == ("unknown", "docs/cadence.toml does not parse", None, None)
@@ -1383,3 +1388,14 @@ def test_what_a_passing_smoke_told_rides_the_note(checkout):
         (d / "smoke.json").write_text(json.dumps(result))
         _, notes, _ = promote.survey([str(checkout)], {}, False, {}, at)
         assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in 48 s{note}"]
+
+
+def test_precheck_is_read_on_the_checkouts_default_branch(monkeypatch, tmp_path):
+    """TD-1037 (review): `precheck` is read from `origin/<default>`, so a repo on `trunk` is not read as unset."""
+    from sessionorc import board
+
+    _fake_gh(monkeypatch, [{"status": "completed", "conclusion": "success"}])
+    revs = []
+    monkeypatch.setattr(board, "default_branch", lambda root: "trunk")
+    monkeypatch.setattr(promote.cadence, "precheck_command", lambda root, rev: revs.append(rev) or ("x", None))
+    assert promote.read_checks(tmp_path, "a" * 40)[3] == "absent" and revs == ["origin/trunk"]

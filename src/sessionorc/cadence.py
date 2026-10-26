@@ -211,7 +211,7 @@ PRECHECK_READ = 20.0
 def precheck_command(root: Path | str, rev: str) -> tuple[str | None, str | None]:
     """The repo's `precheck` from `docs/cadence.toml` at `rev` (design §6 *Where `precheck` is read*, TD-1037):
     `(command, None)`, `(None, None)` where it sets none — no file at `rev`, or a value that is not a
-    non-empty string — or `(None, why)` where the file cannot be read or does not parse. As
+    non-empty string — or `(None, why)` where `rev` is not there, or the file cannot be read or does not parse. As
     `sync.post_sync_command` reads `post_sync`: `tomllib` on the blob, no script, so a pinned repo reads it too."""
     try:
         cp = subprocess.run(
@@ -220,8 +220,15 @@ def precheck_command(root: Path | str, rev: str) -> tuple[str | None, str | None
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, f"{PIN} could not be read: {type(e).__name__}"
-    if cp.returncode != 0:
-        return None, None
+    if cp.returncode != 0:  # no file at `rev` is no `precheck`; no `rev` at all is not known
+        try:
+            there = subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "--verify", "-q", f"{rev}^{{commit}}"],
+                capture_output=True, timeout=PRECHECK_READ, stdin=subprocess.DEVNULL,
+            ).returncode == 0  # fmt: skip
+        except (OSError, subprocess.TimeoutExpired):
+            there = False
+        return None, (None if there else f"{PIN} could not be read: no {rev} here")
     try:
         got = tomllib.loads(cp.stdout.decode(errors="replace")).get("precheck")
     except tomllib.TOMLDecodeError:

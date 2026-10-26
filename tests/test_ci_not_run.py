@@ -403,6 +403,7 @@ def test_done_verdicts_take_the_readings_jobs_for_this_head_else_read_the_requir
 
 
 def _fake_promote(monkeypatch, runs: list, jobs: dict, notes: dict, statuses: list = (), toml=(None, None)):
+    from sessionorc import board as promote_board
     from sessionorc import promote
 
     calls = _fake(monkeypatch, [], jobs, notes)
@@ -418,6 +419,7 @@ def _fake_promote(monkeypatch, runs: list, jobs: dict, notes: dict, statuses: li
 
     monkeypatch.setattr(promote.subprocess, "run", run)
     monkeypatch.setattr(promote.cadence, "precheck_command", lambda root, rev: toml)
+    monkeypatch.setattr(promote_board, "default_branch", lambda root: "main")
     return promote, calls
 
 

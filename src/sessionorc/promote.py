@@ -234,21 +234,26 @@ def read_checks(root: str | Path, sha: str, keep: bool = True) -> tuple[str, str
     `pending` or `unread` — and None where `precheck` is unset or `docs/cadence.toml` does not parse (the
     reading `unknown` with that why). `keep=False` (a rollback's commit) neither reads `precheck` nor reads
     or replaces main's kept verdicts. Only a checkout whose `origin` is GitHub reads its jobs."""
-    command, toml_why = cadence.precheck_command(root, "origin/main") if keep else (None, None)
+    command, toml_why = None, None
+    if keep:
+        from sessionorc import board  # the checkout's default branch, as the pull reads it
+
+        command, toml_why = cadence.precheck_command(root, f"origin/{board.default_branch(Path(root))}")
     if toml_why:
         return "unknown", toml_why, None, None
     got, why = _gh_json(root, f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100")
+    unread = "unread" if command else None  # the status read never made: what it would find is not known
     if why:
-        return "unknown", why, None, None
+        return "unknown", why, None, unread
     runs = got.get("check_runs") if isinstance(got, dict) else None
     if not isinstance(runs, list):
-        return "unknown", "gh api printed something that is not the check runs", None, None
+        return "unknown", "gh api printed something that is not the check runs", None, unread
     got, why = _gh_json(root, f"repos/{{owner}}/{{repo}}/commits/{sha}/status?per_page=100")
     statuses = got.get("statuses") if isinstance(got, dict) else None
     if not why and not isinstance(statuses, list):
         why = "gh api printed something that is not the commit statuses"
     if why:
-        return "unknown", why, None, ("unread" if command else None)
+        return "unknown", why, None, unread
     runs = [r for r in runs if isinstance(r, dict)]
     statuses = [s for s in statuses if isinstance(s, dict)]
     precheck: str | None = None
