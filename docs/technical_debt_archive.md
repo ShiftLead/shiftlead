@@ -19858,3 +19858,26 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Done when:** tests pin `precheck_command` (set, unset, empty, non-string, unparseable), `precheck_script` (each layout, absent), the `precheck` field's five values and null, `keep=False` unaffected, the fold (runs only, statuses only, both, a failed status, a pending status, none) and the precheck rule (set: no status `unknown`, green status green, green beside never-started runs green with no `checks_not_run` (the third return None), green beside a failed run failed; unset: as today); `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1033, TD-686.
+
+## TD-1043: A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2394
+**Location:** `src/shiftlead/ui/app.py` (`api_entry_session`, `api_ledger_start`: each passes `team=` to the new session and no `project=`; `new_submit` passes both); design §4.9 (the `project` badge: its team's repo's project, the repo's own name where no project lists it, TD-722), §4.10 *across teams, by project*
+
+**Why:** on 2026-10-26, `ao status -v` read six open records with a `team` and an empty `project`. Among them were ao-shiftlead-prompts (`ao-grind`, started by Add entry), ao-dev-cadence-memory-vs-cadence and ao-dev-cadence-td-126 (`dc-grind`), and ao-contractmatch-cm-mcp (`cm-grind`). Two kinds of mail are refused to such a session, though the design lets both through:
+- mail from another team on the same project;
+- mail to a same-project session of another team.
+The project edge (TD-582) compares the `project` badges, and an empty one matches nothing.
+
+**Fix:** both routes derive the badge as `new_submit` does: the directory's repo's project, from `teams.reach_block(org, dir, host)`'s first value. The badge alone is wanted, not the Project block, which `new_submit` adds to the prompt. A record already started keeps its badge until its next start.
+
+**Done when** a test starts a session through each route on a repo listed under a project and reads that project on the record, and a test of `message_edge` lets a `note` through between two such sessions of different teams on one project.
+
+**Related:** TD-1042 (the person's sessions across projects); TD-582, TD-722.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2394) — `api_entry_session` and `api_ledger_start` pass `project=` from `teams.reach_block`, as `new_submit` does; `tests/test_ui_entry.py`'s `test_two_open_a_session_starts_of_different_teams_on_one_project_may_mail_each_other` reads the badge on both records and the `project` edge between them, and both routes' tests read `project` on the create.

@@ -2798,6 +2798,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
             if got.get("flow") or review is None:
                 review = got["review"]
+        # the `project` badge, as New session's: the repo's project, from the same function (§4.9, TD-1043);
+        # the badge alone, since this session starts at the prompt with no text to carry a Project block
+        project, _block = await asyncio.to_thread(lambda: teams.reach_block(org_here()[0], root, host_name()))
         s = await call(
             "create",
             name=plan["name"],
@@ -2816,6 +2819,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             context_bound=preset.bound_for(False),
             ledger=cfg.ledger,
             controllers=[plan["manager"]] if plan["manager"] else [],
+            project=project,
             team=team,  # the badge, as the New session form's Team pick sets it; none without a team
             start_context=repoconfig.entry_text(plan["repo"], plan["type"], priority, plan["ledger"]),
             **_draft_of(body),
@@ -2997,6 +3001,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
         if got.get("flow") or review is None:  # as **Open a session** takes it
             review = got["review"]
+        # the `project` badge, as New session's (§4.9, TD-1043): the badge alone, not the Project block
+        project, _block = await asyncio.to_thread(teams.reach_block, org, root, host_name())
         try:
             s = await call(
                 "create",
@@ -3016,6 +3022,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 context_bound=preset.bound_for(False),
                 ledger=cfg.ledger,
                 controllers=[manager] if manager else [],
+                project=project,
                 team=team,
             )
         except HTTPException as e:
