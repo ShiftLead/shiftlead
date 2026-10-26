@@ -92,6 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
 | TD-1027 | `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit) | Low | Open — build |
 | TD-1028 | `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit) | Low | Open — build |
+| TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 
 ---
 
@@ -1948,3 +1949,22 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** each of the four reverts above fails a test; `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1014.
+
+## TD-1029: Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-26 (Paul, after the first memory harvest; drafted by session `memory-vs-cadence`)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — waits on dev-cadence TD-144, which designs the declaration a tool ships.
+**Blocked by:** dev-cadence#TD-144
+**Location:** what dev-cadence TD-144 settles (a command such as `ao … --json`, or a file ShiftLead installs); `src/shiftlead/briefs/` (where a lesson for every user lands); the ADR 2026-10-25 *ShiftLead requires dev-cadence*, Decision 7 (the person's `shiftlead/` directory in their layer repo)
+
+**Why:** dev-cadence's memory harvest is the one place a person's sessions' lessons are sorted (dev-cadence TD-125). Its first run (2026-10-26) found lessons about working in a ShiftLead team that belong in ShiftLead's own texts, and had to file them here by hand (TD-1026). Paul decided (2026-10-26) that ShiftLead should feed the one harvest through an extension point rather than wrap it in a second harvest; dev-cadence TD-144 adds the point, and ShiftLead has to declare its side.
+
+**Fix:** once TD-144 settles the shape: declare (1) how a repo shows it uses ShiftLead (`.shiftlead.yml`); (2) the upstream for a lesson every ShiftLead user needs — an entry in this ledger for its owner, an issue for anyone else; (3) the personal destination — `shiftlead/briefs/<role>.md` (or `preferences.md`) in the person's layer repo, as Decision 7 lays out. A test that the declaration reads as TD-144's format expects.
+
+**Done when** dev-cadence's harvest, run over a repo with `.shiftlead.yml`, offers a ShiftLead-team lesson this ledger or the person's `shiftlead/` directory as its destination.
+
+**Related:** TD-1026 (the lessons filed by hand); dev-cadence TD-125, TD-144.
