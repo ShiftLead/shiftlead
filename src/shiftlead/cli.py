@@ -1830,7 +1830,9 @@ def cmd_promote(args: argparse.Namespace) -> int:
         def status() -> None:
             for name, r in promotes.items():
                 print(_promote_line(name, r))
-            if not promotes:
+            if not promotes and got.get("promotes_read") is False:  # an older agent sends no field
+                print("the home has not read its repos yet since it started: run ao promote status again in a moment")
+            elif not promotes:
                 print("no registered repo carries a promote: block (design §5) — nothing promotes")
 
         return emit(args, promotes, status)

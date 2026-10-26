@@ -90,9 +90,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Open — design |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
-| TD-1032 | A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts | Medium | Open |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
-| TD-1035 | This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so | High | Open — build |
+| TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — blocked by TD-1037 (the shared `precheck` read) |
 | TD-1037 | The promote's checks reading folds commit statuses in, and requires `cadence/precheck` on main's head where the repo sets `precheck` | High | Open — build |
 | TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by TD-1037, decision (paul): file dev-cadence's `precheck.py --commit` |
@@ -101,6 +100,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
 | TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
 | TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | Open — stopgap set per repo (samscrape#1121, shiftlead#2391) |
+| TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
 
 ---
 
@@ -1912,24 +1912,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1032 (the reason the failure showed); TD-804, TD-812 (the smoke).
 
-## TD-1032: A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/promote.py` (`_last_line`, `_judge_smoke`, `SMOKE_WRAPPER`), `src/shiftlead/cli.py` (`ao promote status`, its empty-`promotes` line); design §6 *The smoke* (*How it is judged*: "the log's last lines as the reason")
-
-**Why:** `_last_line` takes the last non-empty line after `── smoke ──` in the run's log, and anything else still writing there lands after the smoke. In TD-1031's failures that was `ao service install`'s closing tip, so the promote row, the hold and the person's note read *smoke failed on 9acc3fc: units run under your user; `loginctl enable-linger` keeps them (and tmux) alive after logout*. Paul acted on it: `loginctl enable-linger` failed (linger was already on, and the shell had no login session), and his promote never ran. The smoke's own verdict, *smoke failed: Repo /repo/shiftlead: [Errno 111] Connection refused*, was seven lines up. Second, `ao promote status` run just after the press printed *no registered repo carries a promote: block (design §5) — nothing promotes*: the agent the run had restarted had not yet read its repos, and an empty `promotes` reads as no block.
-
-**Fix:** (1) the reason is the smoke's own output: `SMOKE_WRAPPER` captures the command's last non-empty lines and writes them to `smoke.json` beside `exit` (still copying all of it to the log), and `_judge_smoke` reads them from there, falling back to `_last_line` for a `smoke.json` with none; §6 *How it is judged* says so. (2) `ao promote status` tells an agent that has not yet read its repos (its first pass since start) from one with no `promote:` block, and says *the home has not read its repos yet* for the first.
-
-**Done when** a test appends a line to the log after the smoke's own last line and the failure's why is still the smoke's; and a test of `ao promote status` against a host reply from an agent with no first pass prints the not-yet-read line, not the no-block one.
-
-**Related:** TD-1031 (the race that put the run's lines after the smoke's).
-
 ## TD-1033: PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it
 
 **Priority:** High
@@ -1947,27 +1929,23 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** dev-cadence TD-148 (the convention), samscrape TD-465, ledgerboard TD-003.
 
-## TD-1035: This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so
+## TD-1034: `rpc_td_next` hands `ids_script` the call's remaining budget, and no test would notice if it did not (test audit)
 
-**Priority:** High
+**Priority:** Low
 **Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1033)
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2379)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Location:** `docs/cadence.toml` (no `precheck`); `.github/workflows/ci.yml` (`pull_request` and push to `main`); `docs/briefs/grinder-ao-1.md` (*The gate here*: *wait for the PR's checks to pass (`gh pr checks N --watch`)*), any other file under `docs/briefs/` that waits on CI (`docs/briefs/techlead-context.md` is a held path, so the PR goes to its reader); `AGENTS.md`; design §6 *Promote* (*The precheck on main*), dev-cadence §4.12
+**Location:** `src/sessionorc/agent_ids.py` (`rpc_td_next`: `left = max(0.1, start + BUDGET - time.monotonic())`, `ids_script(root, left)`), `tests/test_td_next.py` (`test_a_pinned_repo_runs_the_pinned_trees_script_through_the_resolver`, `test_a_pin_that_does_not_resolve_refuses_in_the_launchers_words`)
 
-**Why:** TD-1033: GitHub Actions stopped on the shared account and Paul decided every repo gates on a local `precheck` (dev-cadence TD-148). This repo's PRs read red for a reason that says nothing about the code.
+**Why:** #2379 (TD-1014 slice 6) added the `timeout` argument to `ids_script` and passes it the call's remaining `BUDGET`, so a pin whose first fetch is slow cannot hold a `td_next` past its 45 s answer (the default is `cadence.TREE_TIMEOUT`, 330 s). Probed on `origin/main` 27a8c0254 with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_td_next.py`: replacing `asyncio.to_thread(ids_script, root, left)` with `asyncio.to_thread(ids_script, root)` leaves 42 passed. The stub launcher answers at once, so no test sees the timeout reach `cadence.tree`, and none has a tree resolve slower than the budget. Reverted, a stuck fetch would hold the per-repo id lock for 330 s while every other caller is told "busy".
 
-**Fix:**
-- `precheck` in `docs/cadence.toml`, with a comment saying why: one command that pins pdm's interpreter to the machine's `python3` (3.13 on kmaster, the live copy's; pdm also holds a 3.12.9 of its own it may otherwise pick), then `pdm sync -G ui -G dev`, `pdm run lint` and `TERM=xterm-256color pdm run test` (CI set `TERM` for the pty bridge tests). The clean worktree has nothing installed, so the command installs (§4.12); `tmux` is on the machine. The 3.12 floor is kept by ruff's `target-version = "py312"` and by `ci.yml`'s matrix run by hand.
-- `ci.yml` keeps its job and matrix under `workflow_dispatch` alone: no `pull_request`, no `push`.
-- `docs/briefs/grinder-ao-1.md`'s gate line, and any brief line that waits on `gh pr checks`: before the ask and the merge, `python3 scripts/precheck.py --pr N` (in the background: it runs the suite, minutes), then `check_cadence.py` as now. `AGENTS.md` says the gate is `cadence/precheck`.
-- Try it on this PR from its own worktree, where the branch's `docs/cadence.toml` sets it: `precheck.py --pr <n> --no-record` first, then without, so the PR merges on its own status.
+**Fix:** add a test that monkeypatches `cadence.tree` to record the `timeout` it is called with (or a stub launcher that sleeps past a monkeypatched small `BUDGET`) and asserts the call is bounded by the budget, not `TREE_TIMEOUT`.
 
-**Done when:** this PR carries a green `cadence/precheck` recorded by `precheck.py` and merged on it; `ci.yml` has no `pull_request` or `push` trigger; the briefs and `AGENTS.md` name the precheck; `pdm run test` and `pdm run lint` pass.
+**Done when:** the revert above fails a test; `pdm run test` and `pdm run lint` pass.
 
-**Related:** TD-1033, dev-cadence TD-148.
+**Related:** TD-1014, TD-970.
 
 ## TD-1036: A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck`
 
@@ -2125,3 +2103,22 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Done when** a worktree the home makes in a pinned repo with no `worktree_setup` is hydrated, and the stopgaps are removed.
 
 **Related:** TD-1014 (the resolver), dev-cadence TD-129, TD-149; samscrape#1121.
+
+## TD-1048: `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-26 (ao-dev-cadence-dc-grinder, through `ao td add --repo shiftlead`; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design, once dev-cadence TD-145 slice 2 gives `ledger_next_id.py` its `--branch` and its *Taken by* line
+**Blocked by:** dev-cadence#TD-145
+**Location:** `src/sessionorc/agent_ids.py` (`_ids_script`: the script's argv is `--count`, `--by`, `--floor`, `--ledger`, `--archive`, `--json`, with no `--branch`, and the reply relays `ids`, `unread`, `reserved`, `why`, `warnings`, with no `taken_by`); `src/shiftlead/cli.py` (`ao td next`'s output); design §4.4 *A ledger entry's id is handed out by the home* (*The run*), §4.7 (`ao td next`, its `--json` keys)
+
+**Why:** dev-cadence TD-145 (after ShiftLead/shiftlead#2370 typed TD-1028 by hand and the counter then gave TD-1028 to another session) makes the cadence check's `ledger` row fail a new entry whose `**Taken by:**` is not its take's `by`, and warn on one with none. The line is to be copied from the front end, never typed from memory, but `ao td next` is shiftlead's front end and prints no such line. It also runs the script in the home's checkout, which stays on `main` (§4.4 *The run*), so a take records that checkout's branch, never the branch of the session the id is for, and a branch mismatch cannot be checked. Without both, every shiftlead session's entry is warned on, and fails once the row reads the by and the branch.
+
+**Fix:** design first: `td_next` passes `--branch <the asking session's branch>` where it has one, and the round decides where that branch is read (the caller's record or its directory, on the home or a node). `ao td next` prints the script's *Taken by* line, and `--json` gives `taken_by`. The round also checks that this ledger's `Fields:` line, and ledgerboard's reading of it, accept `Taken by` before any entry carries it, since an undeclared field fails `ledger.py --check --since`.
+
+**Done when** the design names the flag, the line and the key, and the build entries are filed.
+
+**Related:** dev-cadence TD-145, TD-124 (the counter); TD-970, TD-1014, TD-1034 (`td_next`'s script road); ShiftLead/shiftlead#2370.

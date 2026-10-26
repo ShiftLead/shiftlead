@@ -45,6 +45,7 @@ OPTIONAL = ("smoke",)  # run once `check` reads the commit (§6 *The smoke*, TD-
 SMOKE_MARK = "── smoke ──"
 SMOKE_TOLD = "smoke passed; "  # a passing smoke's last line, what it told after it, rides the note (TD-881)
 TOLD_CAP = 1000  # the most of it a note carries
+SMOKE_LAST = 20  # the smoke's last non-empty lines its wrapper keeps in `smoke.json` (TD-1032)
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HEX_RE = re.compile(r"^[0-9a-f]{7,40}$")  # a rollback's commit: its hex in full or a prefix of seven or more
 # a check run's conclusions that are not a pass; `neutral` and `skipped` are
@@ -457,7 +458,7 @@ def start_smoke(root: str | Path, repo: str, intent: dict[str, Any]) -> dict[str
         out.write(f"{SMOKE_MARK}\n")
     with open(log_path, "ab") as out:
         p = subprocess.Popen(
-            [sys.executable, "-c", SMOKE_WRAPPER, str(intent["smoke"]), str(d / "smoke.json"), sha],
+            [sys.executable, "-c", SMOKE_WRAPPER, str(intent["smoke"]), str(d / "smoke.json"), sha, str(SMOKE_LAST)],
             cwd=str(intent.get("tree") or root), stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             start_new_session=True, env=env,
         )  # fmt: skip
@@ -468,14 +469,27 @@ def start_smoke(root: str | Path, repo: str, intent: dict[str, Any]) -> dict[str
     return intent
 
 
-# the smoke's wrapper: the command through the shell, then its result written beside the intent
+# the smoke's wrapper: the command through the shell, its output copied to the log and its last
+# non-empty lines kept (each capped), then its result written beside the intent with those lines
+# (TD-1032); the result waits on the shell, not the pipe, which a child it left behind may hold open
 SMOKE_WRAPPER = """
-import json, os, subprocess, sys
+import collections, json, os, subprocess, sys, threading
 from datetime import UTC, datetime
-code = subprocess.run(sys.argv[1], shell=True).returncode
+p = subprocess.Popen(sys.argv[1], shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+last = collections.deque(maxlen=int(sys.argv[4]))
+def copy():
+    for line in p.stdout:
+        sys.stdout.buffer.write(line)
+        sys.stdout.buffer.flush()
+        if line.strip():
+            last.append(line.decode("utf-8", "replace").strip()[:2000])
+t = threading.Thread(target=copy, daemon=True)
+t.start()
+code = p.wait()
+t.join(5)
 f = sys.argv[2]
 with open(f + ".tmp", "w") as out:
-    json.dump({"sha": sys.argv[3], "exit": code, "at": datetime.now(UTC).isoformat()}, out)
+    json.dump({"sha": sys.argv[3], "exit": code, "at": datetime.now(UTC).isoformat(), "last": list(last)}, out)
 os.replace(f + ".tmp", f)
 sys.exit(code)
 """
@@ -696,7 +710,8 @@ def _judge_smoke(
 ) -> tuple[dict[str, Any] | None, str | None]:
     """A smoke in flight: its result in `smoke.json` for the intent's commit, exit 0 a pass and any
     other a failure; gone with no result, or past `SMOKE_BOUND` (killed, while the pid is still the
-    smoke), a failure. Its why is *smoke failed on <sha7>: <the log's last line>*."""
+    smoke), a failure. Its why is *smoke failed on <sha7>: <the smoke's last line>*, from `smoke.json`
+    where the wrapper kept it, else the log's."""
     sha7 = str(intent.get("sha"))[:7]
     pid, started = intent.get("smoke_pid"), intent.get("smoke_started")
 
@@ -721,10 +736,10 @@ def _judge_smoke(
     code = res.get("exit")
     if code == 0:
         took = _age(intent.get("smoke_at"), _when(res.get("at")) or now)
-        last = _last_line(intent, TOLD_CAP + len(SMOKE_TOLD))  # what it told: a page over budget, a reach refused
+        last = _said(intent, res, TOLD_CAP + len(SMOKE_TOLD))  # what it told: a page over budget, a reach refused
         told = last[len(SMOKE_TOLD) :] if last.startswith(SMOKE_TOLD) else ""
         return None, _passed(repo, r, intent, took if took is not None else 0.0, told)
-    line = _last_line(intent) or f"it exited {code}"
+    line = _said(intent, res) or f"it exited {code}"
     return _smoke_failed(repo, r, intent, f"smoke failed on {sha7}: {line}", code, run)
 
 
@@ -758,6 +773,17 @@ def _when(at: Any) -> datetime | None:
 def _log_line(intent: dict[str, Any], line: str) -> None:
     with suppress(OSError), open(str(intent.get("log")), "a", encoding="utf-8") as out:
         out.write(line + "\n")
+
+
+def _said(intent: dict[str, Any], res: dict[str, Any] | None, cap: int = 200) -> str:
+    """The smoke's own last non-empty line, as its wrapper kept it in `smoke.json`, its first `cap`
+    characters, "" when it kept none (the smoke said nothing): whatever else writes to the run's log
+    after the smoke cannot stand in for it. A result with no `last` at all (a wrapper before TD-1032)
+    falls back to the log's last line."""
+    last = (res or {}).get("last")
+    if isinstance(last, list):
+        return str(last[-1])[:cap] if last else ""
+    return _last_line(intent, cap)
 
 
 def _last_line(intent: dict[str, Any], cap: int = 200) -> str:

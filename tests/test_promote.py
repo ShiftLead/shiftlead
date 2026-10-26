@@ -5,8 +5,10 @@ three preconditions, the run detached with its intent file written first, its ou
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import signal
 import subprocess
 import time
 from datetime import UTC, datetime, timedelta
@@ -309,8 +311,10 @@ async def test_a_fresh_agent_concludes_a_run_it_did_not_start(agent, checkout, m
     assert not (promote.repo_dir("repo") / "inflight.json").exists()
     assert [e.text for e in agent.person_inbox if e.from_ == "system"] == [f"promoted `repo` `{main[:7]}` — 1 commit"]
     async with LocalClient() as person:
-        got = (await person.call("host"))["promotes"]["repo"]
+        host = await person.call("host")
+    got = host["promotes"]["repo"]
     assert (got["live"], got["main"], got["ahead"], got["inflight"], got["unmet"]) == (main, main, 0, None, None)
+    assert host["promotes_read"] is True  # TD-1032: a pass has read the repos
 
 
 async def test_an_unserved_repo_is_promoted_by_no_pass(agent, checkout, monkeypatch):
@@ -467,6 +471,24 @@ def test_ao_promote_status_prints_the_readings(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert out.startswith("shiftlead · live 4444444 · main 9999999, 3 ahead · checks green · auto off")
     assert "FAILED 9999999 at t: it broke" in out and "    boom" in out
+
+
+@pytest.mark.parametrize(
+    "host, said",
+    [
+        ({"promotes": {}, "promotes_read": False}, "the home has not read its repos yet since it started"),
+        ({"promotes": {}, "promotes_read": True}, "no registered repo carries a promote: block"),
+        ({"promotes": {}}, "no registered repo carries a promote: block"),  # an agent before TD-1032
+    ],
+)
+def test_ao_promote_status_tells_an_unread_home_from_one_with_no_block(monkeypatch, capsys, host, said):
+    """TD-1032: an agent just restarted has empty `promotes` until its first pass reads the repos;
+    `ao promote status` says so rather than that nothing promotes."""
+    from shiftlead import cli
+
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster"} | host)
+    assert cli.main(["promote", "status"]) == 0
+    assert capsys.readouterr().out.startswith(said)
 
 
 # ── slice 3: the row's snooze, and the press's notes (§4.5a *Inbox row: promote*) ──────────────
@@ -1052,6 +1074,57 @@ def test_a_silent_smoke_that_fails_says_its_exit_code(tmp_path, monkeypatch):
     failed, note = promote._judge_smoke("repo", r, intent, datetime.now(UTC), None)
     assert note is None and failed["why"] == f"smoke failed on {'a' * 7}: it exited 3" and failed["exit"] == 3
     assert "hello" not in failed["why"]
+
+
+def test_a_failed_smokes_why_is_its_own_last_line_whatever_the_log_gains_after(tmp_path, monkeypatch):
+    """TD-1032: the wrapper copies the smoke's output to the log and keeps its last lines in
+    `smoke.json`, so a line written to the log after the smoke (the run's own closing tip) is not the
+    failure's why."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    smoke = "echo 'Repo /repo/shiftlead: refused'; echo; echo 'smoke failed: Connection refused'; exit 3"
+    intent = _smoke_intent(tmp_path, smoke=smoke)
+    got = promote.start_smoke(tmp_path, "repo", intent)
+    _wait_gone(got["smoke_pid"])
+    res = json.loads((promote.repo_dir("repo") / "smoke.json").read_text())
+    assert res["exit"] == 3 and res["last"] == ["Repo /repo/shiftlead: refused", "smoke failed: Connection refused"]
+    with open(intent["log"], "a", encoding="utf-8") as out:
+        out.write("units run under your user; `loginctl enable-linger` keeps them alive after logout\n")
+    log = Path(intent["log"]).read_text().splitlines()
+    assert log[-3:-1] == ["", "smoke failed: Connection refused"]  # the smoke's output still reaches the log
+    r = {"inflight": got, "root": str(tmp_path), "main": got["sha"]}
+    failed, note = promote._judge_smoke("repo", r, got, datetime.now(UTC), None)
+    assert note is None and failed["why"] == f"smoke failed on {'a' * 7}: smoke failed: Connection refused"
+
+
+def test_a_smoke_that_leaves_a_child_on_its_output_still_writes_its_result(tmp_path, monkeypatch):
+    """TD-1032's review: the wrapper reads the smoke's output through a pipe, and a child the smoke
+    left behind holds it open; the result is written once the shell exits, not when the pipe closes."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    intent = _smoke_intent(tmp_path, smoke="(sleep 30 &) ; echo 'smoke passed; told'")
+    got = promote.start_smoke(tmp_path, "repo", intent)
+    res, t0 = None, time.monotonic()
+    while res is None and time.monotonic() - t0 < 15:
+        res = promote._read(promote.repo_dir("repo") / "smoke.json")
+        time.sleep(0.1)
+    assert res and res["exit"] == 0 and res["last"] == ["smoke passed; told"]
+    with contextlib.suppress(OSError):
+        os.killpg(got["smoke_pid"], signal.SIGKILL)  # the child left behind, in the smoke's own group
+    promote.alive(got["smoke_pid"])  # reaped
+
+
+def test_a_silent_failed_smoke_says_its_exit_code_whatever_the_log_gains_after(tmp_path, monkeypatch):
+    """TD-1032's review: a wrapper that kept no lines (`last: []`) means the smoke said nothing, so the
+    why is its exit code, never a line the run wrote to the log after it."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    intent = _smoke_intent(tmp_path, smoke="exit 3")
+    got = promote.start_smoke(tmp_path, "repo", intent)
+    _wait_gone(got["smoke_pid"])
+    assert json.loads((promote.repo_dir("repo") / "smoke.json").read_text())["last"] == []
+    with open(intent["log"], "a", encoding="utf-8") as out:
+        out.write("units run under your user; `loginctl enable-linger` keeps them alive after logout\n")
+    r = {"inflight": got, "root": str(tmp_path), "main": got["sha"]}
+    failed, note = promote._judge_smoke("repo", r, got, datetime.now(UTC), None)
+    assert note is None and failed["why"] == f"smoke failed on {'a' * 7}: it exited 3"
 
 
 @pytest.mark.parametrize("frm", [None, "main"])

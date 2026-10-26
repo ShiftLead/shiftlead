@@ -26,6 +26,15 @@
 # `claude --worktree` puts them; worktrees already elsewhere are not moved.
 # worktree-root = ".claude/worktrees"
 
+# The repo's own checks, as one command (§4.12, TD-1035). GitHub Actions stopped on the shared
+# account (TD-1033), so a PR is gated on this: scripts/precheck.py --pr N runs it on the PR's head
+# in a clean worktree and records a cadence/precheck status, and the home runs it on main's head
+# (design §6 *The precheck on main*). The worktree has nothing installed, so it installs first. The
+# interpreter is pinned to the machine's python3 (3.13 on kmaster, the live copy's), since pdm
+# also holds a 3.12.9 of its own it may otherwise pick; the 3.12 floor is kept by ruff's
+# target-version and by ci.yml's matrix, run by hand. TERM is set for the pty bridge tests.
+precheck = "pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run lint && TERM=xterm-256color pdm run test"
+
 # --- opt-outs (cadence.md Adoption checklist step 9): what this repo does not adopt, each
 # naming the ADR that decided it. Read by sync.sh and sync.sh --verify; --verify reports each
 # as OPTED-OUT. Nothing uncommented here means the whole cadence is adopted.

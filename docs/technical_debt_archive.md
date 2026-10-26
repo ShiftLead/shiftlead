@@ -19779,3 +19779,65 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Related:** TD-1026, dev-cadence TD-125.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2386) — the steer clause in `grinder.md`, `designer.md`, `manager.md`, `auditor.md`, `manager_on_call.md` and, shorter, `hunter.md`; the sibling read and the claim's area in `grinder.md`'s and `designer.md`'s claim lines; `designer.md`'s next run reads its own PRs from its claims and branch, never `gh pr list --author @me`.
+
+## TD-1032: A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2385
+**Location:** `src/sessionorc/promote.py` (`_last_line`, `_judge_smoke`, `SMOKE_WRAPPER`), `src/shiftlead/cli.py` (`ao promote status`, its empty-`promotes` line); design §6 *The smoke* (*How it is judged*: "the log's last lines as the reason")
+
+**Why:** `_last_line` takes the last non-empty line after `── smoke ──` in the run's log, and anything else still writing there lands after the smoke. In TD-1031's failures that was `ao service install`'s closing tip, so the promote row, the hold and the person's note read *smoke failed on 9acc3fc: units run under your user; `loginctl enable-linger` keeps them (and tmux) alive after logout*. Paul acted on it: `loginctl enable-linger` failed (linger was already on, and the shell had no login session), and his promote never ran. The smoke's own verdict, *smoke failed: Repo /repo/shiftlead: [Errno 111] Connection refused*, was seven lines up. Second, `ao promote status` run just after the press printed *no registered repo carries a promote: block (design §5) — nothing promotes*: the agent the run had restarted had not yet read its repos, and an empty `promotes` reads as no block.
+
+**Fix:** (1) the reason is the smoke's own output: `SMOKE_WRAPPER` captures the command's last non-empty lines and writes them to `smoke.json` beside `exit` (still copying all of it to the log), and `_judge_smoke` reads them from there, falling back to `_last_line` for a `smoke.json` with none; §6 *How it is judged* says so. (2) `ao promote status` tells an agent that has not yet read its repos (its first pass since start) from one with no `promote:` block, and says *the home has not read its repos yet* for the first.
+
+**Done when** a test appends a line to the log after the smoke's own last line and the failure's why is still the smoke's; and a test of `ao promote status` against a host reply from an agent with no first pass prints the not-yet-read line, not the no-block one.
+
+**Related:** TD-1031 (the race that put the run's lines after the smoke's).
+
+**Resolved:** 2026-10-26 (grinder-ao-1, PR #2385) — (1) `SMOKE_WRAPPER` runs the smoke through a pipe, copies each line to the run's log and keeps its last `SMOKE_LAST` (20) non-empty lines as `last` in `smoke.json`; `_judge_smoke` reads the failure's why (and a pass's told part) from there through `_said`, falling back to `_last_line` only for a result with no `last` (an empty one is a smoke that said nothing: *it exited N*, the techlead's finding). The copy runs in a thread and the result waits on the shell's exit (the copy joined for 5 s), so a child the smoke leaves on its output cannot hold it (the review's note). (2) `host` carries `promotes_read` at the home (false until the first pass since start), and `ao promote status` with no repo prints *the home has not read its repos yet since it started* for it. §6 *How it is judged* and §4.7 say so. Tests: `test_a_failed_smokes_why_is_its_own_last_line_whatever_the_log_gains_after` (a line appended to the log after the smoke) and `test_a_smoke_that_leaves_a_child_on_its_output_still_writes_its_result` and `test_ao_promote_status_tells_an_unread_home_from_one_with_no_block` in `tests/test_promote.py`.
+
+## TD-1040: `test_put_on_the_board_twice_at_once_writes_one_line_and_a_refused_dismiss_is_said` fails now and then: its third `board_edit` is refused as *repo is unserved*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, met in TD-1032's full suite)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2385
+**Location:** `tests/test_board.py` (the test, line ~362; its `repo` fixture has neither a pin nor a `docs/cadence-sync.lock`), `src/sessionorc/seams.py` (`unserved: no dev-cadence …`, line ~152)
+
+**Why:** In one full `pdm run test` of TD-1032's branch the test's last `board_edit` (after the monkeypatched dismiss) raised `AgentError: repo is unserved: no dev-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — ao repo add … --adopt; the home writes nothing to its board until it is cured`. Run alone it then failed once in three and passed eleven times after. The fixture repo carries no dev-cadence, so it reads as unserved once the agent has read it; the two presses before pass, so the reading seems to land mid-test (a tick reading the `repos.txt` the test writes), and the board write is refused from then on.
+
+**Fix:** give the test's repo what makes it served (a `docs/cadence-sync.lock`, or the pin the other served fixtures use), or read why the first two presses pass and settle the race; then run it in a loop (`for i in $(seq 30)`) to show it holds.
+
+**Done when** the test passes 30 runs in a row alone and in the full suite.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, PR #2385) — the cause: `_board_served` refuses by the tick's reading of the repo (`self._repos`), absent until a tick reads the `repos.txt` the test writes, so a test whose presses all ran before that read passed, and one the read overtook was refused (CI's 3.12 run on #2385 failed `test_board_edit_decides_only_with_one_of_the_items_answers` the same way). `tests/test_board.py`'s `repo` fixture now calls `conftest.served`, so the repo reads served whenever the read lands. The two tests passed 30 runs in a row; `tests/test_board.py` 53 passed.
+
+## TD-1035: This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (the designer, from TD-1033)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — built in #2389
+**Location:** `docs/cadence.toml` (no `precheck`); `.github/workflows/ci.yml` (`pull_request` and push to `main`); `docs/briefs/grinder-ao-1.md` (*The gate here*: *wait for the PR's checks to pass (`gh pr checks N --watch`)*), any other file under `docs/briefs/` that waits on CI (`docs/briefs/techlead-context.md` is a held path, so the PR goes to its reader); `AGENTS.md`; design §6 *Promote* (*The precheck on main*), dev-cadence §4.12
+
+**Why:** TD-1033: GitHub Actions stopped on the shared account and Paul decided every repo gates on a local `precheck` (dev-cadence TD-148). This repo's PRs read red for a reason that says nothing about the code.
+
+**Fix:**
+- `precheck` in `docs/cadence.toml`, with a comment saying why: one command that pins pdm's interpreter to the machine's `python3` (3.13 on kmaster, the live copy's; pdm also holds a 3.12.9 of its own it may otherwise pick), then `pdm sync -G ui -G dev`, `pdm run lint` and `TERM=xterm-256color pdm run test` (CI set `TERM` for the pty bridge tests). The clean worktree has nothing installed, so the command installs (§4.12); `tmux` is on the machine. The 3.12 floor is kept by ruff's `target-version = "py312"` and by `ci.yml`'s matrix run by hand.
+- `ci.yml` keeps its job and matrix under `workflow_dispatch` alone: no `pull_request`, no `push`.
+- `docs/briefs/grinder-ao-1.md`'s gate line, and any brief line that waits on `gh pr checks`: before the ask and the merge, `python3 scripts/precheck.py --pr N` (in the background: it runs the suite, minutes), then `check_cadence.py` as now. `AGENTS.md` says the gate is `cadence/precheck`.
+- Try it on this PR from its own worktree, where the branch's `docs/cadence.toml` sets it: `precheck.py --pr <n> --no-record` first, then without, so the PR merges on its own status.
+
+**Done when:** this PR carries a green `cadence/precheck` recorded by `precheck.py` and merged on it; `ci.yml` has no `pull_request` or `push` trigger; the briefs and `AGENTS.md` name the precheck; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1033, dev-cadence TD-148.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2389) — `docs/cadence.toml`'s `precheck` (its comment says why), `ci.yml` under `workflow_dispatch` alone, `docs/briefs/grinder-ao-1.md`'s gate line and `AGENTS.md` name `precheck.py` and `cadence/precheck`; #2389 merged on its own recorded status.

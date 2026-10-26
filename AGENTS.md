@@ -124,7 +124,9 @@ Every change goes branch → PR → squash merge; the pre-push hook blocks main
 (`ALLOW_MAIN_PUSH=1` is the deliberate override; cadence §4 lists the carve-outs). Every other
 concurrent session in this repo works in a worktree (`claude --worktree <name>` or
 `scripts/open_worktree.sh <topic>`); the first session in the checkout is the anchor.
-Self-authored PRs get an independent cheaper-model review before merge; doc-only PRs get a
+A PR's gate is its `cadence/precheck` status, not GitHub Actions (which run only by hand, `ci.yml`):
+`python3 scripts/precheck.py --pr <n>` runs `docs/cadence.toml`'s `precheck` on its head and records it
+(cadence §4.12, TD-1035). Self-authored PRs get an independent cheaper-model review before merge; doc-only PRs get a
 fact-check against the repo. A PR that `ao pr held <n>` says is held waits for its reader only once
 the author asks: when it is green, post its review, then send `ao msg --kind ask --pr <n> <reader> "…"`
 (design §4.9b *How the reader hears of a PR*) — nothing else sends the first ask. The Repo page and
