@@ -1781,7 +1781,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-25 (the designer, from TD-1009)
 **Owner:** grinder
 **Kind:** build
-**Waits:** event — every registered consumer repo's `docs/cadence-sync.lock` at or after dev-cadence 611d911 (TD-132, `cadence_layer.py --json`, #326), the commit `OLDEST` is raised to; read 2026-10-25 (grinder-ao-2): samscrape, contractmatch and ledgerboard at 4453db4, pneuma-ops and guardians-devenv at 3384140, shiftlead at 232f2ad — none holds it. Each repo's sync is its own sessions' work
+**Waits:** event — every registered consumer repo's `docs/cadence-sync.lock` at or after dev-cadence 611d911 (TD-132, `cadence_layer.py --json`, #326), the commit `OLDEST` is raised to; read 2026-10-25 (grinder-ao-2), each lock's `files_commit`: samscrape, contractmatch and ledgerboard at 4453db4, pneuma-ops and guardians-devenv at 3384140, shiftlead at 232f2ad — none holds it. Each repo's sync is its own sessions' work
 **Status:** Open — build
 **Blocked by:** dev-cadence#TD-132, TD-1012
 **Location:** new `src/shiftlead/layers.py` (the listing and the reads), `src/sessionorc/cadence.py` (`OLDEST` raised), `src/sessionorc/brief.py` (`fill`: the `{person}` slot and its `sources`), `src/shiftlead/briefs/*.md` (the slot and the sentence before *This repo's rules*), `src/shiftlead/repoconfig.py` (`entry_text`, `work_text`: the additions), `src/shiftlead/cli.py` (`ao prefs`'s layer line); tests beside `tests/test_brief_replay.py` and `tests/test_repoconfig.py`; design §4.8 *The person's own additions*, §4.9b *Preferences, in layers*
