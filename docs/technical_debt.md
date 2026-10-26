@@ -87,8 +87,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
 | TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) done (#2366); (3) waits on dev-cadence TD-136–TD-139 |
-| TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Designed — builds TD-1023, TD-1024 |
-| TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
 | TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Open — design |
 | TD-1026 | Two team lessons from the memory harvest are not in the role briefs: a steer's default waits for its bound, and `--author @me` is not "my PRs"; the designer brief lacks the never-`SendMessage` line | Low | Designed — builds TD-1030 |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
@@ -1848,52 +1846,6 @@ Trimming before the rule arrives here loses it (§2.4).
 - `a-park-is-a-merged-pr.md`, `check-open-prs-before-a-design-round.md`, `cloud-design-round.md` and `ui-review-screenshots.md` have no frontmatter. Add `name`, `description` and `type`.
 
 **Done when:** (1), (2) and (4) are done, and (3) is done after dev-cadence TD-136, TD-137, TD-138 and TD-139 have reached this repo.
-
-## TD-1022: ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-26, the designer) — §4.2 (the line's two modes, which repo line counts as running the hooks), §4.3 *A repo's start hooks are every adapter's to run*, §5 *The seams* (the line's vintages, two new SessionStart warnings, the per-clone warnings' words by era), §4.7 `ao repo add`, §4.5a *Repo page: missing seams*. Built by TD-1023 (the line, first) and TD-1024 (the Repo page's words).
-**Blocked by:** TD-1023, TD-1024
-**Location:** `src/shiftlead/adapters/claude_code/__init__.py` (`CADENCE_HOOK_LINE`, and `cadence_hook_line`, the line the Repo page compares a repo's own SessionStart with), `src/shiftlead/adapters/gemini/hook.py` (`start_hooks`, which runs the start hooks as the line does), `tests/test_claude_adapter.py`; `src/sessionorc/seams.py` (`warnings`: *dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh <root>`* and `on_cadence_roster`'s *not on dev-cadence's roster: sync-all will not reach it*, TD-1010 part 3); design §4.7 `ao repo add`, §4.5a *Repo page, missing seams*, §5 *The seams*; dev-cadence `files/.claude/settings.json` (the seed line), `files/scripts/install_git_hooks.sh`
-
-**Why:** dev-cadence TD-129 (ADR 2026-10-25; dev-cadence's plan 2026-10-25-pinned-not-synced) runs a pinned repo's hooks through the `dev-cadence` launcher and retires `sync.sh` and `sync-all.sh` once the roster is pinned. Its slice 5 (dev-cadence #335) changed the seeded SessionStart line to run `dev-cadence hook session-start` where `docs/cadence.toml` has a `[dev-cadence]` table, and to say so when no launcher is on `PATH`. ShiftLead's `CADENCE_HOOK_LINE` is still the old line, which runs `scripts/cadence_hooks.sh` alone, so a session ShiftLead starts in a pinned repo, where that script no longer exists, runs no cadence hook and says nothing; and the Repo page, comparing each repo's own line with the old one, would warn *no SessionStart line* on every repo carrying the new seed. dev-cadence's session could not file this here (`ao td add --repo shiftlead` refused 2026-10-25, *shiftlead has no question seat*). The two warnings name `sync.sh` as their cure and `sync-all` as what reaches a repo; under a pin the per-clone setup is `dev-cadence adopt` or `install_git_hooks.sh`, and dev-cadence's roster (`~/.config/dev-cadence/repos.txt`) stays for `adopt` and `gc` while `sync-all.sh` goes.
-
-**Fix:** the design round decides:
-- `CADENCE_HOOK_LINE` becomes dev-cadence's seed line verbatim (both modes), with a parity test against dev-cadence's `files/.claude/settings.json` so the copy cannot drift again; the Gemini adapter's run follows it.
-- The two warnings' words and cures for a pinned repo: what the per-clone cure is once `sync.sh` is gone, and whether the roster warning stays (the roster still feeds `gc`) with new words or goes with `sync-all.sh`; a lock-era repo keeps today's words until it is pinned.
-- §4.7, §4.5a and §5 change to match, and the build entries are filed.
-
-**Done when:** the design PR is merged with its build entries filed; those builds' Done when hold a pinned temp repo whose ShiftLead-started session runs `dev-cadence hook session-start` through a stub launcher, and the Repo page warning neither *no SessionStart line* nor `sync.sh` / `sync-all` for it.
-
-**Related:** dev-cadence TD-129 (slice 5, #335; slice 11, #341), TD-1009, TD-1010 (part 3, the roster warning), TD-1014 (the pin era's other readers), TD-507 (the doctor's reading of dev-cadence's line of any vintage).
-
-## TD-1024: The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1022)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/seams.py` (`reading`: a `hook_pinned` field; `shimmed`; `warnings`), `src/shiftlead/doctor.py` (`missing_seams`, two new constants beside `NO_SESSION_START`), `src/sessionorc/cadence.py` (`is_source`), `src/shiftlead/adopt.py` (`dev_cadence`), `src/shiftlead/repoconfig.py` (the `{gate}` prefix's `there("sync.sh")`), `tests/test_seams.py`, `tests/test_repo_seams.py`, the help text where it names the warnings; design §5 *The seams*, §4.7 `ao repo add`, §4.5a *Repo page: missing seams*
-
-**Why:** TD-1022: the per-clone warnings cure with `sync.sh`, which dev-cadence retires once its roster is pinned, and nothing on the page says when a repo's own SessionStart line is older or newer than ShiftLead's copy.
-
-**Fix:** as §5 *The seams* says —
-- The reading carries `hook_pinned` (`sessionorc.cadence.hook_pinned`, TD-1023), so a client reads it from the repo facts; "pinned" in this entry means it.
-- `cadence.is_source` (and its docstring) accepts a root holding `files/` and either `sync.sh` or `launcher/INTERFACE`, so dev-cadence's source, and the roster's dev-cadence checkout the cures and `seams.descends` find by it, still read once `sync.sh` retires (§5 *The seams*); `adopt.dev_cadence` and `repoconfig`'s `{gate}` prefix (read across a node's link with `there`) take the same two-way test, so no reader tests `sync.sh` alone. Where `adopt.dev_cadence`'s pick has no `sync.sh`, `ao repo add`'s adopt (`adopt._sync`, which runs it) refuses by name, *dev-cadence at <dc> has no sync.sh: run `dev-cadence -C <dc> adopt <path>` yourself*, rather than fail on a missing file — checked before the scratch clone in both callers, `adopt.offer` and the `--adopt` path, so no clone is made and the PR body's `sync.sh` line is never reached (§4.7 `ao repo add`); moving `_sync` onto the launcher's `adopt` is not this entry's.
-- In a pinned repo, `shimmed` is False for a shim whose text lacks `dev-cadence hook "` (the launcher call only the TD-129 shim makes, `dev-cadence hook "${0##*/}"`; the bare `dev-cadence hook` is in every shim's `SHIM_MARKER`, and its `[dev-cadence]` is written escaped inside a grep pattern, so neither is a test); the shim warning reads *dev-cadence's per-clone setup not run in this checkout — `dev-cadence -C <root> run install_git_hooks.sh`* and the roster warning *not on dev-cadence's roster: its gc may remove the tree this repo pins — `dev-cadence -C <dev-cadence> adopt <root>`*. A repo without a pin keeps today's words, byte for byte. (Where `adopt` refuses — a lock still there, or a synced copy before dev-cadence #341 — §5 says the roster line is appended by hand; the words stay.)
-- `missing_seams`: where no SessionStart command is a known vintage (any adapter's `cadence_hook_line` or `cadence_hook_lines_past`) and one names `cadence_hooks.sh` or `dev-cadence hook`, it warns *SessionStart line is not one this build knows: dev-cadence's seed may be newer than ShiftLead's copy — or copy the line from dev-cadence's files/.claude/settings.json*; a known vintage beside a hand-written command warns nothing; a line warned so is not also warned *no SessionStart line*, which stays for a repo naming neither; in a pinned repo where no command is the current line, a command that is a past vintage warns *SessionStart line predates the pin: a session started outside ShiftLead runs no cadence hook — copy the line from `dev-cadence -C <root> path .claude/settings.json`*. The dev-cadence source's `files/` form counts as the line, as now. A reading without `hook_pinned` (an older host agent) reads unpinned: today's words, no *predates the pin*.
-
-**Done when:** a pinned temp repo carrying the current line, the TD-129 shim and a roster line warns neither *no SessionStart line* nor `sync.sh` / `sync-all`; the same repo with the 2026-09-25 line warns *predates the pin*, with a pre-pin shim the launcher's shim cure, and off the roster the `adopt` cure; an unpinned repo's three warnings are today's words; a line with one byte changed warns *not one this build knows*, and not also *no SessionStart line*, and the same beside the current line warns nothing; a shim text taken from dev-cadence 2cc2b88 (pre-pin) in a pinned repo warns, one from ddd2f99 does not; the 2026-09-25 line beside the current one warns no *predates the pin*; a temp root with `files/` and `launcher/INTERFACE` and no `sync.sh` reads `is_source` and is `adopt.dev_cadence`'s pick, and `ao repo add` (with and without `--adopt`) against it gives the refusal and makes no clone, and `seams.descends` finds it as the roster's dev-cadence checkout; a copied repo's cures still name `sync.sh` (the copy era has it); a reading without `hook_pinned` warns as today. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1022, TD-1023, TD-1010 (the roster warning), TD-1014.
-
----
 
 ## TD-1025: Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md`
 
