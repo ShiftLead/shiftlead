@@ -86,11 +86,13 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
-| TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) now; (3) waits on dev-cadence TD-136–TD-139 |
+| TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) done (#2366); (3) waits on dev-cadence TD-136–TD-139 |
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Designed — builds TD-1023, TD-1024 |
 | TD-1023 | The layer's SessionStart line is dev-cadence's pinned seed, verbatim and parity-tested; Gemini's start hooks and the repo's own line follow the pin | High | Open — build |
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
 | TD-1026 | Two team lessons from the memory harvest are not in the role briefs: a steer's default waits for its bound, and `--author @me` is not "my PRs"; the designer brief lacks the never-`SendMessage` line | Low | Open — from the 2026-10-26 memory harvest |
+| TD-1027 | `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit) | Low | Open — build |
+| TD-1028 | `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit) | Low | Open — build |
 
 ---
 
@@ -1801,7 +1803,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-26 (Paul, through the memory harvest; drafted by session `memory-vs-cadence`)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open. Items (1), (2) and (4) can start now; (3) waits on dev-cadence TD-136 to TD-139.
+**Status:** Open — items (1), (2) and (4) done in #2366 (grinder-ao-2, 2026-10-26): the passages corrected, the copies trimmed to a pointer at the cadence rule (`gate-everything-after-a-merge-on-its-state` keeps its reopen-at-the-same-sha cure, which no rule says), `live-system-restart-authorized` deleted, the four files given frontmatter, `MEMORY.md`'s lines to match. Item (3) is left: it waits on dev-cadence TD-136 to TD-139 being archived there and synced here.
+**Blocked by:** dev-cadence#TD-136, dev-cadence#TD-137, dev-cadence#TD-138, dev-cadence#TD-139
 **Location:** `docs/claude-memory/`
 
 **Why:** Paul's first memory harvest (dev-cadence TD-125, 2026-10-26) judged every memory in `docs/claude-memory/` against dev-cadence's cadence and his own cadence layer. Some memories now contradict the cadence. A wrong memory is worse than none (cadence §7.1): a session follows it. Most of the wrong ones teach numbering TD ids by hand. Others repeat a rule cadence.md now holds, so the copies drift as the cadence changes. Other people will work in this repo, so memories whose lessons went only into Paul's personal layer or his `craft.md` stay here as they are. That includes `agree-the-layout-before-model-reviews` and `hold-a-design-until-its-round-ends`.
@@ -1932,3 +1935,39 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Done when** (1)–(3) are in the briefs and (4) is decided, here or in the brief.
 
 **Related:** dev-cadence TD-125 (the harvest), ADR 2026-10-25 *ShiftLead requires dev-cadence* (Decision 7, the person's `shiftlead/` directory — where a lesson only Paul wants would go instead).
+
+## TD-1027: `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2368)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/repoconfig.py` (`layout`'s inner `pinned()`), `tests/test_repoconfig.py` (`test_a_pinned_repos_layout_names_the_resolvers_command`)
+
+**Why:** #2368 (TD-1014 slice 2) wrote `pinned()` to say a pin the launcher would refuse "is pinned still", and to read a refused-by-name `OSError` across the link as there. Probed on `origin/main` 0a24e16f4 with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_repoconfig.py tests/test_cli_teams.py`: (a) replacing `return PIN_HEADER in (line.strip() for line in text.splitlines())` (the `TOMLDecodeError` fallback) with `return False` leaves 143 passed; (b) replacing the `except OSError` body's `if any(why in str(e) for why in THERE_REFUSALS): return True` with a bare `raise` leaves 143 passed. The test's only TOML cases are a valid table, a valid table with odd spacing and a comment, and `[other]`, so neither branch runs; `test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_otherwise` covers `there()`'s refusals, not `pinned()`'s own copy of them. A node's repo whose pin is half-edited would then brief a session the copy's `python3 scripts/…` paths, which a pinned repo has not got, with nothing to say so.
+
+**Fix:** add to the test (or beside it) a pin whose text is not TOML but holds a `[dev-cadence]` line (layout reads the resolver's command), one whose text is not TOML and has none (reads the copy's paths), and a `cfg.read` that raises an `OSError` of a refusal named in `THERE_REFUSALS` (pinned) and of another kind (raised).
+
+**Done when:** each of the two reverts above fails a test; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014, TD-1011.
+
+## TD-1028: `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2365)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/cadence.py` (`_tree`, `_launcher_words`), `tests/test_cadence_pin.py`
+
+**Why:** #2365 (TD-1014 slice 1) made `_tree` answer `(None, why)` in words a repo's lack then prints (§5 *How the readers find dev-cadence*). Probed on `origin/main` 0a24e16f4 with `PYTHONPATH=$PWD/src pdm run pytest -q -x tests/test_cadence_pin.py tests/test_seams.py tests/test_lane_news.py tests/test_cadence_policy.py`: replacing the text of `the launcher gave no answer in {timeout:.0f}s`, of `the launcher could not run: …`, or the guard `if not out or not Path(out).is_dir():` (made `if False:`) each leaves 56 passed, and so does reading the first line of the launcher's stderr, not the last, in `_launcher_words`. `grep -rn "gave no answer\|could not run\|not a directory here" tests` finds none of the three (one unrelated docstring in test_cli_teams.py matches "not a directory here"). `test_a_pin_the_launcher_refuses_or_cannot_resolve_is_a_lack_by_name` covers only a non-zero exit with one stderr line.
+
+**Fix:** a stub launcher (`_stub` in the module) that sleeps past a small `timeout`, an `argv` that cannot execute, one that exits 0 printing a path that is not a directory or nothing, and a refusal on several stderr lines whose last is the reason; each asserted as the words a lack carries.
+
+**Done when:** each of the four reverts above fails a test; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.

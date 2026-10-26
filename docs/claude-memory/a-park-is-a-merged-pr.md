@@ -1,3 +1,10 @@
+---
+name: a-park-is-a-merged-pr
+description: A cloud session's park of an entry exists once its PR is merged, not opened; re-search the id's PRs in every state before the round
+metadata:
+  type: feedback
+---
+
 # A park is a merged PR, not an open one
 
 **2026-09-25 (Paul).** A cloud session parks a ledger entry on the board by opening a PR with the
