@@ -2010,8 +2010,8 @@ Trimming before the rule arrives here loses it (§2.4).
 **Type:** debt
 **Added:** 2026-10-26 (the designer, from TD-1031)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — build
+**Kind:** live-check #2402
+**Status:** Open — built in #2402: `_conclude` waits for the run's end after `check` reads the commit, and the smoke checks the running build. The live read: the next promote of shiftlead's main after #2402 is live (`ao promote status`) — its log (`~/.shiftlead/promotes/shiftlead/<sha>.log`, read only) has `── smoke ──` after the run's last line (`ao service install`'s), the smoke's log has *running build <sha7> is the promoted one*, and the note says *smoke passed*
 **Location:** `src/sessionorc/promote.py` (`_conclude`'s first branch, `start_smoke`, `_concluded`), `scripts/smoke.py` (this repo's smoke), `src/shiftlead/ui/inbox.py` and `ao promote status` (the window's words, if they key on live); design §6 *Promote* (*Live reads the wanted commit and the run has ended*), *The smoke* (*When and where*, *The promote is in flight until the smoke ends*)
 
 **Why:** TD-1031: shiftlead's `run` writes the build record `check` reads before it restarts the units, so the smoke started on `check` alone met a UI going down three times, each a rollback and a hold.
