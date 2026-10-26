@@ -242,10 +242,11 @@ def test_hooks_settings_shape():
     hc = hooks_settings(prof, "/x/shiftlead-hook", cadence_line=True)["hooks"]
     ss = hc["SessionStart"][0]["hooks"]
     assert [x["command"] for x in ss] == ["/x/shiftlead-hook", CADENCE_HOOK_LINE] and ss[1]["timeout"] >= 130
-    # The line runs the main checkout's runner (dev-cadence TD-055 (b), 2026-09-25): the first entry of
-    # `git worktree list --porcelain`, falling back to the directory's own copy outside a git repo.
+    # The line reads the main checkout (dev-cadence TD-055 (b), 2026-09-25): the first entry of
+    # `git worktree list --porcelain`, falling back to the directory's own copy outside a git repo; its
+    # pinned and copied modes are tests/test_cadence_hook_line.py's (TD-1023).
     assert CADENCE_HOOK_LINE.startswith('r=$(git -C "${CLAUDE_PROJECT_DIR:-.}" worktree list --porcelain')
-    assert '"${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh"; if [ -x "$f" ]' in CADENCE_HOOK_LINE
+    assert 'elif [ -x "$f" ]; then "$f" --session-start; fi' in CADENCE_HOOK_LINE
     assert len(hc["Stop"][0]["hooks"]) == 1  # only SessionStart gains it
 
 

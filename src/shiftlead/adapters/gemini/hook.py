@@ -25,6 +25,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -54,6 +55,18 @@ WAKES_ENV = "SHIFTLEAD_GEMINI_WAKES"
 # dev-cadence's runner (design §4.3 *A repo's start hooks are every adapter's to run*), the main checkout's
 START_HOOKS = ("scripts", "cadence_hooks.sh")
 START_HOOKS_TIMEOUT = 150  # seconds: the runner's own bound, > 5 children × its 25 s child timeout
+# a pinned repo's (design §4.2, TD-1023): the launcher's word, from PATH, and the two sentences dev-cadence's
+# seed line prints when it cannot run the pin (exit 2) or there is none, copied from the seed (a parity test)
+PINNED_HOOK = ("dev-cadence", "hook", "session-start")
+PIN_FAILED = (
+    "dev-cadence: the launcher could not run the pin in docs/cadence.toml (it said why above), "
+    "so the cadence session-start hooks did not run (TD-129)"
+)
+NO_LAUNCHER = (
+    "dev-cadence: this repo pins dev-cadence in docs/cadence.toml but no dev-cadence launcher is on PATH, "
+    "so the cadence session-start hooks did not run; install it once per machine: clone dev-cadence at its "
+    "latest tag, then run: install -m 755 launcher/dev_cadence.py ~/.local/bin/dev-cadence"
+)
 
 
 def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -126,11 +139,18 @@ def start_context(payload: dict[str, Any]) -> str:
 
 
 def start_hooks(payload: dict[str, Any]) -> str:
-    """Run the repo's start hooks, as Claude Code's layer line does (`CADENCE_HOOK_LINE`): the main
-    checkout's runner — the first entry of `git worktree list` — else the project's own copy, only where
-    it is executable; its stdout, or "" when there is none or it failed."""
+    """Run the repo's start hooks, as Claude Code's layer line does (`CADENCE_HOOK_LINE`). In a pinned repo
+    (`cadence.hook_pinned`), `dev-cadence hook session-start` from PATH in `cwd`, the payload on its stdin:
+    its stdout whatever its exit, then `PIN_FAILED` after an exit 2; `PIN_FAILED` alone on a timeout, and
+    `NO_LAUNCHER` with none on PATH — never "" (design §4.2, TD-1023). Otherwise the main checkout's
+    runner — the first entry of `git worktree list` — else the project's own copy, only where it is
+    executable; its stdout, or "" when there is none or it failed."""
+    from sessionorc import cadence  # here, not at the top: every other event's import path stays light
+
     cwd = Path(str(payload.get("cwd") or os.getcwd()))
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or cwd)
+    if cadence.hook_pinned(project):
+        return _pinned_hooks(payload, cwd)
     try:
         listed = subprocess.run(
             ["git", "-C", str(project), "worktree", "list", "--porcelain"],
@@ -155,6 +175,26 @@ def start_hooks(payload: dict[str, Any]) -> str:
         )
     except (OSError, subprocess.SubprocessError, ValueError):
         return ""
+    return done.stdout
+
+
+def _pinned_hooks(payload: dict[str, Any], cwd: Path) -> str:
+    """The seed line's pinned mode: the launcher's `hook session-start` and what it printed (`start_hooks`)."""
+    if shutil.which(PINNED_HOOK[0]) is None:
+        return NO_LAUNCHER
+    try:
+        done = subprocess.run(
+            list(PINNED_HOOK),
+            input=json.dumps(payload),
+            capture_output=True,
+            text=True,
+            cwd=cwd if cwd.is_dir() else None,
+            timeout=START_HOOKS_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError):  # a timeout too: a first fetch can outlast the bound
+        return PIN_FAILED
+    if done.returncode == 2:
+        return "\n".join(x for x in (done.stdout.rstrip("\n"), PIN_FAILED) if x)
     return done.stdout
 
 

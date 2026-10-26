@@ -376,9 +376,13 @@ NO_SESSION_START = "no SessionStart line: a session started outside ShiftLead mi
 
 
 def _hook_lines(source: bool) -> set[str]:
-    """Each adapter's SessionStart line for dev-cadence (`cadence_hook_line`), its runner under `files/`
-    in dev-cadence's own source (§5 *The seams*)."""
-    lines = {getattr(adapters.get(n), "cadence_hook_line", None) for n in adapters.names()}
+    """Each adapter's SessionStart line for dev-cadence (`cadence_hook_line`) and its earlier vintages
+    (`cadence_hook_lines_past`, TD-1023), its runner under `files/` in dev-cadence's own source (§5 *The seams*)."""
+    lines: set[object] = set()
+    for n in adapters.names():
+        ad = adapters.get(n)
+        lines.add(getattr(ad, "cadence_hook_line", None))
+        lines.update(getattr(ad, "cadence_hook_lines_past", ()) or ())
     out = {x for x in lines if isinstance(x, str) and x}
     return {x.replace("/scripts/cadence_hooks.sh", "/files/scripts/cadence_hooks.sh") for x in out} if source else out
 

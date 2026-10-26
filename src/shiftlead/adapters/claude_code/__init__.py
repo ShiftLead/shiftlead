@@ -23,7 +23,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import identity, paths
+from sessionorc import cadence, identity, paths
 from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Prompt, Transcript
 from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, State
@@ -170,18 +170,39 @@ def pretrust(cwd: Path, profile: Profile) -> bool:
 
 
 # dev-cadence's one SessionStart line (design §4.2; cadence §3, 2026-09-11). Byte-identical to the
-# line in dev-cadence `files/.claude/settings.json` — a parity pair: the repo's own settings carry
-# it for hand-started sessions, this layer carries it for the sessions shiftlead starts. Since
-# 2026-09-25 (dev-cadence TD-055 (b)) the line runs the MAIN checkout's runner — the first entry of
-# `git worktree list --porcelain`, computed live, so it is right in a container as on the host — and
-# dev-cadence's runner finds its children beside itself (its PR #101, 2026-09-22; a consumer's copy
-# under scripts/ is what its last sync carried), so a worktree on an older branch runs the current
-# hook set against itself; `$CLAUDE_PROJECT_DIR` alone resolved to that branch's own copy. In the
-# main checkout the two are the same directory; outside a git repo `r` is empty and the old path
-# plus the `[ -x ]` guard keep it a no-op, as in a directory that is not a dev-cadence consumer.
+# line in dev-cadence `files/.claude/settings.json` (as of dev-cadence ddd2f99, TD-1023) — a parity pair:
+# the repo's own settings carry it for hand-started sessions, this layer carries it for the sessions
+# shiftlead starts. It reads the MAIN checkout — the first entry of `git worktree list --porcelain`,
+# computed live, so it is right in a container as on the host; outside a git repo `r` is empty and the
+# directory's own path stands in — and has two modes (dev-cadence TD-129). Pinned, where that checkout's
+# `docs/cadence.toml` has a `[dev-cadence]` header (`sessionorc.cadence.hook_pinned` reads it the same
+# way): `dev-cadence hook session-start` from PATH in the session directory, with one line into the
+# context when the launcher cannot run the pin (exit 2) or is not on PATH. Copied: the main checkout's
+# runner, guarded by `[ -x ]`, so a directory that is not a dev-cadence consumer runs nothing.
+CADENCE_PIN_FAILED = (
+    "dev-cadence: the launcher could not run the pin in docs/cadence.toml (it said why above), "
+    "so the cadence session-start hooks did not run (TD-129)"
+)
+CADENCE_NO_LAUNCHER = (
+    "dev-cadence: this repo pins dev-cadence in docs/cadence.toml but no dev-cadence launcher is on PATH, "
+    "so the cadence session-start hooks did not run; install it once per machine: clone dev-cadence at its "
+    "latest tag, then run: install -m 755 launcher/dev_cadence.py ~/.local/bin/dev-cadence"
+)
 CADENCE_HOOK_LINE = (
     "r=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p'); "
-    'f="${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi'
+    'f="${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh"; '
+    "if grep -qsE '^[[:space:]]*\\[dev-cadence\\][[:space:]]*(#.*)?$' \"${r:-$CLAUDE_PROJECT_DIR}/docs/cadence.toml\"; "
+    "then if command -v dev-cadence >/dev/null 2>&1; "
+    'then (cd "${CLAUDE_PROJECT_DIR:-.}" && dev-cadence hook session-start); rc=$?; [ "$rc" -ne 2 ] && exit "$rc"; '
+    f"echo '{CADENCE_PIN_FAILED}'; else echo '{CADENCE_NO_LAUNCHER}'; fi; "
+    'elif [ -x "$f" ]; then "$f" --session-start; fi'
+)
+# The earlier seeds, newest first, which a repo may still carry (design §5 *The seams*): dev-cadence
+# 4316bd4 (2026-09-25, the main checkout's runner) and 267cae5 (2026-09-11, the directory's own runner).
+CADENCE_HOOK_LINES_PAST = (
+    "r=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p'); "
+    'f="${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi',
+    'f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi',
 )
 CADENCE_HOOK_TIMEOUT = 150  # > 5 children × the runner's 25 s child timeout
 # A session directory whose own SessionStart already runs dev-cadence's hooks — the one runner
@@ -194,7 +215,8 @@ CADENCE_HOOK_TIMEOUT = 150  # > 5 children × the runner's 25 s child timeout
 # session deep in one long tool run still reports; the flag that makes `shiftlead-hook` the command.
 STATUSLINE_REFRESH = 60
 STATUSLINE_FLAG = "--statusline"
-CADENCE_WIRED_MARKERS = ("scripts/cadence_hooks.sh", "scripts/nudge_user_attention.py")
+CADENCE_PINNED_MARKER = "dev-cadence hook session-start"  # the seed's pinned mode (TD-1023)
+CADENCE_WIRED_MARKERS = ("scripts/cadence_hooks.sh", "scripts/nudge_user_attention.py", CADENCE_PINNED_MARKER)
 
 
 def hooks_file(profile: Profile, cadence_line: bool = False, unattended: bool = False, padding: int = 0) -> Path:
@@ -250,14 +272,17 @@ def repo_wires_cadence(cwd: Path) -> bool:
     """Does `cwd/.claude/settings.json` — the file Claude Code loads for this directory, so in a
     worktree the worktree's own copy — already run dev-cadence's SessionStart hooks? Substring match
     on each SessionStart command; an unreadable or malformed file counts as not wired (the guard in
-    CADENCE_HOOK_LINE keeps that harmless)."""
+    CADENCE_HOOK_LINE keeps that harmless). In a pinned repo (`cadence.hook_pinned`) only a command that
+    reads the pin counts: a pre-pin line runs a copied runner that is gone, so the layer's line goes
+    beside it (design §4.2, TD-1023)."""
     try:
         data = json.loads((cwd / ".claude" / "settings.json").read_text(encoding="utf-8"))
         groups = data.get("hooks", {}).get("SessionStart", [])
         cmds = [str(h.get("command", "")) for g in groups for h in g.get("hooks", [])]
     except (OSError, ValueError, AttributeError, TypeError):
         return False
-    return any(m in c for c in cmds for m in CADENCE_WIRED_MARKERS)
+    markers = (CADENCE_PINNED_MARKER,) if cadence.hook_pinned(cwd) else CADENCE_WIRED_MARKERS
+    return any(m in c for c in cmds for m in markers)
 
 
 def hook_command() -> str | None:
@@ -523,6 +548,7 @@ class ClaudeCodeAdapter:
     permission_channel = True  # a pending permission is answered through the hook's decision (§4.3, §4.5a)
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
     cadence_hook_line = CADENCE_HOOK_LINE  # the repo's own SessionStart is compared with it (§5 *The seams*)
+    cadence_hook_lines_past = CADENCE_HOOK_LINES_PAST  # the earlier seeds a repo may still carry (TD-1023)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
     # session of this tool is handed its mail by a pane write (§4.10)
     implements = frozenset({"background", "composer", "context", "links", "prompts", "spend", "title", "usage_report"})
