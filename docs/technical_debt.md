@@ -94,6 +94,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1027 | `repoconfig.layout`'s pinned test leaves two branches of `pinned()` unpinned: an unparseable pin, and a refused read across the link (test audit) | Low | Open — build |
 | TD-1028 | `cadence.tree`'s timeout, `OSError` and not-a-directory answers have no test (test audit) | Low | Open — build |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
+| TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Open |
+| TD-1032 | A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts | Medium | Open |
 
 ---
 
@@ -1989,3 +1991,39 @@ These sit today in samscrape's memory and Paul's `craft.md` (his layer repo), so
 **Done when** dev-cadence's harvest, run over a repo with `.shiftlead.yml`, offers a ShiftLead-team lesson this ledger or the person's `shiftlead/` directory as its destination.
 
 **Related:** TD-1026 (the lessons filed by hand); dev-cadence TD-125, TD-144.
+
+## TD-1031: A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/sessionorc/promote.py` (`_judge`'s first branch: `start_smoke` on `r["live"] == intent["sha"]` while the run's pid may be alive; `read_live`), `.shiftlead.yml` (`promote:`'s `run` and `check`); design §6 *Promote*, *The smoke* (*When and where*: "It starts on the pass whose `check` reads the run's commit")
+
+**Why:** shiftlead's `check` reads the installed package's build record, which changes as soon as `run`'s `pip install` ends — before the same run's `ao service install` restarts the units. The smoke therefore starts on a UI that is about to go down, and the restart refuses it mid-pass. Seen twice: bd90d4e on 2026-10-25 (`Inbox /inbox: [Errno 111] Connection refused`, the units stopped at 21:16:12 inside the smoke) and Paul's press of 9acc3fc on 2026-10-26 (`Repo /repo/shiftlead: [Errno 111] Connection refused`). Both logs show `── smoke ──` before the run's own `wrote … units` lines; every passing log has them the other way round. Each failure rolls live back and writes a hold, so nothing is promoted until the person presses again, and a press fails the same way — main (19 commits, among them TD-1014's resolver) cannot go live while the race stands.
+
+**Fix:** design first, then the build: the smoke starts only once `check` reads the commit **and** the run has ended (`alive(pid, started)` false), so a `run` that restarts what `check` reads is judged on what it left running; §6 *When and where* says so. A run that is still alive past `PROMOTE_BOUND` is killed as now. Whether `check` should instead read the running host agent's build (the repo's choice, §5) is the round's to weigh, not this fix's.
+
+**Done when** a test runs `_judge` with `live == sha` and the run's pid alive and starts no smoke, then with the pid ended and starts it; and a promote of shiftlead's main passes its smoke, its log's `── smoke ──` after the run's last line.
+
+**Related:** TD-1032 (the reason the failure showed); TD-804, TD-812 (the smoke).
+
+## TD-1032: A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/promote.py` (`_last_line`, `_judge_smoke`, `SMOKE_WRAPPER`), `src/shiftlead/cli.py` (`ao promote status`, its empty-`promotes` line); design §6 *The smoke* (*How it is judged*: "the log's last lines as the reason")
+
+**Why:** `_last_line` takes the last non-empty line after `── smoke ──` in the run's log, and anything else still writing there lands after the smoke. In both TD-1031 failures that was `ao service install`'s closing tip, so the promote row, the hold and the person's note read *smoke failed on 9acc3fc: units run under your user; `loginctl enable-linger` keeps them (and tmux) alive after logout*. Paul acted on it: `loginctl enable-linger` failed (linger was already on, and the shell had no login session), and his promote never ran. The smoke's own verdict, *smoke failed: Repo /repo/shiftlead: [Errno 111] Connection refused*, was three lines up. Second, `ao promote status` run just after the press printed *no registered repo carries a promote: block (design §5) — nothing promotes*: the agent the run had restarted had not yet read its repos, and an empty `promotes` reads as no block.
+
+**Fix:** (1) the reason is the smoke's own output: `SMOKE_WRAPPER` captures the command's last non-empty lines and writes them to `smoke.json` beside `exit` (still copying all of it to the log), and `_judge_smoke` reads them from there, falling back to `_last_line` for a `smoke.json` with none; §6 *How it is judged* says so. (2) `ao promote status` tells an agent that has not yet read its repos (its first pass since start) from one with no `promote:` block, and says *the home has not read its repos yet* for the first.
+
+**Done when** a test appends a line to the log after the smoke's own last line and the failure's why is still the smoke's; and a test of `ao promote status` against a host reply from an agent with no first pass prints the not-yet-read line, not the no-block one.
+
+**Related:** TD-1031 (the race that put the run's lines after the smoke's).
