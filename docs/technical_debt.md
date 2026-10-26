@@ -86,6 +86,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
+| TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Open |
 
 ---
 
@@ -1706,7 +1707,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Blocked by:** dev-cadence#TD-129, TD-1011
+**Blocked by:** TD-1011
 **Location:** `src/sessionorc/cadence.py` (new `command(repo, word, *args) -> (argv, env)`), every reader of a dev-cadence path (`cadence.gate`, `sync`, `seams`, `repoconfig.layout`'s `{gate}` / `{ledger_check}` / `{cadence_rules}`, the convention notices), `pyproject.toml` (the launcher as a dependency), `src/sessionorc/containers.py` / `ao host up` (the trees beside the wheel); design §5 *How the readers find dev-cadence*, §4.4a
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 3): under dev-cadence TD-129 a repo carries a pin, not the files, so no reader can read a path in the checkout.
@@ -1720,7 +1721,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 
 **Done when:** every reader above calls `cadence.command` and none builds a dev-cadence path in code itself (a path built from `"check_cadence.py"`, `"cadence.md"` or the lock appears only in `cadence.py`, and in `sync.py` until TD-1015 removes the lock; prose, comments and the briefs' words are not readers); a temp repo with a pin and a stub launcher runs the gate through it; a node is provisioned with the tree its repo pins. Tests: a pinned repo (no lock) reads served; a pin whose `ref` does not descend from `OLDEST` reads the older-tree lack; its ledgerboard release is read from the pinned tree.
 
-**Related:** TD-1009, dev-cadence TD-129 and its plan 2026-10-25, TD-1015, TD-1016.
+**Related:** TD-1009, dev-cadence TD-129 and its plan 2026-10-25, TD-1015, TD-1016. dev-cadence#TD-129 left **Blocked by** 2026-10-26 (Paul): its launcher, bump, adopt and shims are merged (dev-cadence #328–#331, #335–#340), and TD-129 closes only once every roster repo is pinned — a pin unserves a repo until this reads it (`seams.serve` reads the lock and the synced gate script, `scripts/check_cadence.py`), so this goes first and the rollout of a served repo waits on it.
 
 ## TD-1015: The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old
 
@@ -1730,7 +1731,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Blocked by:** dev-cadence#TD-129, TD-1014
+**Blocked by:** TD-1014
 **Location:** `src/sessionorc/sync.py` (`check`, the pass), `agent_sync`; `tests/test_sync_pass.py`; design §6 *Sync: a mechanical sync PR is merged at the home*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 5): with a pin there is no lock and no copied file to replay; TD-681 is replaced, not trimmed.
@@ -1739,7 +1740,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 
 **Done when:** tests with a temp repo and a stub dev-cadence history: a pin-only bump that descends merges; one that changes `source`, another file, or a ref that does not descend is refused with its words; the lock path is gone from `sync.check` once no served repo has a lock.
 
-**Related:** TD-1009, TD-681 / TD-684 / TD-685 (what it replaces), dev-cadence TD-129.
+**Related:** TD-1009, TD-681 / TD-684 / TD-685 (what it replaces), dev-cadence TD-129 (its word `bump`, slice 4, #331, is merged; dev-cadence#TD-129 left **Blocked by** 2026-10-26 with TD-1014's).
 
 ## TD-1016: The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences
 
@@ -1748,7 +1749,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-25 (the designer, from TD-1009)
 **Owner:** grinder
 **Kind:** build
-**Waits:** event — every registered consumer repo's `docs/cadence-sync.lock` at or after dev-cadence 611d911 (TD-132, `cadence_layer.py --json`, #326), the commit `OLDEST` is raised to; read 2026-10-25 (grinder-ao-2), each lock's `files_commit`: samscrape, contractmatch and ledgerboard at 4453db4, pneuma-ops and guardians-devenv at 3384140, shiftlead at 232f2ad — none holds it. Each repo's sync is its own sessions' work
+**Waits:** event — every registered consumer repo at or after dev-cadence 611d911 (TD-132, `cadence_layer.py --json`, #326), the commit `OLDEST` is raised to: its pin's `ref` in `docs/cadence.toml` where it has one (dev-cadence TD-129; a served repo is pinned only once TD-1014 reads a pin), else its `docs/cadence-sync.lock`'s `files_commit` (reworded 2026-10-26, Paul: the pin migration drops the lock); read 2026-10-25 (grinder-ao-2), each lock's `files_commit`: samscrape, contractmatch and ledgerboard at 4453db4, pneuma-ops and guardians-devenv at 3384140, shiftlead at 232f2ad — none holds it. Each repo's sync is its own sessions' work
 **Status:** Open — build
 **Blocked by:** dev-cadence#TD-132, TD-1012
 **Location:** new `src/shiftlead/layers.py` (the listing and the reads), `src/sessionorc/cadence.py` (`OLDEST` raised), `src/sessionorc/brief.py` (`fill`: the `{person}` slot and its `sources`), `src/shiftlead/briefs/*.md` (the slot and the sentence before *This repo's rules*), `src/shiftlead/repoconfig.py` (`entry_text`, `work_text`: the additions), `src/shiftlead/cli.py` (`ao prefs`'s layer line); tests beside `tests/test_brief_replay.py` and `tests/test_repoconfig.py`; design §4.8 *The person's own additions*, §4.9b *Preferences, in layers*
@@ -1756,7 +1757,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 7–9, Q2a): the person's texts get one home that follows them, their dev-cadence layer; `entry.md` and `work.md` cannot be changed at all today.
 
 **Fix:**
-- `cadence.OLDEST` (TD-1012) is raised to the dev-cadence commit that ships the listing (its sha read from dev-cadence TD-132's merge when this is picked), so a repo whose copy lacks it is unserved by name rather than every start there failing. **The roster is synced first**: the PR merges only once every registered consumer repo's lock is at or after that commit (dev-cadence's source is passed over) (`ao repo --all` reads none *older than this build reads*), since a raise past the roster unserves it.
+- `cadence.OLDEST` (TD-1012) is raised to the dev-cadence commit that ships the listing (its sha read from dev-cadence TD-132's merge when this is picked), so a repo whose copy lacks it is unserved by name rather than every start there failing. **The roster is synced first**: the PR merges only once every registered consumer repo's pin `ref`, or lock where it still has one, is at or after that commit (dev-cadence's source is passed over) (`ao repo --all` reads none *older than this build reads*), since a raise past the roster unserves it.
 - The listing runs under the session's repo when it is served, else (no repo: a directory session, the director's preferences, `ao prefs`, the Director card, **Accept**; or an unserved repo) under the roster's dev-cadence checkout; neither, the layer is not read, named *no dev-cadence to list the layers*.
 - `layers.listing(repo_root) -> [{root, kind: own|followed, ref}]`: dev-cadence's `--json` listing (TD-132), run at the home under the session's repo with the home's `cadence.toml` (today the checkout's `scripts/cadence_layer.py`, or `files/scripts/cadence_layer.py` in dev-cadence's source; under TD-1014 the resolver's command, moved there by whichever of the two lands second), in its order; exit 0 with `[]` is no layer set (a success: the package's texts alone), a non-zero exit is the start's error by name, never read as an empty list; the expectation is checked against TD-132's build when this is picked.
 - `layers.read(entry, rel) -> (text, sha) | None`: one's own from the working tree, a followed layer's by `git -C <root> show <ref>:shiftlead/<rel>`; `preferences.md` is read from the `own` layer alone.
@@ -1787,3 +1788,24 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when:** a UI test draws a two-part context with both heads and a one-part one with the no-layer line; a record holding only the joined text draws as before; a look (shot) is sent with the PR (design §4.9b).
 
 **Related:** TD-1009, TD-993 / TD-996 (the row), TD-1016.
+
+## TD-1022: ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/shiftlead/adapters/claude_code/__init__.py` (`CADENCE_HOOK_LINE`, and `cadence_hook_line`, the line the Repo page compares a repo's own SessionStart with), `src/shiftlead/adapters/gemini/hook.py` (`start_hooks`, which runs the start hooks as the line does), `tests/test_claude_adapter.py`; `src/sessionorc/seams.py` (`warnings`: *dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh <root>`* and `on_cadence_roster`'s *not on dev-cadence's roster: sync-all will not reach it*, TD-1010 part 3); design §4.7 `ao repo add`, §4.5a *Repo page, missing seams*, §5 *The seams*; dev-cadence `files/.claude/settings.json` (the seed line), `files/scripts/install_git_hooks.sh`
+
+**Why:** dev-cadence TD-129 (ADR 2026-10-25; dev-cadence's plan 2026-10-25-pinned-not-synced) runs a pinned repo's hooks through the `dev-cadence` launcher and retires `sync.sh` and `sync-all.sh` once the roster is pinned. Its slice 5 (dev-cadence #335) changed the seeded SessionStart line to run `dev-cadence hook session-start` where `docs/cadence.toml` has a `[dev-cadence]` table, and to say so when no launcher is on `PATH`. ShiftLead's `CADENCE_HOOK_LINE` is still the old line, which runs `scripts/cadence_hooks.sh` alone, so a session ShiftLead starts in a pinned repo, where that script no longer exists, runs no cadence hook and says nothing; and the Repo page, comparing each repo's own line with the old one, would warn *no SessionStart line* on every repo carrying the new seed. dev-cadence's session could not file this here (`ao td add --repo shiftlead` refused 2026-10-25, *shiftlead has no question seat*). The two warnings name `sync.sh` as their cure and `sync-all` as what reaches a repo; under a pin the per-clone setup is `dev-cadence adopt` or `install_git_hooks.sh`, and dev-cadence's roster (`~/.config/dev-cadence/repos.txt`) stays for `adopt` and `gc` while `sync-all.sh` goes.
+
+**Fix:** the design round decides:
+- `CADENCE_HOOK_LINE` becomes dev-cadence's seed line verbatim (both modes), with a parity test against dev-cadence's `files/.claude/settings.json` so the copy cannot drift again; the Gemini adapter's run follows it.
+- The two warnings' words and cures for a pinned repo: what the per-clone cure is once `sync.sh` is gone, and whether the roster warning stays (the roster still feeds `gc`) with new words or goes with `sync-all.sh`; a lock-era repo keeps today's words until it is pinned.
+- §4.7, §4.5a and §5 change to match, and the build entries are filed.
+
+**Done when:** the design PR is merged with its build entries filed; those builds' Done when hold a pinned temp repo whose ShiftLead-started session runs `dev-cadence hook session-start` through a stub launcher, and the Repo page warning neither *no SessionStart line* nor `sync.sh` / `sync-all` for it.
+
+**Related:** dev-cadence TD-129 (slice 5, #335; slice 11, #341), TD-1009, TD-1010 (part 3, the roster warning), TD-1014 (the pin era's other readers), TD-507 (the doctor's reading of dev-cadence's line of any vintage).
