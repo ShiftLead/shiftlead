@@ -92,7 +92,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
-| TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by decision (paul): file dev-cadence's `precheck.py --commit` |
 | TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
@@ -1954,23 +1953,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1014, TD-970.
 
-## TD-1038: Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes
-
-**Priority:** High
-**Type:** feature
-**Added:** 2026-10-26 (the designer, from TD-1033)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build. Paul lifted the `decision (paul)` hold, *go ahead* (2026-10-26, board:5b422cc0), so it is built now with `precheck.py --commit` faked. The live run still waits on dev-cadence's `precheck.py --commit`, which Paul files there (dev-cadence has no question seat, so `ao td add --repo dev-cadence` is refused; the board's act line of 2026-10-26, due 2026-10-29), its text: *`precheck.py --commit <sha>`: run the repo's precheck on a commit of origin's default branch and record `cadence/precheck` on it, as `--pr` does on a PR's head — the same command from the checkout's `docs/cadence.toml`, the same clean detached worktree, context and exit codes; refused (exit 2) when the commit is not an ancestor of `origin/<default>`. Its temp directory named `precheck-<sha7>-…` with the worktree `head` inside it, as `--pr`'s is. For shiftlead TD-1038 (design §6 *The precheck on main*)*; once filed, this Status names that entry (`dev-cadence#TD-NNN`)
-**Location:** `src/sessionorc/promote.py` (`survey`, `acts`, `acts_words`, the intent files), `src/sessionorc/agent_promote.py`, `src/sessionorc/cadence.py` (`precheck_script`, TD-1037's); the Inbox row's words (`ui/inbox.py`); design §6 *The precheck on main*, §4.5a *Inbox row: promote*
-
-**Why:** TD-1033: a squash merge's commit carries no status, and its tree is its PR's head's only when the PR was current with main, which the cadence does not ask — so with no CI on main, main's head would never be green.
-
-**Fix:** as §6 *The precheck on main* says: on the readings' pass, for a repo with `promote:` and `precheck` set, `auto` on or off, when live is not main's head, the head carries no `cadence/precheck`, (1) and (3) hold, no hold stands and none ran or runs on that commit — the reading's `precheck` is `absent` (`unread` starts nothing) — start `precheck.py --commit <sha>` through `precheck_script` (absent: nothing starts, the reading `unknown`, *no precheck.py here*) detached in its own session, `precheck.json` `{sha, at, pid, started, log}` (main's runs alone; TD-1039's sync run keeps `precheck-pr.json`) written first and kept after the run (replaced only by main's next run), the log `precheck-<sha7>.log`; one at a time per repo across both files, checked and started under the agent's promote lock; while a sync run goes, main's reading stays `unknown`, *no cadence/precheck on <sha7>*, and the row says nothing of a precheck; killed at `PRECHECK_BOUND` (twenty minutes) by process group, TERM then KILL, only while its start time matches, then the run's worktree (the `git worktree list --porcelain` entry at the sha whose path is `<temp root>/precheck-<sha7>-*/head`, the exact prefix, as `precheck.py` makes it) removed with `git worktree remove --force`, any empty directory with that prefix removed (a non-empty one the list does not name is a session's own run, left alone), then `git worktree prune`; a `pid: null` file started again while its sha is main's head, dropped once not; the reading `pending`, *prechecking <sha7>*, while it runs; a status on the sha ends it whatever the file says; the process gone with no status reads `unknown`, *precheck on <sha7> ended and recorded nothing* (its exit code and last line where this home started it), not rerun on that commit. The Inbox row under `auto` reads *· prechecking `<sha7>` — promotes when green*; a failed precheck on main's head draws the row under *Needs you*, counted, *checks failed on `<sha7>`* with the log's last lines, whatever `auto` says, until main moves.
-
-**Done when:** tests pin, with `precheck.py --commit` faked, when it starts and when it does not (precheck unset, no `promote:`, a status already there, one running, one already run on the sha, a hold, (1) or (3) unmet; `auto` off still starts), one at a time with the sync run, the restart that finds a run going, a `pid: null` file (main's head and not), a failed status read, the bound's group kill and the prune, the no-status end, and the row's words (prechecking; failed under *Needs you*); `pdm run test` and `pdm run lint` pass. The live run — a promote under `auto` on a precheck the home ran — is the designer's look once dev-cadence's `--commit` lands, not this entry's.
-
-**Related:** TD-1033, TD-1037, TD-804 (the smoke's detached run), TD-581.
 
 ## TD-1039: The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck`
 
