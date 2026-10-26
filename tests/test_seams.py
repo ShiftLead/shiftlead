@@ -166,7 +166,8 @@ def test_dev_cadences_source_is_served_with_no_lock_and_its_gate_under_files(tmp
 
 
 @pytest.mark.unit
-def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path):
+def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path, monkeypatch):
+    monkeypatch.setattr(seams, "descends", lambda *a: (True, None))  # dev-cadence's age: tests/test_repo_seams.py
     root = served(tmp_path)
     assert seams.reading(root)["warnings"] == ["no board at docs/user_attention.md", "no worktree setup"]
     (root / ".shiftlead.yml").write_text("board: notes/board.md\n")

@@ -3436,7 +3436,7 @@ class TickMixin:
                 led = ledgers is None or root in ledgers or "ledger" not in old
                 out[root] = TickMixin._read_repo(
                     root, old, root in full, now, by_remote, resolve, reader, ledger=led, boards=boards,
-                    held=(keys or {}).get(root),
+                    held=(keys or {}).get(root), roster=registry if registry is not None else roots,
                 )  # fmt: skip
                 if live is None:  # no promote reading yet since the start: unknown is not *not live* (TD-516)
                     _carry_live(out[root], old)
@@ -3467,10 +3467,12 @@ class TickMixin:
         ledger: bool = True,
         boards: bool = False,
         held: list[str] | None = None,
+        roster: list[str] | None = None,
     ) -> dict[str, Any]:
         """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
         pass, so two checkouts of one remote are one `gh` read. `ledger` False keeps the last
-        ledger as it stands (a pass for the board alone); `boards` is the board's clock (`_read_boards`)."""
+        ledger as it stands (a pass for the board alone); `boards` is the board's clock (`_read_boards`);
+        `roster` the registry's checkouts, where the seams find dev-cadence's (§5 *Which dev-cadence*)."""
         stamp = now.isoformat()
         remote = reports._git(root, "remote", "get-url", "origin") if due else None
         remote = (remote or "").strip() if due else str(old.get("remote") or "")
@@ -3496,7 +3498,7 @@ class TickMixin:
         seams = old.get("seams")
         if due or seams is None:  # §4.4 *The seams*: on the repo reading's own cadence
             try:
-                seams = seams_mod.reading(root)
+                seams = seams_mod.reading(root, roster or [root], seams)
             except Exception:  # noqa: BLE001 — a seam that cannot be read keeps the last reading
                 log.exception("reading the seams of %s failed", root)
         if isinstance(led.get("entries"), list) and not seams_mod.unserved({"seams": seams}):

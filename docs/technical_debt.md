@@ -1842,3 +1842,21 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when:** a UI test draws a two-part context with both heads and a one-part one with the no-layer line; a record holding only the joined text draws as before; a look (shot) is sent with the PR (design §4.9b).
 
 **Related:** TD-1009, TD-993 / TD-996 (the row), TD-1016.
+
+## TD-1018: The sync pass judges a sync PR in any repo with a gate, though §6 *Sync* lets it judge one in an unserved repo only when its one lack is an older tree
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-25 (grinder-ao-2, found building TD-1012)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_sync.py` (`_sync_repo`: the `cadence.gate(root) is None` test); `tests/test_sync_pass.py`; design §6 *Sync*, §4.4 *Work orders*
+
+**Why:** §6 *Sync* says a sync PR goes on to the steps only *in a served repo, or an unserved one whose one lack is a tree older than `OLDEST`*; any other unserved repo's PR is the person's, not read, nothing written. `_sync_repo` skips only a repo with no gate, so a repo that has the gate but no lock, a lock that does not parse, or no ledger still has its sync PRs judged and merged.
+
+**Fix:** skip the repo when `seams.unserved` names a lack whose key is not `age` (TD-1012's key for the older tree), reading `serve.lacks` from the repo facts; keep the gate test for a repo with no reading yet.
+
+**Done when:** a sync-pass test: a repo with the gate and no ledger has its green sync PR left unread and nothing written; one whose only lack is `age` has it judged.
+
+**Related:** TD-1011, TD-1012.
