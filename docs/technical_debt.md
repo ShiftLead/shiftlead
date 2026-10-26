@@ -97,10 +97,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
-| TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
 | TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | Open — stopgap set per repo (samscrape#1121, shiftlead#2391) |
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
+| TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Open — design |
+| TD-1052 | Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own | Medium | Open |
 
 ---
 
@@ -2047,27 +2048,6 @@ Then file the build entries.
 
 **Related:** TD-1043 (the empty `project` badge); TD-582, TD-995, TD-1000 (the edges built so far); TD-064, TD-102 (Claude Code's own peer messages, which stay forbidden).
 
-## TD-1043: A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`api_entry_session`, `api_ledger_start`: each passes `team=` to the new session and no `project=`; `new_submit` passes both); design §4.9 (the `project` badge: its team's repo's project, the repo's own name where no project lists it, TD-722), §4.10 *across teams, by project*
-
-**Why:** on 2026-10-26, `ao status -v` read six open records with a `team` and an empty `project`. Among them were ao-shiftlead-prompts (`ao-grind`, started by Add entry), ao-dev-cadence-memory-vs-cadence and ao-dev-cadence-td-126 (`dc-grind`), and ao-contractmatch-cm-mcp (`cm-grind`). Two kinds of mail are refused to such a session, though the design lets both through:
-- mail from another team on the same project;
-- mail to a same-project session of another team.
-The project edge (TD-582) compares the `project` badges, and an empty one matches nothing.
-
-**Fix:** both routes derive the badge as `new_submit` does: the directory's repo's project, from `teams.reach_block(org, dir, host)`'s first value. The badge alone is wanted, not the Project block, which `new_submit` adds to the prompt. A record already started keeps its badge until its next start.
-
-**Done when** a test starts a session through each route on a repo listed under a project and reads that project on the record, and a test of `message_edge` lets a `note` through between two such sessions of different teams on one project.
-
-**Related:** TD-1042 (the person's sessions across projects); TD-582, TD-722.
-
 ## TD-1044: A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes
 
 **Priority:** High
@@ -2105,6 +2085,22 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 
 **Related:** dev-cadence TD-145, TD-124 (the counter); TD-970, TD-1014, TD-1034 (`td_next`'s script road); ShiftLead/shiftlead#2370.
 
+## TD-1050: A container test waits five seconds for the node's provision, and a slow CI runner fails it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_containers.py` (`test_the_home_derives_a_container_nodes_reach_when_it_dials_in`, its `wait_for(…, timeout=5.0)` on `"cm" not in agent.supervision and node.config.is_file()`)
+
+**Why:** on #2394's CI (run 40400754079, 2026-10-26), `test (3.12)` failed this test with `assert False` while `test (3.13)` and the local suite passed it, on a change that touches no container code; a rerun of the job was needed. The same evening two more fixed waits failed #2394's local precheck (4d188f8) under several prechecks' load and passed alone: `tests/test_agent.py::test_send_confirms_the_submit` (*the composer child never painted its prompt*, a 5 s `_poll`) and `tests/test_doorbell.py::test_the_doorbell_rings_only_where_it_may` (`tmux load-buffer`: *error connecting to /tmp/tmux-1000/ao-test-…*, the private server gone). The Fix covers all three. The wait's own comment says a slow CI runner already once read the node before the supervisor's provision wrote its definition (TD-285): five seconds is the bound that ran out. A red run that says nothing about the code costs a rerun and a reader's doubt, and with the local `precheck` (TD-1035) the same wait now gates every PR on kmaster's load too.
+
+**Fix:** find what the wait is waiting on (the supervisor's provision of `cm` in the fixture) and wait on that event, or raise the bound well past the slowest runner seen, keeping the test's assertion; run it under load (`pytest -p no:randomly --count` or a loop beside a busy suite) to show it holds.
+
+**Done when:** the test waits on the provision itself or on a bound shown to hold under load; `pdm run test` and `pdm run lint` pass.
+
 ## TD-1051: A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it
 
 **Priority:** Medium
@@ -2140,3 +2136,19 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when** the design says how the waiting member gets the answer after its relaying seat closes, and how a finished member with unread mail is woken or counted as having work, and the build entries are filed. A doorbell that cannot be delivered is said as a failure, not *rung*.
 
 **Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
+
+## TD-1052: Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/cadence.toml` (`precheck`); `scripts/precheck.py` (synced: its worktree under `tempfile.mkdtemp`, so `/tmp`); the suite's `tmp_path` (`/tmp/pytest-of-kmaster`)
+
+**Why:** the first evening of the local precheck gate (TD-1035, #2389), `precheck.py --pr 2394` recorded *failure* on 2abed34: 4 failed, 2548 errors, nearly all `OSError: [Errno 28] No space left on device` under `/tmp` or pytest's *could not create numbered dir*. `/tmp` on kmaster is a 16 GB tmpfs (RAM); several sessions' prechecks were running at once (`/tmp/precheck-2397-…`, `-2398-…` beside it), each a fresh `.venv` plus the suite's temp homes, and minutes later `/tmp` was back to 49 %. Each session now runs the suite for every PR, so concurrency is the common case: a red status from a full disk says nothing about the code, costs a 12-minute rerun, and could be read as the PR's fault.
+
+**Fix:** pick one or both: the `precheck` command sets `TMPDIR` (and so pytest's base temp) to a disk-backed directory of its own, e.g. under `~/.cache/`, cleaned at its end; and/or a bound on prechecks running at once on the machine (a lock the command takes). Measure a precheck's peak `/tmp` use first. A `TMPDIR` must stay short: one under `~/.cache/aopre2` failed 38 link and container tests with *Connection refused*, their unix sockets' paths past the ~108-byte cap (read 2026-10-26 on #2394). `precheck.py` is dev-cadence's (SYNCED): a change there is `dev-cadence#` work, filed with `ao td add --repo dev-cadence`.
+
+**Done when:** three prechecks run at once on kmaster pass, `/tmp` staying well under full; `pdm run test` and `pdm run lint` pass.
