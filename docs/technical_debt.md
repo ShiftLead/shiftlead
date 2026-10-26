@@ -88,6 +88,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
+| TD-1018 | The sync pass judges a sync PR in any repo with a gate, though §6 *Sync* lets it judge one in an unserved repo only when its one lack is an older tree | Low | Open |
 
 ---
 
