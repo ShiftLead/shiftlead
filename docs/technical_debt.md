@@ -92,10 +92,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
-| TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — blocked by TD-1037 (the shared `precheck` read) |
-| TD-1037 | The promote's checks reading folds commit statuses in, and requires `cadence/precheck` on main's head where the repo sets `precheck` | High | Open — build |
-| TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by TD-1037, decision (paul): file dev-cadence's `precheck.py --commit` |
-| TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — blocked by TD-1037 (the shared `precheck` read) |
+| TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — build |
+| TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by decision (paul): file dev-cadence's `precheck.py --commit` |
+| TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
 | TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
@@ -1964,24 +1963,6 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** tests pin the cases (precheck set and absent on the head: refused with those words; set and failed: refused as failed; absent beside a real failure or `not_run`: those win; set and green: accepted; not set: as today) for `done` and `ask --pr`, and `ao pr wait`'s line; `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1033, TD-639.
-
-## TD-1037: The promote's checks reading folds commit statuses in, and requires `cadence/precheck` on main's head where the repo sets `precheck`
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1033)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/promote.py` (`read_checks`, `survey`), `src/sessionorc/agent_promote.py` (the press's reading); design §6 *Promote* (the **checks** reading)
-
-**Why:** TD-1033: `read_checks` reads only `commits/{sha}/check-runs`, where a `cadence/precheck` commit status never appears, so a repo that gates on precheck reads *no check runs* — `unknown` — and `auto` never promotes.
-
-**Fix:** as §6 now says: (1) the shared read, `sessionorc.cadence.precheck_command(root, rev)` → `(command | None, why | None)`, in `src/sessionorc/cadence.py`, in the manner of `sync.post_sync_command` (`sync.py`) (`tomllib` on `docs/cadence.toml` at `rev`, no script, so a pinned repo reads it too; a non-string or empty value is None; a file that does not parse is `why` *docs/cadence.toml does not parse*) — TD-1036, TD-1038 and TD-1039 use it; and `sessionorc.cadence.precheck_script(root)` → `((argv, env) | None, why | None)`, the three layouts the gate has (the checkout's `scripts/precheck.py`, dev-cadence's `files/scripts/`, the resolver's `dev-cadence run` in a pinned repo with `cadence.command`'s env; env None in the other two), `None` with *no precheck.py here* when absent — TD-1038 and TD-1039 start through it. (2) Read `commits/<sha>/status?per_page=100`'s `statuses` beside the check runs (never its combined `state`, which reads *pending* for a commit with no status) and fold them: `failure`/`error` fails, `pending` keeps it pending, none of either is `unknown`. Where `precheck_command(root, "origin/<default>")` gives a command, main's head is green only when it *also* carries a successful `cadence/precheck`, the rest folding as before except that never-started runs are outranked by a green precheck (the home's own rule; the reading then carries no `checks_not_run`); a `why` leaves it `unknown` with it. The reading keeps the status read's finding as `precheck`: `absent` / `success` / `failure` / `pending` / `unread`, null where `precheck` is unset or the file does not parse, which TD-1038's start rule keys on. The rule is main's head's alone: `keep=False` (a rollback's commit) reads as before; without one `unknown`, *no cadence/precheck on <sha7>* (TD-1038 adds *prechecking <sha7>* while its run goes). The press's reply reads the same fold.
-
-**Done when:** tests pin `precheck_command` (set, unset, empty, non-string, unparseable), `precheck_script` (each layout, absent), the `precheck` field's five values and null, `keep=False` unaffected, the fold (runs only, statuses only, both, a failed status, a pending status, none) and the precheck rule (set: no status `unknown`, green status green, green beside never-started runs green with no `checks_not_run` (the third return None), green beside a failed run failed; unset: as today); `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1033, TD-686.
 
 ## TD-1038: Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes
 
