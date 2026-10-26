@@ -97,6 +97,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1037 | The promote's checks reading folds commit statuses in, and requires `cadence/precheck` on main's head where the repo sets `precheck` | High | Open — build |
 | TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by TD-1037, decision (paul): file dev-cadence's `precheck.py --commit` |
 | TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — blocked by TD-1037 (the shared `precheck` read) |
+| TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
+| TD-1043 | A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it | Medium | Open |
 
 ---
 
@@ -2038,3 +2040,49 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** tests pin the *none* candidate and its wait (not an order), the run before the gate, the skip when a status stands or `precheck` is unset, the uncounted wait on a checkout off `origin/<default>` or dirty and on a run going (main's or another PR's), the pass going on to the next repo, a run's end with a status and with none (counted once), a `pid: null` file, the kill on a moved head or a closed PR, and the day's wait becoming an order; `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1033, TD-681.
+
+## TD-1042: Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/sessionorc/mail.py` (`message_edge`, the message gate); design §4.10 *The message gate is weaker than `control`* (the edges; "a `steer`, a `note`, or a `reply` on any other thread, between sessions of unrelated projects, is still refused: a proposal between them goes through the person"), §9 invariant 9
+
+**Why:** Paul, 2026-10-26: "The mail between sessions limitation is biting us frequently." That day ao-shiftlead-prompts (shiftlead) had to warn ao-dev-cadence-memory-vs-cadence (dev-cadence), which was pinning the roster repos, to hold contractmatch until TD-1014 slice 5 is live. `ao msg --kind note` and `--kind ask` were both refused (*not one of its controllers, its members, its team, its project …*), so Paul pasted the warning into the other session himself. Neither session has controllers: the person started both, and both are the person's own hands. The reasons for refusing peers across projects do not apply between them. Those reasons are that no unrelated team spends another's attention or acts through it (§9 invariants 5 and 11), and that a proposal between projects goes through the person. TD-995 / TD-1000 opened only an `ask` to a question seat, which an ad-hoc interactive session does not hold. TD-582 opened only the same-project edge, which also misses these two: their `project` badge is empty (TD-1043), and shiftlead and dev-cadence are two projects in `org.yml` anyway.
+
+**Fix:** design first: an edge **between the person's own sessions**, meaning interactive (not `unattended`) records with no `controllers`, so the person is their only controller. They may send each other `note`, `ask` and `reply`, whatever their team or project. The round decides:
+- whether `steer` passes too;
+- whether a person-started session may also mail another team's members, or only the person's own;
+- how it reads on the Inbox, since the person sees both ends;
+- whether every depth, pair and thread bound still holds;
+- what the briefs and §4.10 say.
+
+Then file the build entries.
+
+**Done when** the design names the edge and its bounds, and the build entries are filed.
+
+**Related:** TD-1043 (the empty `project` badge); TD-582, TD-995, TD-1000 (the edges built so far); TD-064, TD-102 (Claude Code's own peer messages, which stay forbidden).
+
+## TD-1043: A session started from Add entry or a ledger row's Start carries its team badge but no `project` badge, so the project mail edge misses it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (`api_entry_session`, `api_ledger_start`: each passes `team=` to the new session and no `project=`; `new_submit` passes both); design §4.9 (the `project` badge: its team's repo's project, the repo's own name where no project lists it, TD-722), §4.10 *across teams, by project*
+
+**Why:** on 2026-10-26, `ao status -v` read six open records with a `team` and an empty `project`. Among them were ao-shiftlead-prompts (`ao-grind`, started by Add entry), ao-dev-cadence-memory-vs-cadence and ao-dev-cadence-td-126 (`dc-grind`), and ao-contractmatch-cm-mcp (`cm-grind`). Two kinds of mail are refused to such a session, though the design lets both through:
+- mail from another team on the same project;
+- mail to a same-project session of another team.
+The project edge (TD-582) compares the `project` badges, and an empty one matches nothing.
+
+**Fix:** both routes derive the badge as `new_submit` does: the directory's repo's project, from `teams.reach_block(org, dir, host)`'s first value. The badge alone is wanted, not the Project block, which `new_submit` adds to the prompt. A record already started keeps its badge until its next start.
+
+**Done when** a test starts a session through each route on a repo listed under a project and reads that project on the record, and a test of `message_edge` lets a `note` through between two such sessions of different teams on one project.
+
+**Related:** TD-1042 (the person's sessions across projects); TD-582, TD-722.
