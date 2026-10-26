@@ -56,10 +56,15 @@ TREE_FOR = 60.0  # one resolve answers every reader of one reading: a launcher t
 _trees: dict[tuple[str, tuple[str, str] | None], tuple[float, tuple[Path | None, str | None]]] = {}
 
 
+SOURCE_MARKS = ("sync.sh", "launcher/INTERFACE")  # either, beside `files/`: `sync.sh` until it retires (TD-1024)
+
+
 def is_source(root: Path | str) -> bool:
-    """Whether `root` is dev-cadence's own source (§5 *The seams*): a root holding `sync.sh` and `files/`,
-    which carries no lock and whose every dev-cadence path is under `files/`."""
-    return (Path(root) / "sync.sh").is_file() and (Path(root) / "files").is_dir()
+    """Whether `root` is dev-cadence's own source (§5 *The seams*): a root holding `files/` and `sync.sh` or,
+    once that retires, `launcher/INTERFACE`, which carries no lock and whose every dev-cadence path is under
+    `files/`."""
+    root = Path(root)
+    return (root / "files").is_dir() and any((root / mark).is_file() for mark in SOURCE_MARKS)
 
 
 class PinError(ValueError):

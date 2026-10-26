@@ -196,7 +196,7 @@ def missing_seams(r: Mapping[str, Any]) -> dict[str, Any]:
     warns, or the seams are not read yet."""
     seams = r.get("seams") if isinstance(r.get("seams"), dict) else None
     return {
-        "lines": [_parts(w) for w in doctor.missing_seams(seams)],
+        "lines": [_parts(w) for w in doctor.missing_seams(seams, r.get("root") or "<checkout>")],
         "unserved": [_parts(w) for w in doctor.lacks(seams, r.get("root") or "")],
     }
 

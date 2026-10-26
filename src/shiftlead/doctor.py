@@ -373,18 +373,43 @@ def org(
 
 
 NO_SESSION_START = "no SessionStart line: a session started outside ShiftLead misses the cadence's nudge"
+UNKNOWN_SESSION_START = (
+    "SessionStart line is not one this build knows: dev-cadence's seed may be newer than ShiftLead's copy"
+    " — or copy the line from dev-cadence's files/.claude/settings.json"
+)
+PRE_PIN_SESSION_START = (
+    "SessionStart line predates the pin: a session started outside ShiftLead runs no cadence hook"
+    " — copy the line from `dev-cadence -C {root} path .claude/settings.json`"
+)
+# what names dev-cadence's runner or launcher in a SessionStart command, so a line no vintage matches is
+# one this build does not know rather than no line at all (§5 *The seams*, TD-1024)
+CADENCE_HOOK_NAMES = ("cadence_hooks.sh", "dev-cadence hook")
 
 
 def _hook_lines(source: bool) -> set[str]:
     """Each adapter's SessionStart line for dev-cadence (`cadence_hook_line`) and its earlier vintages
     (`cadence_hook_lines_past`, TD-1023), its runner under `files/` in dev-cadence's own source (§5 *The seams*)."""
-    lines: set[object] = set()
+    current, past = _hook_vintages(source)
+    return current | past
+
+
+def _hook_vintages(source: bool) -> tuple[set[str], set[str]]:
+    """`(current, past)`: each adapter's `cadence_hook_line`, and its `cadence_hook_lines_past` (TD-1023,
+    TD-1024), each with its runner under `files/` in dev-cadence's own source (§5 *The seams*)."""
+    now: set[object] = set()
+    before: set[object] = set()
     for n in adapters.names():
         ad = adapters.get(n)
-        lines.add(getattr(ad, "cadence_hook_line", None))
-        lines.update(getattr(ad, "cadence_hook_lines_past", ()) or ())
-    out = {x for x in lines if isinstance(x, str) and x}
-    return {x.replace("/scripts/cadence_hooks.sh", "/files/scripts/cadence_hooks.sh") for x in out} if source else out
+        now.add(getattr(ad, "cadence_hook_line", None))
+        before.update(getattr(ad, "cadence_hook_lines_past", ()) or ())
+
+    def lines(xs: set[object]) -> set[str]:
+        out = {x for x in xs if isinstance(x, str) and x}
+        if source:
+            return {x.replace("/scripts/cadence_hooks.sh", "/files/scripts/cadence_hooks.sh") for x in out}
+        return out
+
+    return lines(now), lines(before)
 
 
 def lacks(seams: dict[str, Any] | None, root: Any = "") -> list[str]:
@@ -398,19 +423,36 @@ def lacks(seams: dict[str, Any] | None, root: Any = "") -> list[str]:
     return [str(x.get("words")) for x in seams["serve"].get("lacks") or [] if isinstance(x, dict) and x.get("words")]
 
 
-def missing_seams(seams: dict[str, Any] | None) -> list[str]:
+def missing_seams(seams: dict[str, Any] | None, root: Any = "<checkout>") -> list[str]:
     """The warnings of a repo's reading, one sentence each (§4.5a *Repo page: missing seams*): the host
-    agent's own, *no SessionStart line* when the checkout's SessionStart commands hold no adapter's line,
-    then the ledgerboard warning (`ledgerboard_warning`); nothing for a reading not taken yet."""
+    agent's own, then the SessionStart line's (`session_start_warning`), then the ledgerboard warning
+    (`ledgerboard_warning`); nothing for a reading not taken yet. `root` is the checkout a cure names."""
     if not isinstance(seams, dict):
         return []
     out = [str(w) for w in seams.get("warnings") or []]
-    if "session_start" in seams:
-        hooks = _hook_lines(bool(seams.get("source")))
-        if hooks and not hooks & set(seams.get("session_start") or []):
-            out.append(NO_SESSION_START)
+    if "session_start" in seams and (said := session_start_warning(seams, root)):
+        out.append(said)
     lbw = ledgerboard_warning(seams.get("ledgerboard"))
     return [*out, lbw] if lbw else out
+
+
+def session_start_warning(seams: dict[str, Any], root: Any = "<checkout>") -> str | None:
+    """The checkout's SessionStart commands against each adapter's vintages (§5 *The seams*, TD-1024): one
+    that is a vintage is the line, and a hand-written command beside it says nothing; with none, a command
+    naming dev-cadence's runner or launcher is *not one this build knows*, and no such command *no
+    SessionStart line*; in a pinned repo (the reading's `hook_pinned`; a reading without it, from an older
+    host agent, is unpinned) a past vintage with no command the current line *predates the pin*."""
+    current, past = _hook_vintages(bool(seams.get("source")))
+    if not current | past:
+        return None
+    commands = [c for c in seams.get("session_start") or [] if isinstance(c, str)]
+    if not (current | past) & set(commands):
+        if any(name in c for c in commands for name in CADENCE_HOOK_NAMES):
+            return UNKNOWN_SESSION_START
+        return NO_SESSION_START
+    if seams.get("hook_pinned") and not current & set(commands):
+        return PRE_PIN_SESSION_START.format(root=root)
+    return None
 
 
 def ledgerboard_warning(lbr: dict[str, Any] | None) -> str | None:
@@ -439,7 +481,7 @@ def repos(readings: dict[str, Any]) -> list[dict[str, Any]]:
             text = f"repo {name} — seams not read yet"  # the host agent's first pass, or an older build
             out.append(_row("repos", WARNING, text, repo=name, seams=None))
             continue
-        unserved, missing = lacks(seams, r.get("root") or name), missing_seams(seams)
+        unserved, missing = lacks(seams, r.get("root") or name), missing_seams(seams, r.get("root") or name)
         if unserved:
             text = f"repo {name} — {' · '.join([*unserved, *missing])}"
             out.append(_row("repos", LACKING, text, repo=name, seams=seams))

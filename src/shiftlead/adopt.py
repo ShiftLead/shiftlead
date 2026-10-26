@@ -32,8 +32,8 @@ class AdoptError(Exception):
 
 
 def dev_cadence(roster: list[str], root: Path) -> Path | None:
-    """The roster's dev-cadence checkout — the first whose root holds `sync.sh` and `files/` — or None;
-    never `root` itself."""
+    """The roster's dev-cadence checkout — the first whose root holds `files/` and `sync.sh` or
+    `launcher/INTERFACE` (`cadence.is_source`) — or None; never `root` itself."""
     for line in roster:
         here = Path(line).expanduser().resolve()
         if here != root and cadence.is_source(here):
@@ -87,6 +87,13 @@ def scratch_clone(root: Path) -> Iterator[tuple[Path, str]]:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def _syncs(dc: Path, root: Path) -> None:
+    """Refuses a dev-cadence checkout with no `sync.sh` (its `launcher/INTERFACE` alone, TD-1024) before any
+    clone is made: the adopt runs `sync.sh`, and the launcher's `adopt` is the person's to run until it does."""
+    if not (dc / "sync.sh").is_file():
+        raise AdoptError(f"dev-cadence at {dc} has no sync.sh: run `dev-cadence -C {dc} adopt {root}` yourself")
+
+
 def _unpinned(clone: Path, root: Path, default: str) -> None:
     """Refuses a clone whose `origin/<default>` pins dev-cadence already, before `sync.sh` writes a copy beside
     the pin (TD-1014): the checkout is behind its origin."""
@@ -132,6 +139,7 @@ def open_pr(clone: Path, gh: str) -> dict[str, Any] | None:
 def offer(root: Path, dc: Path) -> dict[str, Any]:
     """`ao repo add <path>` on a checkout without dev-cadence: what its adoption would write, `{root, name,
     paths}`; nothing is committed, pushed or added."""
+    _syncs(dc, root)
     with scratch_clone(root) as (clone, default):
         _unpinned(clone, root, default)
         paths = _sync(dc, clone)
@@ -154,7 +162,9 @@ def adopt(root: Path, dc: Path, gh: str = "gh") -> dict[str, Any]:
     PR against the default branch; `{root, name, paths, commit, pr, url}`. An `origin` not on GitHub is
     refused, as is a default branch that already holds what the adopt writes. Where origin holds
     `cadence-adopt` already, its open PR is the answer, `open` true and nothing pushed (a re-run, or one
-    whose `add_repo` failed after the PR was opened); a `cadence-adopt` with no open PR is refused."""
+    whose `add_repo` failed after the PR was opened); a `cadence-adopt` with no open PR is refused, and so
+    is a dev-cadence checkout with no `sync.sh`, before any clone."""
+    _syncs(dc, root)
     url = origin(root)
     if not reports.GITHUB_ORIGIN.search(url):
         raise AdoptError(f"ao repo add opens its PR on GitHub: {root}'s origin is {url}")
