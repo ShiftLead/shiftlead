@@ -1074,7 +1074,8 @@ class HostAgent(
         """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
         whether the home can be reached — which a client on a node needs before it labels what it
         shows *offline*; which build it runs and since when (§4.4, TD-062); and, at the home, the
-        promote's readings per repo (`promotes`, §6 *Promote*), the pull's (`pulls`, §6 *Pull*) and
+        promote's readings per repo (`promotes`, §6 *Promote*, with `promotes_read` false until its
+        first pass since start has read them), the pull's (`pulls`, §6 *Pull*) and
         each wound-down team's `work_waiting` as the `host` record holds it (`work: {<team>: mark}`,
         §6 rule 8), which is what draws the Inbox's team start row and the card's note; each team's
         balance mark (`balance: {<team>: mark}`, §6 *Balance*), every one, a mark with no `repo` included,
@@ -1088,6 +1089,7 @@ class HostAgent(
         if self.mode == "home":
             out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
             out["promotes"] = self._promotes_view()
+            out["promotes_read"] = self._promotes_read  # False until the first pass reads the repos (TD-1032)
             out["pulls"] = self._pulls_view()
             out["waiting"] = work.waiting_of(self.person_inbox)
             out["notify"] = self._notify_view()
