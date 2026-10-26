@@ -29,7 +29,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import build, paths, reports
+from sessionorc import build, cadence, paths, reports
 
 PROMOTE_EVERY = 300.0  # seconds between full readings: the reports' cadence (§6)
 PROMOTE_WATCH = 15.0  # seconds between `check` reads while a run is in flight
@@ -53,6 +53,7 @@ HEX_RE = re.compile(r"^[0-9a-f]{7,40}$")  # a rollback's commit: its hex in full
 # dropped Popen is reaped by the next `subprocess.run` and its status lost), polled for `exit`
 _procs: dict[int, subprocess.Popen[bytes]] = {}
 _exits: dict[int, int] = {}
+PRECHECK_CONTEXT = "cadence/precheck"  # the commit status `precheck.py` records (design §6 *The precheck on main*)
 FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"}
 # the verdicts on main's head's failing jobs, by checkout: `{head, read}` (`reports.classify_failing`,
 # TD-686) — one sha's per checkout, so a job is read once and a new head reads afresh
@@ -200,34 +201,65 @@ def read_ahead_since(root: str | Path, live: str | None, main: str | None) -> st
     return lines[-1].strip() if lines else None
 
 
-def read_checks(root: str | Path, sha: str, keep: bool = True) -> tuple[str, str, dict[str, Any] | None]:
-    """The CI verdict on `sha`: `green` when every check run has concluded and none failed,
-    `pending`, `failed`, or `unknown` with why (no `gh`, no remote, a rate limit, no check runs at
-    all — a commit CI has not looked at is not a green one) — and, third, `checks_not_run`. Failing
-    runs that are all Actions jobs that never started read `unknown`, *CI never ran: <reason>*, with
-    `{reason, kind, runs}` as the third; a real failure beside them is still `failed` (design §6
-    *Promote*, §4.4 *CI that never started is the person's*, TD-686). The jobs' verdicts are kept per
-    sha (`_jobs`), so a job is read once; `keep=False` (a rollback's commit) neither reads nor replaces
-    main's kept verdicts. Only a checkout whose `origin` is GitHub reads its jobs."""
+def _gh_json(root: str | Path, path: str) -> tuple[Any, str | None]:
+    """`gh api <path>`'s JSON, or `(None, why)`."""
     try:
         cp = subprocess.run(
-            ["gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100"],
-            capture_output=True, text=True, timeout=GH_TIMEOUT, cwd=str(root),
+            ["gh", "api", path], capture_output=True, text=True, timeout=GH_TIMEOUT, cwd=str(root),
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired) as e:
-        return "unknown", f"gh could not be asked: {type(e).__name__}", None
+        return None, f"gh could not be asked: {type(e).__name__}"
     if cp.returncode != 0:
-        return "unknown", ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200], None
+        return None, ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200]
     try:
-        runs = json.loads(cp.stdout or "{}").get("check_runs")
-    except (json.JSONDecodeError, AttributeError):
-        return "unknown", "gh api printed something that is not the check runs", None
+        return json.loads(cp.stdout or "{}"), None
+    except json.JSONDecodeError:
+        return None, "gh api printed something that is not JSON"
+
+
+def read_checks(root: str | Path, sha: str, keep: bool = True) -> tuple[str, str, dict[str, Any] | None, str | None]:
+    """The CI verdict on `sha`: the check runs of `commits/<sha>/check-runs` and the commit statuses of
+    `commits/<sha>/status` (its `statuses`, never its combined `state`) folded — `green` when every run
+    and status has concluded and none failed (a status's `failure` or `error` fails it, `pending` keeps
+    it pending), `pending`, `failed`, or `unknown` with why (no `gh`, no remote, a rate limit, no run and
+    no status at all — a commit nothing has looked at is not a green one) — then `checks_not_run`, then
+    `precheck` (design §6 *Promote*, TD-1033). Failing runs that are all Actions jobs that never started
+    read `unknown`, *CI never ran: <reason>*, with `{reason, kind, runs}` as the third; a real failure
+    beside them is still `failed` (§4.4 *CI that never started is the person's*, TD-686). The jobs'
+    verdicts are kept per sha (`_jobs`), so a job is read once.
+
+    Main's head (`keep`) where the repo sets `precheck` (`cadence.precheck_command` on `origin/main`) is
+    green only when it also carries a `cadence/precheck` that succeeded, which outranks never-started runs
+    (then no `checks_not_run`); `precheck` is what the status read found — `absent`, `success`, `failure`,
+    `pending` or `unread` — and None where `precheck` is unset or `docs/cadence.toml` does not parse (the
+    reading `unknown` with that why). `keep=False` (a rollback's commit) neither reads `precheck` nor reads
+    or replaces main's kept verdicts. Only a checkout whose `origin` is GitHub reads its jobs."""
+    command, toml_why = cadence.precheck_command(root, "origin/main") if keep else (None, None)
+    if toml_why:
+        return "unknown", toml_why, None, None
+    got, why = _gh_json(root, f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100")
+    if why:
+        return "unknown", why, None, None
+    runs = got.get("check_runs") if isinstance(got, dict) else None
     if not isinstance(runs, list):
-        return "unknown", "gh api printed something that is not the check runs", None
-    if not runs:
-        return "unknown", f"no check runs on {sha[:7]}", None
+        return "unknown", "gh api printed something that is not the check runs", None, None
+    got, why = _gh_json(root, f"repos/{{owner}}/{{repo}}/commits/{sha}/status?per_page=100")
+    statuses = got.get("statuses") if isinstance(got, dict) else None
+    if not why and not isinstance(statuses, list):
+        why = "gh api printed something that is not the commit statuses"
+    if why:
+        return "unknown", why, None, ("unread" if command else None)
     runs = [r for r in runs if isinstance(r, dict)]
+    statuses = [s for s in statuses if isinstance(s, dict)]
+    precheck: str | None = None
+    if command:
+        mine = [s for s in statuses if s.get("context") == PRECHECK_CONTEXT]
+        state = str(mine[0].get("state") or "") if mine else ""  # newest first, one per context
+        precheck = "failure" if state == "error" else state if state in ("success", "failure", "pending") else "absent"
+    if not runs and not statuses and precheck != "absent":
+        return "unknown", f"no check runs on {sha[:7]}", None, precheck
     failing = [r for r in runs if r.get("status") == "completed" and r.get("conclusion") in FAILED]
+    not_run = None
     if failing and reports.GITHUB_ORIGIN.search(reports.git_origin(root)):
         items = []
         for r in failing:  # a check run's id is its job's; its run is in the job's URL
@@ -238,13 +270,17 @@ def read_checks(root: str | Path, sha: str, keep: bool = True) -> tuple[str, str
         not_run, _, jobs = reports.classify_failing(root, items, sha, kept, GH_TIMEOUT)
         if keep:
             _jobs[str(root)] = jobs
-        if not_run:
-            return "unknown", f"CI never ran: {not_run['reason']}", not_run
-    if failing:
-        return "failed", "", None
-    if any(r.get("status") != "completed" for r in runs):
-        return "pending", "", None
-    return "green", "", None
+    if not_run and precheck == "success":  # the precheck is the check: never-started runs checked nothing
+        failing, not_run = [], None
+    if (failing and not_run is None) or any(s.get("state") in ("failure", "error") for s in statuses):
+        return "failed", "", None, precheck
+    if not_run:
+        return "unknown", f"CI never ran: {not_run['reason']}", not_run, precheck
+    if precheck == "absent":
+        return "unknown", f"no {PRECHECK_CONTEXT} on {sha[:7]}", None, precheck
+    if any(r.get("status") != "completed" for r in runs) or any(s.get("state") == "pending" for s in statuses):
+        return "pending", "", None, precheck
+    return "green", "", None, precheck
 
 
 def unmet(reading: dict[str, Any], press: bool = False, kind: str = "promote") -> tuple[str, str] | None:
@@ -856,7 +892,7 @@ def survey(
                 r.pop(k, None)
             r.update(main)
             if r.get("main"):
-                r["checks"], why, r["checks_not_run"] = read_checks(root, r["main"])
+                r["checks"], why, r["checks_not_run"], r["precheck"] = read_checks(root, r["main"])
                 r["checks_why"] = why or None
                 r["origin"] = reports.git_origin(root)  # whose account `ci_not_run` groups it under (TD-686)
             r["at"] = stamp

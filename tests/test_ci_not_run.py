@@ -402,19 +402,22 @@ def test_done_verdicts_take_the_readings_jobs_for_this_head_else_read_the_requir
     assert reports.done_verdicts(tmp_path, view, ["Lint"], None, 5) == {} and _job_reads(calls) == []
 
 
-def _fake_promote(monkeypatch, runs: list, jobs: dict, notes: dict):
+def _fake_promote(monkeypatch, runs: list, jobs: dict, notes: dict, statuses: list = (), toml=(None, None)):
     from sessionorc import promote
 
     calls = _fake(monkeypatch, [], jobs, notes)
     real = reports.subprocess.run
 
     def run(argv, **kw):
+        if argv[0] == "gh" and "/commits/" in argv[2] and "/status?" in argv[2]:
+            return subprocess.CompletedProcess(argv, 0, json.dumps({"statuses": statuses}), "")
         if argv[0] == "gh" and "/commits/" in argv[2]:
             calls.append(argv)
             return subprocess.CompletedProcess(argv, 0, json.dumps({"check_runs": runs}), "")
         return real(argv, **kw)
 
     monkeypatch.setattr(promote.subprocess, "run", run)
+    monkeypatch.setattr(promote.cadence, "precheck_command", lambda root, rev: toml)
     return promote, calls
 
 
@@ -434,6 +437,7 @@ def test_the_promotes_checks_say_ci_never_ran_failed_or_pending(tmp_path, monkey
         "unknown",
         f"CI never ran: {BILLING}",
         {"reason": BILLING, "kind": "billing", "runs": [RUN, RUN + 1]},
+        None,
     )
     assert _job_reads(calls) == [1, 2]
     # kept per sha: the same head reads no job again; a new one does
@@ -446,10 +450,29 @@ def test_the_promotes_checks_say_ci_never_ran_failed_or_pending(tmp_path, monkey
     promote, _ = _fake_promote(
         monkeypatch, [_run_of(1), _run_of(3)], {1: _job(1), 3: _job(3, runner="r")}, {1: _notes()}
     )
-    assert promote.read_checks(tmp_path, "e" * 40) == ("failed", "", None)
+    assert promote.read_checks(tmp_path, "e" * 40) == ("failed", "", None, None)
     # nothing failed and one still running is pending, as before
     promote, _ = _fake_promote(monkeypatch, [_run_of(1, "success"), {"status": "queued"}], {}, {})
-    assert promote.read_checks(tmp_path, "f" * 40) == ("pending", "", None)
+    assert promote.read_checks(tmp_path, "f" * 40) == ("pending", "", None, None)
+
+
+def test_a_green_precheck_outranks_runs_that_never_started(tmp_path, monkeypatch):
+    """TD-1037: with `precheck` set, never-started runs beside a green `cadence/precheck` read green and carry
+    no `checks_not_run`; beside a real failure it is still failed; with no precheck, CI never ran as before."""
+    set_, green = ("pdm run test", None), [{"context": "cadence/precheck", "state": "success"}]
+    never = [_run_of(1), _run_of(2, run=RUN + 1)]
+    promote, _ = _fake_promote(monkeypatch, never, {1: _job(1), 2: _job(2)}, {1: _notes(), 2: _notes()}, green, set_)
+    monkeypatch.setattr(promote, "_jobs", {})
+    assert promote.read_checks(tmp_path, "c" * 40) == ("green", "", None, "success")
+    promote, _ = _fake_promote(
+        monkeypatch, [_run_of(1), _run_of(3)], {1: _job(1), 3: _job(3, runner="r")}, {1: _notes()}, green, set_
+    )
+    monkeypatch.setattr(promote, "_jobs", {})
+    assert promote.read_checks(tmp_path, "e" * 40) == ("failed", "", None, "success")
+    promote, _ = _fake_promote(monkeypatch, never, {1: _job(1), 2: _job(2)}, {1: _notes(), 2: _notes()}, [], set_)
+    monkeypatch.setattr(promote, "_jobs", {})
+    got = promote.read_checks(tmp_path, "c" * 40)
+    assert got[0] == "unknown" and got[1].startswith("CI never ran") and got[2] and got[3] == "absent"
 
 
 def test_ci_not_run_groups_by_owner_and_leaves_out_a_non_github_origin():

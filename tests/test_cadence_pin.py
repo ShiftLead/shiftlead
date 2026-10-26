@@ -281,3 +281,56 @@ def test_the_dev_cadence_console_script_runs_the_vendored_launcher(tmp_path):
     _git(tmp_path, "init", "-q", str(tmp_path / "bare"))
     cp = subprocess.run([*run, "-C", str(tmp_path / "bare"), "words"], capture_output=True, text=True)
     assert cp.returncode == 2 and cp.stderr.startswith("dev-cadence: ") and "Traceback" not in cp.stderr
+
+
+def test_precheck_is_read_from_the_toml_at_a_rev_with_no_script(tmp_path):
+    """TD-1037 (design §6 *Where `precheck` is read*): `precheck_command` reads `docs/cadence.toml` at the rev
+    named, never the working tree: set, unset, empty, not a string, and a file that does not parse."""
+    root = tmp_path / "r"
+    (root / "docs").mkdir(parents=True)
+    _git(tmp_path, "init", "-q", "-b", "main", str(root))
+    toml = root / cadence.PIN
+    assert cadence.precheck_command(root, "HEAD") == (None, None)  # no commit, no file: unset
+
+    def commit(text: str) -> None:
+        toml.write_text(text)
+        _git(root, "add", "-A")
+        _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "c")
+
+    commit('precheck = "  pdm run test  "\n')
+    assert cadence.precheck_command(root, "HEAD") == ("pdm run test", None)
+    toml.write_text("# the working tree is never read\n")
+    assert cadence.precheck_command(root, "HEAD") == ("pdm run test", None)
+    for text in ("# nothing set\n", 'precheck = "  "\n', "precheck = 3\n", '[x]\nprecheck = "y"\n'):
+        commit(text)
+        assert cadence.precheck_command(root, "HEAD") == (None, None), text
+    commit("precheck = \n")
+    assert cadence.precheck_command(root, "HEAD") == (None, "docs/cadence.toml does not parse")
+
+
+def test_precheck_script_in_each_layout_and_absent(tmp_path, monkeypatch):
+    """TD-1037 (design §6 *What runs*): the checkout's `scripts/`, dev-cadence's own `files/scripts/`, and the
+    resolver's `dev-cadence run` with its env in a pinned repo; absent in each, *no precheck.py here*."""
+    absent = (None, "no precheck.py here")
+    plain = tmp_path / "plain"
+    (plain / "scripts").mkdir(parents=True)
+    assert cadence.precheck_script(plain) == absent
+    (plain / "scripts" / "precheck.py").write_text("")
+    assert cadence.precheck_script(plain) == ((["python3", "scripts/precheck.py"], None), None)
+    src, (first, second) = _dev_cadence(tmp_path)
+    assert cadence.precheck_script(src) == absent
+    (src / "files" / "scripts").mkdir()
+    (src / "files" / "scripts" / "precheck.py").write_text("")
+    assert cadence.precheck_script(src) == ((["python3", "files/scripts/precheck.py"], None), None)
+    payload = _payload(tmp_path)
+    _stub(tmp_path, monkeypatch, payload)
+    root = _pinned(tmp_path, second)
+    assert cadence.precheck_script(root) == absent  # a pinned tree older than the script
+    (payload / "scripts" / "precheck.py").write_text("")
+    cadence._trees.clear()
+    (argv, env), why = cadence.precheck_script(root)
+    assert why is None and argv == cadence.command(root, "run", "precheck.py")[0]
+    assert env is not None and env["CADENCE_REPO_ROOT"] == str(root)
+    (tmp_path / "launcher" / "refuse").write_text("no such ref")
+    cadence._trees.clear()
+    assert cadence.precheck_script(root) == (None, "no such ref")
