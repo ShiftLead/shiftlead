@@ -1075,7 +1075,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   repo sets `precheck`** (dev-cadence §4.12; read as *The precheck on main* says, on the same pass), main's head is green
   only when it also carries a `cadence/precheck` status that succeeded, the rest folding as above
   (a hand-run workflow that failed beside a green precheck is still *failed*, as dev-cadence's `ci`
-  row folds it): with none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
+  row folds it), except that runs that **never started** are outranked by a green precheck — they
+  checked nothing, and with `precheck` set the precheck is the check — so a repo whose push workflow
+  can no longer start reads green on its precheck (the cure for the never-started runs is removing
+  the trigger, as TD-1035 does here): with none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
   the home's own run on it is going (*The precheck on main*, below), as dev-cadence's `ci` row reads
   an open PR's head. *When main moved*
   is its head's committer time (a squash merge stamps it), so the settle and the row's age survive a
@@ -1315,8 +1318,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   what main actually holds.
   - **When.** On the readings' pass, for a repo whose block has `promote:` and which sets `precheck`
     (read as below), `auto` on or off — the row offers the press with the verdict beside it, so the
-    verdict is wanted either way — when live is not main's head, main's head carries no
-    `cadence/precheck` status, preconditions (1) and (3) hold, no hold stands, and no precheck of
+    verdict is wanted either way — when live is not main's head, a status read that succeeded
+    (`commits/<sha>/status?per_page=100`) lists no `cadence/precheck` on main's head — a read that
+    failed leaves the reading `unknown` with its why and starts nothing — preconditions (1) and (3) hold, no hold stands, and no precheck of
     that repo is running or has run on that commit. (1) is required because `precheck.py` reads the
     command from the working tree it is started in: on main's head with a clean tree, the command is
     main's. It does not wait for the settle: a run takes minutes, and the settle runs beside it.
@@ -1324,16 +1328,21 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     run leaves it running on its commit, and the new head is checked on the pass after it ends.
   - **What runs.** `python3 scripts/precheck.py --commit <sha>` (dev-cadence's, the commit form of its
     `--pr`; asked of dev-cadence by TD-1038), found as the gate's script is (`sessionorc.cadence`'s
-    resolver in a pinned repo), started by the shell in the checkout, stdin closed, detached from the
-    tick as the promote's run is. It runs the command in a clean detached worktree of its own at the
+    resolver in a pinned repo), started by the shell in the checkout, stdin closed, in a session of its
+    own (`start_new_session`) and detached from the tick as the promote's run is. It runs the command in a clean detached worktree of its own at the
     commit and records a `cadence/precheck` commit status there, so the verdict outlives the home and
     is the one any reader sees. Its output goes to `~/.shiftlead/promotes/<repo>/precheck-<sha7>.log`
     (pruned with the run logs), and **`~/.shiftlead/promotes/<repo>/precheck.json`** — `{sha, at, pid,
     started, log}`, the process's start time beside its pid as the intent keeps it — is written before
     the start, so a restarted home finds a run going and never starts a second, and never kills a pid
     taken again; a file whose `pid` is null (the home died between the write and the start) is a run
-    that never started, and is started again. `PRECHECK_BOUND` (twenty minutes; CI's job had fifteen)
-    kills a run still going.
+    that never started, started again while its sha is main's head and dropped once it is not. The
+    file is kept after the run ends — it is how *has run on that commit* is known — and replaced only
+    by the next sha's. `PRECHECK_BOUND` (twenty minutes; CI's job had fifteen) kills a run still going:
+    the process group (TERM, then KILL after a few seconds), since `pdm run test` is a grandchild, and
+    only while the start time matches. A kill skips `precheck.py`'s own cleanup, so the home then runs
+    `git worktree prune` in the checkout and removes the run's `precheck-*` directory under the temp
+    root.
   - **How it ends.** The status is the verdict, read on the next pass like any other, and it wins over
     the file: a status on the sha ends the run whatever the file says. Green, and the promote goes on
     by the rules above. **Failed is told**: main's head is red, and with every PR prechecked behind
@@ -1346,12 +1355,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     *precheck on <sha7> ended and recorded nothing*, with its exit code and its log's last line where
     the home that started it saw them (a restarted home cannot read a detached process's exit), and
     is not run again on that commit; the next head runs afresh.
-  - **Where `precheck` is read.** As `sync.post_sync_command` reads `post_sync`: `tomllib` on
-    `docs/cadence.toml` at `origin/<default>` in the registry checkout, no script, so a pinned repo
+  - **Where `precheck` is read.** One helper, `sessionorc.cadence.precheck_command(root, rev)` →
+    `(command | None, why | None)` (built by TD-1037), as `sync.post_sync_command` reads `post_sync`:
+    `tomllib` on `docs/cadence.toml` at `origin/<default>` in the registry checkout, no script, so a pinned repo
     (which carries no `scripts/cadence_config.py`) reads it the same way, and every reader of the
     key at the home — this rule, the checks reading, §4.8's `done` — reads the one copy the gate on
     main reads. A value that is not a non-empty string is no `precheck`; a file that does not parse
-    leaves the checks `unknown`, *docs/cadence.toml does not parse*.
+    is its own answer (`why` *docs/cadence.toml does not parse*), which leaves the checks `unknown`.
   - **What it does not do.** It never checks a commit that is not main's head, never promotes one,
     and never cuts `PROMOTE_MAX_WAIT` short: while merges land faster than a run takes, the head
     never carries a status, the row says *prechecking*, and the person's press is the way through.
@@ -1409,7 +1419,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   and on its cadence (five minutes, detached as the `gh` reads are), over every checkout in the
   home's registry, from the open PRs of the repo's PR reading (§4.4 *Repo facts*: each with its
   `branch`, `head` and `author`). It looks at a sync PR that no live record holds (§4.4's test),
-  that is not a draft and not `conflicting`, and whose `checks` read *green*. Only one that is
+  that is not a draft and not `conflicting`, and whose `checks` read *green* — or, in a repo that
+  sets `precheck` (*The precheck on main*, *Where `precheck` is read*), read *none* with no
+  `cadence/precheck` on its head: no workflow runs on a PR there, so step 4's precheck is what makes
+  it green, and the *green* test applies after it (TD-1033). Only one that is
   **not cross-repository**, whose **author is the home's own `gh` login** (the account `sync-all.sh`
   pushes as), in a served repo, or an unserved one whose one lack is a tree older than `OLDEST` (§5 *The seams*: the sync is its cure), goes on to the steps; any other unserved repo's PR is the person's, as an adoption PR is (§4.7 `ao repo add`) — not read, nothing written.
 
@@ -1482,7 +1495,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      and the head carries no `cadence/precheck` status, the home first runs `python3
      scripts/precheck.py --pr <n>` the same way, in the registry checkout under `PRECHECK_BOUND`
      (TD-1033, *The precheck on main* above): the head's bytes are the ones step 1 proved, so it is
-     the gate's own trust. It is the repo's one precheck at a time: while main's run goes, step 4
+     the gate's own trust. It runs only while the registry checkout is on `origin/<default>` with a clean
+     tree, since `precheck.py` reads the command from the tree it runs in; otherwise step 4 waits, a
+     pass not counted toward `SYNC_TRIES`. It is the repo's one precheck at a time: while main's run goes, step 4
      waits, a pass that is no reading and not counted toward `SYNC_TRIES`. The sync pass holds its
      task while the run goes, so another repo's sync waits behind it; sync PRs are few, and that is
      accepted. Its exit 1 records a failure the gate then reads as one; its exit 2 or 3
