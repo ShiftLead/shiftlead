@@ -460,6 +460,7 @@ def test_start_session_starts_the_persons_session_in_td_n_with_work_md_sent(tmp_
     root = str(repo.resolve())
     assert (kw["name"], kw["worktree"], kw["dir"], kw["repo"]) == (name, name, root, root)
     assert kw["unattended"] is False and kw["role"] == role and kw["team"] == "sam-grind"
+    assert kw["project"] == "sam"  # the repo's project, as New session's badge (§4.9, TD-1043)
     assert kw["lane"] == [ref] and kw["controllers"] == ["ao-samscrape-manager-sam"]
     assert "start_context" not in kw and kw["ledger"] == "docs/technical_debt.md"
     # an entry on no card: *waits on me* is the entry, *the rest* none (TD-912)

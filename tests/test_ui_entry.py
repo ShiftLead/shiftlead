@@ -98,6 +98,7 @@ def test_open_a_session_starts_the_types_role_interactive_in_a_new_worktree_with
         str(repo.resolve()),
     )
     assert kw["unattended"] is False and kw["prompt"] == "" and kw["role"] == "designer" and kw["team"] == "sam-grind"
+    assert kw["project"] == "sam"  # the repo's project, as New session's badge (§4.9, TD-1043)
     assert kw["controllers"] == ["ao-samscrape-manager-sam"]
     assert kw["context_bound"] is None  # a person's own session takes no default bound (§4.8, TD-249)
     # entry.md's lines, filled, are the session's start context (§4.3, TD-283 part 2): the create carries them
@@ -118,11 +119,50 @@ def test_a_repo_no_team_services_starts_plain_with_no_badge(tmp_path, monkeypatc
     r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": ""})
     (kw,) = created
     assert kw["role"] == "plain" and kw["team"] == "" and kw["controllers"] == [] and kw["unattended"] is False
+    assert kw["project"] == "sam"  # the badge is the repo's, team or none (TD-1043)
     # with **What** empty the composer is empty, and the session is told the same
     from shiftlead import repoconfig
 
     assert r.json()["text"] == ""
     assert kw["start_context"] == repoconfig.entry_text("samscrape", "debt", "medium", "docs/technical_debt.md")
+
+
+def test_two_open_a_session_starts_of_different_teams_on_one_project_may_mail_each_other(tmp_path, monkeypatch):
+    """TD-1043, design §4.10 *across teams, by project*: a session from **Open a session** carries its repo's
+    `project` badge beside its team's, so two of them, of two teams whose repos one project lists, have the
+    project edge, which an empty badge on either side never gave."""
+    from sessionorc import mail, models
+
+    world(tmp_path)
+    other = tmp_path / "samweb"
+    other.mkdir()
+    subprocess.run(["git", "init", "-q", str(other)], check=True)
+    home = tmp_path / "home"
+    (tmp_path / "repos.txt").write_text(f"{tmp_path / 'samscrape'}\n{other}\n")
+    doc = yaml.safe_load((home / "org.yml").read_text())
+    doc["projects"]["sam"]["repos"]["samweb"] = {"kmaster": str(other)}
+    doc["teams"]["web-grind"] = {"repo": "samweb", "manager": {"name": "manager-web"}, "members": [{"role": "grinder"}]}
+    (home / "org.yml").write_text(yaml.safe_dump(doc))
+    created: list[dict] = []
+    c = client(monkeypatch, tmp_path, fake([], created=created))
+    for repo in ("samscrape", "samweb"):
+        r = c.post("/api/entry/session", json={"repo": repo, "type": "debt", "words": ""})
+        assert r.status_code == 200, r.text
+    assert [(kw["team"], kw["project"]) for kw in created] == [("sam-grind", "sam"), ("web-grind", "sam")]
+    records = {
+        f"ao-{i}": models.Session(
+            id=f"ao-{i}",
+            name=kw["name"],
+            kind="claude",
+            adapter="claude-code",
+            dir=kw["dir"],
+            team=kw["team"],
+            project=kw["project"],
+        )
+        for i, kw in enumerate(created)
+    }
+    assert mail.message_edge(records, "ao-0", "ao-1", kind="note") == "project"
+    assert mail.message_edge(records, "ao-1", "ao-0", kind="note") == "project"
 
 
 def test_a_bad_type_or_an_unknown_repo_is_refused_and_nothing_starts(tmp_path, monkeypatch):
