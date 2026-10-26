@@ -193,6 +193,34 @@ def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path, mo
     assert seams.reading(root)["session_start"] == []
 
 
+@pytest.mark.unit
+def test_a_served_repo_missing_from_dev_cadences_roster_is_warned_of(tmp_path, monkeypatch):
+    """TD-1010, §4.7 `ao repo add`: while a served repo is not on dev-cadence's own roster, sync-all will not
+    reach it; nothing is said where that roster cannot be read, of an unserved repo, or of dev-cadence's source."""
+    monkeypatch.setattr(seams, "descends", lambda *a: (True, None))
+    root = served(tmp_path / "notes")
+    (root / workorders.BOARD).write_text("# Board\n")
+    hydrate = root / gitinfo.HYDRATE
+    hydrate.write_text("#!/bin/sh\n")
+    hydrate.chmod(0o755)
+    roster = tmp_path / "config" / "dev-cadence" / "repos.txt"
+    monkeypatch.setattr(seams.hosts, "DEV_CADENCE_ROSTER", str(roster))
+    assert seams.reading(root)["warnings"] == [], "no roster to read: nothing said"
+    roster.parent.mkdir(parents=True)
+    roster.write_text("# machine roster\n/elsewhere\n")
+    words = f"not on dev-cadence's roster: sync-all will not reach it — `<dev-cadence>/sync.sh {root}`"
+    assert seams.reading(root)["warnings"] == [words]
+    roster.write_text(f"/elsewhere\n{root.resolve()}\n")
+    assert seams.reading(root)["warnings"] == []
+    roster.write_text("/elsewhere\n")
+    (root / "scripts" / "check_cadence.py").unlink()  # unserved: its lack says what to do, not this
+    assert seams.reading(root)["warnings"] == []
+    source = tmp_path / "dev-cadence"
+    (source / "files" / "scripts").mkdir(parents=True)
+    (source / "sync.sh").write_text("#!/bin/sh\n")
+    assert seams.warnings(source, {"state": "set", "value": None}, {"state": "set"}, None, True) == []
+
+
 def test_unserved_names_each_lack_and_nothing_on_a_guess():
     """TD-1011: the passes read `seams.unserved` — each lack's words for an unserved repo; none for a
     served one, a reading with no `serve` (an older host agent's), or no reading at all."""

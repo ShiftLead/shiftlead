@@ -18,7 +18,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from sessionorc import cadence, gitinfo, reports, sync, workorders
+from sessionorc import cadence, gitinfo, hosts, reports, sync, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 
@@ -258,12 +258,30 @@ def session_start(root: Path | str) -> list[str]:
     return out
 
 
+def on_cadence_roster(root: Path | str) -> bool | None:
+    """Whether the checkout is on dev-cadence's own roster (`hosts.DEV_CADENCE_ROSTER`), which its
+    `sync-all.sh` walks and ShiftLead never writes (§4.7 `ao repo add`); None where that roster could not
+    be read, so nothing is said of it."""
+    try:
+        lines = Path(hosts.DEV_CADENCE_ROSTER).expanduser().read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    here = Path(root).resolve()
+    return any(Path(x.strip()).expanduser().resolve() == here for x in lines if x.strip() and not x.startswith("#"))
+
+
 def warnings(
-    root: Path | str, board: dict[str, Any], setup: dict[str, Any], dc_age: dict[str, Any] | None = None
+    root: Path | str,
+    board: dict[str, Any],
+    setup: dict[str, Any],
+    dc_age: dict[str, Any] | None = None,
+    served: bool = False,
 ) -> list[str]:
     """The warnings the host agent can read itself (§5 *The seams*), each one sentence: a missing board,
-    no worktree setup, a checkout without dev-cadence's hook shim, and dev-cadence's age where it could
-    not be read (§5 *Which dev-cadence*). A repo is served whatever they say."""
+    no worktree setup, a checkout without dev-cadence's hook shim, dev-cadence's age where it could not
+    be read (§5 *Which dev-cadence*), and a `served` repo missing from dev-cadence's own roster (§4.7 `ao
+    repo add`, TD-1010) — never dev-cadence's source, which no sync reaches. A repo is served whatever
+    they say."""
     out: list[str] = []
     if board.get("state") == "absent" or (board.get("value") and not (Path(root) / board["value"]).is_file()):
         out.append(f"no board at {board.get('value') or workorders.BOARD}")
@@ -273,6 +291,8 @@ def warnings(
         out.append(f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh {root}`")
     if dc_age and dc_age.get("why"):
         out.append(f"dev-cadence's age not read: {dc_age['why']}")
+    if served and not cadence.is_source(root) and on_cadence_roster(root) is False:
+        out.append(f"not on dev-cadence's roster: sync-all will not reach it — `<dev-cadence>/sync.sh {root}`")
     return out
 
 
@@ -292,7 +312,7 @@ def reading(root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, 
     }
     out["cadence_age"] = age(root, roster, (old or {}).get("cadence_age"))
     out["serve"] = serve(root, out["ledger"], out["cadence_age"])
-    out["warnings"] = warnings(root, out["board"], out["worktree_setup"], out["cadence_age"])
+    out["warnings"] = warnings(root, out["board"], out["worktree_setup"], out["cadence_age"], out["serve"]["ok"])
     out["session_start"] = session_start(root)
     out["ledgerboard"] = ledgerboard(root)
     out["source"] = cadence.is_source(root)
