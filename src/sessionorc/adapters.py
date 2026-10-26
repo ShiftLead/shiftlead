@@ -63,6 +63,9 @@ class Adapter(Protocol):
     #                                                      for dev-cadence (design §5 *The seams*): a repo whose
     #                                                      `.claude/settings.json` lacks it is warned on the Repo
     #                                                      page and in `ao doctor`; unset, the adapter has none
+    #   cadence_hook_lines_past: tuple[str, ...]          the earlier vintages of that line a repo may still carry,
+    #                                                      newest first, which count as the line (TD-1023); read
+    #                                                      with getattr(adapter, "cadence_hook_lines_past", ())
     #   agent: bool                                       False when what is typed at it is no prompt an agent
     #                                                      runs a turn on — `shell` and `command`; True where
     #                                                      unset. Read through `has_agent`, never an adapter's

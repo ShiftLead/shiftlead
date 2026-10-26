@@ -42,6 +42,9 @@ SOURCE_GATE = f"python3 {SOURCE_SCRIPT} --pr {{pr}} --json"
 OLDEST = "6d92209da67410546a258a467e3ff292fb20166d"
 LOCK = "docs/cadence-sync.lock"  # the copy's lock, while a repo still has one (`sync.LOCK`)
 PIN = "docs/cadence.toml"  # the pin's file: `[dev-cadence]`'s `source` and `ref` (dev-cadence TD-129)
+# the pin's header as the SessionStart line's grep finds it (TD-1023): the twin of dev-cadence's
+# `launcher/words.py` PIN_HEADER_RE, `[^\S\n]` standing for the shell's `[[:space:]]` within a line
+PIN_HEADER_RE = re.compile(r"^[^\S\n]*\[dev-cadence\][^\S\n]*(#.*)?$", re.M)
 # dev-cadence's launcher, vendored frozen from its `launcher/dev_cadence.py` at LAUNCHER_COMMIT (TD-1014); a
 # pinned tree names the lowest launcher interface it runs under, so a newer one is a ShiftLead release
 LAUNCHER = Path(__file__).with_name("dev_cadence.py")
@@ -85,6 +88,31 @@ def pinned(root: Path | str) -> bool:
         return pin(root) is not None
     except PinError:
         return True
+
+
+def hook_pinned(root: Path | str) -> bool:
+    """Whether the SessionStart line runs in its pinned mode for `root` (design §4.2, TD-1023): the main
+    checkout's `docs/cadence.toml` — the first entry of `git worktree list`, else `root` itself, as the
+    line's `${r:-…}` falls back — has a `[dev-cadence]` header (`PIN_HEADER_RE`, matched as the line's grep
+    and the launcher match it). The hooks' view, not `pinned`: a repo pinned with its lock still there is
+    hook-pinned. False where the file is missing or unreadable."""
+    root = Path(root)
+    try:
+        listed = subprocess.run(
+            ["git", "-C", str(root), "worktree", "list", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        ).stdout
+    except (OSError, subprocess.SubprocessError, ValueError):
+        listed = ""
+    first = listed.splitlines()[0] if listed else ""
+    main = Path(first.removeprefix("worktree ")) if first.startswith("worktree ") else root
+    try:
+        text = (main / PIN).read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return False
+    return PIN_HEADER_RE.search(text) is not None
 
 
 def command(repo: Path | str, word: str, *args: str) -> tuple[list[str], dict[str, str]]:
