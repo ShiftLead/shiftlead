@@ -1707,7 +1707,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-25 (the designer, from TD-1009)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build
+**Status:** Open — building in slices (grinder-ao-1). Slice 1, the word and the RPC: `ao repo add <path>` calls the home's `add_repo` RPC (person-only, at the home; `mail.PERSON_ONLY`), which appends the path's main checkout to the roster (`host.repos_registry`) when it holds dev-cadence's lock or is dev-cadence's source, and refuses a path already in the roster or outside a checkout; with `adopted` it adds one without (its adoption PR open); on a node the word is refused, *run ao repo add on the home*; `ao repo --help` names `add`; the next tick reads the new checkout whole. Left (slice 2): the offer (the scratch clone under `$TMPDIR`, `sync.sh`, the paths listed), `--adopt` (the `cadence-adopt` branch, the push, `gh pr create`, then `add_repo` with `adopted`; and on a registered unserved repo), the no-dev-cadence-checkout refusal, the cure words switching to `ao repo add <path> --adopt` and *adoption PR #n open*, and the roster-guard tests.
 **Blocked by:** TD-1011
 **Location:** `src/shiftlead/cli.py` (`cmd_repo`: the `add` word, beside `init`'s dispatch; the adopt's run and the PR), a new `add_repo` RPC at the home (`agent_serve`, person-only through `agent_common.person_only`), `src/sessionorc/hosts.py` (`default_repos_registry()`, the home's `repos.txt`), `src/sessionorc/gitinfo.py` (a scratch clone); a new `tests/test_repo_add.py`; design §4.7 **`ao repo add`**, §5 *Repos*
 

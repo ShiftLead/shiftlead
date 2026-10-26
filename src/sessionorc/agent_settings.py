@@ -10,16 +10,22 @@ from __future__ import annotations
 import asyncio
 import copy
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sessionorc import (
     adapters,
     agent_common,
     defs,
+    gitinfo,
+    hosts,
 )
+from sessionorc import cadence as cadence_mod
+from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
+from sessionorc import sync as sync_mod
 from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     RpcError,
@@ -180,6 +186,47 @@ class SettingsMixin:
                     else:
                         kept.setdefault(role, {}).setdefault(key, []).append(rule)
         return {"rules": kept, "malformed": bad}
+
+    async def rpc_add_repo(self, path: str = "", adopted: bool = False, caller: Any = None) -> dict[str, Any]:
+        """`ao repo add <path>` (design §4.7 **`ao repo add`**, §5 *Repos*, TD-1010): append the main
+        checkout `path` is in to the home's roster, `repos.txt` (`repos_registry` where `hosts.yml` names
+        one) — **a person's own**, refused to a session as `set_settings` is, and at the home alone. A
+        checkout holding dev-cadence's lock, or dev-cadence's source, is added; one without is refused
+        here, since its adoption is offered by the client, unless `adopted` (its adoption PR is open: the
+        repo is unserved until it merges, §5 *The seams*). A path already in the roster is refused. The
+        next tick reads a checkout new to the roster whole, at once (`_refresh_repos`). Returns `{root,
+        name, served}`, `served` as the seams reading finds it (§5 *The seams*: the tree, the gate and the
+        ledger), whatever let it be added."""
+        agent_common.person_only(caller, "add a repo", "§4.7 ao repo add", self._graph())
+        if self.mode != "home":
+            raise RpcError("ao repo add runs at the home (design §4.7): run ao repo add on the home")
+        if not path:
+            raise RpcError("ao repo add takes a checkout's path")
+        try:
+            here = (await asyncio.to_thread(gitinfo.main_checkout, Path(path).expanduser())).resolve()
+        except gitinfo.WorktreeError:
+            raise RpcError(f"{path} is not in a git checkout") from None
+        if not (here / ".git").exists():  # a bare repo's parent, or a submodule's `.git/modules`
+            raise RpcError(f"{path} is not in a checkout with a work tree")
+        root = str(here)
+        host = hosts.local_host()
+        if any(Path(r).expanduser().resolve() == here for r in host.repos()):
+            raise RpcError(f"{root} is in the roster already (design §5 Repos)")
+        holds = (here / sync_mod.LOCK).is_file() or cadence_mod.is_source(here)
+        if not (holds or adopted):
+            raise RpcError(f"{root} holds no dev-cadence ({sync_mod.LOCK}): its adoption comes first (design §4.7)")
+        reg = host.repos_registry
+        try:
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            with reg.open("ab+") as f:  # appended, never rewritten: nothing of the roster is lost
+                f.seek(0, 2)
+                ends = f.tell() == 0 or (f.seek(-1, 2), f.read(1))[1] == b"\n"
+                f.write((b"" if ends else b"\n") + f"{root}\n".encode())
+        except OSError as e:
+            raise RpcError(f"could not write the roster {reg}: {e}") from None
+        log.info("add_repo: %s added to %s by %s", root, reg, caller)
+        served = await asyncio.to_thread(lambda: seams_mod.serve(here, seams_mod.ledger(here))["ok"])
+        return {"root": root, "name": here.name, "served": served}
 
     async def rpc_set_settings(
         self,
