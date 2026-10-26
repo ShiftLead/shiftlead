@@ -1267,7 +1267,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       mid-smoke reads the result rather than a lost child's exit.
     - `last` is the smoke's last non-empty lines (twenty), which the wrapper keeps as it copies the
       output to the log. The reason is read from there, since whatever else writes to the log after
-      the smoke (the run's own closing lines) would otherwise stand in for it. A result with no
+      the smoke (the run's own closing lines) would otherwise stand in for it. A smoke that kept no
+      line at all (`last` empty) fails as *it exited <code>*, never with the log's tail. A result with no
       `last`, and a smoke that wrote no result, read the log's last line after the mark. The result is written once
       the shell exits, not when its output closes, which a child the smoke left behind may hold.
     - A smoke gone with no result written fails.
