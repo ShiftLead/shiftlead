@@ -1080,7 +1080,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   can no longer start reads green on its precheck, and its reading carries no `checks_not_run`, so
   the *CI not starting* row does not name main (the cure for the never-started runs is removing the
   trigger, as TD-1035 does here). The outrank is the home's own rule: dev-cadence's `ci` row reads a
-  never-started run as *unknown* whatever else passed. With none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
+  never-started run as *unknown* whatever else passed. The reading keeps what the status read found
+  as a field of its own, **`precheck`**: `absent`, `success`, `failure`, `pending` or `unread` (the
+  read failed), and null where the repo sets no `precheck` — the rules below key on it, never on the
+  `why` text. The rule is main's head's alone: a rollback's commit (`read_checks`' `keep=False`) is
+  read as before, since an old commit never carries one. With none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
   the home's own run on it is going (*The precheck on main*, below), as dev-cadence's `ci` row reads
   an open PR's head. *When main moved*
   is its head's committer time (a squash merge stamps it), so the settle and the row's age survive a
@@ -1320,9 +1324,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   what main actually holds.
   - **When.** On the readings' pass, for a repo whose block has `promote:` and which sets `precheck`
     (read as below), `auto` on or off — the row offers the press with the verdict beside it, so the
-    verdict is wanted either way — when live is not main's head, a status read that succeeded
-    (`commits/<sha>/status?per_page=100`) lists no `cadence/precheck` on main's head — a read that
-    failed leaves the reading `unknown` with its why and starts nothing — preconditions (1) and (3) hold, no hold stands, and no precheck of
+    verdict is wanted either way — when live is not main's head, the reading's `precheck` is `absent` (a status read of
+    `commits/<sha>/status?per_page=100` that succeeded and lists no `cadence/precheck` on main's head;
+    `unread` leaves the reading `unknown` with its why and starts nothing), preconditions (1) and (3) hold, no hold stands, and no precheck of
     that repo is running or has run on that commit. (1) is required because `precheck.py` reads the
     command from the working tree it is started in: on main's head with a clean tree, the command is
     main's. It does not wait for the settle: a run takes minutes, and the settle runs beside it.
@@ -1333,8 +1337,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     the row says nothing of a precheck, until main's own run starts. Main moving during a run leaves it
     running on its commit, and the new head is checked on the pass after it ends.
   - **What runs.** `python3 scripts/precheck.py --commit <sha>` (dev-cadence's, the commit form of its
-    `--pr`; asked of dev-cadence by TD-1038), found as the gate's script is (`sessionorc.cadence`'s
-    resolver in a pinned repo), started by the shell in the checkout, stdin closed, in a session of its
+    `--pr`; asked of dev-cadence by TD-1038), located by `sessionorc.cadence.precheck_script(root)` —
+    the argv for the three layouts the gate has (the checkout's `scripts/`, dev-cadence's own
+    `files/scripts/`, the resolver's `dev-cadence run` in a pinned repo), or `(None, why)` when the
+    script is absent, as in a pinned tree older than it; then nothing starts and main's reading is
+    `unknown`, *no precheck.py here*, as step 4 waits uncounted — started by the shell in the checkout, stdin closed, in a session of its
     own (`start_new_session`) and detached from the tick as the promote's run is. It runs the command in a clean detached worktree of its own at the
     commit and records a `cadence/precheck` commit status there, so the verdict outlives the home and
     is the one any reader sees. Its output goes to `~/.shiftlead/promotes/<repo>/precheck-<sha7>.log`
@@ -1349,10 +1356,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     the process group (TERM, then KILL after a few seconds), since `pdm run test` is a grandchild, and
     only while the start time matches. A kill skips `precheck.py`'s own cleanup, so the home then
     finds the run's worktree in `git worktree list --porcelain` — `precheck.py` makes it as `head`
-    inside a `mkdtemp` directory named `precheck-…` under the temp root (`tempfile.gettempdir()` in the
-    environment the home starts it with, `TMPDIR` inherited), so the entry at the sha whose
-    path is `<temp root>/precheck-*/head` — removes it with `git worktree remove --force`, prunes, as
-    `drop_tree` does for the promote's tree, and removes the `precheck-*` directory around it.
+    inside a `mkdtemp` directory under the temp root (`tempfile.gettempdir()` in the environment the
+    home starts it with, `TMPDIR` inherited), named by its exact prefix: `precheck-<sha7>-` for a
+    `--commit` run, `precheck-<pr>-` for a `--pr` one — so the entry at the sha whose path is
+    `<temp root>/<prefix>*/head`, a session's own run on another PR or commit never matching — removes it
+    with `git worktree remove --force`, removes every directory with that prefix whether or not an
+    entry was found (a kill between `mkdtemp` and the `worktree add` leaves one empty), and then runs
+    `git worktree prune`, as `drop_tree` does for the promote's tree.
   - **How it ends.** The status is the verdict, read on the next pass like any other, and it wins over
     the file: a status on the sha ends the run whatever the file says. Green, and the promote goes on
     by the rules above. **Failed is told**: main's head is red, and with every PR prechecked behind
@@ -1502,8 +1512,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      never the replay tree, which proves content and never judges. In a repo whose tree is older than
      `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
      its rows are kept only when they parse. **Where the repo sets `precheck`** (dev-cadence §4.12)
-     and the head carries no `cadence/precheck` status, step 4 first starts `python3
-     scripts/precheck.py --pr <n>` as main's run is started (TD-1033, *The precheck on main* above):
+     and the head carries no `cadence/precheck` status, step 4 first starts `precheck.py
+     --pr <n>`, located by `precheck_script` (absent, the pass waits uncounted), as main's run is started (TD-1033, *The precheck on main* above):
      detached, in the registry checkout, under `PRECHECK_BOUND`, its own intent file below. The head's bytes are the ones step 1 proved, so
      it is the gate's own trust. It starts only while the registry checkout is on `origin/<default>`
      with a clean tree, since `precheck.py` reads the command from the tree it runs in, and only while
@@ -1519,7 +1529,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      with no reading, counted toward `SYNC_TRIES` once (the file marked `counted`), after which a later
      pass may start a new run, replacing the file; a head that moved or a PR no longer open kills a
      live run (the group, only while its start time matches) and drops the file. The cleanup after a
-     kill is main's. **Who ends it**: the readings' pass judges `precheck-pr.json`'s bound and kills at
+     kill is main's. **A wait has a bound**: a sync PR that has waited `SYNC_PRECHECK_WAIT` (a day) at one head — the
+     checkout off `origin/<default>` or dirty, or no `precheck.py` there — becomes the team's order as
+     a declined one does, its reason the wait's (*precheck waited a day: the checkout is not clean on
+     origin/<default>*), so a sync PR never waits unseen. **Who ends it**: the readings' pass judges `precheck-pr.json`'s bound and kills at
      it as it does main's (it already reads both files under the lock), so a run outlives no bound
      when the sync pass skips the repo; the sync pass judges the head, the PR's state and `counted`.
      **The gate's exit decides one of three
