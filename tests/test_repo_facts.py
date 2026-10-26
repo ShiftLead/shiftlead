@@ -621,7 +621,15 @@ def test_ao_repo_says_an_unserved_repo_first_and_carries_serve(repo, monkeypatch
             "name": "r",
             "root": str(repo),
             "prs": {"open": []},
-            "ledger": {"entries": [], "by_kind": {}},
+            "ledger": {
+                "entries": [
+                    {"id": "TD-1", "title": "a build", "for_page": "pickable", "pickable": "yes"},
+                    {"id": "TD-2", "title": "a design", "for_page": "design", "pickable": "yes"},
+                    {"id": "TD-3", "title": "a check", "for_page": "live-check", "pickable": "yes", "live": "yes"},
+                    {"id": "TD-4", "title": "for paul", "for_page": "for-you", "pickable": "no"},
+                ],
+                "by_kind": {"pickable": 1, "design": 1, "live-check": 1, "for-you": 1},
+            },
             "seams": {"serve": serve},
         }
     }
@@ -631,13 +639,26 @@ def test_ao_repo_says_an_unserved_repo_first_and_carries_serve(repo, monkeypatch
         lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
     )
     monkeypatch.chdir(repo)
+    original = json.loads(json.dumps(reading))
     assert cli.main(["repo"]) == 0
-    assert capsys.readouterr().out.startswith(f"r  {lack} · 0 open PRs")
+    out = capsys.readouterr().out
+    assert out.startswith(f"r  {lack} · 0 open PRs")
+    # its lanes read empty: nothing listed pickable, design or a live check, and the counts say 0 (TD-1011)
+    assert "4 open entries: 0 pickable, 0 design, 1 for you, 0 live check" in out
+    assert not any(f"TD-{i}" in out for i in (1, 2, 3))
+    reading.clear()
+    reading.update(json.loads(json.dumps(original)))
     assert cli.main(["--json", "repo"]) == 0
-    assert json.loads(capsys.readouterr().out)[0]["serve"] == serve
+    got = json.loads(capsys.readouterr().out)[0]
+    assert got["serve"] == serve
+    pages = [(e["for_page"], e["pickable"]) for e in got["ledger"]["entries"]]
+    assert pages == [("unserved", "no")] * 3 + [("for-you", "no")]
+    reading.clear()
+    reading.update(json.loads(json.dumps(original)))
     reading[str(repo)]["seams"] = {"serve": {"ok": True, "lacks": []}}
     assert cli.main(["repo"]) == 0
-    assert capsys.readouterr().out.startswith("r  0 open PRs")
+    out = capsys.readouterr().out
+    assert out.startswith("r  0 open PRs") and "pickable     TD-1" in out and "design       TD-2" in out
 
 
 def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monkeypatch, capsys):

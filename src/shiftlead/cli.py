@@ -1638,6 +1638,24 @@ def _org_order(names: set[str], members: list[dict[str, Any]]) -> list[str]:
 PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
+UNSERVED_KINDS = ("pickable", "design", "live-check")  # what an unserved repo's lanes do not hold
+
+
+def _unserved_lanes(r: dict[str, Any]) -> None:
+    """An unserved repo's lanes read empty (§5 *The seams*, TD-1011): no entry of `r`'s reading is
+    pickable, design or a live check — each is `for_page: unserved`, `pickable: no`, and the counts say
+    so — so a member reading its lane here finds nothing in it, and the first line's *unserved: <the
+    lack>* is its lane note. The PRs, the board and the doing log are read as in any repo."""
+    led = r.get("ledger") or {}
+    kinds = led.get("by_kind")
+    for e in led.get("entries") or []:
+        if isinstance(e, dict) and (page := e.get("for_page")) in UNSERVED_KINDS:
+            e["for_page"], e["pickable"] = "unserved", "no"
+            if isinstance(kinds, dict):
+                kinds[page] = max(0, int(kinds.get(page) or 0) - 1)
+                kinds["unserved"] = int(kinds.get("unserved") or 0) + 1
+
+
 def _repo_list(e: dict[str, Any]) -> str:
     """Which of `ao repo`'s lists an entry is on (design §4.7's mapping, TD-418): the *pickable* rows
     are the kind *pickable* and a live check nothing blocks whose build is live — the grinder's pick
@@ -1798,6 +1816,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
     for r in picked:
         # whether the home serves it, as `--json` carries it (§4.7 `ao repo`, §5 *The seams*, TD-1011)
         r["serve"] = (r.get("seams") or {}).get("serve")
+        if seams_mod.unserved(r):
+            _unserved_lanes(r)
     if not args.all:
         # what the servicing teams hold and say (§4.8 *the doing log*), the reader's standing on
         # each open PR (§4.9b), and the board items due (§4.4) — TD-176 slice 6
