@@ -190,3 +190,12 @@ def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path):
     assert seams.reading(root)["session_start"] == ["run me"]
     (root / ".claude" / "settings.json").write_text("{not json")
     assert seams.reading(root)["session_start"] == []
+
+
+def test_unserved_names_each_lack_and_nothing_on_a_guess():
+    """TD-1011: the passes read `seams.unserved` — each lack's words for an unserved repo; none for a
+    served one, a reading with no `serve` (an older host agent's), or no reading at all."""
+    lacks = [{"key": "cadence", "words": "unserved: no dev-cadence"}, {"key": "gate"}]
+    assert seams.unserved({"seams": {"serve": {"ok": False, "lacks": lacks}}}) == ["unserved: no dev-cadence", "gate"]
+    for r in ({"seams": {"serve": {"ok": True, "lacks": []}}}, {"seams": {"ledger": {}}}, {}, None, {"seams": None}):
+        assert seams.unserved(r) == []

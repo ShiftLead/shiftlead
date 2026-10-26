@@ -117,9 +117,17 @@ def _git(root, *args):
     subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
 
 
+def _served(root) -> None:
+    """dev-cadence's tree and its gate in `root`, which with a ledger serve it (§5 *The seams*, TD-1011)."""
+    (root / "docs").mkdir(parents=True, exist_ok=True)
+    (root / "scripts").mkdir(exist_ok=True)
+    (root / "docs" / "cadence-sync.lock").write_text("source: dev-cadence\ncommit: abc1234\nfiles_commit: abc1234\n")
+    (root / "scripts" / "check_cadence.py").write_text("x = 1\n")
+
+
 def test_the_repo_reading_is_marked_with_the_repos_settle_over_the_installs(tmp_path):
     root = tmp_path / "r"
-    (root / "docs").mkdir(parents=True)
+    _served(root)
     (root / ".shiftlead.yml").write_text("settle: {design-first: 10m}\n")
     (paths.home() / "settings.yml").write_text("settle: {design-first: 1m, build: 1m}\n")
     led = root / "docs" / "technical_debt.md"
@@ -136,6 +144,26 @@ def test_the_repo_reading_is_marked_with_the_repos_settle_over_the_installs(tmp_
     until = datetime.fromisoformat(got["TD-002"]["settling"]["until"])
     assert timedelta(minutes=9) < until - datetime.now(UTC) <= timedelta(minutes=10)  # the repo's 10m
     assert datetime.fromisoformat(got["TD-003"]["settling"]["until"]) - datetime.now(UTC) <= timedelta(minutes=1)
+
+
+def test_an_unserved_repo_has_no_settle(tmp_path):
+    """TD-1011, design §5 *The seams*: an unserved repo's reading records nothing on the settle clock and
+    marks nothing settling; served, the same reading does."""
+    root = tmp_path / "r"
+    (root / "docs").mkdir(parents=True)
+    (root / ".shiftlead.yml").write_text("settle: {build: 10m}\n")
+    led = root / "docs" / "technical_debt.md"
+    led.write_text("# Ledger\n\n" + _entry(1, "build"))
+    _git(root, "init", "-q")
+    _git(root, "remote", "add", "origin", "https://github.com/o/r.git")
+    first = TickMixin._read_repos([str(root)], {}, {str(root)})
+    assert first[str(root)]["seams"]["serve"]["ok"] is False and not paths.ledger_seen_file().exists()
+    led.write_text("# Ledger\n\n" + _entry(1, "build") + "\n" + _entry(2, "build"))
+    got = _by_id(TickMixin._read_repos([str(root)], first, {str(root)})[str(root)]["ledger"]["entries"])
+    assert "settling" not in got["TD-002"] and not paths.ledger_seen_file().exists()
+    _served(root)
+    TickMixin._read_repos([str(root)], {}, {str(root)})
+    assert paths.ledger_seen_file().exists()
 
 
 def test_a_clock_that_cannot_be_written_marks_no_settling_says_so_and_still_marks_waits(tmp_path, caplog):

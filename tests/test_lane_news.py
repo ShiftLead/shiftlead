@@ -630,3 +630,37 @@ async def test_an_entry_whose_wait_ends_is_told_once_and_not_before(agent, tmp_p
         notes = _notes(agent, sid)
         assert len(notes) == 1 and "your lane gained 1 entry since you declared out of work: TD-002" in notes[0]
         await person.call("kill", id=sid)
+
+
+async def test_an_unserved_repos_lane_reads_empty_and_a_turn_to_unserved_is_told_once(agent, tmp_path):
+    """TD-1011, design §5 *The seams*: an unserved repo's lane reads empty — a member out of work is told
+    nothing of it, and is told once it is served again — and the person gets one `system` note when a
+    served repo with a team running turns unserved."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    lack = "unserved: no dev-cadence (no docs/cadence-sync.lock) — `<dev-cadence>/sync.sh /r`, then a PR"
+    unserved = {"serve": {"ok": False, "lacks": [{"key": "cadence", "words": lack}]}}
+    async with LocalClient() as person:
+        sid = await _finished(agent, person, tmp_path, "w", ["free-pick"], [_e("TD-001")])
+        rec = agent.sessions[sid]
+        rec.team = "grind"
+        await agent._keep_running(now)
+        facts = agent._repos[str(tmp_path)]
+        facts["seams"] = unserved
+        facts["ledger"]["entries"] = [_e("TD-001"), _e("TD-002")]
+        await agent._lane_news(rec, now)
+        assert _notes(agent, sid) == [], "an unserved repo's lane gains nothing"
+        facts["seams"] = {"serve": {"ok": True, "lacks": []}}
+        await agent._lane_news(rec, now)
+        assert len(_notes(agent, sid)) == 1 and "TD-002" in _notes(agent, sid)[0]
+
+        def told() -> list[str]:
+            return [e.text for e in agent.person_inbox if e.from_ == "system" and "has no lane" in e.text]
+
+        served = {**facts, "seams": {"serve": {"ok": True, "lacks": []}}}
+        agent._turned_unserved(str(tmp_path), served, {**facts, "seams": unserved})
+        assert told() == [f"{tmp_path.name} is {lack} — team grind has no lane until it is cured"]
+        agent._turned_unserved(str(tmp_path), {**facts, "seams": unserved}, {**facts, "seams": unserved})
+        agent._turned_unserved(str(tmp_path), {}, {**facts, "seams": unserved})  # read unserved from the first
+        assert len(told()) == 1
+        await person.call("kill", id=sid)

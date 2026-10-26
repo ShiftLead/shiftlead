@@ -313,6 +313,41 @@ async def test_a_fresh_agent_concludes_a_run_it_did_not_start(agent, checkout, m
     assert (got["live"], got["main"], got["ahead"], got["inflight"], got["unmet"]) == (main, main, 0, None, None)
 
 
+async def test_an_unserved_repo_is_promoted_by_no_pass(agent, checkout, monkeypatch):
+    """TD-1011, design §5 *The seams*: the promote pass reads an unserved repo but its `auto` is off for it,
+    so nothing is started; a served one keeps its setting."""
+    await park_ticks(agent)
+    _register(checkout)
+    monkeypatch.setattr(agent, "_promote_auto", lambda: {"repo": True})
+    seen: list[dict] = []
+
+    def survey(roots, prev, full, auto, now, fetched=None):
+        seen.append(dict(auto))
+        return {}, [], {}
+
+    monkeypatch.setattr(promote, "survey", survey)
+    lacks = [{"key": "gate", "words": "unserved: no gate (no scripts/check_cadence.py) — cure"}]
+    agent._repos[str(checkout)] = {
+        "name": "repo",
+        "root": str(checkout),
+        "seams": {"serve": {"ok": False, "lacks": lacks}},
+    }
+    agent._promote_read_at = float("-inf")
+    await agent._refresh_promotes()
+    agent._repos[str(checkout)]["seams"] = {"serve": {"ok": True, "lacks": []}}
+    agent._promote_read_at = float("-inf")
+    await agent._refresh_promotes()
+    assert seen == [{"repo": False}, {"repo": True}]
+    # nor the person's press, a promote or a rollback: it is refused naming the lack
+    agent._repos[str(checkout)]["seams"] = {"serve": {"ok": False, "lacks": lacks}}
+    async with LocalClient() as person:
+        for kw in ({}, {"back": True}, {"sha": "abc1234"}):
+            with pytest.raises(
+                AgentError, match="repo is unserved: no gate .* promotes nothing of it until it is cured"
+            ):
+                await person.call("promote", repo="repo", **kw)
+
+
 # ── slice 2: the press, Dismiss's half, and `ao promote` (§4.7, §6) ────────────────────────────
 
 

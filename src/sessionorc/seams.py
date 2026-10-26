@@ -138,6 +138,17 @@ def serve(root: Path | str, led: dict[str, Any]) -> dict[str, Any]:
     return {"ok": not lacks, "lacks": lacks}
 
 
+def unserved(r: Any) -> list[str]:
+    """The words of each lack that leaves a repo unserved (§5 *The seams*, TD-1011), from its repo facts
+    (`r["seams"]["serve"]`); none for a served repo, and none where no `serve` was read yet (an older host
+    agent's reading, or none yet): a repo is never unserved on a guess."""
+    seams = r.get("seams") if isinstance(r, dict) else None
+    serve = seams.get("serve") if isinstance(seams, dict) else None
+    if not isinstance(serve, dict) or serve.get("ok") is not False:
+        return []
+    return [str(x.get("words") or x.get("key")) for x in serve.get("lacks") or [] if isinstance(x, dict)]
+
+
 def shimmed(root: Path | str) -> bool | None:
     """Whether the checkout's common `.git/hooks/pre-push` carries dev-cadence's shim marker; None
     where the checkout has no `.git` directory to read (a worktree, or no checkout here)."""
