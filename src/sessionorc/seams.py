@@ -52,7 +52,13 @@ def wheel_release() -> str | None:
 
 def ledgerboard(root: Path | str) -> dict[str, Any]:
     """`{release, wheel}`: the release the repo's copy names (the first of `LEDGERBOARD_COPIES` there;
-    None for a copy with no release header, or a repo with neither file) and the wheel's."""
+    None for a copy with no release header, or a repo with neither file) and the wheel's. A pinned repo's
+    is the pinned tree's (TD-1014), and it carries `pinned`: one whose tree did not resolve has no
+    release to compare and is warned of for nothing, its lack saying why."""
+    if cadence.pinned(root):
+        payload = cadence.tree(root)[0]
+        copy = payload / "scripts" / "ledgerboard.py" if payload is not None else None
+        return {"release": _file_release(copy) if copy is not None else None, "wheel": wheel_release(), "pinned": True}
     copy = next((Path(root) / rel for rel in LEDGERBOARD_COPIES if (Path(root) / rel).is_file()), None)
     return {"release": _file_release(copy) if copy is not None else None, "wheel": wheel_release()}
 
@@ -128,12 +134,22 @@ def ledger_lack(led: dict[str, Any] | None, root: Path | str) -> str | None:
 
 def _lock(root: Path) -> tuple[dict[str, Any] | None, str | None]:
     """The checkout's lock and the tree's lack (§5 *The seams*): no lock, or one that does not parse;
-    `(None, None)` for dev-cadence's own source, which carries none."""
+    `(None, None)` for dev-cadence's own source, which carries none. A pinned repo's pin stands in for the
+    lock (`{source, files_commit, pin}`, its `ref` the commit, §5 *How the readers find dev-cadence*,
+    TD-1014): one the launcher would refuse, or cannot resolve, is the tree's lack."""
     if cadence.is_source(root):
         return None, None
+    if cadence.pinned(root):
+        try:
+            source, ref = cadence.pin(root) or ("", "")
+        except cadence.PinError as e:
+            return None, f"unserved: dev-cadence's pin does not parse — {e} — {cure(root)}"
+        if (why := cadence.tree(root)[1]) is not None:
+            return None, f"unserved: dev-cadence's pin does not resolve — {why}"
+        return {"source": source, "commit": ref, "files_commit": ref, "pin": True}, None
     path = root / sync.LOCK
     if not path.is_file():
-        return None, f"unserved: no dev-cadence (no {sync.LOCK}) — {cure(root)}"
+        return None, f"unserved: no dev-cadence (no pin in {cadence.PIN}, no {sync.LOCK}) — {cure(root)}"
     try:
         lock = sync.parse_lock(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError) as e:
@@ -204,12 +220,24 @@ def serve(root: Path | str, led: dict[str, Any], dc_age: dict[str, Any] | None =
     `gate` (its script) and `ledger`, each lack in §5's fixed words with its cure; `ok` when there is none."""
     root = Path(root)
     lacks: list[dict[str, str]] = []
-    if words := _lock(root)[1]:
+    pinned = cadence.pinned(root)
+    lock, words = _lock(root)
+    if words:
         lacks.append({"key": "cadence", "words": words})
     elif dc_age and dc_age.get("descends") is False:
         words = f"unserved: dev-cadence at {dc_age['commit'][:7]} is older than this build reads"
-        lacks.append({"key": "age", "words": f"{words} ({dc_age['oldest'][:7]}) — sync it"})
-    if cadence.gate(root) is None:
+        lacks.append(
+            {"key": "age", "words": f"{words} ({dc_age['oldest'][:7]}) — {'bump the pin' if pinned else 'sync it'}"}
+        )
+    if pinned:  # the pinned tree's gate; a pin that did not resolve has said so already
+        if lock is not None and cadence.gate(root) is None:
+            lacks.append(
+                {
+                    "key": "gate",
+                    "words": f"unserved: no gate (no {cadence.GATE_SCRIPT} in the pinned tree) — bump the pin",
+                }
+            )
+    elif cadence.gate(root) is None:
         script = cadence.SOURCE_SCRIPT if cadence.is_source(root) else cadence.SCRIPT
         lacks.append({"key": "gate", "words": f"unserved: no gate (no {script}) — {cure(root)}"})
     if words := ledger_lack(led, root):

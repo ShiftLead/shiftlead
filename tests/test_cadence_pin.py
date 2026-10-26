@@ -1,0 +1,211 @@
+"""TD-1014 (design §5 *How the readers find dev-cadence*): a repo that pins dev-cadence (`docs/cadence.toml`'s
+`[dev-cadence]`, dev-cadence TD-129) carries no copy, so its readers ask one resolver, `cadence.command`,
+which runs the launcher this build vendors under the host agent's own Python. A pinned repo (no lock)
+reads served, its gate runs through the resolver, its age is its pin's `ref` against `OLDEST`, and its
+ledgerboard release is the pinned tree's; a pin the launcher refuses or cannot resolve is a lack by name."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from sessionorc import cadence, seams
+from sessionorc import ledgerboard as lb
+from shiftlead import doctor
+
+pytestmark = pytest.mark.unit
+
+LEDGER = "# Technical debt\n\n## TD-001: One thing\n\n**Priority:** Low\n**Status:** Open.\n\n---\n"
+# the stub launcher: `-C <dir> path` prints the payload (STUB_PAYLOAD) or refuses as the launcher does
+# (STUB_REFUSE); `-C <dir> run check_cadence.py --pr N --json` prints a verdict; each call is logged
+STUB = r"""
+import json, os, sys
+here = os.path.dirname(os.path.abspath(__file__))
+with open(os.path.join(here, "calls.jsonl"), "a") as f:
+    f.write(json.dumps({"argv": sys.argv[1:], "root": os.environ.get("CADENCE_REPO_ROOT")}) + "\n")
+refuse = os.path.join(here, "refuse")
+if os.path.exists(refuse):
+    print("dev-cadence: " + open(refuse).read(), file=sys.stderr)
+    sys.exit(2)
+args = sys.argv[3:]
+if args == ["path"]:
+    print(open(os.path.join(here, "payload")).read())
+elif args[:2] == ["run", "check_cadence.py"]:
+    pr = int(args[3])
+    print(json.dumps({"prs": [{"pr": pr, "verdict": "fail", "rows": [{"rule": "review", "status": "fail"}]}]}))
+else:
+    sys.exit(2)
+"""
+
+
+@pytest.fixture(autouse=True)
+def _fresh_trees():
+    cadence._trees.clear()
+    yield
+    cadence._trees.clear()
+
+
+def _git(root: Path, *args: str) -> str:
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True).stdout.strip()
+
+
+def _dev_cadence(tmp_path: Path) -> tuple[Path, list[str]]:
+    """dev-cadence's source (a root holding `sync.sh` and `files/`) with two commits, oldest first."""
+    src = tmp_path / "dev-cadence"
+    (src / "files").mkdir(parents=True)
+    (src / "sync.sh").write_text("#!/bin/sh\n")
+    _git(tmp_path, "init", "-q", "-b", "main", str(src))
+    shas = []
+    for n in range(2):
+        (src / "files" / "n").write_text(f"{n}\n")
+        _git(src, "add", "-A")
+        _git(src, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", f"c{n}")
+        shas.append(_git(src, "rev-parse", "HEAD"))
+    return src, shas
+
+
+def _stub(tmp_path: Path, monkeypatch, payload: Path) -> Path:
+    stub = tmp_path / "launcher"
+    stub.mkdir()
+    (stub / "dev_cadence.py").write_text(STUB)
+    (stub / "payload").write_text(str(payload))
+    monkeypatch.setattr(cadence, "LAUNCHER", stub / "dev_cadence.py")
+    return stub
+
+
+def _calls(stub: Path) -> list[dict]:
+    path = stub / "calls.jsonl"
+    return [json.loads(x) for x in path.read_text().splitlines()] if path.exists() else []
+
+
+def _payload(tmp_path: Path) -> Path:
+    """A pinned tree's `files/`: the gate and the wheel's own ledgerboard."""
+    payload = tmp_path / "tree" / "files"
+    (payload / "scripts").mkdir(parents=True)
+    (payload / "scripts" / "check_cadence.py").write_text("x = 1\n")
+    shutil.copy(lb.__file__, payload / "scripts" / "ledgerboard.py")
+    return payload
+
+
+def _pinned(tmp_path: Path, ref: str, source: str = "https://github.com/ShiftLead/dev-cadence") -> Path:
+    root = tmp_path / "notes"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "technical_debt.md").write_text(LEDGER)
+    (root / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "{source}"\nref = "{ref}"\n')
+    return root
+
+
+def test_the_resolver_runs_the_vendored_launcher_under_this_python():
+    argv, env = cadence.command("/r/notes", "run", "check_cadence.py", "--pr", "3")
+    assert argv == [sys.executable, str(cadence.LAUNCHER), "-C", "/r/notes", "run", "check_cadence.py", "--pr", "3"]
+    assert env["CADENCE_REPO_ROOT"] == "/r/notes"
+    assert cadence.LAUNCHER.is_file() and cadence.LAUNCHER.parent == Path(cadence.__file__).parent
+    cp = subprocess.run(argv[:2] + ["--interface"], capture_output=True, text=True, check=True)
+    assert cp.stdout.strip() == "1", "the vendored launcher's interface"
+
+
+def test_the_vendored_launcher_is_dev_cadences_at_the_named_commit():
+    """The launcher is frozen: a change to it is a new vendoring, with `LAUNCHER_COMMIT` moved and this hash."""
+    digest = hashlib.sha256(cadence.LAUNCHER.read_bytes()).hexdigest()
+    assert digest == "495b4610731a0a8b0355b97d882b526439f3aa4d7c417d4b87b269a06940ed57"
+    assert cadence.LAUNCHER_COMMIT == "8008a10e50e9b70cd571984bb2810d79d59c94c7"
+
+
+def test_a_pinned_repo_with_no_lock_reads_served_and_its_gate_runs_through_the_resolver(tmp_path, monkeypatch):
+    src, (first, second) = _dev_cadence(tmp_path)
+    monkeypatch.setattr(cadence, "OLDEST", first)
+    stub = _stub(tmp_path, monkeypatch, _payload(tmp_path))
+    root = _pinned(tmp_path, second)
+    assert cadence.pinned(root) and cadence.pin(root) == ("https://github.com/ShiftLead/dev-cadence", second)
+    got = seams.reading(root, [root, src])
+    assert got["serve"] == {"ok": True, "lacks": []}, got["serve"]
+    assert got["cadence_age"] == {"commit": second, "oldest": first, "descends": True, "why": None}
+    assert got["ledgerboard"] == {"release": seams.wheel_release(), "wheel": seams.wheel_release(), "pinned": True}
+    assert doctor.ledgerboard_warning(got["ledgerboard"]) is None
+    assert cadence.gate(root) == cadence.PINNED_GATE
+    assert cadence.check(root, 7) == {"verdict": "fail", "failed": ["review"]}
+    run = [c for c in _calls(stub) if c["argv"][2:3] == ["run"]]
+    assert run == [{"argv": ["-C", str(root), "run", "check_cadence.py", "--pr", "7", "--json"], "root": str(root)}]
+    # one reading's readers ask the launcher for the tree once
+    assert len([c for c in _calls(stub) if c["argv"][2:] == ["path"]]) == 1
+
+
+def test_a_pin_older_than_oldest_reads_the_older_tree_lack(tmp_path, monkeypatch):
+    src, (first, second) = _dev_cadence(tmp_path)
+    monkeypatch.setattr(cadence, "OLDEST", second)
+    _stub(tmp_path, monkeypatch, _payload(tmp_path))
+    root = _pinned(tmp_path, first)
+    got = seams.reading(root, [root, src])
+    words = f"unserved: dev-cadence at {first[:7]} is older than this build reads ({second[:7]}) — bump the pin"
+    assert got["serve"] == {"ok": False, "lacks": [{"key": "age", "words": words}]}
+
+
+def test_a_pin_the_launcher_refuses_or_cannot_resolve_is_a_lack_by_name(tmp_path, monkeypatch):
+    src, (first, second) = _dev_cadence(tmp_path)
+    monkeypatch.setattr(cadence, "OLDEST", first)
+    stub = _stub(tmp_path, monkeypatch, _payload(tmp_path))
+    root = _pinned(tmp_path, second)
+    (stub / "refuse").write_text("this pin needs launcher interface 2; this launcher is 1 — install a newer launcher")
+    got = seams.reading(root, [root, src])
+    words = (
+        "unserved: dev-cadence's pin does not resolve — it needs launcher interface 2, this build carries 1"
+        " — a newer ShiftLead"
+    )
+    assert got["serve"] == {"ok": False, "lacks": [{"key": "cadence", "words": words}]}, "no gate lack beside it"
+    assert doctor.ledgerboard_warning(got["ledgerboard"]) is None, "a pin with no tree warns for no copy"
+    assert cadence.check(root, 7) is None
+    cadence._trees.clear()
+    (stub / "refuse").write_text("git fetch: could not read from remote")
+    lacks = seams.reading(root, [root, src])["serve"]["lacks"]
+    assert lacks == [
+        {
+            "key": "cadence",
+            "words": "unserved: dev-cadence's pin does not resolve — git fetch: could not read from remote",
+        }
+    ]
+    # a ref the launcher would refuse never reaches it
+    (stub / "refuse").unlink()
+    (root / "docs" / "cadence.toml").write_text(
+        '[dev-cadence]\nsource = "https://github.com/ShiftLead/dev-cadence"\nref = "main"\n'
+    )
+    lack = seams.reading(root, [root, src])["serve"]["lacks"][0]
+    assert lack["key"] == "cadence" and lack["words"].startswith("unserved: dev-cadence's pin does not parse — ")
+    assert "ref must be a full 40-hex commit" in lack["words"] and lack["words"].endswith(seams.cure(root))
+
+
+def test_a_pinned_tree_without_the_gate_is_unserved_and_a_lock_keeps_the_copy_read(tmp_path, monkeypatch):
+    src, (first, second) = _dev_cadence(tmp_path)
+    monkeypatch.setattr(cadence, "OLDEST", first)
+    payload = _payload(tmp_path)
+    (payload / "scripts" / "check_cadence.py").unlink()
+    _stub(tmp_path, monkeypatch, payload)
+    root = _pinned(tmp_path, second)
+    words = "unserved: no gate (no check_cadence.py in the pinned tree) — bump the pin"
+    assert seams.reading(root, [root, src])["serve"]["lacks"] == [{"key": "gate", "words": words}]
+    # while a repo still has the lock, its copy is read: the pin is not
+    (root / "docs" / "cadence-sync.lock").write_text(f"source: x\ncommit: {second[:7]}\nfiles_commit: {second}\n")
+    assert not cadence.pinned(root) and cadence.gate(root) is None
+    assert seams.reading(root, [root, src])["serve"]["lacks"][0]["key"] == "gate"
+    (root / "scripts").mkdir()
+    (root / cadence.SCRIPT).write_text("")
+    assert cadence.gate(root) == cadence.DEFAULT_GATE
+
+
+def test_a_repo_with_neither_pin_nor_lock_names_both(tmp_path):
+    root = tmp_path / "bare"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "technical_debt.md").write_text(LEDGER)
+    (root / "docs" / "cadence.toml").write_text("[other]\nx = 1\n")  # a cadence.toml with no pin is no pin
+    assert not cadence.pinned(root)
+    lack = seams.reading(root)["serve"]["lacks"][0]
+    assert lack == {
+        "key": "cadence",
+        "words": "unserved: no dev-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — "
+        + seams.cure(root),
+    }

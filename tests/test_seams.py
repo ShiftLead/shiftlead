@@ -123,7 +123,12 @@ def test_a_repo_lacking_each_of_the_three_is_unserved_in_its_words(tmp_path):
     (root / "docs" / "cadence-sync.lock").unlink()
     assert seams.reading(root)["serve"] == {
         "ok": False,
-        "lacks": [{"key": "cadence", "words": f"unserved: no dev-cadence (no docs/cadence-sync.lock) — {cure}"}],
+        "lacks": [
+            {
+                "key": "cadence",
+                "words": f"unserved: no dev-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — {cure}",
+            }
+        ],
     }
     (root / "docs" / "cadence-sync.lock").write_text("source: x\n")
     words = seams.reading(root)["serve"]["lacks"][0]["words"]
