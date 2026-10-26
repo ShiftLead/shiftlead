@@ -1260,11 +1260,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     **`SHIFTLEAD_PROMOTE_KIND`** (`promote` or `rollback`). Nothing names a URL or a port: what
     *live* is, and how to reach it, is the repo's, as it is for `check`. It is detached as the run
     is, and its output goes on to the run's log after a line `── smoke ──`.
-  - **How it is judged.** By its **exit code**: 0 passes, and anything else fails with the log's
-    last lines as the reason. Unlike `run`, a smoke restarts nothing.
-    - The home starts it through a wrapper that writes `{sha, exit, at}` to
+  - **How it is judged.** By its **exit code**: 0 passes, and anything else fails with the smoke's
+    own last line as the reason. Unlike `run`, a smoke restarts nothing.
+    - The home starts it through a wrapper that writes `{sha, exit, at, last}` to
       `~/.shiftlead/promotes/<repo>/smoke.json` when the smoke ends. So an agent restarted
       mid-smoke reads the result rather than a lost child's exit.
+    - `last` is the smoke's last non-empty lines (twenty), which the wrapper keeps as it copies the
+      output to the log. The reason is read from there, since whatever else writes to the log after
+      the smoke (the run's own closing lines) would otherwise stand in for it. A smoke that kept no
+      line at all (`last` empty) fails as *it exited <code>*, never with the log's tail. A result with no
+      `last`, and a smoke that wrote no result, read the log's last line after the mark. The result is written once
+      the shell exits, not when its output closes, which a child the smoke left behind may hold.
     - A smoke gone with no result written fails.
     - So does one past **`SMOKE_BOUND`** (ten minutes), which is killed at the bound as the run is,
       but only while the pid is still the smoke. Once the smoke starts, the run's `PROMOTE_BOUND`

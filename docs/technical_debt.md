@@ -90,7 +90,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Open — design |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
-| TD-1032 | A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts | Medium | Open |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — blocked by TD-1037 (the shared `precheck` read) |
@@ -1910,24 +1909,6 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when** a test runs `_conclude` with `live == sha` and the run's pid alive and starts no smoke, then with the pid ended and starts it; and a promote of shiftlead's main passes its smoke, its log's `── smoke ──` after the run's last line.
 
 **Related:** TD-1032 (the reason the failure showed); TD-804, TD-812 (the smoke).
-
-## TD-1032: A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/promote.py` (`_last_line`, `_judge_smoke`, `SMOKE_WRAPPER`), `src/shiftlead/cli.py` (`ao promote status`, its empty-`promotes` line); design §6 *The smoke* (*How it is judged*: "the log's last lines as the reason")
-
-**Why:** `_last_line` takes the last non-empty line after `── smoke ──` in the run's log, and anything else still writing there lands after the smoke. In TD-1031's failures that was `ao service install`'s closing tip, so the promote row, the hold and the person's note read *smoke failed on 9acc3fc: units run under your user; `loginctl enable-linger` keeps them (and tmux) alive after logout*. Paul acted on it: `loginctl enable-linger` failed (linger was already on, and the shell had no login session), and his promote never ran. The smoke's own verdict, *smoke failed: Repo /repo/shiftlead: [Errno 111] Connection refused*, was seven lines up. Second, `ao promote status` run just after the press printed *no registered repo carries a promote: block (design §5) — nothing promotes*: the agent the run had restarted had not yet read its repos, and an empty `promotes` reads as no block.
-
-**Fix:** (1) the reason is the smoke's own output: `SMOKE_WRAPPER` captures the command's last non-empty lines and writes them to `smoke.json` beside `exit` (still copying all of it to the log), and `_judge_smoke` reads them from there, falling back to `_last_line` for a `smoke.json` with none; §6 *How it is judged* says so. (2) `ao promote status` tells an agent that has not yet read its repos (its first pass since start) from one with no `promote:` block, and says *the home has not read its repos yet* for the first.
-
-**Done when** a test appends a line to the log after the smoke's own last line and the failure's why is still the smoke's; and a test of `ao promote status` against a host reply from an agent with no first pass prints the not-yet-read line, not the no-block one.
-
-**Related:** TD-1031 (the race that put the run's lines after the smoke's).
 
 ## TD-1033: PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it
 
