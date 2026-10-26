@@ -41,6 +41,7 @@ def repo(tmp_path, forge) -> Path:
     git(root, "config", "user.name", "t")
     (root / board.BOARD).write_text(BOARD_TEXT)
     (root / "other.txt").write_text("x\n")
+    served(root)  # registered by the tests that talk to the home, which reads it once a tick comes (TD-1040)
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "init")
     forge(root)
