@@ -87,6 +87,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1015 | The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old | Medium | Open — build |
 | TD-1016 | The person's `shiftlead/` texts in their dev-cadence layer repo: briefs, entry and work additions, and the director's preferences | Medium | Open — build |
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
+| TD-1019 | `ao repo add --adopt`'s re-run, stray-branch and already-adopted outcomes, and its refusal on a served repo, have no line in design §4.7 | Low | Open — build |
 
 ---
 
@@ -1820,3 +1821,27 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Done when:** a UI test draws a two-part context with both heads and a one-part one with the no-layer line; a record holding only the joined text draws as before; a look (shot) is sent with the PR (design §4.9b).
 
 **Related:** TD-1009, TD-993 / TD-996 (the row), TD-1016.
+
+## TD-1019: `ao repo add --adopt`'s re-run, stray-branch and already-adopted outcomes, and its refusal on a served repo, have no line in design §4.7
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (docs-audit-ao-1, auditing #2347–#2356)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+
+**Location:** `docs/design/4.7-cli.md` (**`ao repo add`**, lines 301–330), `docs/design-history.md` (§4.7); code `src/shiftlead/adopt.py` (`adopt`), `src/shiftlead/cli.py` (`cmd_repo`)
+
+**Why:** #2356 (TD-1010 slice 2) built four outcomes of `--adopt` that the design's paragraph does not state, though CLAUDE.md's rule is that a behaviour change is a design change in the same PR. The paragraph says only that `--adopt` commits on `cadence-adopt`, pushes and opens a PR, that a non-GitHub `origin` is refused and that `--adopt` on a registered, unserved repo opens its PR. The code also does these:
+- `adopt.adopt`: when origin already holds `cadence-adopt` and an open PR has that head, it returns that PR, `open` true, pushing nothing (*adoption PR #n is open already*); with no open PR it refuses (*origin of <root> holds a branch cadence-adopt with no open PR: open its PR or delete the branch, then run this again*).
+- `adopt.adopt`: when the sync run writes no path it refuses (*origin/<default> of <root> holds dev-cadence already: pull the checkout*).
+- `cli.cmd_repo`: `--adopt` on a registered repo that reads `serve.ok` is refused (*is in the roster already, and served: there is nothing to adopt*), which the design's "A path already in the roster is refused as there" covers only for a bare `add`.
+- the commit message (*adopt dev-cadence <commit>*) and the PR title (*Adopt dev-cadence <commit>*) are in TD-1010's Fix, not in the design; the design says only "the body naming dev-cadence's commit".
+Probe: `grep -rn "holds dev-cadence already\|no open PR\|nothing to adopt\|open already" docs/design` finds nothing; `tests/test_repo_adopt.py` asserts the open-PR re-run, the stray branch and the served-repo refusal (not the already-adopted refusal or the PR title).
+
+**Fix:** state the first three in the **`ao repo add`** paragraph of design §4.7 in the present tense (the title and message may stay in the build entry), with a dated line in `docs/design-history.md` under §4.7; no code change.
+
+**Done when:** the grep in **Why** finds each outcome's words in `docs/design/4.7-cli.md`, and the doc-bound tests pass.
+
+**Related:** TD-1010 (#2356), TD-1009.
