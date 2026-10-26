@@ -88,7 +88,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
 | TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) done (#2366); (3) waits on dev-cadence TD-136–TD-139 |
 | TD-1022 | ShiftLead's copy of dev-cadence's SessionStart line predates the pin, and two Repo page warnings name the sync dev-cadence is retiring | Medium | Designed — builds TD-1023, TD-1024 |
-| TD-1023 | The layer's SessionStart line is dev-cadence's pinned seed, verbatim and parity-tested; Gemini's start hooks and the repo's own line follow the pin | High | Open — build |
 | TD-1024 | The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh` | Medium | Open — build |
 
 ---
@@ -1865,29 +1864,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** dev-cadence TD-129 (slice 5, #335; slice 11, #341), TD-1009, TD-1010 (part 3, the roster warning), TD-1014 (the pin era's other readers), TD-507 (the doctor's reading of dev-cadence's line of any vintage).
 
-## TD-1023: The layer's SessionStart line is dev-cadence's pinned seed, verbatim and parity-tested; Gemini's start hooks and the repo's own line follow the pin
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1022)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/adapters/claude_code/__init__.py` (`CADENCE_HOOK_LINE`, new `CADENCE_HOOK_LINES_PAST`, `CADENCE_WIRED_MARKERS`, `repo_wires_cadence`), `src/shiftlead/adapters/gemini/hook.py` (`start_hooks`), `src/sessionorc/cadence.py` (new `hook_pinned(root)`, beside TD-1014's `pinned`), `src/shiftlead/doctor.py` (`_hook_lines`), `tests/test_claude_adapter.py`, the Gemini adapter's tests; design §4.2 (the line's two modes), §4.3 *A repo's start hooks are every adapter's to run*
-
-**Why:** TD-1022: dev-cadence's seed line runs `dev-cadence hook session-start` in a pinned repo (dev-cadence TD-129 slice 5, #335), and ShiftLead's copy is the 2026-09-25 line, so a session ShiftLead starts in a pinned repo runs no cadence hook and says nothing. dev-cadence's rollout pins a served repo once TD-1014 is live, so this goes first.
-
-**Fix:** as §4.2 says —
-- `CADENCE_HOOK_LINE` is dev-cadence's `files/.claude/settings.json` SessionStart command, byte for byte (as of dev-cadence ddd2f99); `CADENCE_HOOK_LINES_PAST` is a tuple of the earlier seeds, newest first: the 2026-09-25 line (dev-cadence 4316bd4, today's `CADENCE_HOOK_LINE`), then the 2026-09-11 line (267cae5: `f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi`). A parity test reads the seed with `git -C <checkout> show origin/HEAD:files/.claude/settings.json` from the dev-cadence checkout `tests/test_repo_adopt.py` uses (`DEV_CADENCE`) and skips where there is none — guarded on `launcher/INTERFACE` there, not on `sync.sh`, which retires, and skipping with the reason where `git show origin/HEAD:…` fails (no fetch); the commit named in the constant's comment (ddd2f99) is a comment, not checked — never its working tree, which may sit on another branch; it also asserts the seed's `timeout` equals `CADENCE_HOOK_TIMEOUT`; another asserts dev-cadence's own `.claude/settings.json` equals the line with `/files/scripts/cadence_hooks.sh`, as `_hook_lines` makes it; a third reads `files/.claude/settings.json` at 4316bd4 and 267cae5 and asserts they are the two past vintages (all three skip without the checkout).
-- `sessionorc.cadence.hook_pinned(root)` — the hooks' view, not TD-1014's `cadence.pinned` (a parsed pin with no lock), so a repo pinned with its lock still there is hook-pinned: the main checkout's (first `git worktree list` entry of `root`) `docs/cadence.toml` (else `root` itself — any `git` failure or empty output, as the line's `${r:-…}` falls back) has a line matching dev-cadence's header, the twin of its `launcher/words.py` `PIN_HEADER_RE` (`r"^[^\S\n]*\[dev-cadence\][^\S\n]*(#.*)?$"` with `re.M`, the shell's `^[[:space:]]*\[dev-cadence\][[:space:]]*(#.*)?$`); False where the file is missing or unreadable.
-- `repo_wires_cadence(cwd)`: `CADENCE_WIRED_MARKERS` gains `dev-cadence hook session-start`; where `hook_pinned(cwd)`, only a command naming that marker counts, so a repo carrying a pre-pin line gets the layer's line beside its own.
-- Gemini's `start_hooks` follows the line, its two sentences module constants copied from the seed and tested both as substrings of `CADENCE_HOOK_LINE` and against the seed read from dev-cadence in the parity test; `sessionorc.cadence.hook_pinned` imported inside the function (the hook's import path stays light); `hook_pinned(project)` (the same `project` the main-checkout read uses) → `dev-cadence hook session-start` from `PATH`, run in `cwd` as the copied runner is (the two coincide for every launch, as the seed's `cd "${CLAUDE_PROJECT_DIR:-.}"` does), the hook's JSON payload on stdin (Claude Code feeds its SessionStart payload to the line, and dev-cadence's `hook` word passes the session's stdin through); its stdout returned whatever its exit (another nonzero exit: that stdout alone, as the seed's `exit $rc` leaves it), except exit 2 → that stdout then the line's *could not run the pin* sentence; no launcher → the line's *no dev-cadence launcher is on PATH* sentence; a timeout (the launcher's first use may fetch for longer than `START_HOOKS_TIMEOUT`, which stays 150 s under the tool's own 180 s `START_TIMEOUT_MS`) → the *could not run the pin* sentence, never `""`; else the copied runner as now. A test asserts each sentence it returns is a substring of `CADENCE_HOOK_LINE`.
-- Adapters gain `cadence_hook_lines_past` beside `cadence_hook_line` — adapters are duck-typed, so the attribute goes in the contract comment in `src/sessionorc/adapters.py` and is read with `getattr(adapter, "cadence_hook_lines_past", ())`; Claude Code's is `CADENCE_HOOK_LINES_PAST`, and Gemini sets neither, carrying no line of its own; `doctor._hook_lines` takes both from every adapter, with the `files/` form for dev-cadence's source, so a repo carrying either past line is not warned *no SessionStart line* and core names no tool.
-
-**Done when:** a pinned temp repo (a `docs/cadence.toml` with `[dev-cadence]`) and a stub `dev-cadence` on `PATH` that records its argv: a Claude Code layer's line run there (`sh -c`, `CLAUDE_PROJECT_DIR` set) calls `dev-cadence hook session-start` and prints its stdout; with the stub exiting 2 it prints the *could not run* sentence; with none on `PATH` the install sentence; the same three through Gemini's `start_hooks`, and a stub that sleeps past a lowered `START_HOOKS_TIMEOUT` gives the *could not run* sentence; (a node's session is not tested here: TD-1014's Dockerfile test holds the link); an unpinned temp repo still runs `scripts/cadence_hooks.sh`; `hook_pinned` is True for a plain directory (no git) holding the header, and for a linked worktree whose branch lacks `docs/cadence.toml` while the main checkout's has the header; `repo_wires_cadence` is False for the pinned repo carrying the 2026-09-25 line and True for it carrying the current one; `missing_seams` gives no *no SessionStart line* for either vintage. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1022, TD-1024, TD-1014 (the launcher in the venv), TD-998 (`PATH` in a container node), dev-cadence TD-129.
-
 ## TD-1024: The Repo page reads the SessionStart line's vintages, and a pinned repo's per-clone warnings name the launcher, not `sync.sh`
 
 **Priority:** Medium
@@ -1896,7 +1872,6 @@ Trimming before the rule arrives here loses it (§2.4).
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Blocked by:** TD-1023
 **Location:** `src/sessionorc/seams.py` (`reading`: a `hook_pinned` field; `shimmed`; `warnings`), `src/shiftlead/doctor.py` (`missing_seams`, two new constants beside `NO_SESSION_START`), `src/sessionorc/cadence.py` (`is_source`), `src/shiftlead/adopt.py` (`dev_cadence`), `src/shiftlead/repoconfig.py` (the `{gate}` prefix's `there("sync.sh")`), `tests/test_seams.py`, `tests/test_repo_seams.py`, the help text where it names the warnings; design §5 *The seams*, §4.7 `ao repo add`, §4.5a *Repo page: missing seams*
 
 **Why:** TD-1022: the per-clone warnings cure with `sync.sh`, which dev-cadence retires once its roster is pinned, and nothing on the page says when a repo's own SessionStart line is older or newer than ShiftLead's copy.
