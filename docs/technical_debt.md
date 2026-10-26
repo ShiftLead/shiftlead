@@ -2162,4 +2162,4 @@ It files each as a build entry, or as live checks where the design already holds
 
 **Done when** the design says how the waiting member gets the answer after its relaying seat closes, and how a finished member with unread mail is woken or counted as having work, and the build entries are filed. A doorbell that cannot be delivered is said as a failure, not *rung*.
 
-**Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (contractmatch's mail edges, 2026-10-26); TD-299 (contractmatch on its container node).
+**Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
