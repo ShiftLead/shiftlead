@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 from conftest import park_ticks
 
-from sessionorc import agent_ids, modes, paths
+from sessionorc import agent_ids, cadence, modes, paths
 from sessionorc.agent_common import RpcError
 from sessionorc.models import Session
 from shiftlead import cli
@@ -619,6 +619,70 @@ async def test_dev_cadences_own_checkout_runs_files_scripts(home, gh, tmp_path):
     assert agent_ids.ids_script(str(root)) == root / "files/scripts/ledger_next_id.py"
     _stub(root, where="scripts", ids=("TD-004",))
     assert agent_ids.ids_script(str(root)) == root / "scripts/ledger_next_id.py", "a syncing repo's copy first"
+
+
+# a stub launcher (TD-1014): `-C <dir> path` prints the payload, `-C <dir> run <script> …` runs it from the
+# payload's `scripts/` in <dir>, as the pinned tree's `words.py` does; a `refuse` file beside it refuses
+LAUNCHER = r"""
+import os, sys
+here = os.path.dirname(os.path.abspath(__file__))
+if os.path.exists(os.path.join(here, "refuse")):
+    print("dev-cadence: " + open(os.path.join(here, "refuse")).read(), file=sys.stderr)
+    sys.exit(2)
+os.chdir(sys.argv[2])
+payload = open(os.path.join(here, "payload")).read()
+if sys.argv[3:] == ["path"]:
+    print(payload)
+elif sys.argv[3] == "run":
+    os.execv(sys.executable, [sys.executable, os.path.join(payload, "scripts", sys.argv[4]), *sys.argv[5:]])
+"""
+
+
+def _pin(root: Path, tmp_path: Path, monkeypatch) -> Path:
+    """`root` pinned to a stub launcher whose tree's `files/` is returned: no lock, a `[dev-cadence]` pin."""
+    (root / "docs").mkdir(exist_ok=True)
+    (root / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n')
+    payload = tmp_path / "tree" / "files"
+    payload.mkdir(parents=True)
+    stub = tmp_path / "launcher"
+    stub.mkdir()
+    (stub / "dev_cadence.py").write_text(LAUNCHER)
+    (stub / "payload").write_text(str(payload))
+    monkeypatch.setattr(cadence, "LAUNCHER", stub / "dev_cadence.py")
+    cadence._trees.clear()
+    return payload
+
+
+@pytest.mark.integration
+async def test_a_pinned_repo_runs_the_pinned_trees_script_through_the_resolver(home, gh, tmp_path, monkeypatch):
+    """Design §4.4 *A ledger entry's id is handed out by the home*, TD-1014: no copy in the checkout, the pinned
+    tree's `ledger_next_id.py` run by the launcher in the checkout; a copy left in `scripts/` is not read."""
+    root = _one(tmp_path, gh)
+    payload = _pin(root, tmp_path, monkeypatch)
+    _stub(root, ids=("TD-009",))  # a stale copy the pin replaces
+    log = _stub(payload.parent, where="files/scripts", ids=("TD-007",))
+    assert agent_ids.ids_script(str(root)) == payload / "scripts" / "ledger_next_id.py"
+    got = await home.rpc_td_next(repo="shiftlead")
+    assert got["ids"] == ["TD-007"] and got["reserved"] is True
+    seen = json.loads(log.read_text())
+    assert seen["cwd"] == str(root) and seen["argv"][:2] == ["--count", "1"] and float(seen["race"]) > 1.0
+    _stub(payload.parent, where="files/scripts", out="no json")
+    with pytest.raises(RpcError, match=r"the pinned tree's ledger_next_id.py did not answer with its JSON"):
+        await home.rpc_td_next(repo="shiftlead")
+
+
+@pytest.mark.integration
+async def test_a_pin_that_does_not_resolve_refuses_in_the_launchers_words(home, gh, tmp_path, monkeypatch):
+    root = _one(tmp_path, gh)
+    _pin(root, tmp_path, monkeypatch)
+    (tmp_path / "launcher" / "refuse").write_text("git fetch of /src failed")
+    with pytest.raises(RpcError, match=r"shiftlead's dev-cadence pin did not resolve \(git fetch of /src failed\)"):
+        await home.rpc_td_next(repo="shiftlead")
+    (tmp_path / "launcher" / "refuse").unlink()
+    cadence._trees.clear()
+    with pytest.raises(RpcError, match=r"shiftlead's pinned dev-cadence has no ledger_next_id.py: bump the pin"):
+        await home.rpc_td_next(repo="shiftlead")  # a tree with no id script: never the home's own road
+    assert not paths.ids_file().exists()
 
 
 @pytest.mark.integration
