@@ -1721,7 +1721,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 
 **Done when:** every reader above calls `cadence.command` and none builds a dev-cadence path in code itself (a path built from `"check_cadence.py"`, `"cadence.md"` or the lock appears only in `cadence.py`, and in `sync.py` until TD-1015 removes the lock; prose, comments and the briefs' words are not readers); a temp repo with a pin and a stub launcher runs the gate through it; a node is provisioned with the tree its repo pins. Tests: a pinned repo (no lock) reads served; a pin whose `ref` does not descend from `OLDEST` reads the older-tree lack; its ledgerboard release is read from the pinned tree.
 
-**Related:** TD-1009, dev-cadence TD-129 and its plan 2026-10-25, TD-1015, TD-1016. dev-cadence#TD-129 left **Blocked by** 2026-10-26 (Paul): its launcher, bump, adopt and shims are merged (dev-cadence #328–#340), and TD-129 closes only once every roster repo is pinned — a pin unserves a repo until this reads it (`seams.serve` reads the lock alone), so this goes first and the rollout of a served repo waits on it.
+**Related:** TD-1009, dev-cadence TD-129 and its plan 2026-10-25, TD-1015, TD-1016. dev-cadence#TD-129 left **Blocked by** 2026-10-26 (Paul): its launcher, bump, adopt and shims are merged (dev-cadence #328–#331, #335–#340), and TD-129 closes only once every roster repo is pinned — a pin unserves a repo until this reads it (`seams.serve` reads the lock and the synced gate script, `scripts/check_cadence.py`), so this goes first and the rollout of a served repo waits on it.
 
 ## TD-1015: The home's check of a dev-cadence bump PR replaces TD-681's sync check: only the pin lines change, and the new ref descends from the old
 
