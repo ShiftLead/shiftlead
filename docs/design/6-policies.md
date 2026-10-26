@@ -1063,12 +1063,21 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   from the tick as the `gh` reads are) the home takes **three readings** and keeps them on `host`
   under `promotes`: **live**, `check`'s commit, a failed read keeping the last good one with its
   reason; **main**, `origin/main` of the checkout after the home's own `git fetch origin main`;
-  **checks**, the CI verdict on main's head read with `gh` — `green` when every check run has
-  concluded and none failed, `pending`, `failed`, or `unknown` with why (no `gh`, no remote, a rate
-  limit, no check runs at all — a commit CI has not looked at is not a green one; failing runs that
-  all never started, *CI never ran: <reason>*, kept per sha with **`checks_not_run: {reason, kind,
-  runs}`** beside it, a real failure beside them still *failed*, §4.4 *CI that never started is the
-  person's*). *When main moved*
+  **checks**, the verdict on main's head read with `gh` — the check runs of `commits/<sha>/check-runs`
+  and the commit statuses of `commits/<sha>/status` (its `statuses` list, the newest per context; its
+  combined `state` is not read, since it says *pending* for a commit with no status at all), folded
+  together (TD-1033): `green` when every run and status has concluded and none failed (a status's
+  `failure` or `error` fails it, its `pending` keeps the verdict pending), `pending`, `failed`, or
+  `unknown` with why (no `gh`, no remote, a rate limit, no check runs and no statuses at all — a
+  commit nothing has looked at is not a green one; failing runs that all never started, *CI never
+  ran: <reason>*, kept per sha with **`checks_not_run: {reason, kind, runs}`** beside it, a real
+  failure beside them still *failed*, §4.4 *CI that never started is the person's*). **Where the
+  repo sets `precheck`** (dev-cadence §4.12: its `docs/cadence.toml`, read through `python3
+  scripts/cadence_config.py get precheck` in the checkout, on the same pass), main's head is green
+  only when it carries a `cadence/precheck` status that succeeded, whatever else ran or did not: with
+  none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
+  the home's own run on it is going (*The precheck on main*, below), as dev-cadence's `ci` row reads
+  an open PR's head. *When main moved*
   is its head's committer time (a squash merge stamps it), so the settle and the row's age survive a
   restart of the home; the readings are held in memory and re-read at start, and what must survive
   one — a run in flight, a failure — is in the intent files below. Beside the three, for the page's
@@ -1298,6 +1307,38 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       `scripts/smoke.py --setup` makes once, at a person's hand, and never inside the live venv.
       The script re-runs itself under that venv when it exists. Without it, the HTTP half alone
       judges, and the log says *browser half skipped: run scripts/smoke.py --setup*.
+  **The precheck on main** (TD-1033). A repo that gates its PRs on `precheck` runs no CI on `main`,
+  and a squash merge's commit carries no status of its own: its tree is its PR's head's only when
+  that PR was current with main, which the cadence does not ask (dev-cadence's `base` row reads the
+  base branch, not how far behind it the head is). So the home checks main's head itself, as CI on a
+  push to main did.
+  - **When.** On the readings' pass, for a repo whose block has `auto: true` and whose checkout sets
+    `precheck`, when live is not main's head, main's head carries no `cadence/precheck` status,
+    preconditions (1) and (3) hold, no hold stands, and no precheck of that repo is running or has run
+    on that commit. It does not wait for the settle: a run takes minutes, and the settle runs beside
+    it. **One at a time per repo**: main moving during a run leaves it running on its commit, and the
+    new head is checked on the pass after it ends. With `auto: false` none runs, since nothing would
+    act on its verdict; the person's press goes through checks, as ever.
+  - **What runs.** `python3 scripts/precheck.py --commit <sha>` (dev-cadence's, the commit form of its
+    `--pr`; asked of dev-cadence by TD-1038), started by the shell in the checkout, stdin closed,
+    detached from the tick as the promote's run is. It reads the command from the checkout's
+    `docs/cadence.toml`, runs it in a clean detached worktree of its own at the commit and records a
+    `cadence/precheck` commit status there, so the verdict outlives the home and is the one any reader
+    sees. Its output goes to `~/.shiftlead/promotes/<repo>/precheck-<sha7>.log` (pruned with the run
+    logs), and **`~/.shiftlead/promotes/<repo>/precheck.json`** — `{sha, at, pid, started, log}`, the
+    process's start time beside its pid as the intent keeps it — is written before the start, so a
+    restarted home finds a run going and never starts a second, and never kills a pid taken again.
+    `PRECHECK_BOUND` (twenty minutes; CI's job had fifteen) kills a run still going.
+  - **How it ends.** The status is the verdict, read on the next pass like any other: green, and the
+    promote goes on by the rules above; failed, and `auto` waits on (2) as for a red CI run, until a
+    later commit of main passes. The file keeps `exit` and `ended` once the process is gone, and a run
+    that recorded nothing (precheck's exit 2 or 3, a kill at the bound) leaves the reading `unknown`,
+    *precheck on <sha7> exited <n>: <its last line>*, and is not run again on that commit; the next
+    head runs afresh, and the person's press goes through.
+  - **What it does not do.** It never checks a commit that is not main's head, never promotes one,
+    and never cuts `PROMOTE_MAX_WAIT` short: while merges land faster than a run takes, the head
+    never carries a status, the row says *prechecking*, and the person's press is the way through.
+    It runs on the home's machine, so its load is the home's: one suite at a time per repo.
 - **Pull: the main checkout follows origin**: the registry's main checkouts move only when someone
   pulls, and the promote's precondition (1) fails on any checkout no one has pulled since the merge,
   so the home's tick pulls them. It runs **at the home** (§4.4a), in the promote's pass and on its
@@ -1419,7 +1460,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      registry checkout, as rule 10 runs it: the default branch's copy of the script,
      never the replay tree, which proves content and never judges. In a repo whose tree is older than
      `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
-     its rows are kept only when they parse. **Its exit decides one of three
+     its rows are kept only when they parse. **Where the repo sets `precheck`** (dev-cadence §4.12)
+     and the head carries no `cadence/precheck` status, the home first runs `python3
+     scripts/precheck.py --pr <n>` the same way, in the registry checkout under `PRECHECK_BOUND`
+     (TD-1033, *The precheck on main* above): the head's bytes are the ones step 1 proved, so it is
+     the gate's own trust. Its exit 1 records a failure the gate then reads as one; its exit 2 or 3
+     and a kill at the bound are no reading, as below; a status already on the head is never run
+     again on a retry. **Its exit decides one of three
      things.** A pass (exit 0) merges. A **fail** (the script's exit 1) gets a second comment, `cadence-review: BLOCK · sync-check · code · 1
      findings`, with the gate's line. The script reads the first comment as the review, and a latest
      BLOCK outvotes it, so the PR stays blocked until a session posts its own review after its fix.
