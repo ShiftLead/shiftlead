@@ -92,7 +92,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Open |
 | TD-1032 | A failed smoke's reason is the log's last line, so it quotes the run's output; `ao promote status` says "no promote: block" while the agent restarts | Medium | Open |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
-| TD-1035 | This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so | High | Open — build |
 | TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — blocked by TD-1037 (the shared `precheck` read) |
 | TD-1037 | The promote's checks reading folds commit statuses in, and requires `cadence/precheck` on main's head where the repo sets `precheck` | High | Open — build |
 | TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by TD-1037, decision (paul): file dev-cadence's `precheck.py --commit` |
@@ -1943,28 +1942,6 @@ Trimming before the rule arrives here loses it (§2.4).
 **Fix:** (1) `precheck = "pdm sync -G ui -G dev && pdm run lint && pdm run test"` in `docs/cadence.toml` — the clean worktree has nothing installed (§4.12: the command installs what it needs) — on the machine's Python, where CI ran a 3.12/3.13 matrix (say which, or run both); `tmux` must be on the machine, as CI installs it. The merge gate records `cadence/precheck` on each PR's head. (2) Design: what promotion waits on instead — `promote.py`'s `read_checks` reads only `commits/{sha}/check-runs`, where a `cadence/precheck` commit status never appears (no check runs reads as `unknown`), so it must read commit statuses too; then the squash commit on `main` carries no status of its own; options are running the precheck at promote time on `main`'s head and recording `cadence/precheck` there, or accepting the merged PR's head status when its tree equals `main`'s. (3) `ci.yml` keeps only `workflow_dispatch`. (4) The briefs and `AGENTS.md` say the gate is `cadence/precheck`. Done when a PR's gate and a promote both read a local check and no workflow runs on `pull_request` or push.
 
 **Related:** dev-cadence TD-148 (the convention), samscrape TD-465, ledgerboard TD-003.
-
-## TD-1035: This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1033)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `docs/cadence.toml` (no `precheck`); `.github/workflows/ci.yml` (`pull_request` and push to `main`); `docs/briefs/grinder-ao-1.md` (*The gate here*: *wait for the PR's checks to pass (`gh pr checks N --watch`)*), any other file under `docs/briefs/` that waits on CI (`docs/briefs/techlead-context.md` is a held path, so the PR goes to its reader); `AGENTS.md`; design §6 *Promote* (*The precheck on main*), dev-cadence §4.12
-
-**Why:** TD-1033: GitHub Actions stopped on the shared account and Paul decided every repo gates on a local `precheck` (dev-cadence TD-148). This repo's PRs read red for a reason that says nothing about the code.
-
-**Fix:**
-- `precheck` in `docs/cadence.toml`, with a comment saying why: one command that pins pdm's interpreter to the machine's `python3` (3.13 on kmaster, the live copy's; pdm also holds a 3.12.9 of its own it may otherwise pick), then `pdm sync -G ui -G dev`, `pdm run lint` and `TERM=xterm-256color pdm run test` (CI set `TERM` for the pty bridge tests). The clean worktree has nothing installed, so the command installs (§4.12); `tmux` is on the machine. The 3.12 floor is kept by ruff's `target-version = "py312"` and by `ci.yml`'s matrix run by hand.
-- `ci.yml` keeps its job and matrix under `workflow_dispatch` alone: no `pull_request`, no `push`.
-- `docs/briefs/grinder-ao-1.md`'s gate line, and any brief line that waits on `gh pr checks`: before the ask and the merge, `python3 scripts/precheck.py --pr N` (in the background: it runs the suite, minutes), then `check_cadence.py` as now. `AGENTS.md` says the gate is `cadence/precheck`.
-- Try it on this PR from its own worktree, where the branch's `docs/cadence.toml` sets it: `precheck.py --pr <n> --no-record` first, then without, so the PR merges on its own status.
-
-**Done when:** this PR carries a green `cadence/precheck` recorded by `precheck.py` and merged on it; `ci.yml` has no `pull_request` or `push` trigger; the briefs and `AGENTS.md` name the precheck; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1033, dev-cadence TD-148.
 
 ## TD-1036: A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck`
 
