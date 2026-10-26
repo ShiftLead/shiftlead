@@ -107,6 +107,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1058 | `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit) | Low | Open — build |
 | TD-1059 | `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit) | Low | Open — build |
 | TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
+| TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 
@@ -2252,6 +2253,34 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1014.
+
+## TD-1061: Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9b *Seats with a trigger* (`seats:`, `trigger: {every: <duration>}`), §6 rule 3 (the tick starts a due seat), §5 and the Settings page (`settings.yml`, design §4.5 screen 8 *Settings*); `.shiftlead.yml` (this repo's `seats:`, beside `docs-audit-ao-1` and `test-audit-ao-1`); `docs/briefs/` (a sweep brief); dev-cadence's `files/docs/procedures/stranded-work.md`, cadence §3.11 (*Swept:*)
+
+**Why:** Paul, 2026-10-26: "Should we have shiftlead do sweeps automatically (configurable, or optional team member)?" and "Lets also consider having it as a settings item - on (with a duration) would run it routinely on every team with the configured model." A Fable review of the boards that day found:
+- 58 open items on the 7 roster boards, 38 of them past cadence's 14-day *ledger it* bound;
+- samscrape's last sweep 44 days ago and guardians-devenv's 60, and none ever on pneuma-ops or shiftlead.
+
+Detecting staleness is not what is missing (dev-cadence#TD-152 adds the ref states). The weekly sweep the cadence asks for runs only when a person remembers `/stranded-work`. The triggered-seat machinery already runs this repo's two auditors, so a sweep needs a brief and a place to switch it on, not a new mechanism.
+
+**Fix:** design first:
+1. **The seat.** A built-in preset a team adds with one `seats:` line: role `auditor`, `trigger: {every: <duration>}`, and a sweep brief. The brief runs the repo's stranded-work procedure from where dev-cadence keeps it (`dev-cadence path procedures/stranded-work.md` in a pinned repo, the synced `docs/procedures/` copy otherwise), so the steps are never copied.
+2. **The Settings switch** (Paul's ask). `settings.yml` gains a sweep block, `{on, every, profile}`, on the Settings page. When on, every running team gets the seat at that interval with that profile's model, unless the team's own `seats:` names a sweep seat (which wins) or opts out.
+3. **What the seat may do.** It may close an item it has verified done, saying how it verified it; never on ref state alone (dev-cadence#TD-152's two samscrape false positives). It ledgers an item past `escalate-overdue-days`, stamps `Swept:`, and brings the rest to the person as one `note` or as `decide` items. It answers nothing for the person.
+4. **A repo no team serves** (pneuma-ops and guardians-devenv today), for the round to decide: the home starts a one-off sweep session there, or puts a *sweep due* card on the person's Queue, or leaves it.
+
+Then the build entries are filed.
+
+**Done when** the design names the preset, the Settings block and its precedence over a team's `seats:`, what the seat may and may not change, and the no-team case, and the build entries are filed.
+
+**Related:** dev-cadence#TD-152 (ref states in the report), dev-cadence#TD-153 (cross-repo refs); TD-098 (seats with a trigger); the docs-audit and test-audit seats.
 
 ## TD-1064: A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions
 
