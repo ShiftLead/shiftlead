@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -180,6 +181,37 @@ def test_a_pin_the_launcher_refuses_or_cannot_resolve_is_a_lack_by_name(tmp_path
     lack = seams.reading(root, [root, src])["serve"]["lacks"][0]
     assert lack["key"] == "cadence" and lack["words"].startswith("unserved: dev-cadence's pin does not parse — ")
     assert "ref must be a full 40-hex commit" in lack["words"] and lack["words"].endswith(seams.cure(root))
+
+
+def test_a_launcher_that_hangs_cannot_run_or_names_no_directory_is_a_lack_in_words(tmp_path, monkeypatch):
+    """TD-1028: each way `_tree` answers `(None, why)` besides a refusal is said in words a lack prints — a
+    launcher past its timeout, one that cannot run, one that names no tree or a path that is not a directory;
+    a refusal on several stderr lines is said by its last, the reason."""
+    root = _pinned(tmp_path, "a" * 40)
+    argv = []
+    monkeypatch.setattr(cadence, "command", lambda repo, word, *args: (argv, dict(os.environ)))
+
+    def said(*cmd, timeout=cadence.TREE_TIMEOUT):
+        argv[:] = cmd
+        cadence._trees.clear()
+        return cadence.tree(root, timeout)
+
+    assert said(sys.executable, "-c", "import time; time.sleep(30)", timeout=2) == (
+        None,
+        "the launcher gave no answer in 2s",
+    )
+    missing = tmp_path / "no-such-launcher"
+    assert said(str(missing)) == (None, "the launcher could not run: No such file or directory")
+    a_file = tmp_path / "a-file"
+    a_file.write_text("x\n")
+    assert said(sys.executable, "-c", f"print({str(a_file)!r})") == (
+        None,
+        f"the launcher named {a_file}, which is not a directory here",
+    )
+    assert said(sys.executable, "-c", "print()") == (None, "the launcher named no tree, which is not a directory here")
+    refusal = "import sys; print('fetching', file=sys.stderr); print('dev-cadence: no such ref', file=sys.stderr)"
+    assert said(sys.executable, "-c", refusal + "; sys.exit(2)") == (None, "no such ref")
+    assert said(sys.executable, "-c", f"print({str(tmp_path)!r})") == (tmp_path, None)
 
 
 def test_a_pinned_tree_without_the_gate_is_unserved_and_a_lock_keeps_the_copy_read(tmp_path, monkeypatch):
