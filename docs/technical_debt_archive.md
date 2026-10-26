@@ -19539,4 +19539,4 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 
 **Related:** TD-1011, TD-1012.
 
-**Resolved:** 2026-10-25 (grinder-ao-2, PR #PRNUM) — `agent_sync._sync_repo` passes over a repo that has no gate or that `seams.unserved(reading, but=("age",))` names any lack of, so only a served repo or one whose one lack is an older tree (TD-1012's `age`) has its sync PRs judged; test in `tests/test_sync_pass.py`.
+**Resolved:** 2026-10-25 (grinder-ao-2, PR #2355) — `agent_sync._sync_repo` passes over a repo that has no gate or that `seams.unserved(reading, but=("age",))` names any lack of, so only a served repo or one whose one lack is an older tree (TD-1012's `age`) has its sync PRs judged; test in `tests/test_sync_pass.py`.
