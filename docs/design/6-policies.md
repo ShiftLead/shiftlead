@@ -1240,10 +1240,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     copy's build (the repo's choice, §5), and the home reads no exit code, so a run that installed and
     then failed its restart (this repo's `ao service install` after `pip install`) ends reading its
     commit with the old units serving: the smoke is what catches that, and this repo's compares the
-    running build — `ao status --json`'s `build.built_from.commit` — with the full
+    running build — `ao service status --json`'s `build.built_from.commit` — with the full
     `SHIFTLEAD_PROMOTE_SHA`, failing on a null `build` or a missing commit, its last line *running
     build <sha7> is not the promoted <sha7>* or *running build unknown* (TD-1041) — read from the
-    smoke's own `ao status --json` read, and skipped with a line saying so when
+    smoke's own `ao service status --json` read (`ao status --json` is the session list, with no
+    build), and skipped with a line saying so when
     `SHIFTLEAD_PROMOTE_SHA` is unset (a smoke run by hand). A repo with
     no smoke accepts the gap. It runs in the tree `run` was started in: the checkout for a promote,
     `promotes/<repo>/tree` for a rollback. **`smoke:` is read from that tree's own `.shiftlead.yml`
@@ -1351,8 +1352,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       `reach.url`, the route the person uses. Those loads are told and fail nothing: whether the
       home's own request carries an identity the route allows is the route's business, not the
       build's. A refusal is written in the log and on the note.
-    - It reads `ao status --json`, `ao repo --json` and `ao promote status --json`, each of which
-      must exit 0 with JSON. It never runs `ao inbox`, since reading marks entries read (§4.10).
+    - It reads `ao status --json`, `ao repo --json`, `ao promote status --json` and `ao service
+      status --json`, each of which must exit 0 with JSON; the last's build is the running build above. It never runs `ao inbox`, since reading marks entries read (§4.10).
     - Each page is loaded twice and the second load judged against the budget, the first printed as
       *cold*. Each load prints one line to the log, so every promote also measures the pages: the
       page, its status, time to first byte, total time, size, DOM ready and the page's `Server-Timing`
