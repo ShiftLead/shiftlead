@@ -92,7 +92,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
-| TD-1035 | This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so | High | Open — build |
 | TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — blocked by TD-1037 (the shared `precheck` read) |
 | TD-1037 | The promote's checks reading folds commit statuses in, and requires `cadence/precheck` on main's head where the repo sets `precheck` | High | Open — build |
 | TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by TD-1037, decision (paul): file dev-cadence's `precheck.py --commit` |
@@ -1946,28 +1945,6 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** the revert above fails a test; `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1014, TD-970.
-
-## TD-1035: This repo gates its PRs on a local `precheck`: `docs/cadence.toml` names it, `ci.yml` runs only by hand, and the briefs say so
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1033)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `docs/cadence.toml` (no `precheck`); `.github/workflows/ci.yml` (`pull_request` and push to `main`); `docs/briefs/grinder-ao-1.md` (*The gate here*: *wait for the PR's checks to pass (`gh pr checks N --watch`)*), any other file under `docs/briefs/` that waits on CI (`docs/briefs/techlead-context.md` is a held path, so the PR goes to its reader); `AGENTS.md`; design §6 *Promote* (*The precheck on main*), dev-cadence §4.12
-
-**Why:** TD-1033: GitHub Actions stopped on the shared account and Paul decided every repo gates on a local `precheck` (dev-cadence TD-148). This repo's PRs read red for a reason that says nothing about the code.
-
-**Fix:**
-- `precheck` in `docs/cadence.toml`, with a comment saying why: one command that pins pdm's interpreter to the machine's `python3` (3.13 on kmaster, the live copy's; pdm also holds a 3.12.9 of its own it may otherwise pick), then `pdm sync -G ui -G dev`, `pdm run lint` and `TERM=xterm-256color pdm run test` (CI set `TERM` for the pty bridge tests). The clean worktree has nothing installed, so the command installs (§4.12); `tmux` is on the machine. The 3.12 floor is kept by ruff's `target-version = "py312"` and by `ci.yml`'s matrix run by hand.
-- `ci.yml` keeps its job and matrix under `workflow_dispatch` alone: no `pull_request`, no `push`.
-- `docs/briefs/grinder-ao-1.md`'s gate line, and any brief line that waits on `gh pr checks`: before the ask and the merge, `python3 scripts/precheck.py --pr N` (in the background: it runs the suite, minutes), then `check_cadence.py` as now. `AGENTS.md` says the gate is `cadence/precheck`.
-- Try it on this PR from its own worktree, where the branch's `docs/cadence.toml` sets it: `precheck.py --pr <n> --no-record` first, then without, so the PR merges on its own status.
-
-**Done when:** this PR carries a green `cadence/precheck` recorded by `precheck.py` and merged on it; `ci.yml` has no `pull_request` or `push` trigger; the briefs and `AGENTS.md` name the precheck; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1033, dev-cadence TD-148.
 
 ## TD-1036: A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck`
 
