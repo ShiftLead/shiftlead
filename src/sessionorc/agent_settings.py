@@ -10,16 +10,21 @@ from __future__ import annotations
 import asyncio
 import copy
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sessionorc import (
     adapters,
     agent_common,
     defs,
+    gitinfo,
+    hosts,
 )
+from sessionorc import cadence as cadence_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
+from sessionorc import sync as sync_mod
 from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
     RpcError,
@@ -180,6 +185,38 @@ class SettingsMixin:
                     else:
                         kept.setdefault(role, {}).setdefault(key, []).append(rule)
         return {"rules": kept, "malformed": bad}
+
+    async def rpc_add_repo(self, path: str = "", adopted: bool = False, caller: Any = None) -> dict[str, Any]:
+        """`ao repo add <path>` (design §4.7 **`ao repo add`**, §5 *Repos*, TD-1010): append the main
+        checkout `path` is in to the home's roster, `repos.txt` (`repos_registry` where `hosts.yml` names
+        one) — **a person's own**, refused to a session as `set_settings` is, and at the home alone. A
+        checkout holding dev-cadence's lock, or dev-cadence's source, is added; one without is refused
+        here, since its adoption is offered by the client, unless `adopted` (its adoption PR is open: the
+        repo is unserved until it merges, §5 *The seams*). A path already in the roster is refused. The
+        next tick reads a checkout new to the roster whole, at once (`_refresh_repos`). Returns `{root,
+        name, served}`, `served` whether the checkout holds what serves it."""
+        agent_common.person_only(caller, "add a repo", "§4.7 ao repo add", self._graph())
+        if self.mode != "home":
+            raise RpcError("ao repo add runs at the home (design §4.7): run ao repo add on the home")
+        if not path:
+            raise RpcError("ao repo add takes a checkout's path")
+        try:
+            here = (await asyncio.to_thread(gitinfo.main_checkout, Path(path).expanduser())).resolve()
+        except gitinfo.WorktreeError:
+            raise RpcError(f"{path} is not in a git checkout") from None
+        root = str(here)
+        host = hosts.local_host()
+        if any(Path(r).expanduser().resolve() == here for r in host.repos()):
+            raise RpcError(f"{root} is in the roster already (design §5 Repos)")
+        served = (here / sync_mod.LOCK).is_file() or cadence_mod.is_source(here)
+        if not (served or adopted):
+            raise RpcError(f"{root} holds no dev-cadence ({sync_mod.LOCK}): its adoption comes first (design §4.7)")
+        reg = host.repos_registry
+        reg.parent.mkdir(parents=True, exist_ok=True)
+        before = reg.read_text(encoding="utf-8") if reg.exists() else ""
+        reg.write_text(before + ("" if not before or before.endswith("\n") else "\n") + f"{root}\n", encoding="utf-8")
+        log.info("add_repo: %s added to %s by %s", root, reg, caller)
+        return {"root": root, "name": here.name, "served": served}
 
     async def rpc_set_settings(
         self,

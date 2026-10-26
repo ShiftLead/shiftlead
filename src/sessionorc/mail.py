@@ -159,6 +159,7 @@ PERSON_ONLY = frozenset(
         "forget_host",
         "attach",
         "ci_rerun",
+        "add_repo",
     }
 )
 

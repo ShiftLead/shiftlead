@@ -1513,6 +1513,18 @@ def _main_checkout(start: str) -> str | None:
     return str(pathlib.Path(common).resolve().parent) if common else None
 
 
+def cmd_repo_add(args: argparse.Namespace) -> int:
+    """`ao repo add <path>` (design §4.7 **`ao repo add`**, TD-1010): register a checkout with the home —
+    the person's own, on the home machine, since the path is the home's. The home's `add_repo` RPC
+    writes the roster line and refuses what is not its to add, naming why."""
+    if not args.path:
+        raise AgentError("ao repo add takes a checkout's path: ao repo add <path>")
+    if hosts.is_node():
+        raise AgentError("the paths are the home's: run ao repo add on the home (design §4.7)")
+    got = call_sync("add_repo", path=str(pathlib.Path(args.path).expanduser().resolve()))
+    return emit(args, got, lambda: print(f"added {got['name']} — the home reads it on its next tick"))
+
+
 def _repo_line(r: dict[str, Any]) -> str:
     """One repo's numbers on a line (design §4.7 `ao repo`): its PRs and its ledger, each *could not
     look* when its last read failed, with the reading's age."""
@@ -1801,6 +1813,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
     the servicing team's members hold and say, and the board items due. A read, never a write."""
     from shiftlead import review as reviewmod
 
+    if args.name == "add":
+        return cmd_repo_add(args)
+    if args.path:
+        raise AgentError(f"ao repo takes one repo; `ao repo add {args.path}` registers a checkout")
     got: dict[str, dict[str, Any]] = call_sync("repos")
     if args.all:
         picked = list(got.values())
@@ -4699,8 +4715,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--clear", action="store_true", help="remove the stop time: nothing will stop it")
     p.set_defaults(fn=cmd_until)
 
-    p = add("repo", help="a registered repo's numbers: open PRs, the window counts, the ledger by kind (design §4.7)")
-    p.add_argument("name", nargs="?", help="the repo's name or its checkout's path. None: the repo of this directory")
+    p = add(
+        "repo",
+        help="a registered repo's numbers: open PRs, the window counts, the ledger by kind; `add <path>` registers one"
+        " (design §4.7)",
+    )
+    p.add_argument(
+        "name",
+        nargs="?",
+        help="the repo's name or its checkout's path, or `add`. None: the repo of this directory",
+    )
+    p.add_argument("path", nargs="?", help="after `add`: the checkout to register with the home")
     p.add_argument("--all", action="store_true", help="every registered repo, one line each")
     p.set_defaults(fn=cmd_repo)
 
