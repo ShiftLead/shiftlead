@@ -238,8 +238,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     vendored as `src/sessionorc/ledgerboard.py` and held byte-equal to the synced
     `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
 
-  **dev-cadence's own repo is its source**, not a consumer: a checkout whose root holds `sync.sh` and
-  `files/` carries no lock and is at its own head, so its tree is itself (no lock, no `OLDEST` check)
+  **dev-cadence's own repo is its source**, not a consumer: a checkout whose root holds `files/` and `sync.sh` or, once
+  `sync.sh` retires, `launcher/INTERFACE` (TD-1024) carries no lock and is at its own head, so its tree is itself (no lock, no `OLDEST` check)
   and its gate is its own `files/scripts/check_cadence.py --pr {pr} --json`; every rule below that
   counts registered repos' locks (*Which dev-cadence*'s raise, TD-1016's) passes over it. **In the
   source every dev-cadence path a reader names is under `files/`** — `files/docs/cadence.md`,
@@ -317,10 +317,41 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   Convention notices (§6 rule 12) run in every served repo. The SessionStart line (§4.3) is carried by
   ShiftLead's launch for every session it starts (`CADENCE_HOOK_LINE`), so a repo whose own
   `.claude/settings.json` lacks it gets a warning on the Repo page, *no SessionStart line: a session
-  started outside ShiftLead misses the cadence's nudge*, and nothing more. Two more warnings come from dev-cadence's per-clone setup: a checkout without its hook shim and one missing from dev-cadence's own roster, each cured by the person's `<dev-cadence>/sync.sh <checkout>` run (§4.7 `ao repo add`). The host agent reads the
-  file's SessionStart commands into the repo facts as text (§4.4), so a client on another machine sees
-  them, and the clients (`shiftlead.doctor`, the Repo page) compare them with the adapter's own
-  `CADENCE_HOOK_LINE`, which the host agent never imports. **Who reads them**: the host
+  started outside ShiftLead misses the cadence's nudge*, and nothing more. The line has **vintages**, each
+  dev-cadence's seed of its day: the adapter knows the current one (`CADENCE_HOOK_LINE`) and the ones before it
+  that a repo may still carry (`CADENCE_HOOK_LINES_PAST`: the 2026-09-25 main-checkout line, then the 2026-09-11
+  `$CLAUDE_PROJECT_DIR` line — dev-cadence's seed since it became one line), and any of them reads as present — a repo not yet synced is not warned for an older seed. Two more words read the line
+  (TD-1024): where no SessionStart command is a vintage this build knows but one names dev-cadence's runner or
+  launcher (`cadence_hooks.sh`, `dev-cadence hook`), it warns *SessionStart line is not one this build knows:
+  dev-cadence's seed may be newer than ShiftLead's copy — or copy the line from dev-cadence's
+  files/.claude/settings.json* (a hand-written line beside a known vintage warns nothing, and a line warned so is not also warned *no SessionStart
+  line*, which stays the word for a repo with no dev-cadence line at all) — the drift TD-1022 found, said where it shows — and in a
+  **pinned** repo (§4.2: the main checkout's `docs/cadence.toml` has the `[dev-cadence]` header, the hooks' view; the reading's
+  `hook_pinned`; a reading from an older host agent, without the key, reads unpinned) a line of a pre-pin vintage, with no command the current line, warns
+  *SessionStart line predates the pin: a session started outside ShiftLead runs no cadence hook — copy the line from
+  `dev-cadence -C <checkout> path .claude/settings.json`* (the pinned tree's seed; dev-cadence seeds only a missing
+  file and never rewrites this one, `adopt` included, so the copy is the person's; a hand-written pin older than
+  dev-cadence ddd2f99, the seed's pinned mode, holds a pre-pin seed and is bumped first, `dev-cadence bump`). Two more
+  warnings come from dev-cadence's per-clone setup: a checkout without its hook shim and one missing from
+  dev-cadence's own roster. Their cure is the era's (§4.7 `ao repo add`): in a repo still on the copy (a
+  lock, no pin), the person's `<dev-cadence>/sync.sh <checkout>` run cures both, words *dev-cadence's per-clone
+  setup not run in this checkout — `<dev-cadence>/sync.sh <checkout>`* and *not on dev-cadence's roster:
+  sync-all will not reach it — `<dev-cadence>/sync.sh <checkout>`*; in a pinned repo, where `sync.sh` and
+  `sync-all.sh` are retiring (dev-cadence's plan, *Decision* 11), the shim warning reads *dev-cadence's
+  per-clone setup not run in this checkout — `dev-cadence -C <checkout> run install_git_hooks.sh`* (the pinned
+  tree's own installer), and also fires for a shim that predates the pin (its text has no `dev-cadence hook "`, the launcher call only the TD-129 shim
+  makes — the bare `dev-cadence hook` is in every shim's TD-055 marker, so it runs a copied hook that is gone); the roster warning stays, since dev-cadence's `adopt` and `gc` still read the
+  roster (`~/.config/dev-cadence/repos.txt`), and reads *not on dev-cadence's roster: its gc may remove the tree
+  this repo pins — `dev-cadence -C <dev-cadence> adopt <checkout>`* (`adopt` on a pinned repo keeps its pin and
+  every file it would seed that is already there, installs the shims and registers it, so it cures both; a repo moved by dev-cadence's migration, `sync.sh --pin`, has no lock
+  left and `adopt` warns past an edited copy it kept and registers it — dev-cadence #341, open on 2026-10-26; before
+  it, and for a repo pinned by hand with its lock still there, `adopt` refuses, and the roster line is the person's
+  to append by hand; `adopt` also refuses from a dirty dev-cadence clone or one whose HEAD origin lacks — its default branch, once #341 lands — and says so). The roster's loss is small — a tree `gc` removed is fetched again on the next run — but a node or an
+  offline machine cannot fetch it, so it is said. The host agent reads the
+  file's SessionStart commands into the repo facts as text (§4.4), and `hook_pinned` beside them, so a client on another machine sees
+  them, and the clients (`shiftlead.doctor`, the Repo page) compare them with each adapter's own
+  vintages — its `cadence_hook_line` and `cadence_hook_lines_past` (a tuple, `()` where an adapter has none), so
+  core names no tool — which the host agent never imports. **Who reads them**: the host
   agent, at the home, reads `ledger:`, `board:`, `worktree_setup:` and `settle:` and the three
   requirements as it reads `promote:` — for the repo facts (§4.4: the seam state and the lacks the
   Repo page and `ao doctor` draw), the gate run (§6 rule 10 runs at the home), the write-back (§4.4:
