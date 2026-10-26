@@ -673,10 +673,34 @@ def ship_cadence(n: ContainerNode, r: Runner, cid: str, user: str) -> str | None
         r.log(f"shipping dev-cadence {ref[:7]} to {n.name} …")
         dest.parent.mkdir(parents=True, exist_ok=True)
         tmp = dest.with_name(f".ship-{ref}-{os.getpid()}")
-        shutil.copytree(src, tmp, symlinks=True)
-        tmp.rename(dest)
-    r.run(exec_cmd(cid, user, "sh", "-c", CADENCE_INTO_CACHE, "sh", f"{INSIDE_CADENCE}/{ref}", ref))
+        try:
+            shutil.copytree(src, tmp, symlinks=True)
+            tmp.rename(dest)
+        except OSError as e:  # a full disk: nothing half-copied left, and the repo is said unserved
+            _remove_tree(tmp)
+            r.log(f"dev-cadence {ref[:7]} could not be shipped to {n.name} — {e}; {n.name} reads it unserved")
+            return None
+    # the agent's own environment (its env file), so the cache written is the one its launcher reads
+    cmd = exec_cmd(cid, user, "sh", "-c", CADENCE_INTO_CACHE, "sh", f"{INSIDE_CADENCE}/{ref}", ref, env_file=n.env_file)
+    if r.run(cmd, check=False).returncode != 0:
+        r.log(f"dev-cadence {ref[:7]} could not be put in {n.name}'s cache; {n.name} reads it unserved")
+        return None
     return ref
+
+
+def _remove_tree(path: Path) -> None:
+    """`path` removed though it holds a dev-cadence tree, whose directories are read-only (`0555`, as the
+    launcher leaves them): each made writable first, as the launcher's own `_remove` does."""
+    if not path.exists():
+        return
+    for d, dirs, _files in os.walk(path):
+        for name in dirs:
+            with contextlib.suppress(OSError):
+                if not os.path.islink(os.path.join(d, name)):
+                    os.chmod(os.path.join(d, name), 0o755)
+    with contextlib.suppress(OSError):
+        os.chmod(path, 0o755)
+    shutil.rmtree(path, ignore_errors=True)
 
 
 def write_node_config(n: ContainerNode) -> None:
@@ -908,7 +932,7 @@ def host_forget(name: str, r: Runner | None = None, *, purge: bool = False) -> d
     shutil.rmtree(n.link_dir, ignore_errors=True)
     removed = remove_node_entry(hosts.hosts_file(), name)
     if purge:
-        shutil.rmtree(n.node_dir, ignore_errors=True)
+        _remove_tree(n.node_dir)
     return {"node": name, "container": cid, "entry_removed": removed, "volume_kept": not purge}
 
 

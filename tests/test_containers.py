@@ -376,6 +376,10 @@ def test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache(hom
     assert into[0][-2:] == [f"/shiftlead/cadence/{ref}", ref]
     containers.host_up("contractmatch", Fake())  # shipped once: a second run copies nothing new
     assert sorted(p.name for p in shipped.parent.iterdir()) == [ref]
+    os.chmod(shipped / "files", 0o555)  # as the launcher leaves its trees
+    os.chmod(shipped, 0o555)
+    containers.host_forget("contractmatch", Fake(ps=""), purge=True)
+    assert not n.node_dir.exists()  # the purge removes a read-only tree too
 
 
 def test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once(tmp_path):
@@ -408,6 +412,39 @@ def test_a_pin_the_home_cannot_resolve_ships_nothing_and_is_said(home, tmp_path,
     assert not r.execs(containers.CADENCE_INTO_CACHE)
     assert not (containers.node("contractmatch").node_dir / "cadence").exists()
     assert any("does not resolve here — commit cccc is not in the source" in s for s in said)
+
+
+def test_a_copy_that_fails_leaves_nothing_half_shipped(home, tmp_path, monkeypatch):
+    _pinned_node(monkeypatch, tmp_path)
+
+    def full(src, dst, symlinks=False):
+        Path(dst, "files").mkdir(parents=True)
+        os.chmod(Path(dst, "files"), 0o555)
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(containers.shutil, "copytree", full)
+    said, r = [], Fake()
+    r.log = said.append
+    containers.host_up("contractmatch", r)
+    assert list((containers.node("contractmatch").node_dir / "cadence").iterdir()) == []
+    assert not r.execs(containers.CADENCE_INTO_CACHE)
+    assert any("could not be shipped to contractmatch — [Errno 28] No space left on device" in s for s in said)
+
+
+def test_a_cache_step_that_fails_inside_is_said_and_host_up_goes_on(home, tmp_path, monkeypatch):
+    _pinned_node(monkeypatch, tmp_path)
+
+    class Refusing(Fake):
+        def run(self, cmd, *, check=True, stream=False):
+            if containers.CADENCE_INTO_CACHE in cmd:
+                self.calls.append(list(cmd))
+                return subprocess.CompletedProcess(cmd, 1, "", "cp: no space")
+            return super().run(cmd, check=check, stream=stream)
+
+    said, r = [], Refusing()
+    r.log = said.append
+    out = containers.host_up("contractmatch", r)
+    assert out["started"] and any("could not be put in contractmatch's cache" in s for s in said)
 
 
 def test_a_checkout_that_pins_nothing_ships_nothing(home):
