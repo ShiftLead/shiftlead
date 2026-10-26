@@ -1560,7 +1560,7 @@ def cmd_repo_add(args: argparse.Namespace) -> int:
         got = call_sync("add_repo", path=str(path))
         return emit(args, got, lambda: print(f"added {got['name']} — the home reads it on its next tick"))
     # --adopt, on a checkout without dev-cadence or a registered one
-    if registered and seams_mod.serve(root, seams_mod.ledger(root))["ok"]:
+    if registered and seams_mod.reading(root, roster)["serve"]["ok"]:
         raise AgentError(f"{root} is in the roster already, and served: there is nothing to adopt")
     dc = adopt_mod.dev_cadence(roster, root)
     if dc is None:
