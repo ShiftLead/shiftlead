@@ -92,7 +92,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
-| TD-1036 | A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck` | High | Open — build |
 | TD-1038 | Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes | High | Open — blocked by decision (paul): file dev-cadence's `precheck.py --commit` |
 | TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
@@ -1947,25 +1946,6 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when:** the revert above fails a test; `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1014, TD-970.
-
-## TD-1036: A `done` or an `ask` naming a PR requires `cadence/precheck` on its head where the repo sets `precheck`
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1033)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1037
-**Location:** `src/sessionorc/agent.py` (`_pr_checks`, `_not_green`), `src/sessionorc/reports.py` (`at_done`), the `pr_wait` RPC and `ao pr wait`'s line; design §4.8 *A `done` with a PR is told what its checks read*, §4.7 `ao pr wait`, §4.9b (the `ask --pr` read)
-
-**Why:** TD-1033: with no workflow on a PR, its rollup is empty and a `done` or `ask --pr` reads *no checks at all* and is accepted before any check ran.
-
-**Fix:** as §4.8 now says: where the repo sets `precheck` — read through `sessionorc.cadence.precheck_command` (TD-1037) on `origin/<default>` in the registry checkout, never the record's worktree — `cadence/precheck` is required on an open PR's head beside the required set — failed, it is a required check that failed; absent, refused as one still running with *PR #842's head 9c1e0f2 carries no cadence/precheck — run `python3 scripts/precheck.py --pr 842` (in the background), then report done again*. `cadence/precheck` joins the wanted names whenever a required set is read; an absent one is added to the still-running names after `at_done`'s fold, so a real failure and `not_run` outrank it; in such a repo the still-running refusal's hint is the `precheck.py` line, never `gh pr checks --watch`. `ask --pr` reads the same (§4.9b). `ao pr wait` keeps *none* (`3`) for such a head, its line saying *run `scripts/precheck.py --pr <n>`* (§4.7). A merged PR is accepted as now. A file that does not parse is *checks unknown*, never a refusal.
-
-**Done when:** tests pin the cases (precheck set and absent on the head: refused with those words; set and failed: refused as failed; absent beside a real failure or `not_run`: those win; set and green: accepted; not set: as today) for `done` and `ask --pr`, and `ao pr wait`'s line; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1033, TD-639.
 
 ## TD-1038: Under `auto`, the home runs the precheck on main's head, so a repo that gates on precheck promotes
 

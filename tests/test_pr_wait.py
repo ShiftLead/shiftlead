@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks
 
-from sessionorc import identity, modes, reports
+from sessionorc import cadence, identity, modes, reports
 from sessionorc.client import AgentError, LocalClient
 
 
@@ -63,6 +63,52 @@ async def test_a_wait_returns_at_the_refresh_that_leaves_pending(agent, tmp_path
         got = await asyncio.wait_for(call, 5)
     assert got["word"] == "red" and got["failing"] == ["test (3.12)"] and got["head"] == "abc1234def"
     assert got["read_at"] and got["conflicting"] is False and got["pr"] == 7
+
+
+async def test_where_the_repo_sets_precheck_a_head_without_it_stays_none_with_its_line(agent, tmp_path, monkeypatch):
+    """TD-1036, design §4.7: green with no `cadence/precheck` on the head is *none*, the reply naming the line
+    to run; carrying one, green; a repo that sets none, green as before."""
+    await park_ticks(agent)
+    root = str(tmp_path)
+    sets: list[tuple[str | None, str | None]] = [("pdm run test", None)]
+    monkeypatch.setattr(cadence, "precheck_command", lambda r, rev: sets[0])
+    now = datetime.now(UTC)
+    agent._repos[root] = _reading(root, [{**_row(checks="green"), "prechecked": False}], now)
+    async with LocalClient() as c:
+        got = await c.call("pr_wait", root=root, pr=7, timeout=5)
+        assert (got["word"], got["precheck"]) == ("none", "python3 scripts/precheck.py --pr 7")
+        agent._repos[root] = _reading(root, [{**_row(checks="none"), "prechecked": False}], now)
+        got = await c.call("pr_wait", root=root, pr=7, timeout=5)
+        assert (got["word"], got["precheck"]) == ("none", "python3 scripts/precheck.py --pr 7")
+        agent._repos[root] = _reading(root, [{**_row(checks="green"), "prechecked": True}], now)
+        got = await c.call("pr_wait", root=root, pr=7, timeout=5)
+        assert (got["word"], got["precheck"]) == ("green", None)
+        # a reading taken before rows carried `prechecked`: green stays green, none says the line
+        agent._repos[root] = _reading(root, [_row(checks="green")], now)
+        assert (await c.call("pr_wait", root=root, pr=7, timeout=5))["word"] == "green"
+        agent._repos[root] = _reading(root, [_row(checks="none")], now)
+        got = await c.call("pr_wait", root=root, pr=7, timeout=5)
+        assert (got["word"], got["precheck"]) == ("none", "python3 scripts/precheck.py --pr 7")
+        agent._repos[root] = _reading(root, [{**_row(checks="pending"), "prechecked": False}], now)
+        got = await c.call("pr_wait", root=root, pr=7, timeout=0.1)
+        assert (got["word"], got["precheck"]) == ("timeout", None)
+        sets[0] = (None, None)
+        agent._repos[root] = _reading(root, [{**_row(checks="green"), "prechecked": False}], now)
+        got = await c.call("pr_wait", root=root, pr=7, timeout=5)
+        assert (got["word"], got["precheck"]) == ("green", None)
+
+
+def test_the_open_reading_says_whether_a_head_carries_a_precheck():
+    pre = {"__typename": "StatusContext", "context": "cadence/precheck", "state": "FAILURE"}
+    assert reports.prechecked([pre]) and not reports.prechecked([{"name": "test"}]) and not reports.prechecked(None)
+
+
+def test_the_precheck_line_is_the_layouts(tmp_path, monkeypatch):
+    assert cadence.precheck_typed(tmp_path, 9) == "python3 scripts/precheck.py --pr 9"
+    monkeypatch.setattr(cadence, "is_source", lambda r: True)
+    assert cadence.precheck_typed(tmp_path, 9) == "python3 files/scripts/precheck.py --pr 9"
+    monkeypatch.setattr(cadence, "pinned", lambda r: True)
+    assert cadence.precheck_typed(tmp_path, 9) == cadence.typed("run", "precheck.py", "--pr", "9")
 
 
 async def test_a_settled_reading_answers_at_once_and_fresh_waits_for_a_later_read(agent, tmp_path):
@@ -214,6 +260,21 @@ def test_ao_pr_wait_says_the_word_and_exits_by_it(monkeypatch, capsys, word, cod
     assert cli.cmd_pr(_args()) == code
     assert capsys.readouterr().out.strip() == said
     assert calls == [("/r", 7, 60.0, False, None)]
+
+
+def test_ao_pr_wait_says_the_precheck_line_beside_none(monkeypatch, capsys):
+    from shiftlead import cli
+
+    line = "python3 scripts/precheck.py --pr 7"
+    got = {**_row(checks="none"), "pr": 7, "word": "none", "read_at": "2026-10-26T00:00:00+00:00", "precheck": line}
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"id": kw["id"], "repo": "/r"})
+    monkeypatch.setattr(cli, "_pr_wait_call", lambda *a, **kw: (got, 0))
+    assert cli.cmd_pr(_args()) == 3
+    assert capsys.readouterr().out.splitlines() == [
+        "PR #7 none on abc1234",
+        f"run `{line}` (in the background): nothing else checks this head",
+    ]
 
 
 def test_ao_pr_wait_refuses_a_number_the_home_does_not_hold_and_an_old_home(monkeypatch, capsys):

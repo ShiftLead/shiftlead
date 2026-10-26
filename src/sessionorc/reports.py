@@ -294,6 +294,14 @@ def _when(v: Any) -> datetime | None:
 
 
 PR_FIELDS = "number,title,url,state,createdAt,closedAt,mergedAt,headRefName,headRefOid,author,isDraft"
+PRECHECK_CONTEXT = "cadence/precheck"  # the commit status dev-cadence's `precheck.py` records (§4.12, TD-1033)
+
+
+def prechecked(rollup: Any) -> bool:
+    """Whether a `statusCheckRollup` carries a `PRECHECK_CONTEXT` status, whatever its state (TD-1036)."""
+    return any(isinstance(c, dict) and c.get("context") == PRECHECK_CONTEXT for c in rollup or [])
+
+
 OPEN_PR_FIELDS = (
     f"{PR_FIELDS},statusCheckRollup,mergeStateStatus,baseRefName,isCrossRepository"  # the open read alone (TD-613)
 )
@@ -490,10 +498,14 @@ def _required_reading(
     return required, errors
 
 
-def at_done(view: dict[str, Any], required: list[str] | None, verdicts: dict[str, Any] | None = None) -> dict[str, Any]:
+def at_done(
+    view: dict[str, Any], required: list[str] | None, verdicts: dict[str, Any] | None = None, precheck: bool = False
+) -> dict[str, Any]:
     """What a `done` naming a PR is told (design §4.8 *A `done` with a PR is told what its checks
     read*, TD-637), from `gh pr view`'s `state,mergedAt,headRefOid,baseRefName,statusCheckRollup`
-    and its base's required names (None: never read). `{word, sha, failed, not_run, other}`: *merged*,
+    and its base's required names (None: never read). `precheck`, the repo sets one (TD-1036):
+    `PRECHECK_CONTEXT` joins a required set read, and an open head carrying none is still running it,
+    named last in `running` with `precheck_absent` set. `{word, sha, failed, not_run, other}`: *merged*,
     *closed* (unmerged), *refused* (a required check red by `fold_checks`'s rule, named in `failed`),
     *not_run* (every red required check an Actions job that never started, by `verdicts` — `job_verdict`'s
     answers by job id — named in `not_run`, the first one's `{reason, kind}` as `not_run_why`, TD-686),
@@ -509,6 +521,8 @@ def at_done(view: dict[str, Any], required: list[str] | None, verdicts: dict[str
     if state == "CLOSED":
         return {**out, "word": "closed"}
     wanted = set(required or [])
+    if wanted and precheck:
+        wanted.add(PRECHECK_CONTEXT)
     verdicts = verdicts if isinstance(verdicts, dict) else {}
     for c in view.get("statusCheckRollup") or []:
         if not isinstance(c, dict):
@@ -526,6 +540,9 @@ def at_done(view: dict[str, Any], required: list[str] | None, verdicts: dict[str
                 out["failed"].append(item["name"])
         elif word == "pending":
             out["running"].append(str(c.get("name") or c.get("context") or "?"))
+    if precheck and not prechecked(view.get("statusCheckRollup")):
+        out["running"].append(PRECHECK_CONTEXT)  # after the fold: a failure and a run never started outrank it
+        out["precheck_absent"] = True
     if out["failed"]:
         return {**out, "word": "refused"}
     if out["not_run"]:
@@ -670,6 +687,7 @@ def _gh_prs(
         }
         if fields == OPEN_PR_FIELDS:
             row["checks"], row["failing"] = fold_checks(p.get("statusCheckRollup"))
+            row["prechecked"] = prechecked(p.get("statusCheckRollup"))  # `ao pr wait`'s *none* (TD-1036)
             if row["checks"] == "red":  # what `pr_reading` reads for jobs that never started (TD-686)
                 row["failing_items"] = failing_items(p.get("statusCheckRollup"))[0]
             row["merge_state"] = str(p.get("mergeStateStatus") or "").upper()

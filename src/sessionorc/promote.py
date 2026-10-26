@@ -53,7 +53,7 @@ HEX_RE = re.compile(r"^[0-9a-f]{7,40}$")  # a rollback's commit: its hex in full
 # dropped Popen is reaped by the next `subprocess.run` and its status lost), polled for `exit`
 _procs: dict[int, subprocess.Popen[bytes]] = {}
 _exits: dict[int, int] = {}
-PRECHECK_CONTEXT = "cadence/precheck"  # the commit status `precheck.py` records (design §6 *The precheck on main*)
+PRECHECK_CONTEXT = reports.PRECHECK_CONTEXT  # the status `precheck.py` records (design §6 *The precheck on main*)
 FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"}
 # the verdicts on main's head's failing jobs, by checkout: `{head, read}` (`reports.classify_failing`,
 # TD-686) — one sha's per checkout, so a job is read once and a new head reads afresh

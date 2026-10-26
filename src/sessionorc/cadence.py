@@ -255,6 +255,14 @@ def precheck_script(root: Path | str) -> tuple[tuple[list[str], dict[str, str] |
     return (["python3", rel], None), None
 
 
+def precheck_typed(root: Path | str, pr: int) -> str:
+    """The `precheck.py --pr <pr>` line a session types for `root` (design §4.8, TD-1036): the resolver's
+    in a pinned repo, else the layout's own copy — the words of a refusal, never run here."""
+    if pinned(root):
+        return typed("run", PRECHECK_SCRIPT, "--pr", str(pr))
+    return f"python3 {'files/' if is_source(root) else ''}scripts/{PRECHECK_SCRIPT} --pr {pr}"
+
+
 STATES = ("open", "merged", "closed")
 
 
