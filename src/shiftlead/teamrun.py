@@ -25,6 +25,7 @@ from typing import Any
 from sessionorc import balance as balance_mod
 from sessionorc import hosts, naming
 from sessionorc import ledger as ledger_mod
+from sessionorc import seams as seams_mod
 from sessionorc.agent_common import ORPHAN_AFTER
 from sessionorc.client import AgentError
 from sessionorc.gitinfo import work_left
@@ -614,7 +615,8 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
     by_kind}}` — `n` None for a ledger that cannot be read, which is *unknown*, never empty — and `ids`,
     the distinct ids every lane read matched, each once (a team with no record says *its lanes hold n
     entries* from it, §6 rule 8 *A team with no record*, TD-781). `empty`
-    only when every lane was read and none matched. None when there is nothing to
+    only when every lane was read and none matched; `unserved`, the start's refusal, for a team of an
+    unserved repo, whose lanes read empty (§5 *The seams*, TD-1011). None when there is nothing to
     say: no launch has a lane, or the plan itself fails, which the start reports in its own words."""
     try:
         plan = teams.plan(org, name, host, files=files_via(call))
@@ -633,9 +635,12 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
     for x in holders:
         if x.role in roles:
             continue  # a role once: its members share a lane (§4.9)
-        led = (readings.get(str(x.dir)) or {}).get("ledger") or {}
+        reading = readings.get(str(x.dir)) or {}
+        led = reading.get("ledger") or {}
         entries = led.get("entries") if "error" not in led else None
-        if isinstance(entries, list):
+        if isinstance(entries, list) and seams_mod.unserved(reading):
+            roles[x.role] = {"n": 0, "by_kind": {}}  # an unserved repo's lanes read empty (§5, TD-1011)
+        elif isinstance(entries, list):
             mine = [e for e in entries if isinstance(e, dict) and ledger_mod.lane_matches(x.lane, e, name)]
             by_kind = {k: sum(1 for e in mine if (e.get("for_page") or "other") == k) for k, _ in LANE_WORDS}
             roles[x.role] = {"n": len(mine), "by_kind": by_kind}
@@ -643,7 +648,8 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
         else:
             roles[x.role] = {"n": None, "by_kind": {}}
     line = " · ".join(_lane_count(role, got) for role, got in roles.items())
-    return {"line": line, "empty": all(r["n"] == 0 for r in roles.values()), "roles": roles, "ids": list(ids)}
+    out = {"line": line, "empty": all(r["n"] == 0 for r in roles.values()), "roles": roles, "ids": list(ids)}
+    return out | ({"unserved": why} if (why := unserved(call, plan)) else {})
 
 
 def keep_mail_for(
@@ -684,6 +690,21 @@ def readings_via(call: Call) -> dict[str, Any]:
     except Exception:  # noqa: BLE001 — no reading says nothing, never a failed check
         return {}
     return got if isinstance(got, dict) else {}
+
+
+def unserved(call: Call, plan: teams.Plan) -> str | None:
+    """Why a start is refused for a team of an unserved repo (§5 *The seams*, §4.7 *Teams*, TD-1011),
+    naming each lack in §5's words, or None: the home's reading (the `repos` RPC) of each checkout the
+    plan launches in. A repo with no reading, or one read by an agent that predates `serve`, passes —
+    a repo is never unserved on a guess."""
+    roots = list(dict.fromkeys(str(x.dir) for x in plan.launches))
+    readings = readings_via(call)
+    for root in roots:
+        here = Path(root).resolve()
+        r = next((v for k, v in readings.items() if isinstance(v, dict) and Path(k).resolve() == here), {})
+        if lacks := seams_mod.unserved(r):
+            return f"{plan.team}: {r.get('name') or here.name} is {'; '.join(lacks)} (design §5 The seams)"
+    return None
 
 
 def undeclared(call: Call, org: orgmod.Org, plan: teams.Plan, host: str) -> str | None:
@@ -738,7 +759,7 @@ def start(
     plan = teams.plan(org, name, host, profile=profile, files=files_via(call))
     if not plan.launches:
         raise teams.TeamError(f"team {name} starts nothing: a person leads it and it has no members")
-    if why := undeclared(call, org, plan, host):
+    if why := unserved(call, plan) or undeclared(call, org, plan, host):
         raise teams.TeamError(why)
     on = {"host": plan.host} if plan.host else {}
     if plan.host:
@@ -1240,7 +1261,10 @@ def _feature_role(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, c
 
 def work_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """A repo reading's work orders — its board's open decided lines, `board:<key>` (§4.4 *Board
-    write-back*, TD-384) — as entries; none from an agent that predates them."""
+    write-back*, TD-384) — as entries; none from an agent that predates them, and none in an unserved
+    repo (§5 *The seams*, TD-1011)."""
+    if seams_mod.unserved(r):
+        return []
     got = ((r or {}).get("work_orders") or {}).get("orders")
     return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
 
@@ -1248,7 +1272,9 @@ def work_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
 def pr_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """A repo reading's red PRs nobody holds, `pr:<n>` (§4.4 *A red PR nobody holds is a work order*,
     TD-613), as entries — owned by no one: every `free-pick` lane takes one (§4.9b *No anchor seat*,
-    TD-757); none from an agent that predates them."""
+    TD-757); none from an agent that predates them, and none in an unserved repo (§5 *The seams*, TD-1011)."""
+    if seams_mod.unserved(r):
+        return []
     got = ((r or {}).get("pr_orders") or {}).get("orders")
     return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
 
@@ -1257,10 +1283,13 @@ def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
     """What a team's lanes read of a repo (§4.4 *In a team's lanes*): the ledger's open entries and
     the work orders beside them — the board's decided lines (TD-384) and the red PRs nobody holds
     (TD-613) — or None where the ledger was not read. A sync PR's order comes before every entry and
-    every other order (§4.4 *A sync PR is the team's at once*, TD-684)."""
+    every other order (§4.4 *A sync PR is the team's at once*, TD-684). An unserved repo's lanes read
+    empty (§5 *The seams*, TD-1011)."""
     entries = ((r or {}).get("ledger") or {}).get("entries")
     if entries is None:
         return None
+    if seams_mod.unserved(r):
+        return []
     prs = pr_orders(r)
     return [*(e for e in prs if e.get("sync")), *entries, *work_orders(r), *(e for e in prs if not e.get("sync"))]
 

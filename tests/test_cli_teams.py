@@ -2521,6 +2521,44 @@ def test_a_declared_team_or_a_repo_with_no_reading_starts(world, declared):
     assert [p["name"] for p in creates(state)] == ["ops-grind"]
 
 
+# ── a team of an unserved repo (§5 *The seams*, §4.7 *Teams*, TD-1011) ─────────────────────────────
+
+UNSERVED = {
+    "ok": False,
+    "lacks": [
+        {"key": "cadence", "words": "unserved: no dev-cadence (no docs/cadence-sync.lock) — sync it"},
+        {"key": "gate", "words": "unserved: no gate (no scripts/check_cadence.py) — sync it"},
+    ],
+}
+
+
+def test_a_start_is_refused_for_a_team_of_an_unserved_repo_naming_each_lack(world, capsys):
+    tmp_path, state = world
+    grinders = [{"id": "TD-1", "pickable": "yes", "kind": "build", "owner": "grinder", "for_page": "pickable"}]
+    reading = {"name": "shiftlead", "ledger": {"entries": grinders}, "seams": {"serve": UNSERVED}}
+    state["repos"] = {str(tmp_path / "shiftlead"): reading}
+    assert cli.main(["team", "start", "ao-grind"]) != 0
+    err = capsys.readouterr().err
+    assert "ao-grind: shiftlead is unserved: no dev-cadence (no docs/cadence-sync.lock) — sync it; " in err
+    assert "unserved: no gate (no scripts/check_cadence.py) — sync it" in err
+    assert creates(state) == [], "refused before anything is created"
+    # its lanes read empty, as the team card's Start reads them before the start (§4.5a)
+    assert cli.main(["team", "start", "ao-grind", "--anyway"]) != 0, "--anyway does not pass it"
+    assert "shiftlead is unserved: no dev-cadence" in capsys.readouterr().err
+    picks = teamrun.lanes(cli.call_sync, cli._org_here(), "ao-grind", HOST)
+    assert picks["roles"]["grinder"]["n"] == 0 and picks["empty"] is True
+    assert picks["unserved"].startswith("ao-grind: shiftlead is unserved: no dev-cadence")
+    # the start itself refuses it too, as the team card's Start calls it (§4.5a)
+    plan = teams.plan(cli._org_here(), "ao-grind", HOST)
+    assert teamrun.unserved(cli.call_sync, plan) == picks["unserved"]
+    # served, or read by an agent that predates `serve`, it starts: never unserved on a guess
+    for serve in ({"ok": True, "lacks": []}, None):
+        state["repos"] = {str(tmp_path / "shiftlead"): {**reading, "seams": {"serve": serve}}}
+        assert teamrun.lanes(cli.call_sync, cli._org_here(), "ao-grind", HOST)["roles"]["grinder"]["n"] == 1
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert creates(state)
+
+
 def test_a_one_team_repo_starts_with_nothing_declared(world):
     tmp_path, state = world
     state["repos"] = {str(tmp_path / "shiftlead"): {"name": "shiftlead", "ledger": {"declared_teams": []}}}

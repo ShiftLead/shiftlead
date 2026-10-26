@@ -340,26 +340,15 @@ def candidates(prs: list[dict[str, Any]], sync: dict[str, Any], held_by: Any) ->
     ]
 
 
-# a refusal an older build wrote for a repo with no gate, which is unserved now (§5 *The seams*, TD-1011)
-LEGACY_NO_GATE = "no gate: a person merges"
-
-
 def prune(sync: dict[str, Any], prs: list[dict[str, Any]]) -> dict[str, Any]:
     """The kept outcomes, pruned to the open PRs and the newest *merged* one, which the Repos card names
-    (§4.5a) and which neither the pass nor the order reads, since both walk the open PRs; an older
-    build's *no gate* refusal dropped, so the PR is judged once the repo is served (§6 *Sync*)."""
+    (§4.5a) and which neither the pass nor the order reads, since both walk the open PRs."""
     open_ = {str(p.get("number")) for p in prs if isinstance(p, dict)}
     merged = [
         (str(e.get("at") or ""), n) for n, e in sync.items() if isinstance(e, dict) and e.get("verdict") == "merged"
     ]
     last = max(merged)[1] if merged else None
-    return {
-        n: e
-        for n, e in sync.items()
-        if (n in open_ or n == last)
-        and isinstance(e, dict)
-        and not (e.get("verdict") == "refused" and e.get("why") == LEGACY_NO_GATE)
-    }
+    return {n: e for n, e in sync.items() if (n in open_ or n == last) and isinstance(e, dict)}
 
 
 def decline(pr: dict[str, Any], login: str | None) -> str | None:

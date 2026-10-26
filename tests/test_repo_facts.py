@@ -609,6 +609,37 @@ def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypat
     assert "a build" in out and "live check #" not in out.split("TD-010")[1].split("\n")[0]
 
 
+def test_ao_repo_says_an_unserved_repo_first_and_carries_serve(repo, monkeypatch, capsys):
+    """§4.7 `ao repo`, §5 *The seams* (TD-1011): an unserved repo's first line is *unserved: <the lack>*
+    before its counts, and `--json` carries `serve: {ok, lacks}` on the repo; a served one says nothing."""
+    from shiftlead import cli
+
+    lack = "unserved: no gate (no scripts/check_cadence.py) — sync it"
+    serve = {"ok": False, "lacks": [{"key": "gate", "words": lack}]}
+    reading = {
+        str(repo): {
+            "name": "r",
+            "root": str(repo),
+            "prs": {"open": []},
+            "ledger": {"entries": [], "by_kind": {}},
+            "seams": {"serve": serve},
+        }
+    }
+    monkeypatch.setattr(
+        cli,
+        "call_sync",
+        lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
+    )
+    monkeypatch.chdir(repo)
+    assert cli.main(["repo"]) == 0
+    assert capsys.readouterr().out.startswith(f"r  {lack} · 0 open PRs")
+    assert cli.main(["--json", "repo"]) == 0
+    assert json.loads(capsys.readouterr().out)[0]["serve"] == serve
+    reading[str(repo)]["seams"] = {"serve": {"ok": True, "lacks": []}}
+    assert cli.main(["repo"]) == 0
+    assert capsys.readouterr().out.startswith("r  0 open PRs")
+
+
 def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monkeypatch, capsys):
     """TD-368 slice 2 (design §4.7, TD-367): a build on `decision (designer)` is on the design list
     and says *decision* after its owner; a `Kind: design-first` row does not."""
@@ -1004,6 +1035,10 @@ def test_a_red_prs_order_is_every_free_pick_lanes_as_a_board_line_is(repo):
     r2 = {**r, "ledger": {"entries": [td]}, "pr_orders": {"orders": [red, sync], "told": {}}}
     assert [e["id"] for e in teamrun.lane_entries(r2)] == ["pr:8", "TD-001", "board:00aa11bb", "pr:7"]
     assert teamrun.pr_orders({"pr_orders": None}) == [] and teamrun.pr_orders(None) == []
+    # an unserved repo's lanes read empty and it has no order (§5 *The seams*, TD-1011)
+    bare = {"ok": False, "lacks": [{"key": "gate", "words": "unserved: no gate"}]}
+    r3 = {**r2, "seams": {"serve": bare}}
+    assert teamrun.lane_entries(r3) == [] and teamrun.pr_orders(r3) == [] and teamrun.work_orders(r3) == []
 
 
 def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_of_work(repo, monkeypatch, capsys):
