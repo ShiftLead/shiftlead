@@ -250,6 +250,21 @@ async def test_a_repo_with_no_gate_is_unserved_its_sync_pr_not_read_and_nothing_
 
 
 @pytest.mark.integration
+async def test_a_repo_unserved_but_by_an_older_tree_has_its_sync_pr_left_and_an_older_tree_is_judged(agent, gh):
+    """§6 *Sync*, TD-1018: a repo with the gate but no ledger is unserved, its sync PR not read and nothing
+    written; one whose only lack is an older tree (TD-1012's `age`) is judged, since the sync cures it."""
+    led = {"key": "ledger", "words": "unserved: no ledger at docs/technical_debt.md — x"}
+    age = {"key": "age", "words": "unserved: dev-cadence at abc1234 is older than this build reads (6d92209) — sync it"}
+    _reading(agent, _pr())
+    agent._repos[ROOT]["seams"] = {"serve": {"ok": False, "lacks": [led, age]}}
+    await agent._sync_pass()
+    assert agent._repos[ROOT].get("sync", {}) == {} and gh["calls"] == []
+    agent._repos[ROOT]["seams"] = {"serve": {"ok": False, "lacks": [age]}}
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
+
+
+@pytest.mark.integration
 async def test_a_head_moved_before_the_merge_or_a_new_holder_is_not_merged_and_gets_no_verdict(agent, gh, monkeypatch):
     _reading(agent, _pr())
     gh["head"] = ("b" * 40, "open")
