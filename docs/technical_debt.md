@@ -1838,7 +1838,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 - `adopt.adopt`: when the sync run writes no path it refuses (*origin/<default> of <root> holds dev-cadence already: pull the checkout*).
 - `cli.cmd_repo`: `--adopt` on a registered repo that reads `serve.ok` is refused (*is in the roster already, and served: there is nothing to adopt*), which the design's "A path already in the roster is refused as there" covers only for a bare `add`.
 - the commit message (*adopt dev-cadence <commit>*) and the PR title (*Adopt dev-cadence <commit>*) are in TD-1010's Fix, not in the design; the design says only "the body naming dev-cadence's commit".
-Probe: `grep -rn "holds dev-cadence already\|no open PR\|nothing to adopt\|open already" docs/design` finds nothing; `tests/test_repo_adopt.py` asserts all of them.
+Probe: `grep -rn "holds dev-cadence already\|no open PR\|nothing to adopt\|open already" docs/design` finds nothing; `tests/test_repo_adopt.py` asserts the open-PR re-run, the stray branch and the served-repo refusal (not the already-adopted refusal or the PR title).
 
 **Fix:** state the first three in the **`ao repo add`** paragraph of design §4.7 in the present tense (the title and message may stay in the build entry), with a dated line in `docs/design-history.md` under §4.7; no code change.
 
