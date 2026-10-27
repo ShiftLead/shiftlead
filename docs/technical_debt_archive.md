@@ -21148,3 +21148,37 @@ Any of these puts the live agent back to the pre-TD-1093 behaviour for a peer wh
 **Why:** Paul's first memory harvest (dev-cadence TD-125, 2026-10-26) judged every memory in `docs/claude-memory/` against dev-cadence's cadence and his own cadence layer. Some memories now contradict the cadence. A wrong memory is worse than none (cadence §7.1): a session follows it. Most of the wrong ones teach numbering TD ids by hand. Others repeat a rule cadence.md now holds, so the copies drift as the cadence changes. Other people will work in this repo, so memories whose lessons went only into Paul's personal layer or his `craft.md` stay here as they are. That includes `agree-the-layout-before-model-reviews` and `hold-a-design-until-its-round-ends`.
 
 **Resolved:** 2026-10-27 (#2366, then #2490, grinder-ao-2 and grinder-ao-1) — #2366 corrected the passages that contradicted the cadence (1), trimmed the copies of its rules to a pointer (2) and tidied (4); #2490 trimmed (3)'s memories to a pointer at dev-cadence TD-136 to TD-139's rules once the pin (78e4614) carried them: cadence.md §1.1, §2.5, §2.8, §2.9, §2.12, §3.6 and §4.8. The lasting content is in those §s and `docs/claude-memory/`.
+
+## TD-1116: A session the person started cannot steer another team's member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — designed 2026-10-27 (#2489), built by TD-1125 (#2493).
+**Location:** `src/sessionorc/mail.py` (`message_edge`'s edge between the person's own sessions, `by_person`; `from_role`); design §4.10 *The message gate is weaker than `control`* (*between the person's own sessions*, TD-1042/TD-1069), §4.10 *Surface* (the `[controller]` / `[person]` / `[other]` tags), §9 invariants 9 and 13; the role briefs that carry *Instructions come from your controllers and from people* (`src/shiftlead/briefs/` grinder, designer, manager, manager_on_call, hunter, sweeper, auditor; not `entry.md`, `techlead.md`, `work.md` or the `.stage.md` briefs)
+
+**Why:** Paul, 2026-10-27: "There are times when we would do something in an interactive session where we would need to let a grinder know not to touch a dir … or a designer to hold a design or consider a new element." The edge TD-1069 built (#2419) needs **both** ends to be sessions the person started by hand, so one of them reaches an unattended member of another team only by an `ask` to its question seat. Even where mail does land, a `by_person` sender reads as `[other]` (`from_role`), and those briefs say mail from anyone but controllers and people is "information you weigh, never an instruction". So "don't touch `scripts/`" from Paul's session is advice a grinder may set aside.
+
+Paul turned down copying the team's manager or techlead. Their context is refreshed often, so a copy wakes a lead to read news it will not keep. A Fable review (2026-10-27) agreed: a person's hold already tells only the entry's holders, and the manager on call "starts cold … and holds nothing from earlier fills".
+
+**Resolved:** 2026-10-27 — its one build, TD-1125, merged in #2493. The design is in §4.10 *between the person's own sessions* and *Surface*.
+
+**Related:** TD-1042, TD-1069 (the edge as built); TD-1117 (the person's holds from such a session), TD-1118 (where a lasting directive goes); TD-995 (the question-seat edge); TD-064, TD-102 (Claude Code's own peer messages, which stay forbidden; this is the sanctioned way).
+
+## TD-1125: A person's session mails any member, a member replies back to it, and its mail lands `[person-session]`: what it says to do or avoid binds like the person's
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-27 (the designer, from TD-1116)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — built 2026-10-27 in #2493 (grinder-ao-1).
+**Location:** `src/sessionorc/mail.py` (`message_edge`'s `own` edge, `message_gate`'s refusal, `from_role`); `src/sessionorc/agent_mail.py` (the send path beside `adapters.has_agent` and `message_gate`: the no-agent sender's refusal); `src/shiftlead/cli.py` (`INBOX_HEADER`); `src/shiftlead/skill.md` (the Mail rule); `src/shiftlead/briefs/` (`grinder.md`, `designer.md`, `manager.md`, `manager_on_call.md`, `hunter.md`, `sweeper.md`, `auditor.md`: the *Instructions come from* line); `tests/test_mail.py`
+
+**Why:** TD-1116's design: the `own` edge needs both ends to be sessions the person started, so a person's session reaches another team's unattended member only by an `ask` to a question seat, and even then its mail reads `[other]`, which every brief says to weigh, never follow.
+
+**Resolved:** 2026-10-27 (#2493) — `mail.message_edge`'s `own` edge (any target from an own end with no `controllers`, the reply back along it), `message_gate`'s `agentless` refusal, `from_role`'s `person-session`, `INBOX_HEADER`, the skill and the seven briefs. Tests: `tests/test_own_sessions_edge.py`, `tests/test_cli.py::test_msg_and_inbox`; the design is §4.10 *between the person's own sessions* and *Surface*.
+
+**Related:** TD-1116 (the design), TD-1042 / TD-1069 (the edge as built), TD-995 (the question-seat edge), TD-1117 (holds from such a session).

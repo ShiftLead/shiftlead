@@ -662,6 +662,7 @@ class MailMixin:
                 carries=pr is not None or bool(cites),
                 replied=replied,
                 successor=self._successor,
+                agentless=me is not None and not adapters.has_agent(me.adapter),
             )
             if reason is not None:
                 raise RpcError(reason)
