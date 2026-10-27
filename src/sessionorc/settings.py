@@ -404,8 +404,8 @@ def teams(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def repos(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """`repos:` as `{repo: {promote: {auto: bool}, pull: bool, sync: {auto: bool}}}` — the switches a person
-    flips per repo."""
+    """`repos:` as `{repo: {promote: {auto: bool}, pull: bool, sync: {auto: bool}, sweep: bool}}` — the
+    switches a person flips per repo."""
     return _keyed(doc, "repos", parse_repo)
 
 
@@ -525,13 +525,13 @@ def parse_balance(value: Any, drop: bool = False) -> dict[str, Any]:
     return got
 
 
-REPO_KEYS = ("promote", "pull", "sync")
+REPO_KEYS = ("promote", "pull", "sync", "sweep")
 
 
 def parse_repo(value: Any, drop: bool = False) -> dict[str, Any]:
     """One repo's settings: `promote: {auto: bool}` (§6 *Promote*; `run` and `check` stay in the
     repo's `.shiftlead.yml`), `pull: bool` (§6 *Pull*; absent is true) and `sync: {auto: bool}` (§6 *Sync*,
-    TD-685; absent is on)."""
+    TD-685; absent is on) and `sweep: bool` (§4.9b *The sweep*, TD-1091; absent is on)."""
 
     def promote(v: Any) -> dict[str, bool]:
         _fields(v, ("auto",), "promote")
@@ -550,8 +550,54 @@ def parse_repo(value: Any, drop: bool = False) -> dict[str, Any]:
             raise ValueError(f"sync.auto is true or false, not {v.get('auto')!r}")
         return {"auto": v["auto"]}
 
+    def sweep(v: Any) -> bool:
+        if not isinstance(v, bool):
+            raise ValueError(f"sweep is on or off, not {v!r}")
+        return v
+
     value = _fields(value, REPO_KEYS, "a repo's settings", drop)
-    return _each(value, {"promote": promote, "pull": pull, "sync": sync}, drop)
+    return _each(value, {"promote": promote, "pull": pull, "sync": sync, "sweep": sweep}, drop)
+
+
+SWEEP_KEYS = ("on", "every", "profile")
+SWEEP_EVERY = "7d"  # under the cadence's `sweep-every` (10 days), at which `/attention` warns (§4.9b)
+_SWEEP_EVERY = re.compile(r"[1-9][0-9]*[mhd]")
+
+
+def parse_sweep(value: Any, drop: bool = False) -> dict[str, Any]:
+    """`sweep:` (design §5, §4.9b *The sweep*, TD-1091): `on` (true or false), `every` (a duration,
+    `7d`) and `profile` (a profile's name, absent leaving the role's precedence)."""
+
+    def on(b: Any) -> bool:
+        if not isinstance(b, bool):
+            raise ValueError(f"sweep.on is true or false, not {b!r}")
+        return b
+
+    def every(d: Any) -> str:
+        if not isinstance(d, str) or not _SWEEP_EVERY.fullmatch(d.strip()):
+            raise ValueError(f"sweep.every is a duration like 7d, 36h or 90m, not {d!r}")
+        return d.strip()
+
+    def profile(n: Any) -> str:
+        if not isinstance(n, str) or not n.strip():
+            raise ValueError(f"sweep.profile is a profile's name, not {n!r}")
+        return n.strip()
+
+    checks = {"on": on, "every": every, "profile": profile}
+    return _each(_fields(value, SWEEP_KEYS, "sweep", drop), checks, drop)
+
+
+def sweep(doc: dict[str, Any]) -> dict[str, Any]:
+    """The sweep switch as `sweep_switch` answers it: `{on, every, profile?, off: [<repo>…]}` — `on`
+    false and `every` `7d` when absent, `off` the repos whose `repos.<repo>.sweep` is false (on when
+    absent), every field that is not valid read as absent. Nothing else of the file, none of it secret."""
+    try:
+        got = parse_sweep(doc.get("sweep"), drop=True) if isinstance(doc.get("sweep"), dict) else {}
+    except ValueError:
+        got = {}
+    off = sorted(name for name, r in repos(doc).items() if r.get("sweep") is False)
+    profile = {"profile": got["profile"]} if "profile" in got else {}
+    return {"on": got.get("on") is True, "every": got.get("every") or SWEEP_EVERY, **profile, "off": off}
 
 
 def parse_open_in(v: Any) -> str | dict[str, str]:

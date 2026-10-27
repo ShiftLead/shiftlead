@@ -371,6 +371,13 @@ def _seat_of(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> dict[str, 
     session held its id (§4.1, the note `ao team start` prints then) — and never a name the
     definition gives one of its members."""
     whens = _seat_whens(team)
+    switched = f"sweep-{team.name}"
+    for s in sessions:
+        # the Settings switch's sweeper (§4.9b *The switch*, TD-1091): a seat by its record's mark, as
+        # no definition names it
+        mark = s.get("seat")
+        if isinstance(mark, dict) and mark.get("by") == "settings" and switched not in whens:
+            whens[switched] = orgmod.SeatDef(trigger="swept", after=str(mark.get("after") or "")).when()
     if not whens:
         return {}
     members = {n for m in team.members for n in m.names()}
@@ -762,7 +769,15 @@ def start(
     orphan — or held by one an Apply marked — is created succeeding it (`succeeds`), so no definition
     name is left with two records; `moved` lists them. A person's act, as both calls are: a session's
     start of a team the definition renamed is refused, and so is one whose orphans are still live."""
-    plan = teams.plan(org, name, host, profile=profile, files=files_via(call))
+    # the Settings sweep switch (§4.9b *The switch*, TD-1091): a home not reached, or a refusal, gives the
+    # team no sweep seat, and the start says so
+    try:
+        switch: dict[str, Any] | None = call("sweep_switch")
+    except Exception:  # noqa: BLE001 — whatever the transport raised, the answer is the same
+        switch = None
+    plan = teams.plan(org, name, host, profile=profile, files=files_via(call), sweep=switch)
+    if switch is None:
+        plan.notes.append("sweep: the switch not read — no sweep seat")
     if not plan.launches:
         raise teams.TeamError(f"team {name} starts nothing: a person leads it and it has no members")
     if why := unserved(call, plan) or undeclared(call, org, plan, host):

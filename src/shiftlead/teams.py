@@ -41,6 +41,7 @@ PAUSE_PROMPT = (
     "and push what you have, then stop and wait for a resume; do not start anything new."
 )
 RESUME_PROMPT = "shiftlead: resume — the usage gate's line is clear again. Carry on from where you paused."
+SWEEPER = "sweeper"  # the seat role the Settings sweep switch adds (§4.9b *The switch*, TD-1091)
 """The usage gate's two texts (design §6 *Usage gate*, TD-100): set on the record at create, beside
 the wrap-up's, because the host agent types them and `sessionorc` must not know what a brief says."""
 
@@ -1003,12 +1004,37 @@ def _trigger(member: Spec) -> dict[str, str]:
     return {"trigger": "asks"}
 
 
-def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, files: Files | None = None) -> Plan:
+def sweep_seat(team: orgmod.TeamDef, switch: dict[str, Any] | None) -> orgmod.SeatDef | None:
+    """The sweeper seat the Settings switch adds to a team it starts (design §4.9b *The switch*,
+    TD-1091): `sweep-<team>`, the built-in brief, `every` and `profile` from the switch — `switch` is
+    `sweep_switch`'s answer — or None while the switch is off, when the definition has a `sweeper` seat
+    of its own, or when the team's repo is `off`."""
+    if not switch or switch.get("on") is not True:
+        return None
+    if any(s.role == SWEEPER for s in team.seats) or team.repo in (switch.get("off") or ()):
+        return None
+    every = str(switch.get("every") or "")
+    return orgmod.SeatDef(
+        name=f"sweep-{team.name}", role=SWEEPER, trigger="swept", after=every, profile=switch.get("profile") or None
+    )
+
+
+def plan(
+    org: orgmod.Org,
+    name: str,
+    host: str,
+    *,
+    profile: str | None = None,
+    files: Files | None = None,
+    sweep: dict[str, Any] | None = None,
+) -> Plan:
     """Resolve a definition into the sessions it starts, checking everything that can be checked
     without the agent: the checkouts are declared on the team's host (and exist, when that is this
     one — `host` is the host the start runs on), every role, profile and brief resolves, and no
     member asks for something this phase does not build. Raises `TeamError` on the first thing
-    that would have stopped the start — nothing is created here (§4.9: never half a team)."""
+    that would have stopped the start — nothing is created here (§4.9: never half a team). `sweep`
+    is the sweep switch as `sweep_switch` answers it, which a start reads: while on, the plan holds
+    the switch-made sweeper seat (`sweep_seat`)."""
     team = find(org, name)
     if name in org.unlanded:  # a repo's team whose landing cannot be told (§4.9 *Where a repo's team lands*)
         raise TeamError(org.unlanded[name])
@@ -1069,7 +1095,8 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
         missing = _primer_missing(seat, p.techlead.dir, host, here, files)
         if missing:
             p.notes.append(missing)
-    for trig in team.seats:
+    made = sweep_seat(team, sweep)
+    for trig in [*team.seats, *([made] if made else [])]:
         # A seat with a trigger (§4.9b, TD-098): launched as the techlead is — its manager its
         # controller, no grants — and filled again by the manager when its trigger is met.
         if trig.name in seen:
@@ -1096,6 +1123,9 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                 seat=True,
             )
         )
+        if trig is made:
+            # the switch's, not the definition's: the tick reads `every` from settings.yml (§6 rule 3)
+            p.seats[-1].trigger = {**(p.seats[-1].trigger or {}), "by": "settings"}
     for member in team.members:
         if under is not None and under.sits_out(member.role):
             # §4.9c: not started at a Start, interactive or not — a definition's member is the team's
