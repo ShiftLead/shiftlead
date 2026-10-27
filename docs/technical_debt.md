@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1101 | Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row | Low | Open — build |
 
 ---
 
@@ -1944,25 +1943,3 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
-
-## TD-1101: Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (grinder-ao-2, the full runs of TD-1087)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_sync_pass.py` (`test_off_is_written_once_per_head`), `tests/test_board_seam.py` (`test_an_unserved_repos_board_is_written_by_no_press`), `tests/test_identity.py` (`test_the_detached_check_follows_the_tmux_server_it_is_about`)
-
-**Why:** TD-1087's fix (#2455) made its own tests pass 20 of 20 under load. Its other half, five full `-n auto` runs in a row, did not hold: in five full runs of `pytest -n auto --basetemp=<short>` (2026-10-27, load about 8 to 14), four failed one or two tests each, a different test each time. Besides TD-1088, TD-1098 and TD-1102 (`test_dismiss_takes_the_row_off_and_its_snooze_with_it`), they were:
-- `test_off_is_written_once_per_head`: `AssertionError: nothing changed: nothing saved or pushed` (`assert [{'/r/samscrape': …}] == []`).
-- `test_an_unserved_repos_board_is_written_by_no_press`: `Failed: DID NOT RAISE AgentError`.
-- `test_the_detached_check_follows_the_tmux_server_it_is_about`: `assert ([3861993, 50] == [50]`.
-None of the three files calls `park_ticks`, so the fixture's tick loop running beside the test's own steps is the first suspect, as it was in TD-1087, TD-1099 and `test_ci_spells.py`.
-
-**Fix:** for each test, check whether the fixture's tick loop can run the pass the test drives by hand. If it can, park it (`await park_ticks(agent)`, or a file-level `agent` fixture that parks it, as `test_conventions_policy.py` has). Otherwise wait on the event the test reads. Reproduce with 20 runs of each file under `-n auto` beside a full `-n auto` suite.
-
-**Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row, with TD-1098, TD-1100 and TD-1102 fixed too; then `pdm run test` may take `-n auto`.
-
-**Related:** TD-1087 (its other half), TD-1088, TD-1098, TD-1102 (the other flakes in these runs), TD-1100, TD-1068.
