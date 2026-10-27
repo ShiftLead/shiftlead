@@ -97,7 +97,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
 | TD-1097 | `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load | Low | Open — build |
 | TD-1098 | `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it | Low | Open — build |
-| TD-1099 | `test_the_tick_gives_a_prompt_its_sender_and_the_next_read_its_reply` failed one loaded precheck: the fixture's tick loop runs beside its hand ticks | Low | Open — build |
 
 ---
 
@@ -2082,22 +2081,3 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when** the test passes 50 runs alone and 20 under `pdm run test`, and `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1039 (the build that wrote the test), TD-1087, TD-1088 (the other load flakes).
-
-## TD-1099: `test_the_tick_gives_a_prompt_its_sender_and_the_next_read_its_reply` failed one loaded precheck: the fixture's tick loop runs beside its hand ticks
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-2, met in #2448's first precheck)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_record_prompts.py` (`test_the_tick_gives_a_prompt_its_sender_and_the_next_read_its_reply`)
-
-**Why:** #2448's first precheck (at 24553ce59, 2026-10-26, load average about 24) failed this test once, and the rerun passed. The log was overwritten by the rerun, so the assertion that failed is not known. A likely cause can be read from the test: it never parks the fixture's tick loop (`conftest.park_ticks`), yet it drives the reads with `await agent.tick()` and a `prompts` stub that pops a shared `batches` list. A loop tick that lands between the `batches.append` and the test's own tick takes the batch, so the hand tick reads `([], None, cursor)`. `agent._prompts_checked.clear()` re-opens that window before each read.
-
-**Fix:** `await park_ticks(agent)` before the first `batches.append`, so each read is the test's own tick. Then force a loop-style tick between the append and the hand tick, and check the test still passes. If it does not, the cause is elsewhere: run the test under load (`-n auto` beside a full suite) until it fails, and read the assertion.
-
-**Done when:** a tick forced between a `batches.append` and the test's own tick leaves the test passing. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1050, TD-1065, TD-1087.
-

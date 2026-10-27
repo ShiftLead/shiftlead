@@ -20545,3 +20545,23 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Related:** TD-1044.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2449) — the reap test's resolver stub returns `{**os.environ, "CADENCE_REPO_ROOT": str(repo)}` and its launcher logs `$CADENCE_REPO_ROOT` after its arguments, asserted on `--check` and `--dehydrate`; with `_run`'s environment `{**os.environ, "LC_ALL": "C"}` it fails.
+
+## TD-1099: `test_the_tick_gives_a_prompt_its_sender_and_the_next_read_its_reply` failed one loaded precheck: the fixture's tick loop runs beside its hand ticks
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met in #2448's first precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the fix is in #2450
+**Location:** `tests/test_record_prompts.py` (`test_the_tick_gives_a_prompt_its_sender_and_the_next_read_its_reply`)
+
+**Why:** #2448's first precheck (at 24553ce59, 2026-10-26, load average about 24) failed this test once, and the rerun passed. The log was overwritten by the rerun, so the assertion that failed is not known. A likely cause can be read from the test: it never parks the fixture's tick loop (`conftest.park_ticks`), yet it drives the reads with `await agent.tick()` and a `prompts` stub that pops a shared `batches` list. A loop tick that lands between the `batches.append` and the test's own tick takes the batch, so the hand tick reads `([], None, cursor)`. `agent._prompts_checked.clear()` re-opens that window before each read.
+
+**Fix:** `await park_ticks(agent)` before the first `batches.append`, so each read is the test's own tick. If it fails again after that, the cause is elsewhere: run it under load until it fails, and read the assertion.
+
+**Done when:** the test parks the fixture's tick loop before its first read, so no tick but its own takes a batch or adds to `asked`. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1050, TD-1065, TD-1087.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2450) — the test calls `await park_ticks(agent)` once its session is created and hooked; `tests/test_record_prompts.py` passed four runs of four.
