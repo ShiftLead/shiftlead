@@ -20017,3 +20017,23 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Done when:** three prechecks run at once on kmaster pass, `/tmp` staying well under full; `pdm run test` and `pdm run lint` pass.
 
 **Resolved:** 2026-10-26 (grinder-ao-1, #2411) — the `precheck` command in `docs/cadence.toml` gives the suite a disk-backed `TMPDIR` of its own (`/var/tmp/pc.XXXXXX`, removed on exit) and pytest's `--basetemp` under it, a shorter path than `/tmp/pytest-of-<user>/pytest-<n>`, so the sockets fit; `tests/conftest.py`'s tmux-owner file is fixed at `/tmp` so concurrent runs still see each other (TD-025). Measured: one suite peaked at 316 MB; three prechecks of #2411 at once held `/tmp` at 48 % of its space and 75 % of its inodes (other sessions' prechecks ran beside them), and the three runs together peaked at 943 MB under `/var/tmp`. Two passed whole; the third failed one test, a pre-existing race filed as TD-1067. So the 16 GB fill of 2026-10-26 was mostly TD-1053's leaked directories (the inodes), not the prechecks' size. Left outside this repo: `precheck.py`'s own worktree (88 MB, dev-cadence's script) stays under `/tmp`.
+
+## TD-1076: `_gh_prs` sets `prechecked` on each open PR row, `ao pr wait`'s *none* hangs on it, and no test runs `_gh_prs` (test audit)
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/reports.py` (`_gh_prs`: `row["prechecked"] = prechecked(p.get("statusCheckRollup"))`), `src/sessionorc/agent.py` (`rpc_pr_wait`: `got.get("prechecked") is False`), `tests/test_pr_wait.py`
+
+**Why:** #2405 (TD-1036) makes `ao pr wait` answer *none*, with the line to run, for a green head that carries no `cadence/precheck`. `rpc_pr_wait` reads that from the row's `prechecked`, and only `_gh_prs` sets it. `test_where_the_repo_sets_precheck_a_head_without_it_stays_none_with_its_line` builds rows by hand (`{**_row(checks="green"), "prechecked": False}`), a shape the home's own read must write; `grep -rn _gh_prs tests` finds one line, which fails if it is called. Probed on `origin/main`: replacing that `_gh_prs` line with `pass` leaves every test in the files that mention `OPEN_PR_FIELDS`, `pr_reading`, `failing_items` or `prechecked` passing (148 passed). Without the line the row has no `prechecked`, `got.get("prechecked") is False` never holds, and a head with no precheck reads *green* to `ao pr wait` again, which is what the entry was filed to stop.
+
+**Fix:** a test that runs `_gh_prs` (or `pr_reading`) over a faked `gh pr list` JSON with one head carrying a `cadence/precheck` status and one not, and asserts `prechecked` True and False on the rows.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1036.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2417) — `test_the_open_read_writes_prechecked_on_each_row` (`tests/test_pr_wait.py`) runs `_gh_prs` over a faked `gh pr list` with `OPEN_PR_FIELDS`, one head carrying a `cadence/precheck` status and one not, and asserts `prechecked` True and False on the rows, and no `prechecked` on the closed read. The probe (the `prechecked` line replaced with `pass`) fails it.

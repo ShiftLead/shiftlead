@@ -103,6 +103,31 @@ def test_the_open_reading_says_whether_a_head_carries_a_precheck():
     assert reports.prechecked([pre]) and not reports.prechecked([{"name": "test"}]) and not reports.prechecked(None)
 
 
+def test_the_open_read_writes_prechecked_on_each_row(tmp_path, monkeypatch):
+    # the home's own read writes the field `rpc_pr_wait` reads, from `gh pr list`'s rollup (TD-1076)
+    import subprocess
+
+    green = {"__typename": "CheckRun", "name": "test", "status": "COMPLETED", "conclusion": "SUCCESS"}
+    pre = {"__typename": "StatusContext", "context": "cadence/precheck", "state": "SUCCESS"}
+    out = [
+        {"number": 1, "headRefOid": "a1", "statusCheckRollup": [green, pre], "mergeStateStatus": "CLEAN"},
+        {"number": 2, "headRefOid": "b2", "statusCheckRollup": [green], "mergeStateStatus": "CLEAN"},
+    ]
+    asked = []
+
+    def fake(argv, **kw):
+        asked.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(out), stderr="")
+
+    monkeypatch.setattr(reports.subprocess, "run", fake)
+    rows = reports._gh_prs(tmp_path, ["--state", "open"], 5, reports.OPEN_PR_FIELDS)
+    assert asked and asked[0][:3] == ["gh", "pr", "list"]
+    assert {r["number"]: r["prechecked"] for r in rows} == {1: True, 2: False}
+    assert all(r["checks"] == "green" for r in rows)
+    # the closed read asks for no rollup and writes no `prechecked`
+    assert all("prechecked" not in r for r in reports._gh_prs(tmp_path, ["--state", "all"], 5))
+
+
 def test_the_precheck_line_is_the_layouts(tmp_path, monkeypatch):
     assert cadence.precheck_typed(tmp_path, 9) == "python3 scripts/precheck.py --pr 9"
     monkeypatch.setattr(cadence, "is_source", lambda r: True)
