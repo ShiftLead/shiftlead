@@ -20214,4 +20214,4 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 
 **Related:** TD-1038.
 
-**Resolved:** 2026-10-26 (grinder-ao-2, PR to follow in the title) — `test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck` in `tests/test_precheck_on_main.py`: a full pass starts the precheck, then a pass with `full=False` and that reading keeps `prechecking`, starts nothing, and fails if `precheck_on_main` or `precheck_pr_bound` runs. The probe (`if True:` on the line) fails it.
+**Resolved:** 2026-10-26 (grinder-ao-2, #2433) — `test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck` in `tests/test_precheck_on_main.py`: a full pass starts the precheck, then a pass with `full=False` and that reading keeps `prechecking`, starts nothing, and fails if `precheck_on_main` or `precheck_pr_bound` runs. The probe (`if True:` on the line) fails it.
