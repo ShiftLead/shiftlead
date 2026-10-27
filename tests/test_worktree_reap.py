@@ -218,11 +218,13 @@ def test_a_pinned_repos_reap_runs_the_pinned_trees_hydrate(repo, monkeypatch):
     (repo / "docs").mkdir()
     (repo / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/nowhere"\nref = "{"a" * 40}"\n')
     stub = repo.parent / "launcher.sh"
-    stub.write_text(f'#!/bin/sh\nshift 2\necho "$@" >> "{repo}/hydrate.log"\n')
+    # each call runs in the resolver's environment, its pin's variables with it (TD-1075)
+    stub.write_text(f'#!/bin/sh\nshift 2\necho "$@ $CADENCE_REPO_ROOT" >> "{repo}/hydrate.log"\n')
     stub.chmod(0o755)
-    monkeypatch.setattr(cadence, "command", lambda r, word, *a: ([str(stub), word, *a], dict(os.environ)))
+    env = {**os.environ, "CADENCE_REPO_ROOT": str(repo)}
+    monkeypatch.setattr(cadence, "command", lambda r, word, *a: ([str(stub), word, *a], env))
     assert reap(wt, "ao-w")["reaped"] and not wt.exists()
-    assert _calls(repo) == [f"--check --quiet {wt}", f"--dehydrate --quiet {wt}"]
+    assert _calls(repo) == [f"--check --quiet {wt} {repo}", f"--dehydrate --quiet {wt} {repo}"]
 
 
 # -- the branches ---------------------------------------------------------------------------------------
