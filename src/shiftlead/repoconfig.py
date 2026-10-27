@@ -355,6 +355,18 @@ PRESETS: dict[str, dict[str, Any]] = {
         "context": WORKER_CONTEXT,
         "message": "what its trigger counts: the last n PRs, the period",
     },
+    # The sweep (design §4.9b *The sweep*, TD-1061): a seat that runs the repo's stranded-work procedure
+    # once the board's `Swept:` stamp is older than its `swept:` trigger, stamps it, and ends.
+    "sweeper": {
+        "kind": "seat",
+        "brief": "sweeper.md",
+        "lane": [],
+        "grants": [],
+        "icon": "shield",
+        "label": "Sweeper",
+        "context": WORKER_CONTEXT,
+        "message": "the board's open items: one it should verify, close or ledger",
+    },
     # The design stage's role (design §4.9c *The designer gets a template*, TD-309): no icon and no
     # label, so no designer card's badge changes at the build.
     "designer": {

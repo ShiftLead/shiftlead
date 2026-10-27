@@ -46,6 +46,11 @@ NO_LINE = "no line {ref} on the board — reworded or closed"
 # origin has no board · matches · behind — only origin moved, its copy is read · local — only this
 # checkout moved · both — both moved, or no common history to tell
 FETCH_CASES = ("skipped", "none", "matches", "behind", "local", "both")
+# The board's sweep stamps (cadence §3.10), the cadence reader's own (dev-cadence `nudge_user_attention.py`
+# `SWEEP_RE` and `SWEEP_DEEP_RE`), ported verbatim so the sweep seat and `/attention` never disagree on
+# whether a board is swept (design §4.9b *The sweep*, TD-1090)
+SWEEP_RE = re.compile(r"^Swept:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*(?:\((?P<meta>[^)]*)\))?", re.MULTILINE)
+SWEEP_DEEP_RE = re.compile(r"^Swept-deep:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*(?:\((?P<meta>[^)]*)\))?", re.MULTILINE)
 
 
 def is_work_order(ref: str) -> bool:
@@ -88,13 +93,15 @@ def head(text: str) -> str:
 class Origin:
     """What one board's read against origin found: `case` (`FETCH_CASES`), `note` — the sentence for
     people, in the phrases the Inbox's origin note reads (§4.5a **origin note**) — `why` for a skip,
-    and `content`/`source` when origin's copy is the one to read (*behind*)."""
+    `content`/`source` when origin's copy is the one to read (*behind*), and `theirs`, origin's copy in
+    every case that read it, whichever copy is shown — the sweep stamp is read from it (§4.9b *The sweep*)."""
 
     case: str
     note: str
     why: str | None = None
     content: str | None = None
     source: str | None = None
+    theirs: str | None = None
 
 
 def _git(root: Path, args: list[str], timeout: float) -> subprocess.CompletedProcess[bytes]:
@@ -170,16 +177,18 @@ def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT) -> 
             return Origin("none", f"fetched; no board at {at}")
         ours = board.read_text(encoding="utf-8", errors="replace") if board.is_file() else ""
         if theirs == ours:
-            return Origin("matches", f"fetched; board matches {at}")
+            return Origin("matches", f"fetched; board matches {at}", theirs=theirs)
         mb = _git(root, ["merge-base", "HEAD", at], READ_TIMEOUT)
         if mb.returncode != 0:
-            return Origin("both", f"fetched; board DIFFERS from {at} (no common history to compare) — showing local")
+            note = f"fetched; board DIFFERS from {at} (no common history to compare) — showing local"
+            return Origin("both", note, theirs=theirs)
         base = blob(mb.stdout.decode().strip(), rel) or ""
         if ours == base:
-            return Origin("behind", f"fetched; local clone is behind — showing {at}'s board", content=theirs, source=at)
+            note = f"fetched; local clone is behind — showing {at}'s board"
+            return Origin("behind", note, content=theirs, source=at, theirs=theirs)
         if theirs == base:
-            return Origin("local", f"fetched; board DIFFERS from {at} (local edits not pushed)")
-        return Origin("both", f"fetched; board DIFFERS from {at} (both sides changed) — showing local")
+            return Origin("local", f"fetched; board DIFFERS from {at} (local edits not pushed)", theirs=theirs)
+        return Origin("both", f"fetched; board DIFFERS from {at} (both sides changed) — showing local", theirs=theirs)
     except subprocess.TimeoutExpired:
         return Origin("skipped", "fetch skipped (timeout)", why="timeout")
     except Exception as e:  # noqa: BLE001 — a board read without origin beats no board
@@ -216,6 +225,24 @@ def board_rel(root: Path | str) -> Path:
     return board_path(root)[1] or BOARD
 
 
+def _stamp(rx: re.Pattern[str], content: str) -> str | None:
+    """The first line of `content` that `rx` matches with a date, as `YYYY-MM-DD` — None when there is
+    none, or its date is not a calendar date (it reads as absent: the sweep rewrites it)."""
+    m = rx.search(content)
+    if m is None:
+        return None
+    try:
+        return date.fromisoformat(m.group("date")).isoformat()
+    except ValueError:
+        return None
+
+
+def swept(content: str) -> dict[str, str | None]:
+    """A board's sweep stamps (design §4.9b *The sweep*, TD-1090): `{at, deep_at}`, each the date of
+    the first `Swept:` / `Swept-deep:` line carrying one, or None — `{at: None}` is a board never swept."""
+    return {"at": _stamp(SWEEP_RE, content), "deep_at": _stamp(SWEEP_DEEP_RE, content)}
+
+
 def board_items(content: str, today: date) -> list[dict[str, Any]]:
     """The open items of a board's text, each ledgerboard's `item_record` with its id as `key`."""
     out: list[dict[str, Any]] = []
@@ -227,7 +254,8 @@ def board_items(content: str, today: date) -> list[dict[str, Any]]:
 def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | None = None) -> dict[str, Any]:
     """The repo's board as the host agent keeps it (design §4.4 *Each reading has one owner*, *The
     boards*, TD-615), read in-process through ledgerboard (TD-585): `{boards: [...], today}`, each
-    board `{label, board, root, source, fetch_note, fetch_case, fetch_why, items}` and each open item
+    board `{label, board, root, source, fetch_note, fetch_case, fetch_why, items}` — and `swept`, once
+    it was read against origin (below) — and each open item
     ledgerboard's record of it (line, text, due, answers, decided, refs, session, detail, …) with its
     id beside it as `key` (`board:<key>`, *A board line's id*) — or `{error}` when the board could
     not be read. No board is no boards and no error. `fetch` reads against origin (`_against_origin`,
@@ -236,7 +264,12 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
 
     `board` reads that file in place of the checkout's, named as the checkout's board read from
     origin: the host agent's own tree after a write-back (`board.tree_dir`), which is origin's head
-    with the press landed, so the press is in the reading before the checkout pulls it."""
+    with the press landed, so the press is in the reading before the checkout pulls it.
+
+    `swept` (§4.9b *The sweep*, TD-1090) is the stamp of origin's copy, whichever copy is shown: written
+    only by a read against origin — `{at, deep_at}` (`swept`), or None when origin holds no board — and
+    by `board`, the tree a write-back pushed. A read of the checkout alone (no fetch, or a fetch
+    skipped) has no `swept` key, and the caller carries the last one forward."""
     root = Path(root)
     rel = board_path(root)[1]
     if rel is None:
@@ -262,9 +295,11 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
         "fetch_why": found.why if found is not None else None,
         "items": items,
     }
+    if found is not None and found.case != "skipped":
+        b["swept"] = swept(found.theirs) if found.theirs is not None else None
     if board is not None:
         # as the checkout's board, read from origin: the *behind* case (§4.5a **origin note**)
-        b.update(source="origin", fetch_case="behind")
+        b.update(source="origin", fetch_case="behind", swept=swept(content))
     return {"boards": [b], "today": today.isoformat()}
 
 
