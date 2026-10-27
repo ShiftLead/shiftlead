@@ -155,7 +155,7 @@ class IdentityMixin:
         st = self.proc.stat(pid)
         return (pid, st.start if st else 0)
 
-    async def _id_channel(self, peer: int) -> identity.Channel:
+    async def _id_channel(self, peer: int, peer_uid: int | None = None) -> identity.Channel:
         """Classify one connection's peer. A peer that matches no pane we know may belong to one the
         tick has not listed yet — a session's first hook can beat the first tick after `create` —
         so it waits for a fresh list (one at a time, at most one a second) before it is judged
@@ -163,7 +163,8 @@ class IdentityMixin:
         if self._id_detached is None:
             await self._id_read_detached(await asyncio.to_thread(self.tmux.server_pid))
         detached = self._id_detached or None
-        ch = identity.classify(peer, self._id_panes, self.proc, detached=detached, ours=self._id_ours())
+        uids = {"peer_uid": peer_uid, "own_uid": os.geteuid()}
+        ch = identity.classify(peer, self._id_panes, self.proc, detached=detached, ours=self._id_ours(), **uids)
         listed = {p.session for p in self._id_panes}
         unlisted = any(
             sid not in listed and r.pane and (r.host or self.host) == self.host and r.state not in ("exited", "closed")
@@ -180,7 +181,7 @@ class IdentityMixin:
                 if self._id_listed_at and wait > 0:
                     await asyncio.sleep(wait)
                 self._id_note_panes(await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX))
-        return identity.classify(peer, self._id_panes, self.proc, detached=detached, ours=self._id_ours())
+        return identity.classify(peer, self._id_panes, self.proc, detached=detached, ours=self._id_ours(), **uids)
 
     def _id_ours(self) -> set[str]:
         """The scopes of this server's panes that no live record's pane holds (TD-362): a pane that is
@@ -190,7 +191,9 @@ class IdentityMixin:
         gone = {p.cgroup for p, at in self._id_gone.values() if p.cgroup and now - at < identity.PANE_GONE_GRACE}
         return self._id_other_scopes | gone
 
-    async def _identify(self, req: dict[str, Any], peer: int, conn: Any = None) -> dict[str, Any] | None:
+    async def _identify(
+        self, req: dict[str, Any], peer: int, conn: Any = None, peer_uid: int | None = None
+    ) -> dict[str, Any] | None:
         """The one step at the head of dispatch (§4.8a *Where it lives*): judge the envelope's
         `caller` against the channel, record an alarm when they disagree, and — under `enforce` —
         replace the claim with the verdict or refuse. Under `observe` nothing a caller sees
@@ -202,7 +205,7 @@ class IdentityMixin:
         # and exits must not become whatever reuses its pid.
         ch = self._id_conns.get(conn) if conn is not None else None
         if ch is None:
-            ch = await self._id_channel(peer)
+            ch = await self._id_channel(peer, peer_uid)
             self.identity_tally[f"{ch.kind}:{ch.signal}" if ch.signal else ch.kind] += 1
             if conn is not None:
                 self._id_conns[conn] = ch

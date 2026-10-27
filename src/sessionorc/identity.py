@@ -90,6 +90,8 @@ class ProcReader(Protocol):
 
     def cmdline(self, pid: int) -> list[str] | None: ...
 
+    def pid_ns(self, pid: int) -> str | None: ...
+
 
 class LinuxProc:
     """`/proc` as it is. A process that is gone, or one we may not read, is `None` — never an error."""
@@ -164,6 +166,15 @@ class LinuxProc:
             parts.pop()  # argv ends in a NUL; one rewritten by the process may not
         return [a.decode("utf-8", "replace") for a in parts]
 
+    def pid_ns(self, pid: int) -> str | None:
+        """The process's pid namespace, `/proc/<pid>/ns/pid`'s link (`pid:[4026531836]`); None for a
+        process gone, or one whose link this process may not read (another uid without
+        `CAP_SYS_PTRACE`, a non-dumpable process)."""
+        try:
+            return os.readlink(f"/proc/{int(pid)}/ns/pid")
+        except (OSError, ValueError):
+            return None
+
 
 def cgroup_path(lines: Iterable[str]) -> str | None:
     """The path systemd put the process in: cgroup v2's single `0::<path>` line, else v1's
@@ -207,7 +218,7 @@ class Channel:
 
     kind: str  # "session" | "outside" | "unknown"
     session: str | None = None
-    signal: str | None = None  # ancestry | sid | tty · cgroup | unreadable · None for outside
+    signal: str | None = None  # ancestry | sid | tty | scope · cgroup | namespace | unreadable · None for outside
 
     def label(self) -> str:
         return f"session {self.session}" if self.kind == "session" else self.kind
@@ -309,6 +320,8 @@ def classify(
     *,
     detached: str | None = None,
     ours: Collection[str] = (),
+    peer_uid: int | None = None,
+    own_uid: int | None = None,
 ) -> Channel:
     """Which pane the peer belongs to, by the first of four signals that answers (§4.8a).
 
@@ -320,7 +333,17 @@ def classify(
     move into as it could reopen a pty (TD-362). `detached` is `detached_check`'s answer: a peer
     that matched no pane but sits in that cgroup shed every signal on purpose or by accident, and
     is *unknown*, never the person — and so is one in `ours`, the scopes of the server's panes that
-    no live record's pane holds (a pane that is no record's, a gone one inside the grace)."""
+    no live record's pane holds (a pane that is no record's, a gone one inside the grace).
+
+    Last, a peer that nothing placed and that is in another pid namespace than the agent's is
+    *unknown* (TD-1093): a process in a container that reached the socket through a mount. So is
+    one of another uid (`peer_uid` against `own_uid`, both given or the test is off) whose link does
+    not read, and a credential whose pid is 0 (not visible in this namespace). A negative pid is a
+    socket whose credential could not be read: *unknown*, `unreadable`."""
+    if peer_pid < 0:
+        return Channel("unknown", signal="unreadable")
+    if peer_pid == 0:
+        return Channel("unknown", signal="namespace")
     peer = reader.stat(peer_pid)
     if peer is None:
         return Channel("unknown", signal="unreadable")
@@ -362,6 +385,14 @@ def classify(
                 return Channel("session", p.session, "scope")
     if detached and cg and (cg == detached or cg in ours):
         return Channel("unknown", signal="cgroup")
+    # -- the pid namespace (TD-1093): it only turns an *outside* into an *unknown*. A link that reads
+    # is compared; one that does not leaves a peer of the agent's own uid *outside* (a non-dumpable
+    # process of the person's), and makes one of another uid *unknown* ---------------------------
+    theirs, mine = reader.pid_ns(peer_pid), reader.pid_ns(os.getpid())
+    if theirs is not None and mine is not None:
+        return Channel("unknown", signal="namespace") if theirs != mine else OUTSIDE
+    if theirs is None and peer_uid is not None and own_uid is not None and peer_uid != own_uid:
+        return Channel("unknown", signal="namespace")
     return OUTSIDE
 
 
