@@ -92,6 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
+| TD-1128 | `ao msg --team`/`--repo` and `ao td add --repo` refuse a repo whose techlead seat is closed between questions, though an `ask` to a closed seat is meant to fill it | Medium | Open |
 
 ---
 
@@ -1954,3 +1955,26 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Done when** a grep for each listed word finds only uses that match what runs, the doc-bound tests pass, and the code-side mismatches are filed.
 
 **Related:** the docs-audit seat (`docs/briefs/docs-audit.md`); dev-cadence#TD-129 (the pin, which retired `scripts/` and the sync the docs still name); TD-1116 (the briefs' sentence it adds).
+
+---
+## TD-1128: `ao msg --team`/`--repo` and `ao td add --repo` refuse a repo whose techlead seat is closed between questions, though an `ask` to a closed seat is meant to fill it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (Paul, from dev-cadence#TD-157; drafted by session `ao-dev-cadence-dc-tds`)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_mail.py` (the seat resolver behind `--team`/`--repo`, ~186–233: the `r.state != "closed"` filter at ~200); design §4.10 *A team or a repo as the address* ("not `closed` — on call (exited) or live"), against §4.10's lifecycle *A seat is the exception* and §6 rule 3; `src/sessionorc/agent_inbox.py` ~1129 (a closed seat's `ask` marked pending for the fill); tests for `ao msg --repo` / `ao td add --repo`
+
+**Why:** The design says two things about an empty seat. §6 rule 3 closes an idle seat, and §4.10's lifecycle (*A seat is the exception*) says a record carrying `seat` is `closed` whenever the seat is empty, with an `ask` to it left pending and filling it. But §4.10 *A team or a repo as the address* resolves `--team`/`--repo` only to a seat that is "not `closed` — on call (exited) or live", and `agent_mail.py` follows that rule. So the address resolves only while the seat happens to be running. On 2026-10-26, a contractmatch session's `ao td add --repo dev-cadence` was refused with *dev-cadence has no question seat — ask the person*. dev-cadence's team `dc-grind` was running (its grinder working), and `dc-techlead` was closed, as rule 3 leaves it between questions. The finding (dev-cadence TD-156) went back to Paul instead of being filed, and the session then filed it by opening dev-cadence's ledger PR by hand. The inbox already handles the case (`agent_inbox.py` ~1129 marks a closed seat's `ask` pending for the fill), so only the resolver's filter is in the way. Paul decided (dev-cadence TD-157, 2026-10-27) that cross-repo filing must not depend on a running techlead (that TD's option (b)): the `ask` waits for the seat's fill.
+
+**Fix:**
+- **The resolver** accepts a `closed` record that carries `seat` with an `asks` trigger and is not `superseded_by`, as an empty seat to be filled. A live record still wins, and the techlead seat (`tags: true`) still wins among two. A `closed` record with no `seat` stays excluded.
+- **The design:** §4.10 *A team or a repo as the address* says the same thing, so its "not `closed`" agrees with the lifecycle paragraph and rule 3.
+- **The stopped-team edge:** a team with no live record at all. Check whether rule 3 fills a seat of a stopped team. If it does, queue the `ask` as above. If it doesn't, the refusal names the commands that land the entry by hand (`ao td next --repo <X>`, a branch, the repo's ledger PR) instead of telling the session to ask the person.
+- **The reply line** says the seat is closed and will be filled, as any send to a closed seat does.
+
+**Done when** `ao td add --repo dev-cadence` from another repo's session, with `dc-techlead` closed and the team running, is accepted and fills the seat, which drafts the entry. A test pins the resolver on a closed seat record. The stopped-team case either queues or names the commands, and neither tells the session to ask the person.
+
+**Related:** TD-1000 (the `--team`/`--repo` address and `ao td add --repo`), TD-995 (its design), TD-1051/TD-1078 (a seat filled by an answer), TD-1064; dev-cadence#TD-157 (the decision), dev-cadence#TD-156 (the entry that hit it).
