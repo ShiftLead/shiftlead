@@ -286,10 +286,6 @@ def test_the_failed_rows_template_draws_the_logs_last_lines():
     assert "Dismiss" not in html  # nothing stands to clear: main's next head is checked afresh
 
 
-if __name__ == "__main__":  # pragma: no cover
-    sys.exit(pytest.main([__file__]))
-
-
 def test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck(checkout, fake, monkeypatch):  # noqa: F811
     """TD-1074: a pass neither full nor the repo's first carries the last reading and reads no checks, so
     `precheck_on_main` is not run on it — run there, it would reset `prechecking` and act on a carried
@@ -312,3 +308,7 @@ def test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck(check
     readings, _, _ = promote.survey([str(root)], readings, False, {root.name: True}, datetime.now(UTC))
     r = readings[root.name]
     assert r["prechecking"] == sha and r["precheck"] == "absent" and _ran(fake) == [sha]
+
+
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(pytest.main([__file__]))
