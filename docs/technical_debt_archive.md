@@ -20056,4 +20056,4 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 
 **Related:** TD-1037, TD-1033.
 
-**Resolved:** 2026-10-26 (grinder-ao-1, #PR) — `test_the_pass_keeps_the_checks_precheck_on_the_reading` (`tests/test_promote.py`) fakes `read_checks` to each of `absent`, `success`, `failure`, `pending`, `unread` and None, runs `survey` with main's own precheck stubbed, and asserts the reading's `precheck` is that value (and present for None). The probe (`r["precheck"]` replaced with `_`) fails all six.
+**Resolved:** 2026-10-26 (grinder-ao-1, #2420) — `test_the_pass_keeps_the_checks_precheck_on_the_reading` (`tests/test_promote.py`) fakes `read_checks` to each of `absent`, `success`, `failure`, `pending`, `unread` and None, runs `survey` with main's own precheck stubbed, and asserts the reading's `precheck` is that value (and present for None). The probe (`r["precheck"]` replaced with `_`) fails all six.
