@@ -20852,3 +20852,23 @@ None of the three files calls `park_ticks`, so the fixture's tick loop running b
 **Related:** TD-1039.
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2464) — `test_a_run_that_ended_with_no_status…` sets the entry's `waiting_since` three hours back before the counted pass and reads it unchanged after. With `"waiting_since": at` in `tend_precheck`, `tests/test_sync_precheck.py` reads 1 failed, 17 passed.
+
+## TD-1104: `test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing` reads the Queue before the scratch home's tick has read the fixture board
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-1, the precheck of #2430)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the fix is in this entry's PR
+**Location:** `tests/test_look_home.py` (`test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing`)
+
+**Why:** the precheck of #2430 (a docs-only PR, head 47dcf34) failed this one test of 4396: `assert 'A fixture act line.' in queue`, the Queue drawn with no board line. The board reaches the Queue through the host agent's tick (`agent_tick._read_boards`), and the test GETs `/queue` once, as soon as the URL is printed; under a loaded suite the first tick's board read lands after that GET. Run alone, the file passed three of three.
+
+**Fix:** the test GETs `/queue` until the fixture line is drawn, within 60 s, then asserts as before.
+
+**Done when:** the test waits for the tick's board read instead of racing it.
+
+**Related:** TD-771 (the board line on its entry's card), TD-1101, TD-1102 (the other loaded-suite flakes).
+
+**Resolved:** 2026-10-27 (grinder-ao-1) — the test polls `/queue` for the fixture line, bounded at 60 s.
