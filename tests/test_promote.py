@@ -240,6 +240,16 @@ def test_by_hand_the_pass_reads_and_starts_nothing(checkout):
     assert r["live"] != r["main"]
 
 
+@pytest.mark.parametrize("pre", ["absent", "success", "failure", "pending", "unread", None])
+def test_the_pass_keeps_the_checks_precheck_on_the_reading(checkout, monkeypatch, pre):
+    """TD-1037, TD-1055: `read_checks`'s fourth value reaches the reading as `precheck`, which `ao pr wait`
+    and the precheck on main read; nothing is started here, so main's own precheck is stubbed."""
+    monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("green", "", None, pre))
+    monkeypatch.setattr(promote, "precheck_on_main", lambda *a, **kw: None)
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    assert "precheck" in readings["repo"] and readings["repo"]["precheck"] == pre
+
+
 def test_the_pass_reads_live_at_and_the_pending_commits_for_the_build_chip(checkout):
     """§6 *Promote* (TD-539, TD-904): beside the three readings, `live_at` — live's committer time — and
     `pending`, every one of main's commits past live, newest first (`pending_more` 0: the chip cuts); empty at main."""

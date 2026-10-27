@@ -97,7 +97,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
 | TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Open — design |
-| TD-1055 | `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit) | Medium | Open — build |
 | TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
 | TD-1057 | `ship_cadence` gives the cache step the node's env file, and no test would notice if it did not (test audit) | Medium | Open — build |
 | TD-1058 | `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit) | Low | Open — build |
@@ -2078,24 +2077,6 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when** the design says how the waiting member gets the answer after its relaying seat closes, and how a finished member with unread mail is woken or counted as having work, and the build entries are filed. A doorbell that cannot be delivered is said as a failure, not *rung*.
 
 **Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
-
-## TD-1055: `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/promote.py` (`survey`: `r["checks"], why, r["checks_not_run"], r["precheck"] = read_checks(root, r["main"])`), `tests/test_promote.py`, `tests/test_ci_not_run.py`
-
-**Why:** #2396 (TD-1037) made `read_checks` return a fourth value and `survey` keep it as the reading's `precheck`, which TD-1036 and TD-1038 are to read. Probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ci_not_run.py tests/test_promote.py tests/test_cadence_pin.py`: replacing `r["precheck"]` with `_` in that line leaves 102 passed. The `read_checks` tests pin the tuple, and the `survey` tests (`tests/test_promote.py` 229–297) never read `precheck`, so the field TD-1037's *Done when* names ("the `precheck` field's five values and null") is pinned at `read_checks` only and never reaches the reading.
-
-**Fix:** add a `survey` test with `read_checks` faked to each of `absent`, `success`, `failure`, `pending`, `unread` and None, asserting `readings[0]["precheck"]` for each.
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1037, TD-1033.
 
 ## TD-1056: The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit)
 
