@@ -1,23 +1,11 @@
 ---
 name: check-in-flight-before-a-td-step
-description: "Before starting the next step of a multi-step TD, check open PRs and remote branches — another of Paul's sessions may already hold it"
-metadata: 
-  node_type: memory
+description: Check what is in flight before a TD step (cadence §2.9, `forge.py in-flight`); `ao msg` for leads, never a peer message
+metadata:
   type: feedback
-  originSessionId: 192b2355-2009-4e5e-ab33-69257956a53b
-  modified: 2026-09-18T05:53:55.260Z
 ---
 
-Before starting a step of a multi-step TD (TD-057 especially), run `gh pr list` and
-`git branch -r | grep <td>` and read the TD's status line on `origin/main`: on 2026-09-17 another
-of Paul's sessions (`agentorc-containers-98`, worktree `agentorc_containers`) built TD-057 steps
-3c.1–3c.5 and 4a in three hours while the anchor was on TD-052 step 6, and 4a was the anchor's
-planned next step.
-
-**Why:** two sessions on one step cost a rebase at best and a duplicated design decision at worst;
-Paul runs several sessions at once and does not always say which holds what.
-
-**How to apply:** when a step is held elsewhere, do the conformance read of what lands instead of
-building; coordinate over Claude Code's session messages for anchor-to-session talk, but use
-`ao msg` for anything to an unattended lead — a peer message to a lead is held for approval and
-stalls it ([[shiftlead-td-grind-mechanics]], TD-064).
+Cadence §2.9 (dev-cadence TD-137): `dev-cadence run forge.py in-flight TD-NNN` before a TD or one step of
+one, and again right before the work starts. When a step is held elsewhere, do the conformance read of what
+lands instead of building, and reach an unattended lead with `ao msg`, never Claude Code's peer message
+(held for approval, it stalls the lead). Related: [[shiftlead-td-grind-mechanics]].

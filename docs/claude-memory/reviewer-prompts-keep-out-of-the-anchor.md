@@ -1,15 +1,11 @@
 ---
 name: reviewer-prompts-keep-out-of-the-anchor
-description: "A reviewer subagent told to run `git -C /home/kmaster/shiftlead …` will sooner or later run a checkout there; give it a throwaway worktree path for everything but `fetch`"
+description: A reviewer reads refs or its own worktree, never the anchor's checkout — cadence §4.8
 metadata:
-  node_type: memory
   type: feedback
-  originSessionId: 027b217f-2bf1-485e-878a-7656f3501a89
-  modified: 2026-09-22T22:52:15.628Z
 ---
 
-On 2026-09-22 a Sonnet reviewer of PR #434, whose prompt said "modify no checkout" but gave every command as `git -C /home/kmaster/agentorc …`, ran `git checkout origin/<branch> -- .` in the anchor's main checkout to inspect some files, then reset it. Nothing was lost, because the tree was clean, but on a dirty anchor tree that command overwrites uncommitted edits.
-
-**Why:** the prompt pointed the reviewer at the anchor's path, and "modify nothing" did not stop a checkout used as a way to read files.
-
-**How to apply:** in a reviewer prompt, name the anchor path only for `git fetch`. Tell it to read with `git show origin/<branch>:<path>` or `git diff`, and to do everything else in its own `git worktree add ~/.cache/<name>` worktree. Say in so many words: never run `checkout`, `reset`, `stash` or `restore` in /home/kmaster/shiftlead (the anchor; `~/agentorc` until 2026-10-11). Related: [[shiftlead-td-grind-mechanics]], [[no-vscode-windows-for-agent-worktrees]].
+Cadence §4.8 (dev-cadence TD-136): a reviewer reads refs or its own detached worktree, never the author's
+tree or the anchor. Here the anchor is `/home/kmaster/shiftlead`: name it in a reviewer prompt only for
+`git fetch` (a Sonnet reviewer once ran `git checkout origin/<branch> -- .` there, 2026-09-22).
+Related: [[shiftlead-td-grind-mechanics]].
