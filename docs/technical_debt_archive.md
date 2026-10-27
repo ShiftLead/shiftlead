@@ -20195,3 +20195,23 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Related:** TD-1051 (the design); TD-213 (the orphaned question); TD-1079, TD-1080.
 
 **Resolved:** 2026-10-26 (grinder-ao-1, #2429) — `Session._asks` counts an answer waiting (an unread reply that closed the seat's own `ask` or `steer`, or the home's lapse, *Go with it* or decline note, which `_system_note(ends=…)` now gives the question's `reply_to` and `root`) by the question's id, never on a handed entry's thread; `asking` takes `steer`; `_asks_cause` puts the question's id in an `asks` due; `read_when`'s `refills` holds for any reply closing a question the seat sent, and the person's inbox read marks such a question `on_handed` for the Reply line; the techlead preset carries the relay rule and the member presets the deferral line. `tests/test_answer_waiting.py` holds the Done-when.
+
+## TD-1074: `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/promote.py` (`survey`: `if full or first:  # the checks were read this pass (TD-1038)` before `precheck_on_main`), `tests/test_precheck_on_main.py`, `tests/test_promote.py`
+
+**Why:** #2407 (TD-1038) put `precheck_on_main` behind the pass that read the checks, and its docstring says so ("on a pass that read the checks"). A pass that is neither `full` nor the repo's first copies the previous reading (`r: dict[str, Any] = {k: v for k, v in old.items() if ...}`) and reads no checks. Probed on `origin/main`: replacing `if full or first:` with `if True:` on that line leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_promote.py tests/test_precheck_on_main.py` at 102 passed. Run on a cheap pass, `precheck_on_main` resets `prechecking` to None and acts on the carried `precheck` and `checks`, so the *prechecking* row would drop out between full passes and a stale `absent` could start a run; no test has such a pass (`survey(..., full=False)` with a previous reading).
+
+**Fix:** add a `survey` test with a previous reading that has `prechecking` set, `full=False`, and a fake `precheck_script` that records its starts; assert the second pass keeps `prechecking`, starts nothing, and calls `precheck_on_main` not at all (monkeypatch it to fail).
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1038.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2433) — `test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck` in `tests/test_precheck_on_main.py`: a full pass starts the precheck, then a pass with `full=False` and that reading keeps `prechecking`, starts nothing, and fails if `precheck_on_main` or `precheck_pr_bound` runs. The probe (`if True:` on the line) fails it.
