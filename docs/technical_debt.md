@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1085 | A run counted as ending with no status keeps the PR's first `waiting_since`, and no test notices if the clock restarts (test audit) | Low | Open — build |
 
 ---
 
@@ -1945,20 +1944,3 @@ It then names the build entries.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
 
-## TD-1085: A run counted as ending with no status keeps the PR's first `waiting_since`, and no test notices if the clock restarts (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2416, #2412, #2411, #2417, #2420, #2421)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/sync.py` (`tend_precheck`: `"waiting_since": e.get("waiting_since") or at`), `tests/test_sync_precheck.py`
-
-**Why:** `SYNC_PRECHECK_WAIT` (a day at one head, then *refused*) counts from `waiting_since`, which `wait_entry` keeps from the first waiting pass. `tend_precheck` writes the counted pass's entry with the same rule. Probed on `origin/main`: replacing it with `"waiting_since": at` leaves `tests/test_sync_precheck.py` at 17 passed. A run that dies with no status each time would restart its day on every count, and the PR would never be refused to the team. `test_a_run_that_ended_with_no_status…` asserts `verdict`, `tries` and `why`, not the clock.
-
-**Fix:** in that test seed the entry with an old `waiting_since`, and assert it is unchanged after the counted pass.
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1039.
