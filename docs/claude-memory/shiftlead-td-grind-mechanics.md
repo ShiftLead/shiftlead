@@ -1,6 +1,6 @@
 ---
 name: shiftlead-td-grind-mechanics
-description: "Gotchas for scripted ledger edits, PR comments and merging in ShiftLead (template headed TD-001, never guess a PR number, archive-tail conflicts, post comments from a file)"
+description: "Gotchas for scripted ledger edits, PR comments and merging in ShiftLead (post comments from a file, a review comment after the merge never counts, kill by pid); the ledger habits point at cadence §2.5, §2.8, §2.12, §4.8"
 metadata: 
   node_type: memory
   type: project
@@ -10,17 +10,13 @@ metadata:
 
 Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgrind-ao-1):
 
-- `docs/technical_debt.md` carries an `<!-- Entry template … -->` block that is itself headed
-  `## TD-001: Short title of the problem`. Any regex that finds an entry by `## TD-NNN:` must
-  start searching *after* the template's `-->`, or it moves the template and leaves the comment
-  unclosed (this happened once, caught in review of PR #44).
+- A scripted ledger edit parses through `ledger.py` or ledgerboard, never a hand regex on
+  `## TD-NNN:` — the template comment is itself headed `## TD-001` (cadence §2.12, TD-137).
 - `gh pr merge --squash` is silently refused while CI is still pending (`mergeStateStatus`
   UNSTABLE); `gh pr view N --json state` then still says OPEN. Poll
   `gh pr view N --json statusCheckRollup` for `SUCCESS` first. `gh pr checks` output has a
   space in the check name, so `awk '{print $2}'` is wrong.
-- Every TD PR appends to `docs/technical_debt_archive.md`, so consecutive merges conflict on the
-  archive tail (and on the ledger when two PRs delete neighbouring entries). Rebase each branch
-  right before its merge; keep-both is always the right archive resolution.
+- Ledger and archive-tail conflicts, and the rebase right before the merge: cadence §2.5 (TD-137).
 - The archive's label is cadence §2.8's and the review comment's shape is §4.9's; run
   `tests/test_ledger.py` before pushing even a doc-only ledger PR.
 - `pkill -f <pattern>` kills the wrapping shell when the pattern appears in the command line
@@ -28,19 +24,13 @@ Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgri
 - A probe script that starts a child agent must put `SHIFTLEAD_HOME` under a *short* path: the
   session scratchpad path is too long for `agent.sock` (`OSError: AF_UNIX path too long`) and
   the child waits forever for a socket that never appears.
-- Sonnet reviewers should be told to read the PR via `gh pr diff N` and
-  `git show origin/<branch>:<path>` (own throwaway worktree for running tests), never the
-  working copy — then the checkout is free to move to the next TD while the review runs.
+- Where a reviewer reads: cadence §4.8 (TD-136), refs or its own worktree, never the working copy.
 - CI runners lag tmux's exit status: a pane can read `dead=1` with no `pane_dead_status` for
   more than 6 s (seen on 3.13 only, PR #52). Do not assert `exit_code` right after `exited`.
 
 Added 2026-09-14 (same session, a later run, ten PRs merged):
 
-- **Never write a PR number into the ledger before the PR exists.** Guessing "the next free
-  number" is wrong whenever another session merges first, and several do. I did it twice in one
-  run — wrote #140 and #146, both of which went to other sessions' PRs — and each needed its own
-  correcting PR. Open the PR, read the number it returns, then write the ledger line. No test can
-  catch this: a PR number is not a ledger id and nothing checks a citation against GitHub.
+- A PR number is the forge's: cadence §2.8 (TD-137).
 - **A review comment posted or edited after the merge never counts**: editing the comment
   afterwards fails on `updated_at > merged_at`, so the row can never go green. Post the evidence
   before the merge. (The check once read the verdict on the first line only, TD-050; it reads

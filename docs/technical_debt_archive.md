@@ -21134,3 +21134,17 @@ Any of these puts the live agent back to the pre-TD-1093 behaviour for a peer wh
 **Related:** TD-1091, TD-1090.
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2488) — `test_a_mark_that_is_the_seats_only_change_is_saved`: a not-due switch-made seat whose only change is the switch turned off has `{swept: off}` on disk, and loses it when the switch is back on. With the `count` read and `or s.seat_count != count` removed, it fails (27 others pass).
+
+## TD-1021: Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through the memory harvest; drafted by session `memory-vs-cadence`)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — (1), (2) and (4) in #2366 (grinder-ao-2, 2026-10-26); (3) in #2490 (grinder-ao-1, 2026-10-27).
+**Location:** `docs/claude-memory/`
+
+**Why:** Paul's first memory harvest (dev-cadence TD-125, 2026-10-26) judged every memory in `docs/claude-memory/` against dev-cadence's cadence and his own cadence layer. Some memories now contradict the cadence. A wrong memory is worse than none (cadence §7.1): a session follows it. Most of the wrong ones teach numbering TD ids by hand. Others repeat a rule cadence.md now holds, so the copies drift as the cadence changes. Other people will work in this repo, so memories whose lessons went only into Paul's personal layer or his `craft.md` stay here as they are. That includes `agree-the-layout-before-model-reviews` and `hold-a-design-until-its-round-ends`.
+
+**Resolved:** 2026-10-27 (#2366, then #2490, grinder-ao-2 and grinder-ao-1) — #2366 corrected the passages that contradicted the cadence (1), trimmed the copies of its rules to a pointer (2) and tidied (4); #2490 trimmed (3)'s memories to a pointer at dev-cadence TD-136 to TD-139's rules once the pin (78e4614) carried them: cadence.md §1.1, §2.5, §2.8, §2.9, §2.12, §3.6 and §4.8. The lasting content is in those §s and `docs/claude-memory/`.

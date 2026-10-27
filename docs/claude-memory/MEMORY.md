@@ -4,31 +4,31 @@
      Format:  - [Title](file.md) — one-line hook
      Group under ## headers by topic as the list grows. -->
 - [Unattended workers run inside ShiftLead](unattended-workers-run-inside-shiftlead.md) — launch TD-grind workers with `ao new --unattended`, briefs in docs/briefs/
-- [TD-grind mechanics in ShiftLead](shiftlead-td-grind-mechanics.md) — ledger template is headed TD-001; never guess a PR number; archive-tail conflicts; ids and renumbers from `ao td next`; a review comment after the merge never counts
+- [TD-grind mechanics in ShiftLead](shiftlead-td-grind-mechanics.md) — post comments from a file; a review comment after the merge never counts; kill by pid; the ledger habits are cadence §2.5, §2.8, §2.12
 - [Claude Code composer ghost text](claude-code-composer-ghost-text.md) — faint `❯ text` is a suggestion, not an unsubmitted prompt; check `capture-pane -e`
 - [Design goals: effective and non-intrusive](design-goals-effective-non-intrusive.md) — another repo's work is its own sessions' (cadence §3.7); tool wiring in adapters
-- [No VS Code windows for agent worktrees](no-vscode-windows-for-agent-worktrees.md) — open_worktree.sh opens `code -n`; use git worktree add for session-only worktrees
+- [No VS Code windows for agent worktrees](no-vscode-windows-for-agent-worktrees.md) — cadence §1.1: open_worktree.sh is for the person; git worktree add for a session's own
 - [Design review loop with Sonnet](design-review-loop-with-sonnet.md) — round counts are cadence §4.8 (Fable and Sonnet iterate until they agree); a mechanism that keeps failing rounds: ask if it is needed
-- [Alternate review rounds](alternate-review-rounds.md) — Sonnet, fix, Fable, fix; never both at once on the same text (Paul, 2026-10-19)
+- [Alternate review rounds](alternate-review-rounds.md) — cadence §4.8: Sonnet, fix, Fable, fix; never both at once on the same text (Paul, 2026-10-19)
 - [Agree the layout before model reviews](agree-the-layout-before-model-reviews.md) — in a UI round with Paul, no Sonnet/Fable rounds until he and the session agree on the mockups (2026-10-21)
 - [Scratchpad too long for unix sockets](scratchpad-too-long-for-unix-sockets.md) — a scratch SHIFTLEAD_HOME needs a short path like ~/.cache/ao<topic>
 - [How a design round runs from a cloud session](cloud-design-round.md) — park on the board first, propose in chat, Sonnet rounds to READY, fact-check on the PR, one branch
-- [Check open PRs before a design round](check-open-prs-before-a-design-round.md) — the designer's stacked PRs may already hold the design (a restarted run's own too: `gh pr list` before the first claim); compare and reconcile, never design twice
-- [A park is a merged PR, not an open one](a-park-is-a-merged-pr.md) — the designer reads the board on `main`; wait for the park PR to merge, and re-search the id in every state before the round
-- [Check in-flight work before a TD step](check-in-flight-before-a-td-step.md) — another session may hold the next step; conformance-read instead; `ao msg` for leads, never a peer message
+- [Check open PRs before a design round](check-open-prs-before-a-design-round.md) — cadence §2.9 `forge.py in-flight`; a restarted run's own open design PRs too; reconcile, never design twice
+- [A park is a merged PR, not an open one](a-park-is-a-merged-pr.md) — cadence §3.6: a park holds once merged; §2.9: re-search the id's PRs in every state before the round
+- [Check in-flight work before a TD step](check-in-flight-before-a-td-step.md) — cadence §2.9 `forge.py in-flight`; conformance-read a held step; `ao msg` for leads, never a peer message
 - [Headless screenshots on kmaster](headless-screenshots-on-kmaster.md) — snap Firefox `--headless --screenshot` at load; Playwright (`~/ao-shots/pwlib`, Chromium) for anything after scripts run; read-only against the live UI
-- [Open the PR before writing its number](open-the-pr-before-writing-its-number.md) — a guessed `PR #N` in the ledger points at someone else's PR
+- [Open the PR before writing its number](open-the-pr-before-writing-its-number.md) — cadence §2.8: a PR number is the forge's; `ao progress done --pr N` too
 - [pdm run fmt sweeps other sessions' files](pdm-run-fmt-sweeps-other-sessions-files.md) — it formats the whole repo; `git add -A` after it steals a sibling's merged files into your PR
 - [gh comment bodies go in a file](gh-comment-bodies-go-in-a-file.md) — `--body "…"` lets bash run its backticks; use `--body-file`
-- [Dates are local, PR numbers are real](dates-and-pr-numbers-are-local-and-real.md) — `date` before a dated ledger edit; open the PR before writing its number
+- [Dates are local, PR numbers are real](dates-and-pr-numbers-are-local-and-real.md) — `date` before a dated ledger edit (kmaster is local time); PR numbers: cadence §2.8
 - [Read inbox before merging](read-inbox-before-merging.md) — merge rights change by mail; a held-path PR (`ao pr held N`) is handed over: its author sends the techlead seat the `ask --pr` once green, or it sits unasked (#1842)
 - [No checks means conflicting](no-checks-means-conflicting.md) — `gh pr checks` empty after a push: the PR conflicts with main, so no pull_request run; rebase
 - [Gate a merge on the check's exit code](gate-a-merge-on-the-checks-exit-code.md) — step 5 merges on exit 0; capture it from the check itself, never through `| head`
-- [Reviewer prompts keep out of the anchor](reviewer-prompts-keep-out-of-the-anchor.md) — a reviewer given `git -C /home/kmaster/shiftlead` ran a checkout there; worktree paths only
+- [Reviewer prompts keep out of the anchor](reviewer-prompts-keep-out-of-the-anchor.md) — cadence §4.8: refs or its own worktree; name the anchor path only for `git fetch`
 - [Scratch-worktree tests import the main checkout](scratch-worktree-tests-import-main-checkout.md) — run a branch's tests with `PYTHONPATH=$PWD/src` and the main venv
 - [Retarget a stacked PR with the API](retarget-a-stacked-pr-with-the-api.md) — `gh pr edit` (--base, --body-file) fails on projectCards; PATCH pulls/N, rebase --onto, delete the base last
-- [Summary-table conflicts resolve row-wise](summary-table-conflicts-resolve-row-wise.md) — one row per id after a rebase, never both sides; `ao --json` goes before the subcommand
-- [Designer run lessons 2026-09-25](designer-run-lessons-2026-09-25.md) — a steer, and a techlead reply with `--source`, is refused when the person inbox is full (board line / `Source:` first line instead); reviewer agents need explicit refs in a shared worktree; a build entry's id from `ao td next`
+- [Summary-table conflicts resolve row-wise](summary-table-conflicts-resolve-row-wise.md) — cadence §2.5: one row per id after a rebase; `ao --json` goes before the subcommand
+- [Designer run lessons 2026-09-25](designer-run-lessons-2026-09-25.md) — a steer, and a techlead reply with `--source`, is refused when the person inbox is full (board line / `Source:` first line instead); reviewer agents read refs (cadence §4.8); a build entry's id from `ao td next`
 - [An interactive UI/UX review makes the change visible](ui-review-screenshots.md) — significant UI changes reviewed with Paul always come with something to look at: screenshots, renderings or a design page (one per compared shape), kept under docs/mockups/reviews/ and sent into the chat
 - [Design help text is bound to help.py](design-help-text-is-bound-to-help-py.md) — a design PR never rewords §4.5a's help list; the wording goes in the build entry; run the doc-bound tests before pushing
 - [Delete only your own branches, by name](delete-only-your-own-branches-by-name.md) — `git branch` is every session's; never loop a delete over it (2026-09-27 incident, refs/recovered)
@@ -41,7 +41,7 @@
 - [Edit scripts assert before writing](edit-script-asserts-before-writing.md) — check every replacement count first, then write, re-reading per replacement; never chain `git commit` after an edit script
 - [Never count the unread inbox](never-count-the-unread-inbox.md) — `ao inbox --unread` marks entries read; save it to a file, never pipe it through `jq length`; check open questions from the full inbox before stopping
 - [Stop a scratch home by its pid](stop-a-scratch-home-by-its-pid.md) — `pkill -f`/`pgrep -f` on look_home args kills the tool's own shell; `ps | grep '[l]ook…'`, then kill the number
-- [Designer run lessons 2026-10-04](designer-run-lessons-2026-10-04.md) — a history line goes above a section's newest lines, never at its tail; ids from `ao td next`; no checkout while a reviewer reads the worktree
+- [Designer run lessons 2026-10-04](designer-run-lessons-2026-10-04.md) — a history line goes above a section's newest lines, never at its tail; ids from `ao td next`; the tree stays put while a reviewer reads (cadence §4.8)
 - [Memory edits block auto promote](memory-edits-block-auto-promote.md) — a memory write lands uncommitted in the main checkout and auto promote refuses a dirty checkout; land it by PR
 - [Read the claim's reply](read-the-claims-reply.md) — `ao progress claim` can be refused; never send it to /dev/null, check your record before the first step (TD-152 pressed twice, 2026-10-05)
 - [Designer run lessons 2026-10-05](designer-run-lessons-2026-10-05.md) — a steer's first paragraph is warned past ~100 words (read the reply past the warning line); the manager seat may hold no session; a fact-check by commit ref frees the worktree
