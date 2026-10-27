@@ -20772,3 +20772,23 @@ None of the three files calls `park_ticks`, so the fixture's tick loop running b
 **Related:** TD-1087 (its other half), TD-1088, TD-1098, TD-1102 (the other flakes in these runs), TD-1100, TD-1068.
 
 **Resolved:** 2026-10-27 (grinder-ao-2, #2460) — each of the three tests had the fixture's tick loop running beside it, and each now parks it. `park_ticks` itself had a hole: it drained a tick's passes once, but the promote pass starts `_sync_task` as it ends, and that pass ran under the test. The drain now loops until none is in flight. Under `-n auto`, 20 runs of the three files beside five full suites passed 20 of 20. Four of the five full runs passed; the fifth failed only TD-1102's test, fixed in #2459. TD-1098 (#2457) and TD-1100 (#2458) are fixed too. `pdm run test` stays at `-n 8` (the entry said *may*).
+
+## TD-1082: A killed `--pr` precheck run's worktree is dropped by the prefix `precheck-<pr>-`, and the sync tests stub `drop_precheck_tree` to nothing (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2416, #2412, #2411, #2417, #2420, #2421)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/promote.py` (`kill_precheck`: `drop_precheck_tree(root, str(f.get("sha") or ""), f"precheck-{pr}-" if isinstance(pr, int) else None)`), `tests/test_sync_precheck.py` (`pre` fixture: `monkeypatch.setattr(promote, "drop_precheck_tree", lambda *a, **k: None)`), `tests/test_precheck_on_main.py`
+
+**Why:** #2416 made `kill_precheck` pass a PR run's own prefix, so a `--pr` run's leftover worktree (`<tmp>/precheck-<pr>-*/head`) is the one removed and not a `--commit` run's `precheck-<sha7>-`. Probed on `origin/main`: replacing that call with `drop_precheck_tree(root, str(f.get("sha") or ""), None)` leaves `tests/test_sync_precheck.py` at 17 passed. The `pre` fixture replaces `drop_precheck_tree` with a no-op ("no checkout at ROOT"), and `tests/test_precheck_on_main.py` only kills `--commit` runs, so no test sees which prefix is asked for. A wrong prefix leaves every killed PR run's worktree on disk, which TD-1052 and TD-1053 were filed to stop.
+
+**Fix:** a test that stubs `drop_precheck_tree` to record its arguments and kills a run whose file carries `pr` (and one without it), asserting the prefix `precheck-<pr>-` and `None`; or one that makes a worktree at that path in a scratch repo.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1039.
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2461) — `test_a_killed_runs_tree_is_dropped_by_its_own_prefix` records what `kill_precheck` asks `drop_precheck_tree` for: `precheck-1097-` for a run whose file carries `pr`, `None` for one without. With the call's prefix replaced by `None`, `tests/test_sync_precheck.py` reads 1 failed, 17 passed.
