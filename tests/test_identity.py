@@ -8,7 +8,10 @@ from the pytest process, under no pane, as sessions — which is what the table 
 from __future__ import annotations
 
 import json
+import os
 import shlex
+import socket
+import struct
 import sys
 import textwrap
 import time
@@ -33,6 +36,7 @@ class FakeProc:
         self.cgroups = cgroups or {}
         self.script: dict[int, list[Proc | None]] = {}
         self.comms: dict[int, str] = {1: "systemd"}
+        self.ns: dict[int, str] = {}  # pid → its pid namespace link; absent reads as unreadable
 
     def stat(self, pid: int) -> Proc | None:
         if self.script.get(pid):
@@ -44,6 +48,9 @@ class FakeProc:
 
     def comm(self, pid: int) -> str | None:
         return self.comms.get(pid)
+
+    def pid_ns(self, pid: int) -> str | None:
+        return self.ns.get(pid)
 
 
 def P(pid: int, ppid: int, sid: int, tty: int = 0, start: int | None = None) -> Proc:
@@ -197,6 +204,113 @@ def test_the_walk_is_bounded():
 # -- the rule table -------------------------------------------------------------------------------
 
 X = Channel("session", "ao-x", "ancestry")
+
+
+# -- the pid namespace (TD-1093) -------------------------------------------------------------------
+
+HOST_NS, BOX_NS = "pid:[4026531836]", "pid:[4026532999]"
+ME, OTHER = 1000, 0  # the agent's effective uid, and a container's root
+
+
+def _ns(fp: FakeProc, **links: str) -> FakeProc:
+    """The agent's own link is the host's; `links` maps `p<pid>` to a peer's."""
+    fp.ns = {os.getpid(): HOST_NS, **{int(k[1:]): v for k, v in links.items()}}
+    return fp
+
+
+def test_a_peer_no_pane_places_in_another_pid_namespace_is_unknown_never_the_person():
+    # 400 descends from a container runtime (390), not from a pane
+    fp = _ns(FakeProc([*BASE, P(390, 1, 390), P(400, 390, 400)]), p400=BOX_NS, p390=HOST_NS)
+    assert identity.classify(400, PANES, fp) == Channel("unknown", signal="namespace")
+    assert identity.classify(390, PANES, fp) == identity.OUTSIDE  # the agent's own namespace, no pane
+    # a person-only act from it is refused, and the person is told
+    v = identity.judge(identity.classify(400, PANES, fp), None, "inbox_delete")
+    assert v.refusal == identity.MISMATCH and v.alarm["channel"] == "unknown"
+
+
+def test_a_peer_under_a_pane_is_its_session_whatever_namespace_it_runs_in():
+    # `ao` under `bwrap`/`unshare` that a session started: the ppid chain in this host's /proc walks
+    # through the child namespace to the pane
+    fp = _ns(FakeProc([*BASE, P(110, 100, 100, 0x8801), P(111, 110, 111)]), p111=BOX_NS, p110=BOX_NS)
+    assert identity.classify(111, PANES, fp) == Channel("session", "ao-x", "ancestry")
+    # an orphan in a child namespace that keeps the pane's session id is still placed by it
+    fp = _ns(FakeProc([*BASE, P(120, 1, 100)]), p120=BOX_NS)
+    assert identity.classify(120, PANES, fp) == Channel("session", "ao-x", "sid")
+    # and one that nothing places is not
+    fp = _ns(FakeProc([*BASE, P(130, 1, 130)]), p130=BOX_NS)
+    assert identity.classify(130, PANES, fp) == Channel("unknown", signal="namespace")
+
+
+def test_a_pid_of_0_and_an_unreadable_credential_are_unknown_never_unclassified():
+    fp = _ns(FakeProc(list(BASE)))
+    assert identity.classify(0, PANES, fp) == Channel("unknown", signal="namespace")
+    assert identity.classify(-1, PANES, fp) == Channel("unknown", signal="unreadable")
+
+
+def test_an_unreadable_link_is_outside_for_the_agents_own_uid_and_unknown_for_another():
+    fp = _ns(FakeProc([*BASE, P(300, 1, 300, 0x8810)]))  # 300's stat reads, its link does not
+    assert identity.classify(300, PANES, fp, peer_uid=ME, own_uid=ME) == identity.OUTSIDE  # non-dumpable
+    for uid in (OTHER, 1234):  # a container's root or remapped user, or the person's `sudo ao`
+        got = identity.classify(300, PANES, fp, peer_uid=uid, own_uid=ME)
+        assert got == Channel("unknown", signal="namespace"), uid
+    assert identity.classify(300, PANES, fp) == identity.OUTSIDE  # no uids given: the uid test is off
+    # an agent with CAP_SYS_PTRACE reads another uid's link, and an equal one stays outside
+    fp.ns[300] = HOST_NS
+    assert identity.classify(300, PANES, fp, peer_uid=OTHER, own_uid=ME) == identity.OUTSIDE
+
+
+def test_the_suites_own_callers_classify_as_before():
+    """The pytest process: in the agent's namespace, of its uid, under no pane — the person."""
+    real = identity.LinuxProc()
+    assert (real.pid_ns(os.getpid()) or "").startswith("pid:[")
+    assert real.pid_ns(2**22 + 12345) is None
+    me = os.geteuid()
+    assert identity.classify(os.getpid(), [], real, peer_uid=me, own_uid=me) == identity.OUTSIDE
+
+
+def test_the_peer_credential_carries_the_uid_and_an_unreadable_one_is_distinct():
+    from sessionorc import agent_common
+
+    class Writer:
+        def __init__(self, sock):
+            self.sock = sock
+
+        def get_extra_info(self, name):
+            return self.sock if name == "socket" else None
+
+    a, b = socket.socketpair(socket.AF_UNIX)
+    try:
+        assert agent_common._peer_pid(Writer(a)) == (os.getpid(), os.geteuid())
+    finally:
+        a.close(), b.close()
+
+    class Broken:
+        def getsockopt(self, *args):
+            raise OSError("no credential")
+
+    class Zero:
+        def getsockopt(self, *args):
+            return struct.pack("3i", 0, 0, 0)
+
+    assert agent_common._peer_pid(Writer(Broken())) == agent_common.PEER_UNREADABLE
+    assert agent_common._peer_pid(Writer(Zero())) == (0, 0)  # passed on, for the classification
+    assert agent_common._peer_pid(Writer(None)) is None  # no socket: an in-process call
+    assert agent_common._peer_args(Writer(Zero())) == {"peer": 0, "peer_uid": 0}
+    assert agent_common._peer_args(Writer(None)) == {"peer": None, "peer_uid": None}
+
+
+async def test_a_peer_in_another_namespace_is_refused_under_enforce_and_alarmed_under_observe(agent, monkeypatch):
+    agent._id_detached = ""  # off: no tmux server is asked
+    monkeypatch.setattr(agent, "proc", _ns(FakeProc([*BASE, P(400, 1, 400)]), p400=BOX_NS))
+    agent._id_panes = list(PANES)
+    act = {"id": 1, "method": "inbox_delete", "params": {}}
+    agent.identity_mode = "observe"
+    assert await agent._identify(dict(act), 400, peer_uid=OTHER) is None  # served, as before
+    assert [(x["channel"], x["rpc"]) for x in agent.identity_alarms] == [("unknown", "inbox_delete")]
+    assert agent.identity_tally["unknown:namespace"] == 1
+    agent.identity_mode = "enforce"
+    assert (await agent._identify(dict(act), 400, peer_uid=OTHER))["error"] == identity.MISMATCH
+    assert [(x["channel"], x["count"]) for x in agent.identity_alarms] == [("unknown", 2)]  # one alarm, counted
 
 
 def test_the_channel_decides_and_a_claim_that_disagrees_is_refused_and_alarmed():
