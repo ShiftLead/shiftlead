@@ -96,7 +96,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1130 | `Part of:` is read: ledgerboard v2.1 vendored, and the ledger reader and the Queue's reading tell a part from a blocker | Medium | Open — build, blocked by dev-cadence#TD-165 |
 | TD-1131 | A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter | Medium | Open — build, blocked by TD-1130 |
 | TD-1132 | The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:` | Medium | Open — build, blocked by TD-1130 |
-| TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, waits on the promote |
+| TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
 
 ---
 
@@ -2005,7 +2005,8 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 1. **The first PR is the `dev-cadence bump` that runs `scripts/vendor_ledgerboard.sh v2.1` in the same PR** (the fixtures test needs the wheel's copy byte-equal to the pinned tree's). It changes no behaviour. v2.1 also brings v2.0's changes over the vendored v1.3 (its directory loader); a v1 ledger reads as before.
 2. `ledger.py`: pickable from ledgerboard's `rec["pickable"]`; `part_of` and `parts_open` on each entry, open parts kept out of `blocked_by`; `kind_of` reads a parent with open parts as `blocked`; `archived` adds archived ids whose `Part of:` names an open entry.
 3. The Queue's reading: `part_of` per row, the row's parent its `Part of:` parent on the card, else none; the top entry the root parent with the best key, else today's rule; the state *waiting* for an open blocker or an open part, the relation words *after TD-n* carried apart from the state; an open part counts as an open id in `_status`, `waits` and `_wait` (never a leaf); a separate `parts` map in the within-card pick loop, kept out of the tree and the words; `touch`/`names_open` and `_completed` read the archive's `Part of:` lines both ways; *also after* goes.
-4. `builds_open` (both copies, and `blocking`) becomes *some open entry names this entry in `Part of:`*; Back to design's `blocked_open` counts open parts; `design_builds` and the *builds TD-n* back-link read `Part of:`, falling back to a design's `Blocked by:` until its backfill.
+4. `builds_open` (both copies, and `blocking`) becomes *some open entry names this entry in `Part of:`*; Back to design's `blocked_open` counts open parts; `design_builds` and the *builds TD-n* back-link read `Part of:`, falling back to a design's `Blocked by:` until its backfill. The reading keeps the keys the templates read (`builds_open`, `blocked_open`, `builds_of`, `builds`), so `queue_row.html`'s Done guard (22, 43), `builds_of` (57), *every build archived* (62) and `inbox_row.html` change behaviour with no edit here; *also after* stops being produced, and its page test (`tests/test_ui_queue_cards.py:158`) is TD-1131's to retire.
+5. §4.4 *Repo facts*: `kind_of` reads an entry some open entry names in `Part of:` as *blocked*, and §4.8's pick reads ledgerboard's `pickable`.
 
 **Done when** the tests on a TD-748-shaped card — a design, its parts, a trial, a part blocked from another group, a cross-repo blocker, an archived part and an archived parent with an open part — pin each row's parent, state, relation words and order, and a not-backfilled design still reads as today; and `pdm run test` passes.
 
@@ -2020,7 +2021,7 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Kind:** build
 **Status:** Open — build
 **Blocked by:** TD-1130
-**Location:** `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*, `builds_of` 57, the Done guard 22 and 43, *every build archived* 62); `src/shiftlead/ui/templates/inbox_row.html`; `src/shiftlead/ui/static/app.css`; `src/shiftlead/ui/help.py` (help text bound to §4.5a)
+**Location:** `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); `tests/test_ui_queue_cards.py:158` (*also after*, retired); `src/shiftlead/ui/static/app.css`; `src/shiftlead/ui/help.py` (help text bound to §4.5a)
 
 **Why:** TD-1129's page half: the reading of TD-1130 tells a part from a blocker; the card must draw it.
 
@@ -2043,7 +2044,7 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 
 **Why:** TD-1129: the texts the wheel carries tell a designer to list builds in a design's `Blocked by:`, and a grinder to take an entry when nothing its `Blocked by:` names is open. Once the reader knows `Part of:` they must say what a parent with open parts is.
 
-**Fix:** design §4.9c *A design entry archives with its last build*; [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §4 step 5. `build.md` archives a parent with its last part by §4.9c's rule (its `Blocked by:` empty or archived, no decision; one level per PR); `design.md` and `designer.md` write `**Part of:** TD-n` on each build filed and stop listing builds in the design's `Blocked by:`; `grinder.md`'s "nothing `**Blocked by:**` names is still open" gains "and no open entry is `Part of:` it"; `entry.md` names the header line `ao td add` writes for a part; the ledger preamble names `Part of:` and the pick rule (the `Fields:` line does not change: `Part of` is a cadence field). These go live with the promote; `docs/briefs/` is TD-1133's, not this entry's.
+**Fix:** design §4.9c *A design entry archives with its last build*; [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §4 step 5. `build.md` archives a parent with its last part by §4.9c's rule (its `Blocked by:` empty or archived, no decision; one level per PR); `design.md` and `designer.md` write `**Part of:** TD-n` on each build filed and stop listing builds in the design's `Blocked by:`; `grinder.md`'s "nothing `**Blocked by:**` names is still open" gains "and no open entry is `Part of:` it"; `entry.md` names the header line `ao td add` writes for a part; **the transition**: `build.md` keeps the `Blocked by:` reading for a design that still names its build (the build carrying no `Part of:`), archiving it by the rule from before until TD-1133's PR for that design; the ledger preamble names `Part of:` and the pick rule (the `Fields:` line does not change: `Part of` is a cadence field). These go live with the promote; `docs/briefs/` is TD-1133's, not this entry's.
 
 **Done when** each text says it, the doc-bound tests pass, and `pdm run test` passes.
 
