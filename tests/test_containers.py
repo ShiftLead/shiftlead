@@ -365,15 +365,19 @@ def test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache(hom
     """§4.4a, TD-1014 (5): the home copies the tree the node's checkout pins to the node's volume, then
     into the container's launcher cache, where the launcher takes it as made and fetches nothing."""
     ref = _pinned_node(monkeypatch, tmp_path)
+    n = containers.node("contractmatch")
+    n.node_dir.mkdir(parents=True)
+    n.env_file.write_text("XDG_CACHE_HOME=/home/developer/.alt-cache\n")  # the agent's env moves its cache
     r = Fake()
     containers.host_up("contractmatch", r)
-    n = containers.node("contractmatch")
     shipped = n.node_dir / "cadence" / ref
     assert (shipped / "files" / "scripts" / "check_cadence.py").read_text() == "x = 1\n"
     assert (shipped / "launcher" / "INTERFACE").is_file()
     into = r.execs(containers.CADENCE_INTO_CACHE)
     assert len(into) == 1 and into[0][into[0].index("-u") + 1] == "developer"
     assert into[0][-2:] == [f"/shiftlead/cadence/{ref}", ref]
+    # the cache written is the one the agent's launcher reads: the step runs in the agent's env (TD-1057)
+    assert into[0][into[0].index("--env-file") + 1] == str(n.env_file)
     containers.host_up("contractmatch", Fake())  # shipped once: a second run copies nothing new
     assert sorted(p.name for p in shipped.parent.iterdir()) == [ref]
     os.chmod(shipped / "files", 0o555)  # as the launcher leaves its trees

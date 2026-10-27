@@ -17,3 +17,5 @@ may have moved during the nine-minute CI: a `merge conflicts` refusal means reba
 **How to apply:** never put a `gh` invocation you have not run once in the foreground into a wait
 loop's condition. TD-940 (`ao pr wait <n>`) replaces the loop with the home's folded reading;
 see [[no-checks-means-conflicting]] and [[gate-a-merge-on-the-checks-exit-code]].
+
+**Since TD-1035 (2026-10-26)** PRs gate on a local `cadence/precheck`, not GitHub Actions (stopped over billing): see [[precheck-and-merge-in-one-command]].
