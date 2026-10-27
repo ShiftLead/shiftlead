@@ -22,6 +22,8 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
+import time
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
@@ -36,6 +38,8 @@ PROMOTE_WATCH = 15.0  # seconds between `check` reads while a run is in flight
 PROMOTE_SETTLE = 600.0  # main must stand still this long before `auto` promotes (§6)
 PROMOTE_MAX_WAIT = 1800.0  # or main has been ahead of live this long, still or not (§6, TD-581)
 PROMOTE_BOUND = 1200.0  # a run past this is killed and failed (§6)
+PRECHECK_BOUND = 1200.0  # a precheck on main's head past this is killed (§6 *The precheck on main*)
+PRECHECK_GRACE = 5.0  # seconds between the TERM to a precheck's group and the KILL
 SMOKE_BOUND = 600.0  # a smoke past this is killed and failed; from its start, the only clock (§6 *The smoke*)
 CHECK_TIMEOUT = 60.0
 GIT_TIMEOUT = 60.0
@@ -603,6 +607,161 @@ def tail(log_path: Any, lines: int = 20) -> list[str]:
     return text.splitlines()[-lines:]
 
 
+# -- the precheck on main (design §6 *The precheck on main*, TD-1038) ------------------------------
+
+
+def precheck_run(repo: str) -> dict[str, Any] | None:
+    """`precheck.json` `{sha, at, pid, started, log}`, with `exit` and `last` once this home saw the run
+    end: main's last run, kept after it ends (how *has run on that commit* is known) and replaced only
+    by the next sha's."""
+    return _read(repo_dir(repo) / "precheck.json")
+
+
+def precheck_pr_run(repo: str) -> dict[str, Any] | None:
+    """`precheck-pr.json`: the sync pass's run on a mechanical PR (§6 *Sync* step 4, TD-1039), read
+    here only so the two never run at once."""
+    return _read(repo_dir(repo) / "precheck-pr.json")
+
+
+def _going(f: dict[str, Any] | None) -> bool:
+    return bool(f) and alive(f.get("pid"), f.get("started"))
+
+
+def start_precheck(root: str | Path, repo: str, sha: str) -> tuple[dict[str, Any] | None, str | None]:
+    """Start dev-cadence's `precheck.py --commit <sha>` in the checkout, located by
+    `cadence.precheck_script` — `(file, None)`, or `(None, why)` with nothing started where the script is
+    absent. Stdin closed, in a session of its own (`pdm run test` is a grandchild, and the bound kills
+    the group), output to `precheck-<sha7>.log`; `precheck.json` is written **before** the start, so a
+    home that dies in between finds a `pid: null` file, and gains the pid and its start time after.
+    Raises OSError when the script cannot be spawned."""
+    script, why = cadence.precheck_script(root)
+    if script is None:
+        return None, why
+    argv, env = script
+    d = repo_dir(repo)
+    d.mkdir(parents=True, exist_ok=True)
+    log_path = d / f"precheck-{sha[:7]}.log"
+    f: dict[str, Any] = {"sha": sha, "at": datetime.now(UTC).isoformat(), "pid": None, "started": None}
+    f["log"] = str(log_path)
+    _write(d / "precheck.json", f)
+    with open(log_path, "ab") as out:
+        p = subprocess.Popen(
+            [*argv, "--commit", sha], cwd=str(root), stdout=out, stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL, start_new_session=True, env=env,
+        )  # fmt: skip
+    f["pid"], f["started"] = p.pid, proc_start(p.pid)
+    _procs[p.pid] = p
+    _write(d / "precheck.json", f)
+    return f, None
+
+
+def kill_precheck(root: str | Path, f: dict[str, Any]) -> None:
+    """The bound's kill: the run's process group TERM, then KILL after `PRECHECK_GRACE`, only while
+    `alive` reads it as the run; then what `precheck.py`'s own cleanup would have removed (§6)."""
+    pid, started = f.get("pid"), f.get("started")
+    if alive(pid, started):
+        with suppress(OSError):
+            os.killpg(pid, signal.SIGTERM)
+        deadline = time.monotonic() + PRECHECK_GRACE
+        while alive(pid, started) and time.monotonic() < deadline:
+            time.sleep(0.2)
+        # the group's KILL whether or not its leader went on the TERM: a grandchild deaf to it (the
+        # suite) outlives a leader that obeyed; the group was read as the run's a grace ago
+        with suppress(OSError):
+            os.killpg(pid, signal.SIGKILL)
+        kill(pid, started)
+    drop_precheck_tree(root, str(f.get("sha") or ""))
+
+
+def drop_precheck_tree(root: str | Path, sha: str, prefix: str | None = None) -> None:
+    """A killed run's worktree: the `git worktree list --porcelain` entry at `sha` whose path is
+    `<temp root>/<prefix>*/head` (`precheck-<sha7>-` for a `--commit` run), removed with `git worktree
+    remove --force`; any **empty** directory with that prefix removed (a kill between `mkdtemp` and the
+    `worktree add` leaves one; a non-empty one the list does not name is a session's own run, left
+    alone); then `git worktree prune`."""
+    if not SHA_RE.match(sha):
+        return
+    prefix = prefix or f"precheck-{sha[:7]}-"
+    tmp = Path(tempfile.gettempdir())
+    listing, _ = _git(root, "worktree", "list", "--porcelain")
+    for entry in (listing or "").split("\n\n"):
+        fields = dict(line.split(" ", 1) for line in entry.splitlines() if " " in line)
+        path = Path(fields.get("worktree") or "/")
+        if (
+            fields.get("HEAD") == sha
+            and path.name == "head"
+            and path.parent.parent == tmp
+            and path.parent.name.startswith(prefix)
+        ):
+            _git(root, "worktree", "remove", "--force", str(path))
+            if not path.exists():
+                with suppress(OSError):
+                    path.parent.rmdir()
+    for d in tmp.glob(f"{prefix}*"):
+        with suppress(OSError):
+            if d.is_dir() and not any(d.iterdir()):
+                d.rmdir()
+    _git(root, "worktree", "prune")
+
+
+def precheck_on_main(root: str | Path, repo: str, r: dict[str, Any], now: datetime) -> None:
+    """The home's own precheck on main's head (design §6 *The precheck on main*, TD-1038), on a pass that
+    read the checks: `r` is the reading, with `live`, `tree`, `inflight`, `failed` and `held` read. Where
+    the repo sets `precheck` (`r["precheck"]` not None), `auto` on or off: a run past `PRECHECK_BOUND` is
+    killed; a status on main's head is the verdict whatever the file says; with none (`absent`), main's
+    run on the head reads `pending`, *prechecking <sha7>* while it goes, `unknown`, *precheck on <sha7>
+    ended and recorded nothing*, once it has gone, and is never run again on that commit; else one is
+    started when live is not main's head, (1) and (3) hold, no hold stands and neither file shows a run
+    going — the caller holds the agent's promote lock. A `pid: null` file is started again while its sha
+    is main's head, dropped once not. Sets `prechecking` (the sha) while main's run goes on its head,
+    and `precheck_failed` `{sha, log, tail}` while a failed status stands on main's head."""
+    r["prechecking"], r["precheck_failed"] = None, None
+    pre, sha = r.get("precheck"), r.get("main")
+    if pre is None or not sha:
+        return
+    d = repo_dir(repo)
+    f = precheck_run(repo)
+    if f and f.get("pid") is not None and _going(f) and (_age(f.get("at"), now) or 0) >= PRECHECK_BOUND:
+        kill_precheck(root, f)
+        f["why"] = f"killed at the {int(PRECHECK_BOUND // 60)}-minute bound"
+    if f and f.get("pid") is not None and not _going(f) and "exit" not in f:
+        f["exit"] = _exits.pop(f.get("pid"), None)  # None: not this home's child, or not seen ending
+        f["last"] = (tail(f.get("log"), 1) or [""])[0]
+        _write(d / "precheck.json", f)
+    if f and f.get("pid") is None and f.get("sha") != sha:
+        clear(repo, "precheck")  # a run that never started, on a commit that is no longer main's head
+        f = None
+    if pre == "failure":
+        mine = f if f and f.get("sha") == sha else {}
+        r["precheck_failed"] = {"sha": sha, "log": mine.get("log"), "tail": tail(mine.get("log"))}
+        return
+    if pre != "absent":
+        return  # a status on the sha ends it, whatever the file says; `unread` starts nothing
+    if f and f.get("sha") == sha and f.get("pid") is not None:
+        if _going(f):
+            r["checks"], r["checks_why"], r["prechecking"] = "pending", f"prechecking {sha[:7]}", sha
+            return
+        why = f"precheck on {sha[:7]} ended and recorded nothing"
+        if isinstance(f.get("exit"), int):
+            why += f" (exit {f['exit']}" + (f": {f['last']}" if f.get("last") else "") + ")"
+        elif f.get("why"):
+            why += f" ({f['why']})"
+        r["checks"], r["checks_why"] = "unknown", why
+        return
+    if _going(f) or _going(precheck_pr_run(repo)):
+        return  # one at a time per repo: main's reading stays `unknown`, *no cadence/precheck on <sha7>*
+    if r.get("live") == sha or r.get("tree") is not None or r.get("inflight") or r.get("failed") or r.get("held"):
+        return
+    try:
+        started, why = start_precheck(root, repo, sha)
+    except OSError as e:
+        started, why = None, f"precheck.py could not be started: {e}"
+    if started is None:
+        r["checks"], r["checks_why"] = "unknown", why
+        return
+    r["checks"], r["checks_why"], r["prechecking"] = "pending", f"prechecking {sha[:7]}", sha
+
+
 # -- one pass over the registry (the home's tick, detached) ---------------------------------------
 
 
@@ -646,6 +805,8 @@ def acts(r: dict[str, Any], now: datetime) -> dict[str, Any] | None:
     u = unmet(r)
     if u is not None and u[0] != "checks":
         return None
+    if u is not None and r.get("prechecking") == r.get("main"):
+        return {"prechecking": str(r["main"])[:7]}  # the home's own precheck runs on main's head (TD-1038)
     if u is not None:
         return {"checks": str(r.get("checks") or "unknown")}
     left = [
@@ -669,6 +830,8 @@ def acts_words(a: Any) -> str:
         return f"settles in {max(1, -(-int(a['settles_in']) // 60))} min"
     if a.get("at"):
         return "promotes at the next tick"
+    if a.get("prechecking"):
+        return f"prechecking {a['prechecking']} — promotes when green"
     if a.get("checks"):
         return f"checks {a['checks']} — promotes when green"
     if a.get("waiting"):
@@ -938,6 +1101,8 @@ def survey(
                 r["failed"] = fl
             r["inflight"] = inflight(repo)
         r["held"] = held(repo)
+        if full or first:  # the checks were read this pass (TD-1038)
+            precheck_on_main(root, repo, r, now)
         r["auto"] = bool(auto.get(repo))
         behind = bool(r.get("main")) and r.get("live") != r["main"]
         # `auto` acts only on a live it has read (§6, Paul 2026-09-28): a `check` that is not

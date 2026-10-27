@@ -626,7 +626,12 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
     ago · main … · auto on · held* — *rolled back*, never *behind*, since a person put live there;
     its Dismiss ends the hold when no failure stands. A hold a failed smoke wrote (`by: smoke`, §6 *The
     smoke*, TD-811) reads *rolled back by the smoke from `<sha7>` <t> ago — <why>*; a run in flight
-    whose `check` read its commit (`phase: smoke`) reads *checking `<sha7>` live* on the row."""
+    whose `check` read its commit (`phase: smoke`) reads *checking `<sha7>` live* on the row.
+
+    **The precheck on main** (§6, TD-1038): while the home's own run goes on main's head the `auto` row
+    reads *· prechecking `<sha7>` — promotes when green* (`acts`); a precheck that failed on main's head
+    (`precheck_failed`) is drawn under *Needs you*, counted, whatever `auto` says, *checks failed on
+    `<sha7>`* with the log's last lines, until main's head moves."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for repo, r in sorted((promotes or {}).items()):
@@ -635,9 +640,11 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
         failed = r.get("failed") if isinstance(r.get("failed"), dict) else None
         flight = r.get("inflight") if isinstance(r.get("inflight"), dict) else None
         held = r.get("held") if isinstance(r.get("held"), dict) else None
+        pre = r.get("precheck_failed") if isinstance(r.get("precheck_failed"), dict) else None
+        pre = pre if pre and pre.get("sha") == r.get("main") else None  # until main's head moves
         behind = bool(r.get("main")) and r.get("live") != r.get("main")
-        auto_row = bool(r.get("auto")) and behind and not (failed or held or flight)
-        if not failed and not held and not auto_row and (r.get("auto") or not (flight or behind)):
+        auto_row = bool(r.get("auto")) and behind and not (failed or held or flight or pre)
+        if not failed and not held and not pre and not auto_row and (r.get("auto") or not (flight or behind)):
             continue
         live = str(r.get("live") or "")[:7]
         main = str(r.get("main") or "")[:7]
@@ -653,7 +660,7 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
         text += f" · main {main or 'unknown'}"
         if isinstance(ahead, int) and ahead:
             text += f", {ahead} commit{'' if ahead == 1 else 's'} ahead"
-        text += f" · checks {checks}"
+        text += f" · checks failed on {str(pre['sha'])[:7]}" if pre else f" · checks {checks}"
         if held:
             text += f" · auto {'on' if r.get('auto') else 'off'} · held"
         elif auto_row:
@@ -680,8 +687,9 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
                 "auto_row": auto_row,
                 "failed": failed,
                 "held": held,
+                "precheck_failed": pre,
                 "inflight": flight,
-                "fyi": (bool(flight) and not failed) or auto_row,
+                "fyi": (bool(flight) and not failed and not pre) or auto_row,
                 "find": " ".join(x for x in (repo, "promote", text, (failed or {}).get("why") or "") if x),
             }
         )

@@ -1391,7 +1391,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     dev-cadence's own `files/scripts/`, the resolver's `dev-cadence run` in a pinned repo, whose `env`
     is `cadence.command`'s, as the pinned gate is run with it; None in the other two), or None with a
     why when the script is absent, as in a pinned tree older than it; then nothing starts and main's reading is
-    `unknown`, *no precheck.py here*, as step 4 waits uncounted — started by the shell in the checkout, stdin closed, in a session of its
+    `unknown`, *no precheck.py here*, as step 4 waits uncounted — started from that argv with `--commit <sha>` appended (no shell), in the checkout, stdin closed, in a session of its
     own (`start_new_session`) and detached from the tick as the promote's run is. It runs the command in a clean detached worktree of its own at the
     commit and records a `cadence/precheck` commit status there, so the verdict outlives the home and
     is the one any reader sees. Its output goes to `~/.shiftlead/promotes/<repo>/precheck-<sha7>.log`

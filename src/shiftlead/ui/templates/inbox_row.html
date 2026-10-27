@@ -927,6 +927,8 @@
 {%- if e.failed %}
 <div class="body">failed: promoting {{ (e.failed.sha or '')[:7] }} — {{ e.failed.why }}{% if e.failed.exit is not none %} (exit {{ e.failed.exit }}){% endif %}. Nothing is promoted for {{ e.repo }} until this is dismissed or a press succeeds.</div>
 {%- if e.failed.tail %}<pre class="body mono promotelog" title="{{ e.failed.log }}">{{ e.failed.tail | join('\n') }}</pre>{% endif %}
+{%- elif e.precheck_failed %}
+{%- if e.precheck_failed.tail %}<pre class="body mono promotelog" title="{{ e.precheck_failed.log }}">{{ e.precheck_failed.tail | join('\n') }}</pre>{% endif %}
 {%- elif e.inflight and e.inflight.phase == 'smoke' %}
 <div class="st">checking {{ (e.inflight.sha or '')[:7] }} live · started <span class="localtime" data-at="{{ e.inflight.smoke_at or e.inflight.at }}">{{ e.inflight.smoke_at or e.inflight.at }}</span> — its smoke runs, and a note says whether it passed</div>
 {%- elif e.inflight %}
