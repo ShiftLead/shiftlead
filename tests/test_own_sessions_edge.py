@@ -105,6 +105,7 @@ async def test_each_start_writes_the_field_as_the_create_derives_it(agent, hooks
         # a scheduled start is supervised and unattended: no end whatever happens
         later = await mk(person, "later", unattended=True, start_at="2099-01-01T00:00:00Z")
         assert later["by_person"] is False
+        assert agent.sessions[later["id"]].by_person is False  # stored, not only resolved in the view
 
         # the person's resume of a supervised record stays supervised, so it writes false
         await person.call("hook", session=made["sup"], adapter_id="cc-sup")
@@ -160,6 +161,11 @@ async def test_a_node_writes_none_and_the_home_sets_its_copy_from_the_forwarded_
         got = await agent.rpc_create(name="n", dir=str(tmp_path / "n"), adapter="shell")
         assert agent.sessions[got["id"]].by_person is None  # the home's to write
         await agent.rpc_kill(id=got["id"])
+        (tmp_path / "s").mkdir()
+        later = await agent.rpc_create(
+            name="s", dir=str(tmp_path / "s"), adapter="shell", unattended=True, start_at="2099-01-01T00:00:00Z"
+        )
+        assert agent.sessions[later["id"]].by_person is None  # a scheduled record's too
     finally:
         agent.mode, agent.home = "home", agent.host
 

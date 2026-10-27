@@ -1210,12 +1210,13 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     marks each entry controller / person / other, honours `--unread` and `--json`; with no session
     it reads the person inbox."""
 
-    def mk(name: str) -> str:
+    def mk(name: str, **kw) -> str:
         (tmp_path / name).mkdir()  # one directory each: the anchor rule (§9 invariant 2)
         d = str(tmp_path / name)
-        return call_sync("create", name=name, dir=d, adapter="agentshell", argv=["bash", "--norc"])["id"]
+        return call_sync("create", name=name, dir=d, adapter="agentshell", argv=["bash", "--norc"], **kw)["id"]
 
-    lead, worker, peer = mk("lead"), mk("worker"), mk("peer")
+    # the peer unattended: two of the person's own interactive sessions may mail each other (TD-1069)
+    lead, worker, peer = mk("lead"), mk("worker"), mk("peer", unattended=True)
     call_sync("set_controllers", id=worker, add=[lead])
     call_sync("send", id=worker, text="echo typed by a person")
     call_sync("msg", to=worker, text="from the person")
