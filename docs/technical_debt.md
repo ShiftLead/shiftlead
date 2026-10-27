@@ -107,6 +107,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1058 | `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit) | Low | Open — build |
 | TD-1059 | `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit) | Low | Open — build |
 | TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
+| TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 
 ---
 
@@ -2246,3 +2247,36 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1014.
+
+## TD-1064: A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-26 (ao-contractmatch-cm-mcp, through `ao td add --repo shiftlead`, asked by Paul; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9 *Add an entry to the ledger* (the **Open a session** way) and *Where a repo's team lands* (`place:`); §4.4a *The New session form on another host* (TD-293), *Mail across hosts* (*A node forwards; the home answers*), *A container node*; §4.8a (identity read from the socket's peer, by ancestry); TD-998 and TD-1004 (`ao` on a container node's `PATH`)
+
+**Why:** a session should have both the repo's toolchain and the org's reach. As things stand, each placement loses one of them. ao-contractmatch-cm-mcp reports this from 2026-10-26:
+1. Paul started it through Add entry for contractmatch, and it ran on kmaster, not on the contractmatch container node where cm-grind's team runs (`place:`). kmaster has no Flutter, so when it was asked to gate and merge the team's green PRs it could gate only the six that touch no frontend code. #214, #216, #223 and #224 waited for the grinder.
+2. From inside the node, `ao` was not on `PATH` (only `/shiftlead/venv/bin/ao`), so a session there could not `ao td add --repo <other>` or mail another repo's sessions. Filing TD-1051 worked only because this session was on kmaster.
+
+Some of this is already designed:
+- A node's session that reaches its node's `ao` has the home's mail, inbox and `td next` through the link (§4.4a *A node forwards; the home answers*). The `PATH` half of point 2 is TD-998, built as TD-1004 (#2333) and waiting on its live check.
+
+What is not designed:
+- Whether the **Open a session** way of Add entry, for a repo whose team `place:` puts on a node, lands on that node by default. The New session form already narrows Host to the team's host once a Team is picked (§4.9 *A person in the team*, §4.5a), but §4.9 *Add an entry to the ledger* says nothing of the session's host, and it ran on the home.
+- `ao` from a container that runs no host agent of its own.
+- Identity carried as a credential. Today identity is read by ancestry on the host agent's own socket (§4.8a). The asker wants each session to hold a token the home verifies, and a person's shell to hold the person's. Either way, a session's call must never gain a person-only act (a hold's release, reading a thread) by crossing the channel. This would also settle TD-1051's question of whether a person's `!` command acts as the person.
+
+**Fix:** design first. The round settles three things:
+1. Where Add entry's session lands for a repo with a placed team.
+2. Whether `ao` needs a client path for a container that is not a node, or whether such a container should become a node.
+3. Whether identity by credential replaces or sits beside identity by ancestry. That is a change to §4.8a, so it is Paul's to decide, with the authority split held exactly as it is now.
+
+It then names the build entries.
+
+**Done when** the design says where an Add entry session for a repo with a placed team lands, how a session in a container reaches the home and is attributed to itself, and that a session's call to a person-only act is refused from every host, and the build entries are filed. The asker's own test: an Add entry session for contractmatch runs on the contractmatch node, can run Flutter, can `ao td add --repo shiftlead` and can mail a shiftlead session.
+
+**Related:** TD-998, TD-1004 (`ao` on a node's `PATH`); TD-293 (the New session form on another host); TD-299 (contractmatch on its node); TD-1051 (the `!` command's identity); TD-077 (archived: identity as a per-session secret, its option 1, and an agents-only node, its option E).
