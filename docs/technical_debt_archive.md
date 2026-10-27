@@ -20038,6 +20038,26 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 
 **Resolved:** 2026-10-26 (grinder-ao-1, #2417) — `test_the_open_read_writes_prechecked_on_each_row` (`tests/test_pr_wait.py`) runs `_gh_prs` over a faked `gh pr list` with `OPEN_PR_FIELDS`, one head carrying a `cadence/precheck` status and one not, and asserts `prechecked` True and False on the rows, and no `prechecked` on the closed read. The probe (the `prechecked` line replaced with `pass`) fails it.
 
+## TD-1055: `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/promote.py` (`survey`: `r["checks"], why, r["checks_not_run"], r["precheck"] = read_checks(root, r["main"])`), `tests/test_promote.py`, `tests/test_ci_not_run.py`
+
+**Why:** #2396 (TD-1037) made `read_checks` return a fourth value and `survey` keep it as the reading's `precheck`, which TD-1036 and TD-1038 are to read. Probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ci_not_run.py tests/test_promote.py tests/test_cadence_pin.py`: replacing `r["precheck"]` with `_` in that line leaves 102 passed. The `read_checks` tests pin the tuple, and the `survey` tests (`tests/test_promote.py` 229–297) never read `precheck`, so the field TD-1037's *Done when* names ("the `precheck` field's five values and null") is pinned at `read_checks` only and never reaches the reading.
+
+**Fix:** add a `survey` test with `read_checks` faked to each of `absent`, `success`, `failure`, `pending`, `unread` and None, asserting `readings[0]["precheck"]` for each.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1037, TD-1033.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2420) — `test_the_pass_keeps_the_checks_precheck_on_the_reading` (`tests/test_promote.py`) fakes `read_checks` to each of `absent`, `success`, `failure`, `pending`, `unread` and None, runs `survey` with main's own precheck stubbed, and asserts the reading's `precheck` is that value (and present for None). The probe (`r["precheck"]` replaced with `_`) fails all six.
+
 ## TD-1042: Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand
 
 **Priority:** Medium
