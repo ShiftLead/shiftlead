@@ -2,9 +2,13 @@
 slice 1): an `ask` from any session to a record whose seat's trigger is `asks`, one open per sender
 per seat counted along the sender's `superseded_by` chain, and that seat's `reply` back to its asker."""
 
+from datetime import UTC, datetime
+
 import pytest
+from conftest import park_ticks
 
 from sessionorc import agent_mail, mail, models
+from sessionorc.agent_common import RpcError
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import MailEntry
 
@@ -193,7 +197,7 @@ async def test_a_team_or_a_repo_addresses_its_question_seat(agent, tmp_path, mon
                     AgentError, match=r"no team nosuch has a seat record: the teams with one are beta, cm"
                 ):
                     await a.call("msg", team="nosuch", text="q?")
-                # a team whose seat was closed (stopped) has no seat record, not *no question seat*
+                # a team whose seat was superseded has no seat record, not *no question seat*
                 with pytest.raises(AgentError, match=r"no team beta-old has a seat record"):
                     agent.sessions[old].team = "beta-old"
                     await a.call("msg", team="beta-old", text="q?")
@@ -286,3 +290,61 @@ async def test_a_session_asks_another_repos_seat_for_a_ledger_entry(agent, tmp_p
             del agent.remote["laptop"]
         for sid in (seat, asker, mine):
             await person.call("kill", id=sid)
+
+
+async def test_a_closed_seat_is_the_address_and_the_ask_fills_it(agent, tmp_path):
+    """TD-1128, design §4.10 *A team or a repo as the address*: rule 3 leaves an empty seat `closed`
+    (§4.10 *A seat is the exception*), so `--repo` and `--team` resolve to it while its team runs, and
+    when nobody of the team is live — the `ask` waits pending, and rule 3 fills the seat for it."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        seat = await mk(
+            "dc-techlead", team="dc-grind", project="D", seat={"trigger": "asks", "tags": True},
+            supervised=True, prompt="the seat's brief",
+        )  # fmt: skip
+        grinder = await mk("dc-grinder", team="dc-grind", project="D")
+        asker = await mk("cm-session", team="cm-grind", project="C")
+        agent.sessions[seat].repo, agent.sessions[grinder].repo = "/src/dev-cadence", "/src/dev-cadence"
+        agent.sessions[asker].repo = "/src/contractmatch"
+        await person.call("close", id=seat)  # rule 3's close between questions
+        rec = agent.sessions[seat]
+        assert rec.state == "closed"
+        assert (await agent._question_seat(team="dc-grind")) is rec, "the team runs, its seat closed"
+        # a closed seat rule 3 never fills is no address: an ask to it would wait on nothing
+        for field, value in (("sit_out", {"at": "t"}), ("closed_for", {"why": "sit_out"}), ("suspended", {"at": "t"})):
+            setattr(rec, field, value)
+            with pytest.raises(RpcError, match=r"dc-grind has no question seat"):
+                await agent._question_seat(team="dc-grind")
+            setattr(rec, field, None)
+        rec.supervised = False
+        with pytest.raises(RpcError, match=r"dc-grind has no question seat"):
+            await agent._question_seat(team="dc-grind")
+        rec.supervised = True
+        async with LocalClient(caller=asker) as a:
+            got = await a.call("entry_add", repo="dev-cadence", type="debt", text="the address refuses a closed seat")
+        assert got["to"] == seat and _ask_in(rec, got["id"]).open
+        # nobody of the team live (stopped): the address still resolves, and the ask still fills it
+        await person.call("kill", id=grinder)
+        agent.sessions[grinder].state = "closed"
+        assert (await agent._question_seat(repo="dev-cadence")) is rec
+        await agent._keep_running(datetime.now(UTC))
+        new = agent.sessions[seat]
+        assert new is not rec and [r["why"] for r in new.restarts][-1:] == ["fill"], "the ask filled the seat"
+        assert _ask_in(new, got["id"]).open, "and the filled seat holds the question"
+        for sid in (seat, grinder, asker):
+            await person.call("kill", id=sid)
+
+
+def test_a_teams_question_seat_is_live_then_on_call_then_closed():
+    def rec(n: str, state: str, tags: bool = True) -> models.Session:
+        s = models.Session(id=f"ao-{n}", name=n, kind="claude", adapter="claude-code", dir="/w", state=state)
+        s.seat = {"trigger": "asks", **({"tags": True} if tags else {})}
+        return s
+
+    live, on_call, closed = rec("a", "idle"), rec("b", "exited"), rec("c", "closed")
+    one = agent_mail.MailMixin._one_seat
+    assert one("t", [closed, on_call, live]) is live
+    assert one("t", [closed, on_call]) is on_call
+    assert one("t", [closed]) is closed
+    assert one("t", [closed, rec("d", "idle", tags=False)]) is closed, "the techlead seat wins among two"
