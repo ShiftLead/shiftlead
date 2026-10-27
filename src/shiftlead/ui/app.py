@@ -101,6 +101,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     state_counts,  # noqa: F401
     subagent_held,  # noqa: F401
     suspended_note,  # noqa: F401
+    swept_words,  # noqa: F401
     terminal_only,  # noqa: F401
     view,  # noqa: F401
     waiting_view,  # noqa: F401
