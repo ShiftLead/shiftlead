@@ -77,6 +77,24 @@ def absolute_git_dir(directory: Path | str, timeout: float = 5.0) -> str:
     return (_git(directory, "rev-parse", "--absolute-git-dir", timeout=timeout) or "").strip()
 
 
+def branch_exists(directory: Path | str, name: str, timeout: float = 5.0) -> bool | None:
+    """Whether the checkout at `directory` has the local branch `name` — the `branch` link method's
+    reply and the home's `host_branch` (design §4.4a, TD-1064): a found `refs/heads/<name>` is True,
+    git's *not found* (exit 1) False, and anything else — not a repository (exit 128), a timeout, an
+    OS error, a blank directory or name — None, so a failed read never calls a name free."""
+    if not str(directory or "").strip() or not str(name or "").strip():
+        return None
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(Path(directory).expanduser()), "rev-parse", "--verify", "-q", f"refs/heads/{name}"],
+            capture_output=True,
+            timeout=timeout,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return {0: True, 1: False}.get(cp.returncode)
+
+
 HYDRATE = "scripts/hydrate_worktree.sh"
 PINNED_HYDRATE = "dev-cadence run hydrate_worktree.sh"  # the default in a pinned repo, as the Repo page says it
 

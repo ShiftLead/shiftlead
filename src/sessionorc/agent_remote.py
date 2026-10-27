@@ -38,7 +38,7 @@ from sessionorc.agent_common import (
     read_checkout,
     stat_dir,
 )
-from sessionorc.gitinfo import WorktreeError, worktree_path
+from sessionorc.gitinfo import WorktreeError, branch_exists, worktree_path
 from sessionorc.models import (
     PERSON,
     FindingEntry,
@@ -405,6 +405,23 @@ class RemoteMixin:
 
             await asyncio.to_thread(held_here)
         return {"host": host, "repo": repo, "worktrees": out}
+
+    async def rpc_host_branch(self, host: str, dir: str, name: str) -> dict[str, Any]:
+        """Whether the checkout `dir` on `host` has the local branch `name` (design §4.4a, TD-1064):
+        Add entry's name test on a machine node, since a create *starts on* a branch that exists —
+        the `branch` link method. `{host, dir, name, exists}`, `exists` None where it cannot be told,
+        a node without the method (an older install) among them. A read, in `modes.HOME_ONLY` as
+        `host_worktrees` is."""
+        if host == self.host:
+            return {"host": host, "dir": dir, "name": name, "exists": await asyncio.to_thread(branch_exists, dir, name)}
+        try:
+            got = await self._ask_node(host, "branch", dir=dir, name=name)
+        except RpcError as e:
+            if "unknown link method 'branch'" not in str(e):
+                raise
+            got = {"exists": None}
+        seen = got.get("exists") if isinstance(got, dict) else None
+        return {"host": host, "dir": dir, "name": name, "exists": seen if isinstance(seen, bool) else None}
 
     async def _check_occupancy_for(self, host: str, params: dict[str, Any]) -> None:
         """The anchor rule (§9 invariant 2) for a create routed to a container node on this

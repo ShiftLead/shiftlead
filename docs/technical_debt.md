@@ -1934,7 +1934,7 @@ It then names the build entries.
 **Added:** 2026-10-26 (the designer, from TD-1064)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1: the home's `host_branch` and the node's `branch` link method (`gitinfo.branch_exists`, `modes.HOME_ONLY`); slice 2: the Add entry plan and press on the team's host (`ui/app.py`, the form's line)
 **Location:** `src/sessionorc/modes.py` (`HOME_ONLY`), the link's methods and `agent_remote.py` (`host_branch`, beside `host_worktrees`); `src/shiftlead/ui/app.py` (`entry_plan`: the team from `repo_teams(org, host_name())`, the root from `hosts.local_host().repos()`; `entry_name_why`; `api_entry_session`'s `create`); `src/shiftlead/ui/templates/` (the Add entry form's line under **Open a session**); design §4.9 *Add an entry to the ledger* (item 2, *It runs on the team's host*), §4.5a *Add entry form* (**Open a session**, **Name**), §4.4a *The New session form on another host*
 
 **Why:** TD-1064: Paul's Add entry session for contractmatch (2026-10-26) ran on kmaster, not on the contractmatch container node where cm-grind's team runs, so it had no Flutter and could gate only the PRs that touch no frontend code. `entry_plan` reads the local host's registry and `repo_teams(org, host_name())`, and `api_entry_session` creates with no `host`, so the session always lands on the home.
