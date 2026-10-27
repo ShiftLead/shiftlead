@@ -306,9 +306,10 @@ OPEN_PR_FIELDS = (
     f"{PR_FIELDS},statusCheckRollup,mergeStateStatus,baseRefName,isCrossRepository"  # the open read alone (TD-613)
 )
 # a sync PR (design §4.4 *A sync PR is the team's at once*, TD-684): its head branch as dev-cadence's
-# `sync-all.sh` names it, and the lock among its changed files
+# `sync-all.sh` names it, and the lock among its changed files — or, a bump of a pin, the pin's file (TD-1015)
 SYNC_BRANCH = "cadence-sync-"
 SYNC_LOCK = cadence.LOCK
+SYNC_PIN = cadence.PIN
 JOB_URL = re.compile(r"/actions/runs/(\d+)/job/(\d+)")  # an Actions job's check run (`detailsUrl`, TD-686)
 NOT_STARTED = "The job was not started because"  # GitHub's annotation on a job it never ran (TD-686)
 GITHUB_ORIGIN = re.compile(r"(^|[@/])github\.com[:/]")  # a remote on GitHub, ssh or https (TD-686)
@@ -714,7 +715,7 @@ def pr_files(directory: Path | str, pr: int, timeout: float) -> list[str] | str:
 
 def _sync_flag(directory: Path | str, p: dict[str, Any], was: dict[str, Any], timeout: float) -> None:
     """Sets `sync` on an open PR (design §4.4 *A sync PR is the team's at once*, TD-684): whether its
-    branch is `SYNC_BRANCH`-named and `SYNC_LOCK` among its files, and `sync_head`, the head its files
+    branch is `SYNC_BRANCH`-named and `SYNC_LOCK` or `SYNC_PIN` among its files, and `sync_head`, the head its files
     were read at — once per head, the last reading's word kept while the head is the same. A read
     that failed keeps the last word and its head, so the next reading asks again; never read, no
     flag. Not a candidate: neither."""
@@ -725,7 +726,7 @@ def _sync_flag(directory: Path | str, p: dict[str, Any], was: dict[str, Any], ti
         return
     files = pr_files(directory, p["number"], timeout)
     if not isinstance(files, str):
-        p["sync"], p["sync_head"] = SYNC_LOCK in files, p["head"]
+        p["sync"], p["sync_head"] = SYNC_LOCK in files or SYNC_PIN in files, p["head"]
     elif isinstance(was.get("sync"), bool):
         p["sync"], p["sync_head"] = was["sync"], was.get("sync_head")
 

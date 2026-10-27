@@ -1260,6 +1260,23 @@ def test_red_since_is_the_first_reading_that_saw_it_red_kept_while_it_stays_so(t
     assert (by[5]["red_since"], by[6]["red_since"]) == (t0.isoformat(), t2.isoformat())
 
 
+def test_a_bump_of_the_pin_on_a_sync_branch_is_a_sync_pr(tmp_path, monkeypatch):
+    """TD-1015: in a repo that pins dev-cadence there is no lock, so a `cadence-sync-*` branch whose files
+    include the pin's `docs/cadence.toml` is `sync` as well."""
+    t0 = datetime.now(UTC)
+    bump = _pr(8, "open", t0, headRefName="cadence-sync-pin", headRefOid="h8")
+    _fake_gh(monkeypatch, [bump], [])
+    run = reports.subprocess.run
+
+    def with_files(argv, **kw):
+        if argv[1] == "api" and "/files" in argv[2]:
+            return subprocess.CompletedProcess(argv, 0, "docs/cadence.toml\n", "")
+        return run(argv, **kw)
+
+    monkeypatch.setattr(reports.subprocess, "run", with_files)
+    assert reports.pr_reading(tmp_path, t0)["open"][0]["sync"] is True
+
+
 def test_a_sync_pr_is_read_by_its_branch_and_the_lock_among_all_its_files_once_per_head(tmp_path, monkeypatch):
     """TD-684, design §4.4 *A sync PR is the team's at once*: a `cadence-sync-*` branch whose changed
     files, read whole through the paginated list, include the lock is `sync`, with `sync_since` the

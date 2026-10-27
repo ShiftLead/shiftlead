@@ -1606,6 +1606,27 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - a forked PR: *forked*;
   - another login's: *author <login> is not the home's*;
 
+  **A bump of a pin** (TD-1015; ADR 2026-10-25 *Decision* 5, which replaces TD-681's steps 1 and 2 for a
+  pinned repo, and dev-cadence's plan *Decision* 7). Where the merge base holds a `[dev-cadence]` pin in
+  `docs/cadence.toml` and no lock, there is no copied file to replay. Steps 1 and 2 become one check, and
+  the PR is a **routine bump** only when all of these hold:
+  - it changes `docs/cadence.toml` alone, and there only the pin's `ref` line, with its tag comment
+    (*not a routine bump: <path> changed*, *not a routine bump: docs/cadence.toml changed beyond the
+    pin's ref*, *not a routine bump: docs/cadence.toml holds no [dev-cadence] pin*, *not a routine bump:
+    the pin's ref did not move*);
+  - its `source` is the merge base's (*the pin's source changed*);
+  - the new `ref` is a full commit on the default branch of the clone the registry holds of that
+    source, fetched once a pass (*no dev-cadence clone to check the pin against*, *ref <sha> is not a
+    full commit on dev-cadence's <default>*);
+  - the new `ref` descends from the old one: a rollback is a bump the person makes by hand (*ref <sha>
+    does not descend from <old>*);
+  - `docs/cadence.toml` is not a held path (*docs/cadence.toml is a held path*).
+
+  A bump refused for any of these is the team's order, as any refused sync PR is, and merging it is
+  the person's. Step 3 differs for a bump, below; steps 4 and 5 stand. A repo that still holds a lock
+  is checked by steps 1 and 2 as written until it migrates. The lock road leaves `sync.check` once no
+  served repo has a lock.
+
   Each head is checked once:
   1. **The files are dev-cadence's.** The head lock's `source:` must equal the merge base's lock's,
      so the PR does not choose its judge. The home finds that repo's clone in its registry: the
@@ -1654,7 +1675,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      whose member's PR the reader reads as any (rule 11). The check proves the PR is what dev-cadence
      and the repo's own step wrote. Whether the sync itself was right is dev-cadence's review, at its
      own merge.
-  3. **The review evidence.** For a mechanical PR the home posts one comment, through
+  3. **The review evidence.** **For a bump the home posts none.** A bump is reviewed on its compare,
+     never merged unread (dev-cadence's plan *Decision* 7). It waits, uncounted, until the PR carries a
+     review of the compare: a `cadence-review: SHIP` or `FIXED` comment whose reviewer, as its line
+     names it (the gate's own self-attested reading, never the comment's author), is not `sync-check`, whose body names the head (seven hex characters or more), and which no later BLOCK
+     follows. While it waits, its entry keeps `waits: review` and `waiting_since`. It is no longer the
+     home's to hold: the team's order carries it with *no review of the compare at <sha>*, since the review is
+     the team's to give. A bump with no such review after `SYNC_PRECHECK_WAIT` (a day) at one head is
+     *refused*, *review waited a day: …*. Comments that cannot be read are no reading, counted as
+     step 4's are. Once reviewed, the bump goes on to step 4. For any other mechanical PR the home posts one comment, through
      `--body-file`, once per head: the entry keeps `posted`, so a retry (step 4) never posts again. Its first line is `cadence-review: SHIP · sync-check · code · 0 findings`. Its
      body is the lock's `commit:`, the files checked against dev-cadence, *post_sync replayed* or
      *no post_sync*, and the head it checked. The reviewer is named for what it is, never a model,
@@ -1706,7 +1735,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      --match-head-commit <head>`, with no body (cadence §4.2). The forge's head match is the one
      atomic guard, and a push it refuses is the moved head again. A merge is followed by a `system`
      note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — sync of dev-cadence
-     <commit>, n files*.
+     <commit>, n files*, or for a bump *merged `<repo>` #<n> — bump of the dev-cadence pin to <sha>*.
 
   The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, posted,
   at, waiting_since}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, the reason from step 1

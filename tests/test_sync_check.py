@@ -280,3 +280,106 @@ def test_what_post_sync_leaves_running_is_killed(tmp_path):
     assert sync.run_post_sync(tmp_path / "t", "(sleep 1; echo late > late.txt) & exit 0", bound=5) is None
     time.sleep(1.5)
     assert not (tmp_path / "t" / "late.txt").exists()
+
+
+# -- a bump of a pin (TD-1015) --------------------------------------------------------------------------------
+
+PINNED = '# the repo\'s settings\nreview-model = "sonnet"\n\n[dev-cadence]\nsource = "{source}"\nref = "{ref}"\n'
+
+
+class PinWorld(World):
+    """`World`, but the repo's main pins dev-cadence's first commit in `docs/cadence.toml` and holds no lock."""
+
+    def __init__(self, tmp: Path):
+        self.tmp = tmp
+        for name in ("dc", "repo"):
+            g(tmp, "init", "-q", "--bare", "-b", "main", f"{name}.git")
+            g(tmp, "clone", "-q", f"{tmp}/{name}.git", name)
+            g(tmp / name, "checkout", "-q", "-b", "main")
+        self.dc, self.repo, self.source = tmp / "dc", tmp / "repo", f"{tmp}/dc.git"
+        self.ref0 = self.dc_commit({DOC: "one\n"})
+        commit(self.repo, {sync.PIN: self.pin(self.ref0)})
+        g(self.repo, "push", "-q", "origin", "main")
+        g(self.repo, "remote", "set-head", "origin", "main")
+        g(self.dc, "remote", "set-head", "origin", "main")
+
+    def pin(self, ref: str, source: str | None = None) -> str:
+        return PINNED.format(source=source or self.source, ref=ref)
+
+
+@pytest.fixture
+def pinned(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    return PinWorld(tmp_path)
+
+
+def test_a_bump_of_the_pin_alone_that_descends_is_mechanical(pinned):
+    ref = pinned.dc_commit({DOC: "two\n"})
+    head = pinned.pr({sync.PIN: pinned.pin(ref).replace(f'"{ref}"', f'"{ref}"   # v1.2')})
+    got = pinned.check(head)
+    assert (got["verdict"], got["why"], got["kind"]) == ("mechanical", "", "bump")
+    assert (got["commit"], got["old"], got["files"], got["post_sync"]) == (ref, pinned.ref0, [sync.PIN], False)
+    assert not sync.tree_dir(pinned.repo).exists()  # nothing is replayed for a bump
+
+
+@pytest.mark.parametrize(
+    ("change", "why"),
+    [
+        ("source", "the pin's source changed"),
+        ("file", "not a routine bump: src/x.py changed"),
+        ("line", "not a routine bump: docs/cadence.toml changed beyond the pin's ref"),
+        ("same", "not a routine bump: the pin's ref did not move"),
+        ("gone", "not a routine bump: docs/cadence.toml holds no [dev-cadence] pin"),
+    ],
+)
+def test_a_bump_that_changes_more_than_the_ref_is_refused_by_name(pinned, change, why):
+    ref = pinned.dc_commit({DOC: "two\n"})
+    files = {
+        "source": {sync.PIN: pinned.pin(ref, source="https://github.com/evil/dc")},
+        "file": {sync.PIN: pinned.pin(ref), "src/x.py": "x\n"},
+        "line": {sync.PIN: pinned.pin(ref).replace('"sonnet"', '"haiku"')},
+        "same": {sync.PIN: pinned.pin(pinned.ref0).replace(f'"{pinned.ref0}"', f'"{pinned.ref0}"  # v1')},
+        "gone": {sync.PIN: "# no pin\n"},
+    }[change]
+    head = pinned.pr(files)
+    assert pinned.check(head) == {"head": head, "verdict": "refused", "why": why}
+
+
+def test_a_ref_that_does_not_descend_or_is_not_on_the_default_branch_is_refused(pinned):
+    ref1 = pinned.dc_commit({DOC: "two\n"})
+    g(pinned.repo, "checkout", "-q", "main")
+    commit(pinned.repo, {sync.PIN: pinned.pin(ref1)})
+    g(pinned.repo, "push", "-q", "origin", "main")
+    # back to the first commit: on dev-cadence's main, but an ancestor of the pin, not a descendant
+    assert pinned.check(pinned.pr({sync.PIN: pinned.pin(pinned.ref0)}))["why"] == (
+        f"ref {pinned.ref0[:7]} does not descend from {ref1[:7]}"
+    )
+    # a commit dev-cadence never put on main: pushed to a side branch only
+    g(pinned.dc, "checkout", "-q", "-b", "side")
+    side = commit(pinned.dc, {"files/x": "x\n"})
+    g(pinned.dc, "push", "-q", "origin", "side")
+    g(pinned.dc, "checkout", "-q", "main")
+    assert pinned.check(pinned.pr({sync.PIN: pinned.pin(side)}))["why"] == (
+        f"ref {side[:7]} is not a full commit on dev-cadence's main"
+    )
+    # a short ref is no full commit, though it names one; nor is a full one padded with a space
+    head = pinned.pr({sync.PIN: pinned.pin(side[:12])})
+    assert pinned.check(head)["why"] == f"ref {side[:7]} is not a full commit on dev-cadence's main"
+    ref2 = pinned.dc_commit({DOC: "three\n"})
+    head = pinned.pr({sync.PIN: pinned.pin(f" {ref2}")})
+    assert pinned.check(head)["why"] == f"ref  {ref2[:6]} is not a full commit on dev-cadence's main"
+
+
+def test_a_bump_with_no_clone_or_on_a_held_path_is_refused(pinned):
+    head = pinned.pr({sync.PIN: pinned.pin(pinned.dc_commit({DOC: "two\n"}))})
+    assert sync.check(pinned.repo, 7, head, "cadence-sync-1", clones=[])["why"] == (
+        "no dev-cadence clone to check the pin against"
+    )
+    assert pinned.check(head, held=["docs/**"])["why"] == "docs/cadence.toml is a held path"
+
+
+def test_only_ref_moved_reads_the_pin_table_alone():
+    before = PINNED.format(source="s", ref="a" * 40)
+    assert sync.only_ref_moved(before, before.replace(f'"{"a" * 40}"', f'"{"b" * 40}"   # v2'))
+    assert not sync.only_ref_moved('[other]\nref = "a"\n', '[other]\nref = "b"\n')
+    assert not sync.only_ref_moved(before, before + "\n")
