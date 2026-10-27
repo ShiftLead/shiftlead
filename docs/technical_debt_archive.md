@@ -20076,4 +20076,4 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 
 **Related:** TD-1014.
 
-**Resolved:** 2026-10-26 (grinder-ao-1, #PR) — `test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache` (`tests/test_containers.py`) gives the node an env file carrying an `XDG_CACHE_HOME` and asserts the cache exec carries `--env-file` with that file. The probe (`env_file=n.env_file` dropped from `ship_cadence`) fails it.
+**Resolved:** 2026-10-26 (grinder-ao-1, #2421) — `test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache` (`tests/test_containers.py`) gives the node an env file carrying an `XDG_CACHE_HOME` and asserts the cache exec carries `--env-file` with that file. The probe (`env_file=n.env_file` dropped from `ship_cadence`) fails it.
