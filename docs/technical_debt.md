@@ -1914,7 +1914,7 @@ It then names the build entries.
 **Added:** 2026-10-26 (the designer, from TD-1061)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1 built (#2467): the preset, the brief, the `swept` trigger, the stamp read from origin and rule 3's cause. Left: (5), the seat card's first line, *on call — sweeps when unswept 7 d · swept 3 d ago* (or *· never swept*), whose *· swept …* part reads the boards reading's `swept` (a page change: a UI check on a scratch home).
 **Location:** `src/shiftlead/repoconfig.py` (the role presets: `sweeper` beside `auditor`); `src/shiftlead/briefs/sweeper.md` (new); `src/shiftlead/org.py` (`TRIGGERS`, the trigger's parse beside `every`'s); `src/sessionorc/agent_tick.py` (the seat pass, beside the `every` cause at ~2916; `_seat_done`; `_fill`, which records the `swept` cause in `seat_filled`); `src/sessionorc/workorders.py` (`read_boards`, `_against_origin` and `Origin`: origin's content kept in every state, `swept: {at, deep_at}` derived from it, beside `source`); `src/sessionorc/agent_tick.py` `_read_boards` (a plain re-read carries `swept` forward); `src/shiftlead/ui/` (the seat card's *on call* words); design §4.9b *Seats with a trigger* and *The sweep* (the preset, its trigger, what it may change), §6 rule 3 (`swept`), §4.8 (the `sweeper` row), glossary *sweeper*
 
 **Why:** TD-1061: the weekly stranded-work sweep (cadence §3.11) ran only when a person remembered `/stranded-work` — 38 of 58 open board items past 14 days on 2026-10-26, two repos never swept. The seat rule already runs this repo's auditors; a sweep needs a preset, a brief and a trigger keyed to the board's own stamp.
