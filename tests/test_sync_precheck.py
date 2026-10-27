@@ -16,7 +16,7 @@ from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from test_promote import _commit, _git  # noqa: F401
+from test_promote import _commit, _git, checkout  # noqa: F401 — `checkout` a fixture, shared
 from test_sync_pass import HEAD, ROOT, _names, _orders, _pr, _reading, agent, gh  # noqa: F401 — fixtures, shared
 
 from sessionorc import cadence, promote, sync
@@ -278,15 +278,17 @@ async def test_a_day_waiting_at_one_head_is_refused_and_the_teams_order(agent, g
     assert order["id"] == "pr:1097" and "precheck waited a day" in order["context"]
 
 
-def test_the_readings_pass_kills_a_run_past_the_bound_without_the_sync_pass(pre, tmp_path, monkeypatch):
-    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
-    f, _ = promote.start_precheck_pr(tmp_path, REPO, 1097, HEAD)
+def test_the_readings_pass_kills_a_run_past_the_bound_without_the_sync_pass(pre, checkout, monkeypatch):  # noqa: F811
+    """TD-1083: `survey` itself judges the bound, so a repo the sync pass skips has no run outlive it."""
+    monkeypatch.setattr(promote, "precheck_on_main", lambda *a, **kw: None)
+    repo = checkout.name
+    f, _ = promote.start_precheck_pr(checkout, repo, 1097, HEAD)
     now = datetime.now(UTC)
-    promote.precheck_pr_bound(tmp_path, REPO, now)
+    promote.survey([str(checkout)], {}, True, {}, now)
     assert promote.alive(f["pid"], f["started"]), "inside the bound: left running"
-    promote.precheck_pr_bound(tmp_path, REPO, now + timedelta(seconds=promote.PRECHECK_BOUND + 1))
+    promote.survey([str(checkout)], {}, True, {}, now + timedelta(seconds=promote.PRECHECK_BOUND + 1))
     _gone(f)
-    kept = promote.precheck_pr_run(REPO)
+    kept = promote.precheck_pr_run(repo)
     assert not promote.alive(f["pid"], f["started"]) and kept["why"] == "killed at the 20-minute bound"
     assert "counted" not in kept, "counting is the sync pass's"
 
