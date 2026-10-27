@@ -262,7 +262,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      alone, another role's manager being a seat only where its definition says `on_call: true`
      (§4.9) — and the tick sets its `seat_due` with `by` one of four words, each a reading of the
      records and never of a screen: **`asks`**, as the techlead's — an open `ask` or `steer`
-     addressed to it (`asks_waiting` leaves zero); **`pending`** — a member of its team (a
+     addressed to it, or an answer waiting on a question of its own (`asks_waiting` leaves zero, §4.9b, TD-1051); **`pending`** — a member of its team (a
      supervised record listing it in `controllers`) hook-confirmed `needs-you` with a `permission`
      pending, its adapter having a permission channel (§4.3 `permission_channel`: one without it is
      the terminal's, never the seat's; a question or a menu fills nothing: it is a person's, and the Inbox's state row has
@@ -280,7 +280,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      after a fill raises no second `seat_due` until then, so a manager that chose to leave a
      member as it was is not refilled into the same reading; the fill ceiling guards the rest. **A
      question is a cause by its id**: for `asks` the due and the entry carry `ask`, the question's
-     id, in `member`'s place, so a question the manager left standing does not fill it again and
+     id (an answer waiting, its question's), in `member`'s place, so a question the manager left standing does not fill it again and
      a second question does — an entry the person handed it excepted, which is never remembered
      and fills the seat while it owes its outcome, as it does any seat (§4.10). A member's cause
      is its word and the member, nothing finer: a second permission raised before a tick saw the
@@ -719,7 +719,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      about TD-222 lapsed to its default*, *designer-ao-1's ask about TD-222 was answered* — and
      `start` replays the team, where the create that puts a record under the asker's name keeps the
      closed record's mail (§4.10 *The name coming back adopts it*), so the successor reads the lapse
-     note or the `handed` answer at its first `ao inbox` and owes the outcome. Dismiss clears the
+     note or the `handed` answer at its first `ao inbox` and owes the outcome. A **seat's** orphaned question goes under
+     `questions` alone and its name gains no `members[]` row — a seat holds no lane, and rule 3's *answer waiting*
+     fills it for the answer (§4.9b, TD-1051). Dismiss clears the
      mark; a question ends once, so nothing is added to `lane_seen` for it. A team that is *stopped*
      rather than wound down — a stop time, a person's Stop — is never started for it: the note
      waits in the mailbox for the person's Start, which keeps it the same way, while the team's
@@ -1978,10 +1980,8 @@ teams:
   the default the page offers when the rule is first turned on is `prs: 10`, `oldest: 2d`,
   `review: true`. **A node's member is checked too**: a claim is a report, which its node
   forwards to the home (§4.4a), so the home refuses it against its own mark, and on the clearing
-  its note lands in the home's copy of its record, read at its next forwarded `inbox` or `wait`:
-  an idle member on a node has no doorbell yet (§4.4a *The doorbell is the forwarded `wait`*), so
-  it learns of the clearing when something else has it read its inbox — its manager, told of the
-  clearing, is the one to look. A node cut off from the home refuses every report, so nothing is
+  its note lands in the home's copy of its record, and the home rings it through its node as it
+  rings any idle member (§4.4a *The doorbell rings a node's session through its node*, TD-1051). A node cut off from the home refuses every report, so nothing is
   claimed unchecked. **The presets say it**: `grinder` says what a refusal *over its line* means —
   nothing new, finish what is held, end the turn, never `none`, and no branch cut for a new entry
   as a way round; `hunter`, which claims nothing, says the same of its `none`; `auditor` is a
