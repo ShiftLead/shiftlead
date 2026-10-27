@@ -394,7 +394,12 @@ async def agent(tmp_path, monkeypatch):
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))
-    assert await wait_for(lambda: paths.socket_path().exists(), timeout=5.0, step=0.05), "agent socket never appeared"
+    # the tick loop too (TD-1087): `serve` binds the socket a loop step before it makes `_ticker`, so a
+    # test that parked the ticks in that step found none to park, and the loop started under it
+    def up() -> bool:
+        return paths.socket_path().exists() and a._ticker is not None
+
+    assert await wait_for(up, timeout=5.0, step=0.05), "agent socket or tick loop never appeared"
     yield a
     task.cancel()
     with contextlib.suppress(asyncio.CancelledError, Exception):

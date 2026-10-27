@@ -30,6 +30,9 @@ def _files(tmp_path, ages: dict[str, int]):
 
 @pytest.mark.integration
 async def test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_live_ones(agent, tmp_path):
+    # TD-1087: the fixture's loop sweeps too, and under load its sweep took `ao-gone-1/old.png` while
+    # the test's own was reading it (`FileNotFoundError`): the test owns the sweep
+    await park_ticks(agent)
     (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 7\n")
     f = _files(
         tmp_path,
@@ -45,6 +48,7 @@ async def test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_liv
 
 @pytest.mark.integration
 async def test_runs_keep_days_0_deletes_no_attachment(agent, tmp_path):
+    await park_ticks(agent)  # TD-1087: as above
     (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n")
     f = _files(tmp_path, {"ao-gone-4/old.png": 400})
     await asyncio.to_thread(agent._prune_runs, datetime.now(UTC), set(), set())
