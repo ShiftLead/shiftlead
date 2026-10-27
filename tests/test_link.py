@@ -1729,6 +1729,8 @@ async def test_the_new_session_forms_reads_cross_the_link_to_the_node(home, hook
             assert seen["exists"] is True and seen["root"] == str(wt.resolve())
             outside = await person.call("host_dir", host="laptop", dir=str(tmp_path))
             assert outside["exists"] is True and outside["root"] == ""
+            branch = await person.call("host_branch", host="laptop", dir=str(tmp_path / "nr"), name="wt")
+            assert branch["exists"] is True, "the node's own branch, over the `branch` link method (TD-1064)"
         async with LocalClient() as at_node:  # a node answers for itself, and forwards neither to the home
             assert (await at_node.call("host_occupancy", host="laptop", dir=str(wt)))["occupants"]
             for rpc, kw in (("host_occupancy", {"dir": "/"}), ("host_worktrees", {"repo": "/"})):
@@ -1815,6 +1817,55 @@ async def test_host_occupancy_and_worktrees_here_through_a_node_and_for_a_contai
     assert (await agent._from_home("worktrees", {"repo": str(checkout)}))["worktrees"][0]["name"] == "wt"
     assert (await agent._from_home("occupancy", {"dir": ""}))["occupants"] == [], "the node's half"
     assert (await agent._from_home("stat", {"dir": str(checkout)}))["root"] == str(checkout.resolve())
+
+
+async def test_host_branch_reads_a_local_branch_where_the_checkout_is(agent, tmp_path):
+    """Design §4.4a `host_branch` (TD-1064): this host's checkout read here, a node's over the
+    `branch` link method — found True, not found False, not a repository None; a node without
+    the method (an older install) is `exists: null`, never a refusal, while any other failure is
+    refused in words; and it is not served to a call forwarded from a node (`modes.HOME_ONLY`)."""
+    checkout = tmp_path / "repo"
+    _git_repo_with_worktree(checkout, name="entry-1")
+    async with LocalClient() as person:
+        here = await person.call("host_branch", host=agent.host, dir=str(checkout), name="entry-1")
+        assert here == {"host": agent.host, "dir": str(checkout), "name": "entry-1", "exists": True}
+        assert (await person.call("host_branch", host=agent.host, dir=str(checkout), name="entry-2"))["exists"] is False
+        assert (await person.call("host_branch", host=agent.host, dir=str(tmp_path), name="x"))["exists"] is None
+
+        class Node(FakeMux):
+            async def request(self, method, timeout=None, **params):
+                self.sent.append((method, params))
+                return {"exists": params["name"] == "taken"}
+
+        agent._take_records("laptop", [record()], whole=True)
+        agent._link_muxes["laptop"] = mux = Node()
+        agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
+        assert (await person.call("host_branch", host="laptop", dir="/w", name="taken"))["exists"] is True
+        assert (await person.call("host_branch", host="laptop", dir="/w", name="free"))["exists"] is False
+        assert mux.sent == [("branch", {"dir": "/w", "name": "taken"}), ("branch", {"dir": "/w", "name": "free"})]
+
+        class Old(FakeMux):
+            async def request(self, method, timeout=None, **params):
+                raise link.LinkError(f"unknown link method {method!r}")
+
+        agent._link_muxes["laptop"] = Old()
+        assert (await person.call("host_branch", host="laptop", dir="/w", name="x"))["exists"] is None
+
+        class Down(FakeMux):
+            async def request(self, method, timeout=None, **params):
+                raise TimeoutError("slow")
+
+        agent._link_muxes["laptop"] = Down()
+        with pytest.raises(AgentError, match="laptop did not answer"):
+            await person.call("host_branch", host="laptop", dir="/w", name="x")
+    resp = await agent._forwarded(
+        "laptop", {"rpc": "host_branch", "params": {"host": agent.host, "dir": "/", "name": "x"}, "caller": None}
+    )
+    assert "host_branch is not served to a call from laptop" in resp["error"]
+    del agent._link_muxes["laptop"]
+    assert (await agent._from_home("branch", {"dir": str(checkout), "name": "entry-1"})) == {"exists": True}
+    assert (await agent._from_home("branch", {"dir": str(checkout), "name": "nope"})) == {"exists": False}
+    assert (await agent._from_home("branch", {"dir": "", "name": "x"})) == {"exists": None}
 
 
 def test_the_nightly_tarball_holds_the_store_and_the_orgs_files_and_nothing_else(tmp_path, monkeypatch):
