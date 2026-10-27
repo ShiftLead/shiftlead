@@ -20892,7 +20892,7 @@ None of the three files calls `park_ticks`, so the fixture's tick loop running b
 
 **Related:** TD-1032 (the reason the failure showed); TD-804, TD-812 (the smoke).
 
-**Resolved:** 2026-10-27 (grinder-ao-1) — its one build, TD-1041, merged in #2402 and its live check held on the promote of d175c1a; the design merged in #2387.
+**Resolved:** 2026-10-27 (grinder-ao-1, #2466) — its one build, TD-1041, merged in #2402 and its live check held on the promote of d175c1a; the design merged in #2387.
 
 ## TD-1041: A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit
 
@@ -20912,4 +20912,4 @@ None of the three files calls `park_ticks`, so the fixture's tick loop running b
 
 **Related:** TD-1031, TD-1032, TD-804.
 
-**Resolved:** 2026-10-27 (grinder-ao-1) — built in #2402; the live check held on the home's next promote, d175c1a at 01:59 local (`last.json`: `by: auto`, `kind: promote`). Its log (`~/.shiftlead/promotes/shiftlead/d175c1a….log`, read only) has `── smoke ──` after the run's last line, `ao service install`'s (*shiftlead-watch.timer: active* and the linger line). Then the smoke log reads *running build d175c1a is the promoted one*, and the log ends *smoke passed* (with over-budget timings for Sessions, Inbox and Queue, which fail nothing).
+**Resolved:** 2026-10-27 (grinder-ao-1, #2466) — built in #2402; the live check held on the home's next promote, d175c1a at 01:59 local (`last.json`: `by: auto`, `kind: promote`). Its log (`~/.shiftlead/promotes/shiftlead/d175c1a….log`, read only) has `── smoke ──` after the run's last line, `ao service install`'s (*shiftlead-watch.timer: active* and the linger line). Then the smoke log reads *running build d175c1a is the promoted one*, and the log ends *smoke passed* (with over-budget timings for Sessions, Inbox and Queue, which fail nothing).
