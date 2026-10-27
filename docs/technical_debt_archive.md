@@ -20363,7 +20363,7 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 
 **Done when:** the test waits on the provision itself or on a bound shown to hold under load; `pdm run test` and `pdm run lint` pass.
 
-**Resolved:** 2026-10-26 (grinder-ao-2, #PR) — each of the four waits on its event, not a longer sleep:
+**Resolved:** 2026-10-26 (grinder-ao-2, #2440) — each of the four waits on its event, not a longer sleep:
 - `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` swapped in the running, agent-alive fake before the supervisor's first round had made its runner. A round that made it late found the agent alive, decided `wait` and never wrote the definition. Now it waits for the definition under the fixture's gone-container fake, then swaps. Forty copies under `-n 16` with eight busy CPUs: 40 failed before, 40 passed after.
 - `test_send_confirms_the_submit`: the bound on the composer child's first paint is 30 s, not 5. The poll returns as soon as the child paints.
 - `test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line`, and the two other `test_board.py` tests that patch `_refresh_repos`: a repos pass the fixture's first tick started before the patch landed after the test set `_repos`, and emptied it. Each now runs `park_ticks` first, which finishes or cancels that pass.
