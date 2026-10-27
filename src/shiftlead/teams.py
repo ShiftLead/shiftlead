@@ -569,6 +569,22 @@ def _primer_missing(seat: orgmod.TechleadDef, checkout: Path, host: str, here: s
     return f"{seat.name}: its `context:` {seat.context} is not in {checkout} — the seat will start without its primer"
 
 
+def no_checkout(org: orgmod.Org, home: str, host: str, where: str) -> str:
+    """The start's words for repo `home` having no checkout on `host` that `org` knows: `_checkout`'s
+    refusal, and Add entry's on the team's host (§4.5a *Add entry form: Open a session*, TD-1064)."""
+    declared = ", ".join(sorted(org.checkouts.get(home) or {}))
+    heading = org.heading(home)
+    fix = (
+        f"add `{host}: <path>` under `projects.{heading.name}.repos.{home}` in org.yml"
+        if heading is not None
+        else f"register the checkout on {host} (design §5 *Repos*)"
+    )
+    return (
+        f"{where}: repo {home!r} has no checkout on {host} (declared on {declared or 'no host'}) — "
+        f"{fix}, or set the team's `host:`"
+    )
+
+
 def _checkout(
     org: orgmod.Org, team: orgmod.TeamDef, home: str, host: str, here: str, files: Files | None, where: str
 ) -> tuple[Path, repoconfig.Reader | None]:
@@ -576,17 +592,7 @@ def _checkout(
     the node's files across the link for a checkout that is not a directory here (step 4b.3)."""
     checkout = org.checkout(home, host)
     if checkout is None:
-        declared = ", ".join(sorted(org.checkouts.get(home) or {}))
-        heading = org.heading(home)
-        fix = (
-            f"add `{host}: <path>` under `projects.{heading.name}.repos.{home}` in org.yml"
-            if heading is not None
-            else f"register the checkout on {host} (design §5 *Repos*)"
-        )
-        raise TeamError(
-            f"{where}: repo {home!r} has no checkout on {host} (declared on {declared or 'no host'}) — "
-            f"{fix}, or set the team's `host:`"
-        )
+        raise TeamError(no_checkout(org, home, host, where))
     checkout = Path(checkout).expanduser()
     read: repoconfig.Reader | None = None  # this host's disk
     if not checkout.is_dir():

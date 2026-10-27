@@ -88,9 +88,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Designed — builds TD-1092, TD-1093 |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Open — build |
+| TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Live check #2475 |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
 | TD-1109 | The sweep seat's tests (TD-1090) read one board only, so a cause or a card that picks the wrong board, and a card that prints *swept -3 d ago*, pass | Medium | Open |
+| TD-1111 | `test_the_context_reading_is_read_on_the_tick_for_unattended_records` fails under the parallel suite: the context read twice | Low | Open |
 | TD-1112 | The archived TD-1093 says *Eleven tests in `tests/test_identity.py` cover (a)–(d)*, and #2470 added seven | Low | Open |
 
 ---
@@ -1886,8 +1887,8 @@ It then names the build entries.
 **Type:** feature
 **Added:** 2026-10-26 (the designer, from TD-1064)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 1: the home's `host_branch` and the node's `branch` link method (`gitinfo.branch_exists`, `modes.HOME_ONLY`); slice 2: the Add entry plan and press on the team's host (`ui/app.py`, the form's line)
+**Kind:** live-check #2475
+**Status:** Built — slice 1 #2473 (`host_branch`, the `branch` link method), slice 2 #2475 (the Add entry plan and press on the team's host). Live, once #2475 is live (`ao promote status`): read-only — an Add entry plan for contractmatch (`GET /api/entry/plan?repo=contractmatch&type=debt`) names `host` contractmatch and the line *…on contractmatch*; the press and `flutter --version` in the session are the person's (a look), so is `ao td add --repo shiftlead` from it
 **Location:** `src/sessionorc/modes.py` (`HOME_ONLY`), the link's methods and `agent_remote.py` (`host_branch`, beside `host_worktrees`); `src/shiftlead/ui/app.py` (`entry_plan`: the team from `repo_teams(org, host_name())`, the root from `hosts.local_host().repos()`; `entry_name_why`; `api_entry_session`'s `create`); `src/shiftlead/ui/templates/` (the Add entry form's line under **Open a session**); design §4.9 *Add an entry to the ledger* (item 2, *It runs on the team's host*), §4.5a *Add entry form* (**Open a session**, **Name**), §4.4a *The New session form on another host*
 
 **Why:** TD-1064: Paul's Add entry session for contractmatch (2026-10-26) ran on kmaster, not on the contractmatch container node where cm-grind's team runs, so it had no Flutter and could gate only the PRs that touch no frontend code. `entry_plan` reads the local host's registry and `repo_teams(org, host_name())`, and `api_entry_session` creates with no `host`, so the session always lands on the home.
@@ -1940,6 +1941,22 @@ It then names the build entries.
 **Done when:** each of the three reverts fails a test in `tests/test_sweep_seat.py`.
 
 **Related:** TD-1090 (the build), #2467, #2468.
+
+## TD-1111: `test_the_context_reading_is_read_on_the_tick_for_unattended_records` fails under the parallel suite: the context read twice
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, met on TD-1092's suite run)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_agent.py` (`test_the_context_reading_is_read_on_the_tick_for_unattended_records`, line ~1688), the tick's context reading in `src/sessionorc/`
+
+**Why:** the full `pdm run test` on TD-1092 slice 2's branch (no `src/sessionorc/` change) stopped on `assert ['conv-un', 'conv-un'] == ['conv-un']`; alone it passed three times running. A tick that lands twice within the test's window reads the record twice, so the test (or the tick) is timing-dependent under xdist load.
+
+**Fix:** find whether a second tick is legitimate within the window (then assert on a set, or once per tick) or the reading is not deduplicated per tick (then a real double read); fix whichever it is.
+
+**Done when:** the test passes under `pdm run test` repeatedly (e.g. `pytest -n 8 --count 20` on the one test) and asserts what the tick promises.
 
 ## TD-1112: The archived TD-1093 says *Eleven tests in `tests/test_identity.py` cover (a)–(d)*, and #2470 added seven
 

@@ -2123,6 +2123,24 @@ def away_host(host: str) -> str:
     return h if h and h != host_name() else ""
 
 
+def unanswered(host: str, e: HTTPException | str) -> str:
+    """Add entry's words for a read of the team's host that failed (§4.5a *Open a session*, TD-1064):
+    *<host> did not answer*, whichever read met it, with what the home said after it."""
+    detail = str(e.detail if isinstance(e, HTTPException) else e)
+    return detail if detail.startswith(f"{host} did not answer") else f"{host} did not answer: {detail}"
+
+
+def entry_held_why(got: Mapping[str, Any], name: str) -> str:
+    """Add entry's words for a name check's verdict (§4.5a *Add entry form: Name*), or "" where it is
+    free: an exited or closed holder is not free here, where New session would supersede it."""
+    verdict = got.get("verdict")
+    if verdict in ("live", "suspended"):
+        return str(got.get("message") or f"{name} is running — switch to it, or pick another name")
+    if verdict == "supersede":
+        return f"{name} names an exited session — pick another name"
+    return ""
+
+
 async def config_on(call: Any, host: str, directory: str) -> repoconfig.RepoConfig:
     """`directory`'s repo config on another host (§4.4a *The New session form on another host*,
     TD-294): `host_dir` gives the checkout's top level (`root`), and `repoconfig.load` reads its
@@ -2624,12 +2642,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         (`ensure_worktree` would start the session on it)."""
         if naming.slug(name) != name:
             return ENTRY_SLUG_WHY
-        got = await call("name_check", dir=root, name=name, repo=root)
-        verdict = got.get("verdict")
-        if verdict in ("live", "suspended"):
-            return str(got.get("message") or f"{name} is running — switch to it, or pick another name")
-        if verdict == "supersede":
-            return f"{name} names an exited session — pick another name"
+        if why := entry_held_why(await call("name_check", dir=root, name=name, repo=root), name):
+            return why
         with contextlib.suppress(gitinfo.WorktreeError):
             if (await asyncio.to_thread(gitinfo.worktree_path, Path(root), name)).exists():
                 return f"a worktree named {name} exists — pick another name"
@@ -2637,7 +2651,116 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return f"a branch named {name} exists — the session would start on it; pick another name"
         return ""
 
+    async def entry_name_on(host: str, path: str, container: bool, name: str, listed: set[str]) -> str:
+        """`entry_name_why` on the team's host (§4.5a *Add entry form: Name*, TD-1064), in the row's
+        order: the name check routed to `host`, the worktree from `listed` (the plan's one
+        `host_worktrees`), the branch — the home's own read for a container node, whose checkout is
+        the home's own directory, else `host_branch` — each against the node's checkout `path`. A read
+        that fails, and a branch the host cannot tell, is `HostSilent` in the words the plan shows."""
+        if naming.slug(name) != name:
+            return ENTRY_SLUG_WHY
+        try:
+            got = await call("name_check", dir=path, name=name, repo=path, host=host)
+        except HTTPException as e:
+            raise HostSilent(unanswered(host, e)) from None
+        if why := entry_held_why(got, name):
+            return why
+        if name in listed:
+            return f"a worktree named {name} exists — pick another name"
+        if container:
+            exists: bool | None = await asyncio.to_thread(entry_branch_exists, path, name)
+        else:
+            try:
+                exists = (await call("host_branch", host=host, dir=path, name=name) or {}).get("exists")
+            except HTTPException as e:
+                raise HostSilent(unanswered(host, e)) from None
+            if exists is None:  # an older node without `branch`, or a read it could not make
+                raise HostSilent(f"{host} did not say whether {name} is free")
+        if exists:
+            return f"a branch named {name} exists — the session would start on it; pick another name"
+        return ""
+
+    async def entry_place(
+        org: orgmod.Org, team: str, type_: str, repo: str, root: str, name: str
+    ) -> tuple[dict[str, Any], repoconfig.RepoConfig | None]:
+        """Where **Open a session** starts and with what name, on the team's host where `place:` puts
+        the team on another (§4.9 *It runs on the team's host*, §4.5a *Open a session*, TD-1064):
+        `{host, dir, why, role, ledger, default, name_why}`, and the repo config read on a machine node
+        (None elsewhere: this host's and a container node's are the home's checkout, read as before).
+        `why` is the host's refusal — the team's landing, no checkout there, the host silent — which
+        disables the session way and never fails the plan, so **Hand to the techlead** still reads it."""
+        t = org.teams.get(team) if team else None
+        here = host_name()
+        away = (t.host or here) if t is not None else here
+        if away == here:
+            cfg = await asyncio.to_thread(repoconfig.discover, root)  # ValueError: the caller's 400
+            role = await asyncio.to_thread(entry_role, org, team, type_)  # reads the team's flow from disk
+            default = ""
+            for n in range(1, ENTRY_TRIES + 1):
+                cand = f"{ENTRY_PREFIX}-{n}"
+                if not await entry_name_why(root, cand):
+                    default = cand
+                    break
+            if not default:
+                raise HTTPException(409, f"no {ENTRY_PREFIX}-<n> up to {ENTRY_TRIES} is free in {repo}")
+            name_why = await entry_name_why(root, name) if name.strip() else ""
+            out = {"host": "", "dir": root, "why": "", "role": role, "ledger": cfg.ledger}
+            return {**out, "default": default, "name_why": name_why}, None
+        assert t is not None  # `away` is another host only for a team's
+        container = away in container_nodes()
+        path = org.checkout(t.repo, away)
+        node_dir = str(Path(path).expanduser()) if path is not None else ""
+        why, node_cfg, files = "", None, None
+        if team in org.unlanded:  # the start's own refusal; `teams.plan` is not run (§4.9 *Where a repo's team lands*)
+            why = org.unlanded[team]
+        elif path is None:
+            why = teams.no_checkout(org, t.repo, away, "Open a session")
+        elif not container:  # a machine node: its `.shiftlead.yml`, roles and ledger read there (§4.4a)
+            try:
+                node_cfg = await config_on(call, away, node_dir)
+                files = files_on(call, asyncio.get_running_loop())
+            except HostSilent as e:
+                why = unanswered(away, str(e))
+            except ValueError as e:
+                why = str(e).strip('"')
+        cfg = node_cfg
+        if cfg is None and container and not why:
+            cfg = await asyncio.to_thread(repoconfig.discover, root)
+        role = await asyncio.to_thread(entry_role, org, team, type_, files)
+        ledger = cfg.ledger if cfg is not None else repoconfig.DEFAULT_LEDGER
+        listed: set[str] = set()
+        if not why:
+            try:
+                got = await call("host_worktrees", host=away, repo=node_dir)  # once per plan, not per candidate
+                listed = {str(w.get("name") or "") for w in (got or {}).get("worktrees") or [] if isinstance(w, dict)}
+            except HTTPException as e:
+                why = unanswered(away, e)
+        out = {"host": away, "dir": node_dir, "role": role, "ledger": ledger}
+        if why:
+            return {**out, "why": why, "default": "", "name_why": why}, node_cfg
+        default = ""
+        try:  # a candidate that fails is skipped; the first read that fails ends the search
+            for n in range(1, ENTRY_TRIES + 1):
+                cand = f"{ENTRY_PREFIX}-{n}"
+                if cand not in listed and not await entry_name_on(away, node_dir, container, cand, listed):
+                    default = cand
+                    break
+        except HostSilent as e:
+            return {**out, "why": str(e), "default": "", "name_why": str(e)}, node_cfg
+        if not default:
+            raise HTTPException(409, f"no {ENTRY_PREFIX}-<n> up to {ENTRY_TRIES} is free in {t.repo} on {away}")
+        try:
+            name_why = await entry_name_on(away, node_dir, container, name, listed) if name.strip() else ""
+        except HostSilent as e:
+            return {**out, "why": str(e), "default": default, "name_why": str(e)}, node_cfg
+        return {**out, "why": "", "default": default, "name_why": name_why}, node_cfg
+
     async def entry_plan(repo: str, type_: str, name: str = "", pick: str = "") -> dict[str, Any]:
+        return (await entry_plan_cfg(repo, type_, name, pick))[0]
+
+    async def entry_plan_cfg(
+        repo: str, type_: str, name: str = "", pick: str = ""
+    ) -> tuple[dict[str, Any], repoconfig.RepoConfig | None]:
         """What **Open a session** would start for `repo` (a registered checkout's name) and `type_`:
         the team whose `repo:` is the checkout, the role its `entries:` names (§4.9), the first
         `entry-<n>` free in the repo (`default`), the name the press takes — `name` as typed in the
@@ -2655,20 +2778,11 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         root = str(Path(root).expanduser().resolve())
         org, _notes = await asyncio.to_thread(org_here)
         team = repo_teams(org, host_name()).get(root, "")
-        role = await asyncio.to_thread(entry_role, org, team, type_)  # reads the team's flow from disk
         try:
-            cfg = await asyncio.to_thread(repoconfig.discover, root)
+            place, node_cfg = await entry_place(org, team, type_, repo, root, name)
         except ValueError as e:
             raise HTTPException(400, str(e).strip('"')) from None
-        default = ""
-        for n in range(1, ENTRY_TRIES + 1):
-            cand = f"{ENTRY_PREFIX}-{n}"
-            if not await entry_name_why(root, cand):
-                default = cand
-                break
-        if not default:
-            raise HTTPException(409, f"no {ENTRY_PREFIX}-<n> up to {ENTRY_TRIES} is free in {repo}")
-        name_why = await entry_name_why(root, name) if name.strip() else ""
+        role, default, name_why = place["role"], place["default"], place["name_why"]
         name = name if name.strip() else default
         manager, records, attach = "", {}, ""
         with contextlib.suppress(HTTPException):  # no list: the hand line reads as a seat nobody fills
@@ -2693,7 +2807,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return {
             "repo": repo,
             "root": root,
-            "ledger": cfg.ledger,
+            "host": place["host"],  # the team's host where `place:` puts it on another, else "" (TD-1064)
+            "dir": place["dir"],  # the repo's checkout there, which the create's `dir` and worktree base are
+            "why": place["why"],  # why the session way is refused on that host; Hand to the techlead is not
+            "ledger": place["ledger"],
             "type": type_,
             "team": team,
             "role": role,
@@ -2701,12 +2818,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "default": default,  # the **Name** box's prefill and placeholder (§4.5a, TD-677)
             "name_why": name_why,  # stands in place of the line, and disables **Open a session**
             "manager": manager,
-            "line": entry_line(role, name, team),
+            "line": entry_line(role, name, team, place["host"]),
             "teams": servicing,  # what `entry_add` is handed (TD-218), the picked team first (TD-740)
             "picked": picked["team"] if picked else "",
             "hand": entry_hand(servicing, records, datetime.now(UTC)),  # **Hand to the techlead** (TD-219 slice 4)
             "attach": attach,  # why **Attach** refuses, or "" (§4.5a *Add entry form: Attach / drop / paste*)
-        }
+        }, node_cfg
 
     @app.get("/api/entry/plan")
     async def api_entry_plan(repo: str = "", type: str = "debt", name: str = "", team: str = ""):
@@ -2787,34 +2904,38 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         priority = str(body.get("priority") or "").strip().lower() or "medium"  # the **Priority** pick (TD-851)
         if priority not in orgmod.ENTRY_PRIORITIES:
             raise HTTPException(400, f"an entry's priority is {', '.join(orgmod.ENTRY_PRIORITIES)}, not {priority!r}")
-        plan = await entry_plan(repo, type_ or "debt", name)
+        plan, node_cfg = await entry_plan_cfg(repo, type_ or "debt", name)
         if plan["name_why"]:  # taken between the check and the press: refused, never replaced by another
-            raise HTTPException(409, plan["name_why"])
-        root, team = plan["root"], plan["team"]
+            raise HTTPException(409, plan["name_why"])  # the host's refusal too, never a create on the home's path
+        root, team, away = plan["root"], plan["team"], plan["host"]
         try:
-            cfg = await asyncio.to_thread(repoconfig.discover, root)
-            preset = repoconfig.resolve_role(cfg, plan["role"], (await asyncio.to_thread(org_here))[0].roles)
+            cfg = node_cfg or await asyncio.to_thread(repoconfig.discover, root)
+            roles = (await asyncio.to_thread(org_here))[0].roles
+            # a machine node's config reads across the link, blocking on this loop: a worker thread's
+            preset = await asyncio.to_thread(repoconfig.resolve_role, cfg, plan["role"], roles)
+            review = preset.review
+            if team:  # a role's own `review:` wins, else the team's reader (§4.9) — under a flow, the flow's (§4.9c)
+                got = await asyncio.to_thread(team_reader, team, root, node_cfg, preset.name)
+                if got.get("flow") or review is None:
+                    review = got["review"]
         except (KeyError, ValueError) as e:
             raise HTTPException(400, str(e).strip('"')) from None
-        review = preset.review
-        if team:  # a role's own `review:` wins, else the team's reader (§4.9) — under a flow, the flow's (§4.9c)
-            got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
-            if got.get("flow") or review is None:
-                review = got["review"]
+        except OSError as e:  # the node stopped answering between the plan and the role or its reader
+            raise HTTPException(409, unanswered(away, str(e))) from None
         # the `project` badge, as New session's: the repo's project, from the same function (§4.9, TD-1043);
         # the badge alone, since this session starts at the prompt with no text to carry a Project block
         project, _block = await asyncio.to_thread(lambda: teams.reach_block(org_here()[0], root, host_name()))
         s = await call(
             "create",
             name=plan["name"],
-            dir=root,
+            dir=plan["dir"],  # the team's checkout on its host (TD-1064); the badge stays keyed by `root`
             adapter="claude-code",
             profile=preset.profile or "",
             prompt="",  # started at the prompt: a role's brief is written for an unattended run (§4.9)
             unattended=False,
             **teams.gate_prompts(False),
             worktree=plan["name"],
-            repo=root,
+            repo=plan["dir"],
             capabilities=[g for g in dict.fromkeys(preset.grants) if g in GRANTS],  # as New session ticks them
             lane=[],
             role=preset.name,
@@ -2825,6 +2946,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             project=project,
             team=team,  # the badge, as the New session form's Team pick sets it; none without a team
             start_context=repoconfig.entry_text(plan["repo"], plan["type"], priority, plan["ledger"]),
+            **({"host": away} if away else {}),  # routed to the team's host, as New session's Host pick is
             **_draft_of(body),
         )
         text = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)
