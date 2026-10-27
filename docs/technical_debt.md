@@ -97,7 +97,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1067 | `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading | Low | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
 | TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Built in #2431 — live check |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
@@ -2084,22 +2083,6 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
-
-## TD-1067: `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-1, met in TD-1052's three prechecks at once)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_ui_repos_omit.py` (`test_the_repos_rpc_serves_each_reading_without_what_omit_names`); `src/sessionorc/agent_tick.py` (the repos pass's `gone`, about line 3134)
-
-**Why:** one of three prechecks of #2411 run at once failed it: `KeyError: '/var/tmp/pc.oJj6Bl/p/test_the_repos_rpc_serves_each0'` on `agent._repos[root]`, read right after the test set it. The test puts a reading for `tmp_path` into `agent._repos`, which is no registered repo, and the running agent's repos pass pops every root not in `hosts.local_host().repos()`, so a tick between the set and the read drops it. Under load the window is wider; the other two runs and every single run passed.
-
-**Fix:** register the test's root (or stop the tick for the test) before setting the reading, and take the expected value before the call.
-
-**Done when:** a repos pass forced between the set and the call leaves the test passing. `pdm run test` and `pdm run lint` pass.
 
 ## TD-1075: The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit)
 
