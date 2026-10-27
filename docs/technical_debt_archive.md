@@ -20602,7 +20602,7 @@ It files each as a build entry, or as live checks where the design already holds
 
 **Related:** TD-1050, TD-1087 (the same family: a test that reads before the event it waits on).
 
-**Resolved:** 2026-10-27 (grinder-ao-1) — `test_the_linux_reader_reads_children_and_argv_and_falls_back_to_ppid` waits, bounded (`wait_for_sync`), for the child's argv to read non-empty before it asserts `["sleep", "30"]`; `LinuxProc.cmdline` is unchanged. No caller in the code reads a process it has just started: the two (`claude_code` and `gemini` adapters' `background`) read a tool's own children, long since exec'd, and a `[]` there is already read as no argv (`or []`).
+**Resolved:** 2026-10-27 (grinder-ao-1) — `test_the_linux_reader_reads_children_and_argv_and_falls_back_to_ppid` waits, bounded (`wait_for_sync`), for the child's argv to read non-empty before it asserts `["sleep", "30"]`; `LinuxProc.cmdline` is unchanged. No caller in the code reads a process it has just started: the two (`claude_code` and `gemini` adapters' `background`) read a tool's own shell children and the command each runs; a command started a moment before can read `[]`, which blanks its `cmd` for that one poll (`or []`, and the shell's argv check skips it) and reads right on the next, so they take no wait.
 
 ## TD-1060: `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit)
 
