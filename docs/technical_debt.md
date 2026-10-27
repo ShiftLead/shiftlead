@@ -2058,7 +2058,6 @@ Any of these puts the live agent back to the pre-TD-1093 behaviour for a peer wh
 **Related:** TD-1093.
 
 ---
-
 ## TD-1124: The tick's save condition for a switch-made sweep seat's `seat_count` (*off*/*other* mark, TD-1091) is tested by no test: take it out and the suite passes
 
 **Priority:** Low
