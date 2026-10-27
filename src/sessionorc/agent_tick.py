@@ -2901,11 +2901,9 @@ class TickMixin:
         if seat.get("tags"):
             # a tagging seat (§4.4 *An entry names its team*, TD-730): `asks` while a question waits —
             # a standing `tag` due handed back would hide it — else `tag` while uncovered ids stand
-            if s.asks_waiting(home=self.host):
-                return s.seat_due if (s.seat_due or {}).get("by") == "asks" else {"at": now_iso(), "by": "asks"}
-            return self._tag_cause(s, records)
+            return self._asks_cause(s) or self._tag_cause(s, records)
         if trigger == "asks":
-            return (s.seat_due or {"at": now_iso(), "by": "asks"}) if s.asks_waiting(home=self.host) else None
+            return self._asks_cause(s)
         if s.seat_due:
             return s.seat_due
         met = False
@@ -2917,6 +2915,18 @@ class TickMixin:
             every = _duration(str(seat.get("after") or ""))
             met = every is not None and now - _parse(s.created) >= every
         return {"at": now_iso(), "by": trigger} if met else None
+
+    def _asks_cause(self, s: Session) -> dict[str, Any] | None:
+        """A seat's `asks` due while a question waits (§6 rule 3): `{at, by: asks, ask}`, `ask` the id of
+        the first question `asks_ids` counts — an answer waiting by its question's (§4.9b, TD-1051) — the
+        standing due kept while its question still counts, so its `at` is the first tick's."""
+        ids = s.asks_ids(home=self.host)
+        if not ids:
+            return None
+        due = s.seat_due or {}
+        if due.get("by") == "asks" and due.get("ask") in ids:
+            return s.seat_due
+        return {"at": now_iso(), "by": "asks", "ask": ids[0]}
 
     def _tagging_seat(self, root: str, records: list[Session]) -> Session | None:
         """The repo's tagging seat (§4.4 *An entry names its team*, TD-730): among the repo's records
