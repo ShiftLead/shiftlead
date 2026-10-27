@@ -1799,6 +1799,25 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     assert teamrun.seat_ids(org, sessions) == {"b": "comes on the next question", "c": "runs every 6h"}
 
 
+def test_a_sweeper_seat_starts_with_the_built_in_brief_and_its_swept_trigger(world, capsys):
+    """TD-1090, design §4.9b *The sweep*: one `seats:` line with no `brief:` starts a seat on the built-in
+    `sweeper.md`, its record carrying `{trigger: swept, after}`, no lane and no grants."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["seats"] = [{"name": "sweep-ao-1", "role": "sweeper", "trigger": {"swept": "7d"}}]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    (sweep,) = [p for p in creates(state) if p["name"] == "sweep-ao-1"]
+    assert sweep["seat"] == {"trigger": "swept", "after": "7d"}
+    assert sweep["role"] == "sweeper" and sweep["capabilities"] == [] and sweep["lane"] == []
+    assert sweep["prompt"].startswith("You are a **sweeper**")
+    assert "`dev-cadence path procedures/stranded-work.md`" in sweep["prompt"]
+    capsys.readouterr()
+    org = cli._org_here()
+    gone = [{"id": "s", "name": "sweep-ao-1", "team": "ao-grind", "state": "exited"}]
+    assert teamrun.seat_ids(org, gone) == {"s": "sweeps when unswept 7 d"}
+
+
 def test_every_unattended_member_carries_the_usage_gates_two_texts(world):
     """Design §6 *Usage gate* (TD-100 slice 2): the host agent types the record's `pause_prompt` and
     `resume_prompt`, so a team's unattended members get both at create, in `shiftlead.teams`' words."""

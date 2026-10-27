@@ -112,14 +112,16 @@ class TechleadDef:
 class SeatDef:
     """A seat with a trigger (design §4.9b *Seats with a trigger*, TD-098): a session its manager
     fills when `trigger` is met and that ends on its own — `asks` (a question landed, the
-    techlead's), `prs` (that many PRs merged since it last came) or `every` (a duration since it
-    last came, `6h`). It holds no grants, declares nothing and is not counted in a wind-down, so
-    `grants` is fixed empty and there is no lane; the role is any preset, `auditor` the designed one."""
+    techlead's), `prs` (that many PRs merged since it last came), `every` (a duration since it
+    last came, `6h`) or `swept` (the repo's board's `Swept:` stamp that old, or absent — a
+    sweeper's, TD-1090). It holds no grants, declares nothing and is not counted in a wind-down, so
+    `grants` is fixed empty and there is no lane; the role is any preset, `auditor` and `sweeper` the
+    designed ones."""
 
     name: str = ""  # default `<team>-<role>`, filled by the loader
     role: str = ""
-    trigger: str = "asks"  # `asks` | `prs` | `every`
-    after: str = ""  # the trigger's value: `prs`' count, `every`'s duration as written; "" for `asks`
+    trigger: str = "asks"  # `asks` | `prs` | `every` | `swept`
+    after: str = ""  # the trigger's value: `prs`' count, `every`'s or `swept`'s duration as written; "" for `asks`
     profile: str | None = None
     brief: str | None = None  # overrides the role's template
     lane: list[str] = field(default_factory=list)
@@ -132,6 +134,9 @@ class SeatDef:
             return f"runs after {self.after} PR" + ("" if self.after == "1" else "s")
         if self.trigger == "every":
             return f"runs every {self.after}"
+        if self.trigger == "swept":
+            # §4.9b *What a sweep seat's card says*: *sweeps when unswept 7 d*
+            return "sweeps when unswept " + re.sub(r"(\d+)([mhd])", r"\1 \2", self.after)
         return "comes on the next question"
 
 
@@ -671,7 +676,7 @@ SEAT_KEYS = ("name", "role", "trigger", "brief", "profile")
 # sessions pass `_no_stray` so `_validate` can refuse them by name, saying the fix (`_refuse_old`)
 OLD_TEAM_KEYS = ("projects",)
 OLD_KEYS = ("home",)
-TRIGGERS = ("asks", "prs", "every")
+TRIGGERS = ("asks", "prs", "every", "swept")
 _DURATION = re.compile(r"[1-9]\d*[mhd]")
 
 
@@ -824,8 +829,8 @@ def _techlead(team: str, raw: Any, key: str, old: dict[str, Any]) -> TechleadDef
 
 def _seats(team: str, raw: Any, key: str, old: dict[str, Any]) -> list[SeatDef]:
     """`seats: [{name, role, trigger, brief, profile}]` (design §4.9b *Seats with a trigger*).
-    `trigger` is `asks`, `{prs: <n>}` or `{every: <n>m|h|d}`, and is required: a seat nobody says
-    when to fill is a member that never runs. A seat is a session and never `person`, and holds no
+    `trigger` is `asks`, `{prs: <n>}`, `{every: <n>m|h|d}` or `{swept: <n>m|h|d}`, and is required: a
+    seat nobody says when to fill is a member that never runs. A seat is a session and never `person`, and holds no
     `grants:` and no `lane:` — the design gives it none, so a key for them is refused as a typo is."""
     if raw is None:
         return []
@@ -860,21 +865,24 @@ def _seats(team: str, raw: Any, key: str, old: dict[str, Any]) -> list[SeatDef]:
 
 
 def _trigger(raw: Any, key: str) -> tuple[str, str]:
-    """`asks` | `{prs: <n>}` | `{every: <duration>}` → `(kind, value as written)`."""
+    """`asks` | `{prs: <n>}` | `{every: <duration>}` | `{swept: <duration>}` → `(kind, value as written)`."""
     if raw is None:
-        raise ValueError(f"{key} is required: `asks`, `{{prs: <n>}}` or `{{every: <n>m|h|d}}`")
+        raise ValueError(f"{key} is required: `asks`, `{{prs: <n>}}`, `{{every: <n>m|h|d}}` or `{{swept: <n>m|h|d}}`")
     if raw == "asks":
         return "asks", ""
     if not isinstance(raw, dict) or len(raw) != 1 or next(iter(raw)) not in TRIGGERS[1:]:
-        raise ValueError(f"{key}: expected `asks`, `{{prs: <n>}}` or `{{every: <n>m|h|d}}`, got {raw!r}")
+        raise ValueError(
+            f"{key}: expected `asks`, `{{prs: <n>}}`, `{{every: <n>m|h|d}}` or `{{swept: <n>m|h|d}}`, got {raw!r}"
+        )
     kind, value = next(iter(raw.items()))
     if kind == "prs":
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise ValueError(f"{key}.prs must be a whole number of PRs, 1 or more (got {value!r})")
         return "prs", str(value)
+    # `swept` is parsed in `every`'s units (§4.9b *The sweep*)
     if not isinstance(value, str) or not _DURATION.fullmatch(value):
-        raise ValueError(f"{key}.every must be a duration like 30m, 6h or 1d (got {value!r})")
-    return "every", value
+        raise ValueError(f"{key}.{kind} must be a duration like 30m, 6h or 1d (got {value!r})")
+    return kind, value
 
 
 # ── validation ────────────────────────────────────────────────────────────────────────────────

@@ -132,8 +132,9 @@ def filled_for(cause: dict[str, Any] | None) -> str | None:
     """The closing line of a manager on call's fill prompt (§6 rule 3 *A fill says why it came*,
     TD-410), in fixed words from its `seat_due`: *[shiftlead] you are filled for: <by> — <member>*, the
     question's id for `asks`, and for a tagging seat's `tag` the ids it tags, *tag — TD-801, TD-802*
-    (§4.4 *An entry names its team*, TD-730). None for any other fill, which says nothing more."""
-    if not cause or not cause.get("by"):
+    (§4.4 *An entry names its team*, TD-730). None for any other fill, which says nothing more — a
+    sweep seat's `swept` among them, whose brief says what brought it (§4.9b *The sweep*, TD-1090)."""
+    if not cause or not cause.get("by") or cause["by"] == "swept":
         return None
     if cause["by"] == "asks":
         what = cause.get("ask")
@@ -2874,8 +2875,8 @@ class TickMixin:
             return True
         if s.seat_due.get("by") == "tag":
             return True  # a tagging seat's `tag` due is the next fill's (§4.4 *An entry names its team*, TD-730)
-        # a `prs` or `every` due met while the seat ran is the next run's cause (TD-700)
-        if (s.seat or {}).get("trigger") in ("prs", "every"):
+        # a `prs`, `every` or `swept` due met while the seat ran is the next run's cause (TD-700, TD-1090)
+        if (s.seat or {}).get("trigger") in ("prs", "every", "swept"):
             return True
         return (s.seat or {}).get("trigger") == "team" and s.seat_due.get("by") != "asks"
 
@@ -2916,7 +2917,8 @@ class TickMixin:
     def _seat_due(self, s: Session, now: datetime, records: list[Session]) -> dict[str, Any] | None:
         """`seat_due: {at, by}` (§6 rule 3): set once the trigger is met and kept until the fill — but
         `asks` is a question waiting now, so it clears again if none is. `prs` reads `seat_count`,
-        which `_count_seats` keeps; `every` is the time since this record was created. `team` is a
+        which `_count_seats` keeps; `every` is the time since this record was created; `swept` reads
+        the repo's board's stamp (`_swept_met`). `team` is a
         manager on call's (TD-259): `{at, by, member}` — `ask` in `member`'s place for `asks` — the
         first cause standing that no fill was made for; `seat_filled` loses each entry whose cause
         has gone, here, and a due whose cause went before the fill is cleared as `asks` is."""
@@ -2951,7 +2953,37 @@ class TickMixin:
         elif trigger == "every":
             every = _duration(str(seat.get("after") or ""))
             met = every is not None and now - _parse(s.created) >= every
+        elif trigger == "swept":
+            met = self._swept_met(s, now)
         return {"at": now_iso(), "by": trigger} if met else None
+
+    def _swept_met(self, s: Session, now: datetime) -> bool:
+        """A sweep seat's `swept: <d>` cause (design §4.9b *The sweep*, §6 rule 3, TD-1090): the boards
+        reading of the seat's repo carries `swept` for its board (read from origin), and its `at` is
+        null — never swept — or `d` old; **and** `d` has passed since the seat's last fill for it (its
+        `seat_filled` entry `by: swept`), so a run that ended without stamping is not refilled in a loop.
+        An `error` reading, no reading, no board, or a null `swept` (no board on origin) is no cause."""
+        every = _duration(str((s.seat or {}).get("after") or ""))
+        reading = (self._repos.get(s.repo or "") or {}).get("boards")
+        if every is None or not isinstance(reading, dict) or "error" in reading:
+            return False
+        board = next(
+            (b for b in reading.get("boards") or () if isinstance(b, dict) and str(b.get("root")) == str(s.repo)),
+            None,
+        )
+        stamp = (board or {}).get("swept")
+        if not isinstance(stamp, dict):
+            return False
+        at = stamp.get("at")
+        # the stamp is a civil date, the board's local day (cadence §3.10): its age from that day's start
+        if at and now - datetime.fromisoformat(str(at)).astimezone() < every:
+            return False
+        fills = [
+            _parse(e["at"])
+            for e in s.seat_filled
+            if isinstance(e, dict) and e.get("by") == "swept" and isinstance(e.get("at"), str)
+        ]
+        return not fills or now - max(fills) >= every
 
     def _asks_cause(self, s: Session) -> dict[str, Any] | None:
         """A seat's `asks` due while a question waits (§6 rule 3): `{at, by: asks, ask}`, `ask` the id of
@@ -3056,8 +3088,9 @@ class TickMixin:
         log.info("%s: the seat is due (%s) — filling it", s.id, (s.seat_due or {}).get("by"))
         seat = s.seat or {}
         tagged = bool(seat.get("tags")) and (s.seat_due or {}).get("by") == "tag"
-        # a manager on call's cause, or a tagging seat's `tag` (TD-730); a techlead's `asks` fill has none
-        cause = s.seat_due if seat.get("trigger") == "team" or tagged else None
+        # a manager on call's cause, a tagging seat's `tag` (TD-730), or a sweep seat's `swept`, which is
+        # remembered so it fills once (TD-1090) but says nothing (`filled_for`); a techlead's `asks` fill has none
+        cause = s.seat_due if seat.get("trigger") in ("team", "swept") or tagged else None
         # a manager on call says why it came (§6 rule 3 *A fill says why it came*, TD-410): its first
         # act is the reading `seat_due` names, read back from the record, never `ao status` first
         said = filled_for(cause)
@@ -3601,7 +3634,10 @@ class TickMixin:
         (`BOARD_EVERY`) reads the checkout plainly, and only when its board's file or the day moved
         since the last reading, so a board read from origin stays so until the checkout pulls; `tree`
         reads that file — the write-back's tree — as the checkout's board read from origin. A failed
-        read keeps the last boards and orders with `error` and `failed_at` beside them."""
+        read keeps the last boards and orders with `error` and `failed_at` beside them. A board read of
+        the checkout alone (the clock's, or a due pass whose fetch was skipped) carries the last `swept`
+        of the same board (`root` and `label`) forward: only a read against origin writes it (§4.9b
+        *The sweep*, TD-1090)."""
         bds, wos = old.get("boards"), old.get("work_orders")
         try:
             st = (Path(root) / workorders.board_rel(root)).stat()
@@ -3624,6 +3660,14 @@ class TickMixin:
             bds = {**(bds or {"boards": []}), "error": got["error"], "failed_at": at}
             wos = {**(wos or {"orders": []}), "error": got["error"], "failed_at": at}
             return bds, wos
+        was = {
+            (b.get("root"), b.get("label")): b["swept"]
+            for b in (bds or {}).get("boards") or ()
+            if isinstance(b, dict) and "swept" in b
+        }
+        for b in got["boards"]:
+            if isinstance(b, dict) and "swept" not in b and (b.get("root"), b.get("label")) in was:
+                b["swept"] = was[(b.get("root"), b.get("label"))]
         bds = {"boards": got["boards"], "today": got.get("today") or today, "file": file, "at": stamp}
         return bds, {"orders": [workorders.entry(o) for o in workorders.orders(bds)], "at": stamp}
 
