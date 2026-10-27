@@ -1,6 +1,8 @@
 # Tests
 
-`pdm run test` runs everything; `pdm run test-fast` runs the `unit` tier only. CI
+`pdm run test` runs everything, across eight workers (`pytest-xdist`, `-n 8`, TD-1068); `pdm run test-fast`
+runs the `unit` tier only. A test runs in whichever worker takes it, after whatever that worker ran
+before, so a test may lean on no other test's leftovers, and a wait bounds an event, never the load. CI
 (`.github/workflows/ci.yml`) runs lint and the full suite on every push and pull request.
 
 ## Rules

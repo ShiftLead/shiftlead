@@ -105,12 +105,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1065 | `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it | Low | Open — build |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1067 | `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading | Low | Open — build |
-| TD-1068 | The test suite runs on one core, so every precheck takes 12 minutes and main moves under it | Medium | Open |
 | TD-1074 | `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit) | Medium | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
 | TD-1078 | A seat is filled by an answer to its own question, and the techlead relays what came of it to the member whose question it was | Medium | Open — build |
 | TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Open — build |
 | TD-1080 | The stop, start, status and acting-gate words: unread mail on a finished member, the start's cure, a person's row, and the `!` escape | Low | Open — build |
+| TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
 
 ---
 
@@ -2007,7 +2007,7 @@ Trimming before the rule arrives here loses it (§2.4).
 **Added:** 2026-10-26 (grinder-ao-2, met on #2394)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — the container test fixed in TD-1068's PR (#2426): it was not slow but racy. It brought the link up before the agent's first tick, and a link already up is never provisioned, so under `-n auto` load the definition never came, whatever the bound. It now waits for the provision's file, then brings the link up. Left: the other three tests named below.
 **Location:** `tests/test_containers.py` (`test_the_home_derives_a_container_nodes_reach_when_it_dials_in`, its `wait_for(…, timeout=5.0)` on `"cm" not in agent.supervision and node.config.is_file()`)
 
 **Why:** on #2394's CI (run 40400754079, 2026-10-26), `test (3.12)` failed this test with `assert False` while `test (3.13)` and the local suite passed it, on a change that touches no container code; a rerun of the job was needed. The same evening two more fixed waits failed #2394's local precheck (4d188f8) under several prechecks' load and passed alone: `tests/test_agent.py::test_send_confirms_the_submit` (*the composer child never painted its prompt*, a 5 s `_poll`) and `tests/test_doorbell.py::test_the_doorbell_rings_only_where_it_may` (`tmux load-buffer`: *error connecting to /tmp/tmux-1000/ao-test-…*, the private server gone). On #2407's precheck (ad2bcfc, the same night's load) `tests/test_board.py::test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line` failed on *…/repo is not a repo this home reads (its repos registry)* where *TD-22 is yours to do* was wanted, and passed alone: the registry's read lost a race, as TD-1040's *repo is unserved* did. The Fix covers all four. The wait's own comment says a slow CI runner already once read the node before the supervisor's provision wrote its definition (TD-285): five seconds is the bound that ran out. A red run that says nothing about the code costs a rerun and a reader's doubt, and with the local `precheck` (TD-1035) the same wait now gates every PR on kmaster's load too.
@@ -2242,31 +2242,6 @@ It then names the build entries.
 
 **Done when:** a repos pass forced between the set and the call leaves the test passing. `pdm run test` and `pdm run lint` pass.
 
-## TD-1068: The test suite runs on one core, so every precheck takes 12 minutes and main moves under it
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `pyproject.toml` (`[tool.pdm.scripts] test = "pytest -q"`, the dev group, `[tool.pytest.ini_options]`), `docs/cadence.toml` (`precheck`), `tests/conftest.py` (the private tmux servers, `-L ao-test-<uuid>`, and the temp `SHIFTLEAD_HOME`; read `tests/README.md` first), the tests' own free-port helpers (TD-870's kind); the tests known to fail under load: `tests/test_containers.py::test_the_home_derives_a_container_nodes_reach_when_it_dials_in` (TD-1050), `tests/test_conventions_policy.py::test_a_restart_is_written_afresh`
-
-**Why:** Paul, 2026-10-26: "Why is our cadence check so long (12 min) - is there efficiencies/parallelizations we should consider?" The precheck ran 4,257 tests in about 720 of its ~750 s, on one of kmaster's 16 cores. A ledger-and-board PR (#2408) was prechecked five times that evening, and none of the reruns was its own fault:
-- `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` failed twice (TD-1050);
-- `test_a_restart_is_written_afresh` failed once (`TypeError: 'NoneType' object is not subscriptable` at line 170) and passes alone in 2 s;
-- main twice moved the ledger under a run, so the PR conflicted at the end.
-Each cycle costs 12 minutes, and a shorter run gives main less time to move.
-
-**Fix:** a spike, then the switch:
-1. **The spike.** Add `pytest-xdist` to the dev group. Run `pdm run pytest -q -n auto` (and `-n 8`) five times on main, and record wall time and every failure.
-2. **Fix what collides.** For each test that fails only in parallel, give it a per-worker resource (port, tmux socket, `SHIFTLEAD_HOME`, the worker id in the name), or group its file with `--dist loadgroup` / `xdist_group`. The two flaky tests above either get fixed or have their causes ledgered.
-3. **The switch.** `test` becomes `pytest -q -n auto` (or a measured fixed `-n`, since prechecks running at once share 16 cores and `/tmp`, TD-1052), and the precheck uses it.
-
-**Done when** five consecutive `-n auto` runs on main pass, the precheck's measured time is in this entry's Status, and `test_a_restart_is_written_afresh` passes 20 runs under `-n auto` or its cause is ledgered.
-
-**Related:** dev-cadence#TD-155 (a narrow precheck by path), TD-1050, TD-1052, TD-1035.
-
 ## TD-1074: `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit)
 
 **Priority:** Medium
@@ -2356,3 +2331,26 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Done when:** tests hold each of the four words: a stop over an out-of-work member with unread mail, with and without `--close`; a start refused by an idle holder; a status row for a person's session in a team (JSON `person: true` and the text mark); and the acting gate's refusal to a person's session's caller carrying the hint, while a worker's, the person's own shell (passed by `as_person` before the gate) and a caller with no record get none. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1051 (the design); TD-160 (a person in the team), TD-580, TD-801 (the person's own shell); TD-1078, TD-1079.
+
+## TD-1087: Four tests fail only when the suite runs across workers (`-n auto`), and pass alone
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, measuring TD-1068)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_conventions_policy.py` (`test_a_restart_is_written_afresh`, `test_a_member_created_before_an_entry_landed_is_told_once_and_one_created_after_never`), `tests/test_attachment_life.py` (`test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_live_ones`)
+
+**Why:** TD-1068 runs the suite as `pytest -n 8`, which passed seven full runs in a row. Under `-n auto` (16 workers, load 14–18 beside the org's sessions), these failed and passed alone (the conventions file passed 20 of 20 runs serially):
+- `test_a_member_created_before_an_entry_landed_is_told_once_and_one_created_after_never`: `assert [] == ['docs/cadence-changes.md gained 1 entry since you started: …']`, once in five full runs and twice in 20 runs of its file under `-n auto`. The note was not sent within the test's wait.
+- `test_a_restart_is_written_afresh`: `TypeError: 'NoneType' object is not subscriptable` (the same failure TD-1068 met once on one core), once in 20 runs of its file.
+- `test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_live_ones`: `FileNotFoundError` on `…/home/attachments/ao-gone-1/old.png`, once in five full runs. The sweep and the test's own read raced.
+- Also seen once each, already ledgered: `test_hooks_read_each_live_agent_session_and_the_queue` (TD-1065), `test_the_repos_rpc_serves_each_reading_without_what_omit_names` (TD-1067), `test_done_and_back_to_design_…` (TD-1050).
+A suite that fails under load for no fault of the change costs a 2-minute rerun now, not 12, but it is still a red with no cause.
+
+**Fix:** for each test, find what its wait stands for, and wait on that event, as TD-1050's container test now waits for the provision before linking. Reproduce with `pdm run pytest -n auto <file>` in a loop (20 runs) beside a full `-n auto` suite.
+
+**Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row; then `pdm run test` may take `-n auto`.
+
+**Related:** TD-1068, TD-1050, TD-1065, TD-1067.

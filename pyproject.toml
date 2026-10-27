@@ -52,12 +52,15 @@ dev = [
     # all — 26 minutes on PR #192, unattributed to this day, and 14 minutes on 2026-09-20. With
     # this, it fails in the file that hung, with every thread's stack (TD-063).
     "pytest-timeout>=2.3",
+    # the suite across the machine's cores: one core took 12 minutes a precheck (TD-1068)
+    "pytest-xdist>=3.6",
     "ruff>=0.6",
     "httpx>=0.27",
 ]
 
 [tool.pdm.scripts]
-test = "pytest -q"
+# eight workers (TD-1068): ~100 s against 12 min on one core, and room beside other prechecks on 16 cores
+test = "pytest -q -n 8"
 test-fast = "pytest -q -m unit"
 lint = "ruff check src tests"
 fmt = "ruff format src tests"

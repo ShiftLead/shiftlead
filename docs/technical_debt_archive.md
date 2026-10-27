@@ -20124,3 +20124,34 @@ Then file the build entries.
 **Related:** TD-1042 (the design); TD-582, TD-995 (the edges before it); TD-1043 (the empty `project` badge).
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2419) — `Session.by_person`, written once by `rpc_create` from the caller (`as_person`) and the record as written (not `supervised`, no `seat`), never a parameter; a node writes none and the home sets its copy from each forwarded create's reply (`_set_by_person`, `HOME_OWNED`); `mail.by_person` resolves an absent field, `mail.own_end` adds interactive and no seat, and `message_edge` tries `own` after *shared target*. The refusal, `_view` and `ao --skill`'s `ao msg` line say so; `tests/test_own_sessions_edge.py` holds the Done-when.
+
+## TD-1068: The test suite runs on one core, so every precheck takes 12 minutes and main moves under it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `pyproject.toml` (`[tool.pdm.scripts] test = "pytest -q"`, the dev group, `[tool.pytest.ini_options]`), `docs/cadence.toml` (`precheck`), `tests/conftest.py` (the private tmux servers, `-L ao-test-<uuid>`, and the temp `SHIFTLEAD_HOME`; read `tests/README.md` first), the tests' own free-port helpers (TD-870's kind); the tests known to fail under load: `tests/test_containers.py::test_the_home_derives_a_container_nodes_reach_when_it_dials_in` (TD-1050), `tests/test_conventions_policy.py::test_a_restart_is_written_afresh`
+
+**Why:** Paul, 2026-10-26: "Why is our cadence check so long (12 min) - is there efficiencies/parallelizations we should consider?" The precheck ran 4,257 tests in about 720 of its ~750 s, on one of kmaster's 16 cores. A ledger-and-board PR (#2408) was prechecked five times that evening, and none of the reruns was its own fault:
+- `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` failed twice (TD-1050);
+- `test_a_restart_is_written_afresh` failed once (`TypeError: 'NoneType' object is not subscriptable` at line 170) and passes alone in 2 s;
+- main twice moved the ledger under a run, so the PR conflicted at the end.
+Each cycle costs 12 minutes, and a shorter run gives main less time to move.
+
+**Fix:** a spike, then the switch:
+1. **The spike.** Add `pytest-xdist` to the dev group. Run `pdm run pytest -q -n auto` (and `-n 8`) five times on main, and record wall time and every failure.
+2. **Fix what collides.** For each test that fails only in parallel, give it a per-worker resource (port, tmux socket, `SHIFTLEAD_HOME`, the worker id in the name), or group its file with `--dist loadgroup` / `xdist_group`. The two flaky tests above either get fixed or have their causes ledgered.
+3. **The switch.** `test` becomes `pytest -q -n auto` (or a measured fixed `-n`, since prechecks running at once share 16 cores and `/tmp`, TD-1052), and the precheck uses it.
+
+**Done when** five consecutive `-n auto` runs on main pass, the precheck's measured time is in this entry's Status, and `test_a_restart_is_written_afresh` passes 20 runs under `-n auto` or its cause is ledgered.
+
+**Related:** dev-cadence#TD-155 (a narrow precheck by path), TD-1050, TD-1052, TD-1035.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2426) — `pytest-xdist` is in the dev group and `pdm run test` is `pytest -q -n 8`, which the precheck runs. Measured on kmaster, each a full suite (4,318 tests) with a `/var/tmp` `TMPDIR` as the precheck gives it, beside the org's other sessions (load 8–18):
+- `-n 8`: seven runs, all passed, 94–110 s each (the precheck's 12 minutes becomes about 2, its install included).
+- `-n auto` (16 workers): ten runs after the first, 59–88 s each. Before the container fix below, one in five passed. After it, four in five, the one failure TD-1067's race.
+- `--dist loadfile`: three runs, two failed the container test, so the failures were not test order.
+`-n 8` is chosen over `-n auto` because it passed every run, and because prechecks run several at once on 16 cores. `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` (TD-1050) failed most `-n auto` runs: it brought the node's link up before the agent's first tick, and a linked node is never provisioned. It now waits for the provision, then links. `test_a_restart_is_written_afresh` passed 20 of 20 alone, and failed once in 20 runs of its file under `-n auto` (with a sibling twice): ledgered as TD-1087, with the other tests seen to fail only under xdist. The five consecutive `-n auto` passes the entry asked for were not reached; `-n 8` passed seven in a row.
