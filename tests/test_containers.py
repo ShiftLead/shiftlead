@@ -351,6 +351,8 @@ def _pinned_node(monkeypatch, tmp_path, *, resolves=True):
         (tree / "files" / "scripts" / "check_cadence.py").write_text("x = 1\n")
         (tree / "launcher").mkdir()
         (tree / "launcher" / "INTERFACE").write_text("1\n")
+        (tree / "files" / "scripts" / "check.py").symlink_to("check_cadence.py")  # links ship as links (TD-1060)
+        (tree / "files" / "gone").symlink_to("nowhere")
         os.chmod(tree / "files" / "scripts" / "check_cadence.py", 0o444)
     from sessionorc import cadence
 
@@ -373,6 +375,8 @@ def test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache(hom
     shipped = n.node_dir / "cadence" / ref
     assert (shipped / "files" / "scripts" / "check_cadence.py").read_text() == "x = 1\n"
     assert (shipped / "launcher" / "INTERFACE").is_file()
+    assert os.readlink(shipped / "files" / "scripts" / "check.py") == "check_cadence.py"
+    assert os.readlink(shipped / "files" / "gone") == "nowhere"
     into = r.execs(containers.CADENCE_INTO_CACHE)
     assert len(into) == 1 and into[0][into[0].index("-u") + 1] == "developer"
     assert into[0][-2:] == [f"/shiftlead/cadence/{ref}", ref]
@@ -402,10 +406,15 @@ def test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once(tmp_pat
     os.chmod(src / "files" / "a.txt", 0o444)
     os.chmod(src / "files", 0o555)
     env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path / "home")}
+    trees = tmp_path / "home" / ".cache" / "dev-cadence" / "trees"
+    stale = trees / f".ship-{ref}"  # an interrupted run's copy, read-only as `cp -a` left it (TD-1059)
+    stale.mkdir(parents=True)
+    (stale / "stray.txt").write_text("stray\n")
+    os.chmod(stale, 0o555)
     for _ in range(2):
         subprocess.run(["sh", "-c", containers.CADENCE_INTO_CACHE, "sh", str(src), ref], env=env, check=True)
-    trees = tmp_path / "home" / ".cache" / "dev-cadence" / "trees"
     assert [p.name for p in trees.iterdir()] == [ref]
+    assert not (trees / ref / "stray.txt").exists() and not (trees / ref / src.name).exists()
     assert (trees / ref / "files" / "a.txt").read_text() == "a\n"
     assert not os.access(trees / ref / "files" / "a.txt", os.W_OK)
     os.chmod(src / "files", 0o755)  # for pytest's own cleanup
