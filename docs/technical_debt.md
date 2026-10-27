@@ -108,6 +108,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1059 | `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit) | Low | Open — build |
 | TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
+| TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 
 ---
 
@@ -2284,3 +2285,27 @@ It then names the build entries.
 **Done when** the design says where an Add entry session for a repo with a placed team lands, how a session in a container reaches the home and is attributed to itself, and that a session's call to a person-only act is refused from every host, and the build entries are filed. The asker's own test: an Add entry session for contractmatch runs on the contractmatch node, can run Flutter, can `ao td add --repo shiftlead` and can mail a shiftlead session.
 
 **Related:** TD-998, TD-1004 (`ao` on a node's `PATH`); TD-293 (the New session form on another host); TD-299 (contractmatch on its node); TD-1051 (the `!` command's identity); TD-077 (archived: identity as a per-session secret, its option 1, and an agents-only node, its option E).
+
+## TD-1066: A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul; drafted by session `td-1033`, reviewed by Fable)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design. The round agrees the card's layout with Paul on mockups before any Sonnet or Fable round.
+**Location:** `docs/decisions/2026-10-19-queue-card.md` (§2 the want table, §3 Start session, §6 the one-sentence table); design §4.5 (the Queue card, 4.5-ui.md ~1479), §4.5a *Inbox board row: standing*; `src/shiftlead/ui/queue.py:205` (a board row is `decide` unless `watch`/`fyi`); `src/shiftlead/ui/templates/inbox_row.html` (819–821 the item's sentence, 873 the *on the board —* footer, 876 Done in ⋯); `src/shiftlead/ui/inbox.py` (`board_text` ~1153, calling `render.fold_head`, `src/shiftlead/ui/render.py:239`; `board_head` ~1314; standing 1490–1504); `src/sessionorc/ledgerboard.py` (`bold_head` ~898); `src/shiftlead/briefs/work.md` (the id-list sentence)
+
+**Why:** On 2026-10-26 Paul's Queue card for TD-1033 showed one counted *Decide (1)* item, the board's `act` line asking him to file dev-cadence's `precheck.py --commit`, and he could not tell what was asked of him (*it's not really clear what action is being asked of me*). Five things made it so: (1) the filing was already done (dev-cadence#TD-151) and its tick written, but in a ledger PR (#2408) that sat conflicting, so `main`'s board still asked; (2) an `act` line is drawn under **Decide** with **Answer…** as its verb, though cadence §3.3 gives `act` no answers (*if doing it has real alternatives it is a `decide`*), and Done hides in ⋯; (3) the item's sentence is the line up to its bold head, so it leads with *act 2026-10-26 (session designer-ao-1 on kmaster) —*, and its header line *designer-ao-1 · still on TD-1038 — grinder-ao-2 holds it* is the §4.5a *standing* text (where a Reply goes), which §4.5a scopes to Inbox and Repo-page rows and a card has no Reply; (4) the footer *on the board — Answer… writes on its line and Done checks it off* explains the mechanism, not the task; (5) nothing says the task is in dev-cadence: the line is on TD-1033's card only because its `Context:` names TD-1033 first. And the session Paul started from the card was told *waits on me — none*: the brief's id list names ledger entries only, so the board item Paul was looking at reached the session not at all.
+
+**Fix:** design first, as amendments to ADR 2026-10-19 and §4.5/§4.5a:
+(a) **An `act` line is a Do**, not a Decide (ADR §2's table amended, citing cadence §3.3): **Done** its answer in the Answer row, Answer… in ⋯. `decide` and `look` stay Decide.
+(b) **Start session on every Do and Decide item**, not only once in the card's header (Paul, 2026-10-26: *being able to start a session should always be available on Do or Decide items — that way the user can walk them through the process, especially if it is not clear the goal/ramifications*). Started from an item, the session opens with that item as its subject — its kind, its one sentence, its context and where it came from — so the person can have it explain the goal and ramifications and walk them through it, including an item no session can do for them (this one named another repo with no question seat). The round decides the session's entry and branch for an item that is no ledger entry (a board line, an ask, a steer) — the card's chosen entry, as ADR §3's choice gives it, is the obvious one — and how this sits with the header's Start session (kept, or replaced).
+(c) **The brief names the board items**: the id-list sentence carries each Decide and Do item, a board line by its `board:<key>` and one sentence, so *waits on me* is never *none* while the card asks something.
+(d) **An item leads with one sentence that states the task** (ADR §6's rule, its table amended for a board line): the bold head (`bold_head`/`board_head`, already the line's subject off the card) is the sentence, naming the repo the task is in when that is not the card's; the sentence after it the consequence; the `kind date (session …) —` prefix and the rest under *context*. The *standing* text moves from the item's head into Answer…'s title (a §4.5a row-scope fix).
+(e) **The footer goes** once Done is visible; its *landed on origin by shiftlead's own PR* words stay in Done's confirm.
+(f) **A done line is closed by its write-back, never in a feature PR** (a briefs and cadence line, not a reader): a session that finds an act line done checks it off by the card's Done or `ao board edit done --key board:<key>`, which lands the close on origin by the home's own PR. Optionally, the item reads *closing in #n* where an open PR's description names its `board:<key>`, still counted until it merges; reading PR diffs to find a close was considered and rejected (a new GitHub read per PR per poll, and an edited line looks like a closed one).
+
+**Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
+
+**Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
