@@ -92,7 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
-| TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Open — decision (Paul): the shape is worked with him first |
+| TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Agreed 2026-10-27 (ADR) — the designer writes it into the design and names the builds |
 
 ---
 
@@ -1963,9 +1963,8 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — Paul is working the shape in an interactive session before the designer starts
-**Blocked by:** decision (paul) — agree the tree's direction and how a row names its link, in the interactive session of 2026-10-27
-**Location:** `src/sessionorc/queue.py` (`_card`: the rows breadth first by `adj`, either direction; archived rows one hop under the better-keyed member); `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); design §4.4 *The Queue: cards, and the rank that orders them* (*Rows*, *A row's state*), §4.5 screen 12 *A card*, §4.5a *Queue page: card*
+**Status:** Agreed 2026-10-27 — [ADR 2026-10-27](decisions/2026-10-27-part-of.md), drawn with Paul in an interactive session from the live Queue ([the chosen shape](mockups/reviews/2026-10-27-queue-card-c.html)) and reviewed until Fable (round 5) and Sonnet (round 6) were both READY; Paul said go the same day. Next, the designer's round writes it into §4.4 *The Queue: cards, and the rank that orders them* (*The top entry*, *Rows*, *A row's state*), §4.5 screen 12 *A card*, §4.5a *Queue page: card* and §4.9c *A design entry archives with its last build*, and names the shiftlead builds (ADR §4: the reading, the page, the backfill). Those builds wait on the dev-cadence entry filed from the ADR (`ao td add --repo dev-cadence`, 2026-10-27: dev-cadence's team does the ledgerboard v2.1 release with `Part of:`, then cadence §2.4/§2.12). Until shiftlead vendors v2.1 the builds are written the old way, listed in this entry's `Blocked by:`.
+**Location:** `src/sessionorc/ledger.py` (pickable, `kind_of`, `archived`), `src/sessionorc/queue.py` (`_card`: the rows breadth first by `adj`, either direction; archived rows one hop under the better-keyed member); `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); `src/shiftlead/ui/repo.py` (`design_builds`); the briefs and flows ADR §4 step 5 lists; design §4.4 *The Queue: cards, and the rank that orders them* (*Rows*, *A row's state*), §4.5 screen 12 *A card*, §4.5a *Queue page: card*
 
 **Why:** Paul, 2026-10-27, on TD-748's card: "it seems some finished items are laid out like they depend on unfinished items. Is that true?" They do not, but the page says they do. §4.4 *Rows* builds the tree "by `Blocked by:` edges taken in either direction", so nesting says only *joined*, and its direction flips from level to level on the same card:
 - TD-772 sits under TD-748, which waits on it (TD-748 *after TD-772*): the child is the prerequisite.
@@ -1975,9 +1974,9 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 
 A design's `Blocked by:` lists its builds, which follow it, and there the edge means *built by*, not *waits on*. The *after TD-n* state word also reads as the row's relation to its parent when it names some other row. A reader who takes the indent as order, which is the Queue's whole point ("working what I think matters first, dependencies considered"), reads the effort backwards.
 
-**Fix:** design first. Give the tree one direction, and say each row's relation to its parent in words. One shape to weigh: a child is what *follows* its parent, i.e. waits on it or is built from it. A design's builds sit under the design, a blocker sits above what it blocks, and a second parent stays *also after TD-n*. A done row is drawn under what it unblocked (or folded as *d done* under it), never under an open row it does not wait on. The designer weighs it against a flat list in pick order with each row's *after* / *builds* words, and adds the rule to the page's help text.
+**Fix:** [ADR 2026-10-27](decisions/2026-10-27-part-of.md). A part names its one parent in a new cadence field, `**Part of:** TD-n` (same ledger), and a parent's `Blocked by:` keeps only real blockers. A parent with an open part is not pickable, reads *waiting*, and is picked after its parts. No part is blocked by its parent or an ancestor. On a card, indentation means only *part of*: a parent's parts hang on a spine under it with a parts meter, finished parts fold to *✓ n done*, and a blocker is a word on its row (*after TD-772*) that lights the row it names.
 
-**Done when** the rule that sets a row's parent is one direction, written in §4.4 *Rows* and §4.5 screen 12 *A card*; no archived row is drawn under an open row it does not follow; and a test over a card shaped like TD-748's (a design, its builds, a trial and a dependent) pins each row's parent.
+**Done when** the designer's round has written the ADR into the design and filed its builds, and they are done: the reading and the page built, live, and every design backfilled to `Part of:` (ADR §4).
 
 **Related:** TD-748, TD-909, TD-915 (the tree as drawn), dev-cadence#TD-119 (`components()`).
 

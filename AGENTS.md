@@ -180,6 +180,7 @@ Fix them upstream in dev-cadence and bump the pin (`dev-cadence bump`, a reviewe
 | Why the person's view becomes a Queue of ranked effort cards beside a smaller Inbox, and how the rank is stored and read | [docs/decisions/2026-10-15-queue.md](docs/decisions/2026-10-15-queue.md) |
 | How a Queue card asks for the person's attention (Decide, Do, Read), what they do about it (Answer, Start session, ⋯), the Waiting group, and the one-sentence writing rule | [docs/decisions/2026-10-19-queue-card.md](docs/decisions/2026-10-19-queue-card.md) |
 | Whether ShiftLead should require dev-cadence, and where the person's own briefs, start prompts and preferences live | [docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md](docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md) |
+| Why a part names its parent in `Part of:`, how a Queue card draws parts and blockers, and the order the ledgerboard, dev-cadence and shiftlead changes land in | [docs/decisions/2026-10-27-part-of.md](docs/decisions/2026-10-27-part-of.md) |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | `cadence.md` in the pinned dev-cadence (`dev-cadence path cadence.md`; edit it in dev-cadence, never here) |
 | Which dev-cadence this repo runs | [docs/cadence.toml](docs/cadence.toml) — its `[dev-cadence]` table pins the commit (TD-129); `dev-cadence bump` moves it |
