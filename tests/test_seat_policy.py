@@ -83,15 +83,15 @@ async def test_an_asks_seat_is_due_while_a_question_waits(agent, tmp_path):
         await agent._keep_running(now)
         assert agent.sessions[sid] is rec and rec.seat_due is None, "nothing waiting, nothing due"
         # a question lands and is answered by someone else before the tick: due, then not
-        rec.asks_waiting = lambda **kw: 1
+        rec.asks_ids = lambda **kw: ["m-q1"]
         agent._profile_gated = lambda *a: True  # paused: due, but not filled into a pause
         await agent._keep_running(now)
         assert rec.seat_due and rec.seat_due["by"] == "asks" and agent.sessions[sid] is rec
-        rec.asks_waiting = lambda **kw: 0
+        rec.asks_ids = lambda **kw: []
         await agent._keep_running(now)
         assert rec.seat_due is None
         del agent._profile_gated
-        rec.asks_waiting = lambda **kw: 2
+        rec.asks_ids = lambda **kw: ["m-q1", "m-q2"]
         await agent._keep_running(now)
         assert agent.sessions[sid] is not rec
         await person.call("kill", id=sid)
@@ -417,15 +417,15 @@ async def test_a_question_holds_the_tagging_seats_due_as_asks_and_tag_follows(ag
         _end(agent, sid)
         _needs(agent, tmp_path, ["TD-801"])
         agent._profile_gated = lambda *a: True
-        rec.asks_waiting = lambda **kw: 1
+        rec.asks_ids = lambda **kw: ["m-q1"]
         await agent._keep_running(now)
         assert rec.seat_due["by"] == "asks", "a question waits: asks first"
         await agent._keep_running(now + timedelta(minutes=1))
         assert rec.seat_due["by"] == "asks", "a question left standing still holds it"
-        rec.asks_waiting = lambda **kw: 0
+        rec.asks_ids = lambda **kw: []
         await agent._keep_running(now)
         assert rec.seat_due["by"] == "tag" and rec.seat_due["ids"] == ["TD-801"], "then tag"
-        rec.asks_waiting = lambda **kw: 1
+        rec.asks_ids = lambda **kw: ["m-q1"]
         await agent._keep_running(now)
         assert rec.seat_due["by"] == "asks" and "ids" not in rec.seat_due, "a standing tag due becomes asks"
         del agent._profile_gated
@@ -440,11 +440,11 @@ async def test_an_idle_tagging_seat_with_a_tag_due_is_closed_and_filled_an_asks_
         sid, crew = await _tl(person, tmp_path, "db"), await _crew(person, tmp_path, "db")
         rec = agent.sessions[sid]
         _needs(agent, tmp_path, [])
-        rec.asks_waiting = lambda **kw: 1
+        rec.asks_ids = lambda **kw: ["m-q1"]
         _idle(agent, sid, now)
         await agent._keep_running(now)
         assert rec.seat_due["by"] == "asks" and rec.state == "idle", "an asks due holds an idle seat"
-        rec.asks_waiting = lambda **kw: 0
+        rec.asks_ids = lambda **kw: []
         _needs(agent, tmp_path, ["TD-801"])
         await agent._keep_running(now)
         assert rec.state == "closed" and rec.seat_due["by"] == "tag", "a tag due is the next fill's"
@@ -463,7 +463,7 @@ async def test_an_asks_fill_of_a_tagging_seat_writes_no_seat_filled_entry(agent,
         rec = agent.sessions[sid]
         _end(agent, sid)
         _needs(agent, tmp_path, ["TD-801"])
-        rec.asks_waiting = lambda **kw: 1
+        rec.asks_ids = lambda **kw: ["m-q1"]
         await agent._keep_running(now)
         new = agent.sessions[sid]
         assert new is not rec and new.seat_filled == [], "an asks fill carries no cause, as today"

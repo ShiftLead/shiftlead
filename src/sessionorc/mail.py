@@ -698,11 +698,12 @@ def read_when(
     person restore it*), so only a session's reads *budget spent*; `unreachable` is the home's word
     that the record's host link is down (§4.4a), which the record's own state may not say yet;
     `rings` is whether its adapter has a composer the doorbell can type into (`_bell_blocked`).
-    `refills` is a person's `reply` on a handed entry's thread (TD-218): to a seat on call it
-    closes the seat's question and the entry counts toward the seat again, so it fills it as an
-    `ask` does. `lapses` False is an `ask` that carries no bound — a handed entry, which never lapses
-    (§4.10 *An entry handed to a seat*) — so the sentence names none. `cache` is the home's word that a
-    ring would be a restart instead (§4.10 *A lapsed cache is started again, not rung*, TD-467:
+    `refills` is a `reply` — the person's or a session's — that closes a question the seat itself
+    sent (§4.9b *An answer waiting counts too*, TD-1051; TD-218 on a handed entry's thread): to a seat
+    on call it counts toward the seat until a fill reads it, so it fills it as an `ask` does. `lapses`
+    False is an `ask` that carries no bound — a handed entry, which never lapses (§4.10 *An entry
+    handed to a seat*) — so the sentence names none. `cache` is the home's word that a ring would be
+    a restart instead (§4.10 *A lapsed cache is started again, not rung*, TD-467:
     `agent_common.cache_restarts` on a record of its own host). `modal_limit` is the home's word that a
     `limited` record's cap is a modal rule's, a dialog with no reset (§4.3 *The limit dialog is read off
     the screen*: `agent_common.limit_is_modal` on a record of its own host). Advice, never a refusal."""

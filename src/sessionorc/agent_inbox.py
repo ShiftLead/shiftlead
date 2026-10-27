@@ -1099,7 +1099,7 @@ class InboxMixin:
         if e.orphaned:  # nobody is left to take the default: it is written down for whoever holds the work
             return await self._answer_orphan(e, f"go with the default: {e.default}", "go_with_it")
         self._close_entry(msg, "go_with_it", now_iso())
-        self._system_note(e.from_, f"steer {msg} — the person says: go with your default", wake="person")
+        self._system_note(e.from_, f"steer {msg} — the person says: go with your default", wake="person", ends=e)
         await self._push_changes()
         return {"id": PERSON, "msg": msg, "closed_reason": "go_with_it"}
 
@@ -1177,7 +1177,7 @@ class InboxMixin:
             text = f"steer {e.id} lapsed: go with your default"
             if e.adopted_at or e.orphaned:
                 text = f'steer {e.id} about {e.about} lapsed: the default was "{e.default}"'
-            self._system_note(e.from_, text, wake="uncharged")
+            self._system_note(e.from_, text, wake="uncharged", ends=e)
             if e.orphaned:  # nobody is left to act on the default: work for the asker's team (§6 rule 8)
                 self._question_end(e, "lapsed")
         else:
