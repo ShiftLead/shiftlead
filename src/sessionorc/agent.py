@@ -691,6 +691,8 @@ class HostAgent(
         # rule 12 (TD-258): the detached read of each root's docs/cadence-changes.md, and when it last ran
         self._conventions_task: asyncio.Task[None] | None = None
         self._conventions_read_at = datetime.min.replace(tzinfo=UTC)
+        # and the `(root, line)` info lines it logged while their condition lasts, each logged once (TD-1046)
+        self._conventions_quiet: set[tuple[str, str]] = set()
         # rule 11 (TD-258): the detached read of merged PRs against `held:`, when it last ran, what
         # was settled (address, the record's `created`, PR) and when each PR was last tried
         self._held_task: asyncio.Task[None] | None = None

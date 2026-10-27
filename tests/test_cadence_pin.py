@@ -252,15 +252,26 @@ def test_a_pinned_repos_conventions_run_the_pinned_trees_script_through_the_reso
     payload = _payload(tmp_path)
     stub = _stub(tmp_path, monkeypatch, payload)
     root = _pinned(tmp_path, "a" * 40)
-    assert not conventions.has_script(root) and conventions.read(root) is None, "the tree carries no script"
+    assert not conventions.has_script(root) and conventions.read(root) == (None, "no script"), "the tree carries none"
     (payload / "scripts" / "cadence_changes.py").write_text("x = 1\n")
     cadence._trees.clear()
     assert conventions.has_script(root)
     got = conventions.read(root)
-    assert got == {
-        "ref": "origin/main",
-        "entries": [{"heading": "### 2026-10-26 — pinned", "date": "2026-10-26", "title": "pinned", "landed": None}],
-    }
+    assert got == (
+        {
+            "ref": "origin/main",
+            "entries": [
+                {
+                    "heading": "### 2026-10-26 — pinned",
+                    "date": "2026-10-26",
+                    "title": "pinned",
+                    "body": "",
+                    "landed": None,
+                }
+            ],
+        },
+        None,
+    )
     ran = [c for c in _calls(stub) if c["argv"][2:3] == ["run"]]
     assert ran == [{"argv": ["-C", str(root), "run", "cadence_changes.py", "--json"], "root": str(root)}]
     # a lock beside the pin keeps the copy's script, which this checkout lacks
