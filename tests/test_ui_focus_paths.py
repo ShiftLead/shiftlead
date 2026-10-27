@@ -11,10 +11,10 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
 import yaml
+from conftest import scratch_dir
 from fastapi.testclient import TestClient
 
 from shiftlead.ui import help as helpmod
@@ -225,7 +225,7 @@ def _probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the provider is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "path_probe.js"
+    probe = scratch_dir() / "path_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -379,7 +379,7 @@ def test_open_editor_toasts_unless_quiet_and_a_pair_toasts_once():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the opener is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "quiet_probe.js"
+    probe = scratch_dir() / "quiet_probe.js"
     probe.write_text(QUIET_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

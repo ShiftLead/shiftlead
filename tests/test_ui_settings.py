@@ -7,10 +7,10 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import scratch_dir
 from fastapi.testclient import TestClient
 
 from shiftlead import profiles as profiles_mod
@@ -235,7 +235,7 @@ def test_the_line_preview_is_the_gates_arithmetic():
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
     from test_ui_menu import PROBE
 
-    probe = pathlib.Path(tempfile.mkdtemp()) / "set_probe.js"
+    probe = scratch_dir() / "set_probe.js"
     now = int(NOW.timestamp() * 1000)
     resets = (NOW + timedelta(days=3, hours=19)).isoformat()
     head = PROBE[: PROBE.index("const P =")]  # the page's stubs and the eval, without the menu's own probe
@@ -665,7 +665,7 @@ def test_a_telegram_rows_key_is_the_inboxs_row():
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
     from test_ui_menu import PROBE
 
-    probe = pathlib.Path(tempfile.mkdtemp()) / "row_probe.js"
+    probe = scratch_dir() / "row_probe.js"
     head = PROBE[: PROBE.index("const P =")]
     probe.write_text(
         head

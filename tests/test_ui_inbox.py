@@ -15,11 +15,11 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import scratch_dir
 from fastapi.testclient import TestClient
 
 UI = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
@@ -437,7 +437,7 @@ def test_a_poll_never_swaps_rows_out_from_under_the_person():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "swap_probe.js"
+    probe = scratch_dir() / "swap_probe.js"
     probe.write_text(SWAP_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -2503,7 +2503,7 @@ def test_the_terminals_two_client_rules_are_reachable_and_right():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rules are JavaScript, and nothing else runs them")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "term_probe.js"
+    probe = scratch_dir() / "term_probe.js"
     probe.write_text(TERM_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -2915,7 +2915,7 @@ def test_the_answered_count_is_what_arrived_since_the_group_was_last_opened_per_
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "answered_probe.js"
+    probe = scratch_dir() / "answered_probe.js"
     probe.write_text(ANSWERED_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -3047,7 +3047,7 @@ def test_deny_carries_an_optional_reason_from_every_place_it_is_offered(tmp_path
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "deny_probe.js"
+    probe = scratch_dir() / "deny_probe.js"
     probe.write_text(DENY_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -3236,7 +3236,7 @@ def test_the_recount_disables_clear_filters_while_nothing_is_picked():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the recount is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "recount_probe.js"
+    probe = scratch_dir() / "recount_probe.js"
     probe.write_text(RECOUNT_PROBE)
     app_js = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js"
     out = subprocess.run([node, str(probe), str(app_js)], capture_output=True, text=True, timeout=30)
@@ -3314,7 +3314,7 @@ def test_the_script_counts_the_rail_as_the_server_does():
     queries = ["", "?team=grind", "?team=grind,cm&sec=needs", "?sec=fyi&kind=notes", "?team=none&find=home",
                "?kind=questions&find=517%2C", "?team=gone", "?sec=needs&kind=board", "?repo=ao", "?repo=cm-web,gone",
                "?team=audit", "?team=cm&repo=ao", "?repo=ao&sec=later"]  # fmt: skip
-    tmp = pathlib.Path(tempfile.mkdtemp())
+    tmp = scratch_dir()
     (tmp / "probe.js").write_text(RAIL_PROBE)
     (tmp / "cases.json").write_text(json.dumps({"rows": rows, "picks": queries}))
     out = subprocess.run(

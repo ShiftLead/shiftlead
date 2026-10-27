@@ -6,6 +6,7 @@ entries the home's repo facts sort *for you*, grouped by repo, each a mail row â
 from __future__ import annotations
 
 import pytest
+from conftest import scratch_dir
 from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
@@ -358,12 +359,11 @@ def test_a_repos_name_goes_with_its_last_row_and_the_poll_puts_later_back():
     import pathlib
     import shutil
     import subprocess
-    import tempfile
 
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rules are JavaScript, and nothing else runs them")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "ledger_probe.js"
+    probe = scratch_dir() / "ledger_probe.js"
     probe.write_text(LEDGER_PROBE)
     app_js = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js"
     out = subprocess.run([node, str(probe), str(app_js)], capture_output=True, text=True, timeout=30)

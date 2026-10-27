@@ -10,9 +10,9 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
@@ -111,7 +111,7 @@ def got() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the fold's read is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "fill_fold_probe.js"
+    probe = scratch_dir() / "fill_fold_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

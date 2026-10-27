@@ -194,6 +194,27 @@ def _no_persons_settings_carried_over():
     yield
 
 
+_SCRATCH: pytest.TempPathFactory | None = None
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _scratch_factory(tmp_path_factory):
+    global _SCRATCH
+    _SCRATCH = tmp_path_factory
+    yield
+    _SCRATCH = None
+
+
+def scratch_dir(name: str = "scratch") -> Path:
+    """A new directory under this run's pytest base temp, for a helper that has no `tmp_path` (TD-1053).
+
+    pytest keeps the last three runs' base temps and removes the rest, so nothing piles up in `/tmp`
+    the way `tempfile.mkdtemp()` did (about 105,000 directories by 2026-10-26, kmaster's whole
+    inode table). `tests/test_no_temp_leaks.py` refuses a bare `mkdtemp` in the tests."""
+    assert _SCRATCH is not None, "scratch_dir() is for test time, after the session fixtures are set up"
+    return _SCRATCH.mktemp(name)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _never_this_machines_home(tmp_path_factory):
     """No test reads this machine's `~/.shiftlead` or `~/.claude` (TD-044).

@@ -10,9 +10,9 @@ import os
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 
 pytestmark = pytest.mark.unit
 
@@ -76,7 +76,7 @@ def _probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the build chip's reprint is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "build_chip_probe.js"
+    probe = scratch_dir() / "build_chip_probe.js"
     probe.write_text(PROBE)
     env = {**os.environ, "TZ": "America/New_York"}  # the browser's zone, never the host's UTC
     out = subprocess.run(

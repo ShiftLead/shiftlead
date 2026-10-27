@@ -12,11 +12,11 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from conftest import scratch_dir
 from starlette.datastructures import QueryParams
 from test_ui_queue import NOW, client, fake, queue
 
@@ -94,7 +94,7 @@ def _node(cases: list[dict]) -> list[dict]:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the Queue's in-browser picks are JavaScript, and nothing else runs them")
-    d = pathlib.Path(tempfile.mkdtemp())
+    d = scratch_dir()
     (d / "probe.js").write_text(PROBE)
     (d / "cases.json").write_text(json.dumps(cases))
     out = subprocess.run(

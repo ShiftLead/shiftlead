@@ -8,10 +8,10 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import scratch_dir
 
 from sessionorc import mail
 from sessionorc.client import LocalClient
@@ -181,7 +181,7 @@ def test_the_composers_line_swaps_with_the_kind_and_a_reply_reads_as_a_note():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the composer's rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "when_probe.js"
+    probe = scratch_dir() / "when_probe.js"
     probe.write_text(WHEN_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

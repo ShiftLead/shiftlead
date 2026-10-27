@@ -8,9 +8,9 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 from fastapi.testclient import TestClient
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
@@ -144,7 +144,7 @@ def test_the_pop_out_rules_run_as_themselves():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "popout_probe.js"
+    probe = scratch_dir() / "popout_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -265,7 +265,7 @@ def test_open_shell_here_opens_beside_the_page_it_was_pressed_on():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "shell_probe.js"
+    probe = scratch_dir() / "shell_probe.js"
     probe.write_text(SHELL_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -351,7 +351,7 @@ def test_a_blocked_opens_toast_stays_until_it_is_pressed():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "toast_probe.js"
+    probe = scratch_dir() / "toast_probe.js"
     probe.write_text(TOAST_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

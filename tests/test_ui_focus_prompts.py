@@ -9,9 +9,9 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 
 from shiftlead.ui import help as helpmod
 from shiftlead.ui.cards import view
@@ -96,7 +96,7 @@ def _probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the card's logic is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "prompts_probe.js"
+    probe = scratch_dir() / "prompts_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

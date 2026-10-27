@@ -7,6 +7,8 @@ import pathlib
 import re
 from datetime import UTC, datetime, timedelta
 
+from conftest import scratch_dir
+
 from shiftlead.ui import app as ui
 
 NOW = datetime(2026, 9, 26, 12, 0, tzinfo=UTC)
@@ -831,7 +833,6 @@ def _script_ages(stamps: list[str]) -> list[str]:
     import json
     import shutil
     import subprocess
-    import tempfile
 
     import pytest
 
@@ -840,7 +841,7 @@ def _script_ages(stamps: list[str]) -> list[str]:
         pytest.skip("node is not installed: the Doing ages are JavaScript too, and nothing else runs it")
     shift = datetime.now(UTC) - NOW
     moved = [_iso(datetime.fromisoformat(t.replace("Z", "+00:00")) + shift) if t.endswith("Z") else t for t in stamps]
-    probe = ui.Path(tempfile.mkdtemp()) / "age_probe.js"
+    probe = scratch_dir() / "age_probe.js"
     probe.write_text(
         'const fs = require("fs"); const noop = () => {};'
         " const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,"

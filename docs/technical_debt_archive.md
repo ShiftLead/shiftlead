@@ -19939,3 +19939,23 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Related:** TD-993, TD-996, TD-154 (the Transcript).
 
 **Resolved:** 2026-10-26 — dropped: Paul answered the ask m-7f566ce663c2 *Session card only* (reply m-2ec30d0eb12b), so the start context stays on the Session card's *told at start* row (TD-996) and the Transcript does not draw it.
+
+## TD-1053: 47 `tempfile.mkdtemp()` calls in the tests leave a directory in /tmp on every run; 105,000 of them filled kmaster's /tmp inodes and stopped every session
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (Paul; drafted by session `memory-vs-cadence`)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2412. Open until then — /tmp's inodes ran out on kmaster on 2026-10-26 (1,048,574 of 1,048,576 used); Paul cleared the old `/tmp/pytest-of-kmaster/pytest-*` directories, which freed 594,569. Paul then removed the leaked `tmp*` directories older than a day that held one `*_probe.js` or nothing (about 94,000); about 11,000 `tmp*` directories remained an hour later, 6,182 of them probe-only — the day's runs.
+**Location:** `tests/` — 47 `tempfile.mkdtemp()` call sites in 36 files, most writing a browser probe (`tests/test_ui_build_chip.py:79`, `test_ui_composer_bar.py:138`, `test_rank_per_repo.py:135`, `test_read_when.py:184`, `test_recent_links.py:267`, … ; `git grep -n "tempfile.mkdtemp()" -- tests`), plus `test_ui_inbox.py:3317` and `test_ui_queue_picks.py:97`
+
+**Why:** `/tmp` on kmaster is a tmpfs with 1,048,576 inodes, shared by every session: Claude Code keeps each session's output files and scratchpad in `/tmp/claude-1000`, and pytest its run directories in `/tmp/pytest-of-kmaster`. On 2026-10-26 it had no inode left: no command in any session could start (*No space left on device* while 7.8 GB of space was free), and a test suite running then failed with 2,949 errors. About 104,600 of the inodes were directories at /tmp's top level named `tmpXXXXXXXX`, most holding one `*_probe.js` (others hold other tests' leftovers — a `config`, an `origin.git`, `alpha`/`beta`/`gamma` fixture repos — so the 47 probe sites are not the whole leak) — 4,104 from August, 21,231 from September, 79,296 from October, 2,000–3,700 a day. They come from this suite: the UI tests write their browser probe into `tempfile.mkdtemp()` and never remove it, unlike `tmp_path`, which pytest cleans. Every run leaves them — the grinders' and techlead's, every `precheck` (which now runs the whole suite on each PR's head, TD-1033), CI — so the leak grows with the team's pace. pytest's own directories piled up too (634,033 inodes) while many suites ran at once.
+
+**Fix:** (1) each of the 47 sites takes `tmp_path`, and the other tests that leave `tmp*` directories (find them by a suite run's new top-level `/tmp` entries) do the same (or `tmp_path_factory` in a module fixture), so pytest owns and cleans the directory; (2) a guard test fails on `tempfile.mkdtemp(` / `TemporaryDirectory(` without a context manager in `tests/` (an AST walk, not a grep); (3) once merged, the leaked directories go: `find /tmp -maxdepth 1 -type d -name 'tmp*' -mtime +0` holding one `*_probe.js` or nothing — Paul's to run, a shared directory. Consider pointing pytest's basetemp under the worktree (`--basetemp`) for the precheck, so one PR's run never fills the shared /tmp.
+
+**Done when** a full suite run leaves no new directory at /tmp's top level, and the guard test fails on a planted `tempfile.mkdtemp()`.
+
+**Related:** TD-1033 (precheck runs the suite per PR).
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2412) — the 47 `tempfile.mkdtemp()` sites in 36 files take `conftest.scratch_dir()`, a directory from the session's `tmp_path_factory` (pytest keeps three runs' base temps and removes the rest), and the two `NamedTemporaryFile(delete=False)` probes (`test_queue_card_verbs.py`, `test_ui_quote_text.py`) take `tmp_path`; `tests/test_no_temp_leaks.py` walks every test file's AST and fails on `mkdtemp`/`mkstemp`, a `TemporaryDirectory()` outside a `with`, or `NamedTemporaryFile(delete=False)`, with planted cases. A full suite run under `TMPDIR=/tmp/a53` (4267 passed) left nothing at its top level but `pytest-of-kmaster` and `ao-test-owners-1000`, the conftest's one reused owner registry. The old leaked directories are Paul's to remove (the board, due 2026-10-27); the precheck's own base temp is TD-1052's.

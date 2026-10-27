@@ -12,11 +12,10 @@ import re
 import select
 import shutil
 import subprocess
-import tempfile
 import time
 
 import pytest
-from conftest import kill_private_server, private_socket_name
+from conftest import kill_private_server, private_socket_name, scratch_dir
 
 from sessionorc import containers
 from sessionorc.tmux import Tmux
@@ -127,7 +126,7 @@ def _probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the link's handler is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "hyperlink_probe.js"
+    probe = scratch_dir() / "hyperlink_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run(
         [node, str(probe), str(UI / "static" / "app.js"), TARGET], capture_output=True, text=True, timeout=30

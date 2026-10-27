@@ -10,9 +10,9 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 
 from shiftlead.ui import help as helpmod
 
@@ -57,7 +57,7 @@ def _probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the link's handler is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "link_probe.js"
+    probe = scratch_dir() / "link_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -173,7 +173,7 @@ def _cut_probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the join is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "cut_probe.js"
+    probe = scratch_dir() / "cut_probe.js"
     probe.write_text(CUT_PROBE)
     vendor = UI / "static" / "vendor" / "addon-web-links.js"
     out = subprocess.run(

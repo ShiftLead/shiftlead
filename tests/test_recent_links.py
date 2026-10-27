@@ -10,9 +10,9 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 
 from sessionorc import adapters
 from sessionorc.adapters import Link
@@ -264,7 +264,7 @@ def _probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the Session card's row is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "links_probe.js"
+    probe = scratch_dir() / "links_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

@@ -11,7 +11,6 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 
 import pytest
 from test_queue_item_shape import card, inbox
@@ -242,11 +241,11 @@ console.log(JSON.stringify(out));
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
-def test_the_dots_keyboard_model_opens_moves_and_closes_back_on_the_mark():
-    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
-        f.write(PROBE)
+def test_the_dots_keyboard_model_opens_moves_and_closes_back_on_the_mark(tmp_path):
+    probe = tmp_path / "dots_probe.js"
+    probe.write_text(PROBE)
     got = subprocess.run(
-        ["node", f.name, str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=60, check=True
+        ["node", str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=60, check=True
     )
     out = json.loads(got.stdout.strip().splitlines()[-1])
     assert out == {
