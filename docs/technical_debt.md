@@ -91,6 +91,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
+| TD-1082 | A killed `--pr` precheck run's worktree is dropped by the prefix `precheck-<pr>-`, and the sync tests stub `drop_precheck_tree` to nothing (test audit) | Medium | Open — build |
+| TD-1083 | The readings' pass judges the sync pass's precheck bound (`survey` calls `precheck_pr_bound`), and the test named for it never runs `survey` (test audit) | Medium | Open — build |
+| TD-1084 | A repo that stops setting `precheck` drops its entries' `waiting_since`, and no test has an entry waiting when it stops (test audit) | Medium | Open — build |
+| TD-1085 | A run counted as ending with no status keeps the PR's first `waiting_since`, and no test notices if the clock restarts (test audit) | Low | Open — build |
 
 ---
 
@@ -1943,3 +1947,75 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
+
+## TD-1082: A killed `--pr` precheck run's worktree is dropped by the prefix `precheck-<pr>-`, and the sync tests stub `drop_precheck_tree` to nothing (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2416, #2412, #2411, #2417, #2420, #2421)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`kill_precheck`: `drop_precheck_tree(root, str(f.get("sha") or ""), f"precheck-{pr}-" if isinstance(pr, int) else None)`), `tests/test_sync_precheck.py` (`pre` fixture: `monkeypatch.setattr(promote, "drop_precheck_tree", lambda *a, **k: None)`), `tests/test_precheck_on_main.py`
+
+**Why:** #2416 made `kill_precheck` pass a PR run's own prefix, so a `--pr` run's leftover worktree (`<tmp>/precheck-<pr>-*/head`) is the one removed and not a `--commit` run's `precheck-<sha7>-`. Probed on `origin/main`: replacing that call with `drop_precheck_tree(root, str(f.get("sha") or ""), None)` leaves `tests/test_sync_precheck.py` at 17 passed. The `pre` fixture replaces `drop_precheck_tree` with a no-op ("no checkout at ROOT"), and `tests/test_precheck_on_main.py` only kills `--commit` runs, so no test sees which prefix is asked for. A wrong prefix leaves every killed PR run's worktree on disk, which TD-1052 and TD-1053 were filed to stop.
+
+**Fix:** a test that stubs `drop_precheck_tree` to record its arguments and kills a run whose file carries `pr` (and one without it), asserting the prefix `precheck-<pr>-` and `None`; or one that makes a worktree at that path in a scratch repo.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1039.
+
+## TD-1083: The readings' pass judges the sync pass's precheck bound (`survey` calls `precheck_pr_bound`), and the test named for it never runs `survey` (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2416, #2412, #2411, #2417, #2420, #2421)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`survey`: `precheck_pr_bound(root, repo, now)` beside `precheck_on_main`), `tests/test_sync_precheck.py::test_the_readings_pass_kills_a_run_past_the_bound_without_the_sync_pass`
+
+**Why:** #2416 added the call so that a run outlives no bound when the sync pass skips the repo (§6 *Sync* step 4 *Who ends it*). The test's name says *the readings pass*, but it calls `promote.precheck_pr_bound` itself. Probed on `origin/main`: replacing the `survey` line with `pass` leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_sync_precheck.py tests/test_promote.py tests/test_precheck_on_main.py` passing, since `sync.tend_precheck` calls the same function and the sync-pass test reaches it there. A run in a repo whose sync is off or skipped would then go past 20 minutes unkilled.
+
+**Fix:** run `promote.survey` (as `test_the_pass_keeps_the_checks_precheck_on_the_reading` does) over a repo with an old `precheck-pr.json` and a live `pid`, with no sync pass, and assert the process is gone and `why` is kept.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1039.
+
+## TD-1084: A repo that stops setting `precheck` drops its entries' `waiting_since`, and no test has an entry waiting when it stops (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2416, #2412, #2411, #2417, #2420, #2421)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/agent_sync.py` (`_sync_repo`: `elif not prechecks: sync = {n: {k: v … if k != "waiting_since"} …}`), `tests/test_sync_precheck.py::test_precheck_unset_is_no_candidate_and_the_none_pr_is_the_teams`
+
+**Why:** #2416's design line (history 2026-10-26): *a repo that stops setting `precheck` drops its entries' `waiting_since`, so no none PR stays held back from the order*. `sync.mark` holds a PR with `waiting_since` at its head as a green one, so an entry that keeps it holds the PR out of the team's orders for good. Probed on `origin/main`: replacing `if k != "waiting_since"` with `if True` leaves `tests/test_sync_precheck.py` at 17 passed; the one test that sets `precheck` unset starts with no sync entry.
+
+**Fix:** in that test seed `sync["1097"]` with a `waiting_since` at `HEAD`, run the pass with `command = None`, assert the entry has none and `pr:1097` is an order.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1039.
+
+## TD-1085: A run counted as ending with no status keeps the PR's first `waiting_since`, and no test notices if the clock restarts (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2416, #2412, #2411, #2417, #2420, #2421)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/sync.py` (`tend_precheck`: `"waiting_since": e.get("waiting_since") or at`), `tests/test_sync_precheck.py`
+
+**Why:** `SYNC_PRECHECK_WAIT` (a day at one head, then *refused*) counts from `waiting_since`, which `wait_entry` keeps from the first waiting pass. `tend_precheck` writes the counted pass's entry with the same rule. Probed on `origin/main`: replacing it with `"waiting_since": at` leaves `tests/test_sync_precheck.py` at 17 passed. A run that dies with no status each time would restart its day on every count, and the PR would never be refused to the team. `test_a_run_that_ended_with_no_status…` asserts `verdict`, `tries` and `why`, not the clock.
+
+**Fix:** in that test seed the entry with an old `waiting_since`, and assert it is unchanged after the counted pass.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1039.
