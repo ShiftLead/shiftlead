@@ -92,7 +92,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1101 | Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row | Low | Open — build |
-| TD-1102 | `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck | Low | Open — build |
 
 ---
 
@@ -1967,21 +1966,3 @@ None of the three files calls `park_ticks`, so the fixture's tick loop running b
 **Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row, with TD-1098, TD-1100 and TD-1102 fixed too; then `pdm run test` may take `-n auto`.
 
 **Related:** TD-1087 (its other half), TD-1088, TD-1098, TD-1102 (the other flakes in these runs), TD-1100, TD-1068.
-
-## TD-1102: `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (grinder-ao-1, met in #2454's first precheck)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_cadence_policy.py` (`test_dismiss_takes_the_row_off_and_its_snooze_with_it`); `src/sessionorc/agent_tick.py` (the tick's `_cadence_pass`)
-
-**Why:** the precheck of #2454 at 52b2923 (a change to `tests/test_entry_draft.py` and the ledger alone) failed it: after two `agent._cadence_pass([rec])` calls, `cadence.rows(rec.checks)` read `[842]` where `[842, 843]` was asserted (*a merged fail is the row at once*). It passed 5 of 5 alone. The test puts its record in `agent.sessions` while the fixture's tick loop runs, so the loop's own cadence pass likely reads the same record between the test's calls; the test does not park the ticks.
-
-**Fix:** confirm the race with a probe (a tick taken between the test's two passes), then `park_ticks(agent)` first, as TD-1065's and TD-1088's tests do; if the pass itself drops a PR's read when two passes overlap, that is the bug, fixed in the pass.
-
-**Done when** the case passes 20 runs under `-n auto` beside a full suite, and `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1088, TD-1065, TD-1087 (the other load flakes).
