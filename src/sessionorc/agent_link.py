@@ -331,7 +331,7 @@ class LinkMixin:
             except RpcError as e:
                 raise link.LinkError(str(e)) from None
         if rpc not in NODE_ACTS and rpc not in HOME_EDITS:
-            raise link.LinkError(f"{rpc!r} is not an act a node executes")
+            raise link.LinkError(f"{rpc!r}{link.UNKNOWN_ACT}")
         p = dict(params.get("params") or {})
         caller = params.get("caller")
         rid = str(p["id"]) if p.get("id") is not None else None
