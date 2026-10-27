@@ -6,8 +6,13 @@ after its `created`."""
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+from datetime import UTC, datetime
 
-from sessionorc import conventions
+import pytest
+
+from sessionorc import agent_tick, cadence, conventions
 from sessionorc.models import SYSTEM, Session
 
 
@@ -21,7 +26,7 @@ CREATED = "2026-09-29T12:00:00Z"  # after OLD landed (14:41Z the day before), be
 
 
 def _view(e: dict) -> dict:
-    return {k: e[k] for k in ("heading", "date", "title", "landed")}
+    return {k: e[k] for k in ("heading", "date", "title", "body", "landed")}
 
 
 def test_the_scripts_json_is_read():
@@ -29,16 +34,18 @@ def test_the_scripts_json_is_read():
     assert got == {"ref": "origin/trunk", "entries": [_view(OLD), _view(NEW)]}
     for bad in ("", "not json", "[]", json.dumps({"ref": "origin/main"})):
         assert conventions.parse(bad) is None, bad
+    odd = [{"heading": "## a", "body": ["not", "text"]}, {"heading": "## b"}]
+    assert [e["body"] for e in conventions.parse(json.dumps({"entries": odd}))["entries"]] == ["", ""]
 
 
 def test_no_script_is_no_reading(tmp_path):
-    assert not conventions.has_script(tmp_path) and conventions.read(tmp_path) is None
+    assert not conventions.has_script(tmp_path) and conventions.read(tmp_path) == (None, "no script")
     (tmp_path / "scripts").mkdir()
     script = tmp_path / "scripts" / "cadence_changes.py"
     script.write_text("import sys\nsys.exit(2)\n")
-    assert conventions.read(tmp_path) is None, "exit 2: the origin has no default branch"
+    assert conventions.read(tmp_path) == (None, "exit 2, no output"), "exit 2: the origin has no default branch"
     script.write_text(f"print({json.dumps(json.dumps({'ref': 'origin/main', 'entries': [OLD]}))})\n")
-    assert conventions.read(tmp_path) == {"ref": "origin/main", "entries": [_view(OLD)]}
+    assert conventions.read(tmp_path) == ({"ref": "origin/main", "entries": [_view(OLD)]}, None)
 
 
 def test_what_a_reading_makes_of_a_record():
@@ -87,10 +94,15 @@ class _Script:
     def _read(self, root, **kw):
         self.ran.append(str(root))
         got = self.says.get(str(root))
-        return None if got is None else {"ref": "origin/main", "entries": [_view(e) for e in got]}
+        return (
+            (None, "exit 2, no output")
+            if got is None
+            else ({"ref": "origin/main", "entries": [_view(e) for e in got]}, None)
+        )
 
 
 def _member(agent, name: str, root: str, created: str = CREATED, **fields) -> Session:
+    agent._conventions_read_at = datetime.max.replace(tzinfo=UTC)  # the tick's own pass never runs beside the test's
     s = Session(id=f"ao-x-{name}", name=name, kind="agent", adapter="shell", dir="", repo=root, created=created)
     s.host = agent.host
     s.supervised, s.unattended, s.state = True, True, "working"
@@ -184,8 +196,238 @@ async def test_a_record_replaced_while_the_script_ran_is_left_alone(agent, monke
 
     def read(r, **kw):
         _member(agent, "w", root, created="2026-09-30T00:00:00Z")  # a restart, mid-read
-        return {"ref": "origin/main", "entries": [_view(NEW), _view(OLD)]}
+        return {"ref": "origin/main", "entries": [_view(NEW), _view(OLD)]}, None
 
     monkeypatch.setattr(conventions, "read", read)
     await agent._conventions_pass([s])
     assert s.conventions_seen is None and _notes(s) == [] and _notes(agent.sessions[s.id]) == []
+
+
+# ── a pinned repo (TD-1046, §6 rule 12 *In a pinned repo*) ───────────────────────────────────────
+
+PATH = "py launcher path cadence-changes.md"
+
+
+def test_the_pinned_words_carry_each_entrys_body():
+    one = {**NEW, "body": "Do: put the verdict first.\n  Why: a reader skims.\n"}
+    assert conventions.note([one], "origin/main", PATH) == (
+        "dev-cadence's cadence-changes.md gained 1 entry since you started: "
+        '"2026-09-29 — a review comment\'s first line carries the verdict": Do: put the verdict first. '
+        f"Why: a reader skims. — after rebasing onto `origin/main`, `{PATH}` prints its path; go on"
+    )
+    long = {**OLD, "body": "x" * 301}
+    assert f": {'x' * 300}… — after" in conventions.note([long], "origin/main", PATH)
+    assert f": {'x' * 300} — after" in conventions.note([{**long, "body": "x" * 300}], "origin/main", PATH)
+    empty = conventions.note([{**OLD, "body": ""}], "origin/main", PATH)
+    assert '"2026-09-27 — the rules are numbered" — after' in empty, "an empty body leaves the name alone"
+    five = [_entry("2026-10-27", f"rule {n}", "2026-10-27T00:00:00Z") for n in range(5)]
+    words = conventions.note(five, "origin/main", PATH)
+    assert words.count("Do: it.") == 3 and 'rule 2": Do: it. and 2 more — after' in words
+    assert conventions.note([NEW], "origin/main").startswith("docs/cadence-changes.md gained"), "unpinned: unchanged"
+
+
+def _says(entries: list[dict] | None, code: int = 0, stderr: str = "") -> str:
+    out = "" if entries is None else json.dumps({"ref": "origin/main", "entries": entries})
+    return f"import sys\nprint({out!r})\nsys.stderr.write({stderr!r})\nsys.exit({code})\n"
+
+
+class _Pinned:
+    """A pinned fixture root: `cadence.pinned`, `cadence.tree` and `cadence.command` stubbed, the command
+    a script printing `--json`; `tree` may be made to fail."""
+
+    def __init__(self, tmp_path, monkeypatch, name: str = "pinned"):
+        self.root = tmp_path / name
+        self.root.mkdir()
+        self.payload = tmp_path / f"{name}-tree"
+        (self.payload / "scripts").mkdir(parents=True)
+        self.script = self.payload / "scripts" / conventions.PINNED_SCRIPT
+        self.why: str | None = None  # the resolver's refusal, while the tree cannot be made
+        real = cadence.pinned
+        monkeypatch.setattr(cadence, "pinned", lambda r: str(r) == str(self.root) or real(r))
+        monkeypatch.setattr(cadence, "tree", self._tree)
+        monkeypatch.setattr(cadence, "command", lambda r, *a: ([sys.executable, str(self.script)], None))
+
+    def _tree(self, root, timeout=cadence.TREE_TIMEOUT):
+        return (None, self.why) if self.why else (self.payload, None)
+
+    def says(self, entries: list[dict] | None, code: int = 0, stderr: str = "") -> None:
+        self.script.write_text(_says(entries, code, stderr))
+
+
+def _lines(caplog, root) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.getMessage().startswith(f"{root}: ")]
+
+
+async def test_a_pinned_member_is_told_with_bodies_and_the_resolvers_command(agent, tmp_path, monkeypatch, caplog):
+    p = _Pinned(tmp_path, monkeypatch)
+    root = str(p.root)
+    agent._repos[root] = {}
+    p.says([NEW, OLD])
+    home = _member(agent, "home", root)
+    node = _member(agent, "node", root)
+    node.host = "elsewhere"  # a node's member, its replica held as the home holds one; the words are read as sent
+    agent.remote.setdefault("elsewhere", {})[node.id] = agent.sessions.pop(node.id)
+    sent: dict[str, list[str]] = {}
+    real = agent._system_note
+    monkeypatch.setattr(
+        agent, "_system_note", lambda to, text, **kw: (sent.setdefault(to, []).append(text), real(to, text, **kw))
+    )
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._conventions_pass([home, node])
+        await agent._conventions_pass([home, node])
+    typed = cadence.typed("path", "cadence-changes.md")
+    assert _notes(home) == [conventions.note([_view(NEW)], "origin/main", typed)]
+    told = sent[agent._address(node)]
+    assert told == [conventions.note([_view(NEW)], "origin/main", agent_tick.NODE_CHANGES)]
+    assert "`dev-cadence path cadence-changes.md` prints its path" in told[0] and ": Do: it." in told[0]
+    assert typed in sent[agent._address(home)][0]
+    assert home.conventions_seen["headings"] == [NEW["heading"], OLD["heading"]]
+    assert sum("told of 1 new in dev-cadence's changes" in m for m in caplog.messages) == 2
+
+
+async def test_the_migration_is_one_note_naming_three(agent, tmp_path, monkeypatch):
+    """A member created before the migration whose first reading falls after it: every entry the retired
+    copy carried lands at the migration's merge, so it is told them in one note."""
+    p = _Pinned(tmp_path, monkeypatch)
+    root = str(p.root)
+    agent._repos[root] = {}
+    five = [_entry("2026-10-0" + str(n), f"rule {n}", "2026-10-26T12:00:00Z") for n in range(1, 6)]
+    p.says(five)
+    s = _member(agent, "w", root, created="2026-10-25T00:00:00Z")
+    await agent._conventions_pass([s])
+    assert (
+        len(_notes(s)) == 1
+        and "gained 5 entries" in _notes(s)[0]
+        and '"2026-10-03 — rule 3": Do: it. and 2 more' in _notes(s)[0]
+    )
+    assert s.conventions_seen["headings"] == [e["heading"] for e in five]
+
+
+async def test_an_empty_reading_sends_nothing_and_is_logged_once(agent, tmp_path, monkeypatch, caplog):
+    p = _Pinned(tmp_path, monkeypatch)
+    p.says([])
+    unpinned = tmp_path / "unpinned"
+    (unpinned / "scripts").mkdir(parents=True)
+    (unpinned / conventions.SCRIPT).write_text(_says([]))
+    locked = tmp_path / "locked"  # a pin beside docs/cadence-sync.lock: its copy is read
+    (locked / "docs").mkdir(parents=True)
+    (locked / "scripts").mkdir()
+    (locked / "docs" / "cadence.toml").write_text(
+        '[dev-cadence]\nsource = "https://x/dev-cadence"\nref = "' + "a" * 40 + '"\n'
+    )
+    (locked / "docs" / "cadence-sync.lock").write_text("files_commit=x\n")
+    (locked / conventions.SCRIPT).write_text(_says([]))
+    assert not cadence.pinned(locked)
+    members = []
+    for root in (p.root, unpinned, locked):
+        agent._repos[str(root)] = {}
+        members.append(_member(agent, root.name, str(root)))
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._conventions_pass(members)
+        await agent._conventions_pass(members)
+    assert all(_notes(m) == [] for m in members)
+    assert _lines(caplog, p.root) == [f"{p.root}: no entries — the checkout's pin may predate dev-cadence's change"]
+    for root in (unpinned, locked):
+        words = (
+            "no entries — the checkout may predate the migration, or still hold docs/cadence-sync.lock beside its pin"
+        )
+        assert _lines(caplog, root) == [f"{root}: {words}"]
+    p.says([OLD])  # entries end the condition; an empty reading after is logged again
+    await agent._conventions_pass(members)
+    p.says([])
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        caplog.clear()
+        await agent._conventions_pass(members)
+    assert len(_lines(caplog, p.root)) == 1 and _lines(caplog, unpinned) == []
+
+
+async def test_no_reading_says_why(agent, tmp_path, monkeypatch, caplog):
+    p = _Pinned(tmp_path, monkeypatch)
+    root = str(p.root)
+    agent._repos[root] = {}
+    s = _member(agent, "w", root)
+    p.says(None, 2, "cadence_changes: origin has no default branch\n")
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._conventions_pass([s])
+        p.says(None, 2)
+        await agent._conventions_pass([s])
+    assert _lines(caplog, root) == [
+        f"{root}: cadence_changes.py gave no reading — cadence_changes: origin has no default branch",
+        f"{root}: cadence_changes.py gave no reading — exit 2, no output",
+    ]
+    assert s.conventions_seen is None and _notes(s) == []
+
+
+async def test_a_pinned_root_with_no_tree_is_logged_once_while_it_lasts(agent, tmp_path, monkeypatch, caplog):
+    p = _Pinned(tmp_path, monkeypatch)
+    root = str(p.root)
+    agent._repos[root] = {}
+    s = _member(agent, "w", root)
+    p.says([])
+    no_tree = f"{root}: pinned, no tree: the launcher gave no answer in 330s"
+    with caplog.at_level("INFO", logger="shiftlead.agent"):
+        await agent._conventions_pass([s])  # no entries, logged
+        p.why = "the launcher gave no answer in 330s"
+        await agent._conventions_pass([s])  # a root that logged no entries, then loses its tree
+        await agent._conventions_pass([s])
+        assert _lines(caplog, root)[1:] == [no_tree]
+        p.why = None
+        await agent._conventions_pass([s])  # has_script turns true: the condition ends
+        p.why = "the launcher gave no answer in 330s"
+        await agent._conventions_pass([s])
+        p.why = None
+        p.script.unlink()  # a tree present but lacking the script
+        await agent._conventions_pass([s])
+    assert _lines(caplog, root)[1:] == [
+        no_tree,
+        no_tree,
+        f"{root}: pinned, no tree: no scripts/cadence_changes.py in the tree",
+    ]
+    assert _notes(s) == []
+
+
+def test_dev_cadences_source_reads_its_own_script(tmp_path):
+    (tmp_path / "files" / "scripts").mkdir(parents=True)
+    (tmp_path / "sync.sh").write_text("")
+    assert cadence.is_source(tmp_path) and not conventions.has_script(tmp_path)
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / conventions.SCRIPT).write_text(_says([OLD]))  # not the source's script
+    assert not conventions.has_script(tmp_path)
+    (tmp_path / conventions.SOURCE_SCRIPT).write_text(_says([NEW]))
+    assert conventions.has_script(tmp_path)
+    assert conventions.read(tmp_path) == ({"ref": "origin/main", "entries": [_view(NEW)]}, None)
+
+
+def test_each_why_and_each_bound(tmp_path, monkeypatch):
+    (tmp_path / "scripts").mkdir()
+    script = tmp_path / conventions.SCRIPT
+    script.write_text(_says(None, 2, "first\nlast line\n"))
+    assert conventions.read(tmp_path) == (None, "last line")
+    script.write_text("print('not json')\n")
+    assert conventions.read(tmp_path) == (None, "output is not the script's --json")
+    bounds: list[float] = []
+
+    def run(argv, timeout, **kw):
+        bounds.append(timeout)
+        raise subprocess.TimeoutExpired(argv, timeout)
+
+    monkeypatch.setattr(conventions.subprocess, "run", run)
+    assert conventions.read(tmp_path) == (None, "timed out after 180s")
+
+    def fails(argv, timeout, **kw):
+        bounds.append(timeout)
+        raise OSError("no python3 here")
+
+    monkeypatch.setattr(conventions.subprocess, "run", fails)
+    assert conventions.read(tmp_path) == (None, "no python3 here")
+    payload = tmp_path / "tree"
+    (payload / "scripts").mkdir(parents=True)
+    (payload / "scripts" / conventions.PINNED_SCRIPT).write_text("")
+    monkeypatch.setattr(cadence, "pinned", lambda r: True)
+    monkeypatch.setattr(cadence, "tree", lambda r, timeout=0: (payload, None))
+    monkeypatch.setattr(cadence, "command", lambda r, *a: (["x"], None))
+    assert conventions.read(tmp_path) == (None, "no python3 here")
+    assert bounds == [conventions.TIMEOUT, conventions.TIMEOUT, cadence.TREE_TIMEOUT] == [180.0, 180.0, 330.0]
+    with pytest.raises(AssertionError):
+        assert conventions.read(tmp_path, timeout=5.0) == (None, "x")
+    assert bounds[-1] == 5.0, "an explicit bound is kept"
