@@ -20663,3 +20663,28 @@ It files each as a build entry, or as live checks where the design already holds
 **Related:** TD-1050, TD-1065, TD-1087.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2450) — the test calls `await park_ticks(agent)` once its session is created and hooked; `tests/test_record_prompts.py` passed four runs of four.
+
+## TD-1087: Four tests fail only when the suite runs across workers (`-n auto`), and pass alone
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, measuring TD-1068)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the fix is in #2455
+**Location:** `tests/test_conventions_policy.py` (`test_a_restart_is_written_afresh`, `test_a_member_created_before_an_entry_landed_is_told_once_and_one_created_after_never`), `tests/test_attachment_life.py` (`test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_live_ones`)
+
+**Why:** TD-1068 runs the suite as `pytest -n 8`, which passed seven full runs in a row. Under `-n auto` (16 workers, load 14–18 beside the org's sessions), these failed and passed alone (the conventions file passed 20 of 20 runs serially):
+- `test_a_member_created_before_an_entry_landed_is_told_once_and_one_created_after_never`: `assert [] == ['docs/cadence-changes.md gained 1 entry since you started: …']`, once in five full runs and twice in 20 runs of its file under `-n auto`. The note was not sent within the test's wait.
+- `test_a_restart_is_written_afresh`: `TypeError: 'NoneType' object is not subscriptable` (the same failure TD-1068 met once on one core), once in 20 runs of its file.
+- `test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_live_ones`: `FileNotFoundError` on `…/home/attachments/ao-gone-1/old.png`, once in five full runs. The sweep and the test's own read raced.
+- Also seen once each, already ledgered: `test_hooks_read_each_live_agent_session_and_the_queue` (TD-1065), `test_the_repos_rpc_serves_each_reading_without_what_omit_names` (TD-1067), `test_done_and_back_to_design_…` (TD-1050).
+A suite that fails under load for no fault of the change costs a 2-minute rerun now, not 12, but it is still a red with no cause.
+
+**Fix:** for each test, find what its wait stands for, and wait on that event, as TD-1050's container test now waits for the provision before linking. Reproduce with `pdm run pytest -n auto <file>` in a loop (20 runs) beside a full `-n auto` suite.
+
+**Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row; then `pdm run test` may take `-n auto`.
+
+**Related:** TD-1068, TD-1050, TD-1065, TD-1067.
+
+**Resolved:** 2026-10-27 (grinder-ao-2, #2455) — the cause of the two conventions failures was the `agent` fixture: it yielded on the socket file, a loop step before `serve` made `_ticker`, so a `park_ticks` in that step parked nothing and the loop's reap ended the test's member. The fixture now waits for `_ticker` too. The attachment sweep test and its sibling now park the loop, and so does `test_ci_spells.py`, met in these runs. The three files passed 20 of 20 runs under `-n auto` beside full `-n auto` suites. The full runs still failed one or two other tests each time; TD-1101 carries the rest of this Done-when, beside TD-1102.

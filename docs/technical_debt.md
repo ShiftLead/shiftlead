@@ -91,9 +91,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
 | TD-1098 | `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it | Low | Open — build |
 | TD-1100 | Under `-n auto`, `tests/test_link.py` fails 31 of its 68 tests with *connection refused* on a node's `agent.sock`, and each passes alone | Low | Open — build |
+| TD-1101 | Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row | Low | Open — build |
 | TD-1102 | `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck | Low | Open — build |
 
 ---
@@ -1948,29 +1948,6 @@ It then names the build entries.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
 
-## TD-1087: Four tests fail only when the suite runs across workers (`-n auto`), and pass alone
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-1, measuring TD-1068)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_conventions_policy.py` (`test_a_restart_is_written_afresh`, `test_a_member_created_before_an_entry_landed_is_told_once_and_one_created_after_never`), `tests/test_attachment_life.py` (`test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_live_ones`)
-
-**Why:** TD-1068 runs the suite as `pytest -n 8`, which passed seven full runs in a row. Under `-n auto` (16 workers, load 14–18 beside the org's sessions), these failed and passed alone (the conventions file passed 20 of 20 runs serially):
-- `test_a_member_created_before_an_entry_landed_is_told_once_and_one_created_after_never`: `assert [] == ['docs/cadence-changes.md gained 1 entry since you started: …']`, once in five full runs and twice in 20 runs of its file under `-n auto`. The note was not sent within the test's wait.
-- `test_a_restart_is_written_afresh`: `TypeError: 'NoneType' object is not subscriptable` (the same failure TD-1068 met once on one core), once in 20 runs of its file.
-- `test_the_sweep_takes_an_ended_sessions_old_attachments_and_keeps_a_live_ones`: `FileNotFoundError` on `…/home/attachments/ao-gone-1/old.png`, once in five full runs. The sweep and the test's own read raced.
-- Also seen once each, already ledgered: `test_hooks_read_each_live_agent_session_and_the_queue` (TD-1065), `test_the_repos_rpc_serves_each_reading_without_what_omit_names` (TD-1067), `test_done_and_back_to_design_…` (TD-1050).
-A suite that fails under load for no fault of the change costs a 2-minute rerun now, not 12, but it is still a red with no cause.
-
-**Fix:** for each test, find what its wait stands for, and wait on that event, as TD-1050's container test now waits for the provision before linking. Reproduce with `pdm run pytest -n auto <file>` in a loop (20 runs) beside a full `-n auto` suite.
-
-**Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row; then `pdm run test` may take `-n auto`.
-
-**Related:** TD-1068, TD-1050, TD-1065, TD-1067.
-
 ## TD-1098: `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it
 
 **Priority:** Low
@@ -2006,6 +1983,28 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when** `pytest -n auto tests/test_link.py` passes 10 runs in a row on a loaded machine, and `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1087 (four other tests that fail only under `-n auto`), TD-1050, TD-1088.
+
+## TD-1101: Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, the full runs of TD-1087)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_sync_pass.py` (`test_off_is_written_once_per_head`), `tests/test_board_seam.py` (`test_an_unserved_repos_board_is_written_by_no_press`), `tests/test_identity.py` (`test_the_detached_check_follows_the_tmux_server_it_is_about`)
+
+**Why:** TD-1087's fix (#2455) made its own tests pass 20 of 20 under load. Its other half, five full `-n auto` runs in a row, did not hold: in five full runs of `pytest -n auto --basetemp=<short>` (2026-10-27, load about 8 to 14), four failed one or two tests each, a different test each time. Besides TD-1088, TD-1098 and TD-1102 (`test_dismiss_takes_the_row_off_and_its_snooze_with_it`), they were:
+- `test_off_is_written_once_per_head`: `AssertionError: nothing changed: nothing saved or pushed` (`assert [{'/r/samscrape': …}] == []`).
+- `test_an_unserved_repos_board_is_written_by_no_press`: `Failed: DID NOT RAISE AgentError`.
+- `test_the_detached_check_follows_the_tmux_server_it_is_about`: `assert ([3861993, 50] == [50]`.
+None of the three files calls `park_ticks`, so the fixture's tick loop running beside the test's own steps is the first suspect, as it was in TD-1087, TD-1099 and `test_ci_spells.py`.
+
+**Fix:** for each test, check whether the fixture's tick loop can run the pass the test drives by hand. If it can, park it (`await park_ticks(agent)`, or a file-level `agent` fixture that parks it, as `test_conventions_policy.py` has). Otherwise wait on the event the test reads. Reproduce with 20 runs of each file under `-n auto` beside a full `-n auto` suite, with a short `--basetemp` (TD-1100: the default's socket paths are too long for `test_link.py` on kmaster).
+
+**Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row, with TD-1098, TD-1100 and TD-1102 fixed too; then `pdm run test` may take `-n auto`.
+
+**Related:** TD-1087 (its other half), TD-1088, TD-1098, TD-1102 (the other flakes in these runs), TD-1100, TD-1068.
 
 ## TD-1102: `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck
 
