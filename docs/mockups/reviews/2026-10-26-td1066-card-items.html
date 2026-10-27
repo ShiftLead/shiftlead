@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Card Items Review</title>
+<meta name="description" content="TD-1066: a Queue card's board item as drawn on 2026-10-26, and the proposed shape — an act line is a Do, it leads with its task, Done is visible, and every Do and Decide item has its own Start session.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* the app's own tokens (app.css, dark), so the proposed card is drawn in the page's real clothes */
+:root {
+  --bg: #f4f5f7; --fg: #1c2128; --muted: #6b7280; --strong: #374151; --line: #dfe3e8; --card: #fff; --hover: #eef0f3;
+  --link: #1f5fa8; --idle: #2563eb; --waiting: #0d9488; --done-fg: #065f46; --ended: #9aa3ae;
+  --needs: #f59e0b; --needs-bg: #fde68a; --needs-fg: #7c3d00; --warn-bg: #fff7ed;
+  --pri: #2563eb; --accent: #2b5fd9; --accent-fg: #fff; --rv-warn: #a15c00; --rv-warn-bg: #fff3df;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --card: #171b21; --hover: #232a33;
+  --link: #7fb2f0; --idle: #3b82f6; --waiting: #14b8a6; --done-fg: #a7f3d0; --ended: #6b7684;
+  --needs: #f59e0b; --needs-bg: #4a3608; --needs-fg: #fde68a; --warn-bg: #3a2410;
+  --pri: #3b82f6; --accent: #5b8cff; --accent-fg: #0f1216; --rv-warn: #f0b45a; --rv-warn-bg: #2c2210; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --card: #171b21; --hover: #232a33;
+  --link: #7fb2f0; --idle: #3b82f6; --waiting: #14b8a6; --done-fg: #a7f3d0; --ended: #6b7684;
+  --needs: #f59e0b; --needs-bg: #4a3608; --needs-fg: #fde68a; --warn-bg: #3a2410;
+  --pri: #3b82f6; --accent: #5b8cff; --accent-fg: #0f1216; --rv-warn: #f0b45a; --rv-warn-bg: #2c2210; color-scheme: dark }
+
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--sans); }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 28px 16px 72px; display: flex; flex-direction: column; gap: 28px; }
+h1 { font-size: 26px; margin: 0; text-wrap: balance; } h2 { font-size: 18px; margin: 0 0 4px; }
+.sub, .cap { color: var(--muted); margin: 4px 0 10px; max-width: 80ch; } .cap { font-size: 13px; margin-top: 8px; }
+.mono, code { font-family: var(--mono); font-size: .88em; }
+.tag { font: 600 11px var(--mono); letter-spacing: .04em; color: var(--muted); text-transform: uppercase; }
+/* the card, in the app's shapes (§4.5 screen 12) */
+.qcard { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--ended); border-radius: 6px; overflow: hidden; }
+.qcard.amber { border-left-color: var(--needs); }
+.qhead { padding: 10px 14px; background: var(--warn-bg); }
+.qmain { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.qid { font-family: var(--mono); font-size: 13px; color: var(--strong); white-space: nowrap; }
+.qhead > .qmain .qid { font-weight: 600; }
+.qpri { font: 600 11px var(--mono); color: #fff; background: var(--pri); border-radius: 3px; padding: 1px 5px; }
+.qtitle { flex: 1 1 28ch; min-width: 0; } .qhead > .qmain .qtitle { font-weight: 600; }
+.qright { margin-left: auto; display: inline-flex; align-items: baseline; gap: 12px; white-space: nowrap; font-size: 13px; }
+.qmoves { color: var(--muted); letter-spacing: .1em; }
+.pill { padding: 1px 9px; border-radius: 10px; background: var(--needs); color: #3b2300; font-weight: 600; }
+.qcount { color: var(--muted); }
+.btn { font: 500 13px var(--sans); padding: 2px 10px; border-radius: 4px; border: 1px solid var(--line); background: var(--card); color: var(--fg); cursor: pointer; white-space: nowrap; }
+.btn.rec { border: 2px solid var(--accent); padding: 1px 9px; }
+.btn.ghost { background: none; }
+.dots { background: none; border: 0; color: var(--muted); font: 600 15px var(--sans); cursor: pointer; padding: 0 4px; }
+/* an item, drawn whole (Decide or Do) */
+.item { margin: 10px 0 2px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 5px; background: var(--card); display: grid; gap: 4px; }
+.item .kl { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.item .kl .k { font: 600 11px var(--mono); padding: 0 5px; border-radius: 3px; background: var(--hover); color: var(--strong); }
+.item .kl .do { background: var(--needs-bg); color: var(--needs-fg); }
+.item .kl .where { color: var(--needs-fg); font-weight: 600; }
+.item .kl .on { color: var(--link); }
+.item .kl .std { color: var(--muted); }
+.item .lead { font-weight: 600; }
+.item .then { color: var(--strong); font-size: 14px; }
+.item .ctx { font-size: 13px; color: var(--muted); }
+.item .ctx summary { cursor: pointer; } .item .ctx div { padding: 4px 0 0 14px; }
+.item .ans { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 2px; }
+.item .ans .sp { flex: 1; }
+.item .foot { font-size: 12.5px; color: var(--muted); }
+.item.old .body { font-size: 14px; }
+.ann { font-size: 12px; color: var(--rv-warn); background: var(--rv-warn-bg); border-radius: 3px; padding: 0 5px; }
+.rows { padding: 4px 14px 8px; }
+.row { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; padding: 3px 0 3px 12px; margin-left: 1.6em; border-left: 2px solid var(--line); font-size: 14px; }
+.row.done { border-left-color: var(--waiting); } .row.done .qtitle, .row.done .qid { color: var(--muted); }
+.row .st { margin-left: auto; color: var(--muted); font-size: 13px; white-space: nowrap; }
+.held { font: 500 12px var(--sans); color: var(--idle); }
+.changes { display: grid; gap: 8px; counter-reset: c; margin: 0; padding: 0; list-style: none; }
+.changes li { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; display: grid; grid-template-columns: 1.8rem minmax(0, 1fr); gap: 2px 8px; }
+.changes li::before { counter-increment: c; content: counter(c, lower-alpha); font: 600 14px var(--mono); color: var(--accent); }
+.changes li span { color: var(--muted); grid-column: 2; }
+.ask { background: var(--rv-warn-bg); border: 1px solid var(--rv-warn); border-radius: 6px; padding: 14px 18px; }
+.ask ol { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 8px; } .ask li { max-width: 86ch; }
+@media (max-width: 640px) { .qright { margin-left: 0; flex-wrap: wrap; white-space: normal; } .row { margin-left: .6em; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>A card's board item: what it asks, and a session on it</h1>
+    <p class="sub">TD-1066. Paul's TD-1033 card on 2026-10-26, drawn as the page drew it, then the same card in the proposed shape, then a card with two items and your session already open. The texts are the real board line's; the keys and the second card's board item are illustrative. Nothing here is built.</p>
+  </header>
+
+  <section id="today">
+    <span class="tag">Today</span>
+    <h2>The TD-1033 card as drawn on 2026-10-26</h2>
+    <div class="qcard amber">
+      <div class="qhead">
+        <div class="qmain">
+          <span class="qid">shiftlead#TD-1033</span><span class="qpri">H</span>
+          <span class="qtitle">PRs and <code>main</code> are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local <code>precheck</code>, and let promotion read it</span>
+          <span class="qright"><span class="qmoves">⤒ ↑ ↓</span><button class="btn ghost">Start session</button><button class="dots" aria-label="the team's controls">⋯</button><span class="qcount">6 entries</span><span class="pill">Decide 1</span></span>
+        </div>
+        <div class="item old">
+          <div class="kl"><span class="k">board</span><span>shiftlead</span><span class="std">designer-ao-1 · still on TD-1038 — grinder-ao-2 holds it</span><span class="mono">board:7c1e</span><span class="ann">1 · counted as a Decide</span></div>
+          <div class="body"><span class="ann">2 · leads with its prefix</span> act 2026-10-26 (session <code>designer-ao-1</code> on kmaster) — <b>File one entry in dev-cadence's ledger, so ShiftLead's promote can check main's head: <code>precheck.py --commit &lt;sha&gt;</code></b> — run the repo's precheck on a commit of origin's default branch and record <code>cadence/precheck</code> on it, as <code>--pr</code> does on a PR's head. dev-cadence has no question seat, so no session here can file it; …</div>
+          <div class="ans"><button class="btn">Answer…</button><span class="ann">3 · an act has no answers; Done is in ⋯</span><span class="sp"></span><button class="dots">⋯</button></div>
+          <div class="foot">on the board — Answer… writes on its line and Done checks it off, each one edit landed on shiftlead's origin by shiftlead's own pull request <span class="ann">4 · the mechanism, not the task</span></div>
+        </div>
+      </div>
+      <div class="rows">
+        <div class="row done"><span class="qid">TD-1035</span><span class="qtitle">precheck.py and the cadence/precheck status</span><span class="st">done #2391</span></div>
+        <div class="row"><span class="qid">TD-1038</span><span class="qtitle">The home prechecks main's head before a promote</span><span class="st">held by grinder-ao-2</span></div>
+      </div>
+    </div>
+    <p class="cap">1 an <code>act</code> line is drawn under Decide, though cadence §3.3 gives it no answers. 2 the sentence is the line from its start, so it leads with <i>act 2026-10-26 (session …) —</i>, and the header's grey words are the §4.5a <i>standing</i> text, where a Reply goes. 3 its verb is Answer…, and Done is hidden in ⋯. 4 the footer explains the write-back. 5 (not drawn) nothing says the task is in dev-cadence, and Start session told the session <i>waits on me — none</i>.</p>
+  </section>
+
+  <section id="proposed">
+    <span class="tag">Proposed</span>
+    <h2>The same card</h2>
+    <div class="qcard amber">
+      <div class="qhead">
+        <div class="qmain">
+          <span class="qid">shiftlead#TD-1033</span><span class="qpri">H</span>
+          <span class="qtitle">PRs and <code>main</code> are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local <code>precheck</code>, and let promotion read it</span>
+          <span class="qright"><span class="qmoves">⤒ ↑ ↓</span><button class="dots" aria-label="the team's controls">⋯</button><span class="qcount">6 entries</span><span class="pill">Do 1</span></span>
+        </div>
+        <div class="item">
+          <div class="kl"><span class="k do">do</span><span class="where">in dev-cadence</span><span>· board line · <a class="on" href="#">on TD-1038</a></span></div>
+          <div class="lead">File one entry in dev-cadence's ledger, so ShiftLead's promote can check main's head: <code>precheck.py --commit &lt;sha&gt;</code>.</div>
+          <div class="then">Until it is filed, <code>auto</code> cannot promote this repo; a press still works.</div>
+          <details class="ctx"><summary>context</summary><div>act 2026-10-26, session <code>designer-ao-1</code> on kmaster · due 2026-10-29 · Context: TD-1033, TD-1038 · <span class="mono">board:7c1e</span><br>Run the repo's precheck on a commit of origin's default branch and record <code>cadence/precheck</code> on it, as <code>--pr</code> does on a PR's head. dev-cadence has no question seat, so no session here can file it; the full text is in TD-1038's <code>Blocked by:</code> line. Once filed, put its id in that line.</div></details>
+          <div class="ans"><button class="btn rec">Done</button><button class="btn ghost">Start session</button><span class="sp"></span><button class="dots" title="Answer… · Open board · copy board:7c1e" aria-label="the item's controls: Answer…, Open board, copy board:7c1e">⋯</button></div>
+        </div>
+      </div>
+      <div class="rows">
+        <div class="row done"><span class="qid">TD-1035</span><span class="qtitle">precheck.py and the cadence/precheck status</span><span class="st">done #2391</span></div>
+        <div class="row"><span class="qid">TD-1038</span><span class="qtitle">The home prechecks main's head before a promote</span><span class="st">held by grinder-ao-2</span></div>
+      </div>
+    </div>
+    <p class="cap">The <code>act</code> line is a <b>Do</b>: its answer is <b>Done</b>, outlined, and Answer… moves into the item's ⋯ (its <i>standing</i> text, where the words go, in Answer…'s title). The item leads with the line's bold head, says <b>in dev-cadence</b> since the task is not in the card's repo, and puts the sentence after the head under it; the prefix, the date, the key and the rest fold under <i>context</i>. The footer is gone; its <i>landed on origin by shiftlead's own PR</i> words stay in Done's confirm. The item has its <b>own Start session</b>, so the header's is not drawn on a card whose items carry one.</p>
+  </section>
+
+  <section id="two">
+    <span class="tag">Proposed</span>
+    <h2>Two items, then your session open on the card</h2>
+    <div class="qcard amber">
+      <div class="qhead">
+        <div class="qmain">
+          <span class="qid">shiftlead#TD-1064</span><span class="qpri">M</span>
+          <span class="qtitle">A session gets either the repo's tools or the org's reach, never both</span>
+          <span class="qright"><span class="qmoves">⤒ ↑ ↓</span><button class="dots" aria-label="the team's controls">⋯</button><span class="qcount">3 entries</span><span class="pill">Decide 1 · Do 1</span></span>
+        </div>
+        <div class="item">
+          <div class="kl"><span class="k">decide</span><span>steer from designer-ao-1 · goes with its default in 11 h</span></div>
+          <div class="lead">Should a session's identity stay read from its process ancestry, with no per-session credential?</div>
+          <div class="ans"><button class="btn rec">Go with it</button><button class="btn">A per-session credential</button><button class="btn ghost">Open session</button><span class="sp"></span><button class="dots" title="Answer… · Pause">⋯</button></div>
+        </div>
+        <div class="item">
+          <div class="kl"><span class="k do">do</span><span>board line · <a class="on" href="#">on TD-1093</a></span></div>
+          <div class="lead">Run <code>scripts/smoke.py --setup</code> once on kmaster, so the smoke's browser half can run.</div>
+          <div class="ans"><button class="btn rec">Done</button><button class="btn ghost">Open session</button><span class="sp"></span><button class="dots" title="Answer… · Open board · copy board:91aa">⋯</button></div>
+        </div>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="qid">TD-1092</span><span class="qtitle">Add entry's Open a session starts on the team's host</span><span class="st"><span class="held">held by td-1064</span></span></div>
+        <div class="row"><span class="qid">TD-1093</span><span class="qtitle">A peer of <code>agent.sock</code> in another pid namespace reads <i>unknown</i></span><span class="st">ready</span></div>
+      </div>
+    </div>
+    <p class="cap">With your own session on the card (<i>held by td-1064</i>), every item's button reads <b>Open session</b>: it goes to that session and copies the item's id (<span class="mono">m-c1b3…</span>, <span class="mono">board:91aa</span>) for you to paste, typing nothing into it. With no session of yours, each reads <b>Start session</b>, which starts on the card's chosen entry (its worktree and branch, as the header's does today) with that item as its subject. The second item is illustrative.</p>
+  </section>
+
+  <section>
+    <h2>What changes (the entry's (a)–(f))</h2>
+    <ol class="changes">
+      <li><b>An <code>act</code> line is a Do</b><span>Done its answer, Answer… in ⋯; <code>decide</code> and <code>look</code> stay Decide (ADR 2026-10-19 §2, citing cadence §3.3).</span></li>
+      <li><b>Start session on every Do and Decide item</b><span>On the card's chosen entry, with the item as its subject; the header's button only on a card with no such item.</span></li>
+      <li><b>The brief names the item</b><span><i>waits on me</i> carries each Decide and Do item by id (<code>board:&lt;key&gt;</code>, <code>m-…</code>), and the session reads the item itself (<code>ao board show</code>; the thread of a mail item), so the brief stays ids only.</span></li>
+      <li><b>An item leads with its task</b><span>The bold head; the repo named where it is not the card's; the prefix under <i>context</i>; <i>standing</i> into Answer…'s title.</span></li>
+      <li><b>The footer goes</b><span>Its words stay in Done's confirm.</span></li>
+      <li><b>A done line is closed by its write-back</b><span>A briefs and cadence line: Done or <code>ao board edit done</code>, never a feature PR. <i>Closing in #n</i> is left out (below).</span></li>
+    </ol>
+  </section>
+
+  <section class="ask">
+    <h2>Asked of you</h2>
+    <ol>
+      <li><b>Is this the layout?</b> An item's answers, then its own Start session (Open session once yours is on the card), then ⋯; the header's Start session only where no item has one.</li>
+      <li><b>Open session on an item</b> goes to your session and copies the item's id. The alternative is to type <i>look at board:91aa</i> into it for you, which sends words into a session you drive.</li>
+      <li><b><i>Closing in #n</i></b>, read from an open PR's description: recommended left out for now. The write-back of (f) makes it rarely needed.</li>
+    </ol>
+  </section>
+</div>
+</body>
+</html>
