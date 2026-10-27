@@ -93,7 +93,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
 | TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Built in #2431 — live check |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
 | TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
@@ -2006,24 +2005,6 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
-
-## TD-1075: The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/gitinfo.py` (`_run`: `{**(os.environ if env is None else env), "LC_ALL": "C"}`; `_hydrate`), `tests/test_worktree_reap.py::test_a_pinned_repos_reap_runs_the_pinned_trees_hydrate`
-
-**Why:** #2409 (TD-1044) made `_run` take the environment `cadence.command` returns, which for a pinned repo carries the pin's variables (`CADENCE_REPO_ROOT`, as `test_a_pinned_repos_new_worktree_is_hydrated_by_the_pinned_tree` stubs it). The create path is tested for it (the stub launcher writes `$CADENCE_REPO_ROOT`); the reap path is not: the stub is `lambda r, word, *a: ([str(stub), word, *a], dict(os.environ))`, and the stub script echoes `"$@"` only. Probed on `origin/main`: replacing `{**(os.environ if env is None else env), "LC_ALL": "C"}` with `{**os.environ, "LC_ALL": "C"}` leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gitinfo.py tests/test_worktree_reap.py` at 38 passed. A reaper whose `--check` and `--dehydrate` lose the resolver's environment would pass.
-
-**Fix:** have the reap test's resolver stub return `{**os.environ, "CADENCE_REPO_ROOT": str(r)}` and its stub launcher log `$CADENCE_REPO_ROOT` with the arguments; assert it on the `--check` and `--dehydrate` calls.
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1044.
 
 ## TD-1079: The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung*
 

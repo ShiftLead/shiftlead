@@ -20505,3 +20505,23 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Related:** TD-1014.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2446) — `_pinned_node`'s tree holds a relative link and a dangling one, and the ship test asserts both arrive as links with their targets; with `symlinks=True` dropped it fails.
+
+## TD-1075: The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the test is in #2449
+**Location:** `src/sessionorc/gitinfo.py` (`_run`: `{**(os.environ if env is None else env), "LC_ALL": "C"}`; `_hydrate`), `tests/test_worktree_reap.py::test_a_pinned_repos_reap_runs_the_pinned_trees_hydrate`
+
+**Why:** #2409 (TD-1044) made `_run` take the environment `cadence.command` returns, which for a pinned repo carries the pin's variables (`CADENCE_REPO_ROOT`, as `test_a_pinned_repos_new_worktree_is_hydrated_by_the_pinned_tree` stubs it). The create path is tested for it (the stub launcher writes `$CADENCE_REPO_ROOT`); the reap path is not: the stub is `lambda r, word, *a: ([str(stub), word, *a], dict(os.environ))`, and the stub script echoes `"$@"` only. Probed on `origin/main`: replacing `{**(os.environ if env is None else env), "LC_ALL": "C"}` with `{**os.environ, "LC_ALL": "C"}` leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gitinfo.py tests/test_worktree_reap.py` at 38 passed. A reaper whose `--check` and `--dehydrate` lose the resolver's environment would pass.
+
+**Fix:** have the reap test's resolver stub return `{**os.environ, "CADENCE_REPO_ROOT": str(r)}` and its stub launcher log `$CADENCE_REPO_ROOT` with the arguments; assert it on the `--check` and `--dehydrate` calls.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1044.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2449) — the reap test's resolver stub returns `{**os.environ, "CADENCE_REPO_ROOT": str(repo)}` and its launcher logs `$CADENCE_REPO_ROOT` after its arguments, asserted on `--check` and `--dehydrate`; with `_run`'s environment `{**os.environ, "LC_ALL": "C"}` it fails.
