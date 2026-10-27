@@ -66,23 +66,24 @@ def entry_branch_exists(root: str, name: str) -> bool:
     return cp.returncode == 0
 
 
-def entry_role(org: orgmod.Org, team: str, type_: str) -> str:
+def entry_role(org: orgmod.Org, team: str, type_: str, files: teams.Files | None = None) -> str:
     """The role **Open a session** starts for `type_`: the team's `entries:` word for it, else, for a
     feature, its current flow's design stage (§4.9c item 4), else the techlead; `plain` where no team
-    services the repo (§4.9 *Where there is no seat*)."""
+    services the repo (§4.9 *Where there is no seat*). `files` reads a machine node's checkout across
+    the link (`host_files`, TD-1064), so a feature there opens its flow's design role as here."""
     t = org.teams.get(team) if team else None
     if t is None:
         return "plain"
     here = host_name()
-    # §4.9c item 4: a flow's design stage. Read from this host's disk: a team on a node whose checkout
-    # is not here reads no flow and opens the techlead, unless its `entries:` says otherwise
-    return teams.entry_role(org, t, type_, t.host or here, here)
+    return teams.entry_role(org, t, type_, t.host or here, here, files=files)
 
 
-def entry_line(role: str, name: str, team: str) -> str:
-    """The one line under **Open a session** (§4.5a): what the press will start."""
+def entry_line(role: str, name: str, team: str, host: str = "") -> str:
+    """The one line under **Open a session** (§4.5a): what the press will start, and the host it starts
+    on where that is the team's on another host (TD-1064)."""
     tail = "" if team else " — no team services this repo"
-    return f"an interactive {role} session, {name}, in a new worktree{tail}"
+    on = f" on {host}" if host else ""
+    return f"an interactive {role} session, {name}, in a new worktree{on}{tail}"
 
 
 # the teams that service a checkout: `shiftlead.teams`' since TD-218 slice 4, where `ao td add` reads it too
