@@ -7,5 +7,6 @@ metadata:
 
 Cadence §3.6 (dev-cadence TD-138): a park, hold or `Blocked by:` takes effect only once merged, since the
 designer reads the board on `main`; and §2.9 (TD-137): `forge.py in-flight TD-NNN` lists the id's PRs in any
-state, so run it again at the start of the round. Related: [[cloud-design-round]],
+state, so run it again at the start of the round. From a cloud session, which has no `gh`, read the park PR's
+`merged: true` with the GitHub MCP's `pull_request_read`. Related: [[cloud-design-round]],
 [[check-open-prs-before-a-design-round]].
