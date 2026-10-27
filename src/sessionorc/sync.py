@@ -324,7 +324,7 @@ def _check(
 
 def pin_at(root: Path | str, rev: str) -> tuple[str, str] | None:
     """`(source, ref)` of the `[dev-cadence]` table in `docs/cadence.toml` at `rev`, or None where there is
-    none or it does not parse."""
+    none or it does not parse. The `ref` is kept as written, so a padded one is no full commit."""
     text = _text(root, rev, PIN)
     try:
         got = tomllib.loads(text).get("dev-cadence") if text is not None else None
@@ -332,7 +332,7 @@ def pin_at(root: Path | str, rev: str) -> tuple[str, str] | None:
         return None
     if not isinstance(got, dict) or not isinstance(got.get("source"), str) or not isinstance(got.get("ref"), str):
         return None
-    return got["source"].strip(), got["ref"].strip()
+    return got["source"].strip(), got["ref"]
 
 
 def only_ref_moved(before: str, after: str) -> bool:

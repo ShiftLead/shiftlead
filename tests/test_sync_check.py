@@ -341,7 +341,8 @@ def test_a_bump_that_changes_more_than_the_ref_is_refused_by_name(pinned, change
         "same": {sync.PIN: pinned.pin(pinned.ref0).replace(f'"{pinned.ref0}"', f'"{pinned.ref0}"  # v1')},
         "gone": {sync.PIN: "# no pin\n"},
     }[change]
-    assert pinned.check(pinned.pr(files)) == {"head": pinned.pr(files), "verdict": "refused", "why": why}
+    head = pinned.pr(files)
+    assert pinned.check(head) == {"head": head, "verdict": "refused", "why": why}
 
 
 def test_a_ref_that_does_not_descend_or_is_not_on_the_default_branch_is_refused(pinned):
@@ -361,9 +362,12 @@ def test_a_ref_that_does_not_descend_or_is_not_on_the_default_branch_is_refused(
     assert pinned.check(pinned.pr({sync.PIN: pinned.pin(side)}))["why"] == (
         f"ref {side[:7]} is not a full commit on dev-cadence's main"
     )
-    # a short ref is no full commit, though it names one
+    # a short ref is no full commit, though it names one; nor is a full one padded with a space
     head = pinned.pr({sync.PIN: pinned.pin(side[:12])})
     assert pinned.check(head)["why"] == f"ref {side[:7]} is not a full commit on dev-cadence's main"
+    ref2 = pinned.dc_commit({DOC: "three\n"})
+    head = pinned.pr({sync.PIN: pinned.pin(f" {ref2}")})
+    assert pinned.check(head)["why"] == f"ref  {ref2[:6]} is not a full commit on dev-cadence's main"
 
 
 def test_a_bump_with_no_clone_or_on_a_held_path_is_refused(pinned):

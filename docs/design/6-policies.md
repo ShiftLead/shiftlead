@@ -1677,8 +1677,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      own merge.
   3. **The review evidence.** **For a bump the home posts none.** A bump is reviewed on its compare,
      never merged unread (dev-cadence's plan *Decision* 7). It waits, uncounted, until the PR carries a
-     review of the compare: a `cadence-review: SHIP` or `FIXED` comment whose reviewer is not
-     `sync-check`, whose body names the head (seven hex characters or more), and which no later BLOCK
+     review of the compare: a `cadence-review: SHIP` or `FIXED` comment whose reviewer, as its line
+     names it (the gate's own self-attested reading, never the comment's author), is not `sync-check`, whose body names the head (seven hex characters or more), and which no later BLOCK
      follows. While it waits, its entry keeps `waits: review` and `waiting_since`. It is no longer the
      home's to hold: the team's order carries it with *no review of the compare at <sha>*, since the review is
      the team's to give. A bump with no such review after `SYNC_PRECHECK_WAIT` (a day) at one head is
