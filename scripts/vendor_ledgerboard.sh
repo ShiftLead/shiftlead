@@ -5,9 +5,10 @@
 # Copies, from ShiftLead/ledgerboard at <tag> (e.g. v1.0):
 #   ledgerboard.py -> src/sessionorc/ledgerboard.py   (the wheel's copy: container nodes have no scripts/)
 #   fixtures/      -> tests/ledgerboard/              (tooling: never synced)
-# and writes tests/ledgerboard/MANIFEST (the tag, its commit, a sha256 per file). Never
-# scripts/ledgerboard.py: that is a SYNC file and sync.sh is its one writer — run this in the
-# dev-cadence sync PR that brings a new release, with the tag the synced header names, so
+# and writes tests/ledgerboard/MANIFEST (the tag, its commit, a sha256 per file). ledgerboard.py
+# also ships in dev-cadence, and this repo runs the pinned tree's (`docs/cadence.toml`'s
+# [dev-cadence], TD-129; `dev-cadence path scripts/ledgerboard.py`) — run this in the dev-cadence
+# bump PR that brings a new release, with the tag the pinned copy's header names, so
 # tests/test_ledgerboard_fixtures.py (the two copies byte-equal) never merges half a release.
 # Refuses a module whose release header is not <tag>'s or not intact.
 #

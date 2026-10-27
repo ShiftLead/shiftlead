@@ -11,18 +11,18 @@ import sys
 from pathlib import Path
 
 import pytest
+from conftest import pinned_script
 
 from sessionorc import ledger
 
 ROOT = Path(__file__).parents[1]
-SCRIPT = ROOT / "scripts" / "ledger.py"
 
 
 def _script(cwd: Path, reg_dir: Path, *args: str) -> dict:
     """The synced script's `--list --json`, its roster pointed at `reg_dir` alone."""
     env = {**os.environ, "DEV_CADENCE_REG_DIR": str(reg_dir)}
     cp = subprocess.run(
-        [sys.executable, str(SCRIPT), "--list", "--json", *args],
+        [sys.executable, str(pinned_script("ledger.py")), "--list", "--json", *args],
         cwd=cwd, env=env, capture_output=True, text=True, timeout=60, check=True,
     )  # fmt: skip
     return json.loads(cp.stdout)

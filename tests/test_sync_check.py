@@ -232,8 +232,20 @@ def test_post_sync_exit_and_bound(post):
     assert w2.check(w2.honest("five\n"), bound=0.5)["why"].startswith("post_sync did not end in ")
 
 
-def test_parse_lock_reads_this_repos_own():
-    got = sync.parse_lock((Path(__file__).parents[1] / sync.LOCK).read_text())
+# the head of this repo's own last lock (dev-cadence 232f2ad), as sync.sh wrote it: the repo pins dev-cadence
+# now (dev-cadence TD-129) and carries no lock, and a lock is still read while a served repo has one
+LAST_OWN_LOCK = """# Written by ShiftLead/dev-cadence sync.sh — do not edit by hand.
+source: https://github.com/ShiftLead/dev-cadence
+commit: 232f2ad
+files_commit: 232f2ad364384929f57011ff2e76b9ba324ab8d7
+synced: 2026-10-23T01:54:48Z
+file: docs/cadence.md e1f332cb617f8333fb148f401f19e21958ee6d1a6547cbc02791dc67ad63efcd 644
+file: docs/cadence-rationale.md f06aecd78c767a0eac466bb0c5e4637b364fc3582cfd6da5d930c1a38498961d 644
+"""
+
+
+def test_parse_lock_reads_a_lock_as_sync_sh_writes_it():
+    got = sync.parse_lock(LAST_OWN_LOCK)
     assert got["source"] == "https://github.com/ShiftLead/dev-cadence" and got["files"]["docs/cadence.md"][1] == "644"
     assert sync.parse_lock(None) is None
 

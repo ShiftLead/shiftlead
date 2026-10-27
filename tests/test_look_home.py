@@ -12,6 +12,8 @@ import time
 import urllib.request
 from pathlib import Path
 
+from conftest import pinned_script
+
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "scripts" / "look_home.py"
 
@@ -38,6 +40,7 @@ def test_the_live_home_and_a_long_path_are_refused(tmp_path):
 
 
 def test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing(tmp_path):
+    pinned_script("nudge_user_attention.py")  # its fixture repo is made from the pinned tree: skip where it is not
     env = {k: v for k, v in os.environ.items() if k != "SHIFTLEAD_SESSION"}
     err = (tmp_path / "stderr").open("w")  # what the script said, shown when it printed no URL
     proc = subprocess.Popen(

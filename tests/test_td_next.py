@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import park_ticks
+from conftest import park_ticks, pinned_script
 
 from sessionorc import agent_ids, cadence, modes, paths
 from sessionorc.agent_common import RpcError
@@ -696,9 +696,10 @@ async def test_held_holds_the_scripts_ids(home, gh, tmp_path):
 
 @pytest.mark.integration
 async def test_the_home_and_a_direct_run_at_once_take_different_ids_from_one_counter(home, gh, tmp_path):
-    """The real synced script, on a bare origin with no forge: one counter, with the home and without it."""
+    """The real script (the pinned tree's, as a synced repo carries it), on a bare origin with no forge: one
+    counter, with the home and without it."""
     files = {LEDGER: _ledger(1, 2), ARCHIVE: _ledger()}
-    files.update({f"scripts/{p.name}": p.read_text() for p in (Path(__file__).parent.parent / "scripts").glob("*.py")})
+    files.update({f"scripts/{p.name}": p.read_text() for p in pinned_script("ledger_next_id.py").parent.glob("*.py")})
     root = _one(tmp_path, gh, files=files)
     other = _repo(tmp_path, "other", {}, origin=Path(_git(root, "remote", "get-url", "origin")))
     env = {**os.environ, **GIT_ENV, "LEDGER_IDS_RACE_SECONDS": "20"}

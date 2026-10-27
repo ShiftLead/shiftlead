@@ -10,11 +10,10 @@ import time
 from pathlib import Path
 
 import pytest
+from conftest import pinned_script
 
 from sessionorc import gitinfo
 from sessionorc.gitinfo import ensure_worktree, reap_worktree, weigh_branches
-
-ROOT = Path(__file__).resolve().parent.parent
 
 
 def git(cwd, *args) -> str:
@@ -263,7 +262,7 @@ def test_a_branch_another_session_rebased_before_the_close_is_deleted_and_the_ga
     assert int(git(repo, "rev-list", "--count", "origin/ao-w..ao-w")) == 1  # the stale tip the gate failed on
     got = reap(wt, "ao-w")
     assert got["branches_deleted"] == ["ao-w"] and got["branch_kept"] == {}
-    spec = importlib.util.spec_from_file_location("check_cadence", ROOT / "scripts" / "check_cadence.py")
+    spec = importlib.util.spec_from_file_location("check_cadence", pinned_script("check_cadence.py"))
     cc = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cc)
     row = cc.row_pushed({"state": "open", "head": "ao-w"}, str(repo))
@@ -369,4 +368,4 @@ def test_the_disposable_list_is_the_designs(repo):
         ".venv",
     }  # fmt: skip
     assert (gitinfo.REAP_WITHIN, gitinfo.REAP_STEP) == (60.0, 20.0)
-    assert os.access(ROOT / "scripts" / "check_cadence.py", os.R_OK)
+    assert os.access(pinned_script("check_cadence.py"), os.R_OK)  # the gate the test above loads

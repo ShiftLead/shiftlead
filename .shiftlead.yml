@@ -23,6 +23,12 @@ held: ["src/sessionorc/**", "docs/briefs/**"]
 # the briefs name no repo's layout, so this repo's own lives here.
 commands: {test: pdm run test, lint: pdm run lint}
 
+# How a new worktree is set up (design §5 *The seams* `worktree_setup:`, TD-589). Unset, the home runs
+# the repo's own scripts/hydrate_worktree.sh (`gitinfo.HYDRATE`), which leaves with the dev-cadence pin
+# (dev-cadence TD-129), so a team worktree would get no .claude/settings.local.json (its memory path).
+# The pinned tree's hydrate does it instead. Drop this once the default runs the pinned one (TD-1044).
+worktree_setup: 'dev=$(command -v dev-cadence || echo "$HOME/.local/bin/dev-cadence"); "$dev" run hydrate_worktree.sh "$1"'
+
 # How long a new ledger entry waits, holdable, before a lane may take it (design §4.4 *A new entry
 # settles before it is pickable*, §5 `settle:`; TD-707, TD-710): a `design-first` entry ten minutes,
 # so Paul can change or Hold one a session filed; a designer's `build` entries go at once. Wins over

@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+from sessionorc import cadence
 from shiftlead import repoconfig
 
 pytestmark = pytest.mark.unit
@@ -70,6 +71,8 @@ def test_a_bare_repos_brief_says_each_seam_in_its_own_words(tmp_path, role):
 
 @pytest.mark.parametrize("role", ROLES)
 def test_this_repos_brief_reads_its_own_layout(role):
+    # this repo pins dev-cadence (dev-cadence TD-129): its cadence slots are the resolver's commands, typed
+    assert cadence.pinned(REPO)
     text, made = repoconfig.resolve_role(repoconfig.load(REPO), role).compose()
     given = {s: made["slots"][s]["text"] for s in repoconfig.LAYOUT_SLOTS if s in made["slots"]}
     assert set(given) == NAMED[role]  # the same slots in this repo as in a bare one
@@ -78,9 +81,9 @@ def test_this_repos_brief_reads_its_own_layout(role):
         "{lint}": "pdm run lint",
         "{board}": "docs/user_attention.md",
         "{design_dir}": "docs/design/",
-        "{cadence_rules}": "read docs/cadence.md §1–§4",
+        "{cadence_rules}": f"read the file `{cadence.typed('path', 'cadence.md')}` prints, §1–§4",
     }.items():
         if slot in given:
             assert given[slot] == words and words in text, slot
     if "{gate}" in given:
-        assert "python3 scripts/check_cadence.py --pr <n>" in text
+        assert f"{cadence.typed('run', 'check_cadence.py')} --pr <n>" in text
