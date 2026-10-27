@@ -575,13 +575,18 @@ class RemoteMixin:
         """The doorbell's `ring` act on a node's record (§4.4a *The doorbell rings a node's session through
         its node*, TD-1079), routed as `send` is: the node's verdict — `typed`, `busy` or `failed` — with the
         record as it now stands taken at once. None is no verdict: the link down, dropped, or silent past
-        `ACT_TIMEOUT` — nothing charged, nothing written. A node that refuses the act (an older build) failed it."""
+        `ACT_TIMEOUT` — nothing charged, nothing written. A node that refuses `ring` as an act it does not
+        execute (an older build, until the supervisor re-provisions it) is no verdict too (TD-1095); any other
+        refusal failed it."""
         mux = self._link_muxes.get(host)
         if mux is None:
             return None
         try:
             reply = await mux.request("act", timeout=ACT_TIMEOUT, rpc="ring", params=params, caller=None)
         except link.LinkError as e:
+            if str(e).endswith(link.UNKNOWN_ACT):
+                log.info("doorbell for %s@%s: the node does not know the ring yet: %s", params.get("id"), host, e)
+                return None
             log.warning("doorbell for %s@%s: the node refused the ring: %s", params.get("id"), host, e)
             return "failed"
         except (link.LinkClosed, TimeoutError):

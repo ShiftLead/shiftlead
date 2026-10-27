@@ -47,6 +47,8 @@ STDERR_KEPT = 20  # lines of the transport's stderr kept for the diagnosis
 
 Handler = Callable[[str, dict[str, Any]], Awaitable[Any]]
 Target = list[str] | Path  # a transport command, or the home's link socket
+# a node's refusal of an act its build does not execute, after the act's name: an older node says it so (TD-1095)
+UNKNOWN_ACT = " is not an act a node executes"
 
 
 class LinkError(Exception):

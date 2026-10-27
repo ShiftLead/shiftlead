@@ -165,6 +165,28 @@ async def test_no_verdict_charges_and_writes_nothing_and_rings_again_once_the_li
         assert len(node.rings) == 2 and node.rings[1]["retry"] is False and len(home.wakes) == 1
 
 
+async def test_a_node_that_does_not_know_the_ring_is_no_verdict_and_another_refusal_fails(agent):
+    """TD-1095: a node on an older build refuses `ring` as an unknown act — no failure counted, no bell kept,
+    rung again next tick and recorded once it answers `typed`; a refusal of any other kind still fails."""
+    async with _linked(agent) as node:
+        _mail(agent)
+        node.verdicts = [link.LinkError(f"'ring'{link.UNKNOWN_ACT}")] * 3
+        for _ in range(3):
+            await _ring(agent)
+        home = agent.remote[HOST][RID]
+        assert len(node.rings) == 3 and [r["retry"] for r in node.rings] == [False] * 3
+        assert home.wakes == [] and ADDR not in agent._bells and home.doorbell_failed is None
+        await _ring(agent)  # re-provisioned: the ring lands and is recorded as before
+        assert len(node.rings) == 4 and [(w["cause"], w["via"]) for w in home.wakes] == [("mail", "doorbell")]
+        assert agent._bells[ADDR]["rung"] is True
+        node.rec.since = _iso(datetime.now(UTC) + timedelta(seconds=5))  # a new stretch
+        _report(agent, node)
+        _mail(agent)
+        node.verdicts = [link.LinkError("a ring types the unread line and nothing else")]
+        await _ring(agent)
+        assert agent._bells[ADDR]["failures"] == 1 and agent._bells[ADDR]["rung"] is False
+
+
 async def test_a_record_blocked_in_a_forwarded_wait_is_not_rung(agent):
     async with _linked(agent) as node:
         _mail(agent)
@@ -319,3 +341,10 @@ async def test_the_node_answers_busy_and_failed_by_its_own_checks(here):
     async with agent._typing[RID]:
         fake.left = ""
         assert (await agent._ring_here(_act()))["result"] == "busy"  # a send is typing
+
+
+async def test_a_node_refuses_an_act_it_does_not_know_in_the_words_the_home_reads_as_no_verdict(here):
+    agent, s, fake, typed = here
+    with pytest.raises(link.LinkError) as refused:
+        await agent._act({"rpc": "chime", "params": {"id": RID}})
+    assert str(refused.value) == f"'chime'{link.UNKNOWN_ACT}"  # TD-1095: an older node's refusal of `ring` reads so
