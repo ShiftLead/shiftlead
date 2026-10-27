@@ -96,7 +96,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
-| TD-1065 | `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it | Low | Open — build |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1067 | `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading | Low | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
@@ -2061,22 +2060,6 @@ It then names the build entries.
 **Done when** the design says where an Add entry session for a repo with a placed team lands, how a session in a container reaches the home and is attributed to itself, and that a session's call to a person-only act is refused from every host, and the build entries are filed. The asker's own test: an Add entry session for contractmatch runs on the contractmatch node, can run Flutter, can `ao td add --repo shiftlead` and can mail a shiftlead session.
 
 **Related:** TD-998, TD-1004 (`ao` on a node's `PATH`); TD-293 (the New session form on another host); TD-299 (contractmatch on its node); TD-1051 (the `!` command's identity); TD-077 (archived: identity as a per-session secret, its option 1, and an agents-only node, its option E).
-
-## TD-1065: `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-1, met measuring TD-1052)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_doctor.py` (`test_hooks_read_each_live_agent_session_and_the_queue`, the `ao-d-scraped` events file it writes)
-
-**Why:** a full `pdm run test` on 2026-10-26 failed it once — `assert by["ao-d-scraped"]["last_hook"] is None` read `'2026-10-26T23:57:45Z'` — and it passed five times alone. The test writes `ao-d-scraped.jsonl` into a running agent's events directory, and the agent's own loop can read that file before `rpc_doctor` does and stamp `_last_hook`, so the *scraped, no hook* reading the test asserts depends on which runs first.
-
-**Fix:** make the read deterministic: hold the agent's event loop for the test, or write the queue's file where only `rpc_doctor` reads it, then assert as now.
-
-**Done when:** a forced event read before `rpc_doctor` leaves the test passing. `pdm run test` and `pdm run lint` pass.
 
 ## TD-1066: A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself
 

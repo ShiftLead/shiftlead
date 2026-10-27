@@ -83,8 +83,15 @@ async def test_hooks_read_each_live_agent_session_and_the_queue(agent, monkeypat
             id=sid, name=sid, kind="interactive", adapter=ad, dir=str(tmp_path), state=state, confidence=conf
         )
     agent._last_hook["ao-d-fed"] = t0 - timedelta(seconds=12)
-    (paths.events_dir() / "ao-d-scraped.jsonl").write_text('{"a": 1}\n{"a": 2}\n', encoding="utf-8")
+    # the queue's file where only the doctor reads it (TD-1065): the tick drains its own queue's root, and
+    # drained before the doctor's read, this file stamped `last_hook` on the scraped session
+    await park_ticks(agent)  # the one tick below is the test's own
+    queue = tmp_path / "events"
+    queue.mkdir()
+    monkeypatch.setattr(paths, "events_dir", lambda: queue)
+    (queue / "ao-d-scraped.jsonl").write_text('{"a": 1}\n{"a": 2}\n', encoding="utf-8")
     try:
+        await agent.tick()  # an event read before the doctor's changes nothing it asserts
         got = (await agent.rpc_doctor())["hooks"]
         by = {s["id"]: s for s in got["sessions"]}
         assert set(by) == {"ao-d-fed", "ao-d-scraped"}, "a shell has no hooks, a closed session is not live"
@@ -94,7 +101,6 @@ async def test_hooks_read_each_live_agent_session_and_the_queue(agent, monkeypat
     finally:
         for sid in ("ao-d-fed", "ao-d-scraped", "ao-d-shell", "ao-d-gone"):
             agent.sessions.pop(sid, None)
-        (paths.events_dir() / "ao-d-scraped.jsonl").unlink(missing_ok=True)
 
 
 async def test_usage_is_asked_once_per_stale_account_never_when_fresh_cooling_or_metered(agent, monkeypatch):

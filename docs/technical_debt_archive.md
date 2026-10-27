@@ -20389,3 +20389,21 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Related:** TD-1079 (the live check it blocks; #2431 the build), TD-1051, TD-057 (re-provisioning a node on a build change).
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2439) — `_route_ring` reads a refusal ending in `link.UNKNOWN_ACT` (the words an older node already sends, now one constant the node raises and the home reads) as no verdict: nothing charged, no bell kept, rung again next tick; any other refusal stays `failed`. §4.4a says so. Bells are not dropped when a node's link comes up anew: with no bell kept for the refusal, nothing is left for that to clear. Tests: `test_a_node_that_does_not_know_the_ring_is_no_verdict_and_another_refusal_fails`, `test_a_node_refuses_an_act_it_does_not_know_in_the_words_the_home_reads_as_no_verdict`.
+
+## TD-1065: `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, met measuring TD-1052)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the test is in #2447
+**Location:** `tests/test_doctor.py` (`test_hooks_read_each_live_agent_session_and_the_queue`, the `ao-d-scraped` events file it writes)
+
+**Why:** a full `pdm run test` on 2026-10-26 failed it once — `assert by["ao-d-scraped"]["last_hook"] is None` read `'2026-10-26T23:57:45Z'` — and it passed five times alone. The test writes `ao-d-scraped.jsonl` into a running agent's events directory, and the agent's own loop can read that file before `rpc_doctor` does and stamp `_last_hook`, so the *scraped, no hook* reading the test asserts depends on which runs first.
+
+**Fix:** make the read deterministic: hold the agent's event loop for the test, or write the queue's file where only `rpc_doctor` reads it, then assert as now.
+
+**Done when:** a forced event read before `rpc_doctor` leaves the test passing. `pdm run test` and `pdm run lint` pass.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2447) — the test parks the tick loop and points `paths.events_dir` (read at run time only by `agent_doctor._queue`; the tick's `EventQueue` keeps its root) at a directory under `tmp_path`, then takes one tick by hand before `rpc_doctor`. That tick, added to the old test, failed it (`last_hook` stamped); it passes now.
