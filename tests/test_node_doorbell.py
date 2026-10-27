@@ -138,6 +138,9 @@ async def test_a_failed_ring_is_retried_once_then_the_nodes_doorbell_failed_says
         home = agent.remote[HOST][RID]
         assert home.wakes == []  # a node's failed ring is not charged
         assert home.doorbell_failed and home.doorbell_failed["error"].startswith("prompt-stuck")
+        _report(agent, node)  # the node's report of its `doorbell_failed` rings nothing more in the stretch
+        await _ring(agent)
+        assert len(node.rings) == 2
         said = mail.read_when(home, "note", datetime.now(UTC))
         assert said.startswith("lands; its doorbell failed at") and "rung" not in said
         # an older stretch's failure does not stand in this one's
