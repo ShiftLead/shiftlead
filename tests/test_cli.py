@@ -1224,10 +1224,15 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert cli.main(["msg", worker, "rebase first", "--kind", "ask", "--about", "TD-001"]) == 0
     out = capsys.readouterr().out
     assert f"ask → {worker}" in out and "bound" in out
-    # a refusal prints as the RPC words it, naming its rule
-    assert cli.main(["msg", peer, "hi"]) == 1
-    assert "design §4.10" in capsys.readouterr().err
+    # a session the person started reaches an unattended one, which reads it `[person-session]` (TD-1116)
+    assert cli.main(["msg", peer, "hold the dir"]) == 0
+    capsys.readouterr()
     monkeypatch.setenv("SHIFTLEAD_SESSION", peer)
+    assert cli.main(["inbox"]) == 0
+    assert f"[person-session] {lead}" in capsys.readouterr().out
+    # a refusal prints as the RPC words it, naming its rule: nothing goes back but a reply
+    assert cli.main(["msg", lead, "hi"]) == 1
+    assert "design §4.10" in capsys.readouterr().err
     assert cli.main(["--json", "msg", "person", "a question for Paul", "--kind", "ask"]) == 0
     to_person = json.loads(capsys.readouterr().out)
     assert to_person["delivered"] == ["person"]

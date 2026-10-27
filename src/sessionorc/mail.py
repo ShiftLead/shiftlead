@@ -437,8 +437,12 @@ def message_edge(
     - **project**: both carry the same non-empty `project` badge, whatever their teams (TD-582) —
       with `team`, §9 invariant 9's named exception, for mail alone;
     - **shared target**: some record names both in its `controllers` (two leads over one worker);
-    - **own**: both ends started by the person by hand (`own_end`, TD-1069), whatever their team,
-      project, role, `controllers` or state, in any kind — an `ask` carrying no `pr` or `cites`;
+    - **own**: from a record the person started by hand (`own_end`, TD-1069) with no `controllers`
+      to any record, whatever its team, project, role or state — and from one that names a controller
+      to another own end alone (TD-1116) — in any kind but an `ask` carrying `pr` or `cites` or put
+      to a question seat (that one takes the seat's edge); and back along it, a `reply` from any
+      record on an entry in its own inbox (`replied`) whose sender is such an own end with no
+      `controllers`, to that sender or a record its `superseded_by` chain reaches;
     - **question seat**: tried last (TD-995) — an `ask` carrying no `pr` or `cites` (`carries`) to a
       record whose seat's trigger is `asks`, from anywhere in the org; and that seat's `reply` to an
       `ask` it holds (`replied`, from the sender's own inbox), to its asker or a record the asker's
@@ -457,7 +461,16 @@ def message_edge(
         return "project"
     if any(sender in (c := controllers(r)) and target in c for r in records.values()):
         return "shared target"
-    if own_end(me) and own_end(it) and not (kind == "ask" and carries):
+    if own_end(me) and (own_end(it) or not controllers(me)) and not (kind == "ask" and (carries or asks_seat(it))):
+        return "own"
+    if (
+        kind == "reply"
+        and replied is not None
+        and (asker := records.get(replied.from_)) is not None
+        and own_end(asker)
+        and not controllers(asker)
+        and target in chain(records, replied.from_, successor)
+    ):
         return "own"
     if kind == "ask" and not carries and asks_seat(it):
         return "question seat"
@@ -482,6 +495,7 @@ def message_gate(
     carries: bool = False,
     replied: MailEntry | None = None,
     successor: Successor = _raw_successor,
+    agentless: bool = False,
 ) -> str | None:
     """Design §4.10: may `sender` message `target`? A person (`sender == PERSON`) always may — they
     are not a session and may message anyone (§4.8) — and any session may message the person
@@ -489,8 +503,9 @@ def message_gate(
     `message_edge`'s seven edges and nothing else, refused by naming §4.10's graph rather than
     invariant 11: messaging is not acting. An `ask` passing the question-seat edge alone is one open
     question per sender per seat: the sender counted along its `superseded_by` chain, the count read
-    in the target's inbox, since a seat's mail moves with its fills (TD-995). Returns the refusal,
-    or None when the message may land."""
+    in the target's inbox, since a seat's mail moves with its fills (TD-995). A sender with no agent
+    (`agentless`, the person's own shell) sends a `note` alone on the own edge: its target could not
+    reply into it (TD-1116). Returns the refusal, or None when the message may land."""
     if sender == PERSON or target == PERSON:
         return None  # the person inbox is ungated (§4.10 "A session reaches a person")
     if sender == target:
@@ -511,8 +526,13 @@ def message_gate(
         return (
             f"{sender} cannot message {target}: not one of its controllers, its members, its team, "
             f"its project, or a controller of a session it controls — nor an ask to a question seat, "
-            f"or that seat's reply to an ask it holds, nor between two sessions the person started by hand "
-            f"(design §4.10)"
+            f"or that seat's reply to an ask it holds, nor from a session the person started by hand, "
+            f"or a reply to one (design §4.10)"
+        )
+    if edge == "own" and kind in ("ask", "steer") and agentless:
+        return (
+            f"{sender} cannot {kind} {target}: a question needs an inbox to answer into: send it from a session, "
+            f"or `ao msg person` (design §4.10 *between the person's own sessions*)"
         )
     if edge == "question seat" and kind == "ask":
         mine = {k for k in records if sender in chain(records, k, successor)}
@@ -530,7 +550,9 @@ def from_role(records: Mapping[str, Session], holder: str, sender: str, *, contr
     of the holder's controllers, a person, or neither — read at the moment the text is weighed,
     because instructions come from controllers and people, and mail from anyone else is
     information. `system` is the fourth value (design §4.10, 2026-09-19): the home reporting what
-    became of the reader's own message, and never an instruction."""
+    became of the reader's own message, and never an instruction. `person-session` (TD-1116): a
+    sender the person started by hand, with no `controllers`, as it is now — what it says to do or
+    avoid binds as the person's; a sender since put unattended or under a lead reads `other`."""
     if sender == SYSTEM:
         return "system"
     if sender == PERSON:
@@ -538,6 +560,9 @@ def from_role(records: Mapping[str, Session], holder: str, sender: str, *, contr
     me = records.get(holder)
     if me is not None and sender in controllers(me):
         return "controller"
+    them = records.get(sender)
+    if them is not None and own_end(them) and not controllers(them):
+        return "person-session"
     return "other"
 
 

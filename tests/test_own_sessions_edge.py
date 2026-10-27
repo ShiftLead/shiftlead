@@ -1,8 +1,10 @@
 """The edge between the person's own sessions (design §4.10 *between the person's own sessions*, TD-1042,
-TD-1069): two records the person started by hand mail each other in any kind, whatever their team,
-project, role, `controllers` or state. The record says so in `by_person`, derived once by the create and
-never passed; a record before the field resolves it from being interactive, not supervised and with no
-controllers; on a node's record it is the home's, set on its copy from the forwarded create's reply."""
+TD-1069, widened by TD-1116): a record the person started by hand, with no controllers, mails any record in
+any kind, whatever its team, project, role or state, and a `reply` comes back along it; one with a
+controller reaches another own end alone. What lands reads `[person-session]`. The record says so in
+`by_person`, derived once by the create and never passed; a record before the field resolves it from being
+interactive, not supervised and with no controllers; on a node's record it is the home's, set on its copy
+from the forwarded create's reply."""
 
 from __future__ import annotations
 
@@ -11,9 +13,10 @@ from conftest import park_ticks
 
 from sessionorc import mail
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.models import Session
+from sessionorc.models import MailEntry, Session
 
-GRAPH = r"nor between two sessions the person started by hand"
+GRAPH = r"nor from a session the person started by hand, or a reply to one"
+NO_INBOX = r"a question needs an inbox to answer into"
 KINDS = ("note", "ask", "steer", "reply")
 
 
@@ -39,12 +42,19 @@ def test_two_of_the_persons_own_records_pass_in_every_kind_and_each_near_miss_do
         for sender, target in (("a", "b"), ("b", "a"), ("a", "x"), ("sh", "a")):
             assert mail.message_edge(records, sender, target, kind=kind) == "own", (kind, sender, target)
             assert mail.message_gate(records, sender, target, kind=kind) is None
-        for far in ("w", "u", "seat", "qs"):
-            assert mail.message_edge(records, "a", far, kind=kind) != "own", (kind, far)
+        # with no controllers, to any record: a worker, an unattended member, a seat holder
+        for far in ("w", "u", "seat", "mgr"):
+            assert mail.message_edge(records, "a", far, kind=kind) == "own", (kind, far)
+            # none of them is an own end, so nothing goes back but a reply (below)
             assert mail.message_edge(records, far, "a", kind=kind) != "own", (kind, far)
+        # b names a controller: it keeps the first reach, to another own end alone
+        for far in ("w", "u", "seat"):
+            assert mail.message_edge(records, "b", far, kind=kind) is None, (kind, far)
+    assert mail.message_edge(records, "a", "qs", kind="note") == "own"
     # an ask to a question seat keeps the seat's edge, and its one open question per sender
     assert mail.message_edge(records, "a", "qs", kind="ask") == "question seat"
-    assert mail.message_gate(records, "a", "w", kind="note") is not None
+    assert mail.message_gate(records, "a", "w", kind="note") is None
+    assert mail.message_gate(records, "b", "w", kind="note") is not None
     # an ask carrying a pr or cites is a team's: it passes no own edge
     assert mail.message_edge(records, "a", "b", kind="ask", carries=True) is None
     refused = mail.message_gate(records, "a", "b", kind="ask", carries=True)
@@ -119,12 +129,25 @@ async def test_each_start_writes_the_field_as_the_create_derives_it(agent, hooks
             q = (await ca.call("msg", to=made["b"], text="which?", kind="ask"))["entry"]
             await cb.call("msg", text="that one", kind="reply", reply_to=q["id"])
             await cb.call("msg", to=made["a"], text="I will", kind="steer", default="go")
-            # a session a session started is no end, nor the person's session once put unattended
-            with pytest.raises(AgentError, match=GRAPH):
-                await ca.call("msg", to=made["child"], text="hi", kind="note")
+            # a session a session started is no end, but a reaches it (TD-1116), and its reply comes back
+            asked = (await ca.call("msg", to=made["child"], text="hold that", kind="steer", default="hold"))["entry"]
+            async with LocalClient(caller=made["child"]) as cc:
+                got = await cc.call("inbox")
+                mark = {e["id"]: e["from_role"] for e in got["entries"]}
+                assert mark[asked["id"]] == "person-session"
+                # and the wake's mail header, where an unattended member first weighs the text
+                rec = agent.sessions[made["child"]]
+                landed = next(e for e in rec.inbox if e.id == asked["id"])
+                assert agent._header(rec, landed)["from_role"] == "person-session"
+                await cc.call("msg", text="held", kind="reply", reply_to=asked["id"])
+                # its own note to a passes no edge
+                with pytest.raises(AgentError, match=GRAPH):
+                    await cc.call("msg", to=made["a"], text="unprompted", kind="note")
+            # the person's session once put unattended is no sender
             agent.sessions[made["b"]].unattended = True
-            with pytest.raises(AgentError, match=GRAPH):
-                await ca.call("msg", to=made["b"], text="still?", kind="note")
+            async with LocalClient(caller=made["b"]) as cb2:
+                with pytest.raises(AgentError, match=GRAPH):
+                    await cb2.call("msg", to=made["child"], text="still?", kind="note")
             agent.sessions[made["b"]].unattended = False
             # with b's team's manager in its controllers (§4.9 *A person in the team*), and b exited
             agent.sessions[made["b"]].controllers = [made["sup"]]
@@ -146,6 +169,10 @@ async def test_each_start_writes_the_field_as_the_create_derives_it(agent, hooks
         monkeypatch.setattr(mail, "MAILBOX_DEPTH", None)
         async with LocalClient(caller=sh["id"]) as shell:
             await shell.call("msg", to=made["a"], text="from the shell", kind="note")
+            # …a note alone: nothing could answer into it (TD-1116), to a member or another own end
+            for target in (made["a"], made["child"]):
+                with pytest.raises(AgentError, match=NO_INBOX):
+                    await shell.call("msg", to=target, text="which?", kind="steer", default="this")
         assert agent.sessions[made["a"]].inbox[-1].text == "from the shell"
         for sid in made.values():
             if agent.sessions.get(sid) is not None and agent.sessions[sid].pane:
@@ -220,6 +247,107 @@ async def test_a_node_writes_none_and_the_home_sets_its_copy_from_the_forwarded_
         mine = Session(id="ao-mine", name="mine", kind="interactive", adapter="claude-code", dir="/m", by_person=True)
         agent.sessions[mine.id] = mine
         assert mail.message_edge(agent._graph(), mine.id, "ao-p@laptop", kind="steer") == "own"
-        assert mail.message_edge(agent._graph(), mine.id, "ao-s@laptop", kind="note") is None
+        # a session's forwarded start is no end: reached as any record is, it sends nothing back on the edge
+        assert mail.message_edge(agent._graph(), mine.id, "ao-s@laptop", kind="note") == "own"
+        assert mail.message_edge(agent._graph(), "ao-s@laptop", mine.id, kind="note") is None
     finally:
         del agent._link_muxes["laptop"]
+
+
+def _entry(eid: str, sender: str, kind: str = "note") -> MailEntry:
+    return MailEntry(id=eid, from_=sender, to=["x"], at="2026-10-27T00:00:00Z", kind=kind, text="t")
+
+
+@pytest.mark.unit
+def test_a_member_replies_back_along_the_edge_and_nothing_else_goes_back():
+    records = {
+        "a": _rec("a"),  # the person's session, no controllers
+        "a2": _rec("a2"),
+        "b": _rec("b", controllers=["mgr"]),  # the person's session in a team
+        "mgr": _rec("mgr", unattended=True, by_person=False),
+        "w": _rec("w", unattended=True, by_person=False, team="grind", controllers=["mgr"]),
+        "u": _rec("u", unattended=True),  # once the person's, now unattended
+    }
+    records["a"].superseded_by = "a2"
+    for kind in ("note", "ask", "steer"):
+        got = _entry("m-1", "a", kind)
+        # the member's reply on that thread, back to the sender and to its successor
+        for back in ("a", "a2"):
+            assert mail.message_edge(records, "w", back, kind="reply", replied=got) == "own", (kind, back)
+            assert mail.message_gate(records, "w", back, kind="reply", replied=got) is None
+    # the member's unprompted note, ask or steer to it passes no edge
+    for kind in ("note", "ask", "steer"):
+        assert mail.message_gate(records, "w", "a", kind=kind) is not None
+    # a reply to an entry whose sender's record is gone passes no own edge
+    assert mail.message_edge(records, "w", "a", kind="reply", replied=_entry("m-2", "gone")) is None
+    # a reply to an own end with a controller is refused, unless the replier is an own end too
+    from_b = _entry("m-3", "b")
+    assert mail.message_gate(records, "w", "b", kind="reply", replied=from_b) is not None
+    assert mail.message_edge(records, "a", "b", kind="reply", replied=from_b) == "own"
+    # a sender later put in `ao mode unattended` passes no own edge, and reads `other`
+    assert mail.message_edge(records, "u", "w", kind="note") is None
+    assert mail.message_edge(records, "w", "u", kind="reply", replied=_entry("m-4", "u")) is None
+    assert mail.from_role(records, "w", "u") == "other"
+    # an own end with a controller reaches another own end, landing `other`, and no member
+    assert mail.message_edge(records, "b", "a", kind="note") == "own"
+    assert mail.from_role(records, "a", "b") == "other"
+    assert mail.message_edge(records, "b", "w", kind="note") is None
+
+
+@pytest.mark.unit
+def test_from_role_reads_person_session_live_and_controller_first():
+    records = {
+        "a": _rec("a"),
+        "w": _rec("w", unattended=True, by_person=False, controllers=["mgr"]),
+        "w2": _rec("w2", unattended=True, by_person=False, controllers=["a"]),
+        "sh": _rec("sh", adapter="shell"),
+    }
+    assert mail.from_role(records, "w", "a") == "person-session"
+    assert mail.from_role(records, "w", "sh") == "person-session"  # a shell's note reads it too
+    assert mail.from_role(records, "w2", "a") == "controller"
+    records["a"].unattended = True  # since put unattended: its earlier mail reads `other` from then on
+    assert mail.from_role(records, "w", "a") == "other"
+    records["a"].unattended, records["a"].controllers = False, ["mgr"]  # since put under a lead
+    assert mail.from_role(records, "w", "a") == "other"
+
+
+@pytest.mark.unit
+def test_the_persons_shell_sends_a_note_alone_on_the_edge():
+    records = {
+        "sh": _rec("sh", adapter="shell", team="grind"),  # **Open shell here** on a member: its badge
+        "a": _rec("a"),
+        "w": _rec("w", unattended=True, by_person=False, controllers=["mgr"]),
+        "mate": _rec("mate", unattended=True, by_person=False, team="grind", controllers=["mgr"]),
+        "qs": _rec("qs", unattended=True, by_person=False, seat={"trigger": "asks"}),
+    }
+    for target in ("w", "a"):
+        assert mail.message_gate(records, "sh", target, kind="note", agentless=True) is None
+        for kind in ("ask", "steer"):
+            refused = mail.message_gate(records, "sh", target, kind=kind, agentless=True)
+            assert refused is not None and NO_INBOX in refused, (target, kind)
+    # an edge before or after `own` keeps its rule
+    assert mail.message_edge(records, "sh", "qs", kind="ask") == "question seat"
+    assert mail.message_gate(records, "sh", "qs", kind="ask", agentless=True) is None
+    assert mail.message_edge(records, "sh", "mate", kind="ask") == "team"
+    assert mail.message_gate(records, "sh", "mate", kind="ask", agentless=True) is None
+    # a session the person started sends every kind
+    for kind in ("ask", "steer"):
+        assert mail.message_gate(records, "a", "w", kind=kind) is None
+
+
+@pytest.mark.unit
+def test_an_ask_to_a_question_seat_is_the_seats_and_a_pr_ask_is_a_teams():
+    records = {
+        "a": _rec("a"),
+        "qs": _rec("qs", unattended=True, by_person=False, seat={"trigger": "asks"}),
+        "w": _rec("w", unattended=True, by_person=False, controllers=["mgr"]),
+    }
+    assert mail.message_edge(records, "a", "qs", kind="ask") == "question seat"
+    records["qs"].inbox.append(_entry("m-open", "a", "ask"))
+    refused = mail.message_gate(records, "a", "qs", kind="ask")
+    assert refused is not None and "m-open" in refused
+    # a note and a steer to the seat holder pass as own
+    for kind in ("note", "steer"):
+        assert mail.message_gate(records, "a", "qs", kind=kind) is None
+        assert mail.message_edge(records, "a", "qs", kind=kind) == "own"
+    assert mail.message_gate(records, "a", "w", kind="ask", carries=True) is not None
