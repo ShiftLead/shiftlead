@@ -135,9 +135,16 @@ def sweep_stale_test_servers() -> None:
     first one destroyed the first one's tmux server mid-test: its panes vanished from `list-panes`,
     its records froze at `working` with an empty tail, and its next `send-keys` failed with
     `error connecting to /tmp/tmux-…`. That is the whole family of "seen once while a review ran
-    the suite beside me" flakes, and it is why the ownership file exists."""
+    the suite beside me" flakes, and it is why the ownership file exists.
+
+    The owner is asked first, before the socket: a refused connect is no proof the server is dead —
+    another worker's server between its bind and its listen, or too busy to accept under a loaded run,
+    refuses too — and unlinking a live server's socket leaves it running with no way in, which is the
+    same `error connecting` (TD-1050)."""
     for sock in glob.glob(f"/tmp/tmux-{os.getuid()}/ao-test-*"):
         name = os.path.basename(sock)
+        if _owner_alive(name):
+            continue  # a concurrent run is using it
         with socket.socket(socket.AF_UNIX) as s:
             try:
                 s.connect(sock)
@@ -146,8 +153,6 @@ def sweep_stale_test_servers() -> None:
                     os.unlink(sock)
                 _forget_owner(name)
                 continue
-        if _owner_alive(name):
-            continue  # a concurrent run is using it
         subprocess.run(["tmux", "-S", sock, "kill-server"], capture_output=True, check=False)
         with contextlib.suppress(OSError):
             os.unlink(sock)
