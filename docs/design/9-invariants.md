@@ -36,7 +36,7 @@
    writes `team`, never a role (TD-995). It gates mail only; nothing that acts keys on `team` or `project`.
    The edge between the person's own sessions (TD-1042) is not part of the exception: it reads
    the sender's `by_person`, `kind`, `unattended`, `seat` and `controllers` (and, for a record before
-   the field, `supervised`); of the target its agent, its `seat`'s trigger and, when the sender names a
+   the field, `supervised`); of the target (whose agent the send path checks first) its `seat`'s trigger and, when the sender names a
    controller, the same own-end fields; of a reply, the replied entry's sender read the same way (TD-1116),
    fields a start writes, never a role, team or project.
    **A flow is not on the record** (§4.9c): the host agent never reads a flow, the record gains
