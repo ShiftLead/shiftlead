@@ -11,6 +11,8 @@ import stat
 import time
 from datetime import UTC, datetime, timedelta
 
+from conftest import park_ticks
+
 from sessionorc import adapters, hosts, identity, paths
 from sessionorc import settings as settings_mod
 from sessionorc.client import LocalClient
@@ -101,6 +103,8 @@ async def test_usage_is_asked_once_per_stale_account_never_when_fresh_cooling_or
         for p, a, m in (("a", "paul", False), ("b", "paul", False), ("c", "heather", False), ("m", "m", True))
     ]
     doc = _Doc(rows)
+    # the tick's own usage pass would ask the stub's accounts too, between the test's reads (TD-1050)
+    await park_ticks(agent)
     monkeypatch.setitem(adapters._REGISTRY, "docstub", doc)
     got = {r["profile"]: r for r in (await agent.rpc_doctor())["profiles"] if r.get("adapter") == "docstub"}
     assert sorted(doc.asked) == ["a", "c"], "one request per account; a metered profile is never polled"

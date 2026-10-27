@@ -816,7 +816,8 @@ async def test_send_confirms_the_submit(agent, composerstubs, tmp_path, monkeypa
     async def create(name: str, adapter: str) -> str:
         (tmp_path / name).mkdir()
         s = await c.call("create", name=name, dir=str(tmp_path / name), adapter=adapter)
-        assert await agent._poll(lambda: _painted(s["id"]), 5), "the composer child never painted its prompt"
+        # a child python's start and first paint: seconds under a loaded suite, so the bound is wide (TD-1050)
+        assert await agent._poll(lambda: _painted(s["id"]), 30), "the composer child never painted its prompt"
         return s["id"]
 
     async def _painted(sid: str) -> bool:

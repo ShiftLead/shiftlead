@@ -89,7 +89,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
-| TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Designed — builds TD-1078, TD-1079, TD-1080 |
 | TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
 | TD-1058 | `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit) | Low | Open — build |
@@ -105,6 +104,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
 | TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
 | TD-1095 | A node on an older build refuses the home's `ring`, and the home counts the refusal as a failed ring: the member is never rung, and nothing says so | Medium | Open — build |
+| TD-1097 | `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load | Low | Open — build |
 | TD-1098 | `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it | Low | Open — build |
 
 ---
@@ -1893,22 +1893,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1031, TD-1032, TD-804.
 
-## TD-1050: A container test waits five seconds for the node's provision, and a slow CI runner fails it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — the container test fixed in TD-1068's PR (#2426): it was not slow but racy. It brought the link up before the agent's first tick, and a link already up is never provisioned, so under `-n auto` load the definition never came, whatever the bound. It now waits for the provision's file, then brings the link up. Left: the other three tests named below.
-**Location:** `tests/test_containers.py` (`test_the_home_derives_a_container_nodes_reach_when_it_dials_in`, its `wait_for(…, timeout=5.0)` on `"cm" not in agent.supervision and node.config.is_file()`)
-
-**Why:** on #2394's CI (run 40400754079, 2026-10-26), `test (3.12)` failed this test with `assert False` while `test (3.13)` and the local suite passed it, on a change that touches no container code; a rerun of the job was needed. The same evening two more fixed waits failed #2394's local precheck (4d188f8) under several prechecks' load and passed alone: `tests/test_agent.py::test_send_confirms_the_submit` (*the composer child never painted its prompt*, a 5 s `_poll`) and `tests/test_doorbell.py::test_the_doorbell_rings_only_where_it_may` (`tmux load-buffer`: *error connecting to /tmp/tmux-1000/ao-test-…*, the private server gone). On #2407's precheck (ad2bcfc, the same night's load) `tests/test_board.py::test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line` failed on *…/repo is not a repo this home reads (its repos registry)* where *TD-22 is yours to do* was wanted, and passed alone: the registry's read lost a race, as TD-1040's *repo is unserved* did. The Fix covers all four. The wait's own comment says a slow CI runner already once read the node before the supervisor's provision wrote its definition (TD-285): five seconds is the bound that ran out. A red run that says nothing about the code costs a rerun and a reader's doubt, and with the local `precheck` (TD-1035) the same wait now gates every PR on kmaster's load too.
-
-**Fix:** find what the wait is waiting on (the supervisor's provision of `cm` in the fixture) and wait on that event, or raise the bound well past the slowest runner seen, keeping the test's assertion; run it under load (`pytest -p no:randomly --count` or a loop beside a busy suite) to show it holds.
-
-**Done when:** the test waits on the provision itself or on a bound shown to hold under load; `pdm run test` and `pdm run lint` pass.
-
 ## TD-1051: A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it
 
 **Priority:** Medium
@@ -2230,6 +2214,24 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when:** tests with a fake node link: a `ring` the node refuses as an unknown act charges nothing, counts no failure and keeps no bell, and the next tick rings again; once the node answers `typed`, the decision is recorded as before; another refusal still counts `failed`. `pdm run test` and `pdm run lint` pass. TD-1079's live check is then read again.
 
 **Related:** TD-1079 (the live check it blocks; #2431 the build), TD-1051, TD-057 (re-provisioning a node on a build change).
+
+## TD-1097: `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met on TD-1095's full run)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_background_shells.py` (`test_the_linux_reader_reads_children_and_argv_and_falls_back_to_ppid`, its `proc.cmdline(child.pid) == ["sleep", "30"]` straight after `subprocess.Popen`); `src/sessionorc/identity.py` (`LinuxProc.cmdline`)
+
+**Why:** on TD-1095's full `pdm run test` (2026-10-26), this test failed with `assert [] == ['sleep', '30']`, and it passed alone. `Popen` returns once the child's exec has closed its close-on-exec error pipe. In the kernel the close-on-exec files are closed (`begin_new_exec`) before the new image's argument pages are set up, so for a moment `/proc/<pid>/cmdline` reads empty. Under load that moment is long enough for the test to read it.
+
+**Fix:** have the test wait, bounded, for the child's cmdline to read non-empty before asserting it (`wait_for` on `proc.cmdline(child.pid)`). The reader is right to say `[]` for a process with no argv yet. Check whether any caller of `cmdline` in the code reads a process it has just started; if one does, it takes the same wait.
+
+**Done when:** the test waits on the argv itself; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1050, TD-1087 (the same family: a test that reads before the event it waits on).
 
 ## TD-1098: `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it
 
