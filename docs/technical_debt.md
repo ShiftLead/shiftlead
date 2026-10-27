@@ -97,9 +97,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1131 | A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter | Medium | Open — build, blocked by TD-1130 |
 | TD-1132 | The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:` | Medium | Open — build, blocked by TD-1130 |
 | TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
-| TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Open |
 | TD-1141 | `_fillable` (#2495) drops its `unattended` test and no test fails: a closed seat that is supervised but not unattended is still taken for an address | Low | Open |
 | TD-1142 | `message_edge`'s `own` reply (#2493) drops its `target in chain(…)` test and no test fails: a reply to a person-session's entry could go to any record | Medium | Open |
+| TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Open |
 
 ---
 
