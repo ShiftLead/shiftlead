@@ -20465,3 +20465,43 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Related:** TD-1014.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2445) — the second `host_up` in `test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache` runs on a `Fake` whose log is captured: no *shipping dev-cadence* or *could not be shipped* line, the cache step run once, and `ship_cadence` returns the commit; with `if True:` in place of the guard it fails on the log.
+
+## TD-1059: `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the test is in #2446
+**Location:** `src/sessionorc/containers.py` (`CADENCE_INTO_CACHE`: `if [ -e "$d/.ship-$2" ]; then chmod -R u+w ...; rm -rf ...; fi`), `tests/test_containers.py` (`test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once`)
+
+**Why:** The script's second line of defence is a read-only `.ship-<commit>` left by an interrupted run, which `cp -a` would otherwise copy into. Probed on `origin/main`: replacing that whole `if` line with `:` leaves `tests/test_containers.py` at 55 passed; the script test runs the script twice on a clean `$HOME` and never plants a stale `.ship-`.
+
+**Fix:** plant a read-only `trees/.ship-<ref>` with a stray file before the run and assert the result holds only the shipped tree.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2446) — `test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once` plants a read-only `trees/.ship-<ref>` with a stray file before its two runs and asserts the cache holds only `<ref>`, with no stray and no nested copy; with the recovery line replaced by `:` it fails.
+
+## TD-1060: `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the test is in #2446
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `shutil.copytree(src, tmp, symlinks=True)`), `tests/test_containers.py` (`_pinned_node`)
+
+**Why:** Probed on `origin/main`: dropping `symlinks=True` leaves `tests/test_containers.py` at 55 passed. `_pinned_node`'s tree is two files in three directories; a dev-cadence tree with a link (or a dangling one) would be followed or fail the copy, and the test says nothing of it.
+
+**Fix:** add a relative and a dangling symlink to `_pinned_node`'s tree and assert the shipped tree holds them as links.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2446) — `_pinned_node`'s tree holds a relative link and a dangling one, and the ship test asserts both arrive as links with their targets; with `symlinks=True` dropped it fails.

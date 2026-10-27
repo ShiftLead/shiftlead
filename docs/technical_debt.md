@@ -90,8 +90,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Designed — builds TD-1078, TD-1079, TD-1080 |
 | TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
-| TD-1059 | `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit) | Low | Open — build |
-| TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
@@ -1923,42 +1921,6 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when:** the `mine[-1]` probe fails a test. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1037, TD-1033.
-
-## TD-1059: `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/containers.py` (`CADENCE_INTO_CACHE`: `if [ -e "$d/.ship-$2" ]; then chmod -R u+w ...; rm -rf ...; fi`), `tests/test_containers.py` (`test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once`)
-
-**Why:** The script's second line of defence is a read-only `.ship-<commit>` left by an interrupted run, which `cp -a` would otherwise copy into. Probed on `origin/main`: replacing that whole `if` line with `:` leaves `tests/test_containers.py` at 55 passed; the script test runs the script twice on a clean `$HOME` and never plants a stale `.ship-`.
-
-**Fix:** plant a read-only `trees/.ship-<ref>` with a stray file before the run and assert the result holds only the shipped tree.
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1014.
-
-## TD-1060: `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `shutil.copytree(src, tmp, symlinks=True)`), `tests/test_containers.py` (`_pinned_node`)
-
-**Why:** Probed on `origin/main`: dropping `symlinks=True` leaves `tests/test_containers.py` at 55 passed. `_pinned_node`'s tree is two files in three directories; a dev-cadence tree with a link (or a dangling one) would be followed or fail the copy, and the test says nothing of it.
-
-**Fix:** add a relative and a dangling symlink to `_pinned_node`'s tree and assert the shipped tree holds them as links.
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1014.
 
 ## TD-1061: Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one
 
