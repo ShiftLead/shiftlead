@@ -1914,7 +1914,6 @@ It then names the build entries.
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-1090
 **Location:** `src/sessionorc/settings.py` (`sweep:` and `repos.<repo>.sweep`, `set_settings`); `src/sessionorc/agent_settings.py` (`rpc_sweep_switch`, beside `rpc_settings`); `src/sessionorc/identity.py` (`READS`: `sweep_switch` beside `gate`, so a session's call is served); the node serves it from its replica of `settings.yml`, never forwarded (design §4.4a *Settings, replicated*); `src/shiftlead/teams.py` (`ao team start`'s seats: the `by: settings` sweeper seat, beside the techlead's `tags` mark); `src/sessionorc/agent_tick.py` (the seat pass: which `by: settings` seat's cause is computed, `every` read from settings, as `_tagging_seat` picks the repo's first live team); `src/shiftlead/ui/` (the Settings page's Sweep card, the seat card's words); `src/shiftlead/cli.py` (`ao settings` prints the key); design §4.9b *The sweep* (*The switch*, *A repo no team serves*), §6 rule 3 (*A switch-made sweep seat*), §5 `sweep:`, §4.5a *Sweep* card
 
 **Why:** TD-1061, Paul 2026-10-26: *on (with a duration) would run it routinely on every team with the configured model*. A team's own `sweeper` seat (TD-1090) needs a `seats:` line in each definition; the switch gives every served repo one without editing a definition.
