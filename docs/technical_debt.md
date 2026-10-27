@@ -89,9 +89,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1025 | Rule 12 relays no convention change to a member in a pinned repo: the changes travel in the bump, not in the repo's `docs/cadence-changes.md` | Medium | Designed — builds TD-1046; dev-cadence's half on the board |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
-| TD-1033 | PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it | High | Designed — builds TD-1035–TD-1039 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
-| TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
 | TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | In progress (slice 1 #2409); left: drop the stopgaps (samscrape#1121, shiftlead#2391) |
@@ -1907,23 +1905,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1032 (the reason the failure showed); TD-804, TD-812 (the smoke).
 
-## TD-1033: PRs and `main` are checked by GitHub Actions, whose minutes the account's repos share and which have stopped: gate on a local `precheck`, and let promotion read it
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (Paul; drafted by session `memory-vs-cadence`)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-26) — design §6 *Promote* (the checks reading, *The precheck on main*, *Sync* step 4), §4.8 (*A `done` with a PR*), §4.5a *Inbox row: promote*. Fix (2) chose the home's own precheck on main's head over accepting a PR head's status on an equal tree, since a PR merges behind main as the cadence allows and a busy main rarely gives an equal tree; Python: the machine's 3.13, the 3.12 floor kept by ruff's target and `ci.yml` by hand. Builds TD-1035–TD-1039.
-**Blocked by:** TD-1035, TD-1036, TD-1037, TD-1038, TD-1039
-**Location:** `.github/workflows/ci.yml` (`pull_request` and push to `main`: tmux, `pdm sync -G ui -G dev`, `pdm run lint`, `pdm run test -vv`); `docs/cadence.toml` (no `precheck`); `ao promote` (it waits on *checks on main*: `ao promote status` read *not now: checks on main are pending* on 2026-10-26); the merge rules in `docs/briefs/` and `AGENTS.md`; dev-cadence `cadence.md` §4.12 and TD-148
-
-**Why:** GitHub Actions stopped on the shared account (the ShiftLead org from 2026-10-26: *recent account payments have failed or your spending limit needs to be increased*), and Paul decided every repo gates on a local `precheck` instead (dev-cadence TD-148): the minutes are one pool across all the repos, kept for what has to run on GitHub. This repo's CI runs lint and the full test suite on every pull request and every push to `main`, so it is the largest spender, and its PRs now read red for a reason that says nothing about the code. It cannot simply drop the main-branch run: `ao promote` waits for checks on `main` before it promotes, so with no check it would never promote, and with a failed one it would never promote either.
-
-**Fix:** (1) `precheck = "pdm sync -G ui -G dev && pdm run lint && pdm run test"` in `docs/cadence.toml` — the clean worktree has nothing installed (§4.12: the command installs what it needs) — on the machine's Python, where CI ran a 3.12/3.13 matrix (say which, or run both); `tmux` must be on the machine, as CI installs it. The merge gate records `cadence/precheck` on each PR's head. (2) Design: what promotion waits on instead — `promote.py`'s `read_checks` reads only `commits/{sha}/check-runs`, where a `cadence/precheck` commit status never appears (no check runs reads as `unknown`), so it must read commit statuses too; then the squash commit on `main` carries no status of its own; options are running the precheck at promote time on `main`'s head and recording `cadence/precheck` there, or accepting the merged PR's head status when its tree equals `main`'s. (3) `ci.yml` keeps only `workflow_dispatch`. (4) The briefs and `AGENTS.md` say the gate is `cadence/precheck`. Done when a PR's gate and a promote both read a local check and no workflow runs on `pull_request` or push.
-
-**Related:** dev-cadence TD-148 (the convention), samscrape TD-465, ledgerboard TD-003.
-
 ## TD-1034: `rpc_td_next` hands `ids_script` the call's remaining budget, and no test would notice if it did not (test audit)
 
 **Priority:** Low
@@ -1942,25 +1923,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1014, TD-970.
 
-
-## TD-1039: The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1033)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1037
-**Location:** `src/sessionorc/sync.py` (`candidates`, `mark`, step 4, `SYNC_TRIES`), `src/sessionorc/agent_sync.py` (`_sync_repo`: the check-and-start under the promote lock), `src/sessionorc/promote.py` (the starter and the kill's cleanup, shared with TD-1038; the readings' pass judges the bound), `src/sessionorc/cadence.py` (`precheck_script`, TD-1037's); design §6 *Sync* (the candidates, step 4), §4.4 (the sync PRs that wait)
-
-**Why:** TD-1033: once a repo sets `precheck`, the gate reads a sync PR's head with no `cadence/precheck` as *unknown*, so every mechanical sync PR goes to the team as *error* after three passes.
-
-**Fix:** as §6 *Sync* now says: in a repo where `precheck_command` (TD-1037) gives a command, a sync PR reading *none* with no `cadence/precheck` on its head is a candidate (and waits, in §4.4's terms, rather than becoming an order), the *green* test applying after step 4. Step 4: with no `cadence/precheck` on the head, the registry checkout on `origin/<default>` with a clean tree, and no precheck of the repo running, start `precheck.py --pr <n>` through `precheck_script` (absent: an uncounted wait) detached as TD-1038's run is — its own `precheck-pr.json` `{pr, sha, at, pid, started, log}`, one at a time with main's run under the promote lock, `PRECHECK_BOUND`, the same group kill and worktree cleanup (whichever of TD-1038 and this lands first writes the starter and the cleanup; the other uses them) — and go on to the next repo; a pass that cannot start it or finds it going waits, uncounted, holding no task. A later pass reads the status as the gate does, whatever the exit; a `pid: null` file is dropped, uncounted; the process gone with the file's sha still the head and no status is one no-reading pass, counted toward `SYNC_TRIES` once (`counted` on the file), and a later pass may start a new run; a moved head or a PR no longer open kills a live run and drops the file; a head with a status already is not run again; the cleanup's prefix is `precheck-<pr>-`. The `sync` entry keeps `waiting_since`, set on the first waiting pass at a head and reset by a new head; at `SYNC_PRECHECK_WAIT` (a day) the verdict is *refused* and the PR the team's order as a declined one is, its reason the last pass's wait (the checkout, a run going, or *no precheck.py here*).
-
-**Done when:** tests pin the *none* candidate and its wait (not an order), the run before the gate, the skip when a status stands or `precheck` is unset, the uncounted wait on a checkout off `origin/<default>` or dirty and on a run going (main's or another PR's), the pass going on to the next repo, a run's end with a status and with none (counted once), a `pid: null` file, the kill on a moved head or a closed PR, and the day's wait becoming an order; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1033, TD-681.
 
 ## TD-1041: A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit
 
