@@ -260,3 +260,28 @@ async def test_a_day_waiting_at_one_head_is_refused_and_the_teams_order(agent, g
     assert (e["verdict"], e["why"]) == ("refused", "precheck waited a day: the checkout has 1 uncommitted change")
     (order,) = await _orders(agent)
     assert order["id"] == "pr:1097" and "precheck waited a day" in order["context"]
+
+
+def test_the_readings_pass_kills_a_run_past_the_bound_without_the_sync_pass(pre, tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    f, _ = promote.start_precheck_pr(tmp_path, REPO, 1097, HEAD)
+    now = datetime.now(UTC)
+    promote.precheck_pr_bound(tmp_path, REPO, now)
+    assert promote.alive(f["pid"], f["started"]), "inside the bound: left running"
+    promote.precheck_pr_bound(tmp_path, REPO, now + timedelta(seconds=promote.PRECHECK_BOUND + 1))
+    _gone(f)
+    kept = promote.precheck_pr_run(REPO)
+    assert not promote.alive(f["pid"], f["started"]) and kept["why"] == "killed at the 20-minute bound"
+    assert "counted" not in kept, "counting is the sync pass's"
+
+
+@pytest.mark.integration
+async def test_an_unread_precheck_setting_keeps_the_wait_and_its_clock(agent, gh, pre, monkeypatch):  # noqa: F811
+    _reading(agent, _none())
+    since = now_iso()
+    e = {"head": HEAD, "verdict": "", "why": "x", "tries": 0, "posted": False, "waiting_since": since}
+    agent._repos[ROOT]["sync"] = {"1097": e}
+    monkeypatch.setattr(cadence, "precheck_command", lambda root, rev: (None, "docs/cadence.toml does not parse"))
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["waiting_since"] == since and _names(gh) == []
+    assert promote.precheck_pr_run(REPO) is None

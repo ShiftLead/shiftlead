@@ -583,7 +583,7 @@ def tend_precheck(root: Path | str, repo: str, prs: list[dict[str, Any]], sync: 
     if not unprechecked(pr):
         promote.clear(repo, "precheck-pr")  # its status is the gate's to read
         return None
-    if f.get("counted"):
+    if f.get("counted") or settled(sync.get(n), sha):
         return None
     e = sync.get(n) if (sync.get(n) or {}).get("head") == sha else {"head": sha, "tries": 0, "posted": False}
     why = f"precheck on {sha[:7]} ended and recorded nothing" + (f" ({f['why']})" if f.get("why") else "")

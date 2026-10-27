@@ -80,9 +80,11 @@ class SyncMixin:
             covered, repo = True, Path(root).name
             # where the repo sets `precheck`, a PR reading *none* is prechecked before its gate (§6 step 4, TD-1039)
             want = f"origin/{await asyncio.to_thread(workorders.default_branch, Path(root))}"
-            prechecks = bool((await asyncio.to_thread(cadence.precheck_command, root, want))[0])
-            counted = None
-            if not prechecks:  # `precheck` unset since: nothing waits on a precheck the pass will not start
+            command, unread = await asyncio.to_thread(cadence.precheck_command, root, want)
+            prechecks, counted = bool(command), None
+            if unread:  # no reading of `precheck`: a waiting PR keeps its wait and its clock, and nothing starts
+                pass
+            elif not prechecks:  # `precheck` unset since: nothing waits on a precheck the pass will not start
                 sync = {n: {k: v for k, v in e.items() if k != "waiting_since"} for n, e in sync.items()}
             else:
                 async with self._promote_lock:
