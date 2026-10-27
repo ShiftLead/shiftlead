@@ -58,9 +58,10 @@ teams:                                        # per team, by the name org.yml or
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance*: over any of these the team's members take no new claim; absent, no rule
 permissions:                                  # TD-636, §4.9b *The director seat*: per role, the adapter's rule syntax; a deny wins
   grinder: {allow: ["Bash(pdm run test:*)", "Bash(gh pr view:*)"], deny: ["Bash(rm -rf:*)"]}
+sweep: {on: false, every: 7d, profile: grind}   # TD-1061, §4.9b *The sweep*: on, ao team start gives every team it starts a sweeper seat, one filled per repo, due once its board's Swept: stamp is `every` old (read each tick); profile from the next start, absent the role's precedence; a team's own sweeper seat wins
 director: {level: conservative, groom: 7d}    # TD-657, §4.9b *The director answers what is passed up to it*: conservative | extrapolate | liberal; groom every <duration> | off
 repos:                                        # per registered checkout, by its directory name
-  shiftlead: {promote: {auto: false}, pull: true, sync: {auto: true}, director: {level: extrapolate}}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent; §6 *Sync*: a mechanical sync PR merged at the home, on when absent
+  shiftlead: {promote: {auto: false}, pull: true, sync: {auto: true}, director: {level: extrapolate}, sweep: on}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent; §6 *Sync*: a mechanical sync PR merged at the home, on when absent; §4.9b *The sweep*: off leaves the repo out of the sweep switch, on when absent
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
   file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
