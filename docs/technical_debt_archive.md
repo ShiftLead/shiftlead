@@ -20346,3 +20346,25 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Related:** TD-1048 (the design), dev-cadence TD-145 (archived, the take's `by` and branch), dev-cadence TD-150 (the field's filing in ledgerboard), TD-970 (the script road).
 
 **Resolved:** 2026-10-26 (grinder-ao-1, #2437) — `ao td next` sends `branch` (its directory's, only for a checkout of the repo named: `cli._td_branch`); the home checks it (`agent_ids.check_branch`: `git check-ref-format --branch` at `/`, `@` and a changed printed form refused) and passes `--branch=<name>` only to a script whose source holds `"--branch"`; the answer relays `taken_by` and `taken_by_line` (`agent_ids.taken_by_line`: the sibling `ledgerboard.py`'s literal `CADENCE_FIELDS`, else the vendored `declared()` of the ledger), both null on the home's own road and from an older home; the CLI says a non-null line on standard error. Tests in `tests/test_td_next.py`.
+
+## TD-1050: A container test waits five seconds for the node's provision, and a slow CI runner fails it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the container test fixed in TD-1068's PR (#2426): it was not slow but racy. It brought the link up before the agent's first tick, and a link already up is never provisioned, so under `-n auto` load the definition never came, whatever the bound. It now waits for the provision's file, then brings the link up. Left: the other three tests named below.
+**Location:** `tests/test_containers.py` (`test_the_home_derives_a_container_nodes_reach_when_it_dials_in`, its `wait_for(…, timeout=5.0)` on `"cm" not in agent.supervision and node.config.is_file()`)
+
+**Why:** on #2394's CI (run 40400754079, 2026-10-26), `test (3.12)` failed this test with `assert False` while `test (3.13)` and the local suite passed it, on a change that touches no container code; a rerun of the job was needed. The same evening two more fixed waits failed #2394's local precheck (4d188f8) under several prechecks' load and passed alone: `tests/test_agent.py::test_send_confirms_the_submit` (*the composer child never painted its prompt*, a 5 s `_poll`) and `tests/test_doorbell.py::test_the_doorbell_rings_only_where_it_may` (`tmux load-buffer`: *error connecting to /tmp/tmux-1000/ao-test-…*, the private server gone). On #2407's precheck (ad2bcfc, the same night's load) `tests/test_board.py::test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line` failed on *…/repo is not a repo this home reads (its repos registry)* where *TD-22 is yours to do* was wanted, and passed alone: the registry's read lost a race, as TD-1040's *repo is unserved* did. The Fix covers all four. The wait's own comment says a slow CI runner already once read the node before the supervisor's provision wrote its definition (TD-285): five seconds is the bound that ran out. A red run that says nothing about the code costs a rerun and a reader's doubt, and with the local `precheck` (TD-1035) the same wait now gates every PR on kmaster's load too.
+
+**Fix:** find what the wait is waiting on (the supervisor's provision of `cm` in the fixture) and wait on that event, or raise the bound well past the slowest runner seen, keeping the test's assertion; run it under load (`pytest -p no:randomly --count` or a loop beside a busy suite) to show it holds.
+
+**Done when:** the test waits on the provision itself or on a bound shown to hold under load; `pdm run test` and `pdm run lint` pass.
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #PR) — each of the four waits on its event, not a longer sleep:
+- `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` swapped in the running, agent-alive fake before the supervisor's first round had made its runner. A round that made it late found the agent alive, decided `wait` and never wrote the definition. Now it waits for the definition under the fixture's gone-container fake, then swaps. Forty copies under `-n 16` with eight busy CPUs: 40 failed before, 40 passed after.
+- `test_send_confirms_the_submit`: the bound on the composer child's first paint is 30 s, not 5. The poll returns as soon as the child paints.
+- `test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line`, and the two other `test_board.py` tests that patch `_refresh_repos`: a repos pass the fixture's first tick started before the patch landed after the test set `_repos`, and emptied it. Each now runs `park_ticks` first, which finishes or cancels that pass.
+- `test_the_doorbell_rings_only_where_it_may` (*error connecting* to its private server): not reproduced. A likely cause is fixed. `sweep_stale_test_servers` unlinked any `ao-test-*` socket whose connect was refused before asking its owner, and a server another worker was starting, or one too busy to accept, refuses. It now asks the owner first.

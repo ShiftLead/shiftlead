@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import pinned_script, served
+from conftest import park_ticks, pinned_script, served
 
 from sessionorc import board, ledgerboard
 from sessionorc.client import AgentError, LocalClient
@@ -1130,6 +1130,7 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         return None
 
     monkeypatch.setattr(agent, "_refresh_repos", held)
+    await park_ticks(agent)  # a repos pass already in flight would land after `_repos` below (TD-1050)
     entry = {
         "id": "TD-133", "title": LEDGER_TITLE, "for_page": "for-you", "owner": "grinder",
         "answers": ["At the reset", "At a fixed time"], "default": 0,
@@ -1209,6 +1210,9 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         return None
 
     monkeypatch.setattr(agent, "_refresh_repos", held)
+    # a repos pass the fixture's first tick started before the patch lands after `_repos` is set below and
+    # empties it (*…/repo is not a repo this home reads*, under a loaded run): finished first (TD-1050)
+    await park_ticks(agent)
     entries = [
         {"id": "TD-20", "title": "a build", "for_page": "pickable"},
         {"id": "TD-21", "title": "a design", "for_page": "design"},
@@ -1286,6 +1290,7 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
         return None
 
     monkeypatch.setattr(agent, "_refresh_repos", held)
+    await park_ticks(agent)  # a repos pass already in flight would land after `_repos` below (TD-1050)
     real_read = workorders.read_boards
     events: list[dict] = []
     real_broadcast = agent._broadcast

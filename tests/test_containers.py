@@ -750,14 +750,17 @@ async def test_the_home_derives_a_container_nodes_reach_when_it_dials_in(contain
     from conftest import wait_for
     from test_link import record
 
-    container_home["make"] = lambda: Fake(pid="9\n")
-    agent._take_records("cm", [record("ao-cm-w", host="cm")], whole=True)
     # The user comes from the node's own definition, which the supervisor's provision writes: a node
     # that dials in has one. Read before that write lands (a slow CI runner) the user was `root` (TD-285).
     # The provision runs only while the link is down, so the link comes up once it has: up first, and a
-    # loaded run whose first tick came late never provisioned at all (TD-1050, TD-1068).
+    # loaded run whose first tick came late never provisioned at all (TD-1050, TD-1068). It provisions
+    # only a container it finds gone (the fixture's fake), so the running one with its agent alive
+    # takes over after: swapped first, a round whose runner was made late found it alive and waited,
+    # writing nothing (TD-1050).
     node = containers.container_nodes()["cm"]
     assert await wait_for(node.config.is_file, timeout=10.0, step=0.05)
+    container_home["make"] = lambda: Fake(pid="9\n")
+    agent._take_records("cm", [record("ao-cm-w", host="cm")], whole=True)
     agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}
     assert await wait_for(lambda: "cm" not in agent.supervision, timeout=5.0, step=0.05)
     await agent._note_reach("cm")
