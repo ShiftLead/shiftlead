@@ -183,6 +183,7 @@ def _orders(r: dict[str, Any] | None) -> list[Any]:
     return [*((r.get("work_orders") or {}).get("orders") or []), *((r.get("pr_orders") or {}).get("orders") or [])]
 
 
+NODE_CHANGES = "dev-cadence path cadence-changes.md"  # rule 12's command on a node: `ao host up`'s link (TD-1046)
 SETUP_EVERY = 3600.0  # seconds between the setup notes' reads with `profiles.yml` unchanged (TD-875)
 
 
@@ -1554,19 +1555,38 @@ class TickMixin:
         its create, the headings landed at or before `created`; later, a heading it does not hold
         that landed after `created` is one `note` from `system` and joins it. The doorbell does
         the waking; nothing is typed here. A root with no script, or a run with no reading,
-        writes nothing."""
+        writes nothing. In a pinned repo the note carries each entry's body and names the file by the
+        resolver's command (TD-1046); a root's empty reading, and a pinned root whose tree cannot be
+        made, are logged at info once while they last (`_conventions_quiet`)."""
         try:
             by_root: dict[str, list[Session]] = {}
             for s in records:
                 if self._conventions_member(s) and s.repo and s.repo in self._repos:
                     by_root.setdefault(str(s.repo), []).append(s)
             for root, members in by_root.items():
+                pinned = await asyncio.to_thread(cadence_mod.pinned, root)
                 if not await asyncio.to_thread(conventions_mod.has_script, root):  # a pinned tree may fetch
+                    if pinned:
+                        payload, why = await asyncio.to_thread(cadence_mod.tree, root)  # cached
+                        if payload is not None:
+                            why = f"no scripts/{conventions_mod.PINNED_SCRIPT} in the tree"
+                        self._conventions_once(root, f"pinned, no tree: {why}")
                     continue
-                got = await asyncio.to_thread(conventions_mod.read, root)
+                self._conventions_ended(root, "pinned, no tree: ")
+                got, why = await asyncio.to_thread(conventions_mod.read, root)
                 if got is None:
-                    log.info("%s: %s gave no reading", root, conventions_mod.PINNED_SCRIPT)
+                    log.info("%s: %s gave no reading — %s", root, conventions_mod.PINNED_SCRIPT, why)
                     continue
+                if not got["entries"]:
+                    self._conventions_once(
+                        root,
+                        "no entries — the checkout's pin may predate dev-cadence's change"
+                        if pinned
+                        else "no entries — the checkout may predate the migration, "
+                        "or still hold docs/cadence-sync.lock beside its pin",
+                    )
+                else:
+                    self._conventions_ended(root, "no entries — ")
                 for s in members:
                     if not self._is_record(s) or not self._conventions_member(s):
                         continue  # replaced, or declared out of work, while the script ran
@@ -1581,13 +1601,30 @@ class TickMixin:
                         continue
                     s.conventions_seen = {"at": now_iso(), "headings": seen}
                     if told:
-                        self._system_note(self._address(s), conventions_mod.note(told, got["ref"]))
-                        log.info("%s: told of %d new in docs/cadence-changes.md", self._address(s), len(told))
+                        path = None
+                        if pinned:  # a node's container has neither the home's Python nor its launcher
+                            on_home = s.host == self.host
+                            path = cadence_mod.typed("path", "cadence-changes.md") if on_home else NODE_CHANGES
+                        self._system_note(self._address(s), conventions_mod.note(told, got["ref"], path))
+                        where = "dev-cadence's changes" if pinned else "docs/cadence-changes.md"
+                        log.info("%s: told of %d new in %s", self._address(s), len(told), where)
                     self._save(s)
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next pass tries again
             log.exception("the conventions pass failed")
         finally:
             await self._push_changes()
+
+    def _conventions_once(self, root: str, line: str) -> None:
+        """Rule 12's info line for `root`, logged once while it lasts (TD-1046)."""
+        if (root, line) not in self._conventions_quiet:
+            self._conventions_quiet.add((root, line))
+            log.info("%s: %s", root, line)
+
+    def _conventions_ended(self, root: str, prefix: str) -> None:
+        """The condition of `root`'s lines starting `prefix` has ended: the next time it holds, it is logged."""
+        self._conventions_quiet -= {
+            (r, line) for r, line in self._conventions_quiet if r == root and line.startswith(prefix)
+        }
 
     @staticmethod
     def _held_member(s: Session) -> bool:
