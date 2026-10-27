@@ -8,6 +8,7 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import agent_mail, mail, models
+from sessionorc.agent_common import RpcError
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import MailEntry
 
@@ -310,6 +311,16 @@ async def test_a_closed_seat_is_the_address_and_the_ask_fills_it(agent, tmp_path
         rec = agent.sessions[seat]
         assert rec.state == "closed"
         assert (await agent._question_seat(team="dc-grind")) is rec, "the team runs, its seat closed"
+        # a closed seat rule 3 never fills is no address: an ask to it would wait on nothing
+        for field, value in (("sit_out", {"at": "t"}), ("closed_for", {"why": "sit_out"}), ("suspended", {"at": "t"})):
+            setattr(rec, field, value)
+            with pytest.raises(RpcError, match=r"dc-grind has no question seat"):
+                await agent._question_seat(team="dc-grind")
+            setattr(rec, field, None)
+        rec.supervised = False
+        with pytest.raises(RpcError, match=r"dc-grind has no question seat"):
+            await agent._question_seat(team="dc-grind")
+        rec.supervised = True
         async with LocalClient(caller=asker) as a:
             got = await a.call("entry_add", repo="dev-cadence", type="debt", text="the address refuses a closed seat")
         assert got["to"] == seat and _ask_in(rec, got["id"]).open

@@ -19,6 +19,7 @@ from sessionorc import (
     hosts,
     mail,
 )
+from sessionorc import work as work_mod
 from sessionorc.agent_common import (
     RpcError,
     _clean,
@@ -81,6 +82,15 @@ def _shots(shots: Any, kind: str) -> list[str]:
     if looks and kind not in ("steer", "ask"):
         raise RpcError(f"screenshots ride only on a steer or an ask to the person, not a {kind} (design §4.10)")
     return looks
+
+
+def _fillable(r: Session) -> bool:
+    """Whether a question seat's record is one an `ask` reaches (§4.10 *A team or a repo as the address*,
+    TD-1128): live or on call, or `closed` where rule 3 fills it — supervised, unattended, neither
+    suspended nor sat out (`_seat_pass`'s own test), so an `ask` never waits on a seat nothing fills."""
+    if r.state != "closed":
+        return True
+    return bool(r.supervised and r.unattended) and not r.suspended and not r.sit_out and not work_mod.sat_out(r)
 
 
 class MailMixin:
@@ -186,7 +196,8 @@ class MailMixin:
         """The question seat `--team` or `--repo` names (§4.10 *A team or a repo as the address*,
         TD-1000), read from the org's records alone: a record of that team, or of a repo of that name
         (`Path(repo).name`), holding a seat whose trigger is `asks` and not superseded — live, on call,
-        or `closed` as rule 3 leaves an empty seat, which the `ask` fills (TD-1128). A team's two such
+        or `closed` as rule 3 leaves an empty seat, which the `ask` fills (TD-1128) — a closed one only
+        where rule 3 fills it (`_fillable`). A team's two such
         seats resolve to its techlead seat (`tags: true`), and a live record wins over one on call, one
         on call over a closed one; a repo served by two teams is refused naming them. Registries
         are read only to word a refusal. Returns the record. Given both — a ledger request's `--team`
@@ -200,7 +211,7 @@ class MailMixin:
         seats = [
             (a, r)
             for a, r in records.items()
-            if mail.asks_seat(r) and not r.superseded_by and str(r.team or "").strip()
+            if mail.asks_seat(r) and not r.superseded_by and str(r.team or "").strip() and _fillable(r)
         ]
         teams = sorted({r.team for _a, r in seats})
         if not repo:
