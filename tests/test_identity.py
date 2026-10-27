@@ -7,6 +7,7 @@ from the pytest process, under no pane, as sessions — which is what the table 
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shlex
@@ -311,6 +312,30 @@ async def test_a_peer_in_another_namespace_is_refused_under_enforce_and_alarmed_
     agent.identity_mode = "enforce"
     assert (await agent._identify(dict(act), 400, peer_uid=OTHER))["error"] == identity.MISMATCH
     assert [(x["channel"], x["count"]) for x in agent.identity_alarms] == [("unknown", 2)]  # one alarm, counted
+
+
+async def test_a_served_connection_carries_its_peers_uid_to_the_classification(agent, monkeypatch):
+    """TD-1122: the uid of TD-1093 reaches `classify` over a real connection — `_handle_conn` and
+    `_serve_wait` pass `_peer_args`, `_dispatch` hands `peer_uid` to `_identify`, and `_id_channel`
+    sets it beside the agent's own. Only the kernel's credential is faked (`_peer_pid`, read on a real
+    socket above): a peer of another uid whose namespace link does not read, a container's root."""
+    from sessionorc import agent_common
+
+    await park_ticks(agent)
+    agent._id_detached = ""  # off: no tmux server is asked
+    agent._id_panes = list(PANES)
+    monkeypatch.setattr(agent, "proc", _ns(FakeProc([*BASE, P(400, 1, 400)])))  # 400's link does not read
+    monkeypatch.setattr(agent_common, "_peer_pid", lambda writer: (400, os.geteuid() + 1))
+    agent.identity_mode = "enforce"
+    async with LocalClient() as c:
+        with pytest.raises(AgentError, match="did not come from"):
+            await c.call("inbox_delete", ids=["m-none"])  # the person's act, refused: *unknown*, never outside
+        assert (await c.call("whoami")) == {"channel": "unknown", "session": None, "signal": "namespace"}
+    assert agent.identity_tally["unknown:namespace"] == 1 and not agent.identity_tally["outside"]
+    async with LocalClient() as c:  # a wait is served on its own path, and classified the same
+        with contextlib.suppress(AgentError):
+            await c.call("wait", timeout=0)
+    assert agent.identity_tally["unknown:namespace"] == 2 and not agent.identity_tally["outside"]
 
 
 def test_the_channel_decides_and_a_claim_that_disagrees_is_refused_and_alarmed():
