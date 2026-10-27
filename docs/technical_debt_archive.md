@@ -20195,3 +20195,23 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Related:** TD-1051 (the design); TD-213 (the orphaned question); TD-1079, TD-1080.
 
 **Resolved:** 2026-10-26 (grinder-ao-1, #2429) — `Session._asks` counts an answer waiting (an unread reply that closed the seat's own `ask` or `steer`, or the home's lapse, *Go with it* or decline note, which `_system_note(ends=…)` now gives the question's `reply_to` and `root`) by the question's id, never on a handed entry's thread; `asking` takes `steer`; `_asks_cause` puts the question's id in an `asks` due; `read_when`'s `refills` holds for any reply closing a question the seat sent, and the person's inbox read marks such a question `on_handed` for the Reply line; the techlead preset carries the relay rule and the member presets the deferral line. `tests/test_answer_waiting.py` holds the Done-when.
+
+## TD-1080: The stop, start, status and acting-gate words: unread mail on a finished member, the start's cure, a person's row, and the `!` escape
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (the designer, from TD-1051)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2432
+**Location:** `src/shiftlead/teamrun.py` (the stop's *finished (out of work), nothing sent* at 1617–1622 and `_close_settled` at 1653–1665; the start's refusal at 76–82); `src/shiftlead/cli.py` (`ao team status`, 1083–1091); `src/sessionorc/mail.py:359` (the acting gate's *needs the control grant (design §4.8)*, which has the caller's id: the record is looked up for `unattended`, and the person's own shell, `person_shell`, and a caller with no record are excluded — the one string that gets the hint; `agent_remote.py:282`'s file-read refusal is another gate and is left as it is); design §4.9 (`ao team stop`, `ao team start`'s refusal, `ao team status`), §4.8a *A tool's shell escape is the session's*
+
+**Why:** TD-1051 (b), (c), (d) and 5: on contractmatch the stop called a member with unread mail *finished … nothing sent*, the start's refusal named no cure, `ao team status` listed the person's cm-mcp session as *techlead*, and Paul's `! ao team stop` in a Claude Code pane was refused *needs the control grant* with no word of why.
+
+**Fix:** the stop's line for an out-of-work member with `unread() > 0` reads *out of work, n unread — left idle for the doorbell*, and under `--close` *closed with n unread, kept for the name's next start*; the start's `NamesHeld` refusal appends *: `ao team stop <team> --close` closes a settled member, or Close it on its card*; `ao team status`'s rows carry `person` (a record with `unattended: false`) and the text listing marks such a row *person's*; the acting gate's refusal to a caller whose record is a person's session with an agent in it (`unattended: false`, `adapters.has_agent(record.adapter)`, `adapters.py:318`, which takes the adapter id and reads an unknown one, such as an adapter installed only on a node, as having an agent, so the hint shows — a plain shell has no `!` — and not the person's own shell) appends *— typed with the tool's `!`? It runs as this session; run it from your own shell or the page*.
+
+**Done when:** tests hold each of the four words: a stop over an out-of-work member with unread mail, with and without `--close`; a start refused by an idle holder; a status row for a person's session in a team (JSON `person: true` and the text mark); and the acting gate's refusal to a person's session's caller carrying the hint, while a worker's, the person's own shell (passed by `as_person` before the gate) and a caller with no record get none. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1051 (the design); TD-160 (a person in the team), TD-580, TD-801 (the person's own shell); TD-1078, TD-1079.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2432) — `teamrun.stop_members` writes *out of work, n unread — left idle for the doorbell* for an out-of-work member with unread mail, and `_close_settled` *closed with n unread, kept for the name's next start* under `--close`; `NamesHeld` appends the cure when a holder is not suspended; `ao team status` rows carry `person` and the text marks *person's*; `mail.act_gate`'s control-grant refusal to a person's agent session (`not unattended`, `adapters.has_agent`) names the tool's `!` escape. Tests in `test_cli_teams.py` and `test_person_shell_acts.py`.
