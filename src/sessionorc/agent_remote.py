@@ -544,6 +544,8 @@ class RemoteMixin:
         if reply.get("record"):
             self._take_records(host, [reply["record"]], whole=False)
             held = self.remote.get(host, {}).get(str(reply["record"].get("id"))) if method == "create" else None
+            if held is not None:
+                self._set_by_person(held, host, person, reply["record"], params)
             if held is not None and held.supervised:  # the home holds a node session's launch record (§6)
                 # what the node made of the call — an auto-name, a worktree's resolved repo — so a
                 # replay recreates this session, not a new one (review of PR #447)
@@ -939,6 +941,18 @@ class RemoteMixin:
         self._intent_sent.get(host, {}).pop(rid, None)
         log.info("link from %s: %s supersedes %s", host, rid, ", ".join(str(x["id"]) for x in told))
         return True
+
+    def _set_by_person(
+        self, rec: Session, host: str, person: bool, written: dict[str, Any], params: dict[str, Any]
+    ) -> None:
+        """A forwarded `create`'s `by_person` on the home's copy (§4.10 *between the person's own
+        sessions*, TD-1069), whoever called: the caller as the home read it, `supervised` and `seat` as
+        the node's reply carries the written record — the `seat` the home sent where it carries none.
+        Home-owned and never a param of the forwarded create, so an older node is sent nothing new; set
+        in the block that takes the reply, so no gate reads the record without it."""
+        seat = written.get("seat") or params.get("seat")
+        rec.by_person = person and not written.get("supervised") and not seat
+        self._remote_store(host).save(rec)
 
     def _lift_by_person(self, host: str, rid: str) -> None:
         """A person's `create` through the home, on a node, or its own shell's (§4.8, TD-801):

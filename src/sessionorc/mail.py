@@ -283,6 +283,24 @@ def as_person(caller: Any, records: Mapping[str, Session]) -> bool:
     return isinstance(caller, str) and person_shell(records.get(caller))
 
 
+def by_person(record: Session) -> bool:
+    """Whether the person started this record by hand (design §4.10 *between the person's own
+    sessions*, TD-1069): its `by_person`, written once by the create; a record written before the
+    field reads it from being interactive, not `supervised` and with no `controllers`, since a
+    session's start names its starter from birth (§4.8). What the gate and the pushed view read."""
+    if record.by_person is not None:
+        return record.by_person
+    return record.kind == "interactive" and not record.unattended and not record.supervised and not record.controllers
+
+
+def own_end(record: Session) -> bool:
+    """An end of the edge between the person's own sessions (§4.10, TD-1069): started by hand
+    (`by_person`), interactive as invariant 5 reads one, and holding no `seat` of any trigger — so a
+    session of theirs later put in `ao mode unattended` is no end, and an `ask` to a seat keeps the
+    question-seat edge."""
+    return by_person(record) and record.kind == "interactive" and not record.unattended and not record.seat
+
+
 Controllers = Callable[[Session], list[str]]
 
 
@@ -414,6 +432,8 @@ def message_edge(
     - **project**: both carry the same non-empty `project` badge, whatever their teams (TD-582) —
       with `team`, §9 invariant 9's named exception, for mail alone;
     - **shared target**: some record names both in its `controllers` (two leads over one worker);
+    - **own**: both ends started by the person by hand (`own_end`, TD-1069), whatever their team,
+      project, role, `controllers` or state, in any kind — an `ask` carrying no `pr` or `cites`;
     - **question seat**: tried last (TD-995) — an `ask` carrying no `pr` or `cites` (`carries`) to a
       record whose seat's trigger is `asks`, from anywhere in the org; and that seat's `reply` to an
       `ask` it holds (`replied`, from the sender's own inbox), to its asker or a record the asker's
@@ -432,6 +452,8 @@ def message_edge(
         return "project"
     if any(sender in (c := controllers(r)) and target in c for r in records.values()):
         return "shared target"
+    if own_end(me) and own_end(it) and not (kind == "ask" and carries):
+        return "own"
     if kind == "ask" and not carries and asks_seat(it):
         return "question seat"
     if (
@@ -459,7 +481,7 @@ def message_gate(
     """Design §4.10: may `sender` message `target`? A person (`sender == PERSON`) always may — they
     are not a session and may message anyone (§4.8) — and any session may message the person
     inbox (`target == PERSON`). Otherwise a session may message along one of
-    `message_edge`'s six edges and nothing else, refused by naming §4.10's graph rather than
+    `message_edge`'s seven edges and nothing else, refused by naming §4.10's graph rather than
     invariant 11: messaging is not acting. An `ask` passing the question-seat edge alone is one open
     question per sender per seat: the sender counted along its `superseded_by` chain, the count read
     in the target's inbox, since a seat's mail moves with its fills (TD-995). Returns the refusal,
@@ -484,7 +506,8 @@ def message_gate(
         return (
             f"{sender} cannot message {target}: not one of its controllers, its members, its team, "
             f"its project, or a controller of a session it controls — nor an ask to a question seat, "
-            f"or that seat's reply to an ask it holds (design §4.10)"
+            f"or that seat's reply to an ask it holds, nor between two sessions the person started by hand "
+            f"(design §4.10)"
         )
     if edge == "question seat" and kind == "ask":
         mine = {k for k in records if sender in chain(records, k, successor)}

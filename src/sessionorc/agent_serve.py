@@ -60,6 +60,8 @@ class ServeMixin:
         # §4.3 *Permissions: no channel* (TD-785): whether Allow / Deny can answer its permission, the
         # same derivation — a tool with no channel (Gemini CLI) is answered in its terminal alone
         v["permission_channel"] = adapters.permission_channel(s.adapter)
+        # §4.10 *between the person's own sessions* (TD-1069): a record before the field reads resolved
+        v["by_person"] = mail.by_person(s)
         # design §4.8a *An alarm's answers* (TD-077 b): **who answers for this record** — its
         # first live controller, read from the control graph and never from a badge (§9 invariant
         # 9). The page draws **Log TD** only where this is non-null and says *no session answers
