@@ -92,7 +92,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
-| TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Agreed 2026-10-27 (ADR) — the designer writes it into the design and names the builds |
+| TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Designed — builds TD-1130–TD-1133 |
+| TD-1130 | `Part of:` is read: ledgerboard v2.1 vendored, and the ledger reader and the Queue's reading tell a part from a blocker | Medium | Open — build, blocked by dev-cadence#TD-165 |
+| TD-1131 | A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter | Medium | Open — build, blocked by TD-1130 |
+| TD-1132 | The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:` | Medium | Open — build, blocked by TD-1130 |
+| TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, waits on the promote |
 
 ---
 
@@ -1964,7 +1968,8 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Agreed 2026-10-27 — [ADR 2026-10-27](decisions/2026-10-27-part-of.md), drawn with Paul in an interactive session from the live Queue ([the chosen shape](mockups/reviews/2026-10-27-queue-card-c.html)) and reviewed until Fable (round 5) and Sonnet (round 6) were both READY; Paul said go the same day. Next, the designer's round writes it into §4.4 *The Queue: cards, and the rank that orders them* (*The top entry*, *Rows*, *A row's state*), §4.5 screen 12 *A card*, §4.5a *Queue page: card* and §4.9c *A design entry archives with its last build*, and names the shiftlead builds (ADR §4: the reading, the page, the backfill). Those builds wait on the dev-cadence entry filed from the ADR (`ao td add --repo dev-cadence`, 2026-10-27: dev-cadence's team does the ledgerboard v2.1 release with `Part of:`, then cadence §2.4/§2.12). Until shiftlead vendors v2.1 the builds are written the old way, listed in this entry's `Blocked by:`.
+**Status:** Designed 2026-10-27 — [ADR 2026-10-27](decisions/2026-10-27-part-of.md) (agreed with Paul, Fable round 5 and Sonnet round 6 READY) written into design §4.4 *The Queue* (*A card*, *The top entry*, *Rows*, *A row's state*, the within-card order, *Completed cards*), §4.5 screens 11–12, §4.5a *Queue page: card*, §4.9c *A design entry archives with its last build* and the glossary (*part*). The builds are written the old way, listed below, since shiftlead's ledger cannot carry `Part of:` until it vendors ledgerboard v2.1 (TD-1130); TD-1133's backfill converts them with the rest. All wait on dev-cadence#TD-165 (the ledgerboard release and cadence §2.4/§2.12, filed from the ADR).
+**Blocked by:** TD-1130, TD-1131, TD-1132, TD-1133
 **Location:** `src/sessionorc/ledger.py` (pickable, `kind_of`, `archived`), `src/sessionorc/queue.py` (`_card`: the rows breadth first by `adj`, either direction; archived rows one hop under the better-keyed member); `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); `src/shiftlead/ui/repo.py` (`design_builds`); the briefs and flows ADR §4 step 5 lists; design §4.4 *The Queue: cards, and the rank that orders them* (*Rows*, *A row's state*), §4.5 screen 12 *A card*, §4.5a *Queue page: card*
 
 **Why:** Paul, 2026-10-27, on TD-748's card: "it seems some finished items are laid out like they depend on unfinished items. Is that true?" They do not, but the page says they do. §4.4 *Rows* builds the tree "by `Blocked by:` edges taken in either direction", so nesting says only *joined*, and its direction flips from level to level on the same card:
@@ -1980,5 +1985,89 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Done when** the designer's round has written the ADR into the design and filed its builds, and they are done: the reading and the page built, live, and every design backfilled to `Part of:` (ADR §4).
 
 **Related:** TD-748, TD-909, TD-915 (the tree as drawn), dev-cadence#TD-119 (`components()`).
+
+---
+
+## TD-1130: `Part of:` is read: ledgerboard v2.1 vendored, and the ledger reader and the Queue's reading tell a part from a blocker
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1129)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** dev-cadence#TD-165
+**Location:** `scripts/vendor_ledgerboard.sh`, `src/sessionorc/ledgerboard.py` (vendored), `tests/test_ledgerboard_fixtures.py:40`; `src/sessionorc/ledger.py` (pickable at 521, `kind_of` 254, `archived` 825); `src/sessionorc/queue.py` (`touch`/`names_open` ~300–316, `builds_open` 400, `_card` 496–560 with the within-card pick loop 545–550, `_start` 571, `_status` 592, `_wait` 625, `_completed` 753–790); `src/sessionorc/agent_inbox.py` (Back to design's `blocked_open`); `src/shiftlead/ui/inbox.py` (`blocking` ~2381, `blocked_open`/`builds_open` 2439–2440); `src/shiftlead/ui/repo.py` (`design_builds` 140)
+
+**Why:** TD-1129: a Queue card's tree joins `Blocked by:` edges in either direction, so its indent says only *joined*, and a design's `Blocked by:` does two jobs (its builds and its real blockers). [ADR 2026-10-27](decisions/2026-10-27-part-of.md) gives a part a `Part of:` line naming its parent; this build makes shiftlead read it.
+
+**Fix:** design §4.4 *The Queue* (*A card is one connected component*, *The top entry*, *Rows*, *A row's state*, *The rank*'s within-card order, *Completed cards*), §4.5 screen 11 *Its builds*, screen 12's Done… and Back to design…, §4.9c *A design entry archives with its last build*; ADR 2026-10-27 §2 *ShiftLead's ledger reader* and §4 step 3, which list each change with its line.
+1. **The first PR is the `dev-cadence bump` that runs `scripts/vendor_ledgerboard.sh v2.1` in the same PR** (the fixtures test needs the wheel's copy byte-equal to the pinned tree's). It changes no behaviour. v2.1 also brings v2.0's changes over the vendored v1.3 (its directory loader); a v1 ledger reads as before.
+2. `ledger.py`: pickable from ledgerboard's `rec["pickable"]`; `part_of` and `parts_open` on each entry, open parts kept out of `blocked_by`; `kind_of` reads a parent with open parts as `blocked`; `archived` adds archived ids whose `Part of:` names an open entry.
+3. The Queue's reading: `part_of` per row, the row's parent its `Part of:` parent on the card, else none; the top entry the root parent with the best key, else today's rule; the state *waiting* for an open blocker or an open part, the relation words *after TD-n* carried apart from the state; an open part counts as an open id in `_status`, `waits` and `_wait` (never a leaf); a separate `parts` map in the within-card pick loop, kept out of the tree and the words; `touch`/`names_open` and `_completed` read the archive's `Part of:` lines both ways; *also after* goes.
+4. `builds_open` (both copies, and `blocking`) becomes *some open entry names this entry in `Part of:`*; Back to design's `blocked_open` counts open parts; `design_builds` and the *builds TD-n* back-link read `Part of:`, falling back to a design's `Blocked by:` until its backfill.
+
+**Done when** the tests on a TD-748-shaped card — a design, its parts, a trial, a part blocked from another group, a cross-repo blocker, an archived part and an archived parent with an open part — pin each row's parent, state, relation words and order, and a not-backfilled design still reads as today; and `pdm run test` passes.
+
+---
+
+## TD-1131: A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1129)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1130
+**Location:** `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*, `builds_of` 57, the Done guard 22 and 43, *every build archived* 62); `src/shiftlead/ui/templates/inbox_row.html`; `src/shiftlead/ui/static/app.css`; `src/shiftlead/ui/help.py` (help text bound to §4.5a)
+
+**Why:** TD-1129's page half: the reading of TD-1130 tells a part from a blocker; the card must draw it.
+
+**Fix:** design §4.5 screen 12 *A card* (the spine, the relation words, the fold, the parts meter, amber spent on the person alone), §4.5a *Queue page: card*; the chosen shape in [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §3 and its review page `docs/mockups/reviews/2026-10-27-queue-card-c.html` (§3 governs where the page differs: the meter's colours and the top entry). Parts hang on their parent's spine by `part_of`; each open blocker is *after TD-n*, a link that scrolls to and rings its row, lit on hover or focus; finished parts fold to *✓ n done*, opening in place, finished loose rows to one line at the card's end; the parts meter, one segment per part in `branch()`'s four colours with *d/n*, on every parent row and on the header; *also after* goes. Phone width as screen 12's rows are today.
+
+**Done when** the page tests pin a TD-748-shaped card's spine, words, fold and meter, a headless Chromium shot of the live-shaped card at desktop and phone width is in the PR (`docs/mockups/reviews/<date>-td1131-*.png`), and `pdm run test` passes.
+
+---
+
+## TD-1132: The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1129)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1130
+**Location:** `src/shiftlead/flows/td/build.md`, `src/shiftlead/flows/td/design.md`, `src/shiftlead/briefs/grinder.md`, `src/shiftlead/briefs/designer.md`, `src/shiftlead/briefs/entry.md`, `docs/technical_debt.md` (the preamble's Owner/Kind paragraph)
+
+**Why:** TD-1129: the texts the wheel carries tell a designer to list builds in a design's `Blocked by:`, and a grinder to take an entry when nothing its `Blocked by:` names is open. Once the reader knows `Part of:` they must say what a parent with open parts is.
+
+**Fix:** design §4.9c *A design entry archives with its last build*; [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §4 step 5. `build.md` archives a parent with its last part by §4.9c's rule (its `Blocked by:` empty or archived, no decision; one level per PR); `design.md` and `designer.md` write `**Part of:** TD-n` on each build filed and stop listing builds in the design's `Blocked by:`; `grinder.md`'s "nothing `**Blocked by:**` names is still open" gains "and no open entry is `Part of:` it"; `entry.md` names the header line `ao td add` writes for a part; the ledger preamble names `Part of:` and the pick rule (the `Fields:` line does not change: `Part of` is a cadence field). These go live with the promote; `docs/briefs/` is TD-1133's, not this entry's.
+
+**Done when** each text says it, the doc-bound tests pass, and `pdm run test` passes.
+
+---
+
+## TD-1133: Backfill: every design names none of its builds, each build names its design in `Part of:`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1129)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1130, TD-1131, TD-1132
+**Waits:** event — TD-1130 and TD-1132 promoted live (the host agent, `ao`, and every container node's wheel)
+**Location:** `docs/briefs/designer-ao-1.md` and every team brief under `docs/briefs/` (held: `docs/briefs/**`); `docs/technical_debt.md` (the 18 open designs with parts in `Blocked by:`)
+
+**Why:** TD-1129: until a design's builds carry `Part of:`, its card still reads it as blocked by them (design §4.4 *Rows*, *A design not yet backfilled*). An older reader reads a backfilled design as pickable, so the backfill waits for the promote.
+
+**Fix:** [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §4 step 6.
+1. **`docs/briefs/` first**, the first PR after the promote: no designer team is started between the promote and its merge. A team's brief is read from the checkout at team start, so it must not tell a designer to stop listing builds before the live reader knows `Part of:`.
+2. **One PR per design**: its parts' `Part of:` lines and its `Blocked by:` edit land together, each checked with `dev-cadence run ledger.py --pickable` before and after (the design stays not pickable). Each design's `Blocked by:` is read by hand: TD-1029 and TD-857 name only real blockers and keep them; TD-786 stays a part of TD-112 and a blocker of TD-857; whether TD-909 names dev-cadence#TD-121/#TD-122 is judged entry by entry. TD-1129 itself, with TD-1130–TD-1133, is one of them.
+3. The *Done when … Blocked by: names them* sentences (TD-748, TD-909, TD-857, TD-1009) are fixed as they are touched.
+
+**Done when** `ledger.py --check` shows no *legacy edge* ℹ on the ledger, every open design's builds name it in `Part of:`, and the Queue's cards read by *part of* alone.
 
 ---
