@@ -2943,6 +2943,12 @@ class TickMixin:
             return self._asks_cause(s) or self._tag_cause(s, records)
         if trigger == "asks":
             return self._asks_cause(s)
+        if trigger == "swept":
+            # read again each tick, as `asks` is: a stamp written by hand, or a board unreadable, before
+            # the fill clears the due — an unreadable board fills nothing (§4.9b *The sweep*, TD-1090)
+            if not self._swept_met(s, now):
+                return None
+            return s.seat_due if (s.seat_due or {}).get("by") == "swept" else {"at": now_iso(), "by": "swept"}
         if s.seat_due:
             return s.seat_due
         met = False
@@ -2953,8 +2959,6 @@ class TickMixin:
         elif trigger == "every":
             every = _duration(str(seat.get("after") or ""))
             met = every is not None and now - _parse(s.created) >= every
-        elif trigger == "swept":
-            met = self._swept_met(s, now)
         return {"at": now_iso(), "by": trigger} if met else None
 
     def _swept_met(self, s: Session, now: datetime) -> bool:

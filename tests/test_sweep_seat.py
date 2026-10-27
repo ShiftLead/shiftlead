@@ -252,6 +252,31 @@ async def test_a_swept_fill_is_remembered_and_not_due_again_within_its_duration(
 
 
 @pytest.mark.integration
+async def test_a_standing_swept_due_is_read_again_and_an_unreadable_board_fills_nothing(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _sweeper(person, tmp_path)
+        rec = agent.sessions[sid]
+        _end(agent, sid)
+        _board(agent, tmp_path, {"at": _ago(8), "deep_at": None})
+        agent._profile_gated = lambda *a: True  # due, held by a pause
+        await agent._keep_running(now)
+        first = rec.seat_due
+        assert first and first["by"] == "swept"
+        await agent._keep_running(now)
+        assert rec.seat_due is first, "the standing due keeps its first `at`"
+        del agent._profile_gated
+        _board(agent, tmp_path, {"at": _ago(8), "deep_at": None}, error="the reader failed")
+        await agent._keep_running(now)
+        assert agent.sessions[sid] is rec and rec.seat_due is None, "an unreadable board fills nothing"
+        _board(agent, tmp_path, {"at": _ago(0), "deep_at": None})  # swept by hand meanwhile
+        await agent._keep_running(now)
+        assert agent.sessions[sid] is rec and rec.seat_due is None
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
 async def test_an_idle_sweeper_whose_cause_was_met_while_it_ran_is_closed(agent, tmp_path):
     await park_ticks(agent)
     now = datetime.now(UTC)
