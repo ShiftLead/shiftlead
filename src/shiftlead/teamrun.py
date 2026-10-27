@@ -79,7 +79,13 @@ class NamesHeld(teams.TeamError):
             else f"{v['name']} is {v.get('holder_state', 'running')} as {v['holder']}"
             for v in holders
         )
-        super().__init__(f"team {team} was not started — {names}")
+        # the cure for a name held by a session that is merely there (§4.9, TD-1051): a suspension is a person's
+        cure = (
+            f": `ao team stop {team} --close` closes a settled member, or Close it on its card"
+            if any(v.get("verdict") != "suspended" for v in holders)
+            else ""
+        )
+        super().__init__(f"team {team} was not started — {names}{cure}")
 
 
 class PartialStart(teams.TeamError):
@@ -1616,10 +1622,13 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
     for s in members:
         if not now and s.get("out_of_work") and s["state"] in SETTLED:
             # Finished (§4.9a): it declared, and it is not mid-turn. There is nothing to wrap up, and
-            # a prompt would only start a turn that `--close` could then land in the middle of.
-            st.acted.append(
-                {**_entry(s, "member"), "action": "finished (out of work), nothing sent", "state": s["state"]}
+            # a prompt would only start a turn that `--close` could then land in the middle of. Unread
+            # mail says it is not finished for these words: the doorbell rings it (§4.9, TD-1051)
+            n = int(s.get("unread") or 0)
+            action = (
+                f"out of work, {n} unread — left idle for the doorbell" if n else "finished (out of work), nothing sent"
             )
+            st.acted.append({**_entry(s, "member"), "action": action, "state": s["state"], "unread": n})
             continue
         st.acted.append(_stop_one(call, s, "member", now=now))
     if now and lead is not None:  # a kill has nothing to wait for: the lead goes with them
@@ -1663,7 +1672,11 @@ def _close_settled(call: Call, entry: dict[str, Any], record: dict[str, Any] | N
         entry["left_open"] = unsafe
         return
     call("close", id=entry["id"])
-    entry["action"] += ", closed"
+    n = int(record.get("unread") or 0)
+    if entry.get("unread") and n:  # an out-of-work member's mail waits for the name's next start (§4.9, TD-1051)
+        entry["action"] = f"closed with {n} unread, kept for the name's next start"
+    else:
+        entry["action"] += ", closed"
     entry["state"] = "closed"
 
 

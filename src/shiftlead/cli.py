@@ -1063,7 +1063,8 @@ def cmd_team_status(args: argparse.Namespace) -> int:
     """`ao team status <name>` (design §4.9): the lead's Members view for a terminal — each session
     carrying the badge with its state, lane and report line, the lead first, and every name the
     definition expects that is not running said to be so. Under `--json` each row also carries
-    `unattended`, `seat`, `out_of_work` and `restart_wanted` as the record has them, and the reply
+    `unattended`, `seat`, `out_of_work` and `restart_wanted` as the record has them, and `person` — a
+    person's own session in the team, which holds no seat and the text marks *person's* — and the reply
     `finished`, the home's reading of the team (§6 rule 9, TD-241)."""
     org, expected = orgmod.Org(), []
     try:
@@ -1086,6 +1087,8 @@ def cmd_team_status(args: argparse.Namespace) -> int:
             "report": report_line(s),
             "running": True,
             **{k: s.get(k) for k in record},
+            # a person's own session in the team holds no seat whatever preset it runs (§4.9, TD-1051)
+            "person": s.get("unattended") is False,
         }
         for s in ([lead] if lead else []) + members
     ]
@@ -1093,6 +1096,7 @@ def cmd_team_status(args: argparse.Namespace) -> int:
         {
             **{"id": None, "name": n, "state": "not started", "lane": [], "role": "", "report": "", "running": False},
             **dict.fromkeys(record),
+            "person": False,
         }
         for n in expected
         if n not in {s.get("name") for s in found}
@@ -1105,7 +1109,8 @@ def cmd_team_status(args: argparse.Namespace) -> int:
         for r in rows:
             lane = f"  lane: {', '.join(r['lane'] or []) or '-'}"
             report = f"  report: {r['report']}" if r["report"] else ""
-            print(f"{str(r['id'] or r['name']):<{w}}  {r['state']:<11}{lane}{report}")
+            mark = "  person's" if r["person"] else ""
+            print(f"{str(r['id'] or r['name']):<{w}}  {r['state']:<11}{lane}{report}{mark}")
 
     # the home's reading of the team, the one the tick and the page take: it holds when `why` is empty
     team = org.teams.get(args.name)
