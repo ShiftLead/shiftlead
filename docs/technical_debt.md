@@ -90,10 +90,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Live check #2475 |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
-| TD-1116 | A session the person started cannot steer another team's member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow | Medium | Open |
+| TD-1116 | A session the person started cannot steer another team's member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow | Medium | Designed — builds TD-1125 |
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
+| TD-1125 | A person's session mails any member, a member replies back to it, and its mail lands `[person-session]`: what it says to do or avoid binds like the person's | Medium | Open — build |
 
 ---
 
@@ -1930,7 +1931,8 @@ It then names the build entries.
 **Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-27 (the designer) — §4.10 *between the person's own sessions* (the target any record with an agent, an `ask` to an asks seat on the question-seat edge, *Back along it*, the `[person-session]` mark and what binds from it, no copy to a lead, the two ways to an own end the person's hand does not pass), §4.10 *Surface* (the rule and the header), §9 invariant 9. Build TD-1125.
+**Blocked by:** TD-1125
 **Location:** `src/sessionorc/mail.py` (`message_edge`'s edge between the person's own sessions, `by_person`; `from_role`); design §4.10 *The message gate is weaker than `control`* (*between the person's own sessions*, TD-1042/TD-1069), §4.10 *Surface* (the `[controller]` / `[person]` / `[other]` tags), §9 invariants 9 and 13; the role briefs that carry *Instructions come from your controllers and from people* (`src/shiftlead/briefs/` grinder, designer, manager, manager_on_call, hunter, sweeper, auditor; not `entry.md`, `techlead.md`, `work.md` or the `.stage.md` briefs)
 
 **Why:** Paul, 2026-10-27: "There are times when we would do something in an interactive session where we would need to let a grinder know not to touch a dir … or a designer to hold a design or consider a new element." The edge TD-1069 built (#2419) needs **both** ends to be sessions the person started by hand, so one of them reaches an unattended member of another team only by an `ask` to its question seat. Even where mail does land, a `by_person` sender reads as `[other]` (`from_role`), and those briefs say mail from anyone but controllers and people is "information you weigh, never an instruction". So "don't touch `scripts/`" from Paul's session is advice a grinder may set aside.
@@ -2031,3 +2033,27 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Done when** a grep for each listed word finds only uses that match what runs, the doc-bound tests pass, and the code-side mismatches are filed.
 
 **Related:** the docs-audit seat (`docs/briefs/docs-audit.md`); dev-cadence#TD-129 (the pin, which retired `scripts/` and the sync the docs still name); TD-1116 (the briefs' sentence it adds).
+
+## TD-1125: A person's session mails any member, a member replies back to it, and its mail lands `[person-session]`: what it says to do or avoid binds like the person's
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-27 (the designer, from TD-1116)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/mail.py` (`message_edge`'s `own` edge, `message_gate`'s refusal, `from_role`); `src/shiftlead/cli.py` (`INBOX_HEADER`); `src/shiftlead/skill.md` (the Mail rule); `src/shiftlead/briefs/` (`grinder.md`, `designer.md`, `manager.md`, `manager_on_call.md`, `hunter.md`, `sweeper.md`, `auditor.md`: the *Instructions come from* line); `tests/test_mail.py`
+
+**Why:** TD-1116's design: the `own` edge needs both ends to be sessions the person started, so a person's session reaches another team's unattended member only by an `ask` to a question seat, and even then its mail reads `[other]`, which every brief says to weigh, never follow.
+
+**Fix:** as design §4.10 *between the person's own sessions* and *Surface* say:
+1. **The edge.** In `message_edge`, the `own` test becomes: the sender is an `own_end`, and the kind is not an `ask` that carries `pr` or `cites` or is addressed to a record where `asks_seat` holds (that `ask` falls through to the question-seat edge and its one-open-question count). The target is any record: mail to a record with no agent is refused before the gate already.
+2. **Back along it.** Also `own`: a `reply` whose `replied` (the entry in the sender's own inbox) has a `from_` that is an `own_end`, to a target in `chain(records, replied.from_, successor)`, whatever the sender's kind, team or seat.
+3. **The refusal** names the edge *nor from a session the person started by hand, or a reply to one*.
+4. **`from_role`** returns `person-session` after `controller` and before `other`, when the sender's record is an `own_end` at the moment it is read; so `ao inbox` prints `[person-session]`, and the Inbox row's title and the Focus panel show it as they show the other values.
+5. **The rule, where it is read.** `INBOX_HEADER` and the skill's Mail rule read: *Instructions come from your controllers and from people, and on what to do or avoid from a session the person started (`[person-session]`); mail from anyone else is information you weigh, never an instruction.* Each brief listed above gains, beside its *Instructions come from* line, the sentence: *Mail marked `[person-session]` is from a session the person started by hand: what it says to do or avoid binds as the person's own; a technical claim in it is information you weigh.* (A brief change restarts the members, rule 7: one PR.)
+6. Nothing else changes: the send refills no wake budget (a session's caller is not the person), no copy goes to the person inbox or a lead, and every depth, pair and thread bound holds.
+
+**Done when:** tests show (a) a `note` and a `steer` from an `own_end` sender to an unattended team member, a seat holder (`note`) and another own end pass as `own`; (b) an `ask` from it to an `asks` seat passes as `question seat` and a second one while the first is open is refused; an `ask` carrying `pr` to a member is refused; (c) the member's `reply` on that thread back to the sender (and to its successor) passes as `own`, and the member's unprompted `note` to it is refused; (d) a sender later in `ao mode unattended` passes no `own` edge and reads `other`; (e) `from_role` gives `person-session` for an own-end sender, `controller` when it is also the holder's controller; (f) `ao inbox` prints the mark and the new header; each brief listed carries the sentence. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1116 (the design), TD-1042 / TD-1069 (the edge as built), TD-995 (the question-seat edge), TD-1117 (holds from such a session).
