@@ -103,6 +103,7 @@ NODE_OWNED = frozenset(
         "wrapup_at",
         "wrapup_by",
         "doorbell_failed",
+        "ring_seen",
         "first_prompt",
         "first_prompt_sent_at",
         "first_prompt_tries",
@@ -1345,6 +1346,11 @@ class Session:
     # A doorbell that failed to submit twice (design §4.10): `{at, error}`, so the sender and the
     # page can see that the ring did not land; cleared by the next ring that does.
     doorbell_failed: dict[str, str] | None = None
+    # A ring the home routed to this node, as the node saw it (design §4.4a *The doorbell rings a node's session
+    # through its node*, TD-1079): `{token, at, turned, stopped}` — the home's token for that dispatch, when the
+    # node typed it, and the record's next `prompt` hook and the Stop after it. The home judges the ring once
+    # from a report that first brings `stopped`; the next ring replaces it. Never written on one host.
+    ring_seen: dict[str, str] | None = None
     # The bell stopped (design §4.10 *A ring is answered by a read, or the bell stops*, TD-347):
     # `{at, rings}` after `mail.DOORBELL_HELD` rings in a row each answered by a turn that read none of
     # its mail. The doorbell stays silent for it until it reads (`inbox`) or a person acts toward it.

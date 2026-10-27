@@ -325,6 +325,11 @@ class LinkMixin:
         result and the record as it now stands, so the home applies the outcome before it answers
         the caller rather than a report later."""
         rpc = str(params.get("rpc") or "")
+        if rpc == "ring":  # the home's doorbell (§4.4a, TD-1079): no RPC of its own, so no caller reaches it
+            try:
+                return await self._ring_here(dict(params.get("params") or {}))
+            except RpcError as e:
+                raise link.LinkError(str(e)) from None
         if rpc not in NODE_ACTS and rpc not in HOME_EDITS:
             raise link.LinkError(f"{rpc!r} is not an act a node executes")
         p = dict(params.get("params") or {})
