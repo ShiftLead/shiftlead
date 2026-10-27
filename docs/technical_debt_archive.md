@@ -21022,3 +21022,5 @@ Then the build entries are filed.
 **Done when:** the archived line's count equals the tests #2470 added.
 
 **Related:** TD-1093, #2470.
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2478) — counted again on #2470's merge: seven `def test_` lines added to `tests/test_identity.py`, no `parametrize`; TD-1093's line now says *Seven tests*.
