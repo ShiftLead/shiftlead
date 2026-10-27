@@ -436,17 +436,29 @@ class _Wait:
         self.poke = asyncio.Event()
 
 
-def _peer_pid(writer: asyncio.StreamWriter) -> int | None:
-    """The pid at the other end of a unix socket (`SO_PEERCRED`: pid, uid, gid), or None when the
-    transport cannot say — an in-memory stream, a platform without it."""
+PEER_UNREADABLE = (-1, -1)  # a socket whose credential could not be read: classified *unknown*, never skipped
+
+
+def _peer_pid(writer: asyncio.StreamWriter) -> tuple[int, int] | None:
+    """The pid and effective uid at the other end of a unix socket (`SO_PEERCRED`: pid, uid, gid).
+    None only where there is no socket to ask — an in-memory stream, a platform without
+    `SO_PEERCRED`; `PEER_UNREADABLE` where the socket's credential cannot be read; a pid of 0 (not
+    visible in this pid namespace) is passed on, for the classification to read (§4.8a, TD-1093)."""
     sock = writer.get_extra_info("socket")
     if sock is None or not hasattr(socket, "SO_PEERCRED"):
         return None
     try:
         raw = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
     except OSError:
-        return None
-    return struct.unpack("3i", raw)[0] or None
+        return PEER_UNREADABLE
+    pid, uid, _gid = struct.unpack("3i", raw)
+    return pid, uid
+
+
+def _peer_args(writer: asyncio.StreamWriter) -> dict[str, int | None]:
+    """`_dispatch`'s `peer` and `peer_uid` for a connection, from `_peer_pid`."""
+    cred = _peer_pid(writer)
+    return {"peer": None, "peer_uid": None} if cred is None else {"peer": cred[0], "peer_uid": cred[1]}
 
 
 def _reply_line(req: dict[str, Any], reply: dict[str, Any]) -> bytes:

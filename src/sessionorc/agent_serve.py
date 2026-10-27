@@ -33,7 +33,7 @@ from sessionorc.agent_common import (
     PUSH_OPEN,
     RpcError,
     _drop_unknown,
-    _peer_pid,
+    _peer_args,
     _reply_line,
     log,
 )
@@ -221,7 +221,7 @@ class ServeMixin:
                         await self._send(writer, json.dumps(self._omitted(ev, self._sub_omit.get(writer, ()))))
                     await self._push_changes()
                     continue
-                writer.write(_reply_line(req, await self._dispatch(req, peer=_peer_pid(writer), conn=writer)))
+                writer.write(_reply_line(req, await self._dispatch(req, **_peer_args(writer), conn=writer)))
                 await writer.drain()
         except (ConnectionError, asyncio.IncompleteReadError):
             pass
@@ -239,7 +239,7 @@ class ServeMixin:
         for the close. The moment the client goes away — a Ctrl-C, a cancelled turn — the wait is
         cancelled, so no ghost wait is left to be charged a wake and hand the mail to nobody.
         Requests are serial per connection; one sent mid-wait is answered with an error."""
-        task = asyncio.ensure_future(self._dispatch(req, peer=_peer_pid(writer), conn=writer))
+        task = asyncio.ensure_future(self._dispatch(req, **_peer_args(writer), conn=writer))
         try:
             while True:
                 line = asyncio.ensure_future(reader.readline())
@@ -272,16 +272,24 @@ class ServeMixin:
                     await task
 
     async def _dispatch(
-        self, req: dict[str, Any], *, link_host: str | None = None, peer: int | None = None, conn: Any = None
+        self,
+        req: dict[str, Any],
+        *,
+        link_host: str | None = None,
+        peer: int | None = None,
+        peer_uid: int | None = None,
+        conn: Any = None,
     ) -> dict[str, Any]:
         """`link_host`: the request came over that node's link (step 5), so its caller is that
         host's session — `id@host` here — and never this socket's. `peer`: the pid at the other end
         of this host's own socket, from its credentials — what design §4.8a judges the envelope's
         `caller` against; None for a link (identified by its key, never classified) and for a call
-        made in-process. `conn`: the connection, which is what is classified — once, for its life."""
+        made in-process; negative where the socket's credential could not be read. `peer_uid`: that
+        credential's uid, which the classification compares with the agent's own. `conn`: the
+        connection, which is what is classified — once, for its life."""
         if peer is not None and link_host is None and self.identity_mode != "off":
             try:
-                refused = await self._identify(req, peer, conn)
+                refused = await self._identify(req, peer, conn, peer_uid=peer_uid)
             except Exception:  # noqa: BLE001 — a bug in the check must never take the socket down with it
                 # `observe` promises that nothing a caller sees changes, so the request is served as
                 # before. Under `enforce` a check that can be made to fail would be a way round it, so
