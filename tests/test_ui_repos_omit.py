@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import park_ticks
 from test_ui_entry import client, fake, world
 
-from sessionorc import reports
+from sessionorc import hosts, reports
 from sessionorc.client import LocalClient
 
 
@@ -95,13 +96,22 @@ def test_a_filtered_reading_is_the_whole_one_without_those_paths(tmp_path):
     assert "completed" not in inbox and inbox["ledger"]["entries"] == whole["ledger"]["entries"]
 
 
-async def test_the_repos_rpc_serves_each_reading_without_what_omit_names(agent, tmp_path):
+async def test_the_repos_rpc_serves_each_reading_without_what_omit_names(agent, tmp_path, monkeypatch):
     root = str(tmp_path)
+    # the root registered and its read a no-op, so a repos pass keeps the reading the test sets: an
+    # unregistered root's reading is dropped by the next pass, which raced the calls below (TD-1067)
+    await park_ticks(agent)
+    (reg := tmp_path / "repos.txt").write_text(f"{root}\n")
+    real = hosts.local_host
+    monkeypatch.setattr(hosts, "local_host", lambda: dataclasses.replace(real(), repos_registry=reg))
+    monkeypatch.setattr(agent, "_read_repos", lambda *a: {})
     agent._repos[root] = _reading(root)
+    whole = copy.deepcopy(agent._repos[root])
+    await agent._refresh_repos()  # a pass between the set and the calls keeps it
     async with LocalClient() as c:
-        assert await c.call("repos") == {root: agent._repos[root]}  # no omit: whole, as ever
+        assert await c.call("repos") == {root: whole}  # no omit: whole, as ever
         got = await c.call("repos", omit=["ledger.recent", "prs.recent.head", "completed"])
-    assert set(got[root]) == set(agent._repos[root]) - {"completed"}
+    assert set(got[root]) == set(whole) - {"completed"}
     assert "recent" not in got[root]["ledger"] and "head" not in got[root]["prs"]["recent"][0]
     assert got[root]["prs"]["recent"][0]["state"] == "merged"
     assert agent._repos[root]["ledger"]["recent"]  # the agent's own reading keeps every part
