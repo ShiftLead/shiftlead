@@ -20748,3 +20748,27 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Related:** TD-1088, TD-1065, TD-1087 (the other load flakes).
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2459) — the fixture's tick ran `_refresh_repos`, which drops every root the registry does not list as gone; a probe running it between the test's two `_cadence_pass` calls reads `[842]` with only 842 asked, every time, since the second pass skips a record whose `repo` is not in `_repos`. The test now parks the ticks first; production holds a registered root and runs one cadence pass at a time.
+
+## TD-1101: Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, the full runs of TD-1087)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — the fix is in #2460
+**Location:** `tests/test_sync_pass.py` (`test_off_is_written_once_per_head`), `tests/test_board_seam.py` (`test_an_unserved_repos_board_is_written_by_no_press`), `tests/test_identity.py` (`test_the_detached_check_follows_the_tmux_server_it_is_about`)
+
+**Why:** TD-1087's fix (#2455) made its own tests pass 20 of 20 under load. Its other half, five full `-n auto` runs in a row, did not hold: in five full runs of `pytest -n auto --basetemp=<short>` (2026-10-27, load about 8 to 14), four failed one or two tests each, a different test each time. Besides TD-1088, TD-1098 and TD-1102 (`test_dismiss_takes_the_row_off_and_its_snooze_with_it`), they were:
+- `test_off_is_written_once_per_head`: `AssertionError: nothing changed: nothing saved or pushed` (`assert [{'/r/samscrape': …}] == []`).
+- `test_an_unserved_repos_board_is_written_by_no_press`: `Failed: DID NOT RAISE AgentError`.
+- `test_the_detached_check_follows_the_tmux_server_it_is_about`: `assert ([3861993, 50] == [50]`.
+None of the three files calls `park_ticks`, so the fixture's tick loop running beside the test's own steps is the first suspect, as it was in TD-1087, TD-1099 and `test_ci_spells.py`.
+
+**Fix:** for each test, check whether the fixture's tick loop can run the pass the test drives by hand. If it can, park it (`await park_ticks(agent)`, or a file-level `agent` fixture that parks it, as `test_conventions_policy.py` has). Otherwise wait on the event the test reads. Reproduce with 20 runs of each file under `-n auto` beside a full `-n auto` suite.
+
+**Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row, with TD-1098, TD-1100 and TD-1102 fixed too; then `pdm run test` may take `-n auto`.
+
+**Related:** TD-1087 (its other half), TD-1088, TD-1098, TD-1102 (the other flakes in these runs), TD-1100, TD-1068.
+
+**Resolved:** 2026-10-27 (grinder-ao-2, #2460) — each of the three tests had the fixture's tick loop running beside it, and each now parks it. `park_ticks` itself had a hole: it drained a tick's passes once, but the promote pass starts `_sync_task` as it ends, and that pass ran under the test. The drain now loops until none is in flight. Under `-n auto`, 20 runs of the three files beside five full suites passed 20 of 20. Four of the five full runs passed; the fifth failed only TD-1102's test, fixed in #2459. TD-1098 (#2457) and TD-1100 (#2458) are fixed too. `pdm run test` stays at `-n 8` (the entry said *may*).
