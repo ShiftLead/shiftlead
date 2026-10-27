@@ -110,6 +110,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     PATHS_PRIVATE,
     PATHS_RUN_CHARS,
     PATHS_RUNS_MAX,
+    PEER_UNREADABLE,  # noqa: F401
     PRUNE_EVERY,  # noqa: F401
     PUSH_OPEN,  # noqa: F401
     RELAUNCH_KEPT,
@@ -169,6 +170,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     _oldest_first,  # noqa: F401
     _pane_title,  # noqa: F401
     _parse,  # noqa: F401
+    _peer_args,  # noqa: F401
     _peer_pid,  # noqa: F401
     _pr,  # noqa: F401
     _prune_tallies,  # noqa: F401
