@@ -92,7 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
-| TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Open |
+| TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Open — decision (Paul): the shape is worked with him first |
 
 ---
 
@@ -1963,7 +1963,8 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Open — Paul is working the shape in an interactive session before the designer starts
+**Blocked by:** decision (paul) — agree the tree's direction and how a row names its link, in the interactive session of 2026-10-27
 **Location:** `src/sessionorc/queue.py` (`_card`: the rows breadth first by `adj`, either direction; archived rows one hop under the better-keyed member); `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); design §4.4 *The Queue: cards, and the rank that orders them* (*Rows*, *A row's state*), §4.5 screen 12 *A card*, §4.5a *Queue page: card*
 
 **Why:** Paul, 2026-10-27, on TD-748's card: "it seems some finished items are laid out like they depend on unfinished items. Is that true?" They do not, but the page says they do. §4.4 *Rows* builds the tree "by `Blocked by:` edges taken in either direction", so nesting says only *joined*, and its direction flips from level to level on the same card:
