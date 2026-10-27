@@ -20305,3 +20305,44 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Related:** TD-1009, dev-cadence TD-129 and its plan 2026-10-25, TD-1015, TD-1016. dev-cadence#TD-129 left **Blocked by** 2026-10-26 (Paul): its launcher, bump, adopt and shims are merged (dev-cadence #328–#331, #335–#340), and TD-129 closes only once every roster repo is pinned — a pin unserves a repo until this reads it (`seams.serve` reads the lock and the synced gate script, `scripts/check_cadence.py`), so this goes first and the rollout of a served repo waits on it.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2436) — the resolver and its readers in slices #2365, #2368, #2371, #2374, #2379, #2381 and #2390; the last part: a session started on a container node, a team's member or the New session form's, is told `/shiftlead/venv/bin/dev-cadence` for a pinned repo's `{gate}`, `{ledger_check}` and `{cadence_rules}` (`teams.node_venv` into `RepoConfig.venv`, `cadence.typed(…, venv=)`), and the copy's paths and the lock are `cadence.py`'s (`COPY_GATE`, `COPY_LEDGER`, `COPY_RULES`, `reports.SYNC_LOCK = cadence.LOCK`), so the Done-when grep finds them only in `cadence.py`, `sync.py` and `gitinfo.HYDRATE`. Tests: `test_a_container_nodes_member_is_told_the_nodes_own_launcher`, `test_start_on_a_container_node_names_the_nodes_own_launcher`. Still open, as the Status said: shipped trees of an older pin are not pruned, and only the node checkout's pin is shipped.
+
+## TD-1048: `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-26 (ao-dev-cadence-dc-grinder, through `ao td add --repo shiftlead`; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Blocked by:** TD-1089
+**Location:** `src/sessionorc/agent_ids.py` (`_ids_script`: the script's argv is `--count`, `--by`, `--floor`, `--ledger`, `--archive`, `--json`, with no `--branch`, and the reply relays `ids`, `unread`, `reserved`, `why`, `warnings`, with no `taken_by`); `src/shiftlead/cli.py` (`ao td next`'s output); design §4.4 *A ledger entry's id is handed out by the home* (*The run*, *The branch*, *Its answer*), §4.7 (`ao td next`, its `--json` keys)
+
+**Why:** dev-cadence TD-145 (after ShiftLead/shiftlead#2370 typed TD-1028 by hand and the counter then gave TD-1028 to another session) makes the cadence check's `ledger` row fail a new entry whose `**Taken by:**` is not its take's `by`, and warn on one with none. The line is to be copied from the front end, never typed from memory, but `ao td next` is shiftlead's front end and prints no such line. It also runs the script in the home's checkout, which stays on `main` (§4.4 *The run*), so a take records that checkout's branch, never the branch of the session the id is for, and a branch mismatch cannot be checked. Without both, every shiftlead session's entry is warned on, and fails once the row reads the by and the branch.
+
+**Fix:** design first: `td_next` passes `--branch <the asking session's branch>` where it has one, and the round decides where that branch is read (the caller's record or its directory, on the home or a node). `ao td next` prints the script's *Taken by* line, and `--json` gives `taken_by`. The round also checks that this ledger's `Fields:` line, and ledgerboard's reading of it, accept `Taken by` before any entry carries it, since an undeclared field fails `ledger.py --check --since`.
+
+**Done when** the design names the flag, the line and the key, and the build entries are filed.
+
+**Related:** dev-cadence TD-145, TD-124 (the counter); TD-970, TD-1014, TD-1034 (`td_next`'s script road); ShiftLead/shiftlead#2370.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2437) — its one build, TD-1089, merged in #2437.
+
+## TD-1089: `ao td next` sends its directory's branch to the take, and relays the take's `taken_by` and the line to write where the ledger accepts it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-26 (the designer, from TD-1048)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/cli.py` (`cmd_td_next`, `_td_next_send`); `src/sessionorc/agent_ids.py` (`rpc_td_next`, `_ids_script`); `src/sessionorc/ledgerboard.py` (vendored: `CADENCE_FIELDS`, `declared`, read only); `tests/test_td_next.py` (the node's forward needs no change: `agent_remote._forwarded` passes `params` through); design §4.4 *A ledger entry's id is handed out by the home* (*The run*, *The branch*, *Its answer*), §4.7 `ao td next`
+
+**Why:** TD-1048: dev-cadence TD-145's take records a `by` and a branch, and its check warns on a take for another branch and on an entry with no `**Taken by:**`. The home runs the script in its checkout on `main`, so every take records `main`, and `ao td next` relays neither the take's `by` nor a line to write.
+
+**Fix:** (1) The client: `ao td next` reads `git branch --show-current` in `os.getcwd()` and sends it as the `td_next` parameter `branch` only when `_origin_key` of that directory's top level equals the named repo's key: `_origin_key(root)` when `_td_repo` resolved a root, else, for an `owner/repo` sent unresolved, the spelling `_ids_repo` matches (`ids_mod.origin_key` of a URL, else the lowercased `owner/repo`); empty (detached), no `git`, or another repo sends none. (2) The home: `rpc_td_next(…, branch="")` runs `git check-ref-format --branch <branch>` outside any repository (`cwd` a temp or `/`) and refuses a non-empty `branch` it refuses, whose printed form differs from the input, or that is `@` (in words naming the parameter); and `_ids_script` adds `--branch=<branch>` as one argument when given and the script's source holds the literal `"--branch"` (a script from before dev-cadence TD-145 has none, and argparse would refuse the take); the home's own road ignores it. (3) The answer: `_ids_script` relays the script's `taken_by` (a string or null), and the home sets `taken_by_line` to `` f"**Taken by:** {taken_by}" `` when `taken_by` is set and either `"taken by"` is in the `CADENCE_FIELDS` of the `ledgerboard.py` beside the script it ran (read with `ast` as a literal tuple, never imported) or the vendored `ledgerboard.declared(<text>)[0]` is empty for `Path(root) / ledger_path(root)`, read under the lock after the script; a missing or non-literal `ledgerboard.py`, or an unreadable ledger, gives null; the home's own road gives both null. (4) The CLI: sends `branch` only when it has one; `--json` adds `taken_by` and `taken_by_line`, each null when the home's reply lacks it (an older home); a non-null line is printed on standard error as *write `<line>` in each entry's header (cadence §2.10)*, with `--json` or without as the other standard-error lines are, standard output unchanged. (5) §4.7's help for `ao td next`, if it lists the `--json` keys, follows (run the doc-bound tests).
+
+**Done when:** tests show (a) a session in a worktree of the named repo sends its branch and one in another repo's directory or a detached head sends none; (b) the home passes `--branch=<name>` to a fake script that declares `--branch` (the test's fake grows the flag) and leaves it out for one that does not, whose take still gives ids, and refuses a name `check-ref-format` refuses, `@{-1}` and `@`; (c) with a fake script answering `taken_by` and a fake `ledgerboard.py` beside it, a ledger whose `Fields:` line declares a non-cadence vocabulary (as ShiftLead's does) gets `taken_by_line: null`, one with no `Fields:` line gets the line, one whose sibling `CADENCE_FIELDS` holds `taken by` gets the line for both, a ledger that declares `Taken by = …` in its own `Fields:` line gets null (as `judge()`'s `writable` does), and a missing sibling gives null; (d) `ao td next` prints the line on standard error only when non-null, and an older home's reply without the keys gives both null under `--json`; the home's own road answers both null; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1048 (the design), dev-cadence TD-145 (archived, the take's `by` and branch), dev-cadence TD-150 (the field's filing in ledgerboard), TD-970 (the script road).
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2437) — `ao td next` sends `branch` (its directory's, only for a checkout of the repo named: `cli._td_branch`); the home checks it (`agent_ids.check_branch`: `git check-ref-format --branch` at `/`, `@` and a changed printed form refused) and passes `--branch=<name>` only to a script whose source holds `"--branch"`; the answer relays `taken_by` and `taken_by_line` (`agent_ids.taken_by_line`: the sibling `ledgerboard.py`'s literal `CADENCE_FIELDS`, else the vendored `declared()` of the ledger), both null on the home's own road and from an older home; the CLI says a non-null line on standard error. Tests in `tests/test_td_next.py`.
