@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Queue Card Parts</title>
+<meta name="description" content="TD-1129 shape C after a design pass: a design's parts on a spine under it with a parts meter, blockers as words, finished parts folded — TD-748's and TD-1117's cards from the live Queue of 2026-10-27.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{--bg:#f4f5f7;--fg:#1c2128;--muted:#6b7280;--line:#dfe3e8;--card:#fff;--border:#cbd0d6;--link:#1f5fa8;--hover:#eef0f3;
+--waiting:#0d9488;--done:#059669;--working:#16a34a;--ended:#9aa3ae;--pr:#a15c00;--ring:#0d948833;--accent:#2b5fd9;
+--sans:"IBM Plex Sans",system-ui,sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1216;--fg:#e6e9ee;--muted:#8b95a3;--line:#2a313a;--hover:#1d232b;
+--card:#171b21;--border:#3a424d;--link:#7fb2f0;--waiting:#14b8a6;--done:#22c55e;--working:#22c55e;--ended:#5d6774;--pr:#f0b45a;--ring:#14b8a640;--accent:#5b8cff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1216;--fg:#e6e9ee;--muted:#8b95a3;--line:#2a313a;--hover:#1d232b;--card:#171b21;--border:#3a424d;--link:#7fb2f0;
+--waiting:#14b8a6;--done:#22c55e;--working:#22c55e;--ended:#5d6774;--pr:#f0b45a;--ring:#14b8a640;--accent:#5b8cff;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--sans)}
+.wrap{max-width:1200px;margin:0 auto;padding:28px 16px 64px;display:flex;flex-direction:column;gap:18px}
+h1{font-size:22px;font-weight:600;margin:0}
+.sub{color:var(--muted);margin:4px 0 0;max-width:76ch;font-size:14px}
+a{color:var(--link);text-decoration:none}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+.card{border:1px solid var(--border);border-left:4px solid var(--ended);border-radius:6px;background:var(--card);padding-bottom:6px}
+.card.waitc{border-left-color:var(--waiting)}.card.inprog{border-left-color:var(--working)}
+.head,.row{display:grid;grid-template-columns:auto 1.4em minmax(0,1fr) auto;column-gap:8px;align-items:baseline;scroll-margin:80px}
+.head{padding:11px 14px 9px;margin:0;font-weight:600;border-radius:0}
+.row{padding:5px 8px;margin:0 6px;font-size:14px;border-radius:4px;transition:background-color .25s}
+.row.design{font-weight:600;margin-top:8px}
+.row.lit,.head.lit{background:var(--ring)}
+.id{font-family:var(--mono);font-size:.84em;white-space:nowrap;color:var(--fg);width:10.5ch}
+.spine .id{width:8.5ch}
+.title{min-width:0}
+.right{display:flex;gap:12px;align-items:center;justify-content:flex-end;white-space:nowrap;font-size:13px;font-weight:400}
+.rel{color:var(--muted)}
+.on{border-bottom:1px dotted currentColor}
+.st.wait{color:var(--waiting)}.st.done{color:var(--done)}.st.pr{color:var(--pr)}.st.open{color:var(--muted)}
+.pri{display:inline-block;width:1.4em;text-align:center;font:600 11px/1.6 var(--mono);border-radius:3px;background:#5b7bb5;color:#fff}
+.pri.p-high{background:#3b6fe0}.pri.p-low{background:var(--ended)}
+.isdone .title,.isdone .id{color:var(--muted)}
+/* the one bold thing: a design's parts, one segment each, in its state's colour */
+.meter{display:inline-flex;gap:2px;align-items:center}
+.seg{display:block;width:9px;height:9px;border-radius:2px;background:var(--line);border:1px solid var(--ended)}
+.seg.done{background:var(--done);border-color:var(--done)}
+.seg.wait{background:transparent;border-color:var(--waiting);box-shadow:inset 0 0 0 2px var(--waiting)}
+.seg.pr{background:var(--pr);border-color:var(--pr)}
+.mcount{color:var(--muted);font-variant-numeric:tabular-nums;margin-left:-6px}
+/* the spine: parts hang off their design's id */
+.spine{position:relative;margin-left:calc(14px + 1.2em);padding-left:16px}
+.spine::before{content:"";position:absolute;left:0;top:-4px;bottom:10px;border-left:2px solid var(--line)}
+.spine .row,.spine .fold>summary{padding-left:8px}
+.fold>summary{cursor:pointer;list-style:none;padding:5px 14px;font-size:13px;color:var(--muted);width:max-content;border-radius:4px}
+.fold>summary:hover{background:var(--hover)}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary::after{content:"";display:inline-block;margin-left:6px;width:0;height:0;border:4px solid transparent;border-left-color:currentColor;vertical-align:1px}
+.fold[open]>summary::after{transform:rotate(90deg);transform-origin:2px 4px}
+.tick{color:var(--done)}
+.loose{margin-top:2px}
+.key{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:13px;align-items:center}
+.key .meter{margin-right:6px}
+@media (prefers-reduced-motion:reduce){.row{transition:none}}
+@media (max-width:760px){
+ .head,.row,.spine .row{grid-template-columns:auto 1.4em minmax(0,1fr)}
+ .right{grid-column:1/-1;justify-content:flex-start;flex-wrap:wrap;white-space:normal;padding-top:2px}
+ .spine{margin-left:10px;padding-left:10px}
+ .id,.spine .id{width:auto}}
+</style></head><body><main class="wrap">
+<header><h1>A card's parts, and what each waits on</h1>
+<p class="sub">Shape C for TD-1129, drawn from the live Queue of 27 Oct. A design's parts hang under it; anything a row waits on
+is said on the row. Nothing is placed under a row it does not belong to.</p></header>
+<div class="key"><span><span class="meter"><i class="seg done"></i><i class="seg wait"></i><i class="seg open"></i></span>a design's parts: done, waiting, open</span><span>a line down the left: the parts of the design above it</span><span><span class="rel">after <a class="on" href="#">TD-n</a></span>: waits on that row (hover to find it)</span></div>
+<article class="card waitc"><div class="head" id="TD-748"><span class="id">TD-748</span><span class="pri p-medium" title="medium priority">M</span><span class="title">The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD</span><span class="right"><span class="meter" role="img" aria-label="3 of 4 parts done"><i class="seg done" title="TD-769: done #1939"></i><i class="seg done" title="TD-770: done #1955"></i><i class="seg done" title="TD-771: done #1957"></i><i class="seg wait" title="TD-772: waits until 2026-10-30"></i></span><span class="mcount">3/4</span><span class="st wait">waits until Oct 30</span></span></div><div class="spine"><details class="fold"><summary><span class="tick" aria-hidden="true">✓</span> 3 done</summary><div class="row part isdone" id="TD-769"><span class="id">TD-769</span><span class="pri p-medium" title="medium priority">M</span><span class="title">Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs</span><span class="right"><span class="st done">done #1939</span></span></div><div class="row part isdone" id="TD-770"><span class="id">TD-770</span><span class="pri p-medium" title="medium priority">M</span><span class="title">Build TD-748 (2): the Repo page&#x27;s Technical debt drawn as the repo&#x27;s cards in rank order, with the grip and the move buttons</span><span class="right"><span class="st done">done #1955</span></span></div><div class="row part isdone" id="TD-771"><span class="id">TD-771</span><span class="pri p-medium" title="medium priority">M</span><span class="title">Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox|queue`, the Inbox&#x27;s ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over</span><span class="right"><span class="st done">done #1957</span></span></div></details><div class="row part" id="TD-772"><span class="id">TD-772</span><span class="pri p-medium" title="medium priority">M</span><span class="title">Read back the Queue&#x27;s two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask</span><span class="right"><span class="st wait">waits until Oct 30</span></span></div></div><div class="row design" id="TD-909"><span class="id">TD-909</span><span class="pri p-high" title="high priority">H</span><span class="title">The Queue card — three wants (Decide, Do, Read), three verbs (Answer, Start session on the card&#x27;s team, ⋯), a Waiting group, items that lead with one sentence</span><span class="right"><span class="meter" role="img" aria-label="6 of 8 parts done"><i class="seg done" title="TD-918: done #2178"></i><i class="seg done" title="TD-911: done #2182"></i><i class="seg done" title="TD-912: done"></i><i class="seg done" title="TD-913: done #2179"></i><i class="seg done" title="TD-914: done #2188"></i><i class="seg done" title="TD-915: done #2187"></i><i class="seg wait" title="TD-916: after TD-772"></i><i class="seg wait" title="TD-917: after TD-772"></i></span><span class="mcount">6/8</span><span class="st wait">waiting</span></span></div><div class="spine"><details class="fold"><summary><span class="tick" aria-hidden="true">✓</span> 6 done</summary><div class="row part isdone" id="TD-918"><span class="id">TD-918</span><span class="pri p-high" title="high priority">H</span><span class="title">Build TD-909 (1): a Queue card that waits sits in a Waiting group, unnumbered and unmoved, and says what it waits for where Up next draws the number</span><span class="right"><span class="st done">done #2178</span></span></div><div class="row part isdone" id="TD-911"><span class="id">TD-911</span><span class="pri p-high" title="high priority">H</span><span class="title">Build TD-909 (2): a Queue card&#x27;s sections are Decide, Do and Read — amber and counted for the first two, Read folded — drawn by each kind&#x27;s renderer in a `card` mode</span><span class="right"><span class="st done">done #2182</span></span></div><div class="row part isdone" id="TD-912"><span class="id">TD-912</span><span class="pri p-high" title="high priority">H</span><span class="title">Build TD-909 (3): Start session once per Queue card, on its repo&#x27;s team with the card as its context — the road widened, the claim owned, the prompt&#x27;s third key</span><span class="right"><span class="st done">done</span></span></div><div class="row part isdone" id="TD-913"><span class="id">TD-913</span><span class="pri p-medium" title="medium priority">M</span><span class="title">Build TD-909 (4): `render.one_sentence`, and a message&#x27;s answers split into labels and what each leads to</span><span class="right"><span class="st done">done #2179</span></span></div><div class="row part isdone" id="TD-914"><span class="id">TD-914</span><span class="pri p-high" title="high priority">H</span><span class="title">Build TD-909 (5): a Queue card&#x27;s three verbs — the Answer row, and the team&#x27;s controls behind ⋯ — with no Reply, Snooze, Put on the board or Due on a card</span><span class="right"><span class="st done">done #2188</span></span></div><div class="row part isdone" id="TD-915"><span class="id">TD-915</span><span class="pri p-medium" title="medium priority">M</span><span class="title">Build TD-909 (6): each Queue card its own box with a coloured edge, its rows&#x27; tree drawn, and a row&#x27;s mentions one phrase</span><span class="right"><span class="st done">done #2187</span></span></div></details><div class="row part" id="TD-916"><span class="id">TD-916</span><span class="pri p-medium" title="medium priority">M</span><span class="title">Build TD-909 (7): `ao msg` warns on a question to the person that does not lead with one sentence, and the briefs say the rule and `--about`</span><span class="right"><span class="rel">after <a class="on" href="#TD-772" data-on="TD-772">TD-772</a></span><span class="st wait">waiting</span></span></div><div class="row part" id="TD-917"><span class="id">TD-917</span><span class="pri p-medium" title="medium priority">M</span><span class="title">Build TD-909 (8): the backfill — an `Ask:` line and each answer&#x27;s consequence on every open entry that waits on the person</span><span class="right"><span class="rel">after <a class="on" href="#TD-772" data-on="TD-772">TD-772</a></span><span class="st wait">waiting</span></span></div></div><div class="row " id="dc-TD-122"><span class="id">dc#TD-122</span><span class="pri p-medium" title="medium priority">M</span><span class="title">The one-sentence rule for what waits on the person in cadence §3.3 and the stage briefs, and a cadence-check warning on an entry with no `Ask:` line</span><span class="right"><span class="rel">after <a class="on" href="#TD-772" data-on="TD-772">TD-772</a></span><span class="st wait">waiting</span></span></div><details class="fold loose"><summary><span class="tick" aria-hidden="true">✓</span> 1 done</summary><div class="row  isdone" id="dc-TD-121"><span class="id">dc#TD-121</span><span class="pri p-medium" title="medium priority">M</span><span class="title">A ledger entry that waits on the person carries an `Ask:` line, and an answer says what it leads to — `&lt;label&gt; (default) — &lt;consequence&gt;` — in cadence §2, §3.5 and ledgerboard&#x27;s readers</span><span class="right"><span class="st done">done #288</span></span></div></details></article>
+<article class="card inprog"><div class="head" id="TD-1117"><span class="id">TD-1117</span><span class="pri p-medium" title="medium priority">M</span><span class="title">A session the person started cannot hold or decide an entry, so a directive to &quot;hold this design&quot; lasts only as long as the receiver&#x27;s context</span><span class="right"><span class="st pr">#2492 conflicting · being fixed</span></span></div><div class="row " id="TD-1118"><span class="id">TD-1118</span><span class="pri p-low" title="low priority">L</span><span class="title">Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver&#x27;s next restart</span><span class="right"><span class="rel">after <a class="on" href="#TD-1117" data-on="TD-1117">TD-1117</a></span><span class="st wait">waiting</span></span></div><details class="fold loose"><summary><span class="tick" aria-hidden="true">✓</span> 1 done</summary><div class="row  isdone" id="TD-1116"><span class="id">TD-1116</span><span class="pri p-medium" title="medium priority">M</span><span class="title">A session the person started cannot steer another team&#x27;s member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow</span><span class="right"><span class="st done">done #2493</span></span></div></details></article>
+</main><script>
+for (const a of document.querySelectorAll('a.on')) {
+  const t = () => document.getElementById(a.dataset.on);
+  const on = () => t()?.classList.add('lit'), off = () => t()?.classList.remove('lit');
+  a.addEventListener('mouseenter', on); a.addEventListener('mouseleave', off);
+  a.addEventListener('focus', on); a.addEventListener('blur', off);
+}
+</script></body></html>
