@@ -9,6 +9,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import notify, reports, workorders
 from sessionorc import settings as settings_mod
@@ -111,6 +112,14 @@ def test_the_told_line_is_the_owner_and_the_count():
 
 
 # -- at the home -------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+async def agent(agent):
+    """The tick parked (TD-1087): the loop's own `_ci_spells_step` ran beside the test's, and under load
+    one wrote `_host_rec` between two of its reads (`KeyError: 'ci_spells'`)."""
+    await park_ticks(agent)
+    return agent
 
 
 @pytest.fixture
