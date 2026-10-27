@@ -87,7 +87,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) done (#2366); (3) waits on the sync of dev-cadence TD-136–TD-139 |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
-| TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Designed — builds TD-1078, TD-1079, TD-1080 |
 | TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
@@ -1851,25 +1850,6 @@ Trimming before the rule arrives here loses it (§2.4).
 **Done when** a test runs `_conclude` with `live == sha` and the run's pid alive and starts no smoke, then with the pid ended and starts it; and a promote of shiftlead's main passes its smoke, its log's `── smoke ──` after the run's last line.
 
 **Related:** TD-1032 (the reason the failure showed); TD-804, TD-812 (the smoke).
-
-## TD-1034: `rpc_td_next` hands `ids_script` the call's remaining budget, and no test would notice if it did not (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2379)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/agent_ids.py` (`rpc_td_next`: `left = max(0.1, start + BUDGET - time.monotonic())`, `ids_script(root, left)`), `tests/test_td_next.py` (`test_a_pinned_repo_runs_the_pinned_trees_script_through_the_resolver`, `test_a_pin_that_does_not_resolve_refuses_in_the_launchers_words`)
-
-**Why:** #2379 (TD-1014 slice 6) added the `timeout` argument to `ids_script` and passes it the call's remaining `BUDGET`, so a pin whose first fetch is slow cannot hold a `td_next` past its 45 s answer (the default is `cadence.TREE_TIMEOUT`, 330 s). Probed on `origin/main` 27a8c0254 with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_td_next.py`: replacing `asyncio.to_thread(ids_script, root, left)` with `asyncio.to_thread(ids_script, root)` leaves 42 passed. The stub launcher answers at once, so no test sees the timeout reach `cadence.tree`, and none has a tree resolve slower than the budget. Reverted, a stuck fetch would hold the per-repo id lock for 330 s while every other caller is told "busy".
-
-**Fix:** add a test that monkeypatches `cadence.tree` to record the `timeout` it is called with (or a stub launcher that sleeps past a monkeypatched small `BUDGET`) and asserts the call is bounded by the budget, not `TREE_TIMEOUT`.
-
-**Done when:** the revert above fails a test; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1014, TD-970.
-
 
 ## TD-1041: A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit
 
