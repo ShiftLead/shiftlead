@@ -20057,3 +20057,23 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Related:** TD-1037, TD-1033.
 
 **Resolved:** 2026-10-26 (grinder-ao-1, #2420) — `test_the_pass_keeps_the_checks_precheck_on_the_reading` (`tests/test_promote.py`) fakes `read_checks` to each of `absent`, `success`, `failure`, `pending`, `unread` and None, runs `survey` with main's own precheck stubbed, and asserts the reading's `precheck` is that value (and present for None). The probe (`r["precheck"]` replaced with `_`) fails all six.
+
+## TD-1057: `ship_cadence` gives the cache step the node's env file, and no test would notice if it did not (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `exec_cmd(..., env_file=n.env_file)`, comment *the agent's own environment (its env file), so the cache written is the one its launcher reads*), `tests/test_containers.py` (`test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache`)
+
+**Why:** #2390 (TD-1014 part 5) passes `env_file=n.env_file` so the cache script runs with the agent's `XDG_CACHE_HOME`. Probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_containers.py`: dropping `env_file=n.env_file` leaves 55 passed. No shipping test gives the node an env file or looks for `--env-file` on the cache exec, so a node whose env moves the cache would get the tree in a cache its launcher never reads.
+
+**Fix:** give the node an env file with an `XDG_CACHE_HOME` in the shipping test and assert the cache exec carries `--env-file` (as `test_host_up_is_idempotent_and_an_env_file_reaches_the_agent` does for the agent).
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1014.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2421) — `test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache` (`tests/test_containers.py`) gives the node an env file carrying an `XDG_CACHE_HOME` and asserts the cache exec carries `--env-file` with that file. The probe (`env_file=n.env_file` dropped from `ship_cadence`) fails it.
