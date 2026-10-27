@@ -20728,3 +20728,23 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Related:** the memory *Scratchpad too long for unix sockets*; TD-1088, TD-1098 (met verifying them); TD-1087 (load flakes under `-n auto`, another cause).
 
 **Resolved:** 2026-10-27 (grinder-ao-2, #2458) — the cause was path length, not the worker count. Once pytest's run counter reached five digits, `<tmp_path>/kmaster/links/laptop/link.sock` was 108 bytes, past `AF_UNIX`'s 107. The home bound `agent.sock` (96 bytes), then died binding its link socket, so every dial was refused (a `gw1N` worker adds a byte, so `-n auto` showed it first). The `home` fixture now puts the home in `scratch_dir("lk")`, about 80 bytes. With the default basetemp, `pytest -n auto tests/test_link.py` passed 10 runs of 10 beside a full `-n auto` suite (load about 11), and that suite passed too (`-n auto` is 16 workers here, the Done-when's `-n 16`). A real home's link socket (`~/.shiftlead/links/<node>/link.sock`, about 55 bytes for `contractmatch`) is far from the limit, so `paths` gains no words for it.
+
+## TD-1102: `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-1, met in #2454's first precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_cadence_policy.py` (`test_dismiss_takes_the_row_off_and_its_snooze_with_it`); `src/sessionorc/agent_tick.py` (the tick's `_cadence_pass`)
+
+**Why:** the precheck of #2454 at 52b2923 (a change to `tests/test_entry_draft.py` and the ledger alone) failed it: after two `agent._cadence_pass([rec])` calls, `cadence.rows(rec.checks)` read `[842]` where `[842, 843]` was asserted (*a merged fail is the row at once*). It passed 5 of 5 alone. The test puts its record in `agent.sessions` while the fixture's tick loop runs, so the loop's own cadence pass likely reads the same record between the test's calls; the test does not park the ticks.
+
+**Fix:** confirm the race with a probe (a tick taken between the test's two passes), then `park_ticks(agent)` first, as TD-1065's and TD-1088's tests do; if the pass itself drops a PR's read when two passes overlap, that is the bug, fixed in the pass.
+
+**Done when** the case passes 20 runs under `-n auto` beside a full suite, and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1088, TD-1065, TD-1087 (the other load flakes).
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2459) — the fixture's tick ran `_refresh_repos`, which drops every root the registry does not list as gone; a probe running it between the test's two `_cadence_pass` calls reads `[842]` with only 842 asked, every time, since the second pass skips a record whose `repo` is not in `_repos`. The test now parks the ticks first; production holds a registered root and runs one cadence pass at a time.

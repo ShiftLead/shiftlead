@@ -355,6 +355,9 @@ async def test_dismiss_takes_the_row_off_and_its_snooze_with_it(agent, tmp_path,
     from sessionorc import modes
     from sessionorc.client import AgentError
 
+    # the tick's own repos pass drops a root the registry does not list, so one landing between the
+    # passes below leaves the record unread (TD-1102)
+    await park_ticks(agent)
     gh, root = _Gh(monkeypatch), _root(agent, tmp_path)
     rec = Session(id="ao-x-w", name="w", kind="agent", adapter="shell", dir="", repo=root, host=agent.host)
     rec.supervised, rec.unattended, rec.state = True, True, "working"
