@@ -91,6 +91,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Live check #2475 |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
 | TD-1122 | TD-1093's uid wiring (`_id_channel`'s `peer_uid`/`own_uid`, `_dispatch` → `_identify`, `_handle_conn`/`_serve_wait`'s `_peer_args`) is tested by no test: drop it and the suite passes | Medium | Open |
+| TD-1123 | TD-1092's node-side name tests are only partly tested: a typed name that is a listed worktree, a non-slug name, and a node that drops between the plan and the press are refused by no test | Medium | Open |
 | TD-1116 | A session the person started cannot steer another team's member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow | Medium | Open |
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
@@ -2055,3 +2056,26 @@ Any of these puts the live agent back to the pre-TD-1093 behaviour for a peer wh
 **Done when** each line named above fails a test when reverted, and the suite is green.
 
 **Related:** TD-1093.
+
+---
+## TD-1123: TD-1092's node-side name tests are only partly tested: a typed name that is a listed worktree, a non-slug name, and a node that drops between the plan and the press are refused by no test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2469–#2481)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (`entry_name_on`, `api_entry_session`'s `except OSError`); `tests/test_ui_entry_host.py`
+
+**Why:** Test audit of #2475 (TD-1092), 2026-10-27. `tests/test_ui_entry_host.py` has 11 tests; three lines the PR added to the Name row's contract (§4.5a *Add entry form: Name*, *Open a session*) survive their removal, each probed on `origin/main` with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_entry_host.py` (11 passed before):
+- `entry_name_on`: `if name in listed:` → `if False:` — 11 passed. The listed-worktree test only reaches the default search, where `cand not in listed` skips the name first; a *typed* name that names a worktree on the node (`a worktree named X exists — pick another name`) is never asked.
+- `entry_name_on`: `if naming.slug(name) != name:` → `if False:` — 11 passed (the node's Name row accepting a non-slug name).
+- `api_entry_session`: `except OSError as e:  # the node stopped answering` → `except ZeroDivisionError` — 11 passed: the 409 `<host> did not answer…` for a node that stops answering between the plan and the press (a config or reader read over the link) has no test.
+The `org.unlanded` branch, by contrast, fails its test when removed, so the harness works.
+
+**Fix:** Three assertions in the existing fakes: `plan(c, name='entry-1')` with `worktrees=('entry-1',)` and the Name row's words; `plan(c, name='Bad Name')` on the node returns `ENTRY_SLUG_WHY`; a `host_files` fake that raises `OSError` on the press (and not the plan) gives 409 `node1 did not answer…` and creates nothing. Revert each line and see it fail.
+
+**Done when** each line named above fails a test when reverted, and the suite is green.
+
+**Related:** TD-1092.
