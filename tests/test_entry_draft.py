@@ -153,6 +153,9 @@ async def test_the_sweep_reads_a_drafts_claim(agent, tmp_path, keep):
     Claimed by a hand: removed `keep` days after the claim, kept under `0`. Claimed by a session:
     kept while the session is live, then its files go by age as the session's own folder's do, the
     folder going with its claim once nothing else is left. A claim that cannot be read is kept."""
+    # TD-1088: the fixture's loop takes the same sweep with its own records' ids, where `ao-live-1` is
+    # no live session, so a loaded run's tick between the test's calls took the live draft
+    await park_ticks(agent)
     (paths.home() / "hosts.yml").write_text(f"local:\n  runs_keep_days: {keep}\n")
     now = datetime.now(UTC)
     old, day = 2 * paths.ATTACH_PART_IDLE_S, 86400

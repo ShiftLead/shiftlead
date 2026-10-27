@@ -92,9 +92,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
-| TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
 | TD-1097 | `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load | Low | Open — build |
 | TD-1098 | `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it | Low | Open — build |
+| TD-1100 | Under `-n auto`, `tests/test_link.py` fails 31 of its 68 tests with *connection refused* on a node's `agent.sock`, and each passes alone | Low | Open — build |
 
 ---
 
@@ -1971,24 +1971,6 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 
 **Related:** TD-1068, TD-1050, TD-1065, TD-1067.
 
-## TD-1088: `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-2, met in #2424's third precheck)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_entry_draft.py` (`test_the_sweep_reads_a_drafts_claim`, line 180); `src/sessionorc/agent.py` (`_prune_runs`, the draft sweep)
-
-**Why:** the precheck of #2424 at 9f54d33 (a change to `.shiftlead.yml` and ledger text alone) failed `test_the_sweep_reads_a_drafts_claim[7]`: after `_prune_runs(now, set())` — *no live reading: a session's draft is kept* — `assert live.exists()` read False for `home/attachments/draft-0000000e`. It passes alone (`pytest -k sweep_reads`, 2 passed). The same PR's two earlier prechecks each failed another known load flake (TD-1065's test, then `test_a_restart_is_written_afresh`, TD-1068), so three runs in a row read red for no fault of the PR's.
-
-**Fix:** find what the sweep reads that a loaded run changes (a clock, the claim file's mtime, a tick racing the call) and make the test hold it fixed; if the sweep itself can prune a live session's draft under load, that is the bug, fixed in the sweep.
-
-**Done when** the case passes 20 runs under a loaded suite (`-n auto`, or three prechecks at once), and `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1087 (four tests that fail only across workers, a draft sweep's among them), TD-1065, TD-1067, TD-1068 (the other load flakes); TD-630 (the draft).
-
 ## TD-1097: `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load
 
 **Priority:** Low
@@ -2024,3 +2006,21 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when** the test passes 50 runs alone and 20 under `pdm run test`, and `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1039 (the build that wrote the test), TD-1087, TD-1088 (the other load flakes).
+
+## TD-1100: Under `-n auto`, `tests/test_link.py` fails 31 of its 68 tests with *connection refused* on a node's `agent.sock`, and each passes alone
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-1, met verifying TD-1088)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_link.py` (the node fixtures that start a node's agent and dial its `agent.sock`)
+
+**Why:** `pdm run pytest -q -n auto tests/test_link.py` on 2026-10-27 00:20 local (load 21, the org's sessions beside it) failed 31 of 68, each `ConnectionRefusedError` from `open_unix_connection` on the node's `<tmp>/kmaster/agent.sock`, or an `assert False` after it; a full `pdm run test -n auto` failed the same 31. `-k crashing_until` alone passed. The suite's own run is `-n 8` (`pdm run test`), where the file passes, so nothing gates on it yet — but a dial that runs before the node's agent listens is a wait bounded on something other than the listen.
+
+**Fix:** find what the node fixture waits on before the first dial and make it wait for the socket to accept (TD-1050's shape), or show the refusal is the worker count alone. Reproduce with the command above.
+
+**Done when** `pytest -n auto tests/test_link.py` passes 10 runs in a row on a loaded machine, and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1087 (four other tests that fail only under `-n auto`), TD-1050, TD-1088.
