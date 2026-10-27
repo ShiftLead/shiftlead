@@ -118,7 +118,7 @@ not mix:
   that uses it is current again. — *proposed* 2026-10-04 (design §4.9c).
 - **role** — a skillset preset an agent is started from: brief template, lane shape, grants,
   profile, and a **kind** (`worker`, `seat`, `manager`, `plain`) — the one fact a flow asks of it
-  (design §4.9c, TD-307). Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `designer`, `techlead`, `auditor`, `manager`,
+  (design §4.9c, TD-307). Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `designer`, `techlead`, `auditor`, `sweeper`, `manager`,
   `plain` (`manager` was `lead` until 2026-09-20, TD-076, and `orchestrator` until 2026-09-17, TD-055 step 2; neither old name resolves, TD-107). A role may carry a display `label:` — what the badge shows; nothing keys on it. *Not:* type. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
 - **look** — a message to the person that names screenshots: a builder's question about a
   merged change to a page, for the one thing its checks and the techlead could not settle. A
@@ -137,7 +137,7 @@ not mix:
   nothing and is not counted in a wind-down (design §4.9b). Workers are members, not seats. On
   a card a seat with nobody in it reads **on call** — *empty* and *filled* are what the home's
   tick does to it, *on call* is what a person sees (TD-097). Every seat has a **trigger**: the
-  techlead's is a question; an **auditor**'s is a count of merged PRs or a period (TD-098). —
+  techlead's is a question; an **auditor**'s is a count of merged PRs or a period (TD-098); a **sweeper**'s is its board's `Swept:` stamp growing old (TD-1061). —
   **decided** 2026-09-21 (asked for by Paul: the word was in use and not defined; *on call* his
   choice the same evening).
 - **on call** — what a seat's card says while nobody is in it: grey, nothing for the person to
@@ -147,6 +147,10 @@ not mix:
 - **auditor** — a role for a seat with a trigger: checks one area (docs, tests) every n merged
   PRs or every so often, files what it finds, and ends. Hunter-shaped unless its brief says
   otherwise. — *proposed* 2026-09-21 (design §4.9b *Seats with a trigger*, TD-098).
+- **sweeper** — a role for a seat with a trigger: runs its repo's stranded-work sweep once the
+  board's `Swept:` stamp is old, closing only what it verified done and bringing the rest to the
+  person. The Settings page's **Sweep** switch gives every served repo one. — *proposed* 2026-10-26
+  (design §4.9b *The sweep*, TD-1061).
 - **grinder** — a role: resolves each lane item to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.

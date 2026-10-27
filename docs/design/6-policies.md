@@ -216,7 +216,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b), and the tick computes **`seat_due: {at,
      by}`** from it — set only once the trigger is met, `by` naming what met it (`asks`, `prs`,
-     `every`, `work`, **`tag`** — the repo's tagging seat while the reading's `needs_team` holds
+     `every`, **`swept`**, `work`, **`tag`** — the repo's tagging seat while the reading's `needs_team` holds
      ids not yet filled for, `seat_due: {at, by: tag, ids}` and `seat_filled` keeping `{by: tag,
      ids}`, so a fill is once per set of ids (§4.4 *An entry names its team*, TD-730) — and `prompt`, the org's director seat's alone: due while a prompt no rule of the
      person's answered is pending on an unattended record of the org whose adapter has a permission
@@ -232,11 +232,30 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      reports' five-minute cadence, one read per repo, at the home in the seat's checkout (a
      node's is at the same absolute path, §4.4a; a path the home cannot see gives no reading), a
      read that failed leaving the last reading rather than zero; for `every: <d>`, when `d` has
-     passed since it was created. A seat whose run never started, its brief lost at launch, is replayed by rule 1's *A lost
+     passed since it was created; for `swept: <d>` (§4.9b *The sweep*, TD-1061), when the repo's
+     board's `Swept:` stamp is older than `d` or absent, read with the board at the repo facts'
+     cadence (§4.4), **and** `d` has passed since the seat's last `seat_filled` entry `by: swept`, so a
+     pass that wrote no stamp is not refilled at once — a board that cannot be read sets nothing. **A
+     switch-made sweep seat** (`sweep:` in `settings.yml`, §4.9b *The sweep*) is written by `ao team
+     start` with the mark `{trigger: swept, after: <every>, by: settings}`; the tick computes its cause
+     only while `sweep.on` is true, the repo is not `off`, no live record of the repo carries a
+     `trigger: swept` mark that is not `by: settings`, and its team is the first live one in the
+     repo's order of teams among the repo's `by: settings` seats — any other is never due — with `d`
+     read from `sweep.every` at the cause, not the mark. For a sweep seat, the eligibility (these
+     tests, and the stamp read from the repo reading's `swept`, §4.9b) is tested before a standing
+     `seat_due` is returned, and a seat that fails it has its `seat_due` cleared, so a switch turned off
+     fills nothing already due. Every `swept` fill writes its cause to `seat_filled` (`{by: swept,
+     at}`), as a `team` or `tag` fill does — the fill's cause is kept for a `swept` trigger as for
+     theirs — which is what the next cause's wait is measured from; unlike
+     theirs, it adds no *you are filled for* line to the prompt (`filled_for` gives none for `swept`), since
+     the brief reads the stamp itself. The
+     stamp is the boards reading's `swept` (§4.9b *The sweep*): null — origin holding no board file, or
+     no read against origin yet — sets no cause, and neither does an `error` reading, whatever `swept`
+     it carries from the last; `{at: null}`, a board without the line, is due. A seat whose run never started, its brief lost at launch, is replayed by rule 1's *A lost
      brief* (TD-717), not filled here. A supervised seat that is `exited` or `closed` with `seat_due`
      set, not suspended, on a profile that is not gated, is filled: `create` with `keep_mail`
      (§4.9b), the launch record, and `seat_due` cleared; a seat that is `idle` with no `seat_due` —
-     or with a `prs` or `every` one, met while it ran and so the next fill's cause (the count starts again at the fill, from the new record's creation) —
+     or with a `prs`, `every` or `swept` one, met while it ran and so the next fill's cause (the count starts again at the fill, from the new record's creation) —
      hook-confirmed for two minutes (`SEAT_IDLE_GRACE`, so a fill is not closed before its prompt
      lands), with nothing dirty or unpushed and **no live subagent and no live background shell** (§4.2 *Working on its own*,
      TD-734, TD-761: a seat that ended its turn on an Agent-tool reviewer or a background CI wait is working, as its card says; its
