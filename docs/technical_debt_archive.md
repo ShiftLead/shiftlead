@@ -19996,4 +19996,4 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 
 **Related:** TD-1036.
 
-**Resolved:** 2026-10-26 (grinder-ao-1, #PR) — `test_the_open_read_writes_prechecked_on_each_row` (`tests/test_pr_wait.py`) runs `_gh_prs` over a faked `gh pr list` with `OPEN_PR_FIELDS`, one head carrying a `cadence/precheck` status and one not, and asserts `prechecked` True and False on the rows, and no `prechecked` on the closed read. The probe (the `prechecked` line replaced with `pass`) fails it.
+**Resolved:** 2026-10-26 (grinder-ao-1, #2417) — `test_the_open_read_writes_prechecked_on_each_row` (`tests/test_pr_wait.py`) runs `_gh_prs` over a faked `gh pr list` with `OPEN_PR_FIELDS`, one head carrying a `cadence/precheck` status and one not, and asserts `prechecked` True and False on the rows, and no `prechecked` on the closed read. The probe (the `prechecked` line replaced with `pass`) fails it.
