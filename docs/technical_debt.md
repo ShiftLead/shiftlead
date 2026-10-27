@@ -2027,7 +2027,7 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 
 **Fix:** design §4.5 screen 12 *A card* (the spine, the relation words, the fold, the parts meter, amber spent on the person alone), §4.5a *Queue page: card*; the chosen shape in [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §3 and its review page `docs/mockups/reviews/2026-10-27-queue-card-c.html` (§3 governs where the page differs: the meter's colours and the top entry). Parts hang on their parent's spine by `part_of`; each open blocker is *after TD-n*, a link that scrolls to and rings its row, lit on hover or focus; finished parts fold to *✓ n done*, opening in place, finished loose rows to one line at the card's end; the parts meter, one segment per part in `branch()`'s four colours with *d/n*, on every parent row and on the header; *also after* goes. Phone width as screen 12's rows are today.
 
-**Done when** the page tests pin a TD-748-shaped card's spine, words, fold (last in its group, after the open parts) and meter, a headless Chromium shot of the live-shaped card at desktop and phone width is in the PR (`docs/mockups/reviews/<date>-td1131-*.png`), and `pdm run test` passes.
+**Done when** the page tests pin a TD-748-shaped card's spine, words, fold (first on the spine, directly under the parent) and meter, a headless Chromium shot of the live-shaped card at desktop and phone width is in the PR (`docs/mockups/reviews/<date>-td1131-*.png`), and `pdm run test` passes.
 
 ---
 
@@ -2060,13 +2060,13 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Status:** Open — build
 **Blocked by:** TD-1130, TD-1131, TD-1132
 **Waits:** event — TD-1130 and TD-1132 promoted live (the host agent, `ao`, and every container node's wheel)
-**Location:** `docs/briefs/designer-ao-1.md` and every team brief under `docs/briefs/` (held: `docs/briefs/**`); `docs/technical_debt.md` (every open `design-first` entry whose `Blocked by:` names an open or archived build, found by reading each one's `Blocked by:` against its builds by hand — the ledger cannot tell a build from a blocker; 18 on 2026-10-27. The check's *legacy edge* ℹ only flags a pair half converted); the fallbacks TD-1130 writes (`src/sessionorc/ledger.py`, `src/sessionorc/queue.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/inbox.py`)
+**Location:** `docs/briefs/designer-ao-1.md` and every team brief under `docs/briefs/` (held: `docs/briefs/**`); `docs/technical_debt_archive.md` (each converted design's archived builds); `docs/technical_debt.md` (every open `design-first` entry whose `Blocked by:` names an open or archived build, found by reading each one's `Blocked by:` against its builds by hand — the ledger cannot tell a build from a blocker; 18 on 2026-10-27. The check's *legacy edge* ℹ only flags a pair half converted); the fallbacks TD-1130 writes (`src/sessionorc/ledger.py`, `src/sessionorc/queue.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/inbox.py`)
 
 **Why:** TD-1129: until a design's builds carry `Part of:`, its card still reads it as blocked by them (design §4.4 *Rows*, *A design not yet backfilled*). An older reader reads a backfilled design as pickable, so the backfill waits for the promote.
 
 **Fix:** [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §4 step 6.
 1. **`docs/briefs/` first**, the first PR after the promote: no designer team is started between the promote and its merge. A team's brief is read from the checkout at team start, so it must not tell a designer to stop listing builds before the live reader knows `Part of:`.
-2. **One PR per design**: its parts' `Part of:` lines and its `Blocked by:` edit land together, each checked with `dev-cadence run ledger.py --pickable` before and after (the design stays not pickable). Each design's `Blocked by:` is read by hand: TD-1029 and TD-857 name only real blockers and keep them; TD-786 stays a part of TD-112 and a blocker of TD-857; whether TD-909 names dev-cadence#TD-121/#TD-122 is judged entry by entry. TD-1129 itself, with TD-1130–TD-1133, is one of them.
+2. **One PR per design**: its parts' `Part of:` lines — its open builds in the ledger and its archived ones in `docs/technical_debt_archive.md`, so the card keeps its finished items (§4.4 *Completed cards*) — and its `Blocked by:` edit land together, each checked with `dev-cadence run ledger.py --pickable` before and after (the design stays not pickable). Each design's `Blocked by:` is read by hand: TD-1029 and TD-857 name only real blockers and keep them; TD-786 stays a part of TD-112 and a blocker of TD-857; whether TD-909 names dev-cadence#TD-121/#TD-122 is judged entry by entry. TD-1129 itself, with TD-1130–TD-1133, is one of them.
 3. **The last PR removes TD-1130's *not yet backfilled* fallbacks** (§4.4 *Rows*), once no design is left to convert.
 4. The *Done when … Blocked by: names them* sentences (TD-748, TD-909, TD-857, TD-1009) are fixed as they are touched.
 
