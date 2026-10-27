@@ -52,6 +52,11 @@ LAUNCHER = Path(__file__).with_name("dev_cadence.py")
 LAUNCHER_COMMIT = "8008a10e50e9b70cd571984bb2810d79d59c94c7"
 TREE_TIMEOUT = 330.0  # one resolve: the launcher's first clone or fetch of a source is bounded at 300 s
 GATE_SCRIPT = "check_cadence.py"  # the gate, as the pinned tree's `files/scripts/` holds it
+# the copy's paths, while a repo still has a lock (a brief's layout slots, §5 *The seams*); dev-cadence's own
+# source holds each under `files/`, and a pinned tree's `files/` holds each by the same relative path
+COPY_GATE = f"scripts/{GATE_SCRIPT}"
+COPY_LEDGER = "scripts/ledger.py"
+COPY_RULES = "docs/cadence.md"
 PINNED_GATE = f"dev-cadence run {GATE_SCRIPT} --pr {{pr}} --json"
 TREE_FOR = 60.0  # one resolve answers every reader of one reading: a launcher that cannot fetch is asked once
 _trees: dict[tuple[str, tuple[str, str] | None], tuple[float, tuple[Path | None, str | None]]] = {}
@@ -135,10 +140,14 @@ def command(repo: Path | str, word: str, *args: str) -> tuple[list[str], dict[st
     return argv, {**os.environ, "CADENCE_REPO_ROOT": str(repo)}
 
 
-def typed(word: str, *args: str) -> str:
+def typed(word: str, *args: str, venv: str | None = None) -> str:
     """The resolver's command for `word` as a brief names it for a session to type (§5 *The seams*): the
     vendored launcher under this install's Python, with no `-C`, so it resolves the checkout the session
-    runs in — a worktree's own ledger, a bump branch's own pin — and sets `CADENCE_REPO_ROOT` itself."""
+    runs in — a worktree's own ledger, a bump branch's own pin — and sets `CADENCE_REPO_ROOT` itself. For a
+    session on a container node, `venv` is the node's own (`containers.INSIDE_VENV`), where the home's paths
+    are not there: its `bin/dev-cadence`, the console script over the same launcher under the node's Python."""
+    if venv is not None:
+        return shlex.join([f"{venv}/bin/dev-cadence", word, *args])
     return shlex.join([sys.executable, str(LAUNCHER), word, *args])
 
 

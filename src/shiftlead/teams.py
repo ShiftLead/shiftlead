@@ -836,6 +836,11 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     checkout, read = _checkout(org, team, home, host, here, files, where)
     try:
         cfg = repoconfig.load(checkout, read=read)
+        if host != here:
+            from sessionorc import containers  # docker's module, loaded only when a node is in play
+
+            if host in containers.container_nodes():  # its briefs name the node's own launcher (§5, TD-1014)
+                cfg.venv = containers.INSIDE_VENV
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
     except (KeyError, ValueError, OSError) as e:
         raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None

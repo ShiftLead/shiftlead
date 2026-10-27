@@ -526,6 +526,40 @@ def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
     assert "has no checkout on devenv (declared on kmaster)" in capsys.readouterr().err
 
 
+def test_a_container_nodes_member_is_told_the_nodes_own_launcher(world, monkeypatch):
+    """TD-1014 (5), design §5 *The layout slots*: a container node shares the checkout's path, so its
+    briefs are read here, but the home's Python and launcher are not in the node — a pinned repo's
+    `{gate}`, `{ledger_check}` and `{cadence_rules}` name the node venv's `bin/dev-cadence` there, and the
+    home's own member keeps the home's command."""
+    from sessionorc import cadence, containers
+
+    tmp_path, state = world
+    checkout = tmp_path / "shiftlead"
+    (checkout / "docs").mkdir()
+    (checkout / "docs" / "cadence.toml").write_text('[dev-cadence]\nsource = "x"\nref = "y"\n')
+    (checkout / "docs" / "grind.md").write_text("gate {gate}; check {ledger_check}; {cadence_rules}\n")
+    (checkout / ".shiftlead.yml").write_text(yaml.safe_dump({"roles": {"grinder": {"brief": "docs/grind.md"}}}))
+    doc = org_doc(tmp_path)
+    doc["projects"]["ao"]["repos"]["shiftlead"]["cm"] = str(checkout)  # the node's volume shares the path
+    doc["teams"]["ao-grind"]["host"] = "cm"
+    write_org(tmp_path, doc)
+    monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": object()})
+    state["elsewhere"] = {str(checkout)}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    prompt = {p["name"]: p for p in creates(state)}["grind-1"]["prompt"]
+    node = f"{containers.INSIDE_VENV}/bin/dev-cadence"
+    assert f"gate {node} run check_cadence.py --pr <n>;" in prompt
+    assert f"check {node} run ledger.py --check;" in prompt and f"`{node} path cadence.md` prints" in prompt
+    assert cadence.typed("run", "check_cadence.py") not in prompt
+    # the same team on the home: the home's own command
+    doc["teams"]["ao-grind"].pop("host")
+    write_org(tmp_path, doc)
+    state["sessions"], state["calls"] = [], []
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    prompt = {p["name"]: p for p in creates(state)}["grind-1"]["prompt"]
+    assert f"gate {cadence.typed('run', 'check_cadence.py')} --pr <n>;" in prompt and node not in prompt
+
+
 def test_stop_degrades_per_member_when_one_is_refused(world, capsys):
     """The 3b leftover: a member whose host is unreachable is named with the reason, and the rest
     are still wrapped up — the stop never aborts on the first refusal."""

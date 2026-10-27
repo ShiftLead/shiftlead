@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from sessionorc import adapters, held, ledger
+from sessionorc import adapters, cadence, held, ledger
 from sessionorc import ledgerboard as lb
 from sessionorc.models import PR_CLOSED, FindingEntry, ProgressEntry, normalize_ref
 
@@ -308,7 +308,7 @@ OPEN_PR_FIELDS = (
 # a sync PR (design §4.4 *A sync PR is the team's at once*, TD-684): its head branch as dev-cadence's
 # `sync-all.sh` names it, and the lock among its changed files
 SYNC_BRANCH = "cadence-sync-"
-SYNC_LOCK = "docs/cadence-sync.lock"
+SYNC_LOCK = cadence.LOCK
 JOB_URL = re.compile(r"/actions/runs/(\d+)/job/(\d+)")  # an Actions job's check run (`detailsUrl`, TD-686)
 NOT_STARTED = "The job was not started because"  # GitHub's annotation on a job it never ran (TD-686)
 GITHUB_ORIGIN = re.compile(r"(^|[@/])github\.com[:/]")  # a remote on GitHub, ssh or https (TD-686)

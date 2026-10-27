@@ -183,10 +183,7 @@ LAYOUT_SLOTS = (
 )
 PR_PLACEHOLDER = "{pr}"
 PR_IN_BRIEF = "<n>"
-CHECK_CADENCE = "scripts/check_cadence.py"
-LEDGER_SCRIPT = "scripts/ledger.py"
 DESIGN_DIR = "docs/design/"
-CADENCE_DOC = "docs/cadence.md"
 PIN_HEADER = "[dev-cadence]"  # a pinned repo's `docs/cadence.toml` table (dev-cadence TD-129)
 SOURCE_PREFIX = "files/"  # dev-cadence's own source holds every dev-cadence path under it (§5 *The seams*)
 NO_TEST = "no test command: run what the repo's README says"
@@ -203,9 +200,10 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
     """Each of `LAYOUT_SLOTS` for `cfg`'s repo (design §5 *The seams*, TD-1011): the cadence's slots
     dev-cadence's paths — under `files/` in dev-cadence's own source (`cadence.is_source`'s test, read with `there`),
     read the way the file was, `cfg.read`; in a pinned repo (`[dev-cadence]` in its `docs/cadence.toml`, no lock)
-    the resolver's command as a session types it, `cadence.typed` (TD-1014) — and `board:` and `ledger:` where
-    the file sets them; `{test}` and `{lint}` `commands:`'s, `{design_dir}` the directory where the checkout
-    holds it, each else its seam's sentence. `{gate}` still holds `{pr}`: the brief's text fills it last."""
+    the resolver's command as a session types it, `cadence.typed` (TD-1014), under `cfg.venv` where set —
+    and `board:` and `ledger:` where the file sets them; `{test}` and `{lint}` `commands:`'s, `{design_dir}`
+    the directory where the checkout holds it, each else its seam's sentence. `{gate}` still holds `{pr}`: the
+    brief's text fills it last."""
 
     def there(rel: str) -> bool:
         if cfg.root is None:
@@ -249,13 +247,14 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
     source = any(there(mark) for mark in cadence.SOURCE_MARKS) and there(SOURCE_PREFIX.rstrip("/"))
     pre = SOURCE_PREFIX if source else ""
     if not pre and pinned():  # the resolver's command, as the session types it (TD-1014)
-        gate = f"{cadence.typed('run', cadence.GATE_SCRIPT)} --pr {PR_PLACEHOLDER}"
-        ledger_check = cadence.typed("run", Path(LEDGER_SCRIPT).name, "--check")
-        rules = f"read the file `{cadence.typed('path', Path(CADENCE_DOC).name)}` prints, §1–§4"
+        venv = cfg.venv  # a container node's own, where the session types it (TD-1014)
+        gate = f"{cadence.typed('run', cadence.GATE_SCRIPT, venv=venv)} --pr {PR_PLACEHOLDER}"
+        ledger_check = cadence.typed("run", Path(cadence.COPY_LEDGER).name, "--check", venv=venv)
+        rules = f"read the file `{cadence.typed('path', Path(cadence.COPY_RULES).name, venv=venv)}` prints, §1–§4"
     else:
-        gate = f"python3 {pre}{CHECK_CADENCE} --pr {PR_PLACEHOLDER}"
-        ledger_check = f"python3 {pre}{LEDGER_SCRIPT} --check"
-        rules = f"read {pre}{CADENCE_DOC} §1–§4"
+        gate = f"python3 {pre}{cadence.COPY_GATE} --pr {PR_PLACEHOLDER}"
+        ledger_check = f"python3 {pre}{cadence.COPY_LEDGER} --check"
+        rules = f"read {pre}{cadence.COPY_RULES} §1–§4"
     return {
         "{gate}": gate,
         "{board}": cfg.board or str(workorders.BOARD),
@@ -678,6 +677,9 @@ class RepoConfig:
     held_sets: dict[str, list[str]] | None = None
     # how the repo's files were read (`load`'s `read`): its role directories are read the same way (§4.9c)
     read: Reader | None = field(default=None, repr=False, compare=False)
+    # §5 *The seams* (TD-1014): the venv a pinned repo's briefs name the resolver's command in — a container
+    # node's own (`containers.INSIDE_VENV`), set by the team's launch there; None: this install's Python
+    venv: str | None = field(default=None, repr=False, compare=False)
 
 
 @lru_cache(maxsize=64)
