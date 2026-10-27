@@ -606,6 +606,16 @@ def unread_line(n: int) -> str:
     return f"[shiftlead] you have {int(n)} unread messages — run ao inbox"
 
 
+def _at_or_after(a: str, b: str | None) -> bool:
+    """Whether the instant `a` is no earlier than `b` (an unreadable one: no)."""
+    try:
+        return not b or datetime.fromisoformat(a.replace("Z", "+00:00")) >= datetime.fromisoformat(
+            b.replace("Z", "+00:00")
+        )
+    except ValueError:
+        return False
+
+
 def _hours(d: timedelta) -> str:
     h = d.total_seconds() / 3600
     return f"{h:g} h" if h >= 1 else f"{int(d.total_seconds() // 60)} min"
@@ -764,6 +774,13 @@ def read_when(
             return "lands without waking it: its wake budget is spent, read on its next look" + tail
         if cache:
             return "started again on its brief within a tick, and reads it first" + tail
+        failed = s.doorbell_failed or {}
+        if failed.get("at") and _at_or_after(failed["at"], s.since):
+            # this idle stretch's ring did not land (§4.10 *The doorbell*, TD-1079): never *rung*
+            return (
+                f"lands; its doorbell failed at {failed['at']} ({failed.get('error') or 'unknown'}), so nothing"
+                " was typed — read on its next look or its next `ao` reply" + tail
+            )
         return 'rung within a tick: the doorbell types "you have n unread" into its pane' + tail
     return (
         "lands; its idle is a guess from the screen, so nothing is typed into it"

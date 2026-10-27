@@ -135,7 +135,7 @@ class WakeMixin:
             return "a wrap-up under way"  # mail never pushes a session past its stop
         if s.gated:
             return "paused by the usage gate"  # mail never wakes a session the gate paused (§6)
-        if self.blocked_in_wait(s.id):
+        if self.blocked_in_wait(self._address(s)):  # a node's record: the forwarded wait's `id@node` caller
             return "blocked in wait"  # reachable already: the wait takes the decision
         return None
 
@@ -143,22 +143,32 @@ class WakeMixin:
         """Each tick: start a ring for every session the doorbell may ring. A ring is its own task,
         since a submit takes seconds and the tick must not wait on it; one per session at a time.
         One ring per idle stretch; a failed one is tried once more in the same stretch, then
-        recorded, and nothing more is typed until the session's state next changes."""
+        recorded, and nothing more is typed until the session's state next changes.
+
+        A node's record is rung by the same decision through its node (§4.4a *The doorbell rings a node's
+        session through its node*, TD-1079): every record in the graph whose link is up, each keyed by its
+        address, a node's stretch read from `since`, since `rev` never moves on the home's copy."""
         if self.mode == "node":
-            return  # the mailbox is the home's; a node's doorbell is the forwarded `wait` (§4.4a)
+            return  # the mailbox is the home's, and the home rings this node's records through it (TD-1079)
         now = datetime.now(UTC)
-        for s in list(self.sessions.values()):
-            if s.id in self._ringing:
+        for s in list(self._graph().values()):
+            here = s.host == self.host
+            if not here and s.host not in self._link_muxes:
+                continue  # its link is down: `unreachable`, and rung once the link is back
+            addr = self._address(s)
+            if addr in self._ringing:
                 continue
-            bell = self._bells.get(s.id)
-            if bell is not None and bell["rev"] != s.rev:
-                del self._bells[s.id]  # its state changed: a new stretch
+            stretch = s.rev if here else s.since
+            bell = self._bells.get(addr)
+            if bell is not None and bell["rev"] != stretch:
+                del self._bells[addr]  # its state changed: a new stretch
                 bell = None
             if not s.unread() or self._bell_blocked(s, now):
                 continue
             if bell is not None and (bell["rung"] or bell["failures"] >= DOORBELL_TRIES):
                 continue
-            self._ringing[s.id] = asyncio.create_task(self._ring(s.id, retry=bell is not None))
+            ring = self._ring(s.id, retry=bell is not None) if here else self._ring_node(s, retry=bell is not None)
+            self._ringing[addr] = asyncio.create_task(ring)
 
     async def _ring(self, sid: str, *, retry: bool) -> None:
         try:
@@ -231,6 +241,132 @@ class WakeMixin:
             s.doorbell_failed = None
             self._save(s)
         await self._push_changes()
+
+    # -- a node's record, rung through its node (design §4.4a, §4.10 *The doorbell*, TD-1079) -----------
+
+    async def _ring_node(self, s: Session, *, retry: bool) -> None:
+        addr = self._address(s)
+        try:
+            await self._ring_node_once(s, addr, retry=retry)
+        except Exception:  # noqa: BLE001 — a detached task: a ring that breaks is a log line
+            log.exception("doorbell for %s failed", addr)
+        finally:
+            self._ringing.pop(addr, None)
+
+    async def _ring_node_once(self, s: Session, addr: str, *, retry: bool) -> None:
+        """One ring of a node's record, decided here and typed there. The budget and the watermark are
+        checked first and charged nothing; the `ring` act carries the line built here, the record's
+        `since` and a fresh token; the decision is recorded on `typed` alone. `busy` keeps no bell and is
+        looked at again next tick; `typed` and `failed` keep the bell for the stretch, a failure retried
+        once (the node writes `doorbell_failed` when the retry fails); no verdict is nothing at all."""
+        fresh = mail.undecided_mail(s)
+        if not fresh or (not any(e.uncharged for e in fresh) and mail.wake_budget_spent(s, datetime.now(UTC))):
+            return  # nothing new since the last wake, or the budget is spent: the mail waits
+        since, token = s.since, secrets.token_hex(6)
+        self._rang.pop(addr, None)  # a new ring: a judgement still pending for an older one drops uncounted
+        dispatched = datetime.now(UTC).replace(microsecond=0)  # `read_at` is whole seconds: the window favours a read
+        act = {"id": s.id, "retry": retry, "since": since, "line": mail.unread_line(s.unread()), "token": token}
+        verdict = await self._route_ring(s.host, act)
+        if verdict is None or verdict == "busy" or self._graph().get(addr) is not s:
+            return  # no verdict, or the next tick looks again: nothing charged, nothing kept
+        bell = self._bells.get(addr)
+        if bell is None or bell["rev"] != since:
+            bell = self._bells[addr] = {"rev": since, "rung": False, "failures": 0}
+        if verdict == "failed":
+            bell["failures"] += 1
+            log.warning("doorbell for %s did not submit (%d of %d)", addr, bell["failures"], DOORBELL_TRIES)
+            return
+        self._decide_wake(s, member_change=False, via="doorbell")
+        bell["rung"] = True
+        self._rang[addr] = {"token": token, "dispatched": dispatched}  # judged from the report bringing its Stop
+        await self._push_changes()
+
+    async def _ring_here(self, p: dict[str, Any]) -> dict[str, Any]:
+        """The home's `ring` act, on the node that holds the pane (§4.4a, TD-1079): `{id, retry, since, line,
+        token}`. `busy` when the state moved since the home's copy (`since`), a send is typing, a dialog is
+        up or the composer holds words; on a retry those words are the first try's line, which is `failed`
+        (*prompt-stuck*). The line is the home's, typed verbatim — only ever the unread line. `ring_seen`
+        is written before typing, since the tool's prompt hook can land before the submit confirmation."""
+        line = str(p.get("line") or "")
+        if line != mail.unread_line(int("".join(c for c in line if c.isdigit()) or 0)):
+            raise RpcError("a ring types the unread line and nothing else")
+        sid = str(p.get("id") or "")
+        s = self.sessions.get(sid)
+        if s is None:
+            return {"result": "busy", "record": None}
+        typing = self._typing[sid]
+        if s.since != p.get("since") or typing.locked():
+            return {"result": "busy", "record": s.to_dict()}
+        async with typing:
+            verdict = await self._ring_here_typing(s, p, line)
+        s = self.sessions.get(sid)
+        return {"result": verdict, "record": s.to_dict() if s is not None else None}
+
+    async def _ring_here_typing(self, s: Session, p: dict[str, Any], line: str) -> str:
+        sid, since, retry = s.id, s.since, bool(p.get("retry"))
+        adapter = adapters.get(s.adapter)
+        reader = getattr(adapter, "composer", None)
+        if reader is None:
+            return self._ring_here_failed(s, "no composer", retry=retry)
+        tail = await asyncio.to_thread(self.tmux.capture_tail, sid, COMPOSER_LINES, raw=True)
+        if self.sessions.get(sid) is not s or s.since != since:
+            return "busy"  # it moved while the screen was read
+        composer = reader(tail)
+        if composer is None or (composer and not retry):
+            return "busy"  # a dialog, or someone's words
+        if composer:  # the first try's own line is still there: nothing more is typed
+            return self._ring_here_failed(s, "prompt-stuck: the line is still in the composer", retry=retry)
+        was, s.ring_seen = s.ring_seen, {"token": str(p.get("token") or ""), "at": now_iso()}
+        try:
+            await self._type(sid, adapter, line)  # the lock is held already
+        except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste: both a failed ring
+            if self.sessions.get(sid) is not s:
+                return "failed"
+            s.ring_seen = was
+            return self._ring_here_failed(s, str(e) or type(e).__name__, retry=retry)
+        s.doorbell_failed = None
+        self._save(s)
+        await self._push_changes()
+        return "typed"
+
+    def _ring_here_failed(self, s: Session, error: str, *, retry: bool) -> str:
+        log.warning("doorbell for %s did not submit (%s): %s", s.id, "the retry" if retry else "the first try", error)
+        if retry:
+            s.doorbell_failed = {"at": now_iso(), "error": error}
+            self._save(s)
+        return "failed"
+
+    @staticmethod
+    def _stamp_ring_seen(s: Session, event: dict[str, Any]) -> None:
+        """On the node, a rung record's hooks stamp its `ring_seen`: `turned` at the next prompt, `stopped`
+        at the Stop after it — the fields the home judges the ring from, since it hears no hook (TD-1079)."""
+        seen = s.ring_seen
+        if not seen or seen.get("stopped"):
+            return
+        if event.get("prompt"):
+            if not seen.get("turned"):
+                s.ring_seen = {**seen, "turned": now_iso()}
+        elif event.get("state") == "idle" and seen.get("turned"):
+            s.ring_seen = {**seen, "stopped": now_iso()}
+
+    def _judge_ring_seen(self, addr: str, s: Session) -> None:
+        """A node's report, judged against the home's ring of that record (TD-1079), as `_bell_answered`
+        judges one host's: once, when a report first brings the Stop's stamp, on this home's clock — an
+        entry of its mailbox read between the ring's dispatch and now ends the run. A `ring_seen` of
+        another token (a newer ring, or lost to a node restart) drops the pending judgement uncounted."""
+        rang = self._rang.get(addr)
+        if rang is None:
+            return
+        seen = s.ring_seen or {}
+        if seen.get("token") != rang["token"]:
+            del self._rang[addr]
+            return
+        if not (seen.get("turned") and seen.get("stopped")):
+            return
+        del self._rang[addr]
+        now = datetime.now(UTC)
+        read = any(e.read_at and rang["dispatched"] <= _parse(e.read_at) <= now for e in s.inbox)
+        self._ring_judged(s, addr, read=read)
 
     # -- the brief typed at the composer (design §4.1 *No prose in the argv*, TD-339) ------------------
 
@@ -434,6 +570,9 @@ class WakeMixin:
         or the bell stops*, TD-347). The ring's turn starts with its prompt (`UserPromptSubmit`); at
         that turn's `Stop` — the next hook `idle` — an unread count no lower than the ring's is one
         more unread ring, a lower one ends the run. `DOORBELL_HELD` in a row set `doorbell_held`."""
+        if self.mode == "node":
+            self._stamp_ring_seen(s, event)  # the home judges this node's rings from its report (TD-1079)
+            return
         rang = self._rang.get(s.id)
         if rang is None:
             return
@@ -443,19 +582,24 @@ class WakeMixin:
         if event.get("state") != "idle" or not rang["turned"]:
             return
         del self._rang[s.id]
-        if s.unread() < rang["count"]:
-            self._unread_rings.pop(s.id, None)  # it read: the run ends
+        self._ring_judged(s, s.id, read=s.unread() < rang["count"])
+
+    def _ring_judged(self, s: Session, key: str, *, read: bool) -> None:
+        """A ring's turn ended: a read ends the run; nothing read is one more unread ring, and
+        `DOORBELL_HELD` in a row set `doorbell_held`. `key` is the record's address."""
+        if read:
+            self._unread_rings.pop(key, None)  # it read: the run ends
             return
-        run = self._unread_rings[s.id] = self._unread_rings.get(s.id, 0) + 1
+        run = self._unread_rings[key] = self._unread_rings.get(key, 0) + 1
         if run >= mail.DOORBELL_HELD and not s.doorbell_held:
             s.doorbell_held = {"at": now_iso(), "rings": run}
-            log.info("%s: doorbell held after %d rings answered with nothing read", s.id, run)
+            log.info("%s: doorbell held after %d rings answered with nothing read", key, run)
 
     def _bell_cleared(self, s: Session) -> bool:
         """A read, or a person's act toward it, ends the run and lifts `doorbell_held` (TD-347).
         True when the record changed, for the caller to save."""
-        self._rang.pop(s.id, None)
-        self._unread_rings.pop(s.id, None)
+        self._rang.pop(self._address(s), None)
+        self._unread_rings.pop(self._address(s), None)
         if not s.doorbell_held:
             return False
         s.doorbell_held = None

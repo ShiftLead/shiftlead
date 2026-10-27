@@ -571,6 +571,27 @@ class RemoteMixin:
         await self._push_changes()
         return result
 
+    async def _route_ring(self, host: str, params: dict[str, Any]) -> str | None:
+        """The doorbell's `ring` act on a node's record (§4.4a *The doorbell rings a node's session through
+        its node*, TD-1079), routed as `send` is: the node's verdict — `typed`, `busy` or `failed` — with the
+        record as it now stands taken at once. None is no verdict: the link down, dropped, or silent past
+        `ACT_TIMEOUT` — nothing charged, nothing written. A node that refuses the act (an older build) failed it."""
+        mux = self._link_muxes.get(host)
+        if mux is None:
+            return None
+        try:
+            reply = await mux.request("act", timeout=ACT_TIMEOUT, rpc="ring", params=params, caller=None)
+        except link.LinkError as e:
+            log.warning("doorbell for %s@%s: the node refused the ring: %s", params.get("id"), host, e)
+            return "failed"
+        except (link.LinkClosed, TimeoutError):
+            return None
+        reply = reply if isinstance(reply, dict) else {}
+        if reply.get("record"):
+            self._take_records(host, [reply["record"]], whole=False)
+        verdict = reply.get("result")
+        return verdict if verdict in ("typed", "busy", "failed") else None
+
     async def _serve_link(self, info: Any, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         """One node's link, for as long as it lasts. The host name is the one sshd's forced command
         announced — it came from `authorized_keys`, never from the node — and everything the link
@@ -884,6 +905,7 @@ class RemoteMixin:
             except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
                 log.warning("link from %s: could not take %s: %s", host, rid, e)
                 continue
+            self._judge_ring_seen(f"{rid}@{host}", mine[rid])  # a ring's Stop, judged here (§4.10, TD-1079)
             self._remote_store(host).save(mine[rid])
         if whole:
             for rid in [r for r in mine if r not in seen]:
@@ -979,6 +1001,8 @@ class RemoteMixin:
         self._drop_launch(f"{rid}@{host}")
         self._remote_store(host).delete(rid)
         address = f"{rid}@{host}"
+        for side in (self._bells, self._rang, self._unread_rings):
+            side.pop(address, None)  # a ring's stretch and run are the record's: a reused id starts at none
         for last in self._subscribers.values():
             last.pop(address, None)
         self._gone.append(address)

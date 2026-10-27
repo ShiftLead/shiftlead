@@ -3348,8 +3348,7 @@ class TickMixin:
         """The mark went: each live member refused while it stood is rung, once, within its wake budget
         (§6 *Balance*), and the field that held it back from the nudge and the lane news goes. A node's
         member is refused at the home, so its record here carries the field and the note lands in the
-        home's copy of it, read at its next forwarded `inbox` or `wait`: nothing rings a node's idle
-        member yet (§4.4a, TD-057)."""
+        home's copy of it, which the doorbell rings through its node (§4.4a, TD-1079)."""
         for s in self._graph().values():
             if s.team != team or not s.balance_refused:
                 continue
