@@ -130,6 +130,16 @@ def test_checkout_why_reads_origins_head_and_a_clean_tree(tmp_path):
     assert "not origin/main's head" in sync.checkout_why(root)
 
 
+def test_a_killed_runs_tree_is_dropped_by_its_own_prefix(monkeypatch, tmp_path):
+    """TD-1082: a `--pr` run's worktree is `precheck-<pr>-*`, and a `--commit` run's the default
+    `precheck-<sha7>-*` (#2416); the `pre` fixture stubs the drop to nothing, so it is read here."""
+    asked: list[tuple] = []
+    monkeypatch.setattr(promote, "drop_precheck_tree", lambda *a: asked.append(a))
+    promote.kill_precheck(tmp_path, {"pid": None, "sha": HEAD, "pr": 1097})
+    promote.kill_precheck(tmp_path, {"pid": None, "sha": HEAD})
+    assert asked == [(tmp_path, HEAD, "precheck-1097-"), (tmp_path, HEAD, None)]
+
+
 # -- at the home --------------------------------------------------------------------------------------------
 
 

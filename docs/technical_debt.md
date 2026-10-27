@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1082 | A killed `--pr` precheck run's worktree is dropped by the prefix `precheck-<pr>-`, and the sync tests stub `drop_precheck_tree` to nothing (test audit) | Medium | Open — build |
 | TD-1083 | The readings' pass judges the sync pass's precheck bound (`survey` calls `precheck_pr_bound`), and the test named for it never runs `survey` (test audit) | Medium | Open — build |
 | TD-1084 | A repo that stops setting `precheck` drops its entries' `waiting_since`, and no test has an entry waiting when it stops (test audit) | Medium | Open — build |
 | TD-1085 | A run counted as ending with no status keeps the PR's first `waiting_since`, and no test notices if the clock restarts (test audit) | Low | Open — build |
@@ -1947,24 +1946,6 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
-
-## TD-1082: A killed `--pr` precheck run's worktree is dropped by the prefix `precheck-<pr>-`, and the sync tests stub `drop_precheck_tree` to nothing (test audit)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2416, #2412, #2411, #2417, #2420, #2421)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/promote.py` (`kill_precheck`: `drop_precheck_tree(root, str(f.get("sha") or ""), f"precheck-{pr}-" if isinstance(pr, int) else None)`), `tests/test_sync_precheck.py` (`pre` fixture: `monkeypatch.setattr(promote, "drop_precheck_tree", lambda *a, **k: None)`), `tests/test_precheck_on_main.py`
-
-**Why:** #2416 made `kill_precheck` pass a PR run's own prefix, so a `--pr` run's leftover worktree (`<tmp>/precheck-<pr>-*/head`) is the one removed and not a `--commit` run's `precheck-<sha7>-`. Probed on `origin/main`: replacing that call with `drop_precheck_tree(root, str(f.get("sha") or ""), None)` leaves `tests/test_sync_precheck.py` at 17 passed. The `pre` fixture replaces `drop_precheck_tree` with a no-op ("no checkout at ROOT"), and `tests/test_precheck_on_main.py` only kills `--commit` runs, so no test sees which prefix is asked for. A wrong prefix leaves every killed PR run's worktree on disk, which TD-1052 and TD-1053 were filed to stop.
-
-**Fix:** a test that stubs `drop_precheck_tree` to record its arguments and kills a run whose file carries `pr` (and one without it), asserting the prefix `precheck-<pr>-` and `None`; or one that makes a worktree at that path in a scratch repo.
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1039.
 
 ## TD-1083: The readings' pass judges the sync pass's precheck bound (`survey` calls `precheck_pr_bound`), and the test named for it never runs `survey` (test audit)
 
