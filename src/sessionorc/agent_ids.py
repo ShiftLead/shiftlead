@@ -7,6 +7,7 @@ get different ids. What it gave is kept in `ids.json`. A mixin `HostAgent` inher
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import contextlib
 import json
@@ -20,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import agent_common, cadence, hosts, mail, paths
+from sessionorc import agent_common, cadence, hosts, ledgerboard, mail, paths
 from sessionorc import ledger as ledger_mod
 from sessionorc import settle as settle_mod
 from sessionorc.agent_common import RpcError, log
@@ -118,6 +119,64 @@ def ids_script(root: str, timeout: float = cadence.TREE_TIMEOUT) -> Path | None:
             raise RpcError(f"{Path(root).name}'s pinned dev-cadence has no {IDS_SCRIPT}: bump the pin")
         return script
     return next((Path(root) / s for s in SCRIPTS if (Path(root) / s).is_file()), None)
+
+
+def taken_by_line(script: Path, ledger: Path, taken_by: str | None) -> str | None:
+    """The header line each new entry writes (`**Taken by:** <by>`, cadence §2.10), or None where the repo's
+    ledger does not accept the field (design §4.4 *Its answer*, TD-1089): `taken by` is in the `CADENCE_FIELDS`
+    of the `ledgerboard.py` beside the script run — read as a literal, never imported — or else the ledger
+    declares no field vocabulary, by the vendored `declared()`. A missing or non-literal sibling, or a ledger
+    that cannot be read, gives None."""
+    if not taken_by:
+        return None
+    fields = _cadence_fields(script.parent / "ledgerboard.py")
+    if fields is None:
+        return None
+    if "taken by" not in fields:
+        try:
+            text = ledger.read_text(encoding="utf-8")
+        except (OSError, ValueError):
+            return None
+        if ledgerboard.declared(text)[0]:
+            return None
+    return f"**Taken by:** {taken_by}"
+
+
+def _cadence_fields(path: Path) -> tuple[str, ...] | None:
+    """`CADENCE_FIELDS` of a `ledgerboard.py`, as a literal tuple of strings, or None."""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, SyntaxError):
+        return None
+    for node in tree.body:
+        target = node.target if isinstance(node, ast.AnnAssign) else None
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target = node.targets[0]
+        if isinstance(target, ast.Name) and target.id == "CADENCE_FIELDS" and node.value is not None:
+            try:
+                got = ast.literal_eval(node.value)
+            except ValueError:
+                return None
+            ok = isinstance(got, tuple) and all(isinstance(f, str) for f in got)
+            return got if ok else None
+    return None
+
+
+async def check_branch(branch: str, timeout: float) -> None:
+    """Refuse a `branch` git would not take as a branch name, one whose printed form differs (`@{-1}`
+    expands), and `@` (design §4.4 *The branch*), run outside any repository."""
+    rc, out, err = await _run(["git", "check-ref-format", "--branch", branch], "/", timeout)
+    if (rc, out, err) == (-1, "", "timed out"):
+        raise RpcError("the branch could not be checked in time: busy, ask again")
+    if rc != 0 or out.strip() != branch or branch == "@":
+        raise RpcError(f"branch {branch!r} is not a branch name (git check-ref-format --branch): send none or a name")
+
+
+def _takes_branch(script: Path) -> bool:
+    try:
+        return '"--branch"' in script.read_text(encoding="utf-8")
+    except (OSError, ValueError):
+        return False
 
 
 def settle_key(root: str, remote: str) -> str:
@@ -262,7 +321,7 @@ class IdsMixin:
         return told, readers, untold
 
     async def rpc_td_next(
-        self, repo: str = "", count: int = 1, held: bool = False, caller: Any = None
+        self, repo: str = "", count: int = 1, held: bool = False, branch: str = "", caller: Any = None
     ) -> dict[str, Any]:
         """`ao td next` (design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries*): the next
         `count` free ids of the repo named `repo` — its registered name, or its origin's `owner/repo` — and the
@@ -271,11 +330,16 @@ class IdsMixin:
         reply, so its entry lands held until the person's Release: the person's and an interactive
         session's, refused to an unattended caller and to one the graph does not hold. Returns `{repo,
         origin, ids, unread}` — and `held: true` with `held` — `unread` the lines naming the open PRs that
-        could not be read, and `reserved`, `why` and `warnings` the script's (on the home's own road `reserved`
-        is true, `why` empty and `warnings` none)."""
+        could not be read, and `reserved`, `why`, `warnings` and `taken_by` the script's, `taken_by_line` the
+        header line to write where the ledger accepts it (on the home's own road `reserved` is true, `why`
+        empty, `warnings` none and both null). `branch` is the caller's directory's (§4.4 *The branch*),
+        checked and passed to a script that takes it; the home's own road drops it."""
         start = time.monotonic()
         if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= COUNT_MAX:
             raise RpcError(f"--count is 1 to {COUNT_MAX}, not {count!r}")
+        branch = branch if isinstance(branch, str) else ""
+        if branch:
+            await check_branch(branch, start + LOCK_BY - time.monotonic())
         if held:
             self._held_caller(caller)
         root, key, name = await self._ids_repo(str(repo or "").strip(), start + LOCK_BY)
@@ -287,10 +351,11 @@ class IdsMixin:
         try:
             left = max(0.1, start + BUDGET - time.monotonic())
             if script := await asyncio.to_thread(ids_script, root, left):
-                got = await self._ids_script(root, key, name, script, count, start, caller)
+                got = await self._ids_script(root, key, name, script, count, start, caller, branch)
             else:
                 ids, unread = await self._ids_give(root, key, count, start, caller)
                 got = {"ids": ids, "unread": unread, "reserved": True, "why": "", "warnings": []}
+                got |= {"taken_by": None, "taken_by_line": None}
         finally:
             lock.release()
         for line in [*got["unread"], *got["warnings"]] + ([] if got["reserved"] else [f"not reserved: {got['why']}"]):
@@ -356,12 +421,14 @@ class IdsMixin:
         return root, keys[root], Path(root).name
 
     async def _ids_script(
-        self, root: str, key: str, name: str, script: Path, count: int, start: float, caller: Any
+        self, root: str, key: str, name: str, script: Path, count: int, start: float, caller: Any, branch: str = ""
     ) -> dict[str, Any]:
         """The road over origin's counter (design §4.4 *A ledger entry's id is handed out by the home*, TD-970): the
         synced script, run in the checkout with this interpreter — a pinned repo's through the resolver (TD-1014) —
         the home's last given as its `--floor`, and killed with its group at the call's deadline. It fetches and
-        reads what it needs; the home reads no PR here."""
+        reads what it needs; the home reads no PR here. `branch` goes as one `--branch=<name>` only to a script
+        whose source declares `"--branch"` (dev-cadence TD-145); one from before has none, and argparse would
+        refuse the take."""
         rel = await asyncio.to_thread(ledger_mod.ledger_path, root)
         by = PERSON if caller is None or mail.is_person(caller) else str(caller)
         floor = await asyncio.to_thread(_last, key)
@@ -370,6 +437,8 @@ class IdsMixin:
             "--count", str(count), "--by", by, "--floor", str(floor),
             "--ledger", rel, "--archive", ledger_mod.archive_path(rel), "--json",
         ]  # fmt: skip
+        if branch and await asyncio.to_thread(_takes_branch, script):
+            args.append(f"--branch={branch}")
         if script.is_relative_to(root):
             argv, env, said = [sys.executable, str(script), *args], dict(os.environ), str(script.relative_to(root))
         else:  # the pinned tree's, which the launcher runs by its name
@@ -396,12 +465,16 @@ class IdsMixin:
         ids = [str(i) for i in res["ids"]]
         await asyncio.to_thread(_record_given, key, ids, by)
         refs = [str(r) for r in res.get("unread") or [] if str(r).strip()]
+        taken_by = res.get("taken_by") if isinstance(res.get("taken_by"), str) and res["taken_by"] else None
+        line = await asyncio.to_thread(taken_by_line, script, Path(root) / rel, taken_by)
         return {
             "ids": ids,
             "unread": [f"open PRs not read: {', '.join(refs)}"] if refs else [],
             "reserved": rc == 0,
             "why": "" if rc == 0 else why,
             "warnings": [str(w) for w in res.get("warnings") or [] if str(w).strip()],
+            "taken_by": taken_by,
+            "taken_by_line": line,
         }
 
     async def _ids_give(
