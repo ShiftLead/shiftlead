@@ -240,3 +240,37 @@ def test_a_plan_on_a_node_lists_its_worktrees_once(tmp_path, monkeypatch):
     assert got["default"] == "entry-4"
     assert [m for m, _ in calls].count("host_worktrees") == 1
     assert [kw["name"] for m, kw in calls if m == "name_check"] == ["entry-4"]
+
+
+def test_a_typed_name_the_nodes_worktrees_list_is_refused_in_the_name_rows_words(tmp_path, monkeypatch):
+    """TD-1123: a typed name, unlike the default search's candidates, reaches the listed-worktree test."""
+    world(tmp_path)
+    got = plan(client(monkeypatch, tmp_path, fake(calls=[], worktrees=("entry-1",))), name="entry-1")
+    assert got["name_why"] == "a worktree named entry-1 exists — pick another name" and got["default"] == "entry-2"
+
+
+def test_a_typed_name_that_is_not_a_slug_is_refused_on_the_node(tmp_path, monkeypatch):
+    from shiftlead.ui.repo import ENTRY_SLUG_WHY
+
+    world(tmp_path)
+    got = plan(client(monkeypatch, tmp_path, fake(calls=[])), name="Bad Name")
+    assert got["name_why"] == ENTRY_SLUG_WHY and got["why"] == ""
+
+
+def test_a_node_that_stops_answering_between_the_plan_and_the_press_creates_nothing(tmp_path, monkeypatch):
+    """TD-1123: the press's plan reads the node, then its reader's read over the link (the press's
+    alone) meets a silent node: 409 in the host's words, nothing created."""
+    world(tmp_path, team_extra={"entries": {"debt": "designer"}})
+    calls, created = [], []
+    from shiftlead.ui import app as ui
+
+    def dropped(team, directory, cfg=None, role=None):
+        assert cfg is not None, "the node's config, read across the link"
+        raise OSError("the link dropped")
+
+    monkeypatch.setattr(ui, "team_reader", dropped)
+    c = client(monkeypatch, tmp_path, fake(calls=calls, created=created))
+    assert plan(c)["why"] == ""
+    r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": "w"})
+    assert (r.status_code, r.json()["detail"]) == (409, "node1 did not answer: the link dropped")
+    assert created == []
