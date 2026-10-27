@@ -91,9 +91,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
-| TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | In progress (slice 1 #2409); left: drop the stopgaps (samscrape#1121, shiftlead#2391) |
 | TD-1046 | A pinned repo's convention note carries each entry's body, and rule 12 reads a pinned root and dev-cadence's source under their own bounds | Low | Open — build |
-| TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
+| TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Designed — build TD-1089 |
 | TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Designed — builds TD-1078, TD-1079, TD-1080 |
 | TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
@@ -110,6 +109,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Open — build |
 | TD-1080 | The stop, start, status and acting-gate words: unread mail on a finished member, the start's cure, a person's row, and the `!` escape | Low | Open — build |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
+| TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
+| TD-1089 | `ao td next` sends its directory's branch to the take, and relays the take's `taken_by` and the line to write where the ledger accepts it | Medium | Open — build |
 
 ---
 
@@ -1945,24 +1946,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1031, TD-1032, TD-804.
 
-## TD-1044: A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (Paul, during dev-cadence TD-129's rollout; drafted by session `memory-vs-cadence`)
-**Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1 (#2409, grinder-ao-1, 2026-10-26): the default setup and the reaper's hydrate run the pinned tree's `hydrate_worktree.sh` (`gitinfo.hydrate_command`). Left: once #2409 is live (`ao promote status`), drop this repo's stopgap `worktree_setup` line (#2391) and ask samscrape to drop its own (samscrape#1121). Found pinning samscrape (ContractMatch/samscrape#1115, merged 2026-10-26); stopgap: samscrape#1121 and this repo's pin PR (#2391) set `worktree_setup` to the pinned hydrate.
-**Location:** `src/sessionorc/gitinfo.py` (`HYDRATE = "scripts/hydrate_worktree.sh"`; `worktree_setup()`, which reads `absent` when the file is missing, and the create path that then skips setup; the reaper's `hydrate` lookup, about line 499); `src/shiftlead/repoconfig.py` (the key's parse; its comment, about line 664, states the default); `src/sessionorc/cadence.py` (`command(repo, word, *args)`, TD-1014's resolver); `src/shiftlead/team_skill.md` (`worktree_setup`, about line 210: unset, dev-cadence's `hydrate_worktree.sh` where the checkout holds it)
-
-**Why:** dev-cadence TD-129 pins a repo's dev-cadence instead of copying it, so a pinned repo has no `scripts/hydrate_worktree.sh`. The home's default `worktree_setup` is exactly that file, and a missing one reads as `absent`, so a worktree the home makes in a pinned repo gets no setup and says nothing: no `.claude/settings.local.json` (the worktree's `autoMemoryDirectory`, so its session's memories land outside the repo, the TD-080 failure), and no nested repos from `docs/nested-repos.txt`. pneuma-ops, ledgerboard and samscrape were pinned on 2026-10-26; samscrape has a team, so its worktrees were affected from that merge until the stopgap. The reaper reads the same path for its `--dehydrate`, so a pinned repo's nested worktrees would not be taken out through their own repos before removal. TD-1014's Done-when (*every reader above calls `cadence.command` and none builds a dev-cadence path in code itself*) should have caught `HYDRATE`, though its list of names (`check_cadence.py`, `cadence.md`, the lock) does not include `hydrate_worktree.sh` — add it there.
-
-**Fix:** where `cadence.pinned(repo)`, the default setup is `cadence.command(repo, "run", "hydrate_worktree.sh", <path>)` (the worktree its path argument), and the reaper's dehydrate the same with `--dehydrate`; a synced repo keeps today's path; a pin that does not resolve raises `WorktreeError` as a failed setup does today (`ensure_worktree`), never a silent skip. `team_skill.md` and design §5 *The seams* say it. Then drop the stopgap `worktree_setup` lines (samscrape, this repo). Tests: a pinned fixture repo's new worktree gets `settings.local.json`; an unresolvable pin warns.
-
-**Done when** a worktree the home makes in a pinned repo with no `worktree_setup` is hydrated, and the stopgaps are removed.
-
-**Related:** TD-1014 (the resolver), dev-cadence TD-129, TD-149; samscrape#1121.
-
 ## TD-1046: A pinned repo's convention note carries each entry's body, and rule 12 reads a pinned root and dev-cadence's source under their own bounds
 
 **Priority:** Low
@@ -1988,9 +1971,9 @@ Trimming before the rule arrives here loses it (§2.4).
 **Added:** 2026-10-26 (ao-dev-cadence-dc-grinder, through `ao td add --repo shiftlead`; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — design, once dev-cadence TD-145 slice 2 gives `ledger_next_id.py` its `--branch` and its *Taken by* line
-**Blocked by:** dev-cadence#TD-145
-**Location:** `src/sessionorc/agent_ids.py` (`_ids_script`: the script's argv is `--count`, `--by`, `--floor`, `--ledger`, `--archive`, `--json`, with no `--branch`, and the reply relays `ids`, `unread`, `reserved`, `why`, `warnings`, with no `taken_by`); `src/shiftlead/cli.py` (`ao td next`'s output); design §4.4 *A ledger entry's id is handed out by the home* (*The run*), §4.7 (`ao td next`, its `--json` keys)
+**Status:** Designed 2026-10-26. dev-cadence TD-145 is archived and the pinned `ledger_next_id.py` (78e4614) has `--branch` and `--json`'s `taken_by`. **The branch**: `ao td next` reads `git branch --show-current` in its own directory at the call and sends it as `branch` only when that directory is a checkout of the repo named (same origin key); the home checks it with `git check-ref-format --branch` and passes `--branch=<name>`; none (detached, another repo) leaves the script's own, the home checkout's `main`. Not the caller's record: its `git.branch` is a tick old, and a session takes ids just after `git switch -c`. **The line**: the check this entry asked for found that ShiftLead's ledger does *not* accept `Taken by` — its preamble declares `Fields:`, and ledgerboard's `CADENCE_FIELDS` lacks the field, so an entry carrying it fails `ledger.py --check --since` as *undeclared-field* (dev-cadence TD-150, waiting on the person's ledgerboard filing). So the answer carries `taken_by` always and `taken_by_line` only where the ledger accepts the field, by `judge()`'s own test against the ledgerboard beside the script the home ran; here it stays null until ledgerboard defines the field and a pin bump brings it. Design §4.4 *The branch* and *Its answer*, §4.7 `ao td next`.
+**Blocked by:** TD-1089
+**Location:** `src/sessionorc/agent_ids.py` (`_ids_script`: the script's argv is `--count`, `--by`, `--floor`, `--ledger`, `--archive`, `--json`, with no `--branch`, and the reply relays `ids`, `unread`, `reserved`, `why`, `warnings`, with no `taken_by`); `src/shiftlead/cli.py` (`ao td next`'s output); design §4.4 *A ledger entry's id is handed out by the home* (*The run*, *The branch*, *Its answer*), §4.7 (`ao td next`, its `--json` keys)
 
 **Why:** dev-cadence TD-145 (after ShiftLead/shiftlead#2370 typed TD-1028 by hand and the counter then gave TD-1028 to another session) makes the cadence check's `ledger` row fail a new entry whose `**Taken by:**` is not its take's `by`, and warn on one with none. The line is to be copied from the front end, never typed from memory, but `ao td next` is shiftlead's front end and prints no such line. It also runs the script in the home's checkout, which stays on `main` (§4.4 *The run*), so a take records that checkout's branch, never the branch of the session the id is for, and a branch mismatch cannot be checked. Without both, every shiftlead session's entry is warned on, and fails once the row reads the by and the branch.
 
@@ -2336,3 +2319,39 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row; then `pdm run test` may take `-n auto`.
 
 **Related:** TD-1068, TD-1050, TD-1065, TD-1067.
+
+## TD-1088: `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met in #2424's third precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_entry_draft.py` (`test_the_sweep_reads_a_drafts_claim`, line 180); `src/sessionorc/agent.py` (`_prune_runs`, the draft sweep)
+
+**Why:** the precheck of #2424 at 9f54d33 (a change to `.shiftlead.yml` and ledger text alone) failed `test_the_sweep_reads_a_drafts_claim[7]`: after `_prune_runs(now, set())` — *no live reading: a session's draft is kept* — `assert live.exists()` read False for `home/attachments/draft-0000000e`. It passes alone (`pytest -k sweep_reads`, 2 passed). The same PR's two earlier prechecks each failed another known load flake (TD-1065's test, then `test_a_restart_is_written_afresh`, TD-1068), so three runs in a row read red for no fault of the PR's.
+
+**Fix:** find what the sweep reads that a loaded run changes (a clock, the claim file's mtime, a tick racing the call) and make the test hold it fixed; if the sweep itself can prune a live session's draft under load, that is the bug, fixed in the sweep.
+
+**Done when** the case passes 20 runs under a loaded suite (`-n auto`, or three prechecks at once), and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1087 (four tests that fail only across workers, a draft sweep's among them), TD-1065, TD-1067, TD-1068 (the other load flakes); TD-630 (the draft).
+
+## TD-1089: `ao td next` sends its directory's branch to the take, and relays the take's `taken_by` and the line to write where the ledger accepts it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-26 (the designer, from TD-1048)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/cli.py` (`cmd_td_next`, `_td_next_send`); `src/sessionorc/agent_ids.py` (`rpc_td_next`, `_ids_script`); `src/sessionorc/ledgerboard.py` (vendored: `CADENCE_FIELDS`, `declared`, read only); `tests/test_td_next.py` (the node's forward needs no change: `agent_remote._forwarded` passes `params` through); design §4.4 *A ledger entry's id is handed out by the home* (*The run*, *The branch*, *Its answer*), §4.7 `ao td next`
+
+**Why:** TD-1048: dev-cadence TD-145's take records a `by` and a branch, and its check warns on a take for another branch and on an entry with no `**Taken by:**`. The home runs the script in its checkout on `main`, so every take records `main`, and `ao td next` relays neither the take's `by` nor a line to write.
+
+**Fix:** (1) The client: `ao td next` reads `git branch --show-current` in `os.getcwd()` and sends it as the `td_next` parameter `branch` only when `_origin_key` of that directory's top level equals the named repo's key: `_origin_key(root)` when `_td_repo` resolved a root, else, for an `owner/repo` sent unresolved, the spelling `_ids_repo` matches (`ids_mod.origin_key` of a URL, else the lowercased `owner/repo`); empty (detached), no `git`, or another repo sends none. (2) The home: `rpc_td_next(…, branch="")` runs `git check-ref-format --branch <branch>` outside any repository (`cwd` a temp or `/`) and refuses a non-empty `branch` it refuses, whose printed form differs from the input, or that is `@` (in words naming the parameter); and `_ids_script` adds `--branch=<branch>` as one argument when given and the script's source holds the literal `"--branch"` (a script from before dev-cadence TD-145 has none, and argparse would refuse the take); the home's own road ignores it. (3) The answer: `_ids_script` relays the script's `taken_by` (a string or null), and the home sets `taken_by_line` to `` f"**Taken by:** {taken_by}" `` when `taken_by` is set and either `"taken by"` is in the `CADENCE_FIELDS` of the `ledgerboard.py` beside the script it ran (read with `ast` as a literal tuple, never imported) or the vendored `ledgerboard.declared(<text>)[0]` is empty for `Path(root) / ledger_path(root)`, read under the lock after the script; a missing or non-literal `ledgerboard.py`, or an unreadable ledger, gives null; the home's own road gives both null. (4) The CLI: sends `branch` only when it has one; `--json` adds `taken_by` and `taken_by_line`, each null when the home's reply lacks it (an older home); a non-null line is printed on standard error as *write `<line>` in each entry's header (cadence §2.10)*, with `--json` or without as the other standard-error lines are, standard output unchanged. (5) §4.7's help for `ao td next`, if it lists the `--json` keys, follows (run the doc-bound tests).
+
+**Done when:** tests show (a) a session in a worktree of the named repo sends its branch and one in another repo's directory or a detached head sends none; (b) the home passes `--branch=<name>` to a fake script that declares `--branch` (the test's fake grows the flag) and leaves it out for one that does not, whose take still gives ids, and refuses a name `check-ref-format` refuses, `@{-1}` and `@`; (c) with a fake script answering `taken_by` and a fake `ledgerboard.py` beside it, a ledger whose `Fields:` line declares a non-cadence vocabulary (as ShiftLead's does) gets `taken_by_line: null`, one with no `Fields:` line gets the line, one whose sibling `CADENCE_FIELDS` holds `taken by` gets the line for both, a ledger that declares `Taken by = …` in its own `Fields:` line gets null (as `judge()`'s `writable` does), and a missing sibling gives null; (d) `ao td next` prints the line on standard error only when non-null, and an older home's reply without the keys gives both null under `--json`; the home's own road answers both null; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1048 (the design), dev-cadence TD-145 (archived, the take's `by` and branch), dev-cadence TD-150 (the field's filing in ledgerboard), TD-970 (the script road).

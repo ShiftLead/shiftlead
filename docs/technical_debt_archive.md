@@ -20156,6 +20156,26 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 - `--dist loadfile`: three runs, two failed the container test, so the failures were not test order.
 `-n 8` is chosen over `-n auto` because it passed every run, and because prechecks run several at once on 16 cores. `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` (TD-1050) failed most `-n auto` runs: it brought the node's link up before the agent's first tick, and a linked node is never provisioned. It now waits for the provision, then links. `test_a_restart_is_written_afresh` passed 20 of 20 alone, and failed once in 20 runs of its file under `-n auto` (with a sibling twice): ledgered as TD-1087, with the other tests seen to fail only under xdist. The five consecutive `-n auto` passes the entry asked for were not reached; `-n 8` passed seven in a row.
 
+## TD-1044: A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (Paul, during dev-cadence TD-129's rollout; drafted by session `memory-vs-cadence`)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/gitinfo.py` (`HYDRATE = "scripts/hydrate_worktree.sh"`; `worktree_setup()`, which reads `absent` when the file is missing, and the create path that then skips setup; the reaper's `hydrate` lookup, about line 499); `src/shiftlead/repoconfig.py` (the key's parse; its comment, about line 664, states the default); `src/sessionorc/cadence.py` (`command(repo, word, *args)`, TD-1014's resolver); `src/shiftlead/team_skill.md` (`worktree_setup`, about line 210: unset, dev-cadence's `hydrate_worktree.sh` where the checkout holds it)
+
+**Why:** dev-cadence TD-129 pins a repo's dev-cadence instead of copying it, so a pinned repo has no `scripts/hydrate_worktree.sh`. The home's default `worktree_setup` is exactly that file, and a missing one reads as `absent`, so a worktree the home makes in a pinned repo gets no setup and says nothing: no `.claude/settings.local.json` (the worktree's `autoMemoryDirectory`, so its session's memories land outside the repo, the TD-080 failure), and no nested repos from `docs/nested-repos.txt`. pneuma-ops, ledgerboard and samscrape were pinned on 2026-10-26; samscrape has a team, so its worktrees were affected from that merge until the stopgap. The reaper reads the same path for its `--dehydrate`, so a pinned repo's nested worktrees would not be taken out through their own repos before removal. TD-1014's Done-when (*every reader above calls `cadence.command` and none builds a dev-cadence path in code itself*) should have caught `HYDRATE`, though its list of names (`check_cadence.py`, `cadence.md`, the lock) does not include `hydrate_worktree.sh` — add it there.
+
+**Fix:** where `cadence.pinned(repo)`, the default setup is `cadence.command(repo, "run", "hydrate_worktree.sh", <path>)` (the worktree its path argument), and the reaper's dehydrate the same with `--dehydrate`; a synced repo keeps today's path; a pin that does not resolve raises `WorktreeError` as a failed setup does today (`ensure_worktree`), never a silent skip. `team_skill.md` and design §5 *The seams* say it. Then drop the stopgap `worktree_setup` lines (samscrape, this repo). Tests: a pinned fixture repo's new worktree gets `settings.local.json`; an unresolvable pin warns.
+
+**Done when** a worktree the home makes in a pinned repo with no `worktree_setup` is hydrated, and the stopgaps are removed.
+
+**Related:** TD-1014 (the resolver), dev-cadence TD-129, TD-149; samscrape#1121.
+
+**Resolved:** 2026-10-26 (grinder-ao-1 #2409, grinder-ao-2 #2424) — slice 1 (#2409): a pinned repo's default worktree setup and the reaper's hydrate run the pinned tree's `hydrate_worktree.sh` (`gitinfo.hydrate_command`, through `cadence.command`), and TD-1014's Done-when names `hydrate_worktree.sh`. Slice 2 (#2424, once #2409 was live in 7209efb, read with the live venv's `gitinfo.hydrate_command` on this checkout): this repo's stopgap `worktree_setup:` is gone. samscrape's own (samscrape#1121) is its sessions' to drop, and samscrape has no question seat, so it is on the board (*Have a samscrape session drop …*, due 2026-11-02).
+
 ## TD-1078: A seat is filled by an answer to its own question, and the techlead relays what came of it to the member whose question it was
 
 **Priority:** Medium
