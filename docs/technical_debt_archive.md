@@ -21024,3 +21024,19 @@ Then the build entries are filed.
 **Related:** TD-1093, #2470.
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2478) — counted again on #2470's merge: seven `def test_` lines added to `tests/test_identity.py`, no `parametrize`; TD-1093's line now says *Seven tests*.
+
+## TD-1111: `test_the_context_reading_is_read_on_the_tick_for_unattended_records` fails under the parallel suite: the context read twice
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, met on TD-1092's suite run)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_agent.py` (`test_the_context_reading_is_read_on_the_tick_for_unattended_records`, line ~1688), the tick's context reading in `src/sessionorc/`
+
+**Why:** the full `pdm run test` on TD-1092 slice 2's branch (no `src/sessionorc/` change) stopped on `assert ['conv-un', 'conv-un'] == ['conv-un']`; alone it passed three times running. A tick that lands twice within the test's window reads the record twice, so the test (or the tick) is timing-dependent under xdist load.
+
+**Fix:** find whether a second tick is legitimate within the window (then assert on a set, or once per tick) or the reading is not deduplicated per tick (then a real double read); fix whichever it is.
+
+**Done when:** the test passes under `pdm run test` repeatedly (e.g. `pytest -n 8 --count 20` on the one test) and asserts what the tick promises.
