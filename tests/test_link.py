@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 import pytest
-from conftest import CHILD, FAST_TICK, kill_private_server, private_socket_name, wait_for
+from conftest import CHILD, FAST_TICK, kill_private_server, private_socket_name, scratch_dir, wait_for
 
 from sessionorc import link, paths, seats
 from sessionorc.agent import HostAgent
@@ -177,8 +177,11 @@ class Home:
 
 
 @pytest.fixture
-async def home(tmp_path):
-    h = Home(tmp_path, ["laptop"])
+async def home():
+    # TD-1100: not under `tmp_path`, whose test-named folder put `kmaster/links/laptop/link.sock` at 108
+    # bytes once pytest's run counter reached five digits, past `AF_UNIX`'s 107: the home could not bind
+    # it and died, and each dial was refused
+    h = Home(scratch_dir("lk"), ["laptop"])
     try:  # around the start too: a home that never came up is still a process and a tmux server
         await h.start()
         yield h
