@@ -110,6 +110,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
+| TD-1068 | The test suite runs on one core, so every precheck takes 12 minutes and main moves under it | Medium | Open |
 
 ---
 
@@ -2338,3 +2339,28 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
+
+## TD-1068: The test suite runs on one core, so every precheck takes 12 minutes and main moves under it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `pyproject.toml` (`[tool.pdm.scripts] test = "pytest -q"`, the dev group, `[tool.pytest.ini_options]`), `docs/cadence.toml` (`precheck`), `tests/conftest.py` (the private tmux servers, `-L ao-test-<uuid>`, and the temp `SHIFTLEAD_HOME`; read `tests/README.md` first), the tests' own free-port helpers (TD-870's kind); the tests known to fail under load: `tests/test_containers.py::test_the_home_derives_a_container_nodes_reach_when_it_dials_in` (TD-1050), `tests/test_conventions_policy.py::test_a_restart_is_written_afresh`
+
+**Why:** Paul, 2026-10-26: "Why is our cadence check so long (12 min) - is there efficiencies/parallelizations we should consider?" The precheck ran 4,257 tests in about 720 of its ~750 s, on one of kmaster's 16 cores. A ledger-and-board PR (#2408) was prechecked five times that evening, and none of the reruns was its own fault:
+- `test_the_home_derives_a_container_nodes_reach_when_it_dials_in` failed twice (TD-1050);
+- `test_a_restart_is_written_afresh` failed once (`TypeError: 'NoneType' object is not subscriptable` at line 170) and passes alone in 2 s;
+- main twice moved the ledger under a run, so the PR conflicted at the end.
+Each cycle costs 12 minutes, and a shorter run gives main less time to move.
+
+**Fix:** a spike, then the switch:
+1. **The spike.** Add `pytest-xdist` to the dev group. Run `pdm run pytest -q -n auto` (and `-n 8`) five times on main, and record wall time and every failure.
+2. **Fix what collides.** For each test that fails only in parallel, give it a per-worker resource (port, tmux socket, `SHIFTLEAD_HOME`, the worker id in the name), or group its file with `--dist loadgroup` / `xdist_group`. The two flaky tests above either get fixed or have their causes ledgered.
+3. **The switch.** `test` becomes `pytest -q -n auto` (or a measured fixed `-n`, since prechecks running at once share 16 cores and `/tmp`, TD-1052), and the precheck uses it.
+
+**Done when** five consecutive `-n auto` runs on main pass, the precheck's measured time is in this entry's Status, and `test_a_restart_is_written_afresh` passes 20 runs under `-n auto` or its cause is ledgered.
+
+**Related:** dev-cadence#TD-155 (a narrow precheck by path), TD-1050, TD-1052, TD-1035.
