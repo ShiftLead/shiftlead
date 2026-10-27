@@ -895,16 +895,15 @@ class MailMixin:
                 # a modal limit has no reset to name (§4.3, TD-944): a node's record's tail is the node's
                 modal_limit=records[sid].host == self.host
                 and agent_common.limit_is_modal(records[sid], adapters.get(records[sid].adapter)),
-                # a person's answer on a handed entry's thread fills a seat on call (TD-218)
-                # — a reply that closes the seat's own question on the thread of an entry it still owes
-                # (review of #760: an outcome note or a seat's FYI on the thread refills nothing)
-                refills=sender == PERSON
-                and entry.kind == "reply"
+                # a reply that closes a question the seat itself sent fills a seat on call — the person's
+                # or a session's, on a handed entry's thread or on its own (§4.9b *an answer waiting*,
+                # TD-1051; review of #760: an outcome note or a seat's FYI on the thread refills nothing)
+                # — but not on a handed entry's thread once it has its outcome, which `asks_waiting` leaves
+                refills=entry.kind == "reply"
                 and bool(closes)
                 and replied is not None
-                and replied.kind == "ask"
                 and replied.from_ == sid
-                and any(e.id == root and e.handed_entry and e.owes for e in records[sid].inbox),
+                and not any(e.id == root and e.handed_entry and not e.owes for e in records[sid].inbox),
             )
             for sid in named
             if sid != PERSON and sid in records
@@ -1092,7 +1091,9 @@ class MailMixin:
         else:
             self._mark(msg_id, closed_at=at, closed_reason=reason)
 
-    def _system_note(self, to: str, text: str, *, wake: str = "note", team: str | None = None) -> None:
+    def _system_note(
+        self, to: str, text: str, *, wake: str = "note", team: str | None = None, ends: MailEntry | None = None
+    ) -> None:
         """A `note` from `system` written **straight into the sender's mailbox** (design §4.10 "How
         the sender hears that one closed without a reply"): it does not pass through the send path,
         so no gate, no tally and no depth sees it, and no session can send as `system`. It reports
@@ -1115,8 +1116,13 @@ class MailMixin:
         superseded record is (§4.10 lifecycle): the note is about the conversation, not the id.
 
         `team` is the team a note is about, stamped where a sender's would be, so the Inbox files it
-        under that team rather than *No team* (§4.10 *An envelope carries its sender's team*)."""
+        under that team rather than *No team* (§4.10 *An envelope carries its sender's team*).
+
+        `ends` is the question a lapse, *Go with it* or decline note ends: the note carries its
+        `reply_to` and `root`, which is how a seat reads it as an answer waiting (§4.9b, TD-1051)."""
         entry = MailEntry(id="m-" + secrets.token_hex(6), from_=SYSTEM, to=[to], at=now_iso(), kind="note", text=text)
+        if ends is not None:
+            entry.reply_to, entry.root = ends.id, ends.root or ends.id
         entry.team = team or None
         entry.subject = mail.subject_of(text)  # a `system` note's derived as any text's (§4.10, TD-561)
         entry.uncharged = wake == "uncharged"
@@ -1239,14 +1245,19 @@ class MailMixin:
                 # a handed entry still owed → its addressee, whose own open question on the thread
                 # the person's reply would close and so refill the seat
                 handed = {e.id: s.id for s in self.sessions.values() for e in s.inbox if e.handed_entry and e.owes}
+                # a seat's own question: the person's answer to it fills the seat too (§4.9b, TD-1051)
+                seats = {s.id for s in self.sessions.values() if s.seat}
                 return {
                     "id": PERSON,
                     "entries": [
                         {
                             **mail.read_answers(e.to_dict()),  # labels and consequences (§4.10, TD-913)
                             "from_role": mail.from_role(self._graph(), PERSON, e.from_, controllers=self._ctl),
-                            # on a handed entry's thread (TD-218): the Reply composer's line is `refill`
-                            "on_handed": e.open and e.kind == "ask" and handed.get(e.root) == e.from_,
+                            # a question a reply to which fills its seat — on a handed entry's thread
+                            # (TD-218) or a seat's own (TD-1051): the Reply composer's line is `refill`
+                            "on_handed": e.open
+                            and e.kind in ("ask", "steer")
+                            and (handed.get(e.root) == e.from_ or e.from_ in seats),
                         }
                         for e in held
                     ],
@@ -1418,7 +1429,7 @@ class MailMixin:
             if held[0].open:
                 e = held[0]
                 self._close_entry(msg, "declined", now_iso())
-                self._system_note(e.from_, f"{e.kind} {msg} declined by the person", wake="person")
+                self._system_note(e.from_, f"{e.kind} {msg} declined by the person", wake="person", ends=e)
                 await self._push_changes()
                 return {
                     "id": PERSON,

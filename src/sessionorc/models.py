@@ -1428,7 +1428,10 @@ class Session:
         another session's inbox. What a manager reads to fill an empty techlead seat; computed
         here like `unread`, so every reader sees the same count. An entry the record passed up
         (§4.9b) is left out: it waits on the person, and a seat filled for it would have nothing
-        to answer.
+        to answer. **An answer waiting** counts too (§4.9b, TD-1051): the unread `reply` that closed a
+        question the record itself sent, or the `system` note of that question's lapse, *Go with it* or
+        decline, once per question — so a seat that closed with a question of its own out is filled
+        when the answer lands, and its first `ao inbox` ends the count.
 
         An address is compared whole, host included (§4.4a): names are unique per host, not per
         org, so `tl@laptop` is not this record's address merely because its id is `tl`. A bare
@@ -1455,8 +1458,8 @@ class Session:
         # outcome, read or not — so a seat that exited with it half done is filled again — and not
         # while a question of the record's own to the person on its thread is open: the seat waits
         # on the person then, and the person's answer closes that question and counts it again
-        asking = {e.root for e in self.outbox if e.open and e.kind == "ask" and PERSON in e.to}
-        return [
+        asking = {e.root for e in self.outbox if e.open and e.kind in ("ask", "steer") and PERSON in e.to}
+        found = [
             e.id
             for e in self.inbox
             if (
@@ -1467,6 +1470,23 @@ class Session:
             and any(where(x) == mine for x in e.to)
             and (not handed_only or e.handed_entry)
         ]
+        if handed_only or not self.seat:
+            return found  # an answer waits in a seat's mailbox alone: a session that is not one reads its own
+        # an answer waiting (§4.9b, TD-1051): the unread reply that closed a question the record sent,
+        # or the `system` note of its lapse, *Go with it* or decline — counted by the question's id, once
+        # per question, and never on a handed entry's thread: the entry counts while it owes, and once
+        # its outcome is reported the seat has acted on the answer
+        sent = {e.id: e for e in self.outbox if e.kind in ("ask", "steer") and where(e.from_) == mine}
+        owing = {e.id for e in self.inbox if e.handed_entry}
+        for e in self.inbox:
+            q = sent.get(e.reply_to or "")
+            if e.read_at or q is None or q.id in found or q.root in owing:
+                continue
+            if (e.kind == "reply" and q.closed_reason == "replied" and q.closed_by == e.id) or (
+                e.kind == "note" and e.from_ == SYSTEM and q.closed_reason in ("lapsed", "go_with_it", "declined")
+            ):
+                found.append(q.id)
+        return found
 
     def prs_waiting(self, *, home: str | None = None) -> dict[str, Any] | None:
         """Design §4.9b *The reader* (TD-093): of `asks_waiting`, the `ask`s that carry a `pr` —
