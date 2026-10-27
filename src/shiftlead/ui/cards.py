@@ -252,9 +252,17 @@ def view(
     if d["seat_when"] and trig.get("trigger") == "prs" and isinstance(counted, int) and not s.get("seat_due"):
         # the tick's count toward it (§6 rule 3, TD-103): *on call — runs after 10 PRs · 4 of 10*
         d["seat_when"] += f" · {counted} of {trig.get('after')}"
+    d["seat_off"] = ""
     if d["seat_when"] and trig.get("trigger") == "swept":
-        # §4.9b *What a sweep seat's card says* (TD-1090): *on call — sweeps when unswept 7 d · swept 3 d ago*
-        d["seat_when"] += swept_words(s, repos)
+        # §4.9b *What a sweep seat's card says* (TD-1090, TD-1091): *on call — sweeps when unswept 7 d ·
+        # swept 3 d ago*; a switch-made seat the tick holds back says why, in its `seat_count`
+        idle, name = (s.get("seat_count") or {}).get("swept"), Path(str(s.get("repo") or "")).name
+        if idle == "other":
+            d["seat_when"] = f"another team's seat sweeps {name}"
+        elif idle == "off":
+            d["seat_off"] = f"off — the sweep switch is off for {name}"
+        else:
+            d["seat_when"] += swept_words(s, repos)
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
     # the word the Org filter's `state:` matches (§4.5a **filter…**, TD-176): the pill's, hyphenated
@@ -1026,6 +1034,10 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             f"{text}: the host agent filled this seat and the ones beside it as often as it will "
             "(design §6) — it is yours now: Resume it, or Forget it"
         )
+    elif d.get("seat") and d.get("seat_off"):
+        # a switch-made sweep seat while the switch or its repo is off (§4.9b, TD-1091): never due
+        text = d["seat_off"]
+        full = f"{text}: nothing fills it while it is off, and its team's next start writes no seat (design §4.9b)"
     elif d.get("seat"):
         # what would make it come (§4.5): the techlead's trigger is a question landing (§4.9b)
         # (§4.9b) — or a seat's own trigger: after n PRs, every so often (TD-098)

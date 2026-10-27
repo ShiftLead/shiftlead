@@ -86,10 +86,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1017 | The Session card's *told at start* row heads each part of the text with its source | Low | Open — build |
 | TD-1021 | Memory harvest 2026-10-26: 27 memories contradict the cadence, repeat it, wait on dev-cadence, or need tidying | Low | Open — (1), (2), (4) done (#2366); (3) waits on the sync of dev-cadence TD-136–TD-139 |
 | TD-1029 | Declare where ShiftLead's team lessons go, so dev-cadence's memory harvest sorts them to this ledger or the person's `shiftlead/` directory | Low | Open — blocked by dev-cadence#TD-144 (the declaration's shape) |
-| TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Designed — builds TD-1090, TD-1091 |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Designed — builds TD-1092, TD-1093 |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1091 | The Settings page's Sweep switch: one switch-made sweeper seat per repo a live team serves, and `repos.<repo>.sweep` | Medium | Open — build |
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Open — build |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
 | TD-1109 | The sweep seat's tests (TD-1090) read one board only, so a cause or a card that picks the wrong board, and a card that prints *swept -3 d ago*, pass | Medium | Open |
@@ -1823,35 +1821,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1026 (the lessons filed by hand); dev-cadence TD-125, TD-144.
 
-## TD-1061: Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-26. **The preset**: `sweeper`, a built-in seat preset with brief `sweeper.md`, which runs the stranded-work procedure from where dev-cadence keeps it, quick or deep by the stamps. **The trigger**: `swept: <duration>`, due once the repo's board's `Swept:` stamp is that old or absent, and the duration has passed since the last such fill — read from the stamp, not the record's age, so a hand sweep counts and a daily-restarted team still sweeps. **The switch**: `sweep: {on, every, profile}` in `settings.yml`, the Settings page's Sweep card; `ao team start` gives every team it starts a `sweep-<team>` seat marked `by: settings` (the host agent reads no definition and a fill replays the start's launch, so a running team gets its seat at its next start), and **one is filled per repo, not per team** (the board is the repo's), the repo's first live team's in its order of teams; a live record's own `trigger: swept` seat wins, and `repos.<repo>.sweep: off` leaves a repo out. The stamp is pushed from the seat's worktree as a stamp-only commit on fresh `origin/<default>`. **May change**: closes only what it verified done, saying how, never on a ref's state alone; ledgers overdue work; stamps `Swept:`; brings the rest as one `note` or an `ask` per decision; writes no other repo's board. **No team**: no sweep — the home starts no session in a repo without a team; the Sweep card lists each repo's stamp age and *no team: never swept*. Design §4.9b *The sweep*, §6 rule 3, §5 `sweep:`, §4.5a Sweep card, §4.8 `sweeper`.
-**Blocked by:** TD-1090, TD-1091
-**Location:** design §4.9b *Seats with a trigger* (`seats:`, `trigger: {every: <duration>}`), §6 rule 3 (the tick starts a due seat), §5 and the Settings page (`settings.yml`, design §4.5 screen 8 *Settings*); `.shiftlead.yml` (this repo's `seats:`, beside `docs-audit-ao-1` and `test-audit-ao-1`); `docs/briefs/` (a sweep brief); dev-cadence's `files/docs/procedures/stranded-work.md`, cadence §3.11 (*Swept:*)
-
-**Why:** Paul, 2026-10-26: "Should we have shiftlead do sweeps automatically (configurable, or optional team member)?" and "Lets also consider having it as a settings item - on (with a duration) would run it routinely on every team with the configured model." A Fable review of the boards that day found:
-- 58 open items on the 7 roster boards, 38 of them past cadence's 14-day *ledger it* bound (`escalate-overdue-days`; the SessionStart hook's line that day read *38 item(s) overdue 14d or more*);
-- samscrape's last sweep 44 days ago and guardians-devenv's 60, and none ever on pneuma-ops or shiftlead.
-
-Detecting staleness is not what is missing (dev-cadence#TD-152 adds the ref states). The weekly sweep the cadence asks for runs only when a person remembers `/stranded-work`. The triggered-seat machinery already runs this repo's two auditors, so a sweep needs a brief and a place to switch it on, not a new mechanism.
-
-**Fix:** design first:
-1. **The seat.** A built-in preset a team adds with one `seats:` line: role `auditor`, `trigger: {every: <duration>}`, and a sweep brief. The brief runs the repo's stranded-work procedure from where dev-cadence keeps it (`dev-cadence path procedures/stranded-work.md` in a pinned repo, the synced `docs/procedures/` copy otherwise), so the steps are never copied.
-2. **The Settings switch** (Paul's ask). `settings.yml` gains a sweep block, `{on, every, profile}`, on the Settings page. When on, every running team gets the seat at that interval with that profile's model, unless the team's own `seats:` names a sweep seat (which wins) or opts out.
-3. **What the seat may do.** It may close an item it has verified done, saying how it verified it; never on ref state alone (dev-cadence#TD-152's two samscrape false positives). It ledgers an item past `escalate-overdue-days`, stamps `Swept:`, and brings the rest to the person as one `note` or as `decide` items. It answers nothing for the person.
-4. **A repo no team serves** (pneuma-ops today; guardians-devenv's `gd-grind` team is in its own `.shiftlead.yml`, not `org.yml`), for the round to decide: the home starts a one-off sweep session there, or puts a *sweep due* card on the person's Queue, or leaves it.
-
-Then the build entries are filed.
-
-**Done when** the design names the preset, the Settings block and its precedence over a team's `seats:`, what the seat may and may not change, and the no-team case, and the build entries are filed.
-
-**Related:** dev-cadence#TD-152 (ref states in the report), dev-cadence#TD-153 (cross-repo refs); TD-098 (seats with a trigger); the docs-audit and test-audit seats.
-
 ## TD-1064: A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions
 
 **Priority:** Medium
@@ -1909,24 +1878,6 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
-
-## TD-1091: The Settings page's Sweep switch: one switch-made sweeper seat per repo a live team serves, and `repos.<repo>.sweep`
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-26 (the designer, from TD-1061)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 1 built: (1) `sweep:` and `repos.<repo>.sweep` in `settings.yml`, written by `set_settings` and drawn by `ao settings`; (2) the `sweep_switch` read (a session's too) and `ao team start`'s `sweep-<team>` seat marked `by: settings`, a seat by that mark in `teamrun`; (3) the tick's eligibility (`_sweep_eligible`: the switch, the repo, a team's own sweeper, the repo's first live team) and `every` read from the switch. Left: (4) the seat card's *another team's seat sweeps <repo>* and *off* lines, (5) the Settings page's Sweep card, (6) its UI check.
-**Location:** `src/sessionorc/settings.py` (`sweep:` and `repos.<repo>.sweep`, `set_settings`); `src/sessionorc/agent_settings.py` (`rpc_sweep_switch`, beside `rpc_settings`); `src/sessionorc/identity.py` (`READS`: `sweep_switch` beside `gate`, so a session's call is served); the node serves it from its replica of `settings.yml`, never forwarded (design §4.4a *Settings, replicated*); `src/shiftlead/teams.py` (`ao team start`'s seats: the `by: settings` sweeper seat, beside the techlead's `tags` mark); `src/sessionorc/agent_tick.py` (the seat pass: which `by: settings` seat's cause is computed, `every` read from settings, as `_tagging_seat` picks the repo's first live team); `src/shiftlead/ui/` (the Settings page's Sweep card, the seat card's words); `src/shiftlead/cli.py` (`ao settings` prints the key); design §4.9b *The sweep* (*The switch*, *A repo no team serves*), §6 rule 3 (*A switch-made sweep seat*), §5 `sweep:`, §4.5a *Sweep* card
-
-**Why:** TD-1061, Paul 2026-10-26: *on (with a duration) would run it routinely on every team with the configured model*. A team's own `sweeper` seat (TD-1090) needs a `seats:` line in each definition; the switch gives every served repo one without editing a definition.
-
-**Fix:** (1) `settings.yml`: `sweep: {on, every, profile}` (`on` false when absent, `every` `7d`, `profile` absent leaving the role's precedence) and `repos.<repo>.sweep` (on when absent), validated and written by `set_settings`. (2) A new RPC `sweep_switch`, open to every caller (not `person_only`), answering `{on, every, profile, off: [<repo>…]}` from `settings.yml` and nothing else; `ao team start` reads it (a home not reached, or a refusal: no sweep seat, and the line *sweep: the switch not read — no sweep seat*): while `on`, add to the team it starts a seat `sweep-<team>`, role `sweeper`, the built-in brief, `profile` when set, its record's mark `{trigger: swept, after: <every>, by: settings}` — unless the definition has a `sweeper` seat or the team's repo is `off`. (3) The tick: test eligibility before returning a standing `seat_due`, clearing it on a seat that fails; compute TD-1090's `swept` cause on a `by: settings` seat only while `sweep.on`, the repo not `off`, no live record of the repo carrying a `trigger: swept` mark that is not `by: settings`, and its team the first live one among the repo's `by: settings` seats in the repo's order of teams; `d` from `sweep.every`, not the mark; every other such seat never due. (4) The seat card: §4.9b *What a sweep seat's card says*, its second and third lines; live as the tagging seat's (unattended, supervised, unsuspended). (5) The Settings page's Sweep card per §4.5a: on, every, profile, the two *next start* notes; a line per registered repo with its switch, the stamp's age and what sweeps it. (6) The UI check of §4.9b (a scratch home, Playwright, the shot committed).
-
-**Done when:** tests show a start with the switch on writes the `by: settings` seat (none when the definition has a sweeper or the repo is off, none with the switch off); with two live teams on one repo only the first's seat is ever due; a live team's own `swept` seat makes the repo's `by: settings` seats never due; off makes none due and clears a standing `seat_due`; a stop of the first team makes the next live team's seat the one due; a change of `every` moves the cause at the next tick; a session's `ao team start` reads `sweep_switch` (never refused as `settings` is; served at a node from its replica) and an unreachable home at the start writes no seat and says so; the Settings card writes the three fields and the per-repo switch through `set_settings` and draws each repo's line; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1061 (the design), TD-1090 (the preset and the trigger), TD-657 (the director's `groom`, the other setting that drives a seat).
 
 ## TD-1092: Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there
 

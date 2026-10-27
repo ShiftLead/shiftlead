@@ -141,3 +141,122 @@ async def test_the_switch_made_seats_duration_is_the_switchs_every_at_the_next_t
         await agent._keep_running(now)
         assert agent.sessions[a].seat_due and agent.sessions[a].seat_due["by"] == "swept", "not the mark's 7d"
         await person.call("kill", id=a)
+
+
+# ── what the cards and the Settings page say (slice 2) ─────────────────────────────────────────
+
+
+@pytest.mark.integration
+async def test_the_tick_records_why_a_switch_made_seat_is_held_back(agent, tmp_path):
+    """§4.9b *What a sweep seat's card says*: the seat the tick holds back carries why, in `seat_count`
+    — `other` while another team's seat sweeps the repo, `off` with the switch off — and loses it once
+    it is the repo's again."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    _switch()
+    async with LocalClient() as person:
+        a, b = await _seat(person, tmp_path, "ao-a"), await _seat(person, tmp_path, "ao-b")
+        _stamp(agent, tmp_path, None)
+        await agent._keep_running(now)
+        assert agent.sessions[a].seat_count is None and agent.sessions[b].seat_count == {"swept": "other"}
+        settings_mod.save({"sweep": {"on": False}})
+        await agent._keep_running(now)
+        assert agent.sessions[a].seat_count == {"swept": "off"} == agent.sessions[b].seat_count
+        _switch()
+        await person.call("kill", id=a)
+        await agent._keep_running(now)
+        assert agent.sessions[b].seat_count is None, "the repo's seat again: nothing to say"
+        await person.call("kill", id=b)
+
+
+@pytest.mark.unit
+def test_a_switch_made_seats_card_says_another_team_sweeps_or_off(tmp_path):
+    from shiftlead.ui.cards import view
+
+    rec = {
+        "id": "ao-sweep",
+        "name": "sweep-ao-b",
+        "state": "closed",
+        "repo": str(tmp_path / "shiftlead"),
+        "seat": {"trigger": "swept", "after": "7d", "by": "settings"},
+    }
+    seats = {"ao-sweep": "sweeps when unswept 7 d"}
+
+    def text(why):
+        return view({**rec, "seat_count": {"swept": why} if why else None}, seats=seats)["slot"]["text"]
+
+    assert text(None) == "on call — sweeps when unswept 7 d"
+    assert text("other") == "on call — another team's seat sweeps shiftlead"
+    assert text("off") == "off — the sweep switch is off for shiftlead"
+
+
+@pytest.mark.unit
+def test_the_sweep_cards_line_per_repo_says_what_sweeps_it(tmp_path):
+    from shiftlead.ui import settings_page as setmod
+
+    roots = {n: tmp_path / n for n in ("a", "b", "c", "d", "e")}
+    for r in roots.values():
+        r.mkdir()
+
+    def rec(name, repo, team, **kw):
+        return {
+            "id": name,
+            "name": name,
+            "repo": str(roots[repo]),
+            "team": team,
+            "unattended": True,
+            "state": "idle",
+            **kw,
+        }
+
+    made, own = {"trigger": "swept", "after": "7d", "by": "settings"}, {"trigger": "swept", "after": "7d"}
+    fleet = [
+        rec("w-a", "a", "ao-a"),
+        rec("sweep-ao-a", "a", "ao-a", state="closed", seat=made),
+        rec("sweep-ao-x", "a", "ao-x", state="closed", seat=made, seat_count={"swept": "other"}),
+        rec("w-b", "b", "ao-b"),
+        rec("sweep-1", "b", "ao-b", state="closed", seat=own),
+        rec("w-c", "c", "ao-c"),
+        rec("old", "e", "gone", state="closed", seat=made),  # a stopped team: nothing of it counts
+    ]
+    board = {"root": str(roots["a"]), "label": "a", "items": [], "swept": {"at": _ago(3), "deep_at": None}}
+    readings = {str(roots["a"]): {"boards": {"boards": [board]}}}
+    switch = {"on": True, "every": "7d", "off": ["d"]}
+    card = setmod.sweep_card(switch, [str(p) for p in roots.values()], fleet, readings, {"grind": 1, "paul": 2})
+    assert [(line["name"], line["on"], line["what"]) for line in card["lines"]] == [
+        ("a", True, "sweep-ao-a (ao-a) · swept 3 d ago"),
+        ("b", True, "the team's own sweep-1"),
+        ("c", True, "ao-c running: its seat comes at its next start"),
+        ("d", False, "off"),
+        ("e", True, "no team"),
+    ]
+    assert card["read"] and card["on"] and card["every"] == "" and card["profiles"] == ["grind", "paul"]
+    board["swept"] = {"at": None, "deep_at": None}
+    readings[str(roots["e"])] = {"boards": {"boards": [{**board, "root": str(roots["e"])}]}}
+    off = setmod.sweep_card(
+        {"on": False, "every": "3d", "off": []}, [str(roots["e"]), str(roots["c"])], fleet, readings, {}
+    )
+    assert [line["what"] for line in off["lines"]] == ["no team: never swept", "the switch is off"]
+    assert off["every"] == "3d" and not off["on"]
+    assert not setmod.sweep_card(None, [], [], {}, {})["read"], "an older agent: no card"
+
+
+def test_the_sweep_card_saves_the_switch_and_each_repos_line(subprocess_agent):
+    from fastapi.testclient import TestClient
+
+    from sessionorc.client import call_sync
+    from shiftlead.ui.app import create_app
+
+    with TestClient(create_app()) as client:
+        page = client.get("/settings").text
+        assert 'id="setsweep"' in page and "a team gets its seat at its next start" in page
+        assert "profile holds from each team's next start" in page and ">the role's</option>" in page
+        ok = client.post("/api/settings/sweep", json={"on": True, "every": "5d", "profile": ""})
+        assert ok.status_code == 200 and ok.json()["sweep"] == {"on": True, "every": "5d", "off": []}
+        bad = client.post("/api/settings/sweep", json={"on": True, "every": "soon"})
+        assert bad.status_code == 400 and "duration" in bad.json()["detail"]
+        assert client.post("/api/settings/sweep", json={"every": "5d"}).status_code == 400
+        assert client.post("/api/settings/repos", json={"repo": "shiftlead", "sweep": False}).json()["ok"]
+        assert call_sync("sweep_switch") == {"on": True, "every": "5d", "off": ["shiftlead"]}
+        assert client.post("/api/settings/repos", json={"repo": "shiftlead", "sweep": "off"}).status_code == 400
+        assert client.post("/api/settings/sweep", json={"on": False, "every": ""}).json()["sweep"]["every"] == "7d"

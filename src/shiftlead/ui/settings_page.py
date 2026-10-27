@@ -26,13 +26,14 @@ from typing import Any
 
 import yaml
 
-from sessionorc import hosts, paths
+from sessionorc import hosts, paths, work
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc.models import tokens_short
 from shiftlead import profiles as profiles_mod
 from shiftlead import repoconfig, teamrun
 
+from .cards import swept_words
 from .common import USAGE_UNKNOWN, _age, usage_clock, usage_read
 
 # The *i* mark of each file card (§4.5a *Settings page: read-only values and the i mark*): when the
@@ -508,6 +509,75 @@ def repo_cards(
         card["auto"] = auto is True
         out.append(card)
     return out
+
+
+def sweep_line(path: str, fleet: list[Mapping[str, Any]], switch: Mapping[str, Any], readings: Any) -> str:
+    """What sweeps one registered repo, for its line on the **Sweep** card (§4.5a, §4.9b *The switch*, *A
+    repo no team serves*, TD-1091), read on the records as the tick reads them: a live team's own sweeper
+    (*the team's own sweep-ao-1 · swept 1 d ago*), else the switch-made seat the tick has not held back
+    (*sweep-ao-grind (ao-grind) · swept 3 d ago*), *off*, a live team with no seat yet (*ao-grind running:
+    its seat comes at its next start*), or *no team: never swept*."""
+    root = str(Path(path).resolve())
+    live = {
+        r.get("team")
+        for r in fleet
+        if r.get("team") and r.get("unattended") and not r.get("superseded_by") and r.get("state") not in work.DEAD
+    }
+    mine = [
+        r
+        for r in fleet
+        if r.get("repo") and str(Path(str(r["repo"])).resolve()) == root and r.get("team") in live
+        if not r.get("superseded_by")
+    ]
+    stamp = swept_words({"repo": path}, readings)
+    seats = [r for r in mine if isinstance(r.get("seat"), dict) and r["seat"].get("trigger") == "swept"]
+    own = [r for r in seats if r["seat"].get("by") != "settings"]
+    if own:
+        return f"the team's own {own[0].get('name')}{stamp}"
+    if Path(path).name in (switch.get("off") or ()):
+        return "off"
+    teams = sorted({str(r.get("team")) for r in mine})
+    if not teams:  # the switch gives a repo no team serves nothing (§4.9b *A repo no team serves*)
+        return "no team: never swept" if stamp == " · never swept" else f"no team{stamp}"
+    if not switch.get("on"):
+        return f"the switch is off{stamp}"
+    made = [r for r in seats if not (r.get("seat_count") or {}).get("swept")]
+    if made:
+        return f"{made[0].get('name')} ({made[0].get('team')}){stamp}"
+    return f"{teams[0]} running: its seat comes at its next start"
+
+
+def sweep_card(
+    switch: Any,
+    checkouts: list[str],
+    fleet: list[Mapping[str, Any]],
+    readings: Any,
+    profiles: Mapping[str, Any],
+) -> dict[str, Any]:
+    """The **Sweep** card (§4.5a, §4.9b *The switch*, §5 `sweep:`, TD-1091): `sweep_switch`'s reading as
+    `settings` answers it — **on**, **every** and **profile**, a pick of `profiles.yml`'s — and a line per
+    registered checkout with its own **swept** switch (`repos.<repo>.sweep`, on when absent) and what
+    sweeps it (`sweep_line`). `read` is false when the host agent gave no `sweep` (an older build)."""
+    sw = switch if isinstance(switch, Mapping) else {}
+    off = set(sw.get("off") or ())
+    lines = [
+        {
+            "name": Path(p).name,
+            "on": Path(p).name not in off,
+            "what": sweep_line(p, fleet, {**sw, "off": sorted(off)}, readings),
+        }
+        for p in checkouts
+    ]
+    return {
+        "read": bool(sw),
+        "on": sw.get("on") is True,
+        # the default drawn as the field's placeholder, so a Save that leaves it writes no `every`
+        "every": "" if sw.get("every") in (None, settings_mod.SWEEP_EVERY) else str(sw["every"]),
+        "every_default": settings_mod.SWEEP_EVERY,
+        "profile": str(sw.get("profile") or ""),
+        "profiles": sorted(profiles),
+        "lines": lines,
+    }
 
 
 def local_entry(path: Path) -> dict[str, Any]:

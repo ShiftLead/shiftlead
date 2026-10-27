@@ -6593,6 +6593,8 @@
       // **weights** (§4.5a *Settings page: Usage*, TD-832): the rows whole; the route sends what differs from the default
       spend: (f) => ["spend", { as_of: f.elements.as_of.value.trim(), rows: $$(".setwrows .setweight", f).map((r) => Object.fromEntries($$("input", r).map((i) => [i.name, i.value.trim()]))) }],
       notify: (f) => ["notify", { telegram: { on: f.elements.tg_on.checked, secrets: f.elements.tg_secrets.value.trim(), link: f.elements.tg_link.value.trim() } }],
+      // **Sweep** (§4.5a, §4.9b *The switch*, TD-1091): the three fields whole, an empty one cleared by the route
+      sweep: (f) => ["sweep", { on: f.elements.sweep_on.checked, every: f.elements.sweep_every.value.trim(), profile: f.elements.sweep_profile.value }],
     };
     // **Save** and **Cancel** (§4.5a *Settings page*, TD-286): Save is pressable, and Cancel shown, only
     // while a field differs from what was drawn; Cancel puts the drawn values back, and a Save makes
@@ -6700,6 +6702,17 @@
         const read = box.parentElement.querySelector(".setsyncread");  // drawn on every card, hidden when empty
         if (read) { read.textContent = box.checked ? "" : "off"; read.hidden = box.checked; }
         AO.toast(`${card.dataset.repo}: sync ${box.checked ? "on" : "off"} · applies on the next pass`, true);
+      } catch (err) { box.checked = !box.checked; AO.toast(`not saved: ${err.message}`); }
+    }));
+    // the **Sweep** card's per-repo **swept** switch (§4.5a, TD-1091): saved on its own press, as **pull** is;
+    // what sweeps the repo is the next page's reading, so the line says only what the press changed
+    $$(".setsweep", page).forEach((box) => box.addEventListener("change", async () => {
+      const line = box.closest(".setsweepline");
+      try {
+        await post("repos", { repo: line.dataset.repo, sweep: box.checked });
+        box.defaultChecked = box.checked;  // saved: the card's Cancel (a form reset) keeps it as pressed
+        $(".setsweepwhat", line).textContent = box.checked ? "on · what sweeps it shows on the next load" : "off";
+        AO.toast(`${line.dataset.repo}: sweep ${box.checked ? "on" : "off"} · applies on the next tick`, true);
       } catch (err) { box.checked = !box.checked; AO.toast(`not saved: ${err.message}`); }
     }));
     // **Send a test** (§4.5a **You**: **Telegram**, §4.10): `notify_test` at the home, its result in words beside the button

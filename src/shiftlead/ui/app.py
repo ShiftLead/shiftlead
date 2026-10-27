@@ -3853,6 +3853,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     host=info,
                 ),
                 "repos": setmod.repo_cards(local_files["repos"], got.get("repos"), (info or {}).get("pulls"), readings),
+                # **Sweep** (§4.5a, §4.9b *The switch*, TD-1091): the switch and a line per registered checkout
+                "sweep": setmod.sweep_card(got.get("sweep"), local_files["repos"], fleet, readings, profiles),
                 "you": term,
                 # **Telegram** (§4.5a **You**, §4.10; TD-319 slice 3): the last send is the home's alone
                 "telegram": setmod.telegram(
@@ -3962,6 +3964,18 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             raise HTTPException(400, str(e)) from None
         return answer(await call("set_settings", spend=spend))
 
+    @app.post("/api/settings/sweep")
+    async def settings_sweep(request: Request):
+        """§4.5a *Settings page* → the **Sweep** card's **Save** (§4.9b *The switch*, TD-1091): `{on: bool,
+        every, profile}`, an empty `every` or `profile` cleared — `7d` and the role's precedence — then
+        `set_settings {sweep}`, whose refusal names a duration that is not one."""
+        body = await body_of(request)
+        if not isinstance(body.get("on"), bool):
+            raise HTTPException(400, "sweep: send {on: true|false, every, profile}")
+        every, profile = str(body.get("every") or "").strip(), str(body.get("profile") or "").strip()
+        sweep = {"on": body["on"], "every": every or None, "profile": profile or None}
+        return answer(await call("set_settings", sweep=sweep))
+
     @app.post("/api/settings/max_age")
     async def settings_max_age(request: Request):
         """§4.5a *Settings page: Usage* → **trust a reading for** (TD-233): `{max_age: text}` — an age
@@ -4057,14 +4071,20 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """§4.5a *Settings page: Repos* → the promote's **auto** switch, `{repo, auto: bool}`, written
         to `repos.<repo>.promote.auto`, or the **pull** switch, `{repo, pull: bool}`, written to
         `repos.<repo>.pull` (§6 *Pull*, TD-263), or the **sync** switch, `{repo, sync: bool}`, written to
-        `repos.<repo>.sync.auto` (§6 *Sync*, TD-685) — each through `set_settings`, one key a press."""
+        `repos.<repo>.sync.auto` (§6 *Sync*, TD-685), or the **Sweep** card's **swept** switch, `{repo, sweep:
+        bool}`, written to `repos.<repo>.sweep` (§4.9b *The switch*, TD-1091) — each through `set_settings`,
+        one key a press."""
         body = await body_of(request)
         repo, auto, pull, sync = str(body.get("repo") or ""), body.get("auto"), body.get("pull"), body.get("sync")
-        keys = [k for k in ("auto", "pull", "sync") if k in body]
+        keys = [k for k in ("auto", "pull", "sync", "sweep") if k in body]
         if not repo or len(keys) != 1 or not isinstance(body[keys[0]], bool):
             raise HTTPException(
-                400, "repos: send {repo, auto: true|false}, {repo, pull: true|false} or {repo, sync: true|false}"
+                400,
+                "repos: send {repo, auto: true|false}, {repo, pull: true|false}, {repo, sync: true|false} "
+                "or {repo, sweep: true|false}",
             )
+        if keys == ["sweep"]:
+            return answer(await call("set_settings", repos={repo: {"sweep": body["sweep"]}}))
         if keys == ["pull"]:
             return answer(await call("set_settings", repos={repo: {"pull": pull}}))
         if keys == ["sync"]:
