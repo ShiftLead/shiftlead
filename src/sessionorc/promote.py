@@ -634,30 +634,45 @@ def start_precheck(root: str | Path, repo: str, sha: str) -> tuple[dict[str, Any
     the group), output to `precheck-<sha7>.log`; `precheck.json` is written **before** the start, so a
     home that dies in between finds a `pid: null` file, and gains the pid and its start time after.
     Raises OSError when the script cannot be spawned."""
+    return _spawn_precheck(root, repo, "precheck", {"sha": sha}, ["--commit", sha], f"precheck-{sha[:7]}.log")
+
+
+def start_precheck_pr(root: str | Path, repo: str, pr: int, sha: str) -> tuple[dict[str, Any] | None, str | None]:
+    """The sync pass's `precheck.py --pr <pr>` on a mechanical PR at head `sha` (§6 *Sync* step 4,
+    TD-1039), started as main's run is, its file `precheck-pr.json` `{pr, sha, at, pid, started, log}`
+    and its output `precheck-pr<pr>-<sha7>.log`. The caller holds the agent's promote lock."""
+    return _spawn_precheck(
+        root, repo, "precheck-pr", {"pr": pr, "sha": sha}, ["--pr", str(pr)], f"precheck-pr{pr}-{sha[:7]}.log"
+    )
+
+
+def _spawn_precheck(
+    root: str | Path, repo: str, name: str, f: dict[str, Any], args: list[str], log_name: str
+) -> tuple[dict[str, Any] | None, str | None]:
     script, why = cadence.precheck_script(root)
     if script is None:
         return None, why
     argv, env = script
     d = repo_dir(repo)
     d.mkdir(parents=True, exist_ok=True)
-    log_path = d / f"precheck-{sha[:7]}.log"
-    f: dict[str, Any] = {"sha": sha, "at": datetime.now(UTC).isoformat(), "pid": None, "started": None}
-    f["log"] = str(log_path)
-    _write(d / "precheck.json", f)
+    log_path = d / log_name
+    f = {**f, "at": datetime.now(UTC).isoformat(), "pid": None, "started": None, "log": str(log_path)}
+    _write(d / f"{name}.json", f)
     with open(log_path, "ab") as out:
         p = subprocess.Popen(
-            [*argv, "--commit", sha], cwd=str(root), stdout=out, stderr=subprocess.STDOUT,
+            [*argv, *args], cwd=str(root), stdout=out, stderr=subprocess.STDOUT,
             stdin=subprocess.DEVNULL, start_new_session=True, env=env,
         )  # fmt: skip
     f["pid"], f["started"] = p.pid, proc_start(p.pid)
     _procs[p.pid] = p
-    _write(d / "precheck.json", f)
+    _write(d / f"{name}.json", f)
     return f, None
 
 
 def kill_precheck(root: str | Path, f: dict[str, Any]) -> None:
     """The bound's kill: the run's process group TERM, then KILL after `PRECHECK_GRACE`, only while
-    `alive` reads it as the run; then what `precheck.py`'s own cleanup would have removed (§6)."""
+    `alive` reads it as the run; then what `precheck.py`'s own cleanup would have removed (§6) — a
+    `--pr` run's (`f` carries `pr`) by its prefix, `precheck-<pr>-`."""
     pid, started = f.get("pid"), f.get("started")
     if alive(pid, started):
         with suppress(OSError):
@@ -670,7 +685,19 @@ def kill_precheck(root: str | Path, f: dict[str, Any]) -> None:
         with suppress(OSError):
             os.killpg(pid, signal.SIGKILL)
         kill(pid, started)
-    drop_precheck_tree(root, str(f.get("sha") or ""))
+    pr = f.get("pr")
+    drop_precheck_tree(root, str(f.get("sha") or ""), f"precheck-{pr}-" if isinstance(pr, int) else None)
+
+
+def precheck_pr_bound(root: str | Path, repo: str, now: datetime) -> None:
+    """The readings' pass judges the sync pass's run's bound as it does main's (§6 *Sync* step 4 *Who
+    ends it*), so a run outlives no bound when the sync pass skips the repo: one going past
+    `PRECHECK_BOUND` is killed and its file kept, saying why, for the sync pass to count."""
+    f = precheck_pr_run(repo)
+    if f and f.get("pid") is not None and _going(f) and (_age(f.get("at"), now) or 0) >= PRECHECK_BOUND:
+        kill_precheck(root, f)
+        f["why"] = f"killed at the {int(PRECHECK_BOUND // 60)}-minute bound"
+        _write(repo_dir(repo) / "precheck-pr.json", f)
 
 
 def drop_precheck_tree(root: str | Path, sha: str, prefix: str | None = None) -> None:
@@ -1103,6 +1130,7 @@ def survey(
         r["held"] = held(repo)
         if full or first:  # the checks were read this pass (TD-1038)
             precheck_on_main(root, repo, r, now)
+            precheck_pr_bound(root, repo, now)
         r["auto"] = bool(auto.get(repo))
         behind = bool(r.get("main")) and r.get("live") != r["main"]
         # `auto` acts only on a live it has read (§6, Paul 2026-09-28): a `check` that is not

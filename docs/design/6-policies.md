@@ -1580,7 +1580,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   move the host agent makes in a person's checkout, and only ever a fast-forward.
 - **Sync: a mechanical sync PR is merged at the home** (TD-681; steps 1 and 2 built as `sessionorc.sync.check`
   by TD-685 slice 1; the pass, the evidence, the gate, the merge and the setting by slice 2, as
-  `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch by slice 3; Paul,
+  `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch by slice 3; step 4's precheck by TD-1039; Paul,
   2026-10-14: *each team should pick up those PRs and run them to ground, but if it's mechanical and
   post_sync would handle it that's even better*). A sync PR (§4.4 *A sync PR is the team's at once*:
   head branch `cadence-sync-*`, the lock in its diff) changes only what dev-cadence owns, and a
