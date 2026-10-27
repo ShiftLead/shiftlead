@@ -91,8 +91,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1098 | `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it | Low | Open — build |
-| TD-1100 | Under `-n auto`, `tests/test_link.py` fails 31 of its 68 tests with *connection refused* on a node's `agent.sock`, and each passes alone | Low | Open — build |
+| TD-1100 | Under pytest's default `--basetemp`, `tests/test_link.py` fails 31 of its 68 tests: the home's `links/<node>/link.sock` passes the unix socket path limit | Low | Open — build |
 | TD-1101 | Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row | Low | Open — build |
 | TD-1102 | `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck | Low | Open — build |
 
@@ -1948,41 +1947,23 @@ It then names the build entries.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
 
-## TD-1098: `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-1, met building TD-1015)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_sync_precheck.py` (`_ran`, line 58; the test at line 197)
-
-**Why:** the test's last pass starts a second detached `precheck.py` stub, then asserts `_ran(pre) == ["--pr 1097", "--pr 1097"]`. `_ran` waits only until the `ran` file exists, and the first run already made it, so it reads the file before the second run appends its line. It fails about one run in eight alone on `origin/main` (`5d9dced`), with `Right contains one more item: '--pr 1097'`, and more often under a loaded suite.
-
-**Fix:** `_ran` takes the number of lines it expects and waits, under its bound, until the file holds that many; each caller passes its count.
-
-**Done when** the test passes 50 runs alone and 20 under `pdm run test`, and `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1039 (the build that wrote the test), TD-1087, TD-1088 (the other load flakes).
-
-## TD-1100: Under `-n auto`, `tests/test_link.py` fails 31 of its 68 tests with *connection refused* on a node's `agent.sock`, and each passes alone
+## TD-1100: Under pytest's default `--basetemp`, `tests/test_link.py` fails 31 of its 68 tests: the home's `links/<node>/link.sock` passes the unix socket path limit
 
 **Priority:** Low
 **Type:** debt
 **Added:** 2026-10-27 (grinder-ao-1, met verifying TD-1088)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_link.py` (the node fixtures that start a node's agent and dial its `agent.sock`)
+**Status:** Open — build; the cause found 2026-10-27 (grinder-ao-1, while verifying TD-1098)
+**Location:** `tests/test_link.py` (the home and node fixtures, whose homes sit at `<basetemp>/popen-gwN/<test name, 30 chars>0/<host>`); `src/sessionorc/paths.py` (the link socket, `links/<node>/link.sock`); `tests/conftest.py`
 
-**Why:** `pdm run pytest -q -n auto tests/test_link.py` on 2026-10-27 00:20 local (load 21, the org's sessions beside it) failed 31 of 68, each `ConnectionRefusedError` from `open_unix_connection` on the node's `<tmp>/kmaster/agent.sock`, or an `assert False` after it; a full `pdm run test -n auto` failed the same 31. `-k crashing_until` alone passed. The suite's own run is `-n 8` (`pdm run test`), where the file passes, so nothing gates on it yet — but a dial that runs before the node's agent listens is a wait bounded on something other than the listen.
+**Why:** `pdm run test` from this worktree on 2026-10-27 (`-n 8`, and `-n auto` too) failed 31 of `tests/test_link.py`'s 68, each a `ConnectionRefusedError` dialling the node's `agent.sock` or an `assert False` after it; `-k crashing_until` alone passed, and so does every precheck. The same file with `--basetemp` under `/var/tmp/pc.XXXXXX` (the precheck's shape) passes 68 of 68. Under the default `/tmp/pytest-of-kmaster/pytest-24002/popen-gw7/test_laptop_closed_its_cards_g0/`, the home's `kmaster/links/laptop/link.sock` is 108 bytes, past what `sun_path` holds (108 with its NUL, so 107 at most), so the link never listens and the node's dial is refused; a node of a longer name, a two-digit worker (`-n 16`) or a six-digit `pytest-NNNNNN` counter only lengthens it. Nothing gates on it (the precheck's basetemp is short), but `pdm run test` from a checkout reads red for no fault of the change.
 
-**Fix:** find what the node fixture waits on before the first dial and make it wait for the socket to accept (TD-1050's shape), or show the refusal is the worker count alone. Reproduce with the command above.
+**Fix:** keep every socket a test makes under the limit whatever the basetemp: `tests/conftest.py` gives the suite a short default `--basetemp` (as the precheck's `$T/p`), or the link fixtures place their homes under a short directory of their own, as `scripts/look_home.py` and the conformance walk do (`/tmp/aoc-…`). If `paths` can be asked for a socket past the limit in a real home too, it says so in words instead of a refused dial.
 
-**Done when** `pytest -n auto tests/test_link.py` passes 10 runs in a row on a loaded machine, and `pdm run test` and `pdm run lint` pass.
+**Done when** `pdm run test` from a worktree passes `tests/test_link.py` under the default basetemp with two-digit workers (`-n 16`), and `pdm run test` and `pdm run lint` pass.
 
-**Related:** TD-1087 (four other tests that fail only under `-n auto`), TD-1050, TD-1088.
+**Related:** the memory *Scratchpad too long for unix sockets*; TD-1088, TD-1098 (met verifying them); TD-1087 (load flakes under `-n auto`, another cause).
 
 ## TD-1101: Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row
 

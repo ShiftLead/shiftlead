@@ -55,11 +55,17 @@ def _none(**over) -> dict:
     return _pr(**{"checks": "none", "prechecked": False, **over})
 
 
-def _ran(pre) -> list[str]:
+def _ran(pre, lines: int) -> list[str]:
+    """The stub's runs, once the file holds `lines` of them or the bound passes (TD-1098: the first
+    run's file exists before a second run appends its line)."""
+
+    def read() -> list[str]:
+        return pre["ran"].read_text().splitlines() if pre["ran"].exists() else []
+
     deadline = time.monotonic() + 5
-    while time.monotonic() < deadline and not pre["ran"].exists():
+    while time.monotonic() < deadline and len(read()) < lines:
         time.sleep(0.05)
-    return pre["ran"].read_text().splitlines() if pre["ran"].exists() else []
+    return read()
 
 
 def _gone(f: dict) -> None:
@@ -132,7 +138,7 @@ async def test_the_pass_runs_the_precheck_before_the_gate_and_the_pr_waits_then_
     _reading(agent, _none())
     await agent._sync_pass()
     assert _names(gh) == ["login", "check", "comment"], "steps 1 to 3, then the precheck in place of the gate"
-    assert _ran(pre) == ["--pr 1097"]
+    assert _ran(pre, 1) == ["--pr 1097"]
     f = promote.precheck_pr_run(REPO)
     assert (f["pr"], f["sha"], f["pid"] is not None) == (1097, HEAD, True)
     e = _entry(agent)
@@ -208,7 +214,7 @@ async def test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_
     assert (e["verdict"], e["tries"]) == ("", 1) and "ended and recorded nothing" in e["why"]
     assert promote.precheck_pr_run(REPO)["counted"] is True and _names(gh) == [], "this pass starts nothing"
     await agent._sync_pass()  # counted already: not counted again, and a new run starts
-    assert _entry(agent)["tries"] == 1 and _ran(pre) == ["--pr 1097", "--pr 1097"]
+    assert _entry(agent)["tries"] == 1 and _ran(pre, 2) == ["--pr 1097", "--pr 1097"]
     assert "counted" not in promote.precheck_pr_run(REPO)
 
 
