@@ -174,8 +174,12 @@ async def test_the_pass_runs_the_precheck_before_the_gate_and_the_pr_waits_then_
 async def test_precheck_unset_is_no_candidate_and_the_none_pr_is_the_teams(agent, gh, pre):  # noqa: F811
     pre["command"] = None
     _reading(agent, _none())
+    # a PR left waiting on its precheck when the repo stopped setting it (TD-1084): that wait is dropped
+    agent._repos[ROOT]["sync"] = {"1097": {"head": HEAD, "verdict": "", "why": "prechecking aaaaaaa", "tries": 0,
+                                           "waiting_since": now_iso()}}  # fmt: skip
     await agent._sync_pass()
     assert _names(gh) == [] and promote.precheck_pr_run(REPO) is None
+    assert "waiting_since" not in _entry(agent), "nothing waits on a precheck the pass will not start"
     assert [o["id"] for o in await _orders(agent)] == ["pr:1097"]
 
 
