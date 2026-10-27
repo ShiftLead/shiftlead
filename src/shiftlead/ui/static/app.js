@@ -6710,6 +6710,7 @@
       const line = box.closest(".setsweepline");
       try {
         await post("repos", { repo: line.dataset.repo, sweep: box.checked });
+        box.defaultChecked = box.checked;  // saved: the card's Cancel (a form reset) keeps it as pressed
         $(".setsweepwhat", line).textContent = box.checked ? "on · what sweeps it shows on the next load" : "off";
         AO.toast(`${line.dataset.repo}: sweep ${box.checked ? "on" : "off"} · applies on the next tick`, true);
       } catch (err) { box.checked = !box.checked; AO.toast(`not saved: ${err.message}`); }
