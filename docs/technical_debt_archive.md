@@ -21089,3 +21089,28 @@ The `org.unlanded` branch, by contrast, fails its test when removed, so the harn
 **Related:** TD-1092.
 
 **Resolved:** 2026-10-27 (grinder-ao-2, #2485) — three tests in `tests/test_ui_entry_host.py`: a typed name the node's worktrees list, a non-slug name on the node (`ENTRY_SLUG_WHY`), and a press whose reader read meets a silent node (409 *node1 did not answer: …*, nothing created); each of the three reverts fails one.
+
+## TD-1122: TD-1093's uid wiring (`_id_channel`'s `peer_uid`/`own_uid`, `_dispatch` → `_identify`, `_handle_conn`/`_serve_wait`'s `_peer_args`) is tested by no test: drop it and the suite passes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2469–#2481)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/agent_identity.py` (`_id_channel`, `_identify`), `src/sessionorc/agent_serve.py` (`_handle_conn`, `_serve_wait`, `_dispatch`); `tests/test_identity.py`
+
+**Why:** Test audit of #2470 (TD-1093), 2026-10-27. The classification is tested in `identity.classify` with a fake `/proc` and `peer_uid=`/`own_uid=` passed by hand, and the end-to-end test (`test_a_peer_in_another_namespace_is_refused_under_enforce_and_alarmed_under_observe`) passes `peer_uid=OTHER` to `_identify` but gives the peer a readable namespace link, so the uid never decides. Nothing runs a connection through `_handle_conn` → `_peer_args` → `_dispatch` → `_identify` → `_id_channel` → `classify`. Probes, each on a clean `origin/main` worktree, `pytest tests/test_identity.py tests/test_agent.py` (113 passed before and after):
+- `_id_channel`: `uids = {"peer_uid": peer_uid, "own_uid": os.geteuid()}` → `uids = {}` — 113 passed.
+- `_identify`: `await self._id_channel(peer, peer_uid)` → `await self._id_channel(peer)` — 113 passed (the earlier `-k` run, 49 passed).
+- `_dispatch`: `self._identify(req, peer, conn, peer_uid=peer_uid)` without `peer_uid` — 49 passed in the `-k` run.
+- `_handle_conn` and `_serve_wait`: `**_peer_args(writer)` replaced by `peer=_peer_args(writer)["peer"]` — 49 passed in the `-k` run.
+Any of these puts the live agent back to the pre-TD-1093 behaviour for a peer whose namespace link is unreadable (another uid: a container's root), which is the case the entry exists for: *outside*, so the person, where the design says *unknown*.
+
+**Fix:** Add one test that sends a request over a real unix socket pair to a served connection (or calls `_dispatch` with `**_peer_args(writer)` of a socket whose peer uid differs) with a fake `proc` whose link for the peer does not read, and asserts the verdict is *unknown* under `enforce`. Revert each of the four lines above and see it fail. Re-run the `-k` probes over the whole files.
+
+**Done when** each line named above fails a test when reverted, and the suite is green.
+
+**Related:** TD-1093.
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2486) — `test_a_served_connection_carries_its_peers_uid_to_the_classification` drives requests over the agent's socket with only `_peer_pid` faked (another uid, an unreadable namespace link): `enforce` refuses `inbox_delete`, `whoami` reads *unknown / namespace*, and a `wait` through `_serve_wait` is tallied the same. Each of the five lines above, reverted alone, fails it.
