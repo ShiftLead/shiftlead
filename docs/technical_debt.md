@@ -89,7 +89,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Designed — builds TD-1078, TD-1079, TD-1080 |
-| TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
@@ -1903,24 +1902,6 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when** the design says how the waiting member gets the answer after its relaying seat closes, and how a finished member with unread mail is woken or counted as having work, and the build entries are filed. A doorbell that cannot be delivered is said as a failure, not *rung*.
 
 **Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
-
-## TD-1056: The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/promote.py` (`read_checks`: `state = str(mine[0].get("state") ...)`, comment *newest first, one per context*), `tests/test_promote.py` (`test_the_commit_statuses_fold_in_beside_the_runs`, `test_main_needs_a_green_precheck_where_the_repo_sets_one`)
-
-**Why:** #2396 reads the head's `cadence/precheck` as `mine[0]`, relying on GitHub's newest-first order of `commits/<sha>/status`; a re-run's `success` after an earlier `failure` is the case that matters. Probed on `origin/main`: changing `mine[0]` to `mine[-1]` leaves 102 passed in `tests/test_ci_not_run.py tests/test_promote.py tests/test_cadence_pin.py`. No test's fake statuses list holds two statuses of that context.
-
-**Fix:** add a case with two `cadence/precheck` statuses, newest `success` over older `failure` and the reverse, asserting `precheck` is the first's.
-
-**Done when:** the `mine[-1]` probe fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1037, TD-1033.
 
 ## TD-1061: Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one
 
