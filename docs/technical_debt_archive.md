@@ -20624,6 +20624,26 @@ It files each as a build entry, or as live checks where the design already holds
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2446) — `_pinned_node`'s tree holds a relative link and a dangling one, and the ship test asserts both arrive as links with their targets; with `symlinks=True` dropped it fails.
 
+## TD-1098: `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, met building TD-1015)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_sync_precheck.py` (`_ran`, line 58; the test at line 197)
+
+**Why:** the test's last pass starts a second detached `precheck.py` stub, then asserts `_ran(pre) == ["--pr 1097", "--pr 1097"]`. `_ran` waits only until the `ran` file exists, and the first run already made it, so it reads the file before the second run appends its line. It fails about one run in eight alone on `origin/main` (`5d9dced`), with `Right contains one more item: '--pr 1097'`, and more often under a loaded suite.
+
+**Fix:** `_ran` takes the number of lines it expects and waits, under its bound, until the file holds that many; each caller passes its count.
+
+**Done when** the test passes 50 runs alone and 20 under `pdm run test`, and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1039 (the build that wrote the test), TD-1087, TD-1088 (the other load flakes).
+
+**Resolved:** 2026-10-27 (grinder-ao-1) — `_ran(pre, lines)` waits, under its 5 s bound, until the stub's `ran` file holds the runs its caller expects (1, then 2), not merely until the file exists. The test passed 50 runs alone and 20 beside a full `pdm run test`, 0 failures.
+
 ## TD-1075: The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit)
 
 **Priority:** Low
