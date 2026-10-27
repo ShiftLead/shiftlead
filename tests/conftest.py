@@ -373,14 +373,18 @@ async def park_ticks(agent) -> None:
     # a tick's detached passes (`_promote_task`, `_repos_task`, …) outlive it: one still in flight lands
     # after the test has set the state it replaces — a late promote reading put back `_promotes` without
     # the test's live commit, and a lane note went unsent (TD-858; TD-752 and TD-753 awaited them by hand)
-    # — so each is finished here, and one that has not finished in PASS_DRAIN is cancelled
-    passes = [t for k, t in vars(agent).items() if k.endswith("_task") and isinstance(t, asyncio.Task) and not t.done()]
-    if passes:
-        _, late = await asyncio.wait(passes, timeout=PASS_DRAIN)
-        for task in late:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await task
+    # — so each is finished here, and one that has not finished in PASS_DRAIN is cancelled. A pass can start
+    # another as it ends (the promote pass starts `_sync_task`, TD-1101), so the drain runs until none is left
+    end = time.monotonic() + PASS_DRAIN
+    while passes := [
+        t for k, t in vars(agent).items() if k.endswith("_task") and isinstance(t, asyncio.Task) and not t.done()
+    ]:
+        _, late = await asyncio.wait(passes, timeout=max(0.0, end - time.monotonic()))
+        if late and time.monotonic() >= end:
+            for task in late:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await task
 
 
 @pytest.fixture

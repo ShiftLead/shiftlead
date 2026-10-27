@@ -14,7 +14,7 @@ import textwrap
 import time
 
 import pytest
-from conftest import wait_for, wait_state
+from conftest import park_ticks, wait_for, wait_state
 
 from sessionorc import identity, paths
 from sessionorc.client import AgentError, LocalClient
@@ -387,6 +387,9 @@ async def test_the_detached_check_follows_the_tmux_server_it_is_about(agent, mon
     import sessionorc.agent as agent_mod
     from sessionorc import identity
 
+    # TD-1101: the loop's own recheck ran with the patched check against the real server's pid, and
+    # under load its call landed in `checks`: the test takes every recheck by hand
+    await park_ticks(agent)
     pid, checks = 50, []
 
     def check(_reader, *, agent_pid, tmux_pid):

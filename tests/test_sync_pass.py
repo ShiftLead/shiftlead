@@ -3,10 +3,10 @@ takes up and declines, the SHIP and BLOCK comments, the gate's three outcomes, t
 note, the switch, and TD-684's order read through `sync.mark`. The check (slice 1, tested with fixture
 repos in `test_sync_check.py`), the gate and every `gh` call are stubbed: no test reaches GitHub."""
 
-import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import cadence, sync, workorders
 from sessionorc import settings as settings_mod
@@ -72,19 +72,13 @@ def gh(monkeypatch):
 
 @pytest.fixture
 async def agent(agent):
-    """The running agent, its tick kept from starting a sync pass or a repo-facts read of its own (TD-695). The
-    first tick's full reading starts `_sync_pass` as a task; where the reading is slow (CI), that task ran beside
-    the test's own pass and set `_sync_ran` again after the test had cleared it. And each tick's `_refresh_repos`
-    drops the test's `ROOT`, which no registry lists. So each first task is awaited, and a task that never ends
-    stands in its place: the tick starts one only once the last one is done."""
-    held = ("_sync_task", "_repos_task")
-    for name in held:
-        if (task := getattr(agent, name)) is not None:
-            await task
-        setattr(agent, name, asyncio.get_running_loop().create_future())
-    yield agent
-    for name in held:
-        getattr(agent, name).cancel()
+    """The running agent, its tick loop parked (TD-695, TD-1101). The first tick's full reading starts
+    `_sync_pass` as a task; where the reading is slow (CI), that task ran beside the test's own pass and set
+    `_sync_ran` again after the test had cleared it, and each tick's `_refresh_repos` drops the test's `ROOT`,
+    which no registry lists. Holding those two tasks was not enough: the loop's other passes save `_repos` too,
+    and under load one landed inside `test_off_is_written_once_per_head`'s pass. So no tick runs but the test's."""
+    await park_ticks(agent)
+    return agent
 
 
 def _names(state) -> list[str]:

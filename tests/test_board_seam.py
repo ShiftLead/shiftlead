@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import board, workorders
 from sessionorc.client import AgentError, LocalClient
@@ -167,6 +168,9 @@ def test_a_board_outside_the_repo_is_the_key_unset_so_the_write_back_never_edits
 async def test_an_unserved_repos_board_is_written_by_no_press(agent, tmp_path, forge):
     """TD-1011, design §5 *The seams*: the home runs no write-back for an unserved repo — a Done, a Reply
     and an add are refused naming the first lack, and the board is left as it was."""
+    # TD-1101: the loop's `_refresh_repos` reads the registry written below and replaced the hand-set
+    # unserved reading under load, so a press went through: the test owns `_repos`
+    await park_ticks(agent)
     root = make_repo(tmp_path)
     forge(root)
     home = tmp_path / "home"
