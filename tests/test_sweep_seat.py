@@ -304,3 +304,32 @@ def test_a_sweeper_seat_line_reads_from_an_org_file(tmp_path):
     path.write_text(yaml.safe_dump(doc))
     (seat,) = orgmod.load(path).teams["ao-grind"].seats
     assert (seat.role, seat.trigger, seat.after, seat.brief) == ("sweeper", "swept", "7d", None)
+
+
+@pytest.mark.unit
+def test_a_sweep_seats_card_says_how_long_ago_its_repo_was_swept(tmp_path):
+    from shiftlead.ui.cards import view
+
+    rec = {
+        "id": "ao-sweep",
+        "name": "sweep-ao-1",
+        "state": "closed",
+        "repo": str(tmp_path),
+        "seat": {"trigger": "swept", "after": "7d"},
+    }
+    seats = {"ao-sweep": "sweeps when unswept 7 d"}
+
+    def words(swept, **reading):
+        board = {"root": str(tmp_path), "label": "x", "items": []}
+        if swept != "-":
+            board["swept"] = swept
+        repos = {str(tmp_path): {"boards": {"boards": [board], **reading}}}
+        return view(rec, seats=seats, repos=repos)["slot"]["text"]
+
+    assert words({"at": _ago(3), "deep_at": None}) == "on call — sweeps when unswept 7 d · swept 3 d ago"
+    assert words({"at": _ago(0), "deep_at": None}) == "on call — sweeps when unswept 7 d · swept today"
+    assert words({"at": None, "deep_at": None}) == "on call — sweeps when unswept 7 d · never swept"
+    # no board on origin, no `swept` yet, or an unreadable board: nothing guessed
+    for swept, reading in ((None, {}), ("-", {}), ({"at": _ago(3)}, {"error": "boom"})):
+        assert words(swept, **reading) == "on call — sweeps when unswept 7 d"
+    assert view(rec, seats=seats)["slot"]["text"] == "on call — sweeps when unswept 7 d"

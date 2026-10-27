@@ -7,7 +7,7 @@ re-exported from it, so a route, a template or a test reads each name from the a
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -169,6 +169,35 @@ def repo_pr_marks(root: str, reading: Any) -> dict[str, str]:
     return {str(n): w for n, w in pr_marks({"repo": root}, {root: reading}).items()}
 
 
+def swept_words(s: Mapping[str, Any], repos: Mapping[str, Any] | None) -> str:
+    """A sweep seat's stamp on its card (§4.9b *What a sweep seat's card says*, TD-1090): *· swept 3 d
+    ago*, *· swept today*, or *· never swept* for a board on origin without the line — read from the
+    `swept` the boards reading of the seat's repo carries for its board. "" with no reading, an error
+    reading, or a null `swept` (no board on origin): never guessed, as the cause reads none either."""
+    root = pr_repo(s, repos)
+    got = ((repos or {}).get(root) or {}).get("boards") if root else None
+    if not isinstance(got, dict) or got.get("error"):
+        return ""
+    want = str(Path(root).resolve())
+    stamp = next(
+        (
+            b.get("swept")
+            for b in got.get("boards") or ()
+            if isinstance(b, dict) and str(Path(str(b.get("root") or "")).resolve()) == want
+        ),
+        None,
+    )
+    if not isinstance(stamp, dict):
+        return ""
+    if not stamp.get("at"):
+        return " · never swept"
+    try:
+        days = (datetime.now().astimezone().date() - date.fromisoformat(str(stamp["at"]))).days
+    except ValueError:
+        return ""
+    return " · swept today" if days <= 0 else f" · swept {days} d ago"
+
+
 def view(
     s: dict[str, Any],
     fleet: list[dict[str, Any]] | None = None,
@@ -223,6 +252,9 @@ def view(
     if d["seat_when"] and trig.get("trigger") == "prs" and isinstance(counted, int) and not s.get("seat_due"):
         # the tick's count toward it (§6 rule 3, TD-103): *on call — runs after 10 PRs · 4 of 10*
         d["seat_when"] += f" · {counted} of {trig.get('after')}"
+    if d["seat_when"] and trig.get("trigger") == "swept":
+        # §4.9b *What a sweep seat's card says* (TD-1090): *on call — sweeps when unswept 7 d · swept 3 d ago*
+        d["seat_when"] += swept_words(s, repos)
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
     # the word the Org filter's `state:` matches (§4.5a **filter…**, TD-176): the pill's, hyphenated
