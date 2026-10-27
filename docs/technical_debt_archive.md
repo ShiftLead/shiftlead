@@ -21114,3 +21114,21 @@ Any of these puts the live agent back to the pre-TD-1093 behaviour for a peer wh
 **Related:** TD-1093.
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2486) — `test_a_served_connection_carries_its_peers_uid_to_the_classification` drives requests over the agent's socket with only `_peer_pid` faked (another uid, an unreadable namespace link): `enforce` refuses `inbox_delete`, `whoami` reads *unknown / namespace*, and a `wait` through `_serve_wait` is tallied the same. Each of the five lines above, reverted alone, fails it.
+
+## TD-1124: The tick's save condition for a switch-made sweep seat's `seat_count` (*off*/*other* mark, TD-1091) is tested by no test: take it out and the suite passes
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2469–#2481)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/agent_tick.py` (the `count = s.seat_count` read and `or s.seat_count != count` in the seat's save condition, ~2838–2840); `tests/test_sweep_switch.py`, `tests/test_usage_gate.py`
+
+**Why:** Test audit of #2474 (TD-1091 (2)), 2026-10-27. The PR sets `s.seat_count = {"swept": idle}` for a held-back switch-made seat (§4.9b *What a sweep seat's card says*) and widened the seat's `if due != s.seat_due or … or s.seat_count != count:` so that a mark which is the only change is saved and pushed. Probe: remove `or s.seat_count != count` (and the `count` read) on `origin/main` — `pdm run pytest -q tests/test_sweep_switch.py tests/test_usage_gate.py` still gives 27 passed. The other lines the PR added (the card's *other*/*off* words, `sweep_line`'s branches, the `/api/settings/sweep` 400) each fail a test when removed. Without the line, a card's *off — the sweep switch is off for X* can sit in memory until some other field changes and the record is next saved, so a restart or the UI's push shows the old mark.
+
+**Fix:** A tick test: a switch-made sweep seat whose only change in a tick is `seat_count` going from `None` to `{swept: off}` (switch turned off) is saved (`_save` called / the record on disk carries the mark) and pushed. Revert the condition and see it fail.
+
+**Done when** each line named above fails a test when reverted, and the suite is green.
+
+**Related:** TD-1091, TD-1090.
