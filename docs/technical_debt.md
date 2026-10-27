@@ -92,7 +92,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
-| TD-1097 | `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load | Low | Open — build |
 | TD-1098 | `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it | Low | Open — build |
 | TD-1100 | Under `-n auto`, `tests/test_link.py` fails 31 of its 68 tests with *connection refused* on a node's `agent.sock`, and each passes alone | Low | Open — build |
 | TD-1102 | `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck | Low | Open — build |
@@ -1971,24 +1970,6 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row; then `pdm run test` may take `-n auto`.
 
 **Related:** TD-1068, TD-1050, TD-1065, TD-1067.
-
-## TD-1097: `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-2, met on TD-1095's full run)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_background_shells.py` (`test_the_linux_reader_reads_children_and_argv_and_falls_back_to_ppid`, its `proc.cmdline(child.pid) == ["sleep", "30"]` straight after `subprocess.Popen`); `src/sessionorc/identity.py` (`LinuxProc.cmdline`)
-
-**Why:** on TD-1095's full `pdm run test` (2026-10-26), this test failed with `assert [] == ['sleep', '30']`, and it passed alone. `Popen` returns once the child's exec has closed its close-on-exec error pipe. In the kernel the close-on-exec files are closed (`begin_new_exec`) before the new image's argument pages are set up, so for a moment `/proc/<pid>/cmdline` reads empty. Under load that moment is long enough for the test to read it.
-
-**Fix:** have the test wait, bounded, for the child's cmdline to read non-empty before asserting it (`wait_for` on `proc.cmdline(child.pid)`). The reader is right to say `[]` for a process with no argv yet. Check whether any caller of `cmdline` in the code reads a process it has just started; if one does, it takes the same wait.
-
-**Done when:** the test waits on the argv itself; `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1050, TD-1087 (the same family: a test that reads before the event it waits on).
 
 ## TD-1098: `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it
 
