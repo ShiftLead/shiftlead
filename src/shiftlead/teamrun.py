@@ -1675,6 +1675,8 @@ def _close_settled(call: Call, entry: dict[str, Any], record: dict[str, Any] | N
     n = int(record.get("unread") or 0)
     if entry.get("unread") and n:  # an out-of-work member's mail waits for the name's next start (§4.9, TD-1051)
         entry["action"] = f"closed with {n} unread, kept for the name's next start"
+    elif entry.get("unread"):  # read while the stop waited: finished after all
+        entry["action"] = "finished (out of work), nothing sent, closed"
     else:
         entry["action"] += ", closed"
     entry["state"] = "closed"
