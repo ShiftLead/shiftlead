@@ -223,9 +223,13 @@ async def test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_
     f = promote.precheck_pr_run(REPO)
     _gone(f)
     gh["calls"] = []
+    # the day at one head counts from the first wait, so a count never restarts it (TD-1085)
+    since = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
+    _entry(agent)["waiting_since"] = since
     await agent._sync_pass()
     e = _entry(agent)
     assert (e["verdict"], e["tries"]) == ("", 1) and "ended and recorded nothing" in e["why"]
+    assert e["waiting_since"] == since, "the count keeps the first wait's clock"
     assert promote.precheck_pr_run(REPO)["counted"] is True and _names(gh) == [], "this pass starts nothing"
     await agent._sync_pass()  # counted already: not counted again, and a new run starts
     assert _entry(agent)["tries"] == 1 and _ran(pre, 2) == ["--pr 1097", "--pr 1097"]
