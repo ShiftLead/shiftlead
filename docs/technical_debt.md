@@ -95,6 +95,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1097 | `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load | Low | Open — build |
 | TD-1098 | `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it | Low | Open — build |
 | TD-1100 | Under `-n auto`, `tests/test_link.py` fails 31 of its 68 tests with *connection refused* on a node's `agent.sock`, and each passes alone | Low | Open — build |
+| TD-1102 | `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck | Low | Open — build |
 
 ---
 
@@ -2024,3 +2025,21 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when** `pytest -n auto tests/test_link.py` passes 10 runs in a row on a loaded machine, and `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1087 (four other tests that fail only under `-n auto`), TD-1050, TD-1088.
+
+## TD-1102: `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-1, met in #2454's first precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_cadence_policy.py` (`test_dismiss_takes_the_row_off_and_its_snooze_with_it`); `src/sessionorc/agent_tick.py` (the tick's `_cadence_pass`)
+
+**Why:** the precheck of #2454 at 52b2923 (a change to `tests/test_entry_draft.py` and the ledger alone) failed it: after two `agent._cadence_pass([rec])` calls, `cadence.rows(rec.checks)` read `[842]` where `[842, 843]` was asserted (*a merged fail is the row at once*). It passed 5 of 5 alone. The test puts its record in `agent.sessions` while the fixture's tick loop runs, so the loop's own cadence pass likely reads the same record between the test's calls; the test does not park the ticks.
+
+**Fix:** confirm the race with a probe (a tick taken between the test's two passes), then `park_ticks(agent)` first, as TD-1065's and TD-1088's tests do; if the pass itself drops a PR's read when two passes overlap, that is the bug, fixed in the pass.
+
+**Done when** the case passes 20 runs under `-n auto` beside a full suite, and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1088, TD-1065, TD-1087 (the other load flakes).
