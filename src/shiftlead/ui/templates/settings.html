@@ -208,6 +208,33 @@
     {% else %}
       <div class="note">No checkouts in this host's registry.</div>
     {% endfor %}
+    {#- **Sweep** (§4.5a *Settings page: Sweep*, §4.9b *The switch*, §5 `sweep:`; TD-1091): the switch's three
+        fields through `set_settings`, then a line per registered checkout with its own **swept** switch,
+        which writes `repos.<repo>.sweep` on its own press, and what sweeps it -#}
+    {% if sweep.read %}
+    <form class="card pad setcard" data-section="sweep" id="setsweep">
+      <div class="row gap wrap"><span class="h2">sweep</span><span class="note">a sweeper seat on every team, one filled per repo, when its board's <span class="mono">Swept:</span> stamp is old</span></div>
+      <label class="setrow"><span class="setlabel">on</span>
+        <input type="checkbox" name="sweep_on"{% if sweep.on %} checked{% endif %}>
+        <span class="note">a team gets its seat at its next start</span></label>
+      <label class="setrow"><span class="setlabel">every</span>
+        <input class="input setin" name="sweep_every" value="{{ sweep.every }}" placeholder="{{ sweep.every_default }}" autocomplete="off" spellcheck="false">
+        <span class="note">swept again once the stamp is this old · {{ sweep.every_default }} when empty · read at the next tick</span></label>
+      <label class="setrow"><span class="setlabel">profile</span>
+        <select class="input setin" name="sweep_profile">
+          <option value=""{% if not sweep.profile %} selected{% endif %}>the role's</option>
+          {% for p in sweep.profiles %}<option value="{{ p }}"{% if p == sweep.profile %} selected{% endif %}>{{ p }}</option>{% endfor %}
+          {% if sweep.profile and sweep.profile not in sweep.profiles %}<option value="{{ sweep.profile }}" selected>{{ sweep.profile }} (not in profiles.yml)</option>{% endif %}
+        </select>
+        <span class="note">profile holds from each team's next start</span></label>
+      {% for l in sweep.lines %}
+      <div class="setrow setsweepline" data-repo="{{ l.name }}"><span class="setlabel mono">{{ l.name }}</span>
+        <input type="checkbox" class="setsweep" aria-label="sweep {{ l.name }}"{% if l.on %} checked{% endif %}>
+        <span class="note mono setsweepwhat">{{ l.what }}</span></div>
+      {% endfor %}
+      {{ saverow("the switch writes settings.yml's sweep: · each repo's switch saves on its own press") }}
+    </form>
+    {% endif %}
   </section>
 
   {# **You** (§4.5a *Settings page: You*): two halves by write path #}

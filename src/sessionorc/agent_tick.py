@@ -2835,9 +2835,9 @@ class TickMixin:
             return
         if s.sit_out or work_mod.sat_out(s):
             return  # a seat the definition dropped (TD-706): `_sit_out_close` ends it, and nothing fills it
-        filled, seen = s.seat_filled, s.lane_seen
+        filled, seen, count = s.seat_filled, s.lane_seen, s.seat_count
         due = self._seat_due(s, now, records)
-        if due != s.seat_due or s.seat_filled != filled or s.lane_seen != seen:
+        if due != s.seat_due or s.seat_filled != filled or s.lane_seen != seen or s.seat_count != count:
             s.seat_due = due
             self._save(s)
             await self._push_changes()
@@ -2946,7 +2946,11 @@ class TickMixin:
         if trigger == "swept":
             # read again each tick, as `asks` is: a stamp written by hand, or a board unreadable, before
             # the fill clears the due — an unreadable board fills nothing (§4.9b *The sweep*, TD-1090)
-            if not self._sweep_eligible(s, records) or not self._swept_met(s, now):
+            idle = self._sweep_idle(s, records)
+            # why a switch-made seat is not the repo's, for its card (§4.9b *What a sweep seat's card says*)
+            if (s.seat_count or {}).get("swept") != (idle or None):
+                s.seat_count = {"swept": idle} if idle else None
+            if idle or not self._swept_met(s, now):
                 return None
             return s.seat_due if (s.seat_due or {}).get("by") == "swept" else {"at": now_iso(), "by": "swept"}
         if s.seat_due:
@@ -3011,19 +3015,20 @@ class TickMixin:
         whose team comes first in the ledger's `declared_teams`, a team it leaves out after, by name."""
         return self._first_seat(root, records, lambda mark: bool(mark.get("tags")))
 
-    def _sweep_eligible(self, s: Session, records: list[Session]) -> bool:
-        """Whether a sweep seat's `swept` cause may be computed (design §4.9b *The switch*, §6 rule 3,
-        TD-1091). A definition's sweeper always; a switch-made one (`by: settings`) only while
-        `sweep.on`, its repo not `off`, no live team's record of the repo carrying a `swept` mark that is
-        not `by: settings` (a team's own sweeper wins), and it is the repo's first such seat by team, as
-        the tagging seat is chosen — one filled per repo. Tested before a standing due is kept."""
+    def _sweep_idle(self, s: Session, records: list[Session]) -> str:
+        """Why a sweep seat's `swept` cause may not be computed (design §4.9b *The switch*, §6 rule 3,
+        TD-1091), "" where it may. A definition's sweeper always may; a switch-made one (`by: settings`)
+        only while `sweep.on` and its repo not `off` (else `off`), no live team's record of the repo
+        carrying a `swept` mark that is not `by: settings` (a team's own sweeper wins), and it is the
+        repo's first such seat by team, as the tagging seat is chosen — one filled per repo (else
+        `other`). Tested before a standing due is kept."""
         if (s.seat or {}).get("by") != "settings":
-            return True
+            return ""
         switch = settings_mod.sweep(settings_mod.load())
         root = str(s.repo or "")
         name = str((self._repos.get(root) or {}).get("name") or Path(root).name)
         if not switch["on"] or name in switch["off"]:
-            return False
+            return "off"
         live = self._live_teams(records)
         if any(
             r.repo == root
@@ -3033,9 +3038,9 @@ class TickMixin:
             and (r.seat or {}).get("by") != "settings"
             for r in records
         ):
-            return False
+            return "other"
         first = self._first_seat(root, records, lambda m: m.get("trigger") == "swept" and m.get("by") == "settings")
-        return first is s
+        return "" if first is s else "other"
 
     @staticmethod
     def _live_teams(records: list[Session]) -> set[str]:

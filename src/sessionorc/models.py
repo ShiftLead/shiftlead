@@ -1296,7 +1296,9 @@ class Session:
     # (`{at, by: tag, ids}`, the `needs_team` ids no fill covers, TD-730) — and it is what fills the seat; the
     # fill's new record starts without it. `seat_count` is the count toward a `prs:` trigger as last
     # read, `{prs, at}`, so a card can say how far along it is; a `gh` outage leaves the last
-    # reading and never reads as zero. Both the home's, computed at the home.
+    # reading and never reads as zero — or, on a switch-made sweep seat that is not due-able, why:
+    # `{swept: off}` (the switch or its repo off) or `{swept: other}` (another seat sweeps the repo,
+    # §4.9b *The switch*, TD-1091). Both the home's, computed at the home.
     seat_due: dict[str, Any] | None = None
     seat_count: dict[str, Any] | None = None
     # A manager on call's memory of what it was filled for (§6 rule 3 *A manager on call is a seat
