@@ -90,7 +90,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Live check #2475 |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
-| TD-1124 | The tick's save condition for a switch-made sweep seat's `seat_count` (*off*/*other* mark, TD-1091) is tested by no test: take it out and the suite passes | Low | Open |
 | TD-1116 | A session the person started cannot steer another team's member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow | Medium | Open |
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
@@ -2032,22 +2031,3 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Done when** a grep for each listed word finds only uses that match what runs, the doc-bound tests pass, and the code-side mismatches are filed.
 
 **Related:** the docs-audit seat (`docs/briefs/docs-audit.md`); dev-cadence#TD-129 (the pin, which retired `scripts/` and the sync the docs still name); TD-1116 (the briefs' sentence it adds).
-
----
-## TD-1124: The tick's save condition for a switch-made sweep seat's `seat_count` (*off*/*other* mark, TD-1091) is tested by no test: take it out and the suite passes
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1, auditing #2469–#2481)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (the `count = s.seat_count` read and `or s.seat_count != count` in the seat's save condition, ~2838–2840); `tests/test_sweep_switch.py`, `tests/test_usage_gate.py`
-
-**Why:** Test audit of #2474 (TD-1091 (2)), 2026-10-27. The PR sets `s.seat_count = {"swept": idle}` for a held-back switch-made seat (§4.9b *What a sweep seat's card says*) and widened the seat's `if due != s.seat_due or … or s.seat_count != count:` so that a mark which is the only change is saved and pushed. Probe: remove `or s.seat_count != count` (and the `count` read) on `origin/main` — `pdm run pytest -q tests/test_sweep_switch.py tests/test_usage_gate.py` still gives 27 passed. The other lines the PR added (the card's *other*/*off* words, `sweep_line`'s branches, the `/api/settings/sweep` 400) each fail a test when removed. Without the line, a card's *off — the sweep switch is off for X* can sit in memory until some other field changes and the record is next saved, so a restart or the UI's push shows the old mark.
-
-**Fix:** A tick test: a switch-made sweep seat whose only change in a tick is `seat_count` going from `None` to `{swept: off}` (switch turned off) is saved (`_save` called / the record on disk carries the mark) and pushed. Revert the condition and see it fail.
-
-**Done when** each line named above fails a test when reverted, and the suite is green.
-
-**Related:** TD-1091, TD-1090.

@@ -4,12 +4,13 @@ switch-made sweeper seat per repo whose `swept` cause is computed."""
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from conftest import park_ticks
 
-from sessionorc import identity
+from sessionorc import identity, paths
 from sessionorc import settings as settings_mod
 from sessionorc.client import AgentError, LocalClient
 
@@ -167,6 +168,33 @@ async def test_the_tick_records_why_a_switch_made_seat_is_held_back(agent, tmp_p
         await agent._keep_running(now)
         assert agent.sessions[b].seat_count is None, "the repo's seat again: nothing to say"
         await person.call("kill", id=b)
+
+
+@pytest.mark.integration
+async def test_a_mark_that_is_the_seats_only_change_is_saved(agent, tmp_path):
+    """TD-1124: a seat that is not due, whose only change in a tick is its held-back mark, is saved
+    — the record on disk, which a restart and the UI's push read, carries *off*, then loses it."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    _switch()
+    async with LocalClient() as person:
+        a = await _seat(person, tmp_path, "ao-a")
+        _stamp(agent, tmp_path, _ago(1))  # swept a day ago: not due under 7d, before and after
+        await agent._keep_running(now)
+        assert agent.sessions[a].seat_due is None and agent.sessions[a].seat_count is None
+
+        def on_disk() -> dict | None:
+            return json.loads((paths.sessions_dir() / f"{a}.json").read_text())["seat_count"]
+
+        assert on_disk() is None
+        settings_mod.save({"sweep": {"on": False}})
+        await agent._keep_running(now)
+        assert agent.sessions[a].seat_due is None, "the mark is the tick's only change"
+        assert on_disk() == {"swept": "off"}
+        _switch()
+        await agent._keep_running(now)
+        assert on_disk() is None
+        await person.call("kill", id=a)
 
 
 @pytest.mark.unit
