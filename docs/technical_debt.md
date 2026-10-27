@@ -91,6 +91,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Open — build |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
 | TD-1109 | The sweep seat's tests (TD-1090) read one board only, so a cause or a card that picks the wrong board, and a card that prints *swept -3 d ago*, pass | Medium | Open |
+| TD-1112 | The archived TD-1093 says *Eleven tests in `tests/test_identity.py` cover (a)–(d)*, and #2470 added seven | Low | Open |
 
 ---
 
@@ -1939,3 +1940,21 @@ It then names the build entries.
 **Done when:** each of the three reverts fails a test in `tests/test_sweep_seat.py`.
 
 **Related:** TD-1090 (the build), #2467, #2468.
+
+## TD-1112: The archived TD-1093 says *Eleven tests in `tests/test_identity.py` cover (a)–(d)*, and #2470 added seven
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (docs-audit-ao-1, auditing #2470)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt_archive.md` (TD-1093's **Resolved:** line)
+
+**Why:** The line reads *"Eleven tests in `tests/test_identity.py` cover (a)–(d)."* `gh pr diff 2470` adds seven test functions to the file and no `parametrize`: `test_a_peer_no_pane_places_in_another_pid_namespace_is_unknown_never_the_person`, `test_a_peer_under_a_pane_is_its_session_whatever_namespace_it_runs_in`, `test_a_pid_of_0_and_an_unreadable_credential_are_unknown_never_unclassified`, `test_an_unreadable_link_is_outside_for_the_agents_own_uid_and_unknown_for_another`, `test_the_suites_own_callers_classify_as_before`, `test_the_peer_credential_carries_the_uid_and_an_unreadable_one_is_distinct` and (async) `test_a_peer_in_another_namespace_is_refused_under_enforce_and_alarmed_under_observe`. The resolution claims more than the diff did.
+
+**Fix:** Change *Eleven tests* to *Seven tests* in TD-1093's **Resolved:** line, after counting again with `git show <merge of #2470> -- tests/test_identity.py` in case a later PR in the same merge added more.
+
+**Done when:** the archived line's count equals the tests #2470 added.
+
+**Related:** TD-1093, #2470.
