@@ -9,6 +9,7 @@ import pathlib
 from datetime import UTC, datetime
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import adapters, mail
 from sessionorc.adapters import Prompt
@@ -256,6 +257,8 @@ async def test_the_tick_gives_a_prompt_its_sender_and_the_next_read_its_reply(ag
             "id"
         ]
         await person.call("hook", session=sid, adapter_id="conv-1")
+        # every read below is the test's own tick: a loop tick took a batch or added to `asked` (TD-1099)
+        await park_ticks(agent)
         now = datetime.now(UTC)
         agent.sessions[sid].sends.append(_send(1, "ao-lead", "look at #12", "2026-10-22T10:00:00Z"))
         batches.append(([_p("2026-10-22T10:00:01Z", "look at #12")], None, 100))
