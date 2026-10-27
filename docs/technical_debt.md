@@ -2353,13 +2353,13 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 
 **Priority:** Medium
 **Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
 **Location:** `src/sessionorc/promote.py` (`survey`: `if full or first:  # the checks were read this pass (TD-1038)` before `precheck_on_main`), `tests/test_precheck_on_main.py`, `tests/test_promote.py`
 
-**Why:** #2407 (TD-1038) put `precheck_on_main` behind the pass that read the checks, and its docstring says so ("on a pass that read the checks"). A pass that is neither `full` nor the repo's first copies the previous reading (`r = {k: v for k, v in old.items() ...}`) and reads no checks. Probed on `origin/main`: replacing `if full or first:` with `if True:` on that line leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_promote.py tests/test_precheck_on_main.py` at 102 passed. Run on a cheap pass, `precheck_on_main` resets `prechecking` to None and acts on the carried `precheck` and `checks`, so the *prechecking* row would drop out between full passes and a stale `absent` could start a run; no test has such a pass (`survey(..., full=False)` with a previous reading).
+**Why:** #2407 (TD-1038) put `precheck_on_main` behind the pass that read the checks, and its docstring says so ("on a pass that read the checks"). A pass that is neither `full` nor the repo's first copies the previous reading (`r: dict[str, Any] = {k: v for k, v in old.items() if ...}`) and reads no checks. Probed on `origin/main`: replacing `if full or first:` with `if True:` on that line leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_promote.py tests/test_precheck_on_main.py` at 102 passed. Run on a cheap pass, `precheck_on_main` resets `prechecking` to None and acts on the carried `precheck` and `checks`, so the *prechecking* row would drop out between full passes and a stale `absent` could start a run; no test has such a pass (`survey(..., full=False)` with a previous reading).
 
 **Fix:** add a `survey` test with a previous reading that has `prechecking` set, `full=False`, and a fake `precheck_script` that records its starts; assert the second pass keeps `prechecking`, starts nothing, and calls `precheck_on_main` not at all (monkeypatch it to fail).
 
@@ -2371,7 +2371,7 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
@@ -2389,7 +2389,7 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 
 **Priority:** High
 **Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
