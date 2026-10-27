@@ -92,6 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1091 | The Settings page's Sweep switch: one switch-made sweeper seat per repo a live team serves, and `repos.<repo>.sweep` | Medium | Open — build |
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Open — build |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
+| TD-1109 | The sweep seat's tests (TD-1090) read one board only, so a cause or a card that picks the wrong board, and a card that prints *swept -3 d ago*, pass | Medium | Open |
 
 ---
 
@@ -1966,3 +1967,24 @@ It then names the build entries.
 **Done when** the design names each surface, how a run on it is resolved and pressed, and its §4.5a rows, and the build entries are filed.
 
 **Related:** TD-493 (a path in the pane), TD-688 / TD-689 / TD-691 (file links, the file button, a path in a transcript), TD-748 (the Queue), TD-071 (no control from a session's text).
+
+## TD-1109: The sweep seat's tests (TD-1090) read one board only, so a cause or a card that picks the wrong board, and a card that prints *swept -3 d ago*, pass
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2467 and #2468)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_sweep_seat.py` (`_board`, `test_the_swept_cause_reads_the_repos_stamp`, `test_a_sweep_seats_card_says_how_long_ago_its_repo_was_swept`); `src/sessionorc/agent_tick.py` (`_swept_met`); `src/shiftlead/ui/cards.py` (`swept_words`)
+
+**Why:** Three reverts each leave `pytest -q tests/test_sweep_seat.py` at 17 passed, run on `origin/main` at `8da2288c0`:
+- `_swept_met`: `str(b.get("root")) == str(s.repo)` → `True`. The cause then reads the first board of the reading, whatever repo's it is. Every reading in the file (`_board`, the card test's `words`) holds exactly one board; the one test that builds a two-board reading (`test_a_read_of_the_checkout_alone_carries_the_last_swept_forward`) never reaches `_swept_met`. Design §4.9b says the seat reads *the repo's board's* stamp.
+- `swept_words`: `b.get("root") and str(Path(str(b["root"])).resolve()) == want` → `isinstance(b, dict)`. The card then prints another board's age; the same one-board fixture hides it.
+- `swept_words`: `days <= 0` → `days == 0`. A stamp dated ahead prints *· swept -3 d ago*. The cause test pins the future date (`_ago(-10)`, id `future`), the card test has no such row.
+
+**Fix:** (1) Make `_board` and `words` put a second board of another root, with a different `swept`, ahead of the seat's in the reading; the cause and the card must follow the seat's own. (2) A card row with a stamp of a future date, reading *· swept today*. Revert each line above and watch the test fail. `pdm run test` and `pdm run lint` pass.
+
+**Done when:** each of the three reverts fails a test in `tests/test_sweep_seat.py`.
+
+**Related:** TD-1090 (the build), #2467, #2468.
