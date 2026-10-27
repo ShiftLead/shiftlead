@@ -21,12 +21,13 @@ import subprocess
 import tempfile
 import tomllib
 from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from sessionorc import cadence, paths
+from sessionorc import cadence, paths, promote
 from sessionorc import held as held_mod
 from sessionorc.workorders import _git as _git_bytes
 from sessionorc.workorders import default_branch
@@ -312,6 +313,7 @@ def _check(
 # -- the pass (§6 *Sync*, steps 3 to 5; TD-685 slice 2) ---------------------------------------------------
 
 SYNC_TRIES = 3  # passes at one head with no reading before its verdict is *error* (§6 step 4)
+SYNC_PRECHECK_WAIT = 86400.0  # seconds a PR waits at one head for its precheck before *refused* (§6 step 4)
 GH_TIMEOUT = 30.0
 GATE_TIMEOUT = 300.0
 SETTLED = ("merged", "refused", "gate", "error")  # a verdict at a head is final for that head; *off* is not
@@ -323,9 +325,18 @@ def settled(entry: dict[str, Any] | None, head: str) -> bool:
     return bool(entry) and entry.get("head") == head and entry.get("verdict") in SETTLED
 
 
-def candidates(prs: list[dict[str, Any]], sync: dict[str, Any], held_by: Any) -> list[dict[str, Any]]:
+def unprechecked(pr: dict[str, Any]) -> bool:
+    """A PR whose checks read *none* with no `cadence/precheck` on its head: in a repo that sets `precheck`,
+    step 4's precheck is what makes it green (§6 *Sync*, TD-1039)."""
+    return pr.get("checks") == "none" and not pr.get("prechecked")
+
+
+def candidates(
+    prs: list[dict[str, Any]], sync: dict[str, Any], held_by: Any, precheck: bool = False
+) -> list[dict[str, Any]]:
     """The open sync PRs the pass takes up (§6 *Sync*): flagged `sync` (§4.4's test), not a draft, not
-    conflicting, *green*, held by no live record (`held_by(pr)`), and with no verdict at their head."""
+    conflicting, *green* — or, where the repo sets `precheck`, `unprechecked` — held by no live record
+    (`held_by(pr)`), and with no verdict at their head."""
     return [
         pr
         for pr in prs
@@ -333,7 +344,7 @@ def candidates(prs: list[dict[str, Any]], sync: dict[str, Any], held_by: Any) ->
         and pr.get("sync") is True
         and not pr.get("draft")
         and not pr.get("conflicting")
-        and pr.get("checks") == "green"
+        and (pr.get("checks") == "green" or (precheck and unprechecked(pr)))
         and pr.get("head")
         and not settled(sync.get(str(pr.get("number"))), str(pr["head"]))
         and not held_by(pr)
@@ -443,15 +454,18 @@ def _no_reading(entry: dict[str, Any], why: str, at: str) -> dict[str, Any]:
 
 def judge(
     root: Path | str, pr: dict[str, Any], entry: dict[str, Any] | None, clones: Iterable[Path | str], at: str,
-    *, gate: Any = None,
+    *, gate: Any = None, precheck: bool = False,
 ) -> dict[str, Any] | None:  # fmt: skip
     """Steps 1 to 4 on one candidate, blocking (called off the loop): the entry to keep, `ready` set on
     one the gate passed — the merge is the caller's, after it reads the holders again — or None for a
     head that moved (nothing written). A retry keeps `posted`, so the SHIP comment is posted once per
-    head; no reading counts `tries`, and at `SYNC_TRIES` the verdict is *error*."""
+    head; no reading counts `tries`, and at `SYNC_TRIES` the verdict is *error*. With `precheck` (a PR
+    awaiting its precheck) the gate is not run: a mechanical one comes back with `prestart` set, and the
+    start is the caller's, under the promote lock."""
     number, head = int(pr["number"]), str(pr["head"])
     e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0, "posted": False}
     e.pop("ready", None)
+    e.pop("prestart", None)
     held = held_globs(root)
     if held is None:
         return _no_reading(e, "the repo's .shiftlead.yml held: could not be read", at)
@@ -466,6 +480,8 @@ def judge(
         if why := comment(root, number, review_body(got)):
             return _no_reading(e, f"the review comment was not posted: {why}", at)
         e["posted"] = True
+    if precheck:
+        return {**e, "at": at, "prestart": True}
     g = (gate or cadence.check)(root, number, GATE_TIMEOUT)
     if g is None or g.get("verdict") not in ("pass", "fail"):
         return _no_reading(e, "the gate gave no reading", at)
@@ -483,7 +499,8 @@ def mark(prs: list[dict[str, Any]], sync: dict[str, Any], auto: bool) -> list[di
     holds — merged at its head, or green with no verdict at its head while the switch is on — carries
     `sync_home`, and is no order; one with a verdict at its head carries `sync_why`, its order's
     `Context`, and so does one *off* at its head the home does not hold (*sync is off*). Copies; the
-    reading is never changed."""
+    reading is never changed. A PR the pass left waiting on its precheck at its head (`waiting_since`)
+    waits as a green one does."""
     out = []
     for pr in prs:
         if not isinstance(pr, dict) or pr.get("sync") is not True:
@@ -493,9 +510,97 @@ def mark(prs: list[dict[str, Any]], sync: dict[str, Any], auto: bool) -> list[di
         head = str(pr.get("head") or "")
         if settled(e, head):
             pr = {**pr, "sync_home": True} if e["verdict"] == "merged" else {**pr, "sync_why": str(e.get("why") or "")}
-        elif auto and pr.get("checks") == "green" and not pr.get("draft") and not pr.get("conflicting"):
-            pr = {**pr, "sync_home": True}
+        elif (
+            auto
+            and not pr.get("draft")
+            and not pr.get("conflicting")
+            and (pr.get("checks") == "green" or (waiting(e, head) and unprechecked(pr)))
+        ):
+            pr = {**pr, "sync_home": True}  # a PR awaiting its precheck waits as a green one (§4.4, TD-1039)
         elif e and e.get("verdict") == "off" and e.get("head") == head:
             pr = {**pr, "sync_why": str(e.get("why") or "sync is off")}
         out.append(pr)
     return out
+
+
+# -- step 4's precheck (§6 *Sync* step 4, TD-1039) --------------------------------------------------------
+
+
+def waiting(entry: dict[str, Any] | None, head: str) -> bool:
+    """Whether the pass left this head waiting on its precheck: an entry at it with `waiting_since` and
+    no verdict."""
+    return bool(entry) and entry.get("head") == head and bool(entry.get("waiting_since")) and not entry.get("verdict")
+
+
+def checkout_why(root: Path | str) -> str | None:
+    """Why the registry checkout cannot run `precheck.py`, which reads the command from the tree it runs
+    in: None on `origin/<default>`'s head with a clean tree, else the reason."""
+    want = default_branch(Path(root))
+    try:
+        head = _out(root, "rev-parse", "HEAD").strip()
+        tip = _out(root, "rev-parse", f"origin/{want}").strip()
+        status = _out(root, "status", "--porcelain")
+    except _Error as e:
+        return f"the checkout cannot be read: {e}"
+    if head != tip:
+        return f"the checkout is at {head[:7]}, not origin/{want}'s head {tip[:7]}"
+    if status.strip():
+        n = len(status.splitlines())
+        return f"the checkout has {n} uncommitted change{'' if n == 1 else 's'}"
+    return None
+
+
+def precheck_blocked(root: Path | str, repo: str) -> str | None:
+    """Why no precheck can start now — a run of the repo going (main's or a PR's: one at a time), or the
+    checkout — or None. Read again under the promote lock just before the start."""
+    if promote._going(promote.precheck_run(repo)) or promote._going(promote.precheck_pr_run(repo)):
+        return f"a precheck of {repo} is running"
+    return checkout_why(root)
+
+
+def tend_precheck(root: Path | str, repo: str, prs: list[dict[str, Any]], sync: dict[str, Any], at: str) -> str | None:
+    """The life of `precheck-pr.json`, once a pass under the promote lock, before the candidates (§6 *Sync*
+    step 4): a `pid: null` file is dropped, uncounted; a PR no longer open, or a head that moved, kills a
+    live run and drops the file; a run gone with no status on its head counts one pass with no reading
+    toward `SYNC_TRIES`, once (`counted`), after which a later pass may start a new one; a status on the
+    head ends it, whatever the exit. Changes `sync` in place; returns the PR it counted, which this pass
+    leaves waiting. The bound is judged first, as the readings' pass judges it."""
+    promote.precheck_pr_bound(root, repo, datetime.fromisoformat(at))
+    f = promote.precheck_pr_run(repo)
+    if not f:
+        return None
+    if f.get("pid") is None:
+        promote.clear(repo, "precheck-pr")
+        return None
+    n, sha = str(f.get("pr")), str(f.get("sha") or "")
+    pr = next((p for p in prs if isinstance(p, dict) and str(p.get("number")) == n), None)
+    if pr is None or str(pr.get("head") or "") != sha:
+        promote.kill_precheck(root, f)  # only while its start time matches; the cleanup either way
+        promote.clear(repo, "precheck-pr")
+        return None
+    if promote._going(f):
+        return None
+    if not unprechecked(pr):
+        promote.clear(repo, "precheck-pr")  # its status is the gate's to read
+        return None
+    if f.get("counted"):
+        return None
+    e = sync.get(n) if (sync.get(n) or {}).get("head") == sha else {"head": sha, "tries": 0, "posted": False}
+    why = f"precheck on {sha[:7]} ended and recorded nothing" + (f" ({f['why']})" if f.get("why") else "")
+    sync[n] = {**_no_reading(dict(e), why, at), "waiting_since": e.get("waiting_since") or at}
+    promote._write(promote.repo_dir(repo) / "precheck-pr.json", {**f, "counted": True})
+    return n
+
+
+def wait_entry(entry: dict[str, Any] | None, head: str, why: str, at: str) -> dict[str, Any]:
+    """A pass that waits on the precheck, uncounted: the entry at `head` with `waiting_since` (set on the
+    first waiting pass, reset by a new head) and the wait's reason; at `SYNC_PRECHECK_WAIT` the verdict is
+    *refused*, *precheck waited a day: <the reason>*, and the PR the team's."""
+    e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0, "posted": False}
+    e.pop("prestart", None)
+    since = e.get("waiting_since") or at
+    e.update(waiting_since=since, why=why, at=at, verdict=e.get("verdict") or "")
+    age = promote._age(since, datetime.fromisoformat(at))
+    if age is not None and age >= SYNC_PRECHECK_WAIT:
+        e.update(verdict="refused", why=f"precheck waited a day: {why}")
+    return e

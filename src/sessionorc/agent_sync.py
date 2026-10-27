@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import cadence, hosts, workorders
+from sessionorc import promote as promote_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import sync as sync_mod
@@ -76,8 +77,17 @@ class SyncMixin:
                     sync[n] = {"head": head, "verdict": "off", "why": "sync is off", "tries": 0, "posted": False,
                                "at": now_iso()}  # fmt: skip
         else:
-            covered = True
-            for pr in sync_mod.candidates(prs, sync, lambda p: self._sync_held_by(root, p)):
+            covered, repo = True, Path(root).name
+            # where the repo sets `precheck`, a PR reading *none* is prechecked before its gate (§6 step 4, TD-1039)
+            want = f"origin/{await asyncio.to_thread(workorders.default_branch, Path(root))}"
+            prechecks = bool((await asyncio.to_thread(cadence.precheck_command, root, want))[0])
+            counted = None
+            if not prechecks:  # `precheck` unset since: nothing waits on a precheck the pass will not start
+                sync = {n: {k: v for k, v in e.items() if k != "waiting_since"} for n, e in sync.items()}
+            else:
+                async with self._promote_lock:
+                    counted = await asyncio.to_thread(sync_mod.tend_precheck, root, repo, prs, sync, now_iso())
+            for pr in sync_mod.candidates(prs, sync, lambda p: self._sync_held_by(root, p), prechecks):
                 n, head = str(pr["number"]), str(pr["head"])
                 if not self._sync_login:
                     self._sync_login = await asyncio.to_thread(sync_mod.gh_login)
@@ -89,6 +99,11 @@ class SyncMixin:
                     sync[n] = {"head": head, "verdict": "refused", "why": why, "tries": 0, "posted": False,
                                "at": now_iso()}  # fmt: skip
                     continue
+                if prechecks and sync_mod.unprechecked(pr):
+                    e = await self._sync_precheck(root, pr, sync.get(n), clones, n == counted)
+                    if e is not None:
+                        sync[n] = e
+                    continue  # a wait holds no task: the pass goes on
                 e = await asyncio.to_thread(sync_mod.judge, root, pr, sync.get(n), clones, now_iso())
                 if e is None:
                     continue  # the head moved: the next pass checks the new one
@@ -102,6 +117,35 @@ class SyncMixin:
             self._repos[root] = {**cur, "sync": sync}  # never the snapshot: a re-read may have landed
             self.repos_store.save(self._repos)
             await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
+
+    async def _sync_precheck(
+        self, root: str, pr: dict[str, Any], entry: dict[str, Any] | None, clones: list[Any], counted: bool
+    ) -> dict[str, Any] | None:
+        """Step 4's precheck on a PR reading *none* (§6 *Sync*, TD-1039): a run going, or a checkout that cannot
+        run it, waits uncounted without the check; else steps 1 to 3, and a mechanical PR's `precheck.py --pr`
+        is started detached under the promote lock, the blockers read again there. A wait past
+        `SYNC_PRECHECK_WAIT` at the head is *refused*. None for a head that moved."""
+        repo, head, at = Path(root).name, str(pr["head"]), now_iso()
+        if counted:  # its run ended this pass with nothing recorded: a later pass may start another
+            return sync_mod.wait_entry(entry, head, (entry or {}).get("why") or "", at)
+        if why := await asyncio.to_thread(sync_mod.precheck_blocked, root, repo):
+            return sync_mod.wait_entry(entry, head, why, at)
+        e = await asyncio.to_thread(sync_mod.judge, root, pr, entry, clones, at, precheck=True)
+        if e is None or not e.pop("prestart", False):
+            return e  # moved, refused, or no reading (counted, as any check's)
+        async with self._promote_lock:
+            why = await asyncio.to_thread(sync_mod.precheck_blocked, root, repo)
+            if not why:
+                try:
+                    started, why = await asyncio.to_thread(
+                        promote_mod.start_precheck_pr, root, repo, int(pr["number"]), head
+                    )
+                except OSError as err:
+                    started, why = None, f"precheck.py could not be started: {err}"
+                if started is not None:
+                    why = f"prechecking {head[:7]}"
+                    log.info("sync: %s #%s: prechecking %s", repo, pr["number"], head[:7])
+        return sync_mod.wait_entry(e, head, why or "", at)
 
     async def _sync_merge(self, root: str, pr: dict[str, Any], e: dict[str, Any]) -> dict[str, Any] | None:
         """Step 5: the holders and the head read again just before the merge. A new holder drops the merge
