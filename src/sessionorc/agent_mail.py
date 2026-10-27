@@ -185,9 +185,10 @@ class MailMixin:
     async def _question_seat(self, team: str | None = None, repo: str | None = None) -> Session:
         """The question seat `--team` or `--repo` names (§4.10 *A team or a repo as the address*,
         TD-1000), read from the org's records alone: a record of that team, or of a repo of that name
-        (`Path(repo).name`), holding a seat whose trigger is `asks`, neither superseded nor closed — on
-        call or live. A team's two such seats resolve to its techlead seat (`tags: true`), and a live
-        record wins over one on call; a repo served by two teams is refused naming them. Registries
+        (`Path(repo).name`), holding a seat whose trigger is `asks` and not superseded — live, on call,
+        or `closed` as rule 3 leaves an empty seat, which the `ask` fills (TD-1128). A team's two such
+        seats resolve to its techlead seat (`tags: true`), and a live record wins over one on call, one
+        on call over a closed one; a repo served by two teams is refused naming them. Registries
         are read only to word a refusal. Returns the record. Given both — a ledger request's `--team`
         (§4.7 *Entries*) — the team chooses among the repo's: one with no seat record on it is refused
         naming those that have one."""
@@ -199,7 +200,7 @@ class MailMixin:
         seats = [
             (a, r)
             for a, r in records.items()
-            if mail.asks_seat(r) and not r.superseded_by and r.state != "closed" and str(r.team or "").strip()
+            if mail.asks_seat(r) and not r.superseded_by and str(r.team or "").strip()
         ]
         teams = sorted({r.team for _a, r in seats})
         if not repo:
@@ -234,13 +235,16 @@ class MailMixin:
     @staticmethod
     def _one_seat(team: str, recs: list[Session]) -> Session:
         """One team's question seat among its records (§4.10): the techlead seat (`tags: true`) of
-        two, then a live record over one on call; two left is refused naming them."""
+        two, then a live record over one on call, and one on call over a closed one; two left is
+        refused naming them."""
         if len(recs) > 1:
             tagged = [r for r in recs if (r.seat or {}).get("tags") is True]
             if not tagged:
                 names = ", ".join(sorted(r.name for r in recs))
                 raise RpcError(f"{team} has {len(recs)} question seats and no techlead seat among them: {names}")
-            recs = [r for r in tagged if r.state != "exited"] or tagged
+            rank = {"exited": 1, "closed": 2}  # live first, then on call, then closed
+            best = min(rank.get(r.state, 0) for r in tagged)
+            recs = [r for r in tagged if rank.get(r.state, 0) == best]
         if len(recs) > 1:
             names = ", ".join(sorted(r.name for r in recs))
             raise RpcError(f"{team} has {len(recs)} question seats: {names}")
