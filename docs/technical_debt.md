@@ -106,7 +106,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1067 | `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading | Low | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
 | TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Built in #2431 — live check |
-| TD-1080 | The stop, start, status and acting-gate words: unread mail on a finished member, the start's cure, a person's row, and the `!` escape | Low | Open — build |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
 | TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
 | TD-1089 | `ao td next` sends its directory's branch to the take, and relays the take's `taken_by` and the line to write where the ledger accepts it | Medium | Open — build |
@@ -2259,24 +2258,6 @@ It then names the build entries.
 **Done when:** tests hold, with a fake node link, that an idle hook-confirmed node record with unread mail gets one `ring` routed to its node per idle stretch; that a `busy` verdict charges nothing and is looked at again on the next tick; that a `failed` ring is retried once and then writes `doorbell_failed`; that `read_when` for such a record says the failure and never *rung*; that a record blocked in a forwarded `wait` (caller `id@node`) is not rung;  that a ring with no verdict before the link drops charges and writes nothing and is rung again once the link is up; that the node's `doorbell_failed` report does not ring the record again in the same stretch, and a node state change (a new `since`) does start one; that a report carrying `ring_seen` with `turned` and `stopped` is judged once (the same report twice counts once), one with `turned` alone waits, an entry read before the ring's dispatch does not end the run, and a held bell is written for a node's record with no entry read by `stopped`, and none where one was read just before it; that the typed line is the home's; that a node's idle record past the cache floor is rung, not restarted; and that a down link still reads *unreachable*. A live check on contractmatch's node: a note to an idle member there is typed into its pane within a tick. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1051 (the design); TD-057 (the node split), TD-052 (the doorbell); TD-299 (contractmatch on its node); TD-1078, TD-1080.
-
-## TD-1080: The stop, start, status and acting-gate words: unread mail on a finished member, the start's cure, a person's row, and the `!` escape
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (the designer, from TD-1051)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/teamrun.py` (the stop's *finished (out of work), nothing sent* at 1617–1622 and `_close_settled` at 1653–1665; the start's refusal at 76–82); `src/shiftlead/cli.py` (`ao team status`, 1083–1091); `src/sessionorc/mail.py:359` (the acting gate's *needs the control grant (design §4.8)*, which has the caller's id: the record is looked up for `unattended`, and the person's own shell, `person_shell`, and a caller with no record are excluded — the one string that gets the hint; `agent_remote.py:282`'s file-read refusal is another gate and is left as it is); design §4.9 (`ao team stop`, `ao team start`'s refusal, `ao team status`), §4.8a *A tool's shell escape is the session's*
-
-**Why:** TD-1051 (b), (c), (d) and 5: on contractmatch the stop called a member with unread mail *finished … nothing sent*, the start's refusal named no cure, `ao team status` listed the person's cm-mcp session as *techlead*, and Paul's `! ao team stop` in a Claude Code pane was refused *needs the control grant* with no word of why.
-
-**Fix:** the stop's line for an out-of-work member with `unread() > 0` reads *out of work, n unread — left idle for the doorbell*, and under `--close` *closed with n unread, kept for the name's next start*; the start's `NamesHeld` refusal appends *: `ao team stop <team> --close` closes a settled member, or Close it on its card*; `ao team status`'s rows carry `person` (a record with `unattended: false`) and the text listing marks such a row *person's*; the acting gate's refusal to a caller whose record is a person's session with an agent in it (`unattended: false`, `adapters.has_agent(record.adapter)`, `adapters.py:318`, which takes the adapter id and reads an unknown one, such as an adapter installed only on a node, as having an agent, so the hint shows — a plain shell has no `!` — and not the person's own shell) appends *— typed with the tool's `!`? It runs as this session; run it from your own shell or the page*.
-
-**Done when:** tests hold each of the four words: a stop over an out-of-work member with unread mail, with and without `--close`; a start refused by an idle holder; a status row for a person's session in a team (JSON `person: true` and the text mark); and the acting gate's refusal to a person's session's caller carrying the hint, while a worker's, the person's own shell (passed by `as_person` before the gate) and a caller with no record get none. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1051 (the design); TD-160 (a person in the team), TD-580, TD-801 (the person's own shell); TD-1078, TD-1079.
 
 ## TD-1087: Four tests fail only when the suite runs across workers (`-n auto`), and pass alone
 

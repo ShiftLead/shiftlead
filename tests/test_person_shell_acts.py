@@ -163,3 +163,25 @@ async def test_the_shell_starts_keeps_succeeds_and_lifts_as_the_person_does(agen
         with pytest.raises(RpcError, match="needs the control grant"):
             await agent.rpc_host_files(host=agent.host, dir=str(tmp_path / "repo"), paths=["brief.md"], caller=sh)
     await _kill_all(agent)
+
+
+@pytest.mark.unit
+def test_the_gates_refusal_to_a_persons_agent_session_names_the_tools_escape():
+    """§4.8a *A tool's shell escape is the session's* (TD-1080): the control-grant refusal to a caller
+    whose record is a person's session with an agent in it names the way out; a worker, a plain shell
+    with a controller (no `!`), and a caller with no record get the refusal alone, and the person's own
+    shell passes."""
+    hint = "typed with the tool's `!`? It runs as this session; run it from your own shell or the page"
+    pane = _rec("ao-cc", adapter="claude-code")  # the person's Claude Code session
+    elsewhere = _rec("ao-nx", adapter="node-only-tool")  # an adapter this host does not know reads as an agent
+    worker = _rec("ao-w", adapter="claude-code", unattended=True)
+    plain = _rec("ao-c", controllers=["ao-x"])  # a shell, but a session: no `!` to type it through
+    target = _rec("ao-t", adapter="claude-code", unattended=True)
+    records = {s.id: s for s in (pane, elsewhere, worker, plain, target, _rec("ao-sh"))}
+    for caller in ("ao-cc", "ao-nx"):
+        got = mail.act_gate(records, caller, "kill", {"id": "ao-t"})
+        assert got and "needs the control grant" in got and got.endswith(hint), caller
+    for caller in ("ao-w", "ao-c", "ao-gone"):
+        got = mail.act_gate(records, caller, "kill", {"id": "ao-t"})
+        assert got and "needs the control grant" in got and hint not in got, caller
+    assert mail.act_gate(records, "ao-sh", "kill", {"id": "ao-t"}) is None

@@ -21,6 +21,7 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
+from sessionorc import adapters
 from sessionorc.models import GRANTS, PERSON, SYSTEM, MailEntry, Session, has_control, start_note
 
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
@@ -374,7 +375,11 @@ def act_gate(
     me = records.get(str(caller))
     if me is None or not has_control(me.capabilities):
         target = "a new session" if method == "create" else params.get("id", "?")
-        return f"{caller} cannot {method} {target}: needs the control grant (design §4.8)"
+        # a person's session with an agent in it (§4.8a *A tool's shell escape is the session's*, TD-1051):
+        # what the person typed through the tool's `!` runs as the session, so the refusal names the way out
+        typed = me is not None and not me.unattended and adapters.has_agent(me.adapter)
+        hint = " — typed with the tool's `!`? It runs as this session; run it from your own shell or the page"
+        return f"{caller} cannot {method} {target}: needs the control grant (design §4.8)" + (hint if typed else "")
     if method == "create":
         # No target to be a member of yet. What create is gated on instead is attenuation: the
         # child's grants must be a subset of the creator's (design §4.8, capability attenuation).

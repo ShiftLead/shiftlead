@@ -187,6 +187,21 @@ def test_a_suspended_holder_aborts_the_whole_start_too(world, capsys):
     assert "was not started" in err and "hunt is suspended as ao-shiftlead-hunt — a person lifts it" in err
 
 
+def test_a_start_refused_by_an_idle_holder_names_the_cure(world, capsys):
+    """§4.9, TD-1080: a name held by a session merely sitting there names how to free it."""
+    tmp_path, state = world
+    state["host"] = {"host": "local"}
+    state["verdicts"]["hunt"] = {
+        "name": "hunt", "verdict": "live", "holder": "ao-shiftlead-hunt", "holder_state": "idle",
+    }  # fmt: skip
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    err = capsys.readouterr().err
+    assert (
+        "hunt is idle as ao-shiftlead-hunt: `ao team stop ao-grind --close` closes a settled member, "
+        "or Close it on its card"
+    ) in err
+
+
 def test_an_exited_holder_is_superseded_and_the_start_goes_ahead(world):
     tmp_path, state = world
     state["verdicts"]["grind-1"] = {"name": "grind-1", "verdict": "supersede", "holder_state": "exited"}
@@ -723,6 +738,30 @@ def test_a_finished_member_gets_no_wrap_up_prompt_and_is_closed(world, capsys, m
     assert "finished (out of work), nothing sent, closed" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize("close", [False, True])
+def test_an_out_of_work_member_with_unread_mail_is_not_called_finished(world, capsys, monkeypatch, close):
+    """§4.9, TD-1080: its mail is the doorbell's, and under `--close` the name's next start keeps it."""
+    tmp_path, state = world
+    started(state)
+    by_id = {s["id"]: s for s in state["sessions"]}
+    by_id["ao-shiftlead-grind-1"].update(
+        state="idle",
+        unread=2,
+        out_of_work={"at": "2026-09-17T06:00:00Z", "why": "ledger empty"},
+        git={"dirty": 0, "ahead": 0, "upstream": "origin/x", "unpushed": 0},
+    )
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-orc-ao")
+    argv = ["team", "stop", "ao-grind", "--timeout", "0", *(["--close"] if close else [])]
+    assert cli.main(argv) == 0
+    assert "ao-shiftlead-grind-1" not in [p["id"] for m, p in state["calls"] if m == "send"]
+    out = capsys.readouterr().out
+    assert "nothing sent" not in out
+    if close:
+        assert "closed with 2 unread, kept for the name's next start" in out
+    else:
+        assert "out of work, 2 unread — left idle for the doorbell" in out
+
+
 def test_close_needs_proof_of_pushed_not_an_absent_count(world, capsys):
     """Review of PR #192, and design §4.2's **one measure** (TD-080): a record with no `git` yet is
     unknown, not clean, and *pushed* is `git.unpushed` — computed once by the host agent, against
@@ -779,6 +818,22 @@ def test_status_lists_the_members_with_state_lane_and_report_line(world, capsys)
     rows = json.loads(capsys.readouterr().out)["sessions"]
     assert [r["name"] for r in rows] == ["orc-ao", "grind-1", "grind-2", "hunt"]
     assert rows[-1]["running"] is False
+
+
+def test_status_marks_a_persons_session_in_the_team(world, capsys):
+    """§4.9, TD-1080: a person's own session holds no seat whatever preset it runs; its row says so."""
+    tmp_path, state = world
+    started(state)
+    capsys.readouterr()
+    by = {s["name"]: s for s in state["sessions"]}
+    by["hunt"]["unattended"] = False
+    assert cli.main(["team", "status", "ao-grind"]) == 0
+    lines = {ln.split()[0]: ln for ln in capsys.readouterr().out.splitlines()}
+    assert lines[by["hunt"]["id"]].endswith("person's")
+    assert not lines[by["grind-1"]["id"]].endswith("person's")
+    assert cli.main(["--json", "team", "status", "ao-grind"]) == 0
+    rows = {r["name"]: r for r in json.loads(capsys.readouterr().out)["sessions"]}
+    assert rows["hunt"]["person"] is True and rows["grind-1"]["person"] is False
 
 
 def test_status_json_carries_what_the_homes_reading_reads_and_the_reading(world, capsys):
