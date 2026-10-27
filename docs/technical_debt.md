@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Live check #2475 |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
 | TD-1109 | The sweep seat's tests (TD-1090) read one board only, so a cause or a card that picks the wrong board, and a card that prints *swept -3 d ago*, pass | Medium | Open |
-| TD-1111 | `test_the_context_reading_is_read_on_the_tick_for_unattended_records` fails under the parallel suite: the context read twice | Low | Open |
 
 ---
 
@@ -1940,19 +1939,3 @@ It then names the build entries.
 **Done when:** each of the three reverts fails a test in `tests/test_sweep_seat.py`.
 
 **Related:** TD-1090 (the build), #2467, #2468.
-
-## TD-1111: `test_the_context_reading_is_read_on_the_tick_for_unattended_records` fails under the parallel suite: the context read twice
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (grinder-ao-2, met on TD-1092's suite run)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_agent.py` (`test_the_context_reading_is_read_on_the_tick_for_unattended_records`, line ~1688), the tick's context reading in `src/sessionorc/`
-
-**Why:** the full `pdm run test` on TD-1092 slice 2's branch (no `src/sessionorc/` change) stopped on `assert ['conv-un', 'conv-un'] == ['conv-un']`; alone it passed three times running. A tick that lands twice within the test's window reads the record twice, so the test (or the tick) is timing-dependent under xdist load.
-
-**Fix:** find whether a second tick is legitimate within the window (then assert on a set, or once per tick) or the reading is not deduplicated per tick (then a real double read); fix whichever it is.
-
-**Done when:** the test passes under `pdm run test` repeatedly (e.g. `pytest -n 8 --count 20` on the one test) and asserts what the tick promises.

@@ -1676,6 +1676,9 @@ async def test_the_context_reading_is_read_on_the_tick_for_unattended_records(ag
         return reading
 
     monkeypatch.setattr(adapters.get("shell"), "context", context, raising=False)
+    # the test owns every tick (TD-1111): a loop tick landing between the hook and the clear below read the
+    # record once more, `['conv-un', 'conv-un']` under the parallel suite
+    await park_ticks(agent)
     async with LocalClient() as person:
         att = await person.call("create", name="att", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         un = await person.call(
