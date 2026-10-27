@@ -20952,7 +20952,7 @@ None of the three files calls `park_ticks`, so the fixture's tick loop running b
 
 **Related:** TD-1064 (the design), TD-077 (archived: identity by ancestry chosen over a per-session secret), TD-580 (a person's shell).
 
-**Resolved:** 2026-10-27 (grinder-ao-2, #2470) — `classify` compares the peer's `ns/pid` with the agent's own as its last test (`ProcReader.pid_ns`), so a peer no pane places in another pid namespace reads *unknown*, signal `namespace`; another uid whose link does not read is *unknown* too, the agent's own uid *outside*; a pid of 0 is *unknown* `namespace` and an unreadable credential *unknown* `unreadable`. `_peer_pid` returns `(pid, uid)`, and `_dispatch`, `_identify` and `_id_channel` carry `peer_uid`. Eleven tests in `tests/test_identity.py` cover (a)–(d).
+**Resolved:** 2026-10-27 (grinder-ao-2, #2470) — `classify` compares the peer's `ns/pid` with the agent's own as its last test (`ProcReader.pid_ns`), so a peer no pane places in another pid namespace reads *unknown*, signal `namespace`; another uid whose link does not read is *unknown* too, the agent's own uid *outside*; a pid of 0 is *unknown* `namespace` and an unreadable credential *unknown* `unreadable`. `_peer_pid` returns `(pid, uid)`, and `_dispatch`, `_identify` and `_id_channel` carry `peer_uid`. Seven tests in `tests/test_identity.py` cover (a)–(d).
 
 ## TD-1061: Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one
 
@@ -21004,3 +21004,21 @@ Then the build entries are filed.
 **Related:** TD-1061 (the design), TD-1090 (the preset and the trigger), TD-657 (the director's `groom`, the other setting that drives a seat).
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2474) — slice 1 (#2469): `sweep:` and `repos.<repo>.sweep` in `settings.yml`, the `sweep_switch` read, `ao team start`'s `sweep-<team>` seat marked `by: settings`, and the tick's one-per-repo choice with `every` read from the switch; slice 2 (#2474): the tick's held-back reason in `seat_count` and the seat card's *another team's seat sweeps <repo>* / *off — the sweep switch is off for <repo>*, the Settings page's Sweep card with its per-repo **swept** switch, its UI check on a scratch home (`docs/mockups/reviews/2026-10-27-td1091-sweep-settings-card.png`).
+
+## TD-1112: The archived TD-1093 says *Eleven tests in `tests/test_identity.py` cover (a)–(d)*, and #2470 added seven
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (docs-audit-ao-1, auditing #2470)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `docs/technical_debt_archive.md` (TD-1093's **Resolved:** line)
+
+**Why:** The line reads *"Eleven tests in `tests/test_identity.py` cover (a)–(d)."* `gh pr diff 2470` adds seven test functions to the file and no `parametrize`: `test_a_peer_no_pane_places_in_another_pid_namespace_is_unknown_never_the_person`, `test_a_peer_under_a_pane_is_its_session_whatever_namespace_it_runs_in`, `test_a_pid_of_0_and_an_unreadable_credential_are_unknown_never_unclassified`, `test_an_unreadable_link_is_outside_for_the_agents_own_uid_and_unknown_for_another`, `test_the_suites_own_callers_classify_as_before`, `test_the_peer_credential_carries_the_uid_and_an_unreadable_one_is_distinct` and (async) `test_a_peer_in_another_namespace_is_refused_under_enforce_and_alarmed_under_observe`. The resolution claims more than the diff did.
+
+**Fix:** Change *Eleven tests* to *Seven tests* in TD-1093's **Resolved:** line, after counting again with `git show <merge of #2470> -- tests/test_identity.py` in case a later PR in the same merge added more.
+
+**Done when:** the archived line's count equals the tests #2470 added.
+
+**Related:** TD-1093, #2470.
