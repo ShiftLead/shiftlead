@@ -234,7 +234,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     below); under dev-cadence TD-129, the pin in `docs/cadence.toml`, resolved (*How the readers find
     dev-cadence*, below);
   - **the gate**, dev-cadence's `check_cadence.py` (§6 rule 10);
-  - **the ledger**, in ledgerboard format at `ledger:` (default `docs/technical_debt.md`), the format
+  - **the ledger**, in ledgerboard format at `ledger:` — a file, or a v2 directory of one file per entry
+    (§4.4 *Either layout*; default `docs/ledger` where that is a directory, else `docs/technical_debt.md`) — the format
     `ShiftLead/ledgerboard`'s `SPEC.md` defines and its `ledgerboard.py` reads — the one parser,
     vendored as `src/sessionorc/ledgerboard.py` and held byte-equal to the synced
     `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
