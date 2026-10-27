@@ -107,7 +107,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1074 | `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit) | Medium | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
 | TD-1078 | A seat is filled by an answer to its own question, and the techlead relays what came of it to the member whose question it was | Medium | Open — build |
-| TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Open — build |
+| TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Built in #2431 — live check |
 | TD-1080 | The stop, start, status and acting-gate words: unread mail on a finished member, the start's cure, a person's row, and the `!` escape | Low | Open — build |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
 | TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
@@ -2285,8 +2285,8 @@ It then names the build entries.
 **Type:** debt
 **Added:** 2026-10-26 (the designer, from TD-1051)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — build
+**Kind:** live-check #2431
+**Status:** Built in #2431 (2026-10-26, grinder-ao-2); a live check once #2431 is live: read-only, send a note to an idle member on contractmatch's container node and read that its record gains a `wakes` entry `via: doorbell` within a tick, and that `ao status -v` shows no `doorbell_failed` for that stretch (a transcript read for the typed line). Not yet live.
 **Location:** `src/sessionorc/agent_wake.py` (`_ring_doorbells`, 142–161: rings only `self.sessions`, and returns on a node; `_ring`, `_bell_failed`); `src/sessionorc/agent_remote.py` (routing an act to a node; the node's handler); `src/sessionorc/mail.py` (`read_when`, 736–743); `src/sessionorc/agent_tick.py:3341` (`_balance_ring`'s docstring, *nothing rings a node's idle member yet*); `src/shiftlead/briefs/manager.md` (the over-the-line paragraph's last sentence, *except one on another host … one `ao send` saying the line is clear* — the nudge's node exceptions in its step 1 and step 2 stay, the nudge being a typed line of rule 4, not the doorbell); design §4.4a *The doorbell rings a node's session through its node*, §4.10 *The doorbell* and the `read_when` table, §6 *Balance*
 
 **Why:** TD-1051 (a): mail to designer-cm-1 and grinder-cm-1 on contractmatch's container node said *rung within a tick*, and nothing was typed, because the home rings only its own host's records and a node rings nothing.
