@@ -21132,3 +21132,5 @@ Any of these puts the live agent back to the pre-TD-1093 behaviour for a peer wh
 **Done when** each line named above fails a test when reverted, and the suite is green.
 
 **Related:** TD-1091, TD-1090.
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2488) — `test_a_mark_that_is_the_seats_only_change_is_saved`: a not-due switch-made seat whose only change is the switch turned off has `{swept: off}` on disk, and loses it when the switch is back on. With the `count` read and `or s.seat_count != count` removed, it fails (27 others pass).
