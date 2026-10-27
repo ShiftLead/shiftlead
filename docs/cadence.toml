@@ -59,4 +59,4 @@ precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pd
 # full commit, moved by `dev-cadence bump` in a reviewed PR. Written by `sync.sh --pin`.
 [dev-cadence]
 source = "https://github.com/ShiftLead/dev-cadence"
-ref = "b2b6d8e32854511076a6cb92f1f82530d10800a4"
+ref = "78e461428615de0acc5c78c86215961589dadf47"
