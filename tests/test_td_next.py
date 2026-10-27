@@ -151,7 +151,8 @@ async def test_count_gives_ids_in_a_row_and_the_record_keeps_who(home, gh, tmp_p
     _one(tmp_path, gh, nums=(1, 4))
     got = await home.rpc_td_next(repo="shiftlead", count=3, caller="ao-w")
     assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-005", "TD-006", "TD-007"],
-                   "unread": [], "reserved": True, "why": "", "warnings": []}  # fmt: skip
+                   "unread": [], "reserved": True, "why": "", "warnings": [], "taken_by": None,
+                   "taken_by_line": None}  # fmt: skip
     rec = json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]
     assert rec["last"] == 7 and [(g["id"], g["by"]) for g in rec["given"]] == [
         ("TD-005", "ao-w"), ("TD-006", "ao-w"), ("TD-007", "ao-w")
@@ -378,7 +379,8 @@ def test_the_cli_sends_a_symlinked_checkouts_registered_name(tmp_path, monkeypat
     assert cli.main(["--json", "td", "next"]) == 0
     assert json.loads(capsys.readouterr().out) == {"repo": "shiftlead", "ids": ["TD-001", "TD-002"],
                                                    "unread": ["open PR #3 not read: x"], "reserved": True,
-                                                   "why": "", "warnings": []}  # fmt: skip
+                                                   "why": "", "warnings": [], "taken_by": None,
+                                                   "taken_by_line": None}  # fmt: skip
 
 
 @pytest.mark.unit
@@ -496,7 +498,7 @@ def test_the_cli_sends_held_and_says_so_in_json(tmp_path, monkeypatch, capsys):
 
 
 def _stub(root: Path, rc: int = 0, ids=("TD-050",), why: str = "", unread=(), warnings=(), out=None, sleep=0.0,
-          where: str = "scripts") -> Path:  # fmt: skip
+          where: str = "scripts", taken_by=None, branch: bool = False) -> Path:  # fmt: skip
     """A stand-in `ledger_next_id.py` in the checkout's working tree: it records its argv, cwd, race budget and
     pid (and a `sleep` child's, in its group) to `<root>.stub.json`, then prints `out` (the script's JSON by
     default) and exits `rc`."""
@@ -506,12 +508,14 @@ def _stub(root: Path, rc: int = 0, ids=("TD-050",), why: str = "", unread=(), wa
         if out is not None
         else json.dumps(
             {"ids": list(ids), "reserved": rc == 0, "why": why, "unread": list(unread), "warnings": list(warnings)}
+            | ({"taken_by": taken_by} if taken_by is not None else {})
         )
     )
     (root / where).mkdir(parents=True, exist_ok=True)
     (root / where / "ledger_next_id.py").write_text(
         "import json, os, subprocess, sys, time\n"
-        f"child = subprocess.Popen(['sleep', '60']).pid if {sleep!r} else None\n"
+        + ('# parser.add_argument("--branch")\n' if branch else "")
+        + f"child = subprocess.Popen(['sleep', '60']).pid if {sleep!r} else None\n"
         f"open({str(log)!r}, 'w').write(json.dumps({{'argv': sys.argv[1:], 'cwd': os.getcwd(), 'pid': os.getpid(),"
         " 'child': child, 'race': os.environ.get('LEDGER_IDS_RACE_SECONDS')}))\n"
         f"time.sleep({sleep!r})\n"
@@ -537,7 +541,8 @@ async def test_the_script_road_passes_the_floor_by_count_and_ledger_and_records_
     log = _stub(root, ids=("TD-041", "TD-042"))
     got = await home.rpc_td_next(repo="shiftlead", count=2, caller="ao-w")
     assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-041", "TD-042"], "unread": [],
-                   "reserved": True, "why": "", "warnings": []}  # fmt: skip
+                   "reserved": True, "why": "", "warnings": [], "taken_by": None,
+                   "taken_by_line": None}  # fmt: skip
     seen = json.loads(log.read_text())
     assert seen["argv"] == ["--count", "2", "--by", "ao-w", "--floor", "40", "--ledger", LEDGER, "--archive", ARCHIVE,
                             "--json"]  # fmt: skip
@@ -736,3 +741,144 @@ def test_the_cli_says_an_unreserved_id_and_each_warning_on_stderr_and_exits_0(tm
 def test_the_offline_refusal_names_the_script():
     why = modes.offline_refusal("td_next", "ao-x", {}, host="laptop", home="kmaster")
     assert "scripts/ledger_next_id.py" in why
+
+
+# -- TD-1089: the caller's branch, and the take's `**Taken by:**` line (§4.4 *The branch*, *Its answer*) ----------
+
+
+@pytest.mark.integration
+async def test_the_branch_goes_only_to_a_script_that_takes_it(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    log = _stub(root, branch=True)
+    await home.rpc_td_next(repo="shiftlead", branch="td1089-td-next")
+    assert json.loads(log.read_text())["argv"][-1] == "--branch=td1089-td-next", "one argument, never an option"
+    _stub(root, ids=("TD-051",))  # a script from before dev-cadence TD-145: argparse would refuse the take
+    got = await home.rpc_td_next(repo="shiftlead", branch="td1089-td-next")
+    assert got["ids"] == ["TD-051"] and not any(a.startswith("--branch") for a in json.loads(log.read_text())["argv"])
+    _stub(root, branch=True)
+    await home.rpc_td_next(repo="shiftlead")
+    assert not any(a.startswith("--branch") for a in json.loads(log.read_text())["argv"]), "none sent, none passed"
+
+
+@pytest.mark.integration
+async def test_a_branch_git_would_not_name_is_refused(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    log = _stub(root, branch=True)
+    for bad in ("two..dots", "-x", "@{-1}", "@", "has space"):
+        with pytest.raises(RpcError, match=r"is not a branch name"):
+            await home.rpc_td_next(repo="shiftlead", branch=bad)
+    assert not log.exists() and not paths.ids_file().exists()
+
+
+@pytest.mark.integration
+async def test_the_homes_own_road_drops_the_branch_and_answers_both_null(home, gh, tmp_path):
+    _one(tmp_path, gh)
+    got = await home.rpc_td_next(repo="shiftlead", branch="td1089-td-next")
+    assert got["ids"] == ["TD-003"] and (got["taken_by"], got["taken_by_line"]) == (None, None)
+
+
+FIELDS = "# Ledger\n\nFields: Owner = designer | grinder | paul\n\n## TD-001: one\n\nbody\n"
+SIBLING = 'CADENCE_FIELDS = ("priority", "type", "added", "status", "blocked by", "location")\n'
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("ledger", "sibling", "line"),
+    [
+        (FIELDS, SIBLING, False),  # a non-cadence vocabulary, as ShiftLead's ledger declares
+        (_ledger(1), SIBLING, True),  # no Fields: line
+        (FIELDS, SIBLING.replace('"location")', '"location", "taken by")'), True),  # ledgerboard defines it
+        (_ledger(1), SIBLING.replace('"location")', '"location", "taken by")'), True),
+        (FIELDS.replace("paul\n", "paul; Taken by = ao-w\n"), SIBLING, False),  # its own vocabulary: judge()'s no
+        (_ledger(1), None, False),  # no sibling
+        (_ledger(1), "CADENCE_FIELDS = tuple(['taken by'])\n", False),  # not a literal
+    ],
+)
+async def test_the_taken_by_line_is_given_where_the_ledger_accepts_it(home, gh, tmp_path, ledger, sibling, line):
+    root = _one(tmp_path, gh, files={LEDGER: ledger, ARCHIVE: _ledger()})
+    _stub(root, taken_by="ao-w")
+    if sibling is not None:
+        (root / "scripts" / "ledgerboard.py").write_text(sibling)
+    got = await home.rpc_td_next(repo="shiftlead", caller="ao-w")
+    assert got["taken_by"] == "ao-w" and got["taken_by_line"] == ("**Taken by:** ao-w" if line else None)
+
+
+@pytest.mark.integration
+async def test_no_taken_by_is_no_line_and_an_unreadable_ledger_is_none(home, gh, tmp_path):
+    root = _one(tmp_path, gh, files={LEDGER: _ledger(1), ARCHIVE: _ledger()})
+    (root / "scripts").mkdir()
+    (root / "scripts" / "ledgerboard.py").write_text(SIBLING)
+    _stub(root)  # a script that answers no taken_by
+    assert (await home.rpc_td_next(repo="shiftlead"))["taken_by_line"] is None
+    _stub(root, taken_by="ao-w")
+    (root / LEDGER).unlink()
+    got = await home.rpc_td_next(repo="shiftlead")
+    assert got["taken_by"] == "ao-w" and got["taken_by_line"] is None
+
+
+def _checkout(tmp_path: Path, name: str, url: str) -> Path:
+    r = tmp_path / name
+    r.mkdir(parents=True)
+    _git(r, "init", "-q", "-b", "main")
+    _git(r, "remote", "add", "origin", url)
+    _git(r, "commit", "-q", "--allow-empty", "-m", "seed")
+    return r
+
+
+@pytest.mark.unit
+def test_the_cli_sends_its_worktrees_branch_only_for_the_repo_named(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    root = _checkout(tmp_path, "shiftlead", "git@github.com:ShiftLead/shiftlead.git")
+    other = _checkout(tmp_path, "other", "git@github.com:ShiftLead/other.git")
+    _register(root, other)
+    wt = tmp_path / "wt"
+    _git(root, "worktree", "add", "-q", "-b", "td1089-x", str(wt))
+    sent: list[dict] = []
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.append(p) or {"ids": ["TD-001"], "unread": []})
+    monkeypatch.chdir(wt)
+    assert cli.main(["td", "next"]) == 0
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead"]) == 0  # an owner/repo the registry has
+    assert cli.main(["td", "next", "--repo", "other"]) == 0  # another repo named
+    monkeypatch.chdir(other)
+    assert cli.main(["td", "next", "--repo", "shiftlead"]) == 0  # another repo's directory
+    _git(wt, "switch", "-q", "--detach")
+    monkeypatch.chdir(wt)
+    assert cli.main(["td", "next"]) == 0  # a detached head
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["td", "next", "--repo", "Elsewhere/unregistered"]) == 0  # not a checkout at all
+    assert [p.get("branch") for p in sent] == ["td1089-x", "td1089-x", None, None, None, None]
+
+
+@pytest.mark.unit
+def test_an_unregistered_owner_repo_sends_the_branch_of_its_own_checkout(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    here = _checkout(tmp_path, "tools", "https://github.com/Two/Tools.git")
+    sent: list[dict] = []
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.append(p) or {"ids": [], "unread": []})
+    monkeypatch.chdir(here)
+    assert cli.main(["td", "next", "--repo", "two/tools"]) == 0
+    assert cli.main(["td", "next", "--repo", "One/tools"]) == 0
+    assert [(p["repo"], p.get("branch")) for p in sent] == [("two/tools", "main"), ("One/tools", None)]
+
+
+@pytest.mark.unit
+def test_the_cli_says_the_taken_by_line_on_stderr_and_an_older_home_gives_both_null(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    reply = {"ids": ["TD-007"], "unread": [], "taken_by": "ao-w", "taken_by_line": "**Taken by:** ao-w"}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: reply)
+    for json_flag in ([], ["--json"]):
+        assert cli.main([*json_flag, "td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
+        out, err = capsys.readouterr()
+        assert "write `**Taken by:** ao-w` in each entry's header (cadence §2.10)" in err
+        assert out == "TD-007\n" if not json_flag else json.loads(out)["taken_by_line"] == "**Taken by:** ao-w"
+    reply = {"ids": ["TD-008"], "unread": [], "taken_by": "ao-w", "taken_by_line": None}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: reply)
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
+    assert "Taken by" not in capsys.readouterr().err
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"ids": ["TD-009"], "unread": []})  # an older home
+    assert cli.main(["--json", "td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert (got["taken_by"], got["taken_by_line"]) == (None, None)

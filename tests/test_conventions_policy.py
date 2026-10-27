@@ -8,9 +8,9 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from datetime import UTC, datetime
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import agent_tick, cadence, conventions
 from sessionorc.models import SYSTEM, Session
@@ -101,8 +101,14 @@ class _Script:
         )
 
 
+@pytest.fixture
+async def agent(agent):
+    """The tick parked: its own pass would race the test's, and its reap would end a paneless member's run."""
+    await park_ticks(agent)
+    return agent
+
+
 def _member(agent, name: str, root: str, created: str = CREATED, **fields) -> Session:
-    agent._conventions_read_at = datetime.max.replace(tzinfo=UTC)  # the tick's own pass never runs beside the test's
     s = Session(id=f"ao-x-{name}", name=name, kind="agent", adapter="shell", dir="", repo=root, created=created)
     s.host = agent.host
     s.supervised, s.unattended, s.state = True, True, "working"

@@ -3395,22 +3395,43 @@ def cmd_td_next(args: argparse.Namespace) -> int:
     TD-731) lands each id held, the person's and an interactive session's. The repo goes by its registered name, or by
     its origin's `owner/repo` when checkouts of different origins share that name; an open PR the home could
     not read is said on standard error, and so are an id not reserved on origin's counter and each of the
-    script's warnings (TD-970), the exit still 0."""
+    script's warnings (TD-970), the exit still 0. The branch of the directory it runs in goes with the call when
+    that directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Taken by:**`
+    line, where the home gives one, is said on standard error."""
     if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
         try:
             _td_repo(args.repo)
         except AgentError:  # an origin's owner/repo, not a registered name: the home resolves it (§4.7)
-            return _td_next_send(args, args.repo)
+            want = ids_mod.origin_key(args.repo) if "github.com" in args.repo else args.repo.lower()
+            return _td_next_send(args, args.repo, _td_branch(want))
     raw, root = _td_repo(args.repo)
     name = pathlib.Path(raw).expanduser().name
     peers = [r for r in hosts.local_host().repos() if pathlib.Path(r).expanduser().name == name]
     if len(peers) > 1 and len({_origin_key(str(pathlib.Path(r).expanduser())) for r in peers}) > 1:
         name = _origin_key(root) or name  # a shared name: the origin picks the one
-    return _td_next_send(args, name)
+    return _td_next_send(args, name, _td_branch(_origin_key(root)))
 
 
-def _td_next_send(args: argparse.Namespace, name: str) -> int:
-    extra = {"held": True} if getattr(args, "held", False) else {}
+def _td_branch(key: str) -> str:
+    """The branch of the directory `ao td next` runs in, when its top level's origin is `key` (§4.4 *The
+    branch*): none for another repo's directory, a detached head, or no `git`."""
+    here = os.getcwd()
+    try:
+        top = subprocess.run(
+            ["git", "-C", here, "rev-parse", "--show-toplevel"], capture_output=True, text=True, timeout=10
+        )
+        if top.returncode != 0 or not key or _origin_key(top.stdout.strip()) != key:
+            return ""
+        cp = subprocess.run(["git", "-C", here, "branch", "--show-current"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return cp.stdout.strip() if cp.returncode == 0 else ""
+
+
+def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
+    extra: dict[str, Any] = {"held": True} if getattr(args, "held", False) else {}
+    if branch:
+        extra["branch"] = branch
     got = call_sync("td_next", repo=name, count=args.count, **extra)  # the home's 45 s budget is under the client's
     for line in got.get("unread") or ():
         print(line, file=sys.stderr)
@@ -3419,6 +3440,9 @@ def _td_next_send(args: argparse.Namespace, name: str) -> int:
         print(f"not reserved on origin's counter: {got.get('why') or 'the script did not say why'}", file=sys.stderr)
     for line in got.get("warnings") or ():
         print(line, file=sys.stderr)
+    taken_line = got.get("taken_by_line") or None  # an older home answers neither key
+    if taken_line:
+        print(f"write `{taken_line}` in each entry's header (cadence §2.10)", file=sys.stderr)
     out = {
         "repo": got.get("repo"),
         "ids": got.get("ids") or [],
@@ -3426,6 +3450,8 @@ def _td_next_send(args: argparse.Namespace, name: str) -> int:
         "reserved": reserved,
         "why": got.get("why") or "",
         "warnings": got.get("warnings") or [],
+        "taken_by": got.get("taken_by") or None,
+        "taken_by_line": taken_line,
     }
     if got.get("held"):
         out["held"] = True
