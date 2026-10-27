@@ -21040,3 +21040,5 @@ Then the build entries are filed.
 **Fix:** find whether a second tick is legitimate within the window (then assert on a set, or once per tick) or the reading is not deduplicated per tick (then a real double read); fix whichever it is.
 
 **Done when:** the test passes under `pdm run test` repeatedly (e.g. `pytest -n 8 --count 20` on the one test) and asserts what the tick promises.
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2481) — a second tick was legitimate: the fixture's loop tick read the record after the hook, then the test cleared `_context_checked` and read it again. The test now parks the loop (`park_ticks`) and owns every tick; `pytest -n 8 tests/test_agent.py` passed three times running.
