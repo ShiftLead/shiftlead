@@ -14,7 +14,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import paths
+from sessionorc import cadence, paths
 
 
 @dataclass
@@ -78,14 +78,27 @@ def absolute_git_dir(directory: Path | str, timeout: float = 5.0) -> str:
 
 
 HYDRATE = "scripts/hydrate_worktree.sh"
+PINNED_HYDRATE = "dev-cadence run hydrate_worktree.sh"  # the default in a pinned repo, as the Repo page says it
+
+
+def hydrate_command(repo: Path | str) -> tuple[list[str], dict[str, str] | None] | None:
+    """The argv prefix and environment that run dev-cadence's `hydrate_worktree.sh` for the main checkout
+    `repo` (§5 *The seams*, TD-1044): in a pinned repo the pinned tree's, through the resolver
+    (`cadence.command`), whose refusal of a pin it cannot resolve is the script's failure; otherwise the
+    checkout's own `scripts/hydrate_worktree.sh` when it is there and executable; else None."""
+    if cadence.pinned(repo):
+        return cadence.command(repo, "run", Path(HYDRATE).name)
+    script = Path(repo) / HYDRATE
+    return ([str(script)], None) if script.is_file() and os.access(script, os.X_OK) else None
 
 
 def worktree_setup(repo: Path | str) -> tuple[str, str | None]:
     """The checkout's worktree setup (§5 *The seams*, TD-589): `("set", command)` for its
     `.shiftlead.yml` `worktree_setup:`, `("defaulted", HYDRATE)` when the key is unset and the checkout
-    holds an executable `scripts/hydrate_worktree.sh` (dev-cadence's), `("absent", None)` otherwise. A
-    file that cannot be read, or a key that is not a non-empty string, is the key unset: the clients
-    (`shiftlead.repoconfig`) refuse such a file by name."""
+    holds an executable `scripts/hydrate_worktree.sh` (dev-cadence's), `("defaulted", PINNED_HYDRATE)` when
+    it is unset in a pinned repo (TD-1044), `("absent", None)` otherwise. A file that cannot be read, or a
+    key that is not a non-empty string, is the key unset: the clients (`shiftlead.repoconfig`) refuse such a
+    file by name."""
     try:
         doc = yaml.safe_load(paths.repo_file(repo).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
@@ -93,6 +106,8 @@ def worktree_setup(repo: Path | str) -> tuple[str, str | None]:
     got = doc.get("worktree_setup") if isinstance(doc, dict) else None
     if isinstance(got, str) and got.strip():
         return "set", got.strip()
+    if cadence.pinned(repo):
+        return "defaulted", PINNED_HYDRATE
     hydrate = Path(repo) / HYDRATE
     if hydrate.is_file() and os.access(hydrate, os.X_OK):
         return "defaulted", HYDRATE
@@ -106,9 +121,10 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0, *, resume: boo
     contain it, so a Resume of a reaped record takes up its pushed work (design §4.1 *Started again*). Reused
     when it already exists. A new one is
     then set up by the repo's `worktree_setup` (§5 *The seams*, TD-589): a configured command, run by
-    the shell in the new worktree with its path as `$1`, or by default the repo's own `scripts/hydrate_worktree.sh` when
-    present (dev-cadence repos), so the worktree gets the untracked pieces git leaves out. `created` is whether
-    this call made it, which the record keeps as `worktree_made` (design §4.1 *A close reaps the worktree it made*)."""
+    the shell in the new worktree with its path as `$1`, or by default dev-cadence's `hydrate_worktree.sh` — the
+    repo's own when present, the pinned tree's in a pinned repo (`hydrate_command`) — so the worktree gets the
+    untracked pieces git leaves out. `created` is whether this call made it, which the record keeps as
+    `worktree_made` (design §4.1 *A close reaps the worktree it made*)."""
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
         raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
     path = worktree_path(repo, name)
@@ -142,12 +158,15 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0, *, resume: boo
     kind, command = worktree_setup(repo)
     if kind == "absent" or not command:
         return path, True
+    env = None
     if kind == "set":
         what, argv, cwd = command, ["sh", "-c", command, "sh", str(path)], str(path)  # the path its `$1`
+    elif (hydrate := hydrate_command(repo)) is not None:
+        what, argv, cwd, env = "hydrate_worktree.sh", [*hydrate[0], str(path)], None, hydrate[1]
     else:
-        what, argv, cwd = "hydrate_worktree.sh", [str(repo / HYDRATE), str(path)], None
+        return path, True
     try:
-        hp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+        hp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=env)
     except (OSError, subprocess.TimeoutExpired) as e:
         raise WorktreeError(f"worktree created at {path}, but {what} could not run: {type(e).__name__}") from None
     if hp.returncode != 0:
@@ -495,16 +514,21 @@ def main_checkout(directory: Path | str, timeout: float = REAP_STEP) -> Path:
     return worktree_path(Path(directory), "x", timeout).parent.parent.parent
 
 
-def _hydrate_script(repo: Path) -> Path | None:
-    """The main checkout's `hydrate_worktree.sh` when it is there and executable, as the reaper runs it."""
-    script = repo / HYDRATE
-    return script if script.is_file() and os.access(script, os.X_OK) else None
+def _hydrate(repo: Path, wt: Path, *args: str, timeout: float) -> subprocess.CompletedProcess | None:
+    """`hydrate_worktree.sh <args> <wt>` as the reaper runs it (`hydrate_command`: the pinned tree's in a pinned
+    repo, TD-1044), bounded by `timeout`; None when the repo has none, it could not be run, or it ran out."""
+    hydrate = hydrate_command(repo)
+    if hydrate is None:
+        return None
+    return _run([*hydrate[0], *args, str(wt)], timeout, env=hydrate[1])
 
 
-def _run(argv: list[str], timeout: float, cwd: Path | str | None = None) -> subprocess.CompletedProcess | None:
+def _run(
+    argv: list[str], timeout: float, cwd: Path | str | None = None, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess | None:
     """One call bounded by `timeout`, or None when it could not be run or ran out."""
     try:
-        env = {**os.environ, "LC_ALL": "C"}  # git's refusals are matched in English
+        env = {**(os.environ if env is None else env), "LC_ALL": "C"}  # git's refusals are matched in English
         return subprocess.run(argv, capture_output=True, text=True, timeout=max(timeout, 0.1), cwd=cwd, env=env)
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -547,7 +571,7 @@ def ignored_blockers(wt: Path, repo: Path, timeout: float = REAP_STEP) -> list[s
     cp = _run(["git", "-C", str(wt), "status", "--porcelain", "-z", "--ignored", "--untracked-files=all"], timeout)
     if cp is None or cp.returncode != 0:
         return None
-    hydrate = _hydrate_script(repo)
+    hydrate = hydrate_command(repo) is not None
     depth = _nested_depth(repo)
     out = []
     for entry in cp.stdout.split("\0"):
@@ -563,7 +587,7 @@ def ignored_blockers(wt: Path, repo: Path, timeout: float = REAP_STEP) -> list[s
         if _disposable(rel, wt):
             continue
         if rel == ".claude/settings.local.json" and hydrate:
-            sp = _run([str(hydrate), "--settings-disposable", str(wt)], timeout)
+            sp = _hydrate(repo, wt, "--settings-disposable", timeout=timeout)
             if sp is not None and sp.returncode == 0:
                 continue
         nested = p.endswith("/") and (wt / rel / ".git").is_file() and hydrate
@@ -639,11 +663,10 @@ def worktree_holds(wt: Path, repo: Path, deadline: float, *, idle=None) -> str |
         return UNKNOWN
     if locked:
         return "locked"
-    hydrate = _hydrate_script(repo)
-    if hydrate:
+    if hydrate_command(repo) is not None:
         if left() <= 0:
             return TIMED_OUT
-        cp = _run([str(hydrate), "--check", "--quiet", str(wt)], left())
+        cp = _hydrate(repo, wt, "--check", "--quiet", timeout=left())
         if cp is None:
             return TIMED_OUT
         if cp.returncode != 0:
@@ -759,9 +782,8 @@ def reweigh_gone(
 
 def rehydrate(repo: Path, wt: Path) -> None:
     """Hydrate `wt` again after a `--dehydrate` that was not followed by a remove; exempt from the deadline."""
-    hydrate = _hydrate_script(repo)
-    if hydrate and wt.is_dir():
-        _run([str(hydrate), "--quiet", str(wt)], REAP_STEP)
+    if wt.is_dir():
+        _hydrate(repo, wt, "--quiet", timeout=REAP_STEP)
 
 
 def reap_worktree(
@@ -785,13 +807,13 @@ def reap_worktree(
     why = worktree_holds(wt, repo, deadline, idle=idle)
     if why:
         return {"kept": why}
-    hydrate = _hydrate_script(repo)
+    hydrate = hydrate_command(repo) is not None
     if time.monotonic() > (deadline - REAP_STEP if hydrate else deadline):
         return {"kept": TIMED_OUT}  # no step starts past the deadline, and `--dehydrate` none past its own
     if on_reaping is not None:
         on_reaping(branch)
     if hydrate:
-        cp = _run([str(hydrate), "--dehydrate", "--quiet", str(wt)], REAP_STEP)
+        cp = _hydrate(repo, wt, "--dehydrate", "--quiet", timeout=REAP_STEP)
         if cp is None or cp.returncode != 0:
             rehydrate(repo, wt)
             return {"kept": "nested work unsaved"}
