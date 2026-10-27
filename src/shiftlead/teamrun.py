@@ -772,9 +772,10 @@ def start(
     # the Settings sweep switch (§4.9b *The switch*, TD-1091): a home not reached, or a refusal, gives the
     # team no sweep seat, and the start says so
     try:
-        switch: dict[str, Any] | None = call("sweep_switch")
+        got = call("sweep_switch")
     except Exception:  # noqa: BLE001 — whatever the transport raised, the answer is the same
-        switch = None
+        got = None
+    switch: dict[str, Any] | None = got if isinstance(got, dict) else None
     plan = teams.plan(org, name, host, profile=profile, files=files_via(call), sweep=switch)
     if switch is None:
         plan.notes.append("sweep: the switch not read — no sweep seat")
