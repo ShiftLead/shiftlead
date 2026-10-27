@@ -90,6 +90,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Live check #2475 |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
+| TD-1122 | TD-1093's uid wiring (`_id_channel`'s `peer_uid`/`own_uid`, `_dispatch` → `_identify`, `_handle_conn`/`_serve_wait`'s `_peer_args`) is tested by no test: drop it and the suite passes | Medium | Open |
 | TD-1116 | A session the person started cannot steer another team's member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow | Medium | Open |
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
@@ -2030,3 +2031,27 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Done when** a grep for each listed word finds only uses that match what runs, the doc-bound tests pass, and the code-side mismatches are filed.
 
 **Related:** the docs-audit seat (`docs/briefs/docs-audit.md`); dev-cadence#TD-129 (the pin, which retired `scripts/` and the sync the docs still name); TD-1116 (the briefs' sentence it adds).
+
+---
+## TD-1122: TD-1093's uid wiring (`_id_channel`'s `peer_uid`/`own_uid`, `_dispatch` → `_identify`, `_handle_conn`/`_serve_wait`'s `_peer_args`) is tested by no test: drop it and the suite passes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2469–#2481)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_identity.py` (`_id_channel`, `_identify`), `src/sessionorc/agent_serve.py` (`_handle_conn`, `_serve_wait`, `_dispatch`); `tests/test_identity.py`
+
+**Why:** Test audit of #2470 (TD-1093), 2026-10-27. The classification is tested in `identity.classify` with a fake `/proc` and `peer_uid=`/`own_uid=` passed by hand, and the end-to-end test (`test_a_peer_in_another_namespace_is_refused_under_enforce_and_alarmed_under_observe`) passes `peer_uid=OTHER` to `_identify` but gives the peer a readable namespace link, so the uid never decides. Nothing runs a connection through `_handle_conn` → `_peer_args` → `_dispatch` → `_identify` → `_id_channel` → `classify`. Probes, each on a clean `origin/main` worktree, `pytest tests/test_identity.py tests/test_agent.py` (113 passed before and after):
+- `_id_channel`: `uids = {"peer_uid": peer_uid, "own_uid": os.geteuid()}` → `uids = {}` — 113 passed.
+- `_identify`: `await self._id_channel(peer, peer_uid)` → `await self._id_channel(peer)` — 113 passed (the earlier `-k` run, 49 passed).
+- `_dispatch`: `self._identify(req, peer, conn, peer_uid=peer_uid)` without `peer_uid` — 49 passed in the `-k` run.
+- `_handle_conn` and `_serve_wait`: `**_peer_args(writer)` replaced by `peer=_peer_args(writer)["peer"]` — 49 passed in the `-k` run.
+Any of these puts the live agent back to the pre-TD-1093 behaviour for a peer whose namespace link is unreadable (another uid: a container's root), which is the case the entry exists for: *outside*, so the person, where the design says *unknown*.
+
+**Fix:** Add one test that sends a request over a real unix socket pair to a served connection (or calls `_dispatch` with `**_peer_args(writer)` of a socket whose peer uid differs) with a fake `proc` whose link for the peer does not read, and asserts the verdict is *unknown* under `enforce`. Revert each of the four lines above and see it fail. Re-run the `-k` probes over the whole files.
+
+**Done when** each line named above fails a test when reverted, and the suite is green.
+
+**Related:** TD-1093.
