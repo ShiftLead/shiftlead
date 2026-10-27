@@ -177,6 +177,15 @@ def test_the_commit_statuses_fold_in_beside_the_runs(monkeypatch, tmp_path):
     assert promote.read_checks(tmp_path, sha) == ("unknown", "HTTP 502", None, None)
 
 
+def test_the_newest_of_two_precheck_statuses_is_the_precheck(monkeypatch, tmp_path):
+    """TD-1056: `commits/<sha>/status` lists statuses newest first, so of two `cadence/precheck` statuses the
+    first is the precheck — a re-run's success over an earlier failure, and the reverse."""
+    done, set_ = {"status": "completed", "conclusion": "success"}, ("pdm run test", None)
+    for newest, older in (("success", "failure"), ("failure", "success")):
+        _fake_gh(monkeypatch, [done], [_status(newest), _status(older)], toml=set_)
+        assert promote.read_checks(tmp_path, "a" * 40)[3] == newest
+
+
 def test_main_needs_a_green_precheck_where_the_repo_sets_one(monkeypatch, tmp_path):
     """TD-1037: with `precheck` set, main's head is green only beside a successful `cadence/precheck`; the
     reading's `precheck` field says what the status read found."""

@@ -20390,6 +20390,26 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2439) — `_route_ring` reads a refusal ending in `link.UNKNOWN_ACT` (the words an older node already sends, now one constant the node raises and the home reads) as no verdict: nothing charged, no bell kept, rung again next tick; any other refusal stays `failed`. §4.4a says so. Bells are not dropped when a node's link comes up anew: with no bell kept for the refusal, nothing is left for that to clear. Tests: `test_a_node_that_does_not_know_the_ring_is_no_verdict_and_another_refusal_fails`, `test_a_node_refuses_an_act_it_does_not_know_in_the_words_the_home_reads_as_no_verdict`.
 
+## TD-1056: The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/promote.py` (`read_checks`: `state = str(mine[0].get("state") ...)`, comment *newest first, one per context*), `tests/test_promote.py` (`test_the_commit_statuses_fold_in_beside_the_runs`, `test_main_needs_a_green_precheck_where_the_repo_sets_one`)
+
+**Why:** #2396 reads the head's `cadence/precheck` as `mine[0]`, relying on GitHub's newest-first order of `commits/<sha>/status`; a re-run's `success` after an earlier `failure` is the case that matters. Probed on `origin/main`: changing `mine[0]` to `mine[-1]` leaves 102 passed in `tests/test_ci_not_run.py tests/test_promote.py tests/test_cadence_pin.py`. No test's fake statuses list holds two statuses of that context.
+
+**Fix:** add a case with two `cadence/precheck` statuses, newest `success` over older `failure` and the reverse, asserting `precheck` is the first's.
+
+**Done when:** the `mine[-1]` probe fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1037, TD-1033.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2443) — `tests/test_promote.py::test_the_newest_of_two_precheck_statuses_is_the_precheck` holds `read_checks`'s `precheck` to the first of two `cadence/precheck` statuses, both orders; the `mine[-1]` probe fails it.
+
 ## TD-1065: `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it
 
 **Priority:** Low
