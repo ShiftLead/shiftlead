@@ -1164,6 +1164,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-13 (amendment): the prediction came true — OpenAI's Agents API (public beta 2026-09-10), Anthropic's Managed Agents, AWS Bedrock AgentCore and Microsoft's Foundry Agent Service all sell a managed cloud agent runtime on token billing with no infrastructure fee. Conclusion recorded: the runtime is commodity; the relay sells the neutral view, not a runtime ([ADR](decisions/2026-09-13-openai-agents-api.md)). The spec now states this in the present tense.
 
 ## 4.6 Transport and terminal mechanics
+- 2026-10-27 (TD-1108's review, round 13, Fable, no findings): the loop closes, Sonnet READY in rounds 10 and 12.
 - 2026-10-27 (TD-1108's review, round 12, Sonnet, READY, 0 findings): the round-11 changes hold against `inbox_row.html` and `AO.pathLinksHtml`.
 - 2026-10-27 (TD-1108's review, round 11, Fable, 3 findings — one follow-on of round 9, two nits — all adopted): an *answered for you* row's quote resolves by the answerer's context, not the asker's, accepted, since an attachment's absolute run opens the same file either way; a linked run carries the transcript's `title`; TD-1108's Status quotes §4.5a's row cell as written.
 - 2026-10-27 (TD-1108's review, round 10, Sonnet, READY, 1 nit, adopted): a card's `.body.sentence`, its `leads` and a ledger title in either mode are `AO.ITEM_TEXT`'s and link; only the `.subj.sentence` stays text.
