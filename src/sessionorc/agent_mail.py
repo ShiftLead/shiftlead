@@ -898,7 +898,12 @@ class MailMixin:
                 # a reply that closes a question the seat itself sent fills a seat on call — the person's
                 # or a session's, on a handed entry's thread or on its own (§4.9b *an answer waiting*,
                 # TD-1051; review of #760: an outcome note or a seat's FYI on the thread refills nothing)
-                refills=entry.kind == "reply" and bool(closes) and replied is not None and replied.from_ == sid,
+                # — but not on a handed entry's thread once it has its outcome, which `asks_waiting` leaves
+                refills=entry.kind == "reply"
+                and bool(closes)
+                and replied is not None
+                and replied.from_ == sid
+                and not any(e.id == root and e.handed_entry and not e.owes for e in records[sid].inbox),
             )
             for sid in named
             if sid != PERSON and sid in records

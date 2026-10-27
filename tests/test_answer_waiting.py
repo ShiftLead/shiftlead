@@ -75,6 +75,23 @@ def test_the_homes_note_ending_the_question_counts_and_any_other_note_does_not(r
     tq.closed_reason = reason
     t.inbox.append(plain)
     assert t.asks_waiting() == 0
+    # the home's note ending another session's question, copied to this seat, counts nothing
+    u = _seat()
+    theirs = MailEntry(id="m-t", from_="ao-w", to=[PERSON], at="2026-10-26T11:00:00Z", kind="steer", text="?")
+    theirs.closed_reason = reason
+    u.outbox.append(theirs)
+    n = MailEntry(id="m-n2", from_=SYSTEM, to=[u.id], at="2026-10-26T11:10:00Z", kind="note", text="ended")
+    n.reply_to = n.root = "m-t"
+    u.inbox.append(n)
+    assert u.asks_waiting() == 0
+
+
+@pytest.mark.unit
+def test_an_answer_to_a_session_that_is_no_seat_counts_nothing():
+    s = _seat()
+    s.seat = None
+    _answer(s, _asked(s))
+    assert s.asks_waiting() == 0, "a worker reads its own answers; no seat is filled for them"
 
 
 @pytest.mark.unit

@@ -1464,8 +1464,8 @@ class Session:
             and any(where(x) == mine for x in e.to)
             and (not handed_only or e.handed_entry)
         ]
-        if handed_only:
-            return found
+        if handed_only or not self.seat:
+            return found  # an answer waits in a seat's mailbox alone: a session that is not one reads its own
         # an answer waiting (§4.9b, TD-1051): the unread reply that closed a question the record sent,
         # or the `system` note of its lapse, *Go with it* or decline — counted by the question's id, once
         # per question, and never on a handed entry's thread: the entry counts while it owes, and once
