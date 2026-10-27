@@ -82,8 +82,11 @@ class SyncMixin:
             want = f"origin/{await asyncio.to_thread(workorders.default_branch, Path(root))}"
             command, unread = await asyncio.to_thread(cadence.precheck_command, root, want)
             prechecks, counted = bool(command), None
-            if unread:  # no reading of `precheck`: a waiting PR keeps its wait and its clock, and nothing starts
-                pass
+            if unread:  # no reading of `precheck`: nothing starts; a PR waiting on its precheck keeps its clock, and
+                # the pass covers nothing, so it is the team's again rather than held without end (§6 *Sync*)
+                covered = not any(
+                    sync_mod.waiting(sync.get(str(p.get("number"))), str(p.get("head") or "")) for p in prs
+                )
             elif not prechecks:  # `precheck` unset since: nothing waits on a precheck the pass will not start
                 sync = {n: {k: v for k, v in e.items() if k != "waiting_since"} for n, e in sync.items()}
             else:

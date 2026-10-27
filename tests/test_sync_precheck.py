@@ -276,12 +276,20 @@ def test_the_readings_pass_kills_a_run_past_the_bound_without_the_sync_pass(pre,
 
 
 @pytest.mark.integration
-async def test_an_unread_precheck_setting_keeps_the_wait_and_its_clock(agent, gh, pre, monkeypatch):  # noqa: F811
+async def test_an_unread_precheck_setting_keeps_the_clock_covers_nothing_and_the_pr_is_the_teams(
+    agent,  # noqa: F811
+    gh,  # noqa: F811
+    pre,
+    monkeypatch,
+):
     _reading(agent, _none())
     since = now_iso()
     e = {"head": HEAD, "verdict": "", "why": "x", "tries": 0, "posted": False, "waiting_since": since}
     agent._repos[ROOT]["sync"] = {"1097": e}
     monkeypatch.setattr(cadence, "precheck_command", lambda root, rev: (None, "docs/cadence.toml does not parse"))
+    agent._sync_ran[ROOT] = datetime.now(UTC) - timedelta(minutes=20)  # an older cover, which this pass must not renew
     await agent._sync_pass()
     assert agent._repos[ROOT]["sync"]["1097"]["waiting_since"] == since and _names(gh) == []
     assert promote.precheck_pr_run(REPO) is None
+    # a pass that could not read the setting covers nothing: the waiting PR is the team's order again
+    assert [o["id"] for o in await _orders(agent)] == ["pr:1097"]

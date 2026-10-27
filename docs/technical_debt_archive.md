@@ -19986,7 +19986,7 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Added:** 2026-10-26 (the designer, from TD-1033)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done — #2416. Open — build
+**Status:** Done — #2416
 **Blocked by:** TD-1037
 **Location:** `src/sessionorc/sync.py` (`candidates`, `mark`, step 4, `SYNC_TRIES`), `src/sessionorc/agent_sync.py` (`_sync_repo`: the check-and-start under the promote lock), `src/sessionorc/promote.py` (the starter and the kill's cleanup, shared with TD-1038; the readings' pass judges the bound), `src/sessionorc/cadence.py` (`precheck_script`, TD-1037's); design §6 *Sync* (the candidates, step 4), §4.4 (the sync PRs that wait)
 
