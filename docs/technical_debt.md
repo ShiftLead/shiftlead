@@ -110,6 +110,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1068 | The test suite runs on one core, so every precheck takes 12 minutes and main moves under it | Medium | Open |
+| TD-1074 | `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit) | Medium | Open — build |
+| TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
+| TD-1076 | `_gh_prs` sets `prechecked` on each open PR row, `ao pr wait`'s *none* hangs on it, and no test runs `_gh_prs` (test audit) | High | Open — build |
 
 ---
 
@@ -2345,3 +2348,57 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Done when** five consecutive `-n auto` runs on main pass, the precheck's measured time is in this entry's Status, and `test_a_restart_is_written_afresh` passes 20 runs under `-n auto` or its cause is ledgered.
 
 **Related:** dev-cadence#TD-155 (a narrow precheck by path), TD-1050, TD-1052, TD-1035.
+
+## TD-1074: `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`survey`: `if full or first:  # the checks were read this pass (TD-1038)` before `precheck_on_main`), `tests/test_precheck_on_main.py`, `tests/test_promote.py`
+
+**Why:** #2407 (TD-1038) put `precheck_on_main` behind the pass that read the checks, and its docstring says so ("on a pass that read the checks"). A pass that is neither `full` nor the repo's first copies the previous reading (`r: dict[str, Any] = {k: v for k, v in old.items() if ...}`) and reads no checks. Probed on `origin/main`: replacing `if full or first:` with `if True:` on that line leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_promote.py tests/test_precheck_on_main.py` at 102 passed. Run on a cheap pass, `precheck_on_main` resets `prechecking` to None and acts on the carried `precheck` and `checks`, so the *prechecking* row would drop out between full passes and a stale `absent` could start a run; no test has such a pass (`survey(..., full=False)` with a previous reading).
+
+**Fix:** add a `survey` test with a previous reading that has `prechecking` set, `full=False`, and a fake `precheck_script` that records its starts; assert the second pass keeps `prechecking`, starts nothing, and calls `precheck_on_main` not at all (monkeypatch it to fail).
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1038.
+
+## TD-1075: The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/gitinfo.py` (`_run`: `{**(os.environ if env is None else env), "LC_ALL": "C"}`; `_hydrate`), `tests/test_worktree_reap.py::test_a_pinned_repos_reap_runs_the_pinned_trees_hydrate`
+
+**Why:** #2409 (TD-1044) made `_run` take the environment `cadence.command` returns, which for a pinned repo carries the pin's variables (`CADENCE_REPO_ROOT`, as `test_a_pinned_repos_new_worktree_is_hydrated_by_the_pinned_tree` stubs it). The create path is tested for it (the stub launcher writes `$CADENCE_REPO_ROOT`); the reap path is not: the stub is `lambda r, word, *a: ([str(stub), word, *a], dict(os.environ))`, and the stub script echoes `"$@"` only. Probed on `origin/main`: replacing `{**(os.environ if env is None else env), "LC_ALL": "C"}` with `{**os.environ, "LC_ALL": "C"}` leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gitinfo.py tests/test_worktree_reap.py` at 38 passed. A reaper whose `--check` and `--dehydrate` lose the resolver's environment would pass.
+
+**Fix:** have the reap test's resolver stub return `{**os.environ, "CADENCE_REPO_ROOT": str(r)}` and its stub launcher log `$CADENCE_REPO_ROOT` with the arguments; assert it on the `--check` and `--dehydrate` calls.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1044.
+
+## TD-1076: `_gh_prs` sets `prechecked` on each open PR row, `ao pr wait`'s *none* hangs on it, and no test runs `_gh_prs` (test audit)
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/reports.py` (`_gh_prs`: `row["prechecked"] = prechecked(p.get("statusCheckRollup"))`), `src/sessionorc/agent.py` (`rpc_pr_wait`: `got.get("prechecked") is False`), `tests/test_pr_wait.py`
+
+**Why:** #2405 (TD-1036) makes `ao pr wait` answer *none*, with the line to run, for a green head that carries no `cadence/precheck`. `rpc_pr_wait` reads that from the row's `prechecked`, and only `_gh_prs` sets it. `test_where_the_repo_sets_precheck_a_head_without_it_stays_none_with_its_line` builds rows by hand (`{**_row(checks="green"), "prechecked": False}`), a shape the home's own read must write; `grep -rn _gh_prs tests` finds one line, which fails if it is called. Probed on `origin/main`: replacing that `_gh_prs` line with `pass` leaves every test in the files that mention `OPEN_PR_FIELDS`, `pr_reading`, `failing_items` or `prechecked` passing (148 passed). Without the line the row has no `prechecked`, `got.get("prechecked") is False` never holds, and a head with no precheck reads *green* to `ao pr wait` again, which is what the entry was filed to stop.
+
+**Fix:** a test that runs `_gh_prs` (or `pr_reading`) over a faked `gh pr list` JSON with one head carrying a `cadence/precheck` status and one not, and asserts `prechecked` True and False on the rows.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1036.
