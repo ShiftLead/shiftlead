@@ -677,6 +677,21 @@ async def test_a_pinned_repo_runs_the_pinned_trees_script_through_the_resolver(h
 
 
 @pytest.mark.integration
+async def test_the_pins_resolve_is_bounded_by_the_calls_budget(home, gh, tmp_path, monkeypatch):
+    """TD-1034: the resolve gets what is left of the call's `BUDGET`, never `cadence.TREE_TIMEOUT`'s 330 s — a
+    stuck first fetch would hold the repo's id lock past the 45 s answer."""
+    root = _one(tmp_path, gh)
+    payload = _pin(root, tmp_path, monkeypatch)
+    _stub(payload.parent, where="files/scripts", ids=("TD-007",))
+    seen, tree = [], cadence.tree
+    monkeypatch.setattr(
+        cadence, "tree", lambda r, timeout=cadence.TREE_TIMEOUT: (seen.append(timeout), tree(r, timeout))[1]
+    )
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-007"]
+    assert seen and all(0 < t <= agent_ids.BUDGET for t in seen), seen
+
+
+@pytest.mark.integration
 async def test_a_pin_that_does_not_resolve_refuses_in_the_launchers_words(home, gh, tmp_path, monkeypatch):
     root = _one(tmp_path, gh)
     _pin(root, tmp_path, monkeypatch)
