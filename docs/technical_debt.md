@@ -1707,8 +1707,8 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-25 (the designer, from TD-1009)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1014
+**Status:** Open — build; the bump's check (steps 1–2 as `sync._check_bump`, step 3's wait on a review of the compare, §4.4's test counting `docs/cadence.toml`, §6 *Sync* rewritten) in the PR of this line; left: the lock road leaves `sync.check` once no served repo holds a lock (the Done when's last clause)
+**Waits:** event — no served repo holds `docs/cadence-sync.lock` (each migrates to a pin in its own sessions' PR)
 **Location:** `src/sessionorc/sync.py` (`check`, the pass), `agent_sync`; `tests/test_sync_pass.py`; design §6 *Sync: a mechanical sync PR is merged at the home*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 5): with a pin there is no lock and no copied file to replay; TD-681 is replaced, not trimmed.
@@ -2229,3 +2229,21 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when:** tests with a fake node link: a `ring` the node refuses as an unknown act charges nothing, counts no failure and keeps no bell, and the next tick rings again; once the node answers `typed`, the decision is recorded as before; another refusal still counts `failed`. `pdm run test` and `pdm run lint` pass. TD-1079's live check is then read again.
 
 **Related:** TD-1079 (the live check it blocks; #2431 the build), TD-1051, TD-057 (re-provisioning a node on a build change).
+
+## TD-1098: `test_a_run_that_ended_with_no_status_is_counted_once_and_a_later_pass_starts_another` reads the stub's record before the second run writes it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, met building TD-1015)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_sync_precheck.py` (`_ran`, line 58; the test at line 197)
+
+**Why:** the test's last pass starts a second detached `precheck.py` stub, then asserts `_ran(pre) == ["--pr 1097", "--pr 1097"]`. `_ran` waits only until the `ran` file exists, and the first run already made it, so it reads the file before the second run appends its line. It fails about one run in eight alone on `origin/main` (`5d9dced`), with `Right contains one more item: '--pr 1097'`, and more often under a loaded suite.
+
+**Fix:** `_ran` takes the number of lines it expects and waits, under its bound, until the file holds that many; each caller passes its count.
+
+**Done when** the test passes 50 runs alone and 20 under `pdm run test`, and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1039 (the build that wrote the test), TD-1087, TD-1088 (the other load flakes).

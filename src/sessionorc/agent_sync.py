@@ -170,7 +170,10 @@ class SyncMixin:
                 return None  # the head moved under the merge: the forge's match refused it, and nothing is written
             return sync_mod._no_reading(e, f"the merge was refused: {why}", now_iso())
         repo = Path(root).name
-        text = f"merged {repo} #{n} — sync of dev-cadence {e.get('commit') or '?'}, {e.get('files', 0)} files"
+        if e.get("kind") == "bump":
+            text = f"merged {repo} #{n} — bump of the dev-cadence pin to {(e.get('commit') or '?')[:7]}"
+        else:
+            text = f"merged {repo} #{n} — sync of dev-cadence {e.get('commit') or '?'}, {e.get('files', 0)} files"
         self._system_note(PERSON, text)
         log.info("sync: %s", text)
         return {**e, "verdict": "merged", "why": "", "at": now_iso()}

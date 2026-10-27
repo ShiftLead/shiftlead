@@ -194,6 +194,62 @@ def test_judge_a_failed_gate_blocks_and_a_refusal_posts_nothing(gh):
     assert sync.judge(ROOT, _pr(), None, [], "T0")["tries"] == 1
 
 
+BUMP = {"verdict": "mechanical", "why": "", "head": HEAD, "kind": "bump", "commit": "e" * 40, "old": "d" * 40,
+        "files": ["docs/cadence.toml"], "post_sync": False}  # fmt: skip
+
+
+def test_judge_a_bump_posts_nothing_and_waits_on_a_review_of_its_compare(gh, monkeypatch):
+    """TD-1015, §6 *Sync* step 3 for a bump: the home posts no evidence of its own; the bump waits, uncounted,
+    for a review of its compare at the head, then gates as any; a day with none is *refused*."""
+    gh["check"], review = dict(BUMP), [None, False]
+    monkeypatch.setattr(sync, "compare_review", lambda root, n, head: tuple(review))
+    e = sync.judge(ROOT, _pr(), None, [], "2026-10-26T00:00:00+00:00")
+    assert (e["verdict"], e["waits"], e["tries"], e["posted"]) == ("", "review", 0, False)
+    assert e["why"] == f"no review of the compare at {HEAD[:7]}" and e["waiting_since"] == "2026-10-26T00:00:00+00:00"
+    assert _names(gh) == ["check"]
+    # unreadable comments are no reading, counted
+    review[:] = ["HTTP 502", False]
+    assert sync.judge(ROOT, _pr(), e, [], "2026-10-26T00:05:00+00:00")["tries"] == 1
+    # reviewed: the gate runs, no comment is posted, and the wait is over
+    review[:] = [None, True]
+    gh["calls"] = []
+    got = sync.judge(ROOT, _pr(), e, [], "2026-10-26T00:10:00+00:00")
+    assert got["ready"] and got["kind"] == "bump" and got["commit"] == "e" * 40 and got["files"] == 1
+    assert "waits" not in got and "waiting_since" not in got and _names(gh) == ["check", "gate"]
+    # a day with no review: refused, and the PR the team's
+    review[:] = [None, False]
+    e = sync.judge(ROOT, _pr(), e, [], "2026-10-27T00:00:00+00:00")
+    assert (e["verdict"], e["why"]) == ("refused", f"review waited a day: no review of the compare at {HEAD[:7]}")
+
+
+def test_mark_a_bump_waiting_on_its_review_is_the_teams_order():
+    e = {"head": HEAD, "verdict": "", "why": "no review of the compare at aaaaaaa", "waits": "review",
+         "waiting_since": "T0"}  # fmt: skip
+    (pr,) = sync.mark([_pr()], {"1097": e}, True)
+    assert pr["sync_why"] == "no review of the compare at aaaaaaa" and "sync_home" not in pr
+
+
+def _comments(monkeypatch, *bodies):
+    import json
+
+    out = json.dumps({"comments": [{"body": b} for b in bodies]})
+    monkeypatch.setattr(sync, "_gh", lambda root, args, timeout=0: (None, out))
+
+
+def test_compare_review_wants_another_reviewer_naming_the_head_and_no_block_after(monkeypatch):
+    ship = f"Read the compare at {HEAD[:9]}.\n\ncadence-review: SHIP · claude-sonnet-5-5 · code · 0 findings"
+    _comments(monkeypatch, ship)
+    assert sync.compare_review(ROOT, 1, HEAD) == (None, True)
+    _comments(monkeypatch, ship.replace(HEAD[:9], "b" * 9))  # another head's review
+    assert sync.compare_review(ROOT, 1, HEAD) == (None, False)
+    _comments(monkeypatch, f"cadence-review: SHIP · sync-check · code · 0 findings\n\n- head {HEAD}")
+    assert sync.compare_review(ROOT, 1, HEAD) == (None, False)
+    _comments(monkeypatch, ship, f"{HEAD[:7]}\ncadence-review: BLOCK · claude-sonnet-5-5 · code · 1 findings")
+    assert sync.compare_review(ROOT, 1, HEAD) == (None, False)
+    monkeypatch.setattr(sync, "_gh", lambda root, args, timeout=0: ("HTTP 502", ""))
+    assert sync.compare_review(ROOT, 1, HEAD) == ("HTTP 502", False)
+
+
 # -- at the home --------------------------------------------------------------------------------------------
 
 
@@ -225,6 +281,18 @@ async def test_a_mechanical_sync_pr_is_merged_with_the_note_and_is_no_order(agen
     assert gh["calls"] == []
     # the reading's re-read keeps the pass's outcomes
     assert agent.repos_store.load()[ROOT]["sync"]["1097"]["verdict"] == "merged"
+
+
+@pytest.mark.integration
+async def test_a_reviewed_bump_is_merged_with_its_own_note(agent, gh, monkeypatch):
+    gh["check"] = dict(BUMP)
+    monkeypatch.setattr(sync, "compare_review", lambda root, n, head: (None, True))
+    _reading(agent, _pr())
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
+    assert _names(gh) == ["login", "check", "gate", "head", "merge"]
+    notes = [e.text for e in agent.person_inbox if e.from_ == "system"]
+    assert "merged samscrape #1097 — bump of the dev-cadence pin to eeeeeee" in notes
 
 
 @pytest.mark.integration
