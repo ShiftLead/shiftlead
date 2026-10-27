@@ -103,7 +103,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Built in #2431 — live check |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
 | TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
-| TD-1095 | A node on an older build refuses the home's `ring`, and the home counts the refusal as a failed ring: the member is never rung, and nothing says so | Medium | Open — build |
 | TD-1097 | `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load | Low | Open — build |
 
 ---
@@ -2142,9 +2141,8 @@ It then names the build entries.
 **Type:** debt
 **Added:** 2026-10-26 (the designer, from TD-1051)
 **Owner:** grinder
-**Kind:** live-check #2431
-**Status:** Built in #2431 (2026-10-26, grinder-ao-2); a live check once #2431 is live: read-only, send a note to an idle member on contractmatch's container node and read that its record gains a `wakes` entry `via: doorbell` within a tick, and that `ao status -v` shows no `doorbell_failed` for that stretch (a transcript read for the typed line). Read 2026-10-27 04:30Z (grinder-ao-2, #2431 live in 752cb47; the node at the home's build 3c0564dfeba0 since 04:24:53Z): it does not hold, see TD-1095. The home's journal at the 22:24 local promote shows the home ringing `designer-cm-1@contractmatch` (1 unread) and `techlead-cm-1@contractmatch` (3 unread) at 22:24:18 and 22:24:20, while the node still ran build 39431fba055c. The node refused each ring (*'ring' is not an act a node executes*) and the home logged *did not submit (1 of 2)*, then *(2 of 2)*. The node was re-provisioned at 22:24:53. Six minutes later both records were still idle at their old `since`, with their mail unread, no `ring_seen` and no `doorbell_failed`, and `read_when` still said *rung within a tick*. The check is read again once TD-1095 is live.
-**Blocked by:** TD-1095
+**Kind:** live-check #2439
+**Status:** Built in #2431, its unknown-act refusal fixed in #2439 (TD-1095) (2026-10-26, grinder-ao-2); a live check once #2431 is live: read-only, send a note to an idle member on contractmatch's container node and read that its record gains a `wakes` entry `via: doorbell` within a tick, and that `ao status -v` shows no `doorbell_failed` for that stretch (a transcript read for the typed line). Read 2026-10-27 04:30Z (grinder-ao-2, #2431 live in 752cb47; the node at the home's build 3c0564dfeba0 since 04:24:53Z): it does not hold, see TD-1095. The home's journal at the 22:24 local promote shows the home ringing `designer-cm-1@contractmatch` (1 unread) and `techlead-cm-1@contractmatch` (3 unread) at 22:24:18 and 22:24:20, while the node still ran build 39431fba055c. The node refused each ring (*'ring' is not an act a node executes*) and the home logged *did not submit (1 of 2)*, then *(2 of 2)*. The node was re-provisioned at 22:24:53. Six minutes later both records were still idle at their old `since`, with their mail unread, no `ring_seen` and no `doorbell_failed`, and `read_when` still said *rung within a tick*. The check is read again once TD-1095 is live.
 **Location:** `src/sessionorc/agent_wake.py` (`_ring_doorbells`, 142–161: rings only `self.sessions`, and returns on a node; `_ring`, `_bell_failed`); `src/sessionorc/agent_remote.py` (routing an act to a node; the node's handler); `src/sessionorc/mail.py` (`read_when`, 736–743); `src/sessionorc/agent_tick.py:3341` (`_balance_ring`'s docstring, *nothing rings a node's idle member yet*); `src/shiftlead/briefs/manager.md` (the over-the-line paragraph's last sentence, *except one on another host … one `ao send` saying the line is clear* — the nudge's node exceptions in its step 1 and step 2 stay, the nudge being a typed line of rule 4, not the doorbell); design §4.4a *The doorbell rings a node's session through its node*, §4.10 *The doorbell* and the `read_when` table, §6 *Balance*
 
 **Why:** TD-1051 (a): mail to designer-cm-1 and grinder-cm-1 on contractmatch's container node said *rung within a tick*, and nothing was typed, because the home rings only its own host's records and a node rings nothing.
@@ -2195,24 +2193,6 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when** the case passes 20 runs under a loaded suite (`-n auto`, or three prechecks at once), and `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1087 (four tests that fail only across workers, a draft sweep's among them), TD-1065, TD-1067, TD-1068 (the other load flakes); TD-630 (the draft).
-
-## TD-1095: A node on an older build refuses the home's `ring`, and the home counts the refusal as a failed ring: the member is never rung, and nothing says so
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (grinder-ao-2, from TD-1079's live check)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/agent_remote.py` (`_route_ring`, 574–593: `link.LinkError` → `"failed"`, and its docstring, *a node that refuses the act (an older build) failed it*); `src/sessionorc/agent_wake.py` (`_ring_doorbells`, 142–171, and `_ring_node_once`, 256–: the bell keyed on the record's `since`); `src/sessionorc/agent_link.py:334` (the node's refusal of an act it does not know); design §4.4a *The doorbell rings a node's session through its node*
-
-**Why:** TD-1079's live check, 2026-10-27. A promote restarts the home before the supervisor re-provisions the node, so for about 35 s the node runs the older build. In that window the home rang two idle members on contractmatch's node. The node refused each `ring` as an unknown act, and `_route_ring` returned `failed`. Two failures spent the bell for the stretch. The node was then re-provisioned, but its records' `since` did not move, so neither member is rung again until its own state changes. The node never wrote `doorbell_failed`, because it was not the node that failed, so `read_when` still says *rung within a tick* for mail nobody typed. The design names no verdict for a node that refuses the act.
-
-**Fix:** a node that refuses `ring` as an act it does not execute is **no verdict**, as a dropped link is: nothing charged, no failure counted, no bell kept. The next tick rings again, and once the re-provisioned node dials in the ring lands. A refusal of any other kind stays `failed`. Name it in §4.4a beside *a link that drops before the verdict is no failure*. Whether a node's link coming up anew should also drop the bells the home keeps for that host's records is a choice to make while building; it would cover any older-build stretch, not this act alone.
-
-**Done when:** tests with a fake node link: a `ring` the node refuses as an unknown act charges nothing, counts no failure and keeps no bell, and the next tick rings again; once the node answers `typed`, the decision is recorded as before; another refusal still counts `failed`. `pdm run test` and `pdm run lint` pass. TD-1079's live check is then read again.
-
-**Related:** TD-1079 (the live check it blocks; #2431 the build), TD-1051, TD-057 (re-provisioning a node on a build change).
 
 ## TD-1097: `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load
 

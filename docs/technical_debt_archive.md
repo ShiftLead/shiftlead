@@ -20369,3 +20369,23 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 - `test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line`, and the two other `test_board.py` tests that patch `_refresh_repos`: a repos pass the fixture's first tick started before the patch landed after the test set `_repos`, and emptied it. Each now runs `park_ticks` first, which finishes or cancels that pass.
 - `test_doctor.py::test_usage_is_asked_once_per_stale_account_never_when_fresh_cooling_or_metered` failed #2439's precheck (`assert ['a', 'c'] == []`): the tick's own usage pass asked the stub's accounts between the test's reads. It parks the ticks too.
 - `test_the_doorbell_rings_only_where_it_may` (*error connecting* to its private server): not reproduced. A likely cause is fixed. `sweep_stale_test_servers` unlinked any `ao-test-*` socket whose connect was refused before asking its owner, and a server another worker was starting, or one too busy to accept, refuses. It now asks the owner first.
+
+## TD-1095: A node on an older build refuses the home's `ring`, and the home counts the refusal as a failed ring: the member is never rung, and nothing says so
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, from TD-1079's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/agent_remote.py` (`_route_ring`, 574–593: `link.LinkError` → `"failed"`, and its docstring, *a node that refuses the act (an older build) failed it*); `src/sessionorc/agent_wake.py` (`_ring_doorbells`, 142–171, and `_ring_node_once`, 256–: the bell keyed on the record's `since`); `src/sessionorc/agent_link.py:334` (the node's refusal of an act it does not know); design §4.4a *The doorbell rings a node's session through its node*
+
+**Why:** TD-1079's live check, 2026-10-27. A promote restarts the home before the supervisor re-provisions the node, so for about 35 s the node runs the older build. In that window the home rang two idle members on contractmatch's node. The node refused each `ring` as an unknown act, and `_route_ring` returned `failed`. Two failures spent the bell for the stretch. The node was then re-provisioned, but its records' `since` did not move, so neither member is rung again until its own state changes. The node never wrote `doorbell_failed`, because it was not the node that failed, so `read_when` still says *rung within a tick* for mail nobody typed. The design names no verdict for a node that refuses the act.
+
+**Fix:** a node that refuses `ring` as an act it does not execute is **no verdict**, as a dropped link is: nothing charged, no failure counted, no bell kept. The next tick rings again, and once the re-provisioned node dials in the ring lands. A refusal of any other kind stays `failed`. Name it in §4.4a beside *a link that drops before the verdict is no failure*. Whether a node's link coming up anew should also drop the bells the home keeps for that host's records is a choice to make while building; it would cover any older-build stretch, not this act alone.
+
+**Done when:** tests with a fake node link: a `ring` the node refuses as an unknown act charges nothing, counts no failure and keeps no bell, and the next tick rings again; once the node answers `typed`, the decision is recorded as before; another refusal still counts `failed`. `pdm run test` and `pdm run lint` pass. TD-1079's live check is then read again.
+
+**Related:** TD-1079 (the live check it blocks; #2431 the build), TD-1051, TD-057 (re-provisioning a node on a build change).
+
+**Resolved:** 2026-10-26 (grinder-ao-2, #2439) — `_route_ring` reads a refusal ending in `link.UNKNOWN_ACT` (the words an older node already sends, now one constant the node raises and the home reads) as no verdict: nothing charged, no bell kept, rung again next tick; any other refusal stays `failed`. §4.4a says so. Bells are not dropped when a node's link comes up anew: with no bell kept for the refusal, nothing is left for that to clear. Tests: `test_a_node_that_does_not_know_the_ring_is_no_verdict_and_another_refusal_fails`, `test_a_node_refuses_an_act_it_does_not_know_in_the_words_the_home_reads_as_no_verdict`.
