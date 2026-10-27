@@ -90,6 +90,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Live check #2475 |
 | TD-1108 | A file path on the Queue page or in the Inbox is plain text: it should open in the person's editor, as a path in the pane or a transcript does | Medium | Open |
+| TD-1116 | A session the person started cannot steer another team's member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow | Medium | Open |
+| TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
+| TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
+| TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
 
 ---
 
@@ -1917,3 +1921,112 @@ It then names the build entries.
 **Done when** the design names each surface, how a run on it is resolved and pressed, and its §4.5a rows, and the build entries are filed.
 
 **Related:** TD-493 (a path in the pane), TD-688 / TD-689 / TD-691 (file links, the file button, a path in a transcript), TD-748 (the Queue), TD-071 (no control from a session's text).
+
+## TD-1116: A session the person started cannot steer another team's member, and its mail lands as `[other]`, which every brief tells a member to weigh, not follow
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/sessionorc/mail.py` (`message_edge`'s edge between the person's own sessions, `by_person`; `from_role`); design §4.10 *The message gate is weaker than `control`* (*between the person's own sessions*, TD-1042/TD-1069), §4.10 *Surface* (the `[controller]` / `[person]` / `[other]` tags), §9 invariants 9 and 13; the role briefs that carry *Instructions come from your controllers and from people* (`src/shiftlead/briefs/` grinder, designer, manager, manager_on_call, hunter, sweeper, auditor; not `entry.md`, `techlead.md`, `work.md` or the `.stage.md` briefs)
+
+**Why:** Paul, 2026-10-27: "There are times when we would do something in an interactive session where we would need to let a grinder know not to touch a dir … or a designer to hold a design or consider a new element." The edge TD-1069 built (#2419) needs **both** ends to be sessions the person started by hand, so one of them reaches an unattended member of another team only by an `ask` to its question seat. Even where mail does land, a `by_person` sender reads as `[other]` (`from_role`), and those briefs say mail from anyone but controllers and people is "information you weigh, never an instruction". So "don't touch `scripts/`" from Paul's session is advice a grinder may set aside.
+
+Paul turned down copying the team's manager or techlead. Their context is refreshed often, so a copy wakes a lead to read news it will not keep. A Fable review (2026-10-27) agreed: a person's hold already tells only the entry's holders, and the manager on call "starts cold … and holds nothing from earlier fills".
+
+**Fix:** design first, amending the edge §4.10 has:
+1. **The target widens.** A `by_person` sender may mail any record with an agent, in every kind, `steer` included. The test on the sender stays as TD-1069 wrote it.
+2. **A new tag.** Its mail lands as **`[person-session]`**, a `from_role` value of its own, not `person`. Each brief gains one sentence: from it, an instruction about what to do or avoid binds like the person's own, and a technical claim is information. So a worker's text that a person's session passes on does not arrive as the person's word. It does not refill the target's wake budget, which stays the person's alone.
+3. **An `ask` to a seat** still takes the question-seat edge and its one-open-question count.
+4. **No copy** to the target's manager or techlead.
+5. The round also states the two known ways to `by_person` that do not run through the person's hand: a `claude` started in an **Open shell here** pane, and a caller-less request under `observe` / `off`. With this widening they reach any member, not only the person's other sessions.
+
+**Done when** §4.10 names the widened edge, the `[person-session]` tag and the briefs' sentence, the doc-bound tests pass, and the build entries are filed.
+
+**Related:** TD-1042, TD-1069 (the edge as built); TD-1117 (the person's holds from such a session), TD-1118 (where a lasting directive goes); TD-995 (the question-seat edge); TD-064, TD-102 (Claude Code's own peer messages, which stay forbidden; this is the sanctioned way).
+
+## TD-1117: A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/sessionorc/agent_common.py` (`person_only`), `src/sessionorc/mail.py` (`PERSON_ONLY`), `src/sessionorc/agent_ids.py` (`rpc_td_hold`, its `held.by`), `src/sessionorc/agent_inbox.py` (`rpc_ledger_decide`); design §4.4 *Hold* (TD-905), §4.8 (the person-only list and its list-versus-code test), §4.8a (`as_person`)
+
+**Why:** Paul's 2026-10-27 ask to have a designer hold a design or a grinder leave something alone runs into how mail lasts. Mail lives in the receiver's context, and an unattended member is restarted often. A restart keeps the mail, but as read entries, which `ao inbox --unread` (what a brief runs at start) does not print, and which are pruned 12 hours after reading. Invariant 13 already says what must outlive a session belongs in the ledger, the board or a PR. The lasting act exists: `ao td hold <id> --why` writes the hold on the home's settle clock and tells its holders itself. But it is the person's own act, so a session the person drives is refused it (*a person's own act, refused to every session but the person's own shell*).
+
+The reason it is the person's is that "a worker must never hold an entry of its own lane" (§4.4). A `by_person` session is never in a lane: it is not supervised and holds no seat.
+
+**Fix:** design first, then the build. `person_only` gains a `by_person` carve-out for `td_hold` (hold, release, drop notice) and `ledger_decide` (Done / Back to design) only, and `held.by` records the session's id. The refusal text names the carve-out, and §4.8's list-versus-code test gains the third class. These stay the person's own shell:
+- promote and clear;
+- settings, reach and definitions;
+- restart, relaunch, suspend and identity;
+- forgetting a host, adding a repo;
+- the Inbox's own bookkeeping (`inbox_*`, `attention_snooze`, `thread`), which is the person's attention.
+
+There is precedent for a carve-out inside a person-only call: `entry_add` passes a session for another repo than its own.
+
+**Done when** a `by_person` session's `ao td hold` and `ao td done` succeed and record its id, a team member's are refused as now, and §4.8's list and test name the carve-out.
+
+**Related:** TD-1116, TD-905, TD-801.
+
+## TD-1118: Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-1116, TD-1117
+**Location:** design §4.10 *An agreement between peers* and §9 invariant 13; `docs/briefs/README.md`; the team briefs' exclusion lines (e.g. `docs/briefs/grinder-ao-1.md`'s *Out of your reach: …*)
+
+**Why:** a Fable review of Paul's 2026-10-27 proposal found that the lasting places already exist:
+- **A team brief's line.** A change to a brief's files restarts an idle member within `BRIEF_SETTLE` (ten minutes) and asks a working one to restart at its next step (§6 rule 7). `grinder-ao-1.md` already carries one: *Out of your reach: TD-003 and TD-008 …*.
+- **A hold with `--why`**, which the hold's holders are told.
+- **The entry's Status or `Blocked by`.**
+- **The repo's `held:` paths**, for a softer "ask the techlead first".
+No document names them, so a session reaches for mail. A "keep out of `<path>`" sent as mail lasts until the receiver's next restart.
+
+**Fix:** one short table, in §4.10 beside invariant 13's sentence and in `docs/briefs/README.md`, of where a lasting directive goes:
+- a path to keep out of → a line in the team's brief (by PR; rule 7 restarts the members);
+- an entry to wait or stop → a hold with `--why` (TD-1117 lets a person's session do it);
+- a condition on an entry → its Status or `Blocked by`;
+- a path to cross only with a read → `held:`.
+Mail tells the member now. The table's entry is what lasts.
+
+**Done when** both places carry the table and the doc-bound tests pass.
+
+**Related:** TD-1116, TD-1117.
+
+## TD-1119: The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
+**Owner:** designer
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/` (every section), `docs/design.md`, `docs/glossary.md`, `docs/briefs/` (`grinder-ao-*.md`, `manager-ao-1.md`, `designer-ao-1.md`, `techlead-context.md`, `README.md`), `src/shiftlead/briefs/` (the role briefs), `.shiftlead.yml` (the team definition and its comments), `AGENTS.md`, `README.md`, `docs/claude-memory/`, `src/shiftlead/ui/help.py` (the help text bound to §4.5a)
+
+**Why:** Paul, 2026-10-27: "It looks like our docs are out of date … we are still talking about lane (grinders just grab the next item now) and manager (seat removed)." On main that day, *lane* appears as a word on 338 lines in 29 files and *manager* on 456 lines in 35 files (`git grep -iw`) across `docs/design`, `docs/briefs` and `src/shiftlead/briefs`. `.shiftlead.yml` still defines `manager-ao-1`, and `ao status` shows it closed. Both the session's and a Fable review's advice that day leaned on these words, so stale docs mislead the agents that read them, as well as people.
+
+The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent PRs left. It does not sweep the whole tree against what runs.
+
+**Fix:**
+1. **List what runs.** For each word and mechanism the docs lean on (lane, manager seat, seats, flows, sync versus pin, CI versus precheck, `scripts/` versus `dev-cadence run`), write down what the code and `.shiftlead.yml` do now, citing the code.
+2. **Sweep in that order, by PR per area:**
+   - the design (the source of truth), its stale passages rewritten in the present tense, with a dated line in `docs/design-history.md` for each change of behaviour the design missed;
+   - then the glossary and `AGENTS.md`;
+   - then the briefs, whose changes restart members (rule 7, so batch them);
+   - then README and the memories.
+3. **File, don't fix,** where the code is the stale side: an entry per mismatch.
+4. The help text bound to §4.5a moves with the design rows (a design PR leaves `help.py` wording to the build).
+
+**Done when** a grep for each listed word finds only uses that match what runs, the doc-bound tests pass, and the code-side mismatches are filed.
+
+**Related:** the docs-audit seat (`docs/briefs/docs-audit.md`); dev-cadence#TD-129 (the pin, which retired `scripts/` and the sync the docs still name); TD-1116 (the briefs' sentence it adds).
