@@ -54,7 +54,7 @@ TREE_TIMEOUT = 330.0  # one resolve: the launcher's first clone or fetch of a so
 GATE_SCRIPT = "check_cadence.py"  # the gate, as the pinned tree's `files/scripts/` holds it
 # the copy's paths, while a repo still has a lock (a brief's layout slots, §5 *The seams*); dev-cadence's own
 # source holds each under `files/`, and a pinned tree's `files/` holds each by the same relative path
-COPY_GATE = f"scripts/{GATE_SCRIPT}"
+COPY_GATE = SCRIPT
 COPY_LEDGER = "scripts/ledger.py"
 COPY_RULES = "docs/cadence.md"
 PINNED_GATE = f"dev-cadence run {GATE_SCRIPT} --pr {{pr}} --json"

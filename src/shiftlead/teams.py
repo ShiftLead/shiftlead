@@ -274,6 +274,17 @@ Spec = orgmod.MemberDef | orgmod.ManagerDef | orgmod.TechleadDef | orgmod.SeatDe
 Files = Callable[[str, str, list[str]], dict[str, "str | None"]]
 
 
+def node_venv(host: str, here: str) -> str | None:
+    """The venv a brief composed for a session on `host` names the resolver's command in (§5 *The layout
+    slots*, TD-1014): a container node's own, `containers.INSIDE_VENV`, since it shares the checkout's path
+    but not the home's Python or launcher; None on this host or a machine node."""
+    if host == here:
+        return None
+    from sessionorc import containers  # docker's module, loaded only when a node is in play
+
+    return containers.INSIDE_VENV if host in containers.container_nodes() else None
+
+
 def reader_on(files: Files, host: str, checkout: Path) -> repoconfig.Reader:
     """A `repoconfig.Reader` for a checkout on another host: only its own files, by their path
     relative to it — a brief outside the checkout is not read across the link at all."""
@@ -836,11 +847,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     checkout, read = _checkout(org, team, home, host, here, files, where)
     try:
         cfg = repoconfig.load(checkout, read=read)
-        if host != here:
-            from sessionorc import containers  # docker's module, loaded only when a node is in play
-
-            if host in containers.container_nodes():  # its briefs name the node's own launcher (§5, TD-1014)
-                cfg.venv = containers.INSIDE_VENV
+        cfg.venv = node_venv(host, here)
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
     except (KeyError, ValueError, OSError) as e:
         raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None

@@ -165,6 +165,30 @@ def test_start_on_another_host_carries_that_hosts_brief_and_ledger(form):
 
 
 @pytest.mark.unit
+def test_start_on_a_container_node_names_the_nodes_own_launcher(form, monkeypatch):
+    """TD-1014 (5), design §5 *The layout slots*: a pinned repo's `{gate}` in a brief started from the form
+    on a container node names the node venv's `bin/dev-cadence`, not the home's Python and launcher; on a
+    machine node the home's command stands, as before."""
+    from sessionorc import cadence, containers
+
+    c, calls = form
+    monkeypatch.setitem(NODE_FILES, "docs/cadence.toml", '[dev-cadence]\nsource = "x"\nref = "y"\n')
+    monkeypatch.setitem(NODE_FILES, "docs/scout.md", "Gate: {gate}.\n")
+    monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": object()})
+    node = f"{containers.INSIDE_VENV}/bin/dev-cadence run check_cadence.py --pr <n>"
+    for host, words in (("cm", node), ("node1", f"{cadence.typed('run', 'check_cadence.py')} --pr <n>")):
+        calls.clear()
+        r = c.post(
+            "/new",
+            data={"name": "w1", "dir": "/srv/node/alpha", "role": "hunter", "host": host},
+            follow_redirects=False,
+        )
+        assert r.status_code == 303, r.text
+        prompt = next(p for m, p in calls if m == "create")["prompt"]
+        assert f"Gate: {words}." in prompt, (host, prompt)
+
+
+@pytest.mark.unit
 def test_a_brief_outside_the_checkout_on_another_host_stops_start(form):
     c, calls = form
     r = c.post(
