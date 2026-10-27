@@ -11,10 +11,10 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 from datetime import UTC, datetime
 
 import pytest
+from conftest import scratch_dir
 from fastapi.testclient import TestClient
 
 from sessionorc.client import AgentError
@@ -251,7 +251,7 @@ def test_a_moves_neighbours_are_the_whole_orders():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "rank_probe.js"
+    probe = scratch_dir() / "rank_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(JS)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

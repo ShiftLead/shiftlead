@@ -9,10 +9,10 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 from typing import Any
 
 import pytest
+from conftest import scratch_dir
 from test_rank import NOW, _cards, _entry, _repo, _ups
 
 from sessionorc import rank
@@ -132,7 +132,7 @@ def test_a_repo_page_move_in_the_browser_names_the_neighbours_the_home_takes():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "rank_scoped_probe.js"
+    probe = scratch_dir() / "rank_scoped_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(JS)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

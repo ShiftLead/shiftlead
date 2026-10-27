@@ -9,9 +9,9 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 
 JS = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js"
 
@@ -62,7 +62,7 @@ def test_a_node_already_in_place_is_not_moved():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "order_probe.js"
+    probe = scratch_dir() / "order_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(JS)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

@@ -7,9 +7,9 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 
 JS = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js"
 
@@ -52,7 +52,7 @@ def test_a_saved_size_reaches_an_open_terminal_and_refits_it():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "look_probe.js"
+    probe = scratch_dir() / "look_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(JS)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

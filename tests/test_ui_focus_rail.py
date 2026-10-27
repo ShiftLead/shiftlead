@@ -10,9 +10,9 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 from test_ui import client  # noqa: F401 — the fixture, by name
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
@@ -46,7 +46,7 @@ def _probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rail's glyphs are JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "rail_probe.js"
+    probe = scratch_dir() / "rail_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
@@ -167,7 +167,7 @@ def test_put_away_bring_back_and_a_glyph_press_and_the_choice_survives_a_reload(
         r'<script>(try \{ if \(JSON\.parse\(localStorage\.getItem\("ao\.focus\.side"\).*?)</script>', html
     )
     assert inline, "the template's before-first-paint script"
-    probe = pathlib.Path(tempfile.mkdtemp()) / "rail_press.js"
+    probe = scratch_dir() / "rail_press.js"
     probe.write_text(PRESS)
     run = [node, str(probe), str(UI / "static" / "app.js"), inline.group(1)]
     out = subprocess.run(run, capture_output=True, text=True, timeout=30)

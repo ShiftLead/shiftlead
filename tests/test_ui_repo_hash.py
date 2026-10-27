@@ -7,9 +7,9 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 JS = UI / "static" / "app.js"
@@ -39,7 +39,7 @@ def test_the_hash_names_an_id_or_nothing():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "hash_probe.js"
+    probe = scratch_dir() / "hash_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(JS)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

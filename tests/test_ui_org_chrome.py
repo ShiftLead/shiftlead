@@ -9,9 +9,9 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 from test_ui import client  # noqa: F401 — the fixture, by name
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
@@ -57,7 +57,7 @@ def _run(filters: list[str], toggles: list[list[str]]) -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the Org's filter is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "org_filter_probe.js"
+    probe = scratch_dir() / "org_filter_probe.js"
     probe.write_text(PROBE)
     run = [node, str(probe), str(UI / "static" / "app.js"), json.dumps(CARDS), json.dumps(filters), json.dumps(toggles)]
     out = subprocess.run(run, capture_output=True, text=True, timeout=30)

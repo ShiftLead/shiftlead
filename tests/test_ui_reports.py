@@ -8,9 +8,9 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 from fastapi.testclient import TestClient
 
 UI = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
@@ -55,7 +55,7 @@ def test_a_claim_with_a_pr_is_in_review_and_one_without_is_in_progress():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the panel's rule is JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "groups_probe.js"
+    probe = scratch_dir() / "groups_probe.js"
     probe.write_text(GROUPS_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr

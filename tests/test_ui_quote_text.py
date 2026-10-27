@@ -6,7 +6,6 @@ import json
 import pathlib
 import shutil
 import subprocess
-import tempfile
 
 import pytest
 
@@ -42,14 +41,13 @@ CASES = {
 
 
 @pytest.mark.unit
-def test_the_quote_drops_the_inline_marks_and_nothing_else():
+def test_the_quote_drops_the_inline_marks_and_nothing_else(tmp_path):
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
-        f.write(PROBE)
-    out = subprocess.run([node, f.name, str(JS), *CASES], capture_output=True, text=True, timeout=30)
-    pathlib.Path(f.name).unlink()
+    probe = tmp_path / "quote_probe.js"
+    probe.write_text(PROBE)
+    out = subprocess.run([node, str(probe), str(JS), *CASES], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout) == list(CASES.values())
     assert "const q = AO.quoteText(o.quote);" in JS.read_text()  # the composer draws the quote through it

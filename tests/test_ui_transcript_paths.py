@@ -13,9 +13,9 @@ import pathlib
 import re
 import shutil
 import subprocess
-import tempfile
 
 import pytest
+from conftest import scratch_dir
 from test_ui_transcript import page  # noqa: F401 — the fixture
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
@@ -113,7 +113,7 @@ def _probe() -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the page's paths are JavaScript, and nothing else runs it")
-    probe = pathlib.Path(tempfile.mkdtemp()) / "transcript_paths_probe.js"
+    probe = scratch_dir() / "transcript_paths_probe.js"
     probe.write_text(PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
