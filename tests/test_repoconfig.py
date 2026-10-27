@@ -34,6 +34,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
         "manager",
         "techlead",
         "auditor",
+        "sweeper",
         "designer",
         "plain",
     ]
@@ -93,6 +94,7 @@ commands:
         "manager",
         "techlead",
         "auditor",
+        "sweeper",
         "designer",
         "plain",
         "reviewer",
@@ -426,6 +428,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
         "manager": "Manager",
         "techlead": "Tech Lead",
         "auditor": "Auditor",
+        "sweeper": "Sweeper",
         "designer": "Designer",
         "plain": "Plain",
     }
@@ -460,6 +463,7 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
         "manager": "flag",
         "techlead": "book",
         "auditor": "eye",
+        "sweeper": "shield",
         "designer": None,
         "plain": None,
     }
@@ -533,6 +537,7 @@ def test_a_role_says_when_to_message_it(tmp_path):
         "grinder": "its own card only: the entry it holds, a finding on its PR",
         "hunter": "an area to look at; it files, never fixes",
         "auditor": "what its trigger counts: the last n PRs, the period",
+        "sweeper": "the board's open items: one it should verify, close or ledger",
     }
     for name, line in want.items():
         assert repoconfig.resolve_role(cfg, name).message == line
