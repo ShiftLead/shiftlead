@@ -188,7 +188,11 @@ def _board(agent, tmp_path, swept, error: str | None = None) -> None:
     b = {"label": tmp_path.name, "root": str(tmp_path), "items": []}
     if swept != "absent":
         b["swept"] = swept
-    reading = {"boards": [b], **({"error": error} if error else {})}
+    # another repo's board ahead of the seat's, its stamp the opposite cause (TD-1109): the seat reads its own
+    mine_due = isinstance(swept, dict) and (not swept.get("at") or swept["at"] <= _ago(7))
+    other = {"label": "other", "root": str(tmp_path / "other"), "items": []}
+    other["swept"] = {"at": _ago(0) if mine_due else _ago(30), "deep_at": None}
+    reading = {"boards": [other, b], **({"error": error} if error else {})}
     agent._repos[str(tmp_path)] = {"boards": reading}
 
 
@@ -323,11 +327,14 @@ def test_a_sweep_seats_card_says_how_long_ago_its_repo_was_swept(tmp_path):
         board = {"root": str(tmp_path), "label": "x", "items": []}
         if swept != "-":
             board["swept"] = swept
-        repos = {str(tmp_path): {"boards": {"boards": [board], **reading}}}
+        # another repo's board ahead of the seat's, with a stamp of its own (TD-1109): never the one printed
+        other = {"root": str(tmp_path / "other"), "label": "y", "items": [], "swept": {"at": _ago(5), "deep_at": None}}
+        repos = {str(tmp_path): {"boards": {"boards": [other, board], **reading}}}
         return view(rec, seats=seats, repos=repos)["slot"]["text"]
 
     assert words({"at": _ago(3), "deep_at": None}) == "on call — sweeps when unswept 7 d · swept 3 d ago"
     assert words({"at": _ago(0), "deep_at": None}) == "on call — sweeps when unswept 7 d · swept today"
+    assert words({"at": _ago(-3), "deep_at": None}) == "on call — sweeps when unswept 7 d · swept today"  # ahead
     assert words({"at": None, "deep_at": None}) == "on call — sweeps when unswept 7 d · never swept"
     # no board on origin, no `swept` yet, or an unreadable board: nothing guessed
     for swept, reading in ((None, {}), ("-", {}), ({"at": _ago(3)}, {"error": "boom"})):
