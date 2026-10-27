@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
-from conftest import park_ticks
+from conftest import park_ticks, wait_for_sync
 
 from sessionorc import adapters, agent_common, identity, reports, work
 from sessionorc.agent import IDLE_NUDGE, SEAT_IDLE_GRACE, SHELL_WAIT
@@ -88,6 +88,9 @@ def test_the_linux_reader_reads_children_and_argv_and_falls_back_to_ppid(monkeyp
     child = subprocess.Popen(["sleep", "30"])
     try:
         assert child.pid in proc.children(os.getpid())
+        # TD-1097: `Popen` returns once exec closed its error pipe, before the new image's argv is set,
+        # so for a moment the argv reads empty; the reader is right to say so, and the test waits on it
+        assert wait_for_sync(lambda: proc.cmdline(child.pid)), "the child's argv never read"
         assert proc.cmdline(child.pid) == ["sleep", "30"]
         real = builtins.open
 

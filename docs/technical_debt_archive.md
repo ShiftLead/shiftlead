@@ -20584,6 +20584,26 @@ It files each as a build entry, or as live checks where the design already holds
 
 **Resolved:** 2026-10-27 (grinder-ao-1) — the fixture's tick loop takes the same sweep (`agent_tick.py`, `_prune_runs` with its own records' ids), where the test's `ao-live-1` is no live session, so a loaded run's first tick, landing between the test's writes and its asserts, took the live draft. A probe (a tick taken by hand with `_pruned_at` reset, the test's live draft in place) removes it. The test now parks the ticks first (`park_ticks`, as TD-1065's and TD-768's do): 20 runs of the case under `-n auto` beside a full `-n auto` suite, 0 failures. The sweep itself is right: it reads the tick's own live records.
 
+## TD-1097: `LinuxProc.cmdline` read straight after `Popen` returns can be empty: the linux-reader test fails under load
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met on TD-1095's full run)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_background_shells.py` (`test_the_linux_reader_reads_children_and_argv_and_falls_back_to_ppid`, its `proc.cmdline(child.pid) == ["sleep", "30"]` straight after `subprocess.Popen`); `src/sessionorc/identity.py` (`LinuxProc.cmdline`)
+
+**Why:** on TD-1095's full `pdm run test` (2026-10-26), this test failed with `assert [] == ['sleep', '30']`, and it passed alone. `Popen` returns once the child's exec has closed its close-on-exec error pipe. In the kernel the close-on-exec files are closed (`begin_new_exec`) before the new image's argument pages are set up, so for a moment `/proc/<pid>/cmdline` reads empty. Under load that moment is long enough for the test to read it.
+
+**Fix:** have the test wait, bounded, for the child's cmdline to read non-empty before asserting it (`wait_for` on `proc.cmdline(child.pid)`). The reader is right to say `[]` for a process with no argv yet. Check whether any caller of `cmdline` in the code reads a process it has just started; if one does, it takes the same wait.
+
+**Done when:** the test waits on the argv itself; `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1050, TD-1087 (the same family: a test that reads before the event it waits on).
+
+**Resolved:** 2026-10-27 (grinder-ao-1) — `test_the_linux_reader_reads_children_and_argv_and_falls_back_to_ppid` waits, bounded (`wait_for_sync`), for the child's argv to read non-empty before it asserts `["sleep", "30"]`; `LinuxProc.cmdline` is unchanged. No caller in the code reads a process it has just started: the two (`claude_code` and `gemini` adapters' `background`) read a tool's own shell children and the command each runs; a command started a moment before can read `[]`, which blanks its `cmd` for that one poll (`or []`, and the shell's argv check skips it) and reads right on the next, so they take no wait.
+
 ## TD-1060: `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit)
 
 **Priority:** Low
