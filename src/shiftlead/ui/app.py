@@ -2141,7 +2141,9 @@ async def config_on(call: Any, host: str, directory: str) -> repoconfig.RepoConf
         return cfg
     read = teams.reader_on(files_on(call, asyncio.get_running_loop()), host, Path(root))
     try:
-        return await asyncio.to_thread(repoconfig.load, root, read=read)
+        cfg = await asyncio.to_thread(repoconfig.load, root, read=read)
+        cfg.venv = teams.node_venv(host, host_name())  # a container node's briefs name its own launcher (TD-1014)
+        return cfg
     except OSError as e:  # the host stopped answering between the two reads
         raise HostSilent(str(e)) from None
 
