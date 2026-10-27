@@ -58,3 +58,6 @@
 - [Walk an unregistered adapter](walk-an-unregistered-adapter.md) — conformance walk on an adapter with no entry point (Gemini before TD-785): a scratch `*.dist-info` on `PYTHONPATH`, nothing installed
 - [Wait for CI with gh pr checks --watch](wait-for-ci-with-gh-pr-checks-watch.md) — kmaster's gh has no `--json` on `pr checks`; a loop on it spins forever; `--watch` in the background, then the cadence check (until TD-940)
 - [Prefer standard practice before custom design](prefer-standard-practice-before-custom-design.md) — find the tool's own check (git branch -d, worktree remove, reflog fork-point) before inventing one; TD-978 rounds 8–11 reinvented git cherry (2026-10-23)
+- [`!` commands run as this session](bang-commands-run-as-this-session.md) — person-only acts (`ao promote`, `clear`) are refused from a `!` line; `ao service install` there needs `XDG_RUNTIME_DIR`
+- [Shiftlead is pinned: run dev-cadence's scripts](shiftlead-is-pinned-run-dev-cadence-scripts.md) — since #2391 no `scripts/ledger.py`/`check_cadence.py`/`precheck.py`; `dev-cadence run <script>`
+- [Precheck and merge in one command](precheck-and-merge-in-one-command.md) — ~12 min precheck, main moves the ledger under it; precheck, gate and merge as one background command
