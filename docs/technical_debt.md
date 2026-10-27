@@ -104,7 +104,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1065 | `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it | Low | Open — build |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1067 | `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading | Low | Open — build |
-| TD-1074 | `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit) | Medium | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
 | TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Built in #2431 — live check |
 | TD-1080 | The stop, start, status and acting-gate words: unread mail on a finished member, the start's cure, a person's row, and the `!` escape | Low | Open — build |
@@ -2224,24 +2223,6 @@ It then names the build entries.
 **Fix:** register the test's root (or stop the tick for the test) before setting the reading, and take the expected value before the call.
 
 **Done when:** a repos pass forced between the set and the call leaves the test passing. `pdm run test` and `pdm run lint` pass.
-
-## TD-1074: `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/promote.py` (`survey`: `if full or first:  # the checks were read this pass (TD-1038)` before `precheck_on_main`), `tests/test_precheck_on_main.py`, `tests/test_promote.py`
-
-**Why:** #2407 (TD-1038) put `precheck_on_main` behind the pass that read the checks, and its docstring says so ("on a pass that read the checks"). A pass that is neither `full` nor the repo's first copies the previous reading (`r: dict[str, Any] = {k: v for k, v in old.items() if ...}`) and reads no checks. Probed on `origin/main`: replacing `if full or first:` with `if True:` on that line leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_promote.py tests/test_precheck_on_main.py` at 102 passed. Run on a cheap pass, `precheck_on_main` resets `prechecking` to None and acts on the carried `precheck` and `checks`, so the *prechecking* row would drop out between full passes and a stale `absent` could start a run; no test has such a pass (`survey(..., full=False)` with a previous reading).
-
-**Fix:** add a `survey` test with a previous reading that has `prechecking` set, `full=False`, and a fake `precheck_script` that records its starts; assert the second pass keeps `prechecking`, starts nothing, and calls `precheck_on_main` not at all (monkeypatch it to fail).
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1038.
 
 ## TD-1075: The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit)
 
