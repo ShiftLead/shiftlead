@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
-| TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | In progress (slice 1 #2409); left: drop the stopgaps (samscrape#1121, shiftlead#2391) |
 | TD-1046 | A pinned repo's convention note carries each entry's body, and rule 12 reads a pinned root and dev-cadence's source under their own bounds | Low | Open — build |
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
 | TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
@@ -111,6 +110,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1079 | The home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, never *rung* | Medium | Open — build |
 | TD-1080 | The stop, start, status and acting-gate words: unread mail on a finished member, the start's cure, a person's row, and the `!` escape | Low | Open — build |
 | TD-1087 | Four tests fail only when the suite runs across workers (`-n auto`), and pass alone | Low | Open |
+| TD-1088 | `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading | Low | Open — build |
 
 ---
 
@@ -1946,24 +1946,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1031, TD-1032, TD-804.
 
-## TD-1044: A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (Paul, during dev-cadence TD-129's rollout; drafted by session `memory-vs-cadence`)
-**Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1 (#2409, grinder-ao-1, 2026-10-26): the default setup and the reaper's hydrate run the pinned tree's `hydrate_worktree.sh` (`gitinfo.hydrate_command`). Left: once #2409 is live (`ao promote status`), drop this repo's stopgap `worktree_setup` line (#2391) and ask samscrape to drop its own (samscrape#1121). Found pinning samscrape (ContractMatch/samscrape#1115, merged 2026-10-26); stopgap: samscrape#1121 and this repo's pin PR (#2391) set `worktree_setup` to the pinned hydrate.
-**Location:** `src/sessionorc/gitinfo.py` (`HYDRATE = "scripts/hydrate_worktree.sh"`; `worktree_setup()`, which reads `absent` when the file is missing, and the create path that then skips setup; the reaper's `hydrate` lookup, about line 499); `src/shiftlead/repoconfig.py` (the key's parse; its comment, about line 664, states the default); `src/sessionorc/cadence.py` (`command(repo, word, *args)`, TD-1014's resolver); `src/shiftlead/team_skill.md` (`worktree_setup`, about line 210: unset, dev-cadence's `hydrate_worktree.sh` where the checkout holds it)
-
-**Why:** dev-cadence TD-129 pins a repo's dev-cadence instead of copying it, so a pinned repo has no `scripts/hydrate_worktree.sh`. The home's default `worktree_setup` is exactly that file, and a missing one reads as `absent`, so a worktree the home makes in a pinned repo gets no setup and says nothing: no `.claude/settings.local.json` (the worktree's `autoMemoryDirectory`, so its session's memories land outside the repo, the TD-080 failure), and no nested repos from `docs/nested-repos.txt`. pneuma-ops, ledgerboard and samscrape were pinned on 2026-10-26; samscrape has a team, so its worktrees were affected from that merge until the stopgap. The reaper reads the same path for its `--dehydrate`, so a pinned repo's nested worktrees would not be taken out through their own repos before removal. TD-1014's Done-when (*every reader above calls `cadence.command` and none builds a dev-cadence path in code itself*) should have caught `HYDRATE`, though its list of names (`check_cadence.py`, `cadence.md`, the lock) does not include `hydrate_worktree.sh` — add it there.
-
-**Fix:** where `cadence.pinned(repo)`, the default setup is `cadence.command(repo, "run", "hydrate_worktree.sh", <path>)` (the worktree its path argument), and the reaper's dehydrate the same with `--dehydrate`; a synced repo keeps today's path; a pin that does not resolve raises `WorktreeError` as a failed setup does today (`ensure_worktree`), never a silent skip. `team_skill.md` and design §5 *The seams* say it. Then drop the stopgap `worktree_setup` lines (samscrape, this repo). Tests: a pinned fixture repo's new worktree gets `settings.local.json`; an unresolvable pin warns.
-
-**Done when** a worktree the home makes in a pinned repo with no `worktree_setup` is hydrated, and the stopgaps are removed.
-
-**Related:** TD-1014 (the resolver), dev-cadence TD-129, TD-149; samscrape#1121.
-
 ## TD-1046: A pinned repo's convention note carries each entry's body, and rule 12 reads a pinned root and dev-cadence's source under their own bounds
 
 **Priority:** Low
@@ -2355,3 +2337,21 @@ A suite that fails under load for no fault of the change costs a 2-minute rerun 
 **Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row; then `pdm run test` may take `-n auto`.
 
 **Related:** TD-1068, TD-1050, TD-1065, TD-1067.
+
+## TD-1088: `test_the_sweep_reads_a_drafts_claim[7]` fails under a loaded precheck: a session's draft is pruned with no live reading
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met in #2424's third precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_entry_draft.py` (`test_the_sweep_reads_a_drafts_claim`, line 180); `src/sessionorc/agent.py` (`_prune_runs`, the draft sweep)
+
+**Why:** the precheck of #2424 at 9f54d33 (a change to `.shiftlead.yml` and ledger text alone) failed `test_the_sweep_reads_a_drafts_claim[7]`: after `_prune_runs(now, set())` — *no live reading: a session's draft is kept* — `assert live.exists()` read False for `home/attachments/draft-0000000e`. It passes alone (`pytest -k sweep_reads`, 2 passed). The same PR's two earlier prechecks each failed another known load flake (TD-1065's test, then `test_a_restart_is_written_afresh`, TD-1068), so three runs in a row read red for no fault of the PR's.
+
+**Fix:** find what the sweep reads that a loaded run changes (a clock, the claim file's mtime, a tick racing the call) and make the test hold it fixed; if the sweep itself can prune a live session's draft under load, that is the bug, fixed in the sweep.
+
+**Done when** the case passes 20 runs under a loaded suite (`-n auto`, or three prechecks at once), and `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1087 (four tests that fail only across workers, a draft sweep's among them), TD-1065, TD-1067, TD-1068 (the other load flakes); TD-630 (the draft).
