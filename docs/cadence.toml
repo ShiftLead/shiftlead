@@ -33,7 +33,12 @@
 # interpreter is pinned to the machine's python3 (3.13 on kmaster, the live copy's), since pdm
 # also holds a 3.12.9 of its own it may otherwise pick; the 3.12 floor is kept by ruff's
 # target-version and by ci.yml's matrix, run by hand. TERM is set for the pty bridge tests.
-precheck = "pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run lint && TERM=xterm-256color pdm run test"
+# The suite's temp files go to a directory of the run's own on disk, removed at its end (TD-1052):
+# /tmp on kmaster is a 16 GB tmpfs every session shares, and a precheck that met it full read red
+# for no fault of the PR's. The path stays short — /var/tmp/pc.XXXXXX, and pytest's --basetemp
+# under it in place of /tmp/pytest-of-<user>/pytest-<n> — since the suite's unix sockets live under
+# tmp_path and a socket's path is capped near 108 bytes (one under ~/.cache/aopre2 failed 38 tests).
+precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test --basetemp=$T/p"
 
 # --- opt-outs (cadence.md Adoption checklist step 9): what this repo does not adopt, each
 # naming the ADR that decided it. Read by sync.sh and sync.sh --verify; --verify reports each

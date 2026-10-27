@@ -91,13 +91,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
-| TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
+| TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Designed — builds TD-1069 |
 | TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | In progress (slice 1 #2409); left: drop the stopgaps (samscrape#1121, shiftlead#2391) |
 | TD-1046 | A pinned repo's convention note carries each entry's body, and rule 12 reads a pinned root and dev-cadence's source under their own bounds | Low | Open — build |
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
 | TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Open — design |
-| TD-1052 | Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own | Medium | Open |
 | TD-1055 | `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit) | Medium | Open — build |
 | TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
 | TD-1057 | `ship_cadence` gives the cache step the node's env file, and no test would notice if it did not (test audit) | Medium | Open — build |
@@ -106,8 +105,14 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
+| TD-1065 | `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it | Low | Open — build |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
+| TD-1067 | `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading | Low | Open — build |
 | TD-1068 | The test suite runs on one core, so every precheck takes 12 minutes and main moves under it | Medium | Open |
+| TD-1069 | The message gate's edge between the person's own sessions: two sessions the person started by hand mail each other in any kind, whatever their team or project | Medium | Open — build |
+| TD-1074 | `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit) | Medium | Open — build |
+| TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
+| TD-1076 | `_gh_prs` sets `prechecked` on each open PR row, `ao pr wait`'s *none* hangs on it, and no test runs `_gh_prs` (test audit) | High | Open — build |
 
 ---
 
@@ -1949,7 +1954,8 @@ Trimming before the rule arrives here loses it (§2.4).
 **Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-26 (design §4.10 *The message gate*, **between the person's own sessions**): a record the person started by hand (`by_person`, written at start), still interactive and holding no `seat`, may mail another in every kind (`note`, `ask`, `steer`, `reply`), whatever the team, project or `controllers` of either; a session a session, a team start, a Restart or the tick made is no end, a seat is never one, the person's own shell may send but is never mailed, every depth, pair and thread bound holds, nothing is copied to the person inbox, and the edge keys on `by_person`, `kind`, `unattended` and `seat`, so it is no part of §9 invariant 9's exception. TD-1069 builds it.
+**Blocked by:** TD-1069
 **Location:** `src/sessionorc/mail.py` (`message_edge`, the message gate); design §4.10 *The message gate is weaker than `control`* (the edges; "a `steer`, a `note`, or a `reply` on any other thread, between sessions of unrelated projects, is still refused: a proposal between them goes through the person"), §9 invariant 9
 
 **Why:** Paul, 2026-10-26: "The mail between sessions limitation is biting us frequently." That day ao-shiftlead-prompts (shiftlead) had to warn ao-dev-cadence-memory-vs-cadence (dev-cadence), which was pinning the roster repos, to hold contractmatch until TD-1014 slice 5 is live. `ao msg --kind note` and `--kind ask` were both refused (*not one of its controllers, its members, its team, its project …*), so Paul pasted the warning into the other session himself. Neither session has controllers: the person started both, and both are the person's own hands. The reasons for refusing peers across projects do not apply between them. Those reasons are that no unrelated team spends another's attention or acts through it (§9 invariants 5 and 11), and that a proposal between projects goes through the person. TD-995 / TD-1000 opened only an `ask` to a question seat, which an ad-hoc interactive session does not hold. TD-582 opened only the same-project edge, which also misses these two: their `project` badge is empty (TD-1043), and shiftlead and dev-cadence are two projects in `org.yml` anyway.
@@ -2073,22 +2079,6 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when** the design says how the waiting member gets the answer after its relaying seat closes, and how a finished member with unread mail is woken or counted as having work, and the build entries are filed. A doorbell that cannot be delivered is said as a failure, not *rung*.
 
 **Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
-
-## TD-1052: Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/cadence.toml` (`precheck`); `scripts/precheck.py` (synced: its worktree under `tempfile.mkdtemp`, so `/tmp`); the suite's `tmp_path` (`/tmp/pytest-of-kmaster`)
-
-**Why:** the first evening of the local precheck gate (TD-1035, #2389), `precheck.py --pr 2394` recorded *failure* on 2abed34: 4 failed, 2548 errors, nearly all `OSError: [Errno 28] No space left on device` under `/tmp` or pytest's *could not create numbered dir*. `/tmp` on kmaster is a 16 GB tmpfs (RAM); several sessions' prechecks were running at once (`/tmp/precheck-2397-…`, `-2398-…` beside it), each a fresh `.venv` plus the suite's temp homes, and minutes later `/tmp` was back to 49 %. Each session now runs the suite for every PR, so concurrency is the common case: a red status from a full disk says nothing about the code, costs a 12-minute rerun, and could be read as the PR's fault.
-
-**Fix:** pick one or both: the `precheck` command sets `TMPDIR` (and so pytest's base temp) to a disk-backed directory of its own, e.g. under `~/.cache/`, cleaned at its end; and/or a bound on prechecks running at once on the machine (a lock the command takes). Measure a precheck's peak `/tmp` use first. A `TMPDIR` must stay short: one under `~/.cache/aopre2` failed 38 link and container tests with *Connection refused*, their unix sockets' paths past the ~108-byte cap (read 2026-10-26 on #2394). `precheck.py` is dev-cadence's (SYNCED): a change there is `dev-cadence#` work, filed with `ao td add --repo dev-cadence`.
-
-**Done when:** three prechecks run at once on kmaster pass, `/tmp` staying well under full; `pdm run test` and `pdm run lint` pass.
 
 ## TD-1055: `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit)
 
@@ -2259,6 +2249,22 @@ It then names the build entries.
 
 **Related:** TD-998, TD-1004 (`ao` on a node's `PATH`); TD-293 (the New session form on another host); TD-299 (contractmatch on its node); TD-1051 (the `!` command's identity); TD-077 (archived: identity as a per-session secret, its option 1, and an agents-only node, its option E).
 
+## TD-1065: `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, met measuring TD-1052)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_doctor.py` (`test_hooks_read_each_live_agent_session_and_the_queue`, the `ao-d-scraped` events file it writes)
+
+**Why:** a full `pdm run test` on 2026-10-26 failed it once — `assert by["ao-d-scraped"]["last_hook"] is None` read `'2026-10-26T23:57:45Z'` — and it passed five times alone. The test writes `ao-d-scraped.jsonl` into a running agent's events directory, and the agent's own loop can read that file before `rpc_doctor` does and stamp `_last_hook`, so the *scraped, no hook* reading the test asserts depends on which runs first.
+
+**Fix:** make the read deterministic: hold the agent's event loop for the test, or write the queue's file where only `rpc_doctor` reads it, then assert as now.
+
+**Done when:** a forced event read before `rpc_doctor` leaves the test passing. `pdm run test` and `pdm run lint` pass.
+
 ## TD-1066: A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself
 
 **Priority:** Medium
@@ -2282,6 +2288,22 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
+
+## TD-1067: `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, met in TD-1052's three prechecks at once)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_ui_repos_omit.py` (`test_the_repos_rpc_serves_each_reading_without_what_omit_names`); `src/sessionorc/agent_tick.py` (the repos pass's `gone`, about line 3134)
+
+**Why:** one of three prechecks of #2411 run at once failed it: `KeyError: '/var/tmp/pc.oJj6Bl/p/test_the_repos_rpc_serves_each0'` on `agent._repos[root]`, read right after the test set it. The test puts a reading for `tmp_path` into `agent._repos`, which is no registered repo, and the running agent's repos pass pops every root not in `hosts.local_host().repos()`, so a tick between the set and the read drops it. Under load the window is wider; the other two runs and every single run passed.
+
+**Fix:** register the test's root (or stop the tick for the test) before setting the reading, and take the expected value before the call.
+
+**Done when:** a repos pass forced between the set and the call leaves the test passing. `pdm run test` and `pdm run lint` pass.
 
 ## TD-1068: The test suite runs on one core, so every precheck takes 12 minutes and main moves under it
 
@@ -2307,3 +2329,75 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Done when** five consecutive `-n auto` runs on main pass, the precheck's measured time is in this entry's Status, and `test_a_restart_is_written_afresh` passes 20 runs under `-n auto` or its cause is ledgered.
 
 **Related:** dev-cadence#TD-155 (a narrow precheck by path), TD-1050, TD-1052, TD-1035.
+
+## TD-1069: The message gate's edge between the person's own sessions: two sessions the person started by hand mail each other in any kind, whatever their team or project
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-26 (the designer, from TD-1042)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/models.py` (`Session.by_person`); `agent.py`'s `rpc_create` (where it is computed, for the person's starts and the tick's alike); `agent_remote.py` (the home's copy after a forwarded create: a setter of its own name, not the existing `_lift_by_person`, which lifts a suspension); `src/sessionorc/mail.py` (`message_edge`, `message_gate`'s refusal and docstring's edge count); `src/shiftlead/skill.md` (the `ao msg` line); `tests/test_mail.py`; design §4.7 (`ao msg`), §4.10 *The message gate is weaker than `control`* (**between the person's own sessions**), §9 invariant 9
+
+**Why:** TD-1042: the person's own sessions in two projects could not mail each other, so the person pasted one's warning into the other by hand. The design now has the edge.
+
+**Fix:** the record gains `by_person: bool | None = None` (`None`: written before the field), set once at start and never changed, computed inside `rpc_create`: `as_person(caller)` (the person, or the person's own shell; `caller=None`, an in-process call, is the person as `agent_remote` reads it), and not `supervised`, and no `seat` — both read as the record is written, not as the call passed them, so a scheduled record (`_schedule` writes it supervised) and a resume of a supervised record write false. `rpc_create` takes no `by_person` parameter (an RPC `create` carrying one has it dropped with a warning, as `agent_serve` drops any unknown param, so the record's value is the derivation's). The tick's restarts, fills and replays call `rpc_create` too and need no rule of their own: each is `supervised`, so each writes false. Every Restart writes false (only a supervised session restarts); a `--resume` follows the derivation, reading `supervised` as the resumed record carries it, so a resume of a supervised record writes false. On the forwarded path the home reads `supervised` and `seat` from the node's reply record (the `held` it already fetches after a forwarded create), not from what it sent, so a forwarded resume agrees with the node's own derivation. The home's setter runs for every forwarded `create`, whoever called (outside the `and person` test `_lift_by_person` sits under), so a session's or a supervised forwarded create writes an explicit `false`, and in the same synchronous block as `_take_records` takes the reply, so no gate read sees the record without it; a reply record with no `seat` falls back to the `seat` the home sent. On a node the home derives it (its tick's forwarded starts false) and sets it on its own copy once the forwarded create's reply lands, as `agent_remote.py` does for its other post-reply fields; it joins `HOME_OWNED` and is never a param of the forwarded create, so an older node is unaffected. A resolver (`own_session(record)` or a property) reads `None` as `kind: interactive`, `unattended: false`, not `supervised` and `controllers` empty; the gate and the pushed view (`_view`) read the resolved value. `message_edge` gains the edge `own`, tried after `shared target` and before the question seat: both records `by_person`, `kind: interactive`, `unattended: false`, `not record.seat`, whatever their `team`, `project`, `role`, `controllers` or state, any message kind, an `ask` carrying no `pr` or `cites` (`carries`). A target with no agent is refused before the gate, as today; the person's own shell as sender passes. `message_gate`'s refusal adds *nor between two sessions the person started by hand*, its docstring counts seven edges, and `message_edge`'s docstring lists `own`. `ao --skill`'s `ao msg` line names the edge (*… or, between two sessions the person started by hand, any kind*). Nothing else changes: `from_role` says `other`, `read_when` keeps a person's session's row, and nothing is copied to the person inbox.
+
+**Done when:** tests hold that two `by_person` interactive records of different teams and projects pass the gate in each of `note`, `ask`, `steer` and `reply` as `own`, one of them with its team's manager in `controllers`, one of them exited, and the person's own shell as sender; that it is refused when either end is not `by_person` (a session a worker started without `--unattended`, a shell a worker made, a watched lead `ao team start` made), is `unattended`, or holds a `seat` of any trigger; that an `ask` carrying `pr` or `cites` does not pass it; that a record with `by_person` absent reads it from `controllers` being empty, while an explicit `false` with empty `controllers` stays false, and an absent one on a `supervised` record with empty `controllers` (a lead `ao team start` made before the field) is no end; that an RPC `create` carrying `by_person: true` from a session gets the derived value, the param dropped; that the person's resume of a supervised record writes false; that **Open shell here** on a team member (a team badge, empty `controllers`) gives an end, a shell a session started does not, a person's `ao mode unattended` after start ends it, and an `ao at` start is excluded by `unattended`; that each start path writes the field as the Fix says (`ao new` by the person true, from the person's own shell true, with `--supervised` false, `ao team start` false, a Restart, a tick fill or a replay false whatever the launch record held, a session caller false, a node's record as the home derived it, set on the home's copy after the reply — the test expects the home's value, not the node's — and a session's forwarded create writing `false` there); that a node's report landing before the create's reply leaves the field absent until the reply's setter runs, the resolver covering the gap; that a node's record (`id@host`) reads the same; that `PAIR_BOUND` and `MAILBOX_DEPTH` (`agent_mail._check_bounds`) still refuse a `msg` on it, exercised through the `msg` RPC; and the skill's line, the refusal and §4.7's sentence say so.
+
+**Related:** TD-1042 (the design); TD-582, TD-995 (the edges before it); TD-1043 (the empty `project` badge).
+
+## TD-1074: `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/promote.py` (`survey`: `if full or first:  # the checks were read this pass (TD-1038)` before `precheck_on_main`), `tests/test_precheck_on_main.py`, `tests/test_promote.py`
+
+**Why:** #2407 (TD-1038) put `precheck_on_main` behind the pass that read the checks, and its docstring says so ("on a pass that read the checks"). A pass that is neither `full` nor the repo's first copies the previous reading (`r: dict[str, Any] = {k: v for k, v in old.items() if ...}`) and reads no checks. Probed on `origin/main`: replacing `if full or first:` with `if True:` on that line leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_promote.py tests/test_precheck_on_main.py` at 102 passed. Run on a cheap pass, `precheck_on_main` resets `prechecking` to None and acts on the carried `precheck` and `checks`, so the *prechecking* row would drop out between full passes and a stale `absent` could start a run; no test has such a pass (`survey(..., full=False)` with a previous reading).
+
+**Fix:** add a `survey` test with a previous reading that has `prechecking` set, `full=False`, and a fake `precheck_script` that records its starts; assert the second pass keeps `prechecking`, starts nothing, and calls `precheck_on_main` not at all (monkeypatch it to fail).
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1038.
+
+## TD-1075: The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/gitinfo.py` (`_run`: `{**(os.environ if env is None else env), "LC_ALL": "C"}`; `_hydrate`), `tests/test_worktree_reap.py::test_a_pinned_repos_reap_runs_the_pinned_trees_hydrate`
+
+**Why:** #2409 (TD-1044) made `_run` take the environment `cadence.command` returns, which for a pinned repo carries the pin's variables (`CADENCE_REPO_ROOT`, as `test_a_pinned_repos_new_worktree_is_hydrated_by_the_pinned_tree` stubs it). The create path is tested for it (the stub launcher writes `$CADENCE_REPO_ROOT`); the reap path is not: the stub is `lambda r, word, *a: ([str(stub), word, *a], dict(os.environ))`, and the stub script echoes `"$@"` only. Probed on `origin/main`: replacing `{**(os.environ if env is None else env), "LC_ALL": "C"}` with `{**os.environ, "LC_ALL": "C"}` leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gitinfo.py tests/test_worktree_reap.py` at 38 passed. A reaper whose `--check` and `--dehydrate` lose the resolver's environment would pass.
+
+**Fix:** have the reap test's resolver stub return `{**os.environ, "CADENCE_REPO_ROOT": str(r)}` and its stub launcher log `$CADENCE_REPO_ROOT` with the arguments; assert it on the `--check` and `--dehydrate` calls.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1044.
+
+## TD-1076: `_gh_prs` sets `prechecked` on each open PR row, `ao pr wait`'s *none* hangs on it, and no test runs `_gh_prs` (test audit)
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/sessionorc/reports.py` (`_gh_prs`: `row["prechecked"] = prechecked(p.get("statusCheckRollup"))`), `src/sessionorc/agent.py` (`rpc_pr_wait`: `got.get("prechecked") is False`), `tests/test_pr_wait.py`
+
+**Why:** #2405 (TD-1036) makes `ao pr wait` answer *none*, with the line to run, for a green head that carries no `cadence/precheck`. `rpc_pr_wait` reads that from the row's `prechecked`, and only `_gh_prs` sets it. `test_where_the_repo_sets_precheck_a_head_without_it_stays_none_with_its_line` builds rows by hand (`{**_row(checks="green"), "prechecked": False}`), a shape the home's own read must write; `grep -rn _gh_prs tests` finds one line, which fails if it is called. Probed on `origin/main`: replacing that `_gh_prs` line with `pass` leaves every test in the files that mention `OPEN_PR_FIELDS`, `pr_reading`, `failing_items` or `prechecked` passing (148 passed). Without the line the row has no `prechecked`, `got.get("prechecked") is False` never holds, and a head with no precheck reads *green* to `ao pr wait` again, which is what the entry was filed to stop.
+
+**Fix:** a test that runs `_gh_prs` (or `pr_reading`) over a faked `gh pr list` JSON with one head carrying a `cadence/precheck` status and one not, and asserts `prechecked` True and False on the rows.
+
+**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
+
+**Related:** TD-1036.

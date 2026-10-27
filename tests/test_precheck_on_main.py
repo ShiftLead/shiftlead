@@ -210,6 +210,9 @@ def test_a_run_past_the_bound_is_killed_by_group_and_its_worktree_removed(checko
     promote.precheck_on_main(root, "r", _reading(main=sha), NOW)
     f = promote.precheck_run("r")
     assert _ran(fake) == [sha]
+    started = time.monotonic() + 5  # the child has said its pid before the bound's pass kills (TD-1052: a race)
+    while not (tmp_path / "child").is_file() and time.monotonic() < started:
+        time.sleep(0.02)
     later = datetime.now(UTC) + timedelta(seconds=promote.PRECHECK_BOUND + 1)
     r = _reading(main=sha)
     promote.precheck_on_main(root, "r", r, later)

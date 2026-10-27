@@ -242,6 +242,12 @@ not mix:
 - **unattended / interactive** — whether policies (run window, usage gate, stall) may act on a
   session. An interactive session is never acted on by another session (invariant 5). —
   *proposed*.
+- **the person's own session** — a session the person started by hand (`by_person: true`: `ao new`
+  or `ao shell` outside any pane or in the person's own shell, the New session form, Add entry's
+  **Open a session**, **Open shell here**, **+ New ▾ Shell**; never a supervised start or a Restart), still interactive and holding no seat, whoever leads it now. Two such sessions may mail each
+  other in any kind, whatever their team or project (design §4.10, TD-1042). *Not:* a session a session
+  or a team start made, even an interactive one; the person's own shell (§4.8) is one, which may send
+  on that edge but is never mailed. — *design 2026-10-26, TD-1042*.
 - **supervised** — a session someone chose to keep running: `ao team start` marks every member and seat, `ao new --supervised` marks one by hand, and §6's *Keeping a team running* restarts, fills and nudges only sessions so marked (and `unattended`). A person's session is never supervised. — *design 2026-09-22, TD-103*.
 - **early** — of a wanted restart: declared inside `RESTART_EARLY` of the run's start with nothing new reported `done` (design §4.9a *Inside the ceiling*, TD-245; before TD-249 lands, the thirty minutes alone), or repeating what its last run reported or claimed and left (`repeat`): nobody acts on it, the person does. A short run with new merged work is not early. — *proposed* 2026-09-30.
 - **restart** (a person's) — the press that puts a supervised member back into its team's run: closed if still there, replayed from its launch record unattended, its restart marks and count cleared (design §6 rule 2 *A person's restart*, TD-246). *Not:* Resume, which brings a session back attended under the person. — *proposed* 2026-09-30.
