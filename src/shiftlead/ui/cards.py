@@ -183,7 +183,7 @@ def swept_words(s: Mapping[str, Any], repos: Mapping[str, Any] | None) -> str:
         (
             b.get("swept")
             for b in got.get("boards") or ()
-            if isinstance(b, dict) and str(Path(str(b.get("root") or "")).resolve()) == want
+            if isinstance(b, dict) and b.get("root") and str(Path(str(b["root"])).resolve()) == want
         ),
         None,
     )
