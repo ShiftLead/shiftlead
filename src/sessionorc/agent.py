@@ -1476,6 +1476,11 @@ class HostAgent(
                 first_prompt=spec.first_prompt or None,
                 model_file=model_env.get("AGENT_MODEL_FILE"),
             )
+            if self.mode != "node":
+                # started by hand (§4.10 *between the person's own sessions*, TD-1069): derived here and
+                # never passed — `supervised` and `seat` as the record is written, the caller as every
+                # caller is read. A node's is the home's, set on its copy from this create's reply.
+                s.by_person = mail.as_person(caller, self._graph()) and not s.supervised and not s.seat
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
                 kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
@@ -1562,6 +1567,7 @@ class HostAgent(
             previous_run=previous_run,
             host=self.host,
             supervised=True,  # it is started by the tick's replay, as any supervised record is restarted
+            by_person=None if self.mode == "node" else False,  # supervised: a team's (§4.10, TD-1069)
             seat=dict(given["seat"]) if given.get("seat") else None,
             review=given["reading"],
             context_bound=given["bound"],

@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1031 | A promote's smoke starts while its own run is still restarting the units, so shiftlead's smoke fails on a UI going down | Medium | Designed — builds TD-1041 |
 | TD-1034 | `td_next`'s tree-resolve timeout (the call's remaining budget) is untested: the pinned test passes with it dropped (test audit) | Low | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
-| TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Designed — builds TD-1069 |
 | TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | In progress (slice 1 #2409); left: drop the stopgaps (samscrape#1121, shiftlead#2391) |
 | TD-1046 | A pinned repo's convention note carries each entry's body, and rule 12 reads a pinned root and dev-cadence's source under their own bounds | Low | Open — build |
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
@@ -107,7 +106,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
 | TD-1067 | `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading | Low | Open — build |
 | TD-1068 | The test suite runs on one core, so every precheck takes 12 minutes and main moves under it | Medium | Open |
-| TD-1069 | The message gate's edge between the person's own sessions: two sessions the person started by hand mail each other in any kind, whatever their team or project | Medium | Open — build |
 | TD-1074 | `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit) | Medium | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
 | TD-1078 | A seat is filled by an answer to its own question, and the techlead relays what came of it to the member whose question it was | Medium | Open — build |
@@ -1947,32 +1945,6 @@ Trimming before the rule arrives here loses it (§2.4).
 
 **Related:** TD-1031, TD-1032, TD-804.
 
-## TD-1042: Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-26 (design §4.10 *The message gate*, **between the person's own sessions**): a record the person started by hand (`by_person`, written at start), still interactive and holding no `seat`, may mail another in every kind (`note`, `ask`, `steer`, `reply`), whatever the team, project or `controllers` of either; a session a session, a team start, a Restart or the tick made is no end, a seat is never one, the person's own shell may send but is never mailed, every depth, pair and thread bound holds, nothing is copied to the person inbox, and the edge keys on `by_person`, `kind`, `unattended` and `seat`, so it is no part of §9 invariant 9's exception. TD-1069 builds it.
-**Blocked by:** TD-1069
-**Location:** `src/sessionorc/mail.py` (`message_edge`, the message gate); design §4.10 *The message gate is weaker than `control`* (the edges; "a `steer`, a `note`, or a `reply` on any other thread, between sessions of unrelated projects, is still refused: a proposal between them goes through the person"), §9 invariant 9
-
-**Why:** Paul, 2026-10-26: "The mail between sessions limitation is biting us frequently." That day ao-shiftlead-prompts (shiftlead) had to warn ao-dev-cadence-memory-vs-cadence (dev-cadence), which was pinning the roster repos, to hold contractmatch until TD-1014 slice 5 is live. `ao msg --kind note` and `--kind ask` were both refused (*not one of its controllers, its members, its team, its project …*), so Paul pasted the warning into the other session himself. Neither session has controllers: the person started both, and both are the person's own hands. The reasons for refusing peers across projects do not apply between them. Those reasons are that no unrelated team spends another's attention or acts through it (§9 invariants 5 and 11), and that a proposal between projects goes through the person. TD-995 / TD-1000 opened only an `ask` to a question seat, which an ad-hoc interactive session does not hold. TD-582 opened only the same-project edge, which also misses these two: their `project` badge is empty (TD-1043), and shiftlead and dev-cadence are two projects in `org.yml` anyway.
-
-**Fix:** design first: an edge **between the person's own sessions**, meaning interactive (not `unattended`) records with no `controllers`, so the person is their only controller. They may send each other `note`, `ask` and `reply`, whatever their team or project. The round decides:
-- whether `steer` passes too;
-- whether a person-started session may also mail another team's members, or only the person's own;
-- how it reads on the Inbox, since the person sees both ends;
-- whether every depth, pair and thread bound still holds;
-- what the briefs and §4.10 say.
-
-Then file the build entries.
-
-**Done when** the design names the edge and its bounds, and the build entries are filed.
-
-**Related:** TD-1043 (the empty `project` badge); TD-582, TD-995, TD-1000 (the edges built so far); TD-064, TD-102 (Claude Code's own peer messages, which stay forbidden).
-
 ## TD-1044: A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes
 
 **Priority:** High
@@ -2294,24 +2266,6 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Done when** five consecutive `-n auto` runs on main pass, the precheck's measured time is in this entry's Status, and `test_a_restart_is_written_afresh` passes 20 runs under `-n auto` or its cause is ledgered.
 
 **Related:** dev-cadence#TD-155 (a narrow precheck by path), TD-1050, TD-1052, TD-1035.
-
-## TD-1069: The message gate's edge between the person's own sessions: two sessions the person started by hand mail each other in any kind, whatever their team or project
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-26 (the designer, from TD-1042)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/models.py` (`Session.by_person`); `agent.py`'s `rpc_create` (where it is computed, for the person's starts and the tick's alike); `agent_remote.py` (the home's copy after a forwarded create: a setter of its own name, not the existing `_lift_by_person`, which lifts a suspension); `src/sessionorc/mail.py` (`message_edge`, `message_gate`'s refusal and docstring's edge count); `src/shiftlead/skill.md` (the `ao msg` line); `tests/test_mail.py`; design §4.7 (`ao msg`), §4.10 *The message gate is weaker than `control`* (**between the person's own sessions**), §9 invariant 9
-
-**Why:** TD-1042: the person's own sessions in two projects could not mail each other, so the person pasted one's warning into the other by hand. The design now has the edge.
-
-**Fix:** the record gains `by_person: bool | None = None` (`None`: written before the field), set once at start and never changed, computed inside `rpc_create`: `as_person(caller)` (the person, or the person's own shell; `caller=None`, an in-process call, is the person as `agent_remote` reads it), and not `supervised`, and no `seat` — both read as the record is written, not as the call passed them, so a scheduled record (`_schedule` writes it supervised) and a resume of a supervised record write false. `rpc_create` takes no `by_person` parameter (an RPC `create` carrying one has it dropped with a warning, as `agent_serve` drops any unknown param, so the record's value is the derivation's). The tick's restarts, fills and replays call `rpc_create` too and need no rule of their own: each is `supervised`, so each writes false. Every Restart writes false (only a supervised session restarts); a `--resume` follows the derivation, reading `supervised` as the resumed record carries it, so a resume of a supervised record writes false. On the forwarded path the home reads `supervised` and `seat` from the node's reply record (the `held` it already fetches after a forwarded create), not from what it sent, so a forwarded resume agrees with the node's own derivation. The home's setter runs for every forwarded `create`, whoever called (outside the `and person` test `_lift_by_person` sits under), so a session's or a supervised forwarded create writes an explicit `false`, and in the same synchronous block as `_take_records` takes the reply, so no gate read sees the record without it; a reply record with no `seat` falls back to the `seat` the home sent. On a node the home derives it (its tick's forwarded starts false) and sets it on its own copy once the forwarded create's reply lands, as `agent_remote.py` does for its other post-reply fields; it joins `HOME_OWNED` and is never a param of the forwarded create, so an older node is unaffected. A resolver (`own_session(record)` or a property) reads `None` as `kind: interactive`, `unattended: false`, not `supervised` and `controllers` empty; the gate and the pushed view (`_view`) read the resolved value. `message_edge` gains the edge `own`, tried after `shared target` and before the question seat: both records `by_person`, `kind: interactive`, `unattended: false`, `not record.seat`, whatever their `team`, `project`, `role`, `controllers` or state, any message kind, an `ask` carrying no `pr` or `cites` (`carries`). A target with no agent is refused before the gate, as today; the person's own shell as sender passes. `message_gate`'s refusal adds *nor between two sessions the person started by hand*, its docstring counts seven edges, and `message_edge`'s docstring lists `own`. `ao --skill`'s `ao msg` line names the edge (*… or, between two sessions the person started by hand, any kind*). Nothing else changes: `from_role` says `other`, `read_when` keeps a person's session's row, and nothing is copied to the person inbox.
-
-**Done when:** tests hold that two `by_person` interactive records of different teams and projects pass the gate in each of `note`, `ask`, `steer` and `reply` as `own`, one of them with its team's manager in `controllers`, one of them exited, and the person's own shell as sender; that it is refused when either end is not `by_person` (a session a worker started without `--unattended`, a shell a worker made, a watched lead `ao team start` made), is `unattended`, or holds a `seat` of any trigger; that an `ask` carrying `pr` or `cites` does not pass it; that a record with `by_person` absent reads it from `controllers` being empty, while an explicit `false` with empty `controllers` stays false, and an absent one on a `supervised` record with empty `controllers` (a lead `ao team start` made before the field) is no end; that an RPC `create` carrying `by_person: true` from a session gets the derived value, the param dropped; that the person's resume of a supervised record writes false; that **Open shell here** on a team member (a team badge, empty `controllers`) gives an end, a shell a session started does not, a person's `ao mode unattended` after start ends it, and an `ao at` start is excluded by `unattended`; that each start path writes the field as the Fix says (`ao new` by the person true, from the person's own shell true, with `--supervised` false, `ao team start` false, a Restart, a tick fill or a replay false whatever the launch record held, a session caller false, a node's record as the home derived it, set on the home's copy after the reply — the test expects the home's value, not the node's — and a session's forwarded create writing `false` there); that a node's report landing before the create's reply leaves the field absent until the reply's setter runs, the resolver covering the gap; that a node's record (`id@host`) reads the same; that `PAIR_BOUND` and `MAILBOX_DEPTH` (`agent_mail._check_bounds`) still refuse a `msg` on it, exercised through the `msg` RPC; and the skill's line, the refusal and §4.7's sentence say so.
-
-**Related:** TD-1042 (the design); TD-582, TD-995 (the edges before it); TD-1043 (the empty `project` badge).
 
 ## TD-1074: `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit)
 
