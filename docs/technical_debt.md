@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
-| TD-1100 | Under pytest's default `--basetemp`, `tests/test_link.py` fails 31 of its 68 tests: the home's `links/<node>/link.sock` passes the unix socket path limit | Low | Open — build |
 | TD-1101 | Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row | Low | Open — build |
 | TD-1102 | `test_dismiss_takes_the_row_off_and_its_snooze_with_it` reads one row of two under a loaded precheck | Low | Open — build |
 
@@ -1947,24 +1946,6 @@ It then names the build entries.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
 
-## TD-1100: Under pytest's default `--basetemp`, `tests/test_link.py` fails 31 of its 68 tests: the home's `links/<node>/link.sock` passes the unix socket path limit
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (grinder-ao-1, met verifying TD-1088)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build; the cause found 2026-10-27 (grinder-ao-1, while verifying TD-1098)
-**Location:** `tests/test_link.py` (the home and node fixtures, whose homes sit at `<basetemp>/popen-gwN/<test name, 30 chars>0/<host>`); `src/sessionorc/paths.py` (the link socket, `links/<node>/link.sock`); `tests/conftest.py`
-
-**Why:** `pdm run test` from this worktree on 2026-10-27 (`-n 8`, and `-n auto` too) failed 31 of `tests/test_link.py`'s 68, each a `ConnectionRefusedError` dialling the node's `agent.sock` or an `assert False` after it; `-k crashing_until` alone passed, and so does every precheck. The same file with `--basetemp` under `/var/tmp/pc.XXXXXX` (the precheck's shape) passes 68 of 68. Under the default `/tmp/pytest-of-kmaster/pytest-24002/popen-gw7/test_laptop_closed_its_cards_g0/`, the home's `kmaster/links/laptop/link.sock` is 108 bytes, past what `sun_path` holds (108 with its NUL, so 107 at most), so the link never listens and the node's dial is refused; a node of a longer name, a two-digit worker (`-n 16`) or a six-digit `pytest-NNNNNN` counter only lengthens it. Nothing gates on it (the precheck's basetemp is short), but `pdm run test` from a checkout reads red for no fault of the change.
-
-**Fix:** keep every socket a test makes under the limit whatever the basetemp: `tests/conftest.py` gives the suite a short default `--basetemp` (as the precheck's `$T/p`), or the link fixtures place their homes under a short directory of their own, as `scripts/look_home.py` and the conformance walk do (`/tmp/aoc-…`). If `paths` can be asked for a socket past the limit in a real home too, it says so in words instead of a refused dial.
-
-**Done when** `pdm run test` from a worktree passes `tests/test_link.py` under the default basetemp with two-digit workers (`-n 16`), and `pdm run test` and `pdm run lint` pass.
-
-**Related:** the memory *Scratchpad too long for unix sockets*; TD-1088, TD-1098 (met verifying them); TD-1087 (load flakes under `-n auto`, another cause).
-
 ## TD-1101: Three more tests fail once in a full `-n auto` run, each a different one, so five full runs do not yet pass in a row
 
 **Priority:** Low
@@ -1981,7 +1962,7 @@ It then names the build entries.
 - `test_the_detached_check_follows_the_tmux_server_it_is_about`: `assert ([3861993, 50] == [50]`.
 None of the three files calls `park_ticks`, so the fixture's tick loop running beside the test's own steps is the first suspect, as it was in TD-1087, TD-1099 and `test_ci_spells.py`.
 
-**Fix:** for each test, check whether the fixture's tick loop can run the pass the test drives by hand. If it can, park it (`await park_ticks(agent)`, or a file-level `agent` fixture that parks it, as `test_conventions_policy.py` has). Otherwise wait on the event the test reads. Reproduce with 20 runs of each file under `-n auto` beside a full `-n auto` suite, with a short `--basetemp` (TD-1100: the default's socket paths are too long for `test_link.py` on kmaster).
+**Fix:** for each test, check whether the fixture's tick loop can run the pass the test drives by hand. If it can, park it (`await park_ticks(agent)`, or a file-level `agent` fixture that parks it, as `test_conventions_policy.py` has). Otherwise wait on the event the test reads. Reproduce with 20 runs of each file under `-n auto` beside a full `-n auto` suite.
 
 **Done when:** each test passes 20 runs of its file under `-n auto` beside a full suite, and five full `-n auto` runs pass in a row, with TD-1098, TD-1100 and TD-1102 fixed too; then `pdm run test` may take `-n auto`.
 
