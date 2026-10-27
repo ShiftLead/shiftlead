@@ -2913,15 +2913,15 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             roles = (await asyncio.to_thread(org_here))[0].roles
             # a machine node's config reads across the link, blocking on this loop: a worker thread's
             preset = await asyncio.to_thread(repoconfig.resolve_role, cfg, plan["role"], roles)
+            review = preset.review
+            if team:  # a role's own `review:` wins, else the team's reader (§4.9) — under a flow, the flow's (§4.9c)
+                got = await asyncio.to_thread(team_reader, team, root, node_cfg, preset.name)
+                if got.get("flow") or review is None:
+                    review = got["review"]
         except (KeyError, ValueError) as e:
             raise HTTPException(400, str(e).strip('"')) from None
-        except OSError as e:  # the node stopped answering between the plan and the role
+        except OSError as e:  # the node stopped answering between the plan and the role or its reader
             raise HTTPException(409, unanswered(away, str(e))) from None
-        review = preset.review
-        if team:  # a role's own `review:` wins, else the team's reader (§4.9) — under a flow, the flow's (§4.9c)
-            got = await asyncio.to_thread(team_reader, team, root, node_cfg, preset.name)
-            if got.get("flow") or review is None:
-                review = got["review"]
         # the `project` badge, as New session's: the repo's project, from the same function (§4.9, TD-1043);
         # the badge alone, since this session starts at the prompt with no text to carry a Project block
         project, _block = await asyncio.to_thread(lambda: teams.reach_block(org_here()[0], root, host_name()))

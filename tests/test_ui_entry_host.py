@@ -135,7 +135,16 @@ def test_a_machine_nodes_team_reads_its_role_reader_and_ledger_there(tmp_path, m
     """(a) a machine node's org-file path; (c) its ledger and role read through `host_files`, and an
     existing branch there refused in the Name row's words, the plan and the press alike."""
     world(tmp_path, team_extra={"entries": {"debt": "designer"}})
-    calls, created = [], []
+    calls, created, readers = [], [], []
+    from shiftlead.ui import app as ui
+
+    real = ui.team_reader
+
+    def reader(team, directory, cfg=None, role=None):
+        readers.append(cfg)
+        return real(team, directory, cfg, role)
+
+    monkeypatch.setattr(ui, "team_reader", reader)
     c = client(monkeypatch, tmp_path, fake(calls=calls, created=created, branches={"entry-1", "twig"}))
     got = plan(c)
     want = ("node1", NODE_DIR, "docs/node-ledger.md", "designer")
@@ -152,6 +161,8 @@ def test_a_machine_nodes_team_reads_its_role_reader_and_ledger_there(tmp_path, m
     assert (kw["host"], kw["dir"], kw["role"], kw["ledger"]) == ("node1", NODE_DIR, "designer", "docs/node-ledger.md")
     assert "docs/node-ledger.md" in kw["start_context"]
     assert any(m == "host_files" for m, _ in calls), "the ledger was read on the node"
+    (cfg,) = readers
+    assert cfg is not None and cfg.ledger == "docs/node-ledger.md", "the reader is given the node's config"
 
 
 def test_a_repos_team_placed_on_a_node_takes_the_path_that_hosts_registry_gives(tmp_path, monkeypatch):
