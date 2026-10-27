@@ -208,7 +208,7 @@ profile and session names.
 `teams` and `promote` (read by the home's promote, design §6), `gate` (the merge gate's command,
 `{pr}` filled; unset, dev-cadence's `check_cadence.py` where the checkout holds it, design §5 *The seams*),
 `worktree_setup` (a command run in each new worktree; unset, dev-cadence's `hydrate_worktree.sh` where
-the checkout holds it, design §5 *The seams*), `board` (the person's board, from the repo's root; unset,
+the checkout holds it, or the pinned tree's in a pinned repo, design §5 *The seams*), `board` (the person's board, from the repo's root; unset,
 dev-cadence's `user_attention.md` where the checkout holds it, design §5 *The seams*), `settle` (how long a new
 ledger entry of each Kind waits, holdable, before a lane may take it, `{design-first: 10m}`, design §4.4), `held` (the paths a flow's review stage waits for, design §4.9c),
 `commands` (a mapping, `test: …` and `lint: …` filling the briefs' `{test}` and `{lint}`, design §5 *The seams*), and

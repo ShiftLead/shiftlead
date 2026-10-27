@@ -661,7 +661,8 @@ class RepoConfig:
     # §5 *The seams*: keys accepted and read by nothing, which `ao org check` names — `gate:` (TD-1011)
     gone: list[str] = field(default_factory=list)
     # §5 *The seams* `worktree_setup:` (TD-589): the command run in each new worktree; `sessionorc.gitinfo`
-    # runs it at the worktree's creation. None: unset — the default is `scripts/hydrate_worktree.sh` where it exists
+    # runs it at the worktree's creation. None: unset — the default is `scripts/hydrate_worktree.sh` where it exists,
+    # the pinned tree's in a pinned repo (TD-1044)
     worktree_setup: str | None = None
     # §5 *The seams* `board:` (TD-587): the person's board, relative to the repo; `sessionorc.board.board_path`
     # reads it. None: unset — the default is `docs/user_attention.md` where it exists

@@ -75,7 +75,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-986 | On a phone the Focus terminal cannot be scrolled reliably, and there is no Tab to accept a suggestion | Medium | Designed — builds TD-989, TD-990 |
 | TD-990 | The Focus soft-key row: `Tab Esc ↑ ↓ ← → Enter 1–9` under the terminal on a phone or a coarse pointer | Medium | Built (#2320) — the phone look with Paul |
 | TD-995 | A session cannot address another repo or team: names resolve only to sessions, so a request for another repo's ledger ends as a command printed for the person | Medium | Designed — builds TD-1000, TD-1001 |
-| TD-997 | The Transcript draws a session's start context as its first entry — Paul's to keep or drop | Low | Open — waits on Paul |
 | TD-998 | `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao` | Low | Designed — builds TD-1004, TD-1005 |
 | TD-999 | The wait guard in Gemini CLI: its `BeforeTool` hook refuses an unattended session's foreground CI watch, as Claude Code's `PreToolUse` does | Low | Designed — build TD-1007 |
 | TD-1000 | A session asks another team's or repo's question seat — `ao msg --team` / `--repo`, the org-wide `ask` edge, and `ao td add --repo` for another repo | Medium | Open — build |
@@ -95,7 +94,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1039 | The sync pass runs `precheck.py --pr` on a mechanical PR before its gate where the repo sets `precheck` | Medium | Open — build |
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1042 | Two of the person's own interactive sessions in different projects cannot mail each other, so the person relays between them by hand | Medium | Open |
-| TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | Open — stopgap set per repo (samscrape#1121, shiftlead#2391) |
+| TD-1044 | A worktree the home makes in a pinned repo is not hydrated: the default `worktree_setup` runs the repo's own `scripts/hydrate_worktree.sh`, which the pin removes | High | In progress (slice 1 #2409); left: drop the stopgaps (samscrape#1121, shiftlead#2391) |
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
 | TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Open — design |
@@ -1522,23 +1521,6 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 
 **Related:** TD-723 (samscrape and contractmatch under one project, which opens the project edge between them), TD-582 (the cross-team edge), TD-299 (the container nodes).
 
-## TD-997: The Transcript draws a session's start context as its first entry, marked *told at start* — Paul's to keep or drop
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-24 (the designer, from TD-993 part 2)
-**Owner:** designer
-**Kind:** design-first
-**Blocked by:** decision (paul) — his answer to the ask m-7f566ce663c2
-**Status:** Open — waits on Paul's word whether the Transcript should show it.
-**Location:** `src/shiftlead/ui/transcript.py`, the Claude Code adapter's transcript read (`src/shiftlead/adapters/claude_code/transcript.py`, which skips every line type it does not list, the `SessionStart` hook's attachment among them), the Gemini adapter's (TD-786); design §4.5 the Transcript, §4.3 `start_context`
-
-**Why:** TD-993 part 2, the drafting session's suggestion: the start context is already in the conversation file, as the `SessionStart` hook's attachment, and the Transcript drops it; drawn as the conversation's first entry it would make the Transcript the whole record of what the session was given, for a closed session too. TD-993 designed the Session card's row (TD-996) and left this to Paul, since it is his to keep or drop.
-
-**Fix:** design first, once Paul says yes: the entry's mark and style, set apart from the prompts; what an adapter whose start context reaches the conversation another way shows (§4.1 `mail.start_context_file_text`); whether the Session card's row then also links to it.
-
-**Related:** TD-993, TD-996, TD-154 (the Transcript).
-
 ## TD-998: `ao` is not on PATH inside a container node: sessions and shells there reach it only as `/shiftlead/venv/bin/ao`
 
 **Priority:** Low
@@ -1740,7 +1722,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 - A console script `dev-cadence` (`[project.scripts]`, a thin entry calling `sessionorc.dev_cadence.main(sys.argv[1:])`) puts the vendored launcher in the venv's `bin`, and the generated node Dockerfile links `/usr/local/bin/dev-cadence` to it beside `/usr/local/bin/ao`, by the same guarded rule (§4.4a, TD-1022), so dev-cadence's SessionStart line and shims find it on `PATH` in a node; a test holds the line as TD-1004's holds `ao`'s.
 - TD-1013's release is read from the pinned tree's `ledgerboard.py` through the resolver; a repo with a pin and no copy never warns for the absent file.
 
-**Done when:** every reader above calls `cadence.command` and none builds a dev-cadence path in code itself (a path built from `"check_cadence.py"`, `"cadence.md"` or the lock appears only in `cadence.py`, and in `sync.py` until TD-1015 removes the lock; prose, comments and the briefs' words are not readers); a temp repo with a pin and a stub launcher runs the gate through it; a node is provisioned with the tree its repo pins; the venv holds `bin/dev-cadence`, which runs `words`, and the generated Dockerfile's guarded link to it is held by a test as `ao`'s is. Tests: a pinned repo (no lock) reads served; a pin whose `ref` does not descend from `OLDEST` reads the older-tree lack; its ledgerboard release is read from the pinned tree.
+**Done when:** every reader above calls `cadence.command` and none builds a dev-cadence path in code itself (a path built from `"check_cadence.py"`, `"cadence.md"`, `"hydrate_worktree.sh"` or the lock appears only in `cadence.py` — `gitinfo.HYDRATE` aside, the synced repo's own copy, which `gitinfo.hydrate_command` reads beside the pinned tree's (TD-1044), and in `sync.py` until TD-1015 removes the lock; prose, comments and the briefs' words are not readers); a temp repo with a pin and a stub launcher runs the gate through it; a node is provisioned with the tree its repo pins; the venv holds `bin/dev-cadence`, which runs `words`, and the generated Dockerfile's guarded link to it is held by a test as `ao`'s is. Tests: a pinned repo (no lock) reads served; a pin whose `ref` does not descend from `OLDEST` reads the older-tree lack; its ledgerboard release is read from the pinned tree.
 
 **Related:** TD-1009, dev-cadence TD-129 and its plan 2026-10-25, TD-1015, TD-1016. dev-cadence#TD-129 left **Blocked by** 2026-10-26 (Paul): its launcher, bump, adopt and shims are merged (dev-cadence #328–#331, #335–#340), and TD-129 closes only once every roster repo is pinned — a pin unserves a repo until this reads it (`seams.serve` reads the lock and the synced gate script, `scripts/check_cadence.py`), so this goes first and the rollout of a served repo waits on it.
 
@@ -2023,12 +2005,12 @@ Then file the build entries.
 **Added:** 2026-10-26 (Paul, during dev-cadence TD-129's rollout; drafted by session `memory-vs-cadence`)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — found pinning samscrape (ContractMatch/samscrape#1115, merged 2026-10-26); stopgap: samscrape#1121 and this repo's pin PR (#2391) set `worktree_setup` to the pinned hydrate.
+**Status:** In progress — slice 1 (#2409, grinder-ao-1, 2026-10-26): the default setup and the reaper's hydrate run the pinned tree's `hydrate_worktree.sh` (`gitinfo.hydrate_command`). Left: once #2409 is live (`ao promote status`), drop this repo's stopgap `worktree_setup` line (#2391) and ask samscrape to drop its own (samscrape#1121). Found pinning samscrape (ContractMatch/samscrape#1115, merged 2026-10-26); stopgap: samscrape#1121 and this repo's pin PR (#2391) set `worktree_setup` to the pinned hydrate.
 **Location:** `src/sessionorc/gitinfo.py` (`HYDRATE = "scripts/hydrate_worktree.sh"`; `worktree_setup()`, which reads `absent` when the file is missing, and the create path that then skips setup; the reaper's `hydrate` lookup, about line 499); `src/shiftlead/repoconfig.py` (the key's parse; its comment, about line 664, states the default); `src/sessionorc/cadence.py` (`command(repo, word, *args)`, TD-1014's resolver); `src/shiftlead/team_skill.md` (`worktree_setup`, about line 210: unset, dev-cadence's `hydrate_worktree.sh` where the checkout holds it)
 
 **Why:** dev-cadence TD-129 pins a repo's dev-cadence instead of copying it, so a pinned repo has no `scripts/hydrate_worktree.sh`. The home's default `worktree_setup` is exactly that file, and a missing one reads as `absent`, so a worktree the home makes in a pinned repo gets no setup and says nothing: no `.claude/settings.local.json` (the worktree's `autoMemoryDirectory`, so its session's memories land outside the repo, the TD-080 failure), and no nested repos from `docs/nested-repos.txt`. pneuma-ops, ledgerboard and samscrape were pinned on 2026-10-26; samscrape has a team, so its worktrees were affected from that merge until the stopgap. The reaper reads the same path for its `--dehydrate`, so a pinned repo's nested worktrees would not be taken out through their own repos before removal. TD-1014's Done-when (*every reader above calls `cadence.command` and none builds a dev-cadence path in code itself*) should have caught `HYDRATE`, though its list of names (`check_cadence.py`, `cadence.md`, the lock) does not include `hydrate_worktree.sh` — add it there.
 
-**Fix:** where `cadence.pinned(repo)`, the default setup is `cadence.command(repo, "run", "hydrate_worktree.sh", <path>)` (cwd the new worktree), and the reaper's dehydrate the same with `--dehydrate`; a synced repo keeps today's path; a pin that does not resolve raises `WorktreeError` as a failed setup does today (`ensure_worktree`), never a silent skip. `team_skill.md` and design §5 *The seams* say it. Then drop the stopgap `worktree_setup` lines (samscrape, this repo). Tests: a pinned fixture repo's new worktree gets `settings.local.json`; an unresolvable pin warns.
+**Fix:** where `cadence.pinned(repo)`, the default setup is `cadence.command(repo, "run", "hydrate_worktree.sh", <path>)` (the worktree its path argument), and the reaper's dehydrate the same with `--dehydrate`; a synced repo keeps today's path; a pin that does not resolve raises `WorktreeError` as a failed setup does today (`ensure_worktree`), never a silent skip. `team_skill.md` and design §5 *The seams* say it. Then drop the stopgap `worktree_setup` lines (samscrape, this repo). Tests: a pinned fixture repo's new worktree gets `settings.local.json`; an unresolvable pin warns.
 
 **Done when** a worktree the home makes in a pinned repo with no `worktree_setup` is hydrated, and the stopgaps are removed.
 

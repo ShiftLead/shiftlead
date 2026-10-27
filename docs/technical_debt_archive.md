@@ -19921,3 +19921,21 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Related:** TD-1033, TD-1037, TD-804 (the smoke's detached run), TD-581.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2407) — `promote.precheck_on_main` on each pass that reads the checks: starts `precheck_script`'s argv with `--commit <sha>` under the conditions of §6 (one at a time with `precheck-pr.json`), `precheck.json` written first and kept, `pid: null` restarted or dropped, `prechecking` while it runs, *ended and recorded nothing* once gone, `PRECHECK_BOUND`'s TERM-then-KILL and the worktree prune, `precheck_failed` for the Inbox row (*Needs you*, *checks failed on `<sha7>`* with the log's tail) and *prechecking `<sha7>` — promotes when green* on the `auto` row.
+
+## TD-997: The Transcript draws a session's start context as its first entry, marked *told at start* — Paul's to keep or drop
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-24 (the designer, from TD-993 part 2)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Dropped
+**Location:** `src/shiftlead/ui/transcript.py`, the Claude Code adapter's transcript read (`src/shiftlead/adapters/claude_code/transcript.py`, which skips every line type it does not list, the `SessionStart` hook's attachment among them), the Gemini adapter's (TD-786); design §4.5 the Transcript, §4.3 `start_context`
+
+**Why:** TD-993 part 2, the drafting session's suggestion: the start context is already in the conversation file, as the `SessionStart` hook's attachment, and the Transcript drops it; drawn as the conversation's first entry it would make the Transcript the whole record of what the session was given, for a closed session too. TD-993 designed the Session card's row (TD-996) and left this to Paul, since it is his to keep or drop.
+
+**Fix:** design first, once Paul says yes: the entry's mark and style, set apart from the prompts; what an adapter whose start context reaches the conversation another way shows (§4.1 `mail.start_context_file_text`); whether the Session card's row then also links to it.
+
+**Related:** TD-993, TD-996, TD-154 (the Transcript).
+
+**Resolved:** 2026-10-26 — dropped: Paul answered the ask m-7f566ce663c2 *Session card only* (reply m-2ec30d0eb12b), so the start context stays on the Session card's *told at start* row (TD-996) and the Transcript does not draw it.
