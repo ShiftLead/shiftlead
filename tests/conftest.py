@@ -27,7 +27,6 @@ import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import uuid
 from collections.abc import Callable
@@ -83,8 +82,10 @@ FAST_TICK = 0.3
 
 # Which pytest process owns which private tmux server. The sweep below kills leaked servers, and a
 # live server whose owner is still running belongs to a *concurrent* run — a reviewer's suite beside
-# a worker's, two `pytest` processes in one loop — which must never be swept (TD-025).
-OWNERS = Path(tempfile.gettempdir()) / f"ao-test-owners-{os.getuid()}"
+# a worker's, two `pytest` processes in one loop — which must never be swept (TD-025). It lives beside
+# the sockets, never under `$TMPDIR`: a precheck gives each run a `TMPDIR` of its own (TD-1052), and runs
+# that could not see each other's owners would sweep each other's servers.
+OWNERS = Path("/tmp") / f"ao-test-owners-{os.getuid()}"
 
 
 def private_socket_name() -> str:
