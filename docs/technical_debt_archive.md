@@ -20390,6 +20390,44 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2439) — `_route_ring` reads a refusal ending in `link.UNKNOWN_ACT` (the words an older node already sends, now one constant the node raises and the home reads) as no verdict: nothing charged, no bell kept, rung again next tick; any other refusal stays `failed`. §4.4a says so. Bells are not dropped when a node's link comes up anew: with no bell kept for the refusal, nothing is left for that to clear. Tests: `test_a_node_that_does_not_know_the_ring_is_no_verdict_and_another_refusal_fails`, `test_a_node_refuses_an_act_it_does_not_know_in_the_words_the_home_reads_as_no_verdict`.
 
+## TD-1051: A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (ao-contractmatch-cm-mcp, through `ao td add --repo shiftlead`; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — designed in #2418, built by TD-1078, TD-1079, TD-1080. Designed 2026-10-26. **Which rule missed**: the envelope of m-67da098c4b93 is the person's to read (a thread read is the person's act), so the round settled it from the records' rules — whichever way the steer was orphaned or answered, its answer ended in the closed techlead's mailbox, and a seat was filled only by an open question to it (§4.10's table: *any other `reply` … waits in the seat's mailbox*). The design now: **(1)** an answer to a seat's own question — the person's reply, or the note of its steer's lapse, *Go with it* or decline — counts toward `asks_waiting` until read, so it fills the seat, and a techlead that asks the person something of its own about a member's question names the member's reference in `about`, tells the member, and relays what came of it (§4.9b *An answer waiting counts too*, *A member's question stays the member's*; §6 rule 3) — TD-1078; **(2)** the home rings a node's idle session through its node, and a ring that does not land is `doorbell_failed`, which `read_when` says as a failure (§4.4a *The doorbell rings a node's session through its node*; §4.10's table and *The doorbell*) — TD-1079, the cause of (a); **(3)** a finished member with unread mail is rung where it sits (the doorbell has no `out_of_work` check; with (2) a node's member is too), and `team stop` names its unread rather than *nothing sent*; `team start`'s refusal names the cure; a person's session in a team holds no seat and `ao team status` marks its row; a tool's `!` escape is the session's (§4.8a *A tool's shell escape is the session's*), and the acting gate's refusal to a person's session says so (§4.9) — TD-1080, for (b), (c), (d) and 5.
+**Location:** design §4.10 *A question about a reference outlives its asker* (the orphaned question and where its answer goes), §4.9b (the techlead's pass-up, whose answer goes to the asker), §4.10's `read_when` table (*rung within a tick*), §4.9a and §6 rule 8 (a finished member, *A question's end is work*), §4.8a (identity by the `ppid` chain); `src/shiftlead/ui/templates/inbox_row.html` and `src/shiftlead/ui/inbox.py` (`asker_gone_quiet`: *its asker closed without reporting what came of your answer — only you, or its manager, can find out*); `src/shiftlead/teamrun.py` (the stop's *finished (out of work), nothing sent*); `src/sessionorc/mail.py` (`read_when`)
+
+**Why:** contractmatch's cm-grind made no progress for about 22 hours (2026-10-24 to 2026-10-26), as ao-contractmatch-cm-mcp reports:
+1. designer-cm-1 asked techlead-cm-1 a question on TD-060 (ADR 017, contractmatch PR #203), then declared out of work while holding TD-060, to be woken when it resolved.
+2. techlead-cm-1 did not pass the question up. It sent the person a `steer` of its own (m-67da098c4b93) and a reply on the designer's thread, then closed.
+3. Paul answered the steer on 2026-10-25. The answer went to techlead-cm-1, which was closed, and the row read *its asker closed without reporting what came of your answer — only you, or its manager, can find out*. The manager was not running, so nothing reached the designer. grinder-cm-1, waiting on a techlead-cm-1 reply about TD-063, stalled too.
+4. The recovery failed four ways:
+   - (a) mail from cm-mcp to the designer and the grinder (m-65e9fefa15ef, m-8fbab927bd04) said *rung within a tick*, yet no doorbell line appeared in either pane for more than two minutes; both run on contractmatch's container node.
+   - (b) `ao team stop cm-grind` read the designer as *finished (out of work), nothing sent*, though it had unread mail.
+   - (c) `ao team start` refused while that designer stayed registered as idle.
+   - (d) Paul's `! ao team stop`, typed in a Claude Code session, ran as that session (§4.8a: identity by ancestry) and was refused for lack of the control grant.
+5. `ao team status cm-grind` lists the interactive cm-mcp session with role *techlead*, which may be why no real techlead seat was running.
+
+The design already routes some of this. A pass-up's answer goes to the asker (§4.9b). An orphaned question about a reference goes to the board and to its lease holders (§4.10). What failed is the relay: an answer to a techlead's own `steer` reaches only the closed techlead, and nothing ties it to the member whose question it was.
+
+**Fix:** design first. The round reads m-67da098c4b93's envelope (its `about`, whether it orphaned) and the cm-grind records to settle which rule missed, then decides:
+- how a seat's answer, or its relay, reaches the member waiting on it after the seat closes;
+- whether a finished member with unread mail counts as having work for `team stop`, `team start` and the lane's wake;
+- why a node's doorbell said *rung* and typed nothing, and what `read_when` says when it cannot know;
+- whether a person's `!` command in a session should act as the person;
+- whether an interactive session may hold a team's techlead role.
+
+It files each as a build entry, or as live checks where the design already holds.
+
+**Done when** the design says how the waiting member gets the answer after its relaying seat closes, and how a finished member with unread mail is woken or counted as having work, and the build entries are filed. A doorbell that cannot be delivered is said as a failure, not *rung*.
+
+**Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
+
+**Resolved:** 2026-10-27 (designer-ao-1) — its design merged in #2418 and its three builds are archived: TD-1078 (#2429, a seat filled by an answer to its own question), TD-1079 (#2431 and #2439, the doorbell rings a node's session through its node; its live check held), TD-1080 (#2432, the stop, start, status and acting-gate words).
+
 ## TD-1056: The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit)
 
 **Priority:** Low
