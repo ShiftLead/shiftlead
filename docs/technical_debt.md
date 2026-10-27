@@ -114,7 +114,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1069 | The message gate's edge between the person's own sessions: two sessions the person started by hand mail each other in any kind, whatever their team or project | Medium | Open — build |
 | TD-1074 | `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit) | Medium | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
-| TD-1076 | `_gh_prs` sets `prechecked` on each open PR row, `ao pr wait`'s *none* hangs on it, and no test runs `_gh_prs` (test audit) | High | Open — build |
 
 ---
 
@@ -2422,20 +2421,3 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 
 **Related:** TD-1044.
 
-## TD-1076: `_gh_prs` sets `prechecked` on each open PR row, `ao pr wait`'s *none* hangs on it, and no test runs `_gh_prs` (test audit)
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2407, #2409, #2405, #2402)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/reports.py` (`_gh_prs`: `row["prechecked"] = prechecked(p.get("statusCheckRollup"))`), `src/sessionorc/agent.py` (`rpc_pr_wait`: `got.get("prechecked") is False`), `tests/test_pr_wait.py`
-
-**Why:** #2405 (TD-1036) makes `ao pr wait` answer *none*, with the line to run, for a green head that carries no `cadence/precheck`. `rpc_pr_wait` reads that from the row's `prechecked`, and only `_gh_prs` sets it. `test_where_the_repo_sets_precheck_a_head_without_it_stays_none_with_its_line` builds rows by hand (`{**_row(checks="green"), "prechecked": False}`), a shape the home's own read must write; `grep -rn _gh_prs tests` finds one line, which fails if it is called. Probed on `origin/main`: replacing that `_gh_prs` line with `pass` leaves every test in the files that mention `OPEN_PR_FIELDS`, `pr_reading`, `failing_items` or `prechecked` passing (148 passed). Without the line the row has no `prechecked`, `got.get("prechecked") is False` never holds, and a head with no precheck reads *green* to `ao pr wait` again, which is what the entry was filed to stop.
-
-**Fix:** a test that runs `_gh_prs` (or `pr_reading`) over a faked `gh pr list` JSON with one head carrying a `cadence/precheck` status and one not, and asserts `prechecked` True and False on the rows.
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1036.
