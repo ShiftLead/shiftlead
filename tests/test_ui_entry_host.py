@@ -138,7 +138,8 @@ def test_a_machine_nodes_team_reads_its_role_reader_and_ledger_there(tmp_path, m
     calls, created = [], []
     c = client(monkeypatch, tmp_path, fake(calls=calls, created=created, branches={"entry-1", "twig"}))
     got = plan(c)
-    assert (got["host"], got["dir"], got["ledger"], got["role"]) == ("node1", NODE_DIR, "docs/node-ledger.md", "designer")
+    want = ("node1", NODE_DIR, "docs/node-ledger.md", "designer")
+    assert (got["host"], got["dir"], got["ledger"], got["role"]) == want
     assert got["default"] == "entry-2", "entry-1's branch on the node is skipped"
     assert [kw["name"] for m, kw in calls if m == "host_branch"] == ["entry-1", "entry-2"]
     why = "a branch named twig exists — the session would start on it; pick another name"
