@@ -2590,9 +2590,15 @@ def cmd_settings(args: argparse.Namespace) -> int:
             print("  none")
         print("repos:")
         for repo, r in (got.get("repos") or {}).items():
-            print(f"  {repo}: promote {'auto' if (r.get('promote') or {}).get('auto') else 'by hand'}")
+            off = " · sweep off" if r.get("sweep") is False else ""
+            print(f"  {repo}: promote {'auto' if (r.get('promote') or {}).get('auto') else 'by hand'}{off}")
         if not got.get("repos"):
             print("  none — every repo promotes by hand")
+        sw = got.get("sweep") or {}
+        if sw:  # §4.9b *The switch* (TD-1091): a team gets its seat at its next start
+            prof = sw.get("profile") or "the role's"
+            how = f"on, every {sw.get('every')}, profile {prof}" if sw.get("on") else "off"
+            print(f"sweep: {how}")
         person = got.get("person") or {}
         print("person:")
         print(f"  open_in: {person.get('open_in', 'vscode (default)')}")

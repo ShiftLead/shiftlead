@@ -81,6 +81,10 @@ def world(tmp_path, monkeypatch):
             return state["host"]
         if method == "repos":  # the home's repo readings, with the balance marks (§6 *Balance*)
             return state.get("repos", {})
+        if method == "sweep_switch":  # the Settings sweep switch a start reads (§4.9b *The switch*, TD-1091)
+            if isinstance(state.get("sweep"), Exception):
+                raise state["sweep"]
+            return state.get("sweep") or {"on": False, "every": "7d", "off": []}
         if method == "set_settings":  # `ao team flow` (§4.9c): written as the home writes `settings.yml`
             for n, f in params["teams"].items():
                 state.setdefault("teams", {}).setdefault(n, {}).update(f)
@@ -471,7 +475,8 @@ def test_a_team_with_a_host_is_checked_there_and_created_there(world, capsys):
     assert [p for m, p in calls if m == "host_dir"] == [{"host": "devenv", "dir": checkout}]  # once per checkout
     assert all(p["host"] == "devenv" for m, p in calls if m == "name_check")
     assert all(p["host"] == "devenv" and p["dir"] == checkout for p in creates(state))
-    order = [m for m, _ in calls if m not in ("repos", "host_files")]  # the lane reading's, before (TD-265)
+    # the lane reading's, before (TD-265), and the sweep switch's (TD-1091)
+    order = [m for m, _ in calls if m not in ("repos", "host_files", "sweep_switch")]
     assert order[0] == "host_dir" and order.index("create") > order.index("name_check")
 
 
@@ -1816,6 +1821,44 @@ def test_a_sweeper_seat_starts_with_the_built_in_brief_and_its_swept_trigger(wor
     org = cli._org_here()
     gone = [{"id": "s", "name": "sweep-ao-1", "team": "ao-grind", "state": "exited"}]
     assert teamrun.seat_ids(org, gone) == {"s": "sweeps when unswept 7 d"}
+
+
+def test_the_sweep_switch_gives_a_started_team_its_sweeper_seat(world, capsys):
+    """TD-1091, design §4.9b *The switch*: while the Settings switch is on, `ao team start` adds a seat
+    `sweep-<team>`, role `sweeper`, the built-in brief and the switch's profile, its mark `{trigger: swept,
+    after: <every>, by: settings}` — none with the switch off, when the definition has a sweeper of its
+    own, or when the team's repo is off; a switch it cannot read gives none, and the start says so."""
+    tmp_path, state = world
+
+    def start() -> list[dict]:
+        state["calls"].clear()
+        state["sessions"].clear()
+        assert cli.main(["team", "start", "ao-grind"]) == 0
+        return [p for p in creates(state) if p["name"] == "sweep-ao-grind"]
+
+    assert start() == [], "off when absent"
+    assert ("sweep_switch", {}) in state["calls"], "a start reads the switch"
+    state["sweep"] = {"on": True, "every": "5d", "profile": "org-grind", "off": []}
+    (sweep,) = start()
+    assert sweep["seat"] == {"trigger": "swept", "after": "5d", "by": "settings"}
+    assert sweep["role"] == "sweeper" and sweep["profile"] == "org-grind"
+    assert sweep["capabilities"] == [] and sweep["lane"] == []
+    assert sweep["prompt"].startswith("You are a **sweeper**")
+    org = cli._org_here()
+    gone = [{"id": "s", "name": "sweep-ao-grind", "team": "ao-grind", "state": "exited", "seat": sweep["seat"]}]
+    assert teamrun.seat_ids(org, gone) == {"s": "sweeps when unswept 5 d"}, "a seat by its mark"
+    state["sweep"] = {"on": True, "every": "7d", "off": ["shiftlead"]}
+    assert start() == [], "the team's repo is off"
+    state["sweep"] = {"on": True, "every": "7d", "off": []}
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["seats"] = [{"name": "sweep-ao-1", "role": "sweeper", "trigger": {"swept": "7d"}}]
+    write_org(tmp_path, doc)
+    assert start() == [], "the definition's own sweeper wins"
+    write_org(tmp_path, org_doc(tmp_path))
+    capsys.readouterr()
+    state["sweep"] = cli.AgentError("unknown method 'sweep_switch'")
+    assert start() == []
+    assert "sweep: the switch not read — no sweep seat" in capsys.readouterr().err
 
 
 def test_every_unattended_member_carries_the_usage_gates_two_texts(world):

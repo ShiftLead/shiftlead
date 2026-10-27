@@ -238,7 +238,8 @@ async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it
         assert "attach" not in settings.person(settings.load())
         with pytest.raises(AgentError, match="unknown key resrve"):
             await person.call("set_settings", teams={"ao-grind": {"resrve": None}})
-        with pytest.raises(AgentError, match="needs reserves, teams, repos, person, usage, notify, settle or spend"):
+        want = "needs reserves, teams, repos, person, usage, notify, settle, spend or sweep"
+        with pytest.raises(AgentError, match=want):
             await person.call("set_settings")
         await person.call("set_settings", teams={"ao-grind": {"until": None}}, person={"terminal": {"size": None}})
         doc = settings.load()

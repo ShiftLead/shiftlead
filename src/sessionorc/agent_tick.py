@@ -2946,7 +2946,7 @@ class TickMixin:
         if trigger == "swept":
             # read again each tick, as `asks` is: a stamp written by hand, or a board unreadable, before
             # the fill clears the due — an unreadable board fills nothing (§4.9b *The sweep*, TD-1090)
-            if not self._swept_met(s, now):
+            if not self._sweep_eligible(s, records) or not self._swept_met(s, now):
                 return None
             return s.seat_due if (s.seat_due or {}).get("by") == "swept" else {"at": now_iso(), "by": "swept"}
         if s.seat_due:
@@ -2967,7 +2967,10 @@ class TickMixin:
         null — never swept — or `d` old; **and** `d` has passed since the seat's last fill for it (its
         `seat_filled` entry `by: swept`), so a run that ended without stamping is not refilled in a loop.
         An `error` reading, no reading, no board, or a null `swept` (no board on origin) is no cause."""
-        every = _duration(str((s.seat or {}).get("after") or ""))
+        mark = s.seat or {}
+        # a switch-made seat's `d` is the switch's `every` now, not the mark's from its start (TD-1091)
+        after = settings_mod.sweep(settings_mod.load())["every"] if mark.get("by") == "settings" else mark.get("after")
+        every = _duration(str(after or ""))
         reading = (self._repos.get(s.repo or "") or {}).get("boards")
         if every is None or not isinstance(reading, dict) or "error" in reading:
             return False
@@ -3006,16 +3009,53 @@ class TickMixin:
         carrying `seat.tags` whose team is live — an unattended session carrying its badge is live
         (§4.9 *Starting and stopping*), so a stopped team's seat is never filled for this — the one
         whose team comes first in the ledger's `declared_teams`, a team it leaves out after, by name."""
-        led = (self._repos.get(root) or {}).get("ledger") or {}
-        declared = [str(t).casefold() for t in led.get("declared_teams") or []]
-        live = {
+        return self._first_seat(root, records, lambda mark: bool(mark.get("tags")))
+
+    def _sweep_eligible(self, s: Session, records: list[Session]) -> bool:
+        """Whether a sweep seat's `swept` cause may be computed (design §4.9b *The switch*, §6 rule 3,
+        TD-1091). A definition's sweeper always; a switch-made one (`by: settings`) only while
+        `sweep.on`, its repo not `off`, no live team's record of the repo carrying a `swept` mark that is
+        not `by: settings` (a team's own sweeper wins), and it is the repo's first such seat by team, as
+        the tagging seat is chosen — one filled per repo. Tested before a standing due is kept."""
+        if (s.seat or {}).get("by") != "settings":
+            return True
+        switch = settings_mod.sweep(settings_mod.load())
+        root = str(s.repo or "")
+        name = str((self._repos.get(root) or {}).get("name") or Path(root).name)
+        if not switch["on"] or name in switch["off"]:
+            return False
+        live = self._live_teams(records)
+        if any(
+            r.repo == root
+            and r.team in live
+            and not r.superseded_by
+            and (r.seat or {}).get("trigger") == "swept"
+            and (r.seat or {}).get("by") != "settings"
+            for r in records
+        ):
+            return False
+        first = self._first_seat(root, records, lambda m: m.get("trigger") == "swept" and m.get("by") == "settings")
+        return first is s
+
+    @staticmethod
+    def _live_teams(records: list[Session]) -> set[str]:
+        """The teams with an unattended session live (§4.9 *Starting and stopping*)."""
+        return {
             r.team for r in records if r.team and r.unattended and not r.superseded_by and r.state not in work_mod.DEAD
         }
+
+    def _first_seat(self, root: str, records: list[Session], marked: Any) -> Session | None:
+        """Among the repo's seats whose mark `marked` takes and whose team is live — supervised,
+        unattended, unsuspended — the one whose team comes first in the ledger's `declared_teams`, a
+        team it leaves out after, by name (§4.4 *An entry names its team*)."""
+        led = (self._repos.get(root) or {}).get("ledger") or {}
+        declared = [str(t).casefold() for t in led.get("declared_teams") or []]
+        live = self._live_teams(records)
         seats = [
             r
             for r in records
             if r.repo == root
-            and (r.seat or {}).get("tags")
+            and marked(r.seat or {})
             and r.team in live
             and r.supervised
             and r.unattended

@@ -158,6 +158,7 @@ class SettingsMixin:
             "spend": {"weights": settings_mod.weights(doc)},
             "person": settings_mod.person(doc),
             "notify": settings_mod.notify(doc),
+            "sweep": settings_mod.sweep(doc),
             "reach": settings_mod.reach(doc),
             "permissions": self._permissions_read(doc),
             "migrate": [],
@@ -241,6 +242,7 @@ class SettingsMixin:
         notify: dict[str, Any] | None = None,
         settle: dict[str, Any] | None = None,
         spend: dict[str, Any] | None = None,
+        sweep: dict[str, Any] | None = None,
         reach: Any = None,
         caller: Any = None,
     ) -> dict[str, Any]:
@@ -271,14 +273,16 @@ class SettingsMixin:
         - `spend`: `{weights: {as_of?, <model prefix>: {<kind>: $ per million}}}` (§5 `spend.weights`, §4.4
           *Spend per seat*, TD-830), the whole key replaced — `{}` removes it, so the design's default
           holds; an unknown kind or a price that is not a number at or above zero is refused.
+        - `sweep`: `{on?, every?, profile?}` (§5 `sweep:`, §4.9b *The sweep*, TD-1091), a field set to None
+          cleared; and `repos.<repo>.sweep` turns one repo out of it.
 
         `reach` is refused, naming `ao connect`: `set_reach` is the one RPC that writes it (§4.7, TD-648)."""
         agent_common.person_only(caller, "change the settings", "§5 settings.yml", self._graph())
         if reach is not None:
             raise RpcError("set_settings does not write reach: — `ao connect` does, through set_reach (design §4.7)")
-        if all(v is None for v in (reserves, teams, repos, person, usage, notify, settle, spend)):
+        if all(v is None for v in (reserves, teams, repos, person, usage, notify, settle, spend, sweep)):
             raise RpcError(
-                "set_settings needs reserves, teams, repos, person, usage, notify, settle or spend "
+                "set_settings needs reserves, teams, repos, person, usage, notify, settle, spend or sweep "
                 "(design §5 settings.yml)"
             )
         doc = settings_mod.load()
@@ -351,7 +355,10 @@ class SettingsMixin:
             except ValueError as e:
                 raise RpcError(str(e)) from None
             out["spend"] = {"weights": settings_mod.weights(doc)}
-        for key in ("teams", "repos", "person", "usage", "notify", "settle", "spend"):
+        if sweep is not None:
+            doc["sweep"] = self._sweep_change(doc.get("sweep"), sweep)
+            out["sweep"] = settings_mod.sweep(doc)
+        for key in ("teams", "repos", "person", "usage", "notify", "settle", "spend", "sweep"):
             if key in doc and not doc[key]:
                 doc.pop(key)
         settings_mod.save(doc)
@@ -363,7 +370,11 @@ class SettingsMixin:
                     (before_teams.get(str(name)) or {}).get("until"),
                     (after.get(str(name)) or {}).get("until"),
                 )
-        held = [k for k in ("usage_gate", "usage", "teams", "repos", "person", "notify", "settle", "spend") if k in doc]
+        held = [
+            k
+            for k in ("usage_gate", "usage", "teams", "repos", "person", "notify", "settle", "spend", "sweep")
+            if k in doc
+        ]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
         await self._push_settings()
         # detached, as the tick's hand-edit commit is: a wedged git must not hold Save up to its
@@ -406,6 +417,31 @@ class SettingsMixin:
         self._bg.add(task)
         task.add_done_callback(self._bg.discard)
         return {"reach": doc.get("reach"), "before": before}
+
+    @staticmethod
+    def _sweep_change(current: Any, sweep: Any) -> dict[str, Any]:
+        """`set_settings`'s `sweep` half: `{on?, every?, profile?}` laid over what the file holds, a field
+        set to None cleared, each checked by `parse_sweep` before anything is written."""
+        if not isinstance(sweep, dict) or not sweep:
+            raise RpcError("set_settings: sweep is {on, every, profile} (design §5 settings.yml)")
+        if unknown := sorted(set(map(str, sweep)) - set(settings_mod.SWEEP_KEYS)):
+            raise RpcError(f"sweep: unknown key {', '.join(unknown)} (known: {', '.join(settings_mod.SWEEP_KEYS)})")
+        try:
+            parsed = settings_mod.parse_sweep({k: v for k, v in sweep.items() if v is not None})
+        except ValueError as e:
+            raise RpcError(str(e)) from None
+        kept = {k: v for k, v in (current if isinstance(current, dict) else {}).items() if k in settings_mod.SWEEP_KEYS}
+        for k, v in sweep.items():
+            if v is None:
+                kept.pop(k, None)
+        return {**kept, **parsed}
+
+    async def rpc_sweep_switch(self) -> dict[str, Any]:
+        """The sweep switch as `ao team start` reads it (design §4.9b *The sweep*, TD-1091): `{on, every,
+        profile?, off: [<repo>…]}` from `settings.yml` and nothing else of it, none of it secret. **Open to
+        every caller**, the person and a session alike — a session runs `ao team start` (§4.9), where
+        `settings` is the person's own read — and served at a node from its replica (§4.4a)."""
+        return settings_mod.sweep(settings_mod.load())
 
     @staticmethod
     def _notify_change(current: Any, notify: Any) -> dict[str, Any]:
