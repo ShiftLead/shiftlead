@@ -99,7 +99,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1048 | `ao td next` neither prints the `**Taken by:**` line a new entry must carry nor passes the asking session's branch to the counter's take | Medium | Open — design; blocked by dev-cadence#TD-145 |
 | TD-1050 | A container test waits five seconds for the node's provision, and a slow CI runner fails it | Low | Open |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Open — design |
-| TD-1052 | Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own | Medium | Open |
 | TD-1055 | `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit) | Medium | Open — build |
 | TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
 | TD-1057 | `ship_cadence` gives the cache step the node's env file, and no test would notice if it did not (test audit) | Medium | Open — build |
@@ -108,7 +107,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Open — design |
+| TD-1065 | `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it | Low | Open — build |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design |
+| TD-1067 | `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading | Low | Open — build |
 | TD-1068 | The test suite runs on one core, so every precheck takes 12 minutes and main moves under it | Medium | Open |
 | TD-1074 | `promote.survey` runs `precheck_on_main` on every pass, and no test has a pass that did not read the checks (test audit) | Medium | Open — build |
 | TD-1075 | The reaper's hydrate calls take the resolver's environment, and the pinned-repo reap test hands back a copy of `os.environ` (test audit) | Low | Open — build |
@@ -2115,22 +2116,6 @@ It files each as a build entry, or as live checks where the design already holds
 
 **Related:** TD-213 (the orphaned question), TD-216; TD-1042, TD-1043 (mail refused between sessions, seen on contractmatch the same day); TD-299 (contractmatch on its container node).
 
-## TD-1052: Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/cadence.toml` (`precheck`); `scripts/precheck.py` (synced: its worktree under `tempfile.mkdtemp`, so `/tmp`); the suite's `tmp_path` (`/tmp/pytest-of-kmaster`)
-
-**Why:** the first evening of the local precheck gate (TD-1035, #2389), `precheck.py --pr 2394` recorded *failure* on 2abed34: 4 failed, 2548 errors, nearly all `OSError: [Errno 28] No space left on device` under `/tmp` or pytest's *could not create numbered dir*. `/tmp` on kmaster is a 16 GB tmpfs (RAM); several sessions' prechecks were running at once (`/tmp/precheck-2397-…`, `-2398-…` beside it), each a fresh `.venv` plus the suite's temp homes, and minutes later `/tmp` was back to 49 %. Each session now runs the suite for every PR, so concurrency is the common case: a red status from a full disk says nothing about the code, costs a 12-minute rerun, and could be read as the PR's fault.
-
-**Fix:** pick one or both: the `precheck` command sets `TMPDIR` (and so pytest's base temp) to a disk-backed directory of its own, e.g. under `~/.cache/`, cleaned at its end; and/or a bound on prechecks running at once on the machine (a lock the command takes). Measure a precheck's peak `/tmp` use first. A `TMPDIR` must stay short: one under `~/.cache/aopre2` failed 38 link and container tests with *Connection refused*, their unix sockets' paths past the ~108-byte cap (read 2026-10-26 on #2394). `precheck.py` is dev-cadence's (SYNCED): a change there is `dev-cadence#` work, filed with `ao td add --repo dev-cadence`.
-
-**Done when:** three prechecks run at once on kmaster pass, `/tmp` staying well under full; `pdm run test` and `pdm run lint` pass.
-
 ## TD-1055: `promote.survey` stores `read_checks`'s `precheck` as `r["precheck"]`, and no test would notice if it did not (test audit)
 
 **Priority:** Medium
@@ -2300,6 +2285,22 @@ It then names the build entries.
 
 **Related:** TD-998, TD-1004 (`ao` on a node's `PATH`); TD-293 (the New session form on another host); TD-299 (contractmatch on its node); TD-1051 (the `!` command's identity); TD-077 (archived: identity as a per-session secret, its option 1, and an agents-only node, its option E).
 
+## TD-1065: `test_hooks_read_each_live_agent_session_and_the_queue` races the agent's own event read, so a full run can fail it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, met measuring TD-1052)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_doctor.py` (`test_hooks_read_each_live_agent_session_and_the_queue`, the `ao-d-scraped` events file it writes)
+
+**Why:** a full `pdm run test` on 2026-10-26 failed it once — `assert by["ao-d-scraped"]["last_hook"] is None` read `'2026-10-26T23:57:45Z'` — and it passed five times alone. The test writes `ao-d-scraped.jsonl` into a running agent's events directory, and the agent's own loop can read that file before `rpc_doctor` does and stamp `_last_hook`, so the *scraped, no hook* reading the test asserts depends on which runs first.
+
+**Fix:** make the read deterministic: hold the agent's event loop for the test, or write the queue's file where only `rpc_doctor` reads it, then assert as now.
+
+**Done when:** a forced event read before `rpc_doctor` leaves the test passing. `pdm run test` and `pdm run lint` pass.
+
 ## TD-1066: A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself
 
 **Priority:** Medium
@@ -2323,6 +2324,22 @@ It then names the build entries.
 **Done when:** the ADR and §4.5/§4.5a say (a)–(f), the mockups agreed with Paul are under `docs/mockups/reviews/`, and the build entries are filed (ids from `ao td next`) with this entry's `Blocked by:` naming them.
 
 **Related:** TD-1033 (the card), TD-264 (board write-back), TD-142 (standing), TD-603 (the `board:<key>` id).
+
+## TD-1067: `test_the_repos_rpc_serves_each_reading_without_what_omit_names` races the tick that drops an unregistered repo's reading
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-1, met in TD-1052's three prechecks at once)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_ui_repos_omit.py` (`test_the_repos_rpc_serves_each_reading_without_what_omit_names`); `src/sessionorc/agent_tick.py` (the repos pass's `gone`, about line 3134)
+
+**Why:** one of three prechecks of #2411 run at once failed it: `KeyError: '/var/tmp/pc.oJj6Bl/p/test_the_repos_rpc_serves_each0'` on `agent._repos[root]`, read right after the test set it. The test puts a reading for `tmp_path` into `agent._repos`, which is no registered repo, and the running agent's repos pass pops every root not in `hosts.local_host().repos()`, so a tick between the set and the read drops it. Under load the window is wider; the other two runs and every single run passed.
+
+**Fix:** register the test's root (or stop the tick for the test) before setting the reading, and take the expected value before the call.
+
+**Done when:** a repos pass forced between the set and the call leaves the test passing. `pdm run test` and `pdm run lint` pass.
 
 ## TD-1068: The test suite runs on one core, so every precheck takes 12 minutes and main moves under it
 

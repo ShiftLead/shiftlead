@@ -19959,3 +19959,21 @@ The project edge (TD-582) compares the `project` badges, and an empty one matche
 **Related:** TD-1033 (precheck runs the suite per PR).
 
 **Resolved:** 2026-10-26 (grinder-ao-2, #2412) — the 47 `tempfile.mkdtemp()` sites in 36 files take `conftest.scratch_dir()`, a directory from the session's `tmp_path_factory` (pytest keeps three runs' base temps and removes the rest), and the two `NamedTemporaryFile(delete=False)` probes (`test_queue_card_verbs.py`, `test_ui_quote_text.py`) take `tmp_path`; `tests/test_no_temp_leaks.py` walks every test file's AST and fails on `mkdtemp`/`mkstemp`, a `TemporaryDirectory()` outside a `with`, or `NamedTemporaryFile(delete=False)`, with planted cases. A full suite run under `TMPDIR=/tmp/a53` (4267 passed) left nothing at its top level but `pytest-of-kmaster` and `ao-test-owners-1000`, the conftest's one reused owner registry. The old leaked directories are Paul's to remove (the board, due 2026-10-27); the precheck's own base temp is TD-1052's.
+
+## TD-1052: Prechecks running at once fill kmaster's 16 GB `/tmp`, and every test after that errors, so the PR reads red for no fault of its own
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-26 (grinder-ao-2, met on #2394)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/cadence.toml` (`precheck`); `scripts/precheck.py` (synced: its worktree under `tempfile.mkdtemp`, so `/tmp`); the suite's `tmp_path` (`/tmp/pytest-of-kmaster`)
+
+**Why:** the first evening of the local precheck gate (TD-1035, #2389), `precheck.py --pr 2394` recorded *failure* on 2abed34: 4 failed, 2548 errors, nearly all `OSError: [Errno 28] No space left on device` under `/tmp` or pytest's *could not create numbered dir*. `/tmp` on kmaster is a 16 GB tmpfs (RAM); several sessions' prechecks were running at once (`/tmp/precheck-2397-…`, `-2398-…` beside it), each a fresh `.venv` plus the suite's temp homes, and minutes later `/tmp` was back to 49 %. Each session now runs the suite for every PR, so concurrency is the common case: a red status from a full disk says nothing about the code, costs a 12-minute rerun, and could be read as the PR's fault.
+
+**Fix:** pick one or both: the `precheck` command sets `TMPDIR` (and so pytest's base temp) to a disk-backed directory of its own, e.g. under `~/.cache/`, cleaned at its end; and/or a bound on prechecks running at once on the machine (a lock the command takes). Measure a precheck's peak `/tmp` use first. A `TMPDIR` must stay short: one under `~/.cache/aopre2` failed 38 link and container tests with *Connection refused*, their unix sockets' paths past the ~108-byte cap (read 2026-10-26 on #2394). `precheck.py` is dev-cadence's (SYNCED): a change there is `dev-cadence#` work, filed with `ao td add --repo dev-cadence`.
+
+**Done when:** three prechecks run at once on kmaster pass, `/tmp` staying well under full; `pdm run test` and `pdm run lint` pass.
+
+**Resolved:** 2026-10-26 (grinder-ao-1, #2411) — the `precheck` command in `docs/cadence.toml` gives the suite a disk-backed `TMPDIR` of its own (`/var/tmp/pc.XXXXXX`, removed on exit) and pytest's `--basetemp` under it, a shorter path than `/tmp/pytest-of-<user>/pytest-<n>`, so the sockets fit; `tests/conftest.py`'s tmux-owner file is fixed at `/tmp` so concurrent runs still see each other (TD-025). Measured: one suite peaked at 316 MB; three prechecks of #2411 at once held `/tmp` at 48 % of its space and 75 % of its inodes (other sessions' prechecks ran beside them), and the three runs together peaked at 943 MB under `/var/tmp`. Two passed whole; the third failed one test, a pre-existing race filed as TD-1067. So the 16 GB fill of 2026-10-26 was mostly TD-1053's leaked directories (the inodes), not the prechecks' size. Left outside this repo: `precheck.py`'s own worktree (88 MB, dev-cadence's script) stays under `/tmp`.
