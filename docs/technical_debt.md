@@ -90,7 +90,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1041 | A promote concludes, and its smoke starts, only once its run has ended as well as `check` reading the commit | Medium | Open — build |
 | TD-1051 | A steer's answer is lost when the techlead that relayed it closes: a wound-down member waits on it forever, and the team's stop, start and doorbell do not see it | Medium | Designed — builds TD-1078, TD-1079, TD-1080 |
 | TD-1056 | The commit-status read takes the newest `cadence/precheck` status by position, and no test has two (test audit) | Low | Open — build |
-| TD-1058 | `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit) | Low | Open — build |
 | TD-1059 | `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit) | Low | Open — build |
 | TD-1060 | `ship_cadence` copies with `symlinks=True`, and no test tree holds a symlink (test audit) | Low | Open — build |
 | TD-1061 | Nothing runs the stranded-work sweep on a schedule, so attention items sit overdue: a sweep seat, and a Settings switch that gives every team one | Medium | Open |
@@ -1924,24 +1923,6 @@ It files each as a build entry, or as live checks where the design already holds
 **Done when:** the `mine[-1]` probe fails a test. `pdm run test` and `pdm run lint` pass.
 
 **Related:** TD-1037, TD-1033.
-
-## TD-1058: `ship_cadence`'s *shipped once* guard is tested by a directory listing alone, so a second run that fails reads as passing (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-26 (test-audit-ao-1, auditing #2396, #2394, #2390)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/containers.py` (`ship_cadence`: `if not dest.is_dir():`), `tests/test_containers.py` (`test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache`)
-
-**Why:** The test's comment says *shipped once: a second run copies nothing new* and asserts `sorted(p.name for p in shipped.parent.iterdir()) == [ref]`. Probed on `origin/main`: replacing `if not dest.is_dir():` with `if True:` leaves `tests/test_containers.py` at 55 passed: the second copy fails on the existing `dest` (`tmp.rename`), is caught as `OSError`, and the run logs *could not be shipped* and returns None, with the listing unchanged.
-
-**Fix:** assert the second `host_up`'s log carries no *shipping dev-cadence* or *could not be shipped* line, and that `ship_cadence` returns the commit.
-
-**Done when:** the probe above fails a test. `pdm run test` and `pdm run lint` pass.
-
-**Related:** TD-1014.
 
 ## TD-1059: `CADENCE_INTO_CACHE`'s recovery of a stale `.ship-<commit>` is never run by a test (test audit)
 

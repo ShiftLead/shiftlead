@@ -378,8 +378,14 @@ def test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache(hom
     assert into[0][-2:] == [f"/shiftlead/cadence/{ref}", ref]
     # the cache written is the one the agent's launcher reads: the step runs in the agent's env (TD-1057)
     assert into[0][into[0].index("--env-file") + 1] == str(n.env_file)
-    containers.host_up("contractmatch", Fake())  # shipped once: a second run copies nothing new
+    said: list[str] = []
+    again = Fake()
+    again.log = said.append
+    containers.host_up("contractmatch", again)  # shipped once: a second run copies nothing new (TD-1058)
     assert sorted(p.name for p in shipped.parent.iterdir()) == [ref]
+    assert not [line for line in said if "shipping dev-cadence" in line or "could not be shipped" in line], said
+    assert len(again.execs(containers.CADENCE_INTO_CACHE)) == 1
+    assert containers.ship_cadence(n, Fake(), "abc123def456", "developer") == ref
     os.chmod(shipped / "files", 0o555)  # as the launcher leaves its trees
     os.chmod(shipped, 0o555)
     containers.host_forget("contractmatch", Fake(ps=""), purge=True)
