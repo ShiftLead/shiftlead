@@ -1929,7 +1929,6 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed 2026-10-27 (the designer) — design §4.9 *A team's size* and *A member started from the form* (and *A person in the team*'s form bullet, *Add or remove a member*'s share, *A member renamed or removed*'s run-only pass), §4.9c *Every listed flow must be followable*, §6 rules 8–9 (a run-only record), §5 `teams.<team>.size`, §4.7 `ao team size` and `ao team add`, §4.5a (New session **member line** fill + **keep as a team member**, the Team picker, Members… and its **− / +**), glossary *run-only member* and *size*. A form start of a member-line role is a run-only member of the running team by default; the tick keeps it (the size one higher); *run it under me instead* is TD-160's session. Was: Open — design first, two parts: the form fills from the team's member line, and a team's size is a setting (part 2, Paul 2026-10-27)
-**Blocked by:** TD-1164, TD-1165, TD-1166, TD-1167
 **Location:** `src/shiftlead/ui/static/app.js` (`applyTeam` 4809, `tickTeamManager`, `teamRoles`, `applyRole`); `src/shiftlead/ui/templates/new.html` (the Team picker, 70–79, its `data-` attributes); `src/shiftlead/ui/common.py` (`teams_for_form` 901); `src/shiftlead/ui/app.py` (`new_submit` 2423: the preset resolution through `repoconfig.resolve_role`); design §4.5a *New session* (**the form**, **Team** picker, **Role** pick + **Lane** field), §4.9 *A person in the team* (TD-160) and *Add or remove a member from the team card* (TD-163); for part 2, `src/shiftlead/org.py` (the member's `count:`, 146), `src/shiftlead/teams.py` (`plan`, 1028), `src/shiftlead/ui/settings_page.py` (the Teams card, beside `on_work`), `src/sessionorc/work.py` (`sat_out`, 55), design §5 *Configuration* (`teams.<team>`), §4.5a *Settings page* **Teams** and the Members rows, §4.9c *Every listed flow must be followable*
 
 **Why:** Paul, 2026-10-27, after starting a second grinder for dev-cadence from the New session form, to take TD-165 beside the grinder holding TD-090: "It seems like the new session form should fill the rest of itself out after I choose the grinder role." He picked Team *dc-grind* and Role *grinder*. The session started and claimed TD-165, but `ao --json status` shows it is not what dc-grind's member is:
@@ -2000,6 +1999,7 @@ That is the design working as written: a Team pick makes *a person's own session
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
+**Part of:** TD-1149
 **Location:** `src/shiftlead/org.py` (`MemberDef.names` 154); `src/shiftlead/teams.py` (`plan` 1028); `src/sessionorc/models.py` (`run_only` on the record, `HOME_OWNED`), `src/sessionorc/agent.py` (the `keep` act) and `src/sessionorc/settings.py` (`TEAM_KEYS` 359 and the teams validation ~493 — **held**: `src/sessionorc/**`, read by the techlead); `src/shiftlead/flowdefs.py` (`unfollowable` 338, the followable check, called from `teams.py` 415 and 646); `src/shiftlead/cli.py` (`ao team on-work` 2205 as the pattern; `ao team list`; `ao org check`); design §4.9 *A team's size*, §4.9c *Every listed flow must be followable*, §5 `teams.<team>.size`, §4.7 `ao team size`
 
 **Why:** TD-1149 part 2: a team's member count is only its definition's `count:`, so a second grinder for a repo-defined team is a PR.
@@ -2019,6 +2019,7 @@ That is the design working as written: a Team pick makes *a person's own session
 **Kind:** build
 **Status:** Open — build
 **Blocked by:** TD-1164, TD-1166
+**Part of:** TD-1149
 **Location:** `src/shiftlead/org.py` (`edit_members` 1060); `src/shiftlead/ui/app.py` (the members route); the Members dialog's template and `app.js`; design §4.9 *A team's size* (**− / +**, *Add member and Remove keep the definition's share*), §4.5a *team card: Members…*, *Members dialog* **− / +** and **Add member / Remove**, *Members… on a repo-defined team*
 
 **Why:** TD-1149 part 2: the size's two controls are the dialog's **− / +** and the form's tick (TD-1167); the dialog is disabled today on a repo-defined team, where the size is wanted most.
@@ -2038,6 +2039,7 @@ That is the design working as written: a Team pick makes *a person's own session
 **Kind:** build
 **Status:** Open — build
 **Blocked by:** TD-1164
+**Part of:** TD-1149
 **Location:** **held** (`src/sessionorc/**`, read by the techlead): `src/sessionorc/models.py` (the record); `src/sessionorc/work.py` (`sat_out` 55, `crew`, `team_wound_down`); `src/sessionorc/agent.py` (`_sit_out` 2546) and `src/sessionorc/agent_tick.py` (the home's wind-down, stop and conclusion paths, §6 rules 8–9); `src/shiftlead/ui/cards.py` 785 (the card's `closed_for` reading, which reads `why == "sit_out"`); `src/sessionorc/agent_remote.py` 497 (`_route_act`: `closed_for` is `HOME_OWNED`, models.py 118–135, so a node member's mark is written on the home's copy there); `src/sessionorc/agent_tick.py` (`_work_replays` 2203–2225, the stop/wound-down reading ~1987/2046); `src/shiftlead/teamrun.py` (`renames` 1100, the TD-703 diff); `src/shiftlead/cli.py` (`ao team add`); design §4.9 *A member started from the form*, *A member renamed or removed*, §4.7 `ao team add`
 
 **Why:** TD-1149: a member started for this run must be one of the team's crew while it runs and never come back after it, without a definition edit.
@@ -2057,6 +2059,7 @@ That is the design working as written: a Team pick makes *a person's own session
 **Kind:** build
 **Status:** Open — build
 **Blocked by:** TD-1165, TD-1166
+**Part of:** TD-1149
 **Location:** `src/shiftlead/ui/static/app.js` (`applyTeam` 4809, `tickTeamManager`, `teamRoles`, `applyRole`); `src/shiftlead/ui/templates/new.html` (the Team picker 70–79); `src/shiftlead/ui/common.py` (`teams_for_form` 901: the member lines); `src/shiftlead/ui/app.py` (`new_submit` 2423); design §4.9 *A member started from the form*, *A person in the team*, §4.5a *New session* **Team** picker and **member line** fill + **keep as a team member**
 
 **Why:** TD-1149 part 1, Paul: *the new session form should fill the rest of itself out after I choose the grinder role*. Today a Team and Role pick fills the preset only and starts the person's own session.
