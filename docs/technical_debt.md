@@ -97,8 +97,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1131 | A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter | Medium | Open — build, blocked by TD-1130 |
 | TD-1132 | The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:` | Medium | Open — build, blocked by TD-1130 |
 | TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
-| TD-1141 | `_fillable` (#2495) drops its `unattended` test and no test fails: a closed seat that is supervised but not unattended is still taken for an address | Low | Open |
-| TD-1142 | `message_edge`'s `own` reply (#2493) drops its `target in chain(…)` test and no test fails: a reply to a person-session's entry could go to any record | Medium | Open |
 | TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Open |
 
 ---
@@ -2074,42 +2072,6 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 4. The *Done when … Blocked by: names them* sentences (TD-748, TD-909, TD-857, TD-1009) are fixed as they are touched.
 
 **Done when** no open `design-first` entry's `Blocked by:` names a local entry that is its build (read by hand), no *legacy edge* ℹ stands on the ledger, every open design's builds name it in `Part of:`, the fallbacks are gone, and the Queue's cards read by *part of* alone.
-
----
-
-## TD-1141: `_fillable` (#2495) drops its `unattended` test and no test fails: a closed seat that is supervised but not unattended is still taken for an address
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1, auditing #2495)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_mail.py` `_fillable` (`bool(r.supervised and r.unattended)`); `tests/test_question_seat.py::test_a_closed_seat_is_the_address_and_the_ask_fills_it`; design §4.10 *A team or a repo as the address* ("supervised, unattended, neither suspended nor sat out"), `agent_tick.py` `_seat_pass`
-
-**Why:** `_fillable` and the design say rule 3 fills a closed seat only if it is supervised *and* unattended (`_seat_pass`: `not (s.seat and s.supervised and s.unattended)` returns). Probe: in the worktree, change `bool(r.supervised and r.unattended)` to `bool(r.supervised)` and run `tests/test_question_seat.py tests/test_own_sessions_edge.py tests/test_cli.py`: 106 passed. The test's loop over `sit_out`, `closed_for` and `suspended`, and its `rec.supervised = False` case, each fail when their line goes; the `unattended` half has no case. A seat the person took over (`unattended` False) would then be an address an `ask` waits on forever, which the test's own docstring says `_fillable` exists to prevent. (The other mutations of #2495's resolver and `_one_seat` rank — each term of the sit-out/suspended test, `closed` ranked with or below `exited` — fail a test.)
-
-**Fix:** In that test, set `rec.unattended = False` after the `supervised` case and assert the same `no question seat` refusal, then restore it.
-
-**Done when** the mutation above fails the test.
-
----
-
-## TD-1142: `message_edge`'s `own` reply (#2493) drops its `target in chain(…)` test and no test fails: a reply to a person-session's entry could go to any record
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1, auditing #2493)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/mail.py` `message_edge`, the `kind == "reply"` branch of the `own` edge (`target in chain(records, replied.from_, successor)`, ~line 472); `tests/test_own_sessions_edge.py::test_a_member_replies_back_along_the_edge_and_nothing_else_goes_back`
-
-**Why:** The docstring says the reply goes "to that sender or a record its `superseded_by` chain reaches". Probe: replace `and target in chain(records, replied.from_, successor)` with `and True` on that branch alone (line 472, not the question-seat branch at 482) and run `tests/test_question_seat.py tests/test_own_sessions_edge.py tests/test_cli.py`: 106 passed. The test sends the reply to `a` and to its successor `a2`, both of which the chain reaches, and has no case of a reply on an entry from `a` addressed to some other record (`w2`, `mgr`), which the edge must refuse. So the edge can widen from "back to the asker" to "a reply to anyone" unseen.
-
-**Fix:** In that test add a `message_edge`/`message_gate` case: `w` replies on `_entry("m-1", "a")` to an unrelated record (`b`, `mgr`) and passes no own edge.
-
-**Done when** the mutation above fails the test.
 
 ---
 
