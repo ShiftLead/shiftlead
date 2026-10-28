@@ -175,3 +175,101 @@ def test_a_ledger_in_neither_layout_reads_as_an_error(tmp_path, rel):
     root.mkdir()
     got = ledger.reading(root, NOW, with_history=False, rel=rel)
     assert "entries" not in got and got["error"].endswith("No such file or directory")
+
+
+def _fault(root: Path) -> str:
+    """Breaks one entry file of the v2 ledger at `root`: its heading names another id. The fault's words."""
+    led = root / "docs" / "ledger"
+    first = next(p for p in sorted(led.glob("TD-*.md")))
+    text = first.read_text(encoding="utf-8")
+    first.write_text(text.replace("## TD-", "## TD-9", 1), encoding="utf-8")
+    (problem,) = lb.v2_problems("docs/ledger", *ledger.fs_io(root))
+    return problem
+
+
+def test_a_faulted_v2_ledger_is_reported_not_read(tmp_path):
+    """§4.4 *A faulted v2 ledger is reported, not read*: the reading's ledger is an error with
+    `v2_problems()`'s words, an id of it keeps its block, and at a past revision it reads as none."""
+    two = _v2(tmp_path / "two")
+    words = _fault(two)
+    got = ledger.reading(two, NOW, with_history=False)
+    assert "entries" not in got and got["error"] == f"docs/ledger is faulted: {words}"
+    open_id = next(e["id"] for e in lb.entries(LEDGER))
+    state, why = ledger.Registry([str(two)])(f"two#{open_id}")
+    assert state == "unresolved" and why.endswith(f"docs/ledger is faulted: {words}")
+    _commit(two)
+    _git(two, "update-ref", "refs/remotes/origin/main", "HEAD")
+    none, why = ledger.entries_before(two, "docs/ledger", None)
+    assert none is None and why.startswith(f"docs/ledger is faulted: {words} at origin/main ")
+
+
+def test_a_directory_whose_readme_declares_no_v2_is_faulted(tmp_path):
+    two = _v2(tmp_path / "two")
+    readme = two / "docs" / "ledger" / "README.md"
+    readme.write_text(readme.read_text(encoding="utf-8").replace("Ledgerboard: 2", ""), encoding="utf-8")
+    got = ledger.reading(two, NOW, with_history=False)
+    assert "entries" not in got and "README.md declares no `Ledgerboard: 2`" in got["error"]
+    readme.unlink()
+    assert "README.md declares no `Ledgerboard: 2`" in ledger.reading(two, NOW, with_history=False)["error"]
+
+
+def test_the_seams_read_a_v2_ledger_as_its_v1_twin(tmp_path):
+    """§4.4 *The seams*: a v2 directory's major from its README, its entry count as its v1 twin's; a faulted
+    one *unreadable* with the words; a path neither a file nor a directory *absent*."""
+    from sessionorc import seams
+
+    one, two = _v1(tmp_path / "one"), _v2(tmp_path / "two")
+    a, b = seams.ledger(one), seams.ledger(two)
+    assert (a["state"], a["major"], a["directory"]) == ("ok", 1, False)
+    assert (b["path"], b["state"], b["major"], b["directory"]) == ("docs/ledger", "ok", 2, True)
+    assert a["entries"] == b["entries"] == len(lb.entries(LEDGER))
+    words = _fault(two)
+    got = seams.ledger(two)
+    assert got["state"] == "unreadable" and got["why"] == words and got["entries"] is None
+    assert seams.ledger_lack(got, two) == f"unserved: the ledger at docs/ledger does not parse — {words}"
+    (two / ".shiftlead.yml").write_text("ledger: work/todo\n", encoding="utf-8")
+    assert seams.ledger(two)["state"] == "absent"
+
+
+def test_a_set_ledger_gone_from_the_tree_reads_the_other_layout_and_is_warned_of(tmp_path):
+    """§4.4 *Either layout*: a set `ledger:` read live goes through `layout_at`, and the seams warn."""
+    from sessionorc import seams
+
+    two = _v2(tmp_path / "two")
+    (two / ".shiftlead.yml").write_text("ledger: docs/technical_debt.md\n", encoding="utf-8")
+    got = seams.reading(two)
+    assert got["ledger"]["path"] == "docs/ledger" and got["ledger"]["state"] == "ok"
+    assert "`ledger:` names docs/technical_debt.md, which is gone: reading docs/ledger" in got["warnings"]
+    read = ledger.reading(two, NOW, with_history=False)
+    assert read["path"] == "docs/ledger" and read["entries"]
+    (two / ".shiftlead.yml").unlink()
+    assert not any("which is gone" in w for w in seams.reading(two)["warnings"])
+
+
+@pytest.mark.parametrize("pinned", [False, True])
+def test_a_v2_ledger_under_a_tree_that_predates_its_reader_is_unserved(tmp_path, monkeypatch, pinned):
+    """§5 *Which dev-cadence*: a directory under a dev-cadence older than `OLDEST_V2` lacks *predates*,
+    which the sync cures (its key passed over by the sync pass); a v1 file under the same tree does not."""
+    from sessionorc import cadence, seams
+
+    asked: list[str] = []
+
+    def descends(commit, roster, source="", oldest=None):
+        oldest = oldest or cadence.OLDEST
+        asked.append(oldest)
+        return oldest != cadence.OLDEST_V2, None
+
+    monkeypatch.setattr(seams, "descends", descends)
+    monkeypatch.setattr(seams.cadence, "pinned", lambda root: pinned)
+    monkeypatch.setattr(seams, "_lock", lambda root: ({"source": "x", "files_commit": "abc1234def"}, None))
+    one, two = _v1(tmp_path / "one"), _v2(tmp_path / "two")
+    assert seams.reading(one)["ledger"]["state"] == "ok" and asked == [cadence.OLDEST]
+    got = seams.reading(two)
+    assert got["ledger"]["state"] == "predates"
+    cure = "bump the pin" if pinned else "sync it"
+    words = f"unserved: the ledger is a directory and dev-cadence at abc1234 predates its v2 reader (b9236c8) — {cure}"
+    assert {"key": "ledger_age", "words": words} in got["serve"]["lacks"]
+    assert words not in seams.unserved({"seams": got}, but=("age", "ledger_age"))
+    asked.clear()
+    seams.reading(two, old=got)  # the age is carried: ancestry never changes
+    assert asked == []
