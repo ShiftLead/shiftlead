@@ -2219,6 +2219,25 @@ def cmd_team_on_work(args: argparse.Namespace) -> int:
     return emit(args, got, lambda: print(_team_setting_line(name, t)))
 
 
+def cmd_team_size(args: argparse.Namespace) -> int:
+    """`ao team size <team> <line> <n>` (design §4.7, §4.9 *A team's size*, TD-1164): the member line's
+    size written to `teams.<team>.size.<line>` through `set_settings` — a person's own, refused to a
+    session — and, on a live team, its sessions created or wound down to match (`teamrun.resize`, the
+    Members dialog's **− / +**), refused for a line the definition does not name, below 0, below what
+    a listed flow needs, and where a step up's next name is another line's. Prints *grinder-ao: 3 (file
+    says 2)* and what it started or wound down."""
+    try:
+        org = _org_here()
+        name = _defined_team(args, org)
+        got = teamrun.resize(
+            call_sync, org, name, args.line, args.n, hosts.local_host().name,
+            caller=os.environ.get("SHIFTLEAD_SESSION") or None,
+        )  # fmt: skip
+    except (ValueError, teams.TeamError, AgentError) as e:
+        return fail(args, str(e), 1)
+    return emit(args, got, lambda: print(got["text"]))
+
+
 def cmd_team_flow(args: argparse.Namespace) -> int:
     """`ao team flow <team> [<flow> | --apply]` (design §4.7, §4.9c): with no flow, the team's flows
     in order, the current one marked, each one's flow strip and why the team cannot use it, and, for a
@@ -4730,6 +4749,12 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("name")
     q.add_argument("what", choices=settings_mod.ON_WORK, help="ask: an Inbox row (the default); start: the home starts")
     q.set_defaults(fn=cmd_team_on_work)
+
+    q = add_team("size", help="how many sessions a member line runs, over its count: (§4.9 A team's size)")
+    q.add_argument("name")
+    q.add_argument("line", help="the member line's name: (its role where it writes none)")
+    q.add_argument("n", type=int, help="a whole number from 0; on a live team, members started or wound down to match")
+    q.set_defaults(fn=cmd_team_size)
 
     q = add_team("flow", help="the team's flows, the one it runs marked; with a flow, pick it (§4.9c)")
     q.add_argument("name")

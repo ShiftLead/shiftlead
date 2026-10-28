@@ -127,3 +127,98 @@ def test_the_members_view_and_a_live_add_read_the_sized_names(world, tmp_path): 
     got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="hunter")
     assert [c["name"] for c in creates(state)] == ["hunter"]  # grind-3 is not started again
     assert [r["name"] for r in got["created"]] == ["hunter"]
+
+
+# ── slice 2: the next free name, a resize, `ao team size` ──────────────────────────────────────────
+
+
+def _rec(name: str, **kw) -> dict:
+    return {"id": f"ao-{name}", "name": name, "team": "ao-grind", "state": "idle", "unattended": True, **kw}
+
+
+def test_next_free_is_past_the_size_or_from_a_position_and_skips_a_held_name(world, tmp_path):  # noqa: F811
+    team = _sized(world, tmp_path, {"grind": 3}).teams["ao-grind"]
+    assert team.next_free("grind", []) == "grind-4"  # past the size
+    assert team.next_free("grind", [], from_=1) == "grind-2"
+    assert team.next_free("grind", [_rec("grind-2")], from_=1) == "grind-3"  # a live record holds grind-2
+    assert team.next_free("grind", [_rec("grind-4")]) == "grind-5"
+    ended = _rec("grind-4", state="closed", closed_for={"why": "run_ended"})
+    assert team.next_free("grind", [ended]) == "grind-4"  # a run_ended record holds none: the create supersedes it
+    sat = _rec("grind-4", state="closed", closed_for={"why": "sit_out"})
+    assert team.next_free("grind", [sat, _rec("grind-5", superseded_by="x")]) == "grind-4"
+    assert team.next_free("hunt", [_rec("hunt")], from_=0) == "hunt-2"  # a count-1 line's extras are -2, -3
+    with pytest.raises(ValueError, match="team ao-grind has no member line 'mill' \\(its lines: grind, hunt\\)"):
+        team.next_free("mill", [])
+
+
+def test_ao_team_size_on_a_stopped_team_writes_the_setting_only(world, tmp_path, capsys):  # noqa: F811
+    _, state = world
+    assert cli.main(["team", "size", "ao-grind", "hunt", "2"]) == 0
+    assert capsys.readouterr().out.strip() == "hunt: 2 (file says 1) · from the next Start"
+    assert state["teams"] == {"ao-grind": {"size": {"hunt": 2}}}
+    assert cli.main(["team", "size", "ao-grind", "grind", "1"]) == 0  # the other line's size kept
+    assert state["teams"]["ao-grind"]["size"] == {"hunt": 2, "grind": 1}
+    assert not creates(state) and not [c for c in state["calls"] if c[0] == "relaunch"]
+
+
+@pytest.mark.parametrize(
+    ("line", "n", "says"),
+    [
+        ("mill", "2", "team ao-grind has no member line 'mill' (its lines: grind, hunt, grind-3)"),
+        ("grind", "-1", "grind: a size is a whole number of sessions, 0 or more, not -1"),
+        ("grind", "0", "build-review needs a grinder: drop build-review from flows: first"),
+        ("grind", "3", "grind-3 is another line's: rename one of them in the definition"),
+    ],
+)
+def test_ao_team_size_refuses_and_writes_nothing(world, tmp_path, capsys, line, n, says):  # noqa: F811
+    _, state = world
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["teams"]["ao-grind"].update(flows=["build-review"], techlead={"name": "techlead-ao"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "hunter", "name": "grind-3"})
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "size", "ao-grind", line, n]) == 1
+    assert says in capsys.readouterr().err
+    assert "teams" not in state
+
+
+def test_a_resize_on_a_live_team_creates_one_and_winds_one_down(world, tmp_path, capsys):  # noqa: F811
+    _, state = world
+    started(state)
+    capsys.readouterr()
+    assert cli.main(["team", "size", "ao-grind", "grind", "3"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("grind: 3 (file says 2)") and "started grind-3 under ao-shiftlead-orc-ao" in out
+    made = creates(state)
+    assert [p["name"] for p in made] == ["grind-3"] and made[0]["controllers"] == ["ao-shiftlead-orc-ao"]
+    state["calls"].clear()
+    assert cli.main(["team", "size", "ao-grind", "grind", "1"]) == 0
+    out = capsys.readouterr().out
+    downs = [p for m, p in state["calls"] if m == "relaunch"]
+    assert [p["id"] for p in downs] == ["ao-shiftlead-grind-3", "ao-shiftlead-grind-2"]  # highest first
+    assert all(p["sit_out"] and p["dropped"] for p in downs) and not creates(state)
+    assert out.startswith("grind: 1 (file says 2) — grind-3 is wound down by the home")
+    # a step up skips a name a live record already holds and starts nothing twice
+    state["calls"].clear()
+    for s in state["sessions"]:
+        s.pop("sit_out", None)
+    assert cli.main(["team", "size", "ao-grind", "grind", "3"]) == 0
+    assert not creates(state)
+
+
+def test_a_lowered_size_on_a_stopped_team_is_a_removal_start_marks(world, tmp_path, capsys):  # noqa: F811
+    _, state = world
+    started(state)
+    state["host"] = {"host": "local"}
+    for s in state["sessions"]:
+        s["state"] = "closed"
+    (tmp_path / "home" / "settings.yml").write_text(yaml.safe_dump({"teams": {"ao-grind": {"size": {"grind": 1}}}}))
+    org = orgmod.with_home_settings(orgmod.load())
+    plan = teams.plan(org, "ao-grind", HOST, files=teamrun.files_via(cli.call_sync))
+    _, removals = teamrun.renames(plan, state["sessions"])
+    assert [r["name"] for r in removals] == ["grind-2"]
+    state["calls"].clear()
+    assert cli.main(["--json", "team", "start", "ao-grind", "--anyway"]) == 0
+    acts = [(m, p) for m, p in state["calls"] if m in ("create", "relaunch")]
+    assert acts[0] == ("relaunch", {"id": "ao-shiftlead-grind-2", "sit_out": True, "dropped": True})
+    assert "grind-2" not in {p["name"] for m, p in acts if m == "create"}
