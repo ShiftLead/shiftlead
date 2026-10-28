@@ -275,6 +275,10 @@ def test_a_member_replies_back_along_the_edge_and_nothing_else_goes_back():
         for back in ("a", "a2"):
             assert mail.message_edge(records, "w", back, kind="reply", replied=got) == "own", (kind, back)
             assert mail.message_gate(records, "w", back, kind="reply", replied=got) is None
+        # and to a record the sender's chain does not reach, no own edge
+        for other in ("b", "u"):
+            assert mail.message_edge(records, "w", other, kind="reply", replied=got) is None, (kind, other)
+            assert mail.message_gate(records, "w", other, kind="reply", replied=got) is not None
     # the member's unprompted note, ask or steer to it passes no edge
     for kind in ("note", "ask", "steer"):
         assert mail.message_gate(records, "w", "a", kind=kind) is not None
