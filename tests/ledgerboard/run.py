@@ -14,7 +14,9 @@ line (exit 1 when it is not a release header, or the hash does not match). Stdli
 Fixtures, each an invented input and its expected JSON:
 - ``ledger/<case>.md`` (+ ``<case>.archive.md``, optional ``<case>.resolve.json`` mapping a
   ``<repo>#TD-NNN`` item to ``[state, why]``, optional ``<case>.rank.yml``, its rank file) →
-  ``<case>.json``: ``pickable()`` and ``check()``.
+  ``<case>.json``: ``pickable()`` and ``check()``. Its optional v2 twin, the directory
+  ``<case>.v2/`` (``README.md``, ``TD-NNN.md``, ``archive/``, ``rank.yml``), is what ``split()``
+  writes from the v1 texts, and ``load()`` of it gives the same ``<case>.json`` (v2.0).
 - ``board/<case>.md`` → ``<case>.json``: every open item's ``item_record()`` at ``TODAY``, plus
   ``item_key()`` of every item line and ``closed_items()``.
 - ``edit/cases.json`` → ``edit/expected.json``: ``edit_line()``, ``subject()``, ``subject_kind()``,
@@ -23,6 +25,8 @@ Fixtures, each an invented input and its expected JSON:
   ``queue_subject()``, ``implicit_key()``, ``key_order()``, ``midpoint()``, ``rank()``, ``set_rank()``,
   ``rank_path()`` and ``components()`` of a ledger fixture's entries (v1.2); an answer's
   consequence — ``item_record()``'s ``consequences`` and ``decided_line()``'s marked label (v1.3).
+- ``ledger/parts.md`` (v2.1): ``Part of`` — a parent with open and with archived parts, the order,
+  and each check; ``components()`` of it joins through the field.
 """
 
 from __future__ import annotations
@@ -72,15 +76,35 @@ def _refused(fn):
         return {"refused": str(e)}
 
 
-def ledger_case(L, md: Path) -> dict:
-    text = md.read_text(encoding="utf-8")
+def fs_ls(path: str) -> list[str] | None:
+    """``ls`` for ``load()`` over the file system (SPEC *The ledger as a directory*)."""
+    p = Path(path)
+    return sorted(c.name for c in p.iterdir() if c.is_file()) if p.is_dir() else None
+
+
+def fs_read(path: str) -> str | None:
+    p = Path(path)
+    return p.read_text(encoding="utf-8") if p.is_file() else None
+
+
+def v1_texts(md: Path) -> tuple[str, str, str | None]:
+    """(ledger, archive, rank file or None) of a v1 case."""
     arch = md.with_name(md.stem + ".archive.md")
-    archive = arch.read_text(encoding="utf-8") if arch.exists() else ""
+    rk = md.with_name(md.stem + ".rank.yml")
+    return (md.read_text(encoding="utf-8"), arch.read_text(encoding="utf-8") if arch.exists() else "",
+            rk.read_text(encoding="utf-8") if rk.exists() else None)
+
+
+def v2_files(d: Path) -> dict[str, str]:
+    """A v2 case directory as {relative path: text}, its rank file left out."""
+    return {c.relative_to(d).as_posix(): c.read_text(encoding="utf-8")
+            for c in sorted(d.rglob("*")) if c.is_file() and c.name != "rank.yml"}
+
+
+def ledger_case(L, md: Path, texts: tuple[str, str, str | None] | None = None) -> dict:
+    text, archive, rank_text = texts or v1_texts(md)
     res = md.with_name(md.stem + ".resolve.json")
     table = json.loads(res.read_text(encoding="utf-8")) if res.exists() else {}
-
-    rk = md.with_name(md.stem + ".rank.yml")
-    rank_text = rk.read_text(encoding="utf-8") if rk.exists() else None
 
     def resolve(item):
         return tuple(table[item]) if item in table else ("unresolved", f"{item} is not in the fixture's resolver")
@@ -143,10 +167,30 @@ def edit_cases(L, spec: dict, root: Path = HERE) -> dict:
     return out
 
 
+def v2_case(L, md: Path) -> dict:
+    """A v1 case's v2 twin, ``<case>.v2/``: ``split()`` of the v1 texts must write it file for file,
+    and ``load()`` of it must give the v1 case's expected JSON, its summary rows aside (none in v2)."""
+    d = md.with_name(md.stem + ".v2")
+    led, arc, _ = v1_texts(md)
+    got = ledger_case(L, md, (*L.load(str(d), fs_ls, fs_read), fs_read(L.rank_path(str(d)))))
+    rows, got["rows"] = got["rows"], "(the v1 twin's)"
+    got["v2"] = {"split_matches_dir": _refused(lambda: L.split(led, arc)) == {"ok": v2_files(d)},
+                 "rows": rows, "problems": L.v2_problems(str(d), fs_ls, fs_read)}
+    return got
+
+
+def v2_expected(want: dict | None) -> dict | None:
+    if want is None:
+        return None
+    return dict(want, rows="(the v1 twin's)", v2={"split_matches_dir": True, "rows": [], "problems": []})
+
+
 def cases(L, root: Path):
     for md in sorted((root / "ledger").glob("*.md")):
         if not md.name.endswith(".archive.md"):
             yield md.with_suffix(".json"), ledger_case(L, md)
+            if md.with_name(md.stem + ".v2").is_dir():
+                yield (md.with_suffix(".json"), "v2"), v2_case(L, md)
     for md in sorted((root / "board").glob("*.md")):
         yield md.with_suffix(".json"), board_case(L, md)
     spec = json.loads((root / "edit" / "cases.json").read_text(encoding="utf-8"))
@@ -168,14 +212,20 @@ def main(argv: list[str] | None = None) -> int:
     n = 0
     for path, got in cases(L, HERE):
         n += 1
+        twin = isinstance(path, tuple)  # a v2 case: its v1 twin's expected JSON is its own
+        path = path[0] if twin else path
         got = json.loads(json.dumps(got, default=str))
         if a.write:
-            path.write_text(json.dumps(got, indent=1, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+            if not twin:
+                path.write_text(json.dumps(got, indent=1, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
             continue
         want = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+        if twin:
+            want = v2_expected(want)
         if got != want:
             bad += 1
-            print(f"FAIL {path.relative_to(HERE)}: the module's output differs from the expected JSON")
+            print(f"FAIL {path.relative_to(HERE)}{' (its v2 twin)' if twin else ''}: "
+                  "the module's output differs from the expected JSON")
     if a.write:
         print(f"wrote {n} expected file(s)")
         return 0

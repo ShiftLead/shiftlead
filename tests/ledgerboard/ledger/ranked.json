@@ -14,6 +14,22 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-015: every blocker is archived (TD-020) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-016",
+   "kind": "cycle",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-016: on a waits-on cycle with TD-017 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-017",
+   "kind": "cycle",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-017: on a waits-on cycle with TD-016 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
   }
  ],
  "check_since_empty": [
@@ -24,6 +40,22 @@
    "level": "info",
    "standing": false,
    "text": "ℹ TD-015: every blocker is archived (TD-020) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-016",
+   "kind": "cycle",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-016: on a waits-on cycle with TD-017 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-017",
+   "kind": "cycle",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-017: on a waits-on cycle with TD-016 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
   }
  ],
  "declared": {},
@@ -38,6 +70,8 @@
    },
    "id": "TD-011",
    "key": "0h",
+   "part_of": null,
+   "parts_open": [],
    "pickable": true,
    "priority": "Low",
    "title": "Low, ranked to the top",
@@ -56,6 +90,8 @@
    },
    "id": "TD-012",
    "key": "1|0|000012",
+   "part_of": null,
+   "parts_open": [],
    "pickable": false,
    "priority": "High",
    "title": "Joins the ranked card later",
@@ -71,6 +107,8 @@
    },
    "id": "TD-010",
    "key": "1|0|000010",
+   "part_of": null,
+   "parts_open": [],
    "pickable": true,
    "priority": "High",
    "title": "High and unranked",
@@ -87,6 +125,8 @@
    },
    "id": "TD-015",
    "key": "2|0|000015",
+   "part_of": null,
+   "parts_open": [],
    "pickable": true,
    "priority": "Medium",
    "title": "Its blocker is archived",
@@ -105,6 +145,8 @@
    },
    "id": "TD-016",
    "key": "2|0|000016",
+   "part_of": null,
+   "parts_open": [],
    "pickable": false,
    "priority": "Medium",
    "title": "One half of a cycle",
@@ -123,6 +165,8 @@
    },
    "id": "TD-017",
    "key": "2|0|000017",
+   "part_of": null,
+   "parts_open": [],
    "pickable": false,
    "priority": "Medium",
    "title": "The other half",
@@ -138,6 +182,8 @@
    },
    "id": "TD-014",
    "key": "3|0|000014",
+   "part_of": null,
+   "parts_open": [],
    "pickable": true,
    "priority": "Low",
    "title": "The low prerequisite",
@@ -157,6 +203,8 @@
    },
    "id": "TD-013",
    "key": "2|1|000013",
+   "part_of": null,
+   "parts_open": [],
    "pickable": false,
    "priority": "Medium",
    "title": "A feature that waits on a low one",
@@ -181,6 +229,8 @@
    },
    "id": "TD-019",
    "key": "3|0|000019",
+   "part_of": null,
+   "parts_open": [],
    "pickable": false,
    "priority": "Low",
    "title": "Waits on another repo",
@@ -196,6 +246,8 @@
    },
    "id": "TD-018",
    "key": "3i",
+   "part_of": null,
+   "parts_open": [],
    "pickable": true,
    "priority": "High",
    "title": "High, ranked below the low band",
@@ -209,6 +261,20 @@
    "kind": "blockers-archived",
    "level": "info",
    "text": "ℹ TD-015: every blocker is archived (TD-020) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-016",
+   "kind": "cycle",
+   "level": "info",
+   "text": "ℹ TD-016: on a waits-on cycle with TD-017 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-017",
+   "kind": "cycle",
+   "level": "info",
+   "text": "ℹ TD-017: on a waits-on cycle with TD-016 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
   }
  ],
  "pickable": [

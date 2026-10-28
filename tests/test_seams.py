@@ -59,10 +59,10 @@ def test_dev_cadences_files_are_the_defaults_and_shiftlead_yml_sets_each(tmp_pat
 
 @pytest.mark.unit
 def test_a_ledger_that_is_newer_or_unreadable_says_why(tmp_path):
-    root = make(tmp_path, ledger="# Technical debt\n\nLedgerboard: 2\n\n" + LEDGER.split("\n\n", 1)[1])
+    root = make(tmp_path, ledger="# Technical debt\n\nLedgerboard: 3\n\n" + LEDGER.split("\n\n", 1)[1])
     got = seams.ledger(root)
-    assert got["state"] == "newer" and got["major"] == 2 and got["entries"] is None
-    assert "Ledgerboard: 2, newer than this ledgerboard.py reads (1)" in got["why"]
+    assert got["state"] == "newer" and got["major"] == 3 and got["entries"] is None
+    assert "Ledgerboard: 3, newer than this ledgerboard.py reads (2)" in got["why"]
     (root / "docs" / "technical_debt.md").write_bytes(b"\xff\xfe not text")
     got = seams.ledger(root)
     assert got["state"] == "unreadable" and got["why"].startswith("docs/technical_debt.md")
