@@ -1915,7 +1915,8 @@ def start_member(
     manager, the current flow's lane, reader and stage brief, the name check first — and, with `run_only`,
     `run_only` on the create's record and its launch record. The dialog's **Add member**, which edits
     `org.yml`, is `add_member`. Refused for a line the definition does not name, one the current flow
-    does not use, and a name a live session holds."""
+    does not use, and a name a live session holds; a team that is not running is its caller's to refuse
+    (`ao team add`, TD-1166) — with no live manager, the member is created under no one."""
     team = teams.find(org, name)
     try:
         m = team.line(line)
