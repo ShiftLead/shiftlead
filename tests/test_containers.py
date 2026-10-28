@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -956,19 +957,27 @@ async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_lev
     agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}
     agent._note_build("cm", ours)
     assert "stale" not in agent.links["cm"] and agent.links["cm"]["build"] == ours
-    # whatever the first tick started before the link was "up" has finished; from here on, nothing
-    assert await wait_for(lambda: "cm" not in agent._supervising, timeout=5.0, step=0.05)
+    # whatever the first tick started before the link was "up" has finished and its record is gone —
+    # a loaded run can still hold it, with the fixture's short grace, when the build goes stale below
+    # (TD-1169); from here on, nothing
+    assert await wait_for(
+        lambda: "cm" not in agent._supervising and "cm" not in agent.supervision, timeout=5.0, step=0.05
+    )
     before = len(fakes)
     await asyncio.sleep(0.3)
     assert not [f for f in fakes[before:] if f.execs("pip install")]  # level with the home: nothing to do
-    monkeypatch.setattr(containers, "SUPERVISE_GRACE", 1.5)
+    # a grace far wider than the quiet window read below, ended by hand: a loaded run's late tick
+    # can never outlast it (TD-1169)
+    monkeypatch.setattr(containers, "SUPERVISE_GRACE", 30.0)
     agent._note_build("cm", "")  # an agent started before builds existed, or on an older wheel
     assert "the node runs build unknown" in agent.links["cm"]["stale"]
     # behind, and linked: nothing for one grace — a promote restarts this agent a second after it
     # writes the wheel, and the process being stopped must not start an install it cannot finish
     assert await wait_for(lambda: "cm" in agent.supervision, timeout=5.0, step=0.05)  # noticed on a tick…
+    assert agent.supervision["cm"]["next"] > time.monotonic() + 20  # …its first look a grace away…
     await asyncio.sleep(0.5)
     assert not [f for f in fakes[before:] if f.execs("pip install")]  # …and left alone for the grace
+    agent.supervision["cm"]["next"] = 0.0  # the grace ends
     assert await wait_for(
         lambda: any(f.execs("pip install") and f.execs("kill $p") for f in fakes[before:]), timeout=5.0, step=0.05
     )
