@@ -2560,3 +2560,30 @@ def test_msg_addresses_a_team_or_a_repo(monkeypatch, capsys):
     assert len(sent) == n
     assert cli.main(["msg", "nosuch", "x"]) == 1
     assert "no session named nosuch here" in (err := capsys.readouterr().err) and "`--team` or `--repo`" in err
+
+
+@pytest.mark.unit
+def test_status_says_working_for_an_idle_record_working_on_its_own():
+    """§4.2 *Working on its own*, §4.7 (TD-1147): `ao status` prints an `idle` record with a live background
+    shell or live subagents *working*, the card's ending after the mode; with neither, or a wait the home
+    reads, or something pending, the raw state stands — and the record itself stays `idle`."""
+    from sessionorc.models import Session
+
+    base = Session(id="ao-x", name="x", kind="interactive", dir="/tmp", adapter="claude-code", state="idle").view()
+    shell = {"cmd": "timeout 1500 python3 files/scripts/precheck.py --pr 414", "since": "2026-10-27T10:00:00Z"}
+    on_shell = {**base, "unattended": True, "shells": [shell], "shells_live": True}
+    line = cli.status_line(on_shell)
+    assert re.search(r"  working\s.*claude-code \[unattended\] · 1 shell$", line), line
+    on_subs = {**base, "subagents": 2, "subagents_live": True}
+    assert re.search(r"  working\s.*claude-code · 2 subagents$", line := cli.status_line(on_subs)), line
+    for rec in (
+        base,
+        {**base, "subagents": 2, "subagents_live": False},
+        {**base, "shells": [], "shells_live": True},  # a flag over no shell to name (TD-780)
+        {**base, "shells": [shell], "shells_live": False},
+    ):
+        assert re.search(r"  idle\s", line := cli.status_line(rec)) and "·" not in line, (rec, line)
+    assert "  idle " in cli.status_line(on_shell, waiting=True)  # a wait wins, as on the card
+    pending = {**on_shell, "pending": {"kind": "permission", "text": "Bash"}}
+    assert "working" not in cli.status_line(pending)
+    assert on_shell["state"] == base["state"] == "idle"

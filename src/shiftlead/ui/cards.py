@@ -37,7 +37,9 @@ from shiftlead.ending import (
     closer_words,
     ending_hover,
     exit_words,
+    own_work,
     restart_words,
+    shells_of,
     waiting_words,
     worktree_words,
 )
@@ -433,23 +435,15 @@ def view(
     # subagent or a live background shell (the view's `subagents_live`, `shells_live`) and nothing waiting
     # is drawn *working*, ranked and filtered with it, over *idle · unseen*, whose cue shows again once its
     # own work ends; idle in every payload. The ending joins the parts that are live, never *0 subagents*.
-    n = s.get("subagents") if isinstance(s.get("subagents"), int) else 0
     shells = shells_of(s)
     d["own_work"] = d["own_slot"] = d["own_what"] = ""
-    live_subs, live_shells = s.get("subagents_live") is True, s.get("shells_live") is True and bool(shells)
-    if state == "idle" and (live_subs or live_shells) and not d["wait_reason"]:
-        parts, what = ["working"], []
-        if live_subs and n:
-            parts.append(f"{n} subagent{'' if n == 1 else 's'}")
-            what.append("subagents")
-        if live_shells:
-            parts.append(f"{len(shells)} shell{'' if len(shells) == 1 else 's'}")
-            what.append("background shells")
-        d["own_work"] = " · ".join(parts)
+    if (own := own_work(s)) and state == "idle" and not d["wait_reason"]:
+        parts, what = own
+        d["own_work"] = " · ".join(["working", *parts])
         d["own_what"] = " and ".join(what) or "subagents"
         # the slot's ending names the oldest shell and its age (§4.2 *What it draws*)
         d["own_slot"] = d["own_work"]
-        if live_shells:
+        if "background shells" in what:
             age = _age(shells[0].get("since"), now)
             d["own_slot"] += f": {shell_cmd(shells[0])}" + (f" · {age}" if age else "")
         d["state_class"] = d["state_label"] = d["pill_word"] = "working"
@@ -1223,14 +1217,6 @@ def next_act(d: dict[str, Any]) -> str:
     if d.get("pane") is False:
         return "details"
     return "focus"
-
-
-def shells_of(s: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """The record's background shells (§4.2 *A background shell task*, TD-761), oldest `since` first and
-    one with no readable `since` last, so the oldest named is one whose age can be said; a malformed
-    entry is left out rather than costing the card."""
-    got = [sh for sh in (s.get("shells") or []) if isinstance(sh, dict)] if isinstance(s.get("shells"), list) else []
-    return sorted(got, key=lambda sh: (_instant(sh.get("since")) is None, str(sh.get("since") or "")))
 
 
 SHELL_CMD_CUT = 32  # characters of a shell's `cmd` a row, a slot or a confirm draws before *…*
