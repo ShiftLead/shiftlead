@@ -667,6 +667,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .facet .fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }
 .facet .kind { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); white-space: nowrap; }
 .facet .fhead > .seg { margin-left: auto; }
+.facet .fhead > .segs { margin-left: auto; display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 /* *· n red* after the PRs' open count (§4.5a *team card: Repo facet*, TD-613): red, its hover each PR */
 .facet .prred, .facet .prnotrun { margin-left: -4px; font-size: var(--t-cap); font-weight: 600; color: var(--stalled-fg); white-space: nowrap; cursor: help; }
 .facet .prnotrun { color: var(--alarm-fg); }  /* CI never ran, counted apart from red (TD-686) */
@@ -720,6 +721,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .mrow .mprio { min-height: 0; padding: 0; align-self: center; line-height: 16px; } /* one fixed slot, empty when unmarked (TD-232) */
 .mrow .mref, .mrow .mwho, .mrow .mpr { font-family: "JetBrains Mono", monospace; }
 .mrow .mwho .name { color: var(--fg); text-decoration: none; }
+.mrow .mpr .nopr { color: var(--muted); } /* a close by a commit naming no PR (TD-1189) */
 /* a phone: the PR goes under the title before the holder is lost */
 @media (max-width: 720px) {
   .mrow { grid-template-columns: 58px 18px calc(var(--ref-n, 6) * var(--mch)) minmax(0, 1fr) calc(var(--who-n, 12) * var(--mch)); }
@@ -754,8 +756,8 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .sc.plus .plusgo { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); text-decoration: none; }
 .sc.plus .plusmark { font-size: 2em; line-height: 1; font-weight: 300; color: var(--strong); }
 .sc.plus:hover { background: var(--hover); }
-.tsum .lv, .tsum .wv, .tsum .fv { display: flex; flex-direction: column; gap: 5px; }
-.tsum .lv[hidden], .tsum .wv[hidden], .tsum .fv[hidden] { display: none; }
+.tsum .lv, .tsum .wv, .tsum .fv, .tsum .mv { display: flex; flex-direction: column; gap: 5px; }
+.tsum .lv[hidden], .tsum .wv[hidden], .tsum .fv[hidden], .tsum .mv[hidden] { display: none; }
 /* the Org rollup (§4.5a *Sessions: rollup*, TD-176 slice 4) */
 .rollup { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1fr; gap: 12px; margin: 12px 0 18px; }
 @media (max-width: 1100px) { .rollup { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }

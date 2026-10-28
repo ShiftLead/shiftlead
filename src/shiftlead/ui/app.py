@@ -333,6 +333,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
 )
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_HOVER,  # noqa: F401
+    COMPLETED_ROWS,  # noqa: F401
+    COMPLETED_WORD,  # noqa: F401
     DOER_WIDTH,  # noqa: F401
     FACETS,  # noqa: F401
     HEADS_EVERY,  # noqa: F401
@@ -358,6 +360,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     ask_blocks,  # noqa: F401
     asked_line,  # noqa: F401
     compact_line,  # noqa: F401
+    completed_faces,  # noqa: F401
     completed_in,  # noqa: F401
     completed_title,  # noqa: F401
     doing_rows,  # noqa: F401
@@ -372,6 +375,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     rollup,  # noqa: F401
     rollup_counted,  # noqa: F401
     team_lanes,  # noqa: F401
+    team_named,  # noqa: F401
     team_repo,  # noqa: F401
     team_summary,  # noqa: F401
 )
@@ -405,7 +409,6 @@ from .queue import (
 )
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
-    COMPLETED_WORD,  # noqa: F401
     ENTRY_PREFIX,
     ENTRY_SLUG_WHY,
     ENTRY_TRIES,

@@ -2418,14 +2418,18 @@
   // Doing*, TD-176 slice 3). Every variant is in the markup; these pick which shows. The window
   // picker is **one value per browser** for every picker on the page; the Technical debt selector
   // is remembered per team; the answer / doing toggle is the person's until the set of pending
-  // answers changes, and a new one flips it back to *answer*.
+  // answers changes, and a new one flips it back to *answer*. TDs in motion's *in motion · completed*
+  // is stored per team, as the fold is: a stored pick wins whatever the team then holds, and until one
+  // the server's default — *in motion* while the team holds a claim (TD-1189).
+  AO.motionFace = (team, dflt, get) => get("motion:" + team, dflt || "motion");
   const faceFlip = {};  // team → {key, face}: a flip, held while the pending answers are the same
   const scrollKept = {};  // team → the summary's scrolled boxes, from the swap to the next sync
   function summaryState(sum) {
     const team = sum.dataset.team, key = sum.dataset.answerKey || "";
     const flip = faceFlip[team];
     const face = flip && flip.key === key ? flip.face : sum.dataset.faceDefault || "doing";
-    return { led: store.get("led:" + team, "open"), win: store.get("win", "day"), face };
+    const motion = AO.motionFace(team, sum.dataset.motionDefault, store.get);
+    return { led: store.get("led:" + team, "open"), win: store.get("win", "day"), face, motion };
   }
   function syncSummaries() {
     AO.showDoingAges(); // the Doing rows just swapped in: their tooltips in the reader's clock (TD-232)
@@ -2452,6 +2456,7 @@
     $$(".lv", sum).forEach((el) => (el.hidden = el.dataset.lv !== st.led));
     $$(".wv", sum).forEach((el) => (el.hidden = el.dataset.wv !== st.win));
     $$(".fv", sum).forEach((el) => (el.hidden = el.dataset.fv !== st.face));
+    $$(".mv", sum).forEach((el) => (el.hidden = el.dataset.mv !== st.motion));
     $(".fface", sum)?.classList.toggle("answering", st.face === "answer" && !!sum.dataset.answerKey);
     $$(".seg[data-pick]", sum).forEach((seg) => {
       const v = st[seg.dataset.pick];
@@ -2463,6 +2468,7 @@
     if (pick === "win") store.set("win", v);
     else if (!sum) return;
     else if (pick === "led") store.set("led:" + sum.dataset.team, v);
+    else if (pick === "motion") store.set("motion:" + sum.dataset.team, v);
     else faceFlip[sum.dataset.team] = { key: sum.dataset.answerKey || "", face: v };
     syncSummaries();
   }

@@ -7,16 +7,19 @@
    nothing live draws only the facets that hold something (`m.drawn`, TD-418). #}
 {% set m = g.summary %}
 {%- set drawn = m.drawn if m.drawn is defined else ('repo', 'motion', 'face') %}
-<div class="tsum" id="tsum-{{ g.team }}" data-team="{{ g.team }}" data-face-default="{{ m.face }}" data-answer-key="{{ m.answer_key }}">
+<div class="tsum" id="tsum-{{ g.team }}" data-team="{{ g.team }}" data-face-default="{{ m.face }}" data-motion-default="{{ m.motion_face or 'motion' }}" data-answer-key="{{ m.answer_key }}">
   {# -- Repo (§4.5a *team card: Repo facet*, TD-1189): first, with no name row — the repo's line above says it -- #}
   {% if 'repo' in drawn %}{% set on_line = true %}{% include "repo_facet.html" %}{% endif %}
   {# -- TDs in motion (§4.5a *team card: TDs in motion*) -- #}
   {# **Columns** (§4.5a, TD-252): phase · priority · reference · title · holders · PR on one grid, every
      track but the title's a fixed width — the reference's, the holders' and the PR's the server's (`ref_w`,
      `who_w`, `pr_w`) — and every cell drawn, empty where a row has no priority or no PR, so a row keeps its place #}
+  {#- **Completed** (TD-1189): the facet's other face, *in motion · completed*, stored per team (`motion:<team>`) -#}
+  {%- set motion_pick %}<span class="seg" data-pick="motion"><button type="button" data-v="motion">in motion</button><button type="button" data-v="completed">completed</button></span>{% endset %}
   {% if 'motion' in drawn %}
   <div class="facet fmotion" style="--ref-n: {{ m.ref_w or 6 }}; --who-n: {{ m.who_w or 12 }}; --pr-n: {{ m.pr_w or 0 }}">
-    <div class="fhead"><span class="kind">TDs in motion ({{ m.motion | length }})</span> <span class="meta">{% for ph in ('add', 'design', 'grind', 'review') %}{% if m.phases[ph] %}{{ m.phases[ph] }} {{ ph }}{{ ' · ' if not loop.last }}{% endif %}{% endfor %}</span></div>
+    <div class="mv" data-mv="motion"{% if m.motion_face == 'completed' %} hidden{% endif %}>
+    <div class="fhead"><span class="kind">TDs in motion ({{ m.motion | length }})</span> <span class="meta">{% for ph in ('add', 'design', 'grind', 'review') %}{% if m.phases[ph] %}{{ m.phases[ph] }} {{ ph }}{{ ' · ' if not loop.last }}{% endif %}{% endfor %}</span>{{ motion_pick }}</div>
     {% for x in m.motion %}
     <div class="mrow">
       <span class="mphase"><span class="phase ph-{{ x.phase }}">{{ x.phase }}</span></span>
@@ -29,6 +32,32 @@
     {% else %}
     <div class="meta">{% if m.noteam %}no team services this repo{% else %}nothing claimed{% endif %}{% if m.repo and not m.noteam and m.repo.ledger.kind %}{% for b in m.repo.ledger.kind if b.key == 'pickable' %} · {{ b.n }} pickable entr{{ 'y waits' if b.n == 1 else 'ies wait' }} for the next claim{% endfor %}{% endif %}</div>
     {% endfor %}
+    </div>
+    {#- what the ledger closed in the window that the team's records name, on the facet's grid: the age in the
+        phase's column (moved in the browser, `data-doing-at`), no priority, no holders, the PR or *no PR* -#}
+    {% if m.completed %}
+    <div class="mv" data-mv="completed" style="--ref-n: {{ m.done_ref_w or 6 }}; --who-n: 0; --pr-n: {{ m.done_pr_w or 0 }}"{% if m.motion_face != 'completed' %} hidden{% endif %}>
+      {% for w in ('day', 'week', 'month') %}{% set c = m.completed[w] %}
+      <div class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>
+        <div class="fhead"><span class="kind">Completed ({{ c.n }})</span>
+          <span class="segs"><span class="seg" data-pick="win">{% for v in ('day', 'week', 'month') %}<button type="button" data-v="{{ v }}">{{ v }}</button>{% endfor %}</span>{{ motion_pick }}</span></div>
+        {% for x in c.rows %}
+        <div class="mrow">
+          <span class="mphase meta mono" data-doing-at="{{ x.closed }}" title="{{ x.closed }}">{{ x.age }}</span>
+          <span class="mprio"></span>
+          <a class="mref mono strong" href="{{ m.repo.url if m.repo else '#' }}#{{ x.id }}" title="{{ x.id }}">{{ x.id }}</a>
+          <span class="mtitle" title="{{ x.title }}">{{ x.title }}</span>
+          <span class="mwho"></span>
+          <span class="mpr">{% if x.pr %}{% if x.url %}<a href="{{ x.url }}" target="_blank" rel="noopener">#{{ x.pr }}</a>{% else %}<span>#{{ x.pr }}</span>{% endif %}{% else %}<span class="nopr">no PR</span>{% endif %}</span>
+        </div>
+        {% else %}
+        <div class="meta">nothing completed {{ c.word }}</div>
+        {% endfor %}
+        {% if c.more %}<a class="meta more" href="{{ m.repo.url if m.repo else '' }}?win={{ w }}#completed">+{{ c.more }} more</a>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </div>
   {% endif %}
   {# -- Answer needed / Doing (§4.5a *team card: Answer needed / Doing*); none on a repo no team services -- #}
