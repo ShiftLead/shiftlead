@@ -1544,7 +1544,6 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-24 (grinder-ao-1, from TD-992)
 **Owner:** designer
 **Kind:** design-first
-**Blocked by:** TD-1007
 **Status:** Designed 2026-10-24 (the designer): the layer sets `tools.shell.backgroundCompletionBehavior: inject` and `experimental.modelSteering: true`, which in 0.65.0 is what makes a background command's end start an idle session's turn, and the hook refuses on `run_shell_command` not `is_background`, in words naming `is_background` (design §4.3 *A wait the guard refuses*, *The second adapter*). Steered to the techlead as m-d0741b96f424 (bound 12 h, lapses 2026-10-25 08:46Z). Built by TD-1007. Reviewed in eight rounds (Fable and Sonnet alternating; Sonnet READY at round 8; design history §4.3). Before: picked to build 2026-10-24 (grinder-ao-1) and handed back: in Gemini CLI a background shell's end does not wake the session, so the refusal's *run it in the background … its end wakes you* would be untrue there.
 **Location:** `src/shiftlead/adapters/gemini/hook.py` (`refused_command`, `main`; the kill guard is wired there at its `run_shell_command`); design §4.3 *A wait the guard refuses* (it names Claude Code's hook alone) and *The second adapter: Gemini CLI*
 
@@ -1658,6 +1657,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Kind:** live-check #2343
 **Waits:** event — the person re-runs the Gemini layer's `sudo install` line, then an unattended Gemini session's next CI watch; read 2026-10-25 09:42Z (grinder-ao-1, #2343 live in 2734a3e): `ao doctor` reads *Gemini layer stale*, and no Gemini session runs on the home
 **Status:** Built 2026-10-25 (grinder-ao-1, #2343): `LAYER_SETTINGS` holds `inject` and `modelSteering`; `gemini/hook.py`'s `waits_in_the_foreground` sends `wait: true` only under `SHIFTLEAD_GEMINI_WAKES=1`, which `launch` sets when `layer_wakes()` holds, and blocks with `wait_guard.GEMINI_REASON` on `refuse_wait`; the stale note names the missing wake only for a layer without the two settings. Left: the live check in *Done when*, once #2343 is live and the person has re-run the layer's `sudo install` line.
+**Part of:** TD-999
 **Location:** `src/shiftlead/adapters/gemini/__init__.py` (`LAYER_SETTINGS`, `layer_wakes`, `launch`, the doctor note), `src/shiftlead/adapters/gemini/hook.py` (`WAKES_ENV`, `refused_command`, `main`), `src/shiftlead/wait_guard.py` (the reason's words per background form); `tests/test_gemini_adapter.py` (the hook, beside the kill guard's), `tests/test_gemini_setup.py` (the launch with the `home` fixture's temp `MACHINE_LAYER`, the stale note) and `tests/test_gemini_guards.py` (its note assertion); design §4.3 *A wait the guard refuses*, *The second adapter: Gemini CLI*
 
 **Why:** TD-999: in Gemini CLI 0.65.0 a background command's end wakes nothing by default, so the refusal's *its end wakes you* would be untrue there. With `inject` the completion is queued, and an idle session takes it as a turn only with `experimental.modelSteering` on.
