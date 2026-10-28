@@ -108,6 +108,18 @@ def test_what_the_person_typed_over_the_line_is_the_records_for_its_run(world, c
     assert "prompt_from" not in made and made["worktree"] == "dc-extra"
 
 
+def test_a_profile_picked_over_the_lines_is_the_records_with_its_adapter(world, client):  # noqa: F811
+    """TD-1185: a Profile unlike the line's `paul` reaches the create, and its adapter with it."""
+    tmp_path, fleet = world
+    _dc_team(tmp_path)
+    _running(fleet, "dc-grinder")
+    profiles = {"default": "paul", "profiles": {"paul": {"account": "paul"}, "gem": {"adapter": "gemini"}}}
+    (tmp_path / "home" / "profiles.yml").write_text(yaml.safe_dump(profiles))
+    assert _post(client, tmp_path, profile="gem").status_code == 303
+    (made,) = fleet.creates()
+    assert (made["profile"], made["adapter"], made["run_only"]) == ("gem", "gemini", True)
+
+
 def test_a_member_start_on_a_team_not_running_is_refused(world, client):  # noqa: F811
     tmp_path, fleet = world
     _dc_team(tmp_path)
