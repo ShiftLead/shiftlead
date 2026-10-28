@@ -93,7 +93,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
-| TD-1172 | The Queue's v2 archive cache key (`queue._archive_stat`) has no test for an in-place edit of an archive entry file | Low | Open — build |
 | TD-1174 | The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it | Low | Open |
 
 ---
@@ -1977,24 +1976,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** as §4.5a's rows say. (1) `teams_for_form` carries each team's member lines (name, role, profile, lane, brief, the next free name, and the current flow's compiled lane, reader and stage brief where a flow is set). (2) Under a Team pick, a Role a member line names (each line by name where a role has two) fills the form from the line: the name, profile, lane and brief, the manager as controller, unattended and supervised; Start makes a run-only member through TD-1166's create; on a team not running the form refuses with *<team> is not running: start it first* and offers the team's **Start**. (3) **keep as a team member**, off by default: ticked, the line's fields are drawn locked with *a kept member is the line's: change the line in the definition*, and Start is TD-1165's **+**, after the same running check (refused on a team not running, Start offered). (4) **run it under me instead** on such a pick starts the person's own session in the team as today, the manager still ticked as its controller, and hides the tick; it needs no running team. *Interactive*, `plain` and a role no line names are unchanged.
 
 **Done when** tests pin: the fill for a repo-defined team's grinder line (dev-cadence's `dc-grinder` shape: brief `docs/briefs/grinder-dc-1.md`, profile, lane, the manager's id, unattended and supervised); a Start making a run-only record with those fields; the refusal on a team not running, with Start offered; the line's fields locked under the tick; a team whose manager is a person (`manager: person`: no controller ticked, running when any crew record is live); two lines of one role offered each by its name; the *a kept member is the line's* note under the tick; the tick writing the size and creating a kept member; *run it under me instead* giving TD-160's record. The form is looked at in headless Chromium (design §4.9b) with a member line picked, ticked and unticked, the shots named in the PR. `pdm run test` and `pdm run lint` pass.
-
----
-
-## TD-1172: The Queue's v2 archive cache key (`queue._archive_stat`) has no test for an in-place edit of an archive entry file
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_ledger_layout.py` (`test_the_queues_archive_reads_a_v2_archive_as_its_v1_twin`); `src/sessionorc/queue.py` (`_archive_stat`)
-
-**Why:** #2529's `_archive_stat` keys a v2 `archive/` by the directory's mtime plus *its entry files' count and newest mtime* (docstring, §4.4 *Completed cards*' cache). The test's only change is adding `archive/TD-999.md`, which moves the directory's mtime alone. On `origin/main` (0738ed579), replacing the directory branch's `return st.st_mtime_ns, (len(files), max(files, default=0))` with `return st.st_mtime_ns, (0, 0)` (or dropping the `is_dir` branch) leaves `tests/test_ledger_layout.py` and `tests/test_queue.py` green (40 passed). An archived entry edited in place (no rename, no add) changes no directory mtime, so the Queue would serve a stale card with nothing to catch it.
-
-**Fix:** write an existing `archive/TD-*.md` in place with `os.utime` forward past the first read and assert `archive_entries` returns the new text; re-run the mutation above: it must fail.
-
-**Done when** the new assertion fails against the mutation named in **Why** and `pdm run test` passes.
 
 ---
 
