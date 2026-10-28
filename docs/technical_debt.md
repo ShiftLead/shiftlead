@@ -1522,7 +1522,6 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Added:** 2026-10-24 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Blocked by:** TD-1004, TD-1005
 **Status:** Designed 2026-10-24 (the designer): the generated Dockerfile links `/usr/local/bin/ao` to `/shiftlead/venv/bin/ao`, which every shell's `PATH` holds, a login shell's included; the venv's `bin` is not put on `PATH` (a Debian `/etc/profile` resets it for login shells, and its `python3` would shadow the repo's). `ao doctor`'s **nodes** line on a node says when `ao` is not this install's (design §4.4a, §4.7 *`ao doctor`*). Built by TD-1004 (the link) and TD-1005 (the doctor line). Reviewed in six rounds, Fable and Sonnet alternating, both READY at rounds 5 and 6 (design history §4.4a).
 **Location:** `src/sessionorc/containers.py` (the agent's start script, `exec {INSIDE_VENV}/bin/shiftlead-agent serve`, run by `exec_cmd` with `SHIFTLEAD_HOME` and the node's env file and no `PATH`; the generated Dockerfile); design §4.4a (the node's `/shiftlead/venv`, filled with the home's wheel), §4.7 *`ao doctor`* (its checks; on a node they read the node); `src/shiftlead/skill.md` (*`ao` is on `PATH`*)
 
@@ -1635,6 +1634,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Kind:** live-check #2333
 **Waits:** event — contractmatch's next `ao host rebuild contractmatch` (a person's press at the home); read 2026-10-24 21:27Z (grinder-ao-1, #2333 live): container adf6ba2ae675 was created 2026-10-11 13:09Z, before #2333 merged (20:57Z), so its image holds no link yet
 **Status:** Built 2026-10-24 (grinder-ao-2, #2333): `dockerfile_text` writes the guarded link after the tmux step and the machine layers, before `USER <image user>`; its path is `containers.PATH_AO`, its target `INSIDE_VENV`'s `bin/ao`, and `test_the_dockerfile_links_ao_onto_path_after_tmux_and_before_the_images_user` holds the line and its place. Left: the live check in *Done when*, once #2333 is live and contractmatch is rebuilt.
+**Part of:** TD-998
 **Location:** `src/sessionorc/containers.py` (`dockerfile_text`); `tests/test_containers.py`; design §4.4a (the generated Dockerfile, *The link puts `ao` on every shell's `PATH`*)
 
 **Why:** TD-998: on the contractmatch node, `ao` was *command not found* in every session and shell. The node's agent starts by its absolute path with the image's `PATH`, and nothing puts `/shiftlead/venv/bin` on it.
