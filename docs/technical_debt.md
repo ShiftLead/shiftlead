@@ -1226,14 +1226,13 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed (2026-10-19, the designer): §4.4 *Waiting* (a card-level `waits`, `wait` from a leaf, `would_be`, unnumbered and unmoved), *The card's status* (*held (person)* no need, a word of its own), *A move lands*, *One owner* (`group`, `start`), *Hold* (a derived claim is not refused); §4.5 screen 12 *Waiting*, *A card* (its own box, its edge, the tree), *Three wants* (Decide, Do, Read), *An item's shape* (a `card` mode per renderer), *Three verbs* (Answer, Start session widened to `{repo, id, card}`, ⋯), no dates of the person's on a card, the kind pick; screen 11's rows; §4.5a six rows amended and five new; §4.10 *An item leads with one sentence* (`render.one_sentence`, the answers' ` — ` split, the warning); glossary *Waiting*, *Decide / Do / Read*. Built by TD-911–TD-918; dev-cadence#TD-121 (the `Ask:` line, the split in cadence §3.5 and ledgerboard) and dev-cadence#TD-122 (the rule in cadence §3.3 and its stage briefs, the cadence check's warning, after TD-772). Was: Agreed (2026-10-19) — [ADR 2026-10-19](decisions/2026-10-19-queue-card.md), drawn from the live ledger ([the page](mockups/reviews/2026-10-19-queue-redesign.html), [its shot](mockups/reviews/2026-10-19-queue-redesign.png)); the review rounds converged the same day (six rounds, Sonnet and Fable alternating, round 6 READY); the designer's round writes it into §4.4 *The Queue: cards, and the rank that orders them*, §4.5 screen 12, §4.5a and §4.10 and names the builds (ADR §8). Amends TD-748's ADR, which stands for what this does not touch. **Paul lifted the hold 2026-10-19 19:10 MDT** (in an interactive session): the design round is next, the designer's.
-**Blocked by:** TD-918, TD-911, TD-912, TD-913, TD-914, TD-915, TD-916, TD-917
 **Location:** `docs/decisions/2026-10-19-queue-card.md`; the design text it rewrites: §4.4 *The card's status* and *Groups* (4.4-host-agent.md), §4.5 screen 12 *Groups*, *A card*, *What is attached to a card*, *What needs the person* (4.5-ui.md), §4.5a the Queue rows; `src/shiftlead/ui/templates/queue_part.html`, `queue_card.html`, `queue_row.html`, `src/shiftlead/ui/queue.py`; dev-cadence for the writing rule (ADR §6)
 
 **Why:** Measured on 2026-10-19 with the live ledger: 197 cards Up next, 82 amber, 11 saying only *waiting*, the tallest 3,212 px. Paul: *we have many ways that the user's attention is needed and multiple possible replies — we need to figure out how to simplify*; *lots of words all over the place, so I am relegated to reading everything in order*; *the description is written like someone took poor notes then handed them to me*.
 
 **Fix:** The ADR's §1–§6: a Waiting group between In progress and Up next (unnumbered, keeps its place, the date or *event* in the number column); Decide and Do in the header and amber, Read folded with its count; Answer, Start session once per card on its repo's team with the card as context, and ⋯ for the team's controls; no Snooze, Put on the board or Due on a card; each card its own box, the tree's rules drawn, mentions deduplicated; the writing rule (one sentence, consequences, context) in dev-cadence with a backfill, enforced by the home. The design round names the build entries from ADR §8; the dev-cadence entry for the writing rule is filed when the design names it.
 
-**Done when** the design says what the ADR decided, with a build entry per slice of ADR §8, and `Blocked by:` names them.
+**Done when** the design says what the ADR decided, with a build entry per slice of ADR §8, each naming this entry in `Part of:`.
 
 **Related:** TD-748 (the Queue, designed), TD-772 (the trial's read-back, which counts the Waiting group as a change to what the person sees), TD-900 (the Repo page's board, whose card is the Queue's).
 
@@ -1248,6 +1247,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Kind:** build
 **Status:** Open — waits for TD-772's read-back, since the warning and the briefs change what the trial's readings measure (ADR 2026-10-19 §8)
 **Blocked by:** TD-772, TD-913
+**Part of:** TD-909
 **Location:** `src/shiftlead/cli.py` (the warning beside the `FIRST_PARA_WORDS` one), `docs/briefs/` (a held path), `src/shiftlead/briefs/*.md` (the presets' message-shape line)
 
 **Why:** TD-909: design §4.10 *An item leads with one sentence* (*The home warns, never refuses*; *A question to the person about an entry names it*).
@@ -1267,6 +1267,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Kind:** build
 **Status:** Open — waits for TD-772's read-back, since it rewrites the entries the trial's page shows (ADR 2026-10-19 §8), and for dev-cadence#TD-121 (the `Ask:` line and the answers' split in cadence §2, §3.5 and ledgerboard)
 **Blocked by:** TD-772, dev-cadence#TD-121
+**Part of:** TD-909
 **Location:** `docs/technical_debt.md` (on 2026-10-19 about 17 open entries carry `Owner: paul` or `decision (paul)`, none an `Answers:`)
 
 **Why:** TD-909: design §4.10 *An item leads with one sentence* (*with a backfill*).
