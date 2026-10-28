@@ -91,10 +91,11 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
 | TD-1187 | The top bar scrolls away with the page: once scrolled down, the tabs, + New and the counts are out of reach | Medium | Open — design-first |
-| TD-1189 | A team card shows the repo's Technical debt only on the repo's line, and TDs in motion never what the team just finished | Medium | Open — design-first, waits on Paul |
+| TD-1189 | A team card shows the repo's Technical debt only on the repo's line, and TDs in motion never what the team just finished | Medium | Designed — built by TD-1194; review rounds, then Paul's go |
 | TD-1190 | The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass | Medium | Open — design-first |
 | TD-1191 | `member_submit`'s *shell (no agent)* pick (`profile == SHELL_PICK`) is set in no test: drop the guard and the suite stays green | Low | Open — build |
 | TD-1193 | The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green | Low | Open — build |
+| TD-1194 | Build TD-1189: the Repo facet first on each team card, the line keeping it only while no card shows it, and TDs in motion's *completed* face | Medium | Open — waits on TD-1189's rounds and Paul's go |
 
 ---
 
@@ -1948,8 +1949,8 @@ That is the design working as written: a Team pick makes *a person's own session
 **Added:** 2026-10-28 (Paul, through Add entry; drafted by ao-shiftlead-team-cards)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — design first, waits on Paul (worked interactively)
-**Blocked by:** decision (paul) — Paul asked to talk both changes through with a session; drop the line when he says go
+**Status:** Designed 2026-10-28 with Paul (shape A and the completed face, from `docs/mockups/reviews/2026-10-28-td1189-*.png`) — §4.5a *team card: summary*, *Repo facet*, *TDs in motion (n)* **Completed**, *Sessions: repo line*, *Repo page: the team's facets*; §4.5 screen 1; §4.9 *The Sessions page*. Built by TD-1194; review rounds, then Paul's go. Was: Open — design first, worked interactively
+**Blocked by:** decision (paul) — the review rounds converge, then Paul's go; the PR that ends the round drops the line here and on TD-1194
 **Location:** `src/shiftlead/ui/templates/team_summary.html` (the summary's facets: TDs in motion, Answer needed / Doing and its *answer · doing* toggle); `src/shiftlead/ui/templates/repo_facet.html` (Technical debt and Pull requests) and `repo_line.html` (the facet drawn once per repo); `src/shiftlead/ui/org.py` (`completed_in` 94, `motion_rows` 313, `drawn_facets` 508, `team_summary` 520); `src/shiftlead/ui/repo.py` (`completed_rows` 266, the Repo page's Recently completed); `src/shiftlead/ui/static/app.js` (the `.tsum .seg[data-pick]` handler 2311 and the summary's picks 2398); `src/shiftlead/ui/static/app.css` (the summary's facet row, `.fmotion`'s columns 698); design §4.5a rows *team card: summary* 163, *team card: Repo facet* 164, *TDs in motion (n)* 165, *Answer needed / Doing* 166 and *Sessions: repo line* 204; §4.5 screen 1 *A team's card*; §4.9 *The Sessions page* (TD-722, TD-725)
 
 **Why:** Paul, 2026-10-28: *Our teams on the Session page currently shows technical debt as an overview for the team, then TDS IN MOTION and Doing cards on each repo in the team. Lets talk about putting the technical debt as a third card (listed before the tds in motion). Lets also talk about adding a "Recently completed" option on the tds in motion card - to show tds that were done recently - probably similar to the way the answer|doing option works on the doing card.* Today the repo's **Technical debt** (with **Pull requests**) is the Repo facet, drawn once on the repo's line above its teams (TD-722, TD-725), and a team card has two facets, TDs in motion and Answer needed / Doing. So the debt a team works sits apart from the team's own card, and TDs in motion empties the moment a claim closes: what the team just finished is on the Repo page's **Merged** column or behind the facet's *closed* block's hover, never on the card that showed it in motion.
@@ -2013,5 +2014,40 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** assert `written by` plus the `sync.sh` path in the older-checkout test's body check (line 134).
 
 **Done when** that assertion exists and fails with `_word`'s `sync.sh` arm removed.
+
+---
+
+## TD-1194: Build TD-1189: the Repo facet first on each team card, the repo's line keeping it only while no card shows it, and TDs in motion's *completed* face
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-28 (ao-shiftlead-team-cards, from TD-1189's design with Paul)
+**Owner:** grinder
+**Kind:** build
+**Part of:** TD-1189
+**Status:** Open — waits on Paul's go once the design's review rounds converge
+**Blocked by:** decision (paul) — the design's review rounds, then Paul's go (his cadence layer, §2.4); the PR that ends the round drops the line
+**Location:** `src/shiftlead/ui/org.py` (`completed_in` 94, `motion_rows` 313, `drawn_facets` 508, `team_summary` 520 — it already builds the facet with the team's lanes, `team_lanes`; `org_layout`, which puts the facet on the repo's line); `src/shiftlead/ui/repo.py` (`completed_rows` 266: the Merged rows and their PR links); `src/shiftlead/ui/templates/team_summary.html`, `repo_facet.html` (`on_line`), `repo_line.html`, `org_item.html`; `src/shiftlead/ui/static/app.js` (the `.tsum .seg[data-pick]` handler 2311, the summary's picks 2398, the fold's per-team memory, TD-194); `src/shiftlead/ui/static/app.css` (`.tsum`'s columns 644–645, the 1100 px break 651, `.fmotion` 698); design §4.5a rows *team card: summary*, *team card: Repo facet*, *team card: TDs in motion (n)* (**Completed**), *Sessions: repo line*, *Repo page: the team's facets*; §4.5 screen 1 *A team's card*; §4.9 *The Sessions page*; the mockups `docs/mockups/reviews/2026-10-28-td1189-*.png`
+
+**Why:** TD-1189's design, agreed with Paul on 2026-10-28 from the mockups (shape A and the completed face): a team's debt and PRs sit on its own card beside what it holds, and what it just finished stays on the card after the claim closes.
+
+**Fix:** as the §4.5a rows say.
+1. **The facet on the card.** On the Sessions page every team card that draws a summary draws the Repo facet first: Technical debt and Pull requests, no name row (as `on_line`), its lanes *i* the team's (`team_lanes`, which `team_summary` already computes). `.tsum` with a `.frepo` takes `1fr 1.15fr 1.05fr`, one column below 1100 px in the same order.
+2. **The repo's line.** It keeps its name and *open →*. It draws the facet, with the repo's lanes, only while no card of the repo shows one: a repo with no team, or every team card of the repo folded or drawing no summary. The fold is the browser's, so the server renders the line's facet and the client shows it only while that holds, re-checked on each fold and each swap of the groups. On the Repo page the line keeps the facet always and the team cards draw none.
+3. **The completed face.** `team_summary` gains, per window, the team's closes: `completed_in`'s rows whose id, or closing PR, a record with the team's badge names in its `progress` (a claim's `ref`, `pr` or `review_pr`) or in a `restarts` entry's `done`. Each row carries id, title, PR and URL, the closed time and its short age. Eight are sent per window, plus the window's count. The TDs in motion head gains the *in motion · completed* toggle (`data-pick="motion"`). The completed face's head reads *Completed (n)* with the page's window picker; the rows sit on the facet's grid with the age in the phase column; then *+n more*, linking to `/repo/<name>?win=<w>#completed`; and *nothing completed this <window>* when empty. The face is remembered per team in the browser, as the fold is. Until it is picked, the facet opens on *in motion* while the team holds a claim, else on *completed*.
+4. **`drawn_facets`.** It draws the Repo facet when its reading exists, and the motion facet when the team holds a claim or has a close in any window.
+
+**Done when** tests pin:
+- a team card carrying the Repo facet first, with the team's lanes;
+- two teams on one repo each drawing it;
+- the repo's line drawing it for a repo with no team, and its client rule (shown while every card of the repo is folded);
+- the Repo page's cards drawing none;
+- the completed rows matched by a claim's `ref`, by its `pr` and by a `restarts` `done`, and a close no team record names left off;
+- the eight-row cap with *+n more* and its link;
+- the empty window's words;
+- the default face with and without a claim, and the per-team memory;
+- `drawn_facets` for a stopped team with closes and no claim.
+
+The page is looked at in headless Chromium at 1600 and 1000 px, in both faces, with the shots named in the PR (design §4.9b). `pdm run test` and `pdm run lint` pass.
 
 ---
