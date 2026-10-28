@@ -147,7 +147,7 @@ def design_builds(
     TD-1130): for each entry that entries name in `Part of:` (its `parts_open` and `parts_archived`), by its
     id, `{builds, done}` — `builds` those ids in id order; a `design-first` entry no entry names so, not yet
     backfilled (§4.4 *Rows*), lists its `blocked_ids` instead, in that order. Each build is
-    `{id, state, pr, url, held, blocked_by, row}`: `state` *archived* (in `archived`, or an archived part),
+    `{id, state, pr, url, held, blocked_by, row}`: `state` *archived* (in `archived`, which holds the archived parts),
     else *review* with its holder's claim `pr` and its `url` (`prs`, the motion rows'), else *held* by `held`'s
     names, else *open*; `blocked_by` the entry's other builds its own `blocked_by` still names; `row` the id as
     the ledger writes it when it has a row to link to, else ''. `done` is every build archived. And by each
@@ -163,10 +163,8 @@ def design_builds(
         parts = [_tid(str(x)) for x in [*(e.get("parts_open") or []), *(e.get("parts_archived") or [])]]
         if parts:
             ids = sorted({x for x in parts if x}, key=lambda x: int(x[3:]))
-            gone_here = gone | {_tid(str(x)) for x in e.get("parts_archived") or []}
         elif e.get("kind") == "design-first":
             ids = [b for b in e.get("blocked_ids") or [] if _tid(b)]
-            gone_here = gone
         else:
             continue
         if not ids:
@@ -175,12 +173,12 @@ def design_builds(
         builds = []
         for b in ids:
             tid, row = _tid(b), by_tid.get(_tid(b))
-            if tid in gone_here:
+            if tid in gone:
                 builds.append(
                     {"id": tid, "state": "archived", "pr": None, "url": "", "held": "", "blocked_by": [], "row": ""}
                 )
                 continue
-            if row is not None and (not parts or _tid(str(row.get("part_of") or "")) == _tid(str(e["id"]))):
+            if row is not None:
                 back.setdefault(str(row["id"]), []).append(str(e["id"]))
             state = "review" if tid in prs_t else "held" if held_t.get(tid) else "open"
             blocked = [x for x in (_tid(str(y)) for y in (row or {}).get("blocked_by") or []) if x in mine and x != tid]

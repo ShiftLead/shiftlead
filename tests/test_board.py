@@ -1220,6 +1220,7 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         {"id": "TD-23", "title": "after a sibling", "for_page": "blocked", "blocked_by": ["TD-20"]},
         {"id": "TD-24", "title": "held build", "for_page": "pickable"},
         {"id": "TD-25", "title": "after an archived one", "for_page": "blocked", "blocked_by": ["TD-9"]},
+        {"id": "TD-26", "title": "a parent", "for_page": "blocked", "parts_open": ["TD-20"]},  # TD-1130
     ]
     settle.observe(entries, "o/r", {}, datetime.now(UTC))  # the repo's first reading: every id settled
     agent._repos = {
@@ -1252,6 +1253,8 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         # words the board refuses refuse the press before anyone is told (review of #2162)
         with pytest.raises(AgentError, match="may not carry Context:"):
             await me.call("ledger_decide", repo=root, id="TD-20", road="design", words="see Context: TD-1")
+        with pytest.raises(AgentError, match="may not carry Context:"):  # past the guard: an open part counts
+            await me.call("ledger_decide", repo=root, id="TD-26", road="design", words="see Context: TD-1")
         assert not [e for e in w.inbox if e.about == "TD-20"], "nobody was told"
         got = await me.call("ledger_decide", repo=root, id="TD-20", road="design", words=" split  it ")
         assert got["decided"] == "back to design — split it" and got["told"] == ["ao-gw"]

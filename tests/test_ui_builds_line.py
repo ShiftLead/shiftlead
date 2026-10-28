@@ -207,18 +207,19 @@ def test_its_builds_read_part_of_and_fall_back_for_a_design_not_yet_backfilled()
     own `Part of:` parent."""
     entries = [
         {"id": "TD-050", "kind": "build", "blocked_ids": ["TD-060"], "parts_open": ["TD-53", "TD-051"],
-         "parts_archived": ["TD-049"]},
+         "parts_archived": ["TD-049", "TD-1000"]},
         {"id": "TD-051", "kind": "build", "part_of": "TD-050", "blocked_by": ["TD-053", "TD-060"]},
         {"id": "TD-53", "kind": "build", "part_of": "TD-50", "blocked_by": []},
         {"id": "TD-060", "kind": "design-first", "blocked_ids": ["TD-061"]},
         {"id": "TD-061", "kind": "build", "blocked_by": []},
     ]  # fmt: skip
-    lines, back = design_builds(entries, [], {}, {"TD-051": {"pr": 9, "url": "u"}})
+    lines, back = design_builds(entries, ["TD-049", "TD-1000"], {}, {"TD-051": {"pr": 9, "url": "u"}})
     got = lines["TD-050"]
     assert [(b["id"], b["state"]) for b in got["builds"]] == [
         ("TD-049", "archived"),
         ("TD-051", "review"),
         ("TD-53", "open"),
+        ("TD-1000", "archived"),
     ]
     assert got["builds"][1]["blocked_by"] == ["TD-053"], "a sibling blocks it; TD-060 is no build of TD-050"
     assert got["done"] is False
