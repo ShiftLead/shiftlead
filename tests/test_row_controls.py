@@ -290,6 +290,9 @@ def test_a_held_marks_title_names_its_presser_from_the_readings_words(tmp_path):
     got = tpl.render(r=held)
     assert 'title="held by the person&#39;s session paul-1"' in got and "held (person) — after Friday" in got
     assert "title=" not in tpl.render(r={"state": "held (person)", "held": {"at": "t", "by": "person"}})
+    ext = ui.templates.env.from_string('{% import "queue_row.html" as q %}{{ q.extras(e, "/c/r") }}')
+    got = ext.render(e={"settle": "held 2h", "held_words": "the person's session paul-1", "settle_mark": "held"})
+    assert 'title="held by the person&#39;s session paul-1">· held 2h' in got, "the Repo row's settle mark"
 
     home = SimpleNamespace(_presser_words=lambda b: words(b) or "the person")
     view = TickMixin._held_words(home, r)  # type: ignore[arg-type]
