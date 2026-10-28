@@ -3652,7 +3652,8 @@ def test_the_org_draws_a_members_open_ask_as_its_teams_asked_you_line(client, tm
     page = client.get("/").text
     assert f'href="/inbox?row={mid}"' in page and "asked you · 1 · " in page and "askr350: which branch?" in page
     assert "Answer needed (0)" in page, "not counted among the prompts"
-    assert ">asked you</a>" in page, "the rollup's row"
+    asked = 'href="/inbox?team=ao-t350&amp;sec=needs&amp;kind=questions"'  # the rollup row's needs-you menu (TD-1204)
+    assert asked in page
 
     async def answer():
         async with LocalClient() as person:
@@ -3660,7 +3661,7 @@ def test_the_org_draws_a_members_open_ask_as_its_teams_asked_you_line(client, tm
 
     asyncio.run(answer())
     page = client.get("/").text
-    assert f'href="/inbox?row={mid}"' not in page and "asked you · " not in page and ">asked you</a>" not in page
+    assert f'href="/inbox?row={mid}"' not in page and "asked you · " not in page and asked not in page
 
 
 @pytest.mark.unit

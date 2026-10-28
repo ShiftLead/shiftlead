@@ -163,3 +163,45 @@ def test_a_strip_is_drawn_only_with_a_counted_card_and_the_flat_page_has_no_rows
     vs = [_s("a", "needs-you", team="", pending=PERM), _s("b", "working", team="")]
     flat = ui.rollup(None, vs)
     assert flat["rows"] == [] and flat["n_from_teams"] == 1 == flat["answer_needed"]
+
+
+def test_the_rows_render_as_the_design_draws_them():
+    """§4.5a *Sessions: rollup* and *rollup: press and menus*: a table row each, its first cell the link
+    named for what it goes to; a second team's repo, bar and open cells blank; *could not look* dimmed with
+    the error its hover; the blocks by state and a stopped team's stubs and word; the needs-you number solid
+    while an answer is needed (the row's amber edge), its menu's lines and URLs; each ⋯ item; one legend."""
+    needs = [_ask("m-1", "g1", minutes=30), _ask("m-2", "g3", minutes=10)]
+    _, ro = _page(_fleet(), needs)
+    html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=0)
+    rows = html.split('<tr class="ru-row')[1:]
+    assert len(rows) == 6 and html.count('class="legend"') == 1
+    grind, review, design, strip, quiet, norepo = rows
+    assert ' ru-attn"' in grind.split(">")[0] and ' ru-attn"' not in review.split(">")[0]
+    assert 'aria-label="samscrape · grind"' in grind and '<span class="ru-rp">samscrape</span>' in grind
+    assert 'aria-label="samscrape · review"' in review and '<span class="ru-rp' not in review
+    assert 'class="bar"' not in review and '<td class="ru-open ru-r"></td>' in review
+    assert 'href="#team=grind"' in grind and 'href="#strip=samscrape"' in strip and 'href="#norepo"' in norepo
+    assert '<span class="meta ru-dim" title="git: not a repository">could not look</span>' in quiet
+    assert grind.count('<i class="s-') == 3 and "<b>1</b> of 3" in grind
+    assert design.count('class="ru-stub"') == 4 and "wound down 3h ago" in design and " of " not in design
+    # the needs-you number and its menu: *answer needed* to the facet, *asked you* to the Inbox, a line a member
+    assert '<button type="button" class="ru-c ru-ans"' in grind and ">3</button>" in grind
+    assert 'href="#tsum-grind" data-open-team="grind"' in grind
+    assert 'href="/inbox?team=grind&amp;sec=needs&amp;kind=questions"' in grind
+    assert 'href="/inbox?row=m-1"' in grind and 'href="/inbox?row=m-2"' in grind
+    assert 'href="#card-n1" data-open-card="n1"' in norepo and "asked you" not in norepo
+    # the ⋯ items: the card's own acts by their buttons, the links, Add entry… by the repo
+    assert 'data-addentry="samscrape"' in grind and 'href="/new?team=grind"' in grind
+    assert 'data-press="stop" data-team="grind"' in grind and 'data-press="stopnow" data-team="grind"' in grind
+    assert design.index('data-press="start"') < design.index("data-addentry") and 'data-press="stop"' not in design
+    assert 'href="/new?dir=/r/quiet"' in quiet and "data-addentry" not in quiet
+    assert 'data-menu="acts"' not in norepo and 'data-menu="needs"' not in review
+
+
+def test_a_rows_hash_is_url_encoded_as_the_client_reads_it():
+    """The link's `#team=…` / `#repo=…` / `#strip=…` names its item encoded, so the client's `decodeURIComponent`
+    reads back the layout's key whatever the name holds (review of #2623)."""
+    team = {"kind": "team", "key": "team:a b%c", "team": "a b%c", "repo": "", "members": [], "summary": {}}
+    repo = {"kind": "repo", "key": "repo:x y", "repo": "x y", "url": "/repo/x y", "facet": None}
+    rows = ui.rollup_rows([team, repo], set())
+    assert [r["hash"] for r in rows] == ["team=a%20b%25c", "repo=x%20y"]

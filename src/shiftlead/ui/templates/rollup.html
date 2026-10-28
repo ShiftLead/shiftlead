@@ -1,54 +1,101 @@
-{# The Org **rollup** (design §4.5 screen 1 *The Sessions page, team-first*, §4.5a *Sessions: rollup*, TD-176
-   slice 4): four facets under the title, every number a link — Agents and *answer needed* over every
-   session the page draws that has not ended, whatever its team's state, *asked you* over every team's
-   line, TDs and PRs in motion over the live teams (TD-924); with no team live and no session counted,
-   the Needs you facet alone and its *in the Inbox* (TD-406); with one team live, or none and a session
-   counted, Agents and Needs you, since a live team's own facets say the rest (TD-418, built by TD-428
-   slice 2). *answer needed* and *asked you* carry where they go (`data-open-team`, `data-open-card`):
-   the client clears the filter, opens a folded team and stores the opening, then scrolls. Rendered on page load and
-   re-sent with the groups on every delta and on the `repos` and `doing` events.
-   The window picker is the page's one value (the client sets it); *in the Inbox* is the top bar's
-   count, copied in by the client, and *m overdue* beside it the Inbox poll's `overdue_n` (TD-178). #}
+{# The Org **rollup** (design §4.5 screen 1 *The rollup*, §4.5a *Sessions: rollup* and *rollup: press and menus*;
+   TD-1203, built by TD-1204): a table of the page's teams and repos, one line a row in the page's order, then
+   one line of totals. Every count is over `rollup_counted`'s one set, so the rows add up to the totals. A row's
+   first cell is its link (`#team=…`, `#repo=…`, `#strip=…`, `#norepo`), its target grown to the row by the
+   client; the needs-you number and the ⋯ are disclosure buttons in cells of their own. A cell with nothing to
+   say is blank. Re-sent with the groups on every delta and on the `repos` and `doing` events; the client holds
+   the swap while a menu is open. *q on the Queue* and *i in the Inbox* are the top bar's numbers, copied in by
+   the client, and *m overdue* the Inbox poll's `overdue_n` (TD-178). #}
 {% if ro %}
-<div class="rollup{% if ro.quiet %} quiet{% elif ro.lone %} lone{% endif %}">
-  {%- if not ro.quiet %}{#- no team live and no session counted: Needs you alone, its *in the Inbox* (TD-406) #}
-  <div class="facet">
-    {#- the ***i***: a tooltip only, and nothing written under the pills (TD-418) #}
-    <div class="fhead"><span class="kind">Agents ({{ ro.n_agents }})</span><span class="tipmark" tabindex="0" role="img" aria-label="in urgency order, as the cards sort · a pill filters the page to that state" title="in urgency order, as the cards sort · a pill filters the page to that state">i</span></div>
-    <div class="row gap wrap">{% for a in ro.agents %}<button type="button" class="pill nog s-{{ a.cls }}" data-state-filter="{{ a.word }}" title="show only the {{ a.label }} sessions — the filter box's state:{{ a.word }}">{{ a.label }} ({{ a.n }})</button>{% endfor %}</div>
-  </div>
-  {%- if not ro.lone %}{#- one team live, or none: a live team's own facets say TDs and PRs in motion #}
-  <div class="facet">
-    <div class="fhead"><span class="kind">TDs in motion ({{ ro.motion }})</span></div>
-    {% if ro.phases %}
-    <div class="bar" role="img" aria-label="the references members hold, by phase">{% for p in ro.phases %}<a class="bseg phase ph-{{ p.key }}" href="{{ p.url or '#' }}" style="flex-basis: {{ p.pct }}%;" title="{{ p.n }} {{ p.key }}">{{ p.n }}</a>{% endfor %}</div>
-    <div class="legend">{% for ph in ('add', 'design', 'grind', 'review') %}<span><i class="ph-{{ ph }}"></i>{{ ph }}</span>{% endfor %}</div>
-    {% else %}<div class="meta">nothing claimed on any live team</div>{% endif %}
-  </div>
-  <div class="facet">
-    <div class="fhead"><span class="kind">PRs in motion ({{ ro.prs_open }})</span><span class="grow"></span>
-      <span class="seg" data-pick="win">{% for w in ('day', 'week', 'month') %}<button type="button" data-v="{{ w }}">{{ w }}</button>{% endfor %}</span></div>
-    {% if ro.has_repo %}
-    {% for w in ('day', 'week', 'month') %}{% set b = ro.prs[w] %}
-    <div class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>
-      <div class="blocks"><a class="blk opened" href="{{ ro.prs_url or '#' }}" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ ro.prs_url or '#' }}" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed</a></div>
-    </div>
-    {% endfor %}
-    <div class="meta"{% if ro.prs_errors %} title="{{ ro.prs_errors | join('\n') }}"{% endif %}>{{ ro.prs_open }} open{% if ro.waiting %} · {{ ro.waiting }} waiting on review{% endif %}{% if ro.prs_errors %} · a read failed{% endif %}</div>
-    {% else %}<div class="meta">no live team's repo is registered here</div>{% endif %}
-  </div>
+<div class="rollup">
+  {%- if ro.rows %}
+  <table class="rollup-list">
+    <thead><tr>
+      <th scope="col">Teams ({{ ro.rows | selectattr('kind', 'equalto', 'team') | list | length }}) · repos</th>
+      <th scope="col">Technical debt, by kind</th>
+      <th scope="col" class="ru-r">open</th>
+      <th scope="col">Members</th>
+      <th scope="col">Last work</th>
+      <th scope="col" class="ru-r">Needs you</th>
+      <th scope="col"><span class="sr-only">menu</span></th>
+    </tr></thead>
+    <tbody>
+    {%- for r in ro.rows %}
+    <tr class="ru-row ru-{{ r.kind }}{% if r.answer %} ru-attn{% endif %}" data-row="{{ r.key }}">
+      <td class="ru-nm"><a class="ru-go" href="#{{ r.hash }}" data-go="{{ r.key }}" aria-label="{{ r.name }}">
+        {%- if r.kind == 'team' -%}
+        {%- if r.first and r.repo %}<span class="ru-rp{% if not r.repo_url %} ru-plain{% endif %}">{{ r.repo }}</span>{% endif %}<span class="ru-tm{% if not r.first or not r.repo %} ru-only{% endif %}">{{ r.team }}</span>
+        {%- elif r.kind == 'repo' -%}
+        <span class="ru-rp">{{ r.repo }}</span><span class="ru-tm ru-none">no team</span>
+        {%- elif r.kind == 'strip' -%}
+        <span class="ru-tm ru-none ru-sub">{{ r.name }}</span>
+        {%- else -%}
+        <span class="ru-rp">No repo</span>
+        {%- endif -%}
+      </a></td>
+      <td class="ru-debt">
+        {%- if r.error %}<span class="meta ru-dim" title="{{ r.error }}">could not look</span>
+        {%- elif r.segs %}<div class="bar" role="img" aria-label="open entries by kind">{% for b in r.segs %}<span class="bseg k-{{ b.key }}{% if b.pct < 4 %} ru-bare{% endif %}" style="flex-basis: {{ b.pct }}%;" title="{{ b.n }} {{ b.label }}">{{ b.n }}</span>{% endfor %}</div>
+        {%- endif %}</td>
+      <td class="ru-open ru-r">{% if r.open is not none %}{{ r.open }}{% endif %}</td>
+      <td class="ru-mem">
+        {%- if r.blocks or r.stubs %}<span class="ru-blocks">{% for b in r.blocks %}<i class="s-{{ b.cls }}" title="{{ b.name }} · {{ b.label }}"></i>{% endfor %}{% for n in r.stubs %}<i class="ru-stub" title="{{ n }} · no session"></i>{% endfor %}</span>{% endif %}
+        {%- if r.word %}<span class="ru-n ru-word">{{ r.word }}</span>
+        {%- elif r.blocks %}<span class="ru-n"><b>{{ r.working }}</b> of {{ r.blocks | length }}</span>{% endif %}</td>
+      <td class="ru-lw">{% if r.last %}<span class="ru-age" data-doing-at="{{ r.last.at }}">{{ r.last.age }}</span> <span class="ru-who" title="{{ r.last.text }}">{{ r.last.name }}</span>{% endif %}</td>
+      <td class="ru-ny ru-r">
+        {%- if r.needs %}{% set asked = r.asked.n if r.asked else 0 %}
+        <button type="button" class="ru-c{% if r.answer %} ru-ans{% endif %}" aria-expanded="false" aria-haspopup="true" data-menu="needs"
+          title="{{ r.answer }} answer needed{% if r.kind == 'team' %} · {{ asked }} asked you{% if r.asked %}, oldest {{ r.asked.age }}{% endif %}{% endif %}">{{ r.needs }}</button>
+        <div class="ru-menu ru-nymenu" role="menu" hidden>
+          <div class="ru-h">Needs you · {{ r.needs }}</div>
+          {%- if r.answer %}
+          <a role="menuitem" href="{% if r.answer_card %}#card-{{ r.answer_card }}{% else %}#tsum-{{ r.team }}{% endif %}"{% if r.answer_card %} data-open-card="{{ r.answer_card }}"{% else %} data-open-team="{{ r.team }}"{% endif %}><span class="ru-cnt">{{ r.answer }}</span> answer needed</a>
+          {%- endif %}
+          {%- if r.asked %}
+          <a role="menuitem" href="/inbox?team={{ r.team | urlencode }}&amp;sec=needs&amp;kind=questions"><span class="ru-cnt">{{ r.asked.n }}</span> asked you <span class="ru-k">oldest {{ r.asked.age }} · Inbox →</span></a>
+          {%- for m in r.asked.by %}
+          <a role="menuitem" href="/inbox?row={{ m.id | urlencode }}"><span class="ru-cnt">{{ m.n }}</span> {{ m.name }} <span class="ru-k">→</span></a>
+          {%- endfor %}
+          {%- endif %}
+        </div>
+        {%- endif %}</td>
+      <td class="ru-more">
+        {%- if r.acts %}
+        <button type="button" class="ru-dots-btn" aria-expanded="false" aria-haspopup="true" data-menu="acts" aria-label="{{ r.name }}: acts">⋯</button>
+        <div class="ru-menu ru-actmenu" role="menu" hidden>
+          {%- for a in r.acts %}
+          {%- if a == 'add-entry' %}<button type="button" role="menuitem" data-addentry="{{ r.repo }}">Add entry…</button>
+          {%- elif a == 'new-team' %}<a role="menuitem" href="/new?team={{ r.team | urlencode }}">New session in {{ r.team }}</a>
+          {%- elif a == 'new-here' %}<a role="menuitem" href="/new?dir={{ r.root | urlencode }}">New session here</a>
+          {%- elif a == 'start' %}<button type="button" role="menuitem" data-press="start" data-team="{{ r.team }}">Start</button>
+          {%- elif a == 'wind-down' %}<button type="button" role="menuitem" class="ru-sep" data-press="stop" data-team="{{ r.team }}">Wind down</button>
+          {%- elif a == 'stop-now' %}<button type="button" role="menuitem" class="ru-stopc" data-press="stopnow" data-team="{{ r.team }}">Stop now</button>
+          {%- endif %}
+          {%- endfor %}
+        </div>
+        {%- endif %}</td>
+    </tr>
+    {%- endfor %}
+    <tr class="ru-legend"><td></td><td colspan="2"><div class="legend">{% for k, label in kind_bars %}<span><i class="k-{{ k }}"></i>{{ label }}</span>{% endfor %}</div></td><td colspan="4"></td></tr>
+    </tbody>
+  </table>
   {%- endif %}
-  {%- endif %}
-  <div class="facet fneeds{% if ro.answer_needed %} answering{% endif %}">
-    <div class="fhead"><span class="kind">Needs you</span></div>
-    {%- if ro.answer_needed %}{#- *answer needed*: drawn above 0 only, as *asked you* is (TD-418) #}
-    <div class="nrow"><b class="big">{{ ro.answer_needed }}</b> {% if ro.answer_team %}<a href="#tsum-{{ ro.answer_team }}" data-open-team="{{ ro.answer_team }}" title="sessions waiting on a permission or a question in their pane — answered in their team's facet">answer needed</a>{% elif ro.answer_card %}<a href="#card-{{ ro.answer_card }}" data-open-card="{{ ro.answer_card }}" title="sessions waiting on a permission or a question in their pane — answered on the card">answer needed</a>{% else %}<span>answer needed</span>{% endif %}</div>
+  <div class="ru-tot">
+    <span class="ru-grp"><span class="kind">Agents ({{ ro.n_agents }})</span><span class="tipmark" tabindex="0" role="img" aria-label="in urgency order, as the cards sort · a pill filters the page to that state" title="in urgency order, as the cards sort · a pill filters the page to that state">i</span>
+      {%- for a in ro.agents %} <button type="button" class="pill nog s-{{ a.cls }}" data-state-filter="{{ a.word }}" title="show only the {{ a.label }} sessions — the filter box's state:{{ a.word }}">{{ a.label }} ({{ a.n }})</button>{% endfor %}</span>
+    {%- if ro.has_repo %}
+    <span class="ru-grp"><span class="kind">PRs</span><a href="{{ ro.prs_url or '#' }}"{% if ro.prs_errors %} title="{{ ro.prs_errors | join('\n') }}"{% endif %}>({{ ro.prs_open }}) open{% if ro.waiting %}, {{ ro.waiting }} waiting on review{% endif %}
+      {%- for w, word in (('day', 'today'), ('week', 'this week'), ('month', 'this month')) %}{% set b = ro.prs[w] %}<span class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}> · {{ b.opened }} opened {{ b.closed }} closed {{ word }}</span>{% endfor %}
+      {%- if ro.prs_errors %} · a read failed{% endif %}</a></span>
     {%- endif %}
-    {%- if ro.asked %}{#- *asked you* (§4.5a *Sessions: rollup*, TD-354): the teams' open asks to you, the oldest's age; hidden at 0 #}
-    <div class="nrow"><b class="big">{{ ro.asked }}</b> <a href="#tsum-{{ ro.asked_team }}" data-open-team="{{ ro.asked_team }}" title="members' open asks to you, waiting in the Inbox — each team's line links its row">asked you</a> <span class="meta">· <span data-doing-at="{{ ro.asked_at }}">{{ ro.asked_age }}</span></span></div>
-    {%- endif %}
-    <div class="nrow"><b class="big" data-inbox-needs>{{ person_needs or 0 }}</b> <a href="/inbox">in the Inbox</a>{#- §4.5 screen 1 (TD-178): the board items past their date among them, kept live from the Inbox's poll as the count is -#}
-      <span class="meta overdue{% if not person_overdue %} hidden{% endif %}" title="board items in Needs you whose Due: date has passed">· <span data-inbox-overdue>{{ person_overdue or 0 }}</span> overdue</span></div>
+    <span class="ru-grp"><span class="kind">Needs you</span>
+      {%- if ro.answer_team %}<a href="#tsum-{{ ro.answer_team }}" data-open-team="{{ ro.answer_team }}">
+      {%- elif ro.answer_card %}<a href="#card-{{ ro.answer_card }}" data-open-card="{{ ro.answer_card }}">
+      {%- elif ro.asked_team %}<a href="#tsum-{{ ro.asked_team }}" data-open-team="{{ ro.asked_team }}">
+      {%- else %}<a href="#rollup">{% endif %}{{ ro.n_from_teams }} from teams</a> ·
+      <a href="/queue"><span data-queue-needs>{{ person_queue_n or 0 }}</span> on the Queue</a> ·
+      <a href="/inbox"><span data-inbox-needs>{{ person_needs or 0 }}</span> in the Inbox</a><span class="overdue{% if not person_overdue %} hidden{% endif %}" title="board items in Needs you whose Due: date has passed">· <span data-inbox-overdue>{{ person_overdue or 0 }}</span> overdue</span></span>
   </div>
 </div>
 {% endif %}

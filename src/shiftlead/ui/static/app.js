@@ -2316,18 +2316,18 @@
       // of one id, and the cause is not reproduced yet; until it is, a delta leaves one card per id.
       $$(`[id="card-${CSS.escape(ev.id)}"]`).slice(1).forEach((dup) => dup.remove());
       if (ev.groups !== undefined) sync(ev.groups);
-      if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
+      if (ev.rollup !== undefined) AO.swapRollup(ev.rollup);
       AO.markPopped(fresh);
       layout();
     } else if (ev.event === "gone") {
       const c = $(`#card-${CSS.escape(ev.id)}`); if (c) { AO.handRing(c); c.remove(); }
       if (ev.groups !== undefined) sync(ev.groups);
-      if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
+      if (ev.rollup !== undefined) AO.swapRollup(ev.rollup);
       layout();
     } else if (ev.event === "groups") {
       // the repo facts or a doing call moved (TD-176): the summaries are in the groups
       sync(ev.groups);
-      if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
+      if (ev.rollup !== undefined) AO.swapRollup(ev.rollup);
       layout();
     }
   }
@@ -2390,6 +2390,120 @@
     if (filter) filter.value = "";
     if (team && folded) set(foldKey(team), false);
   };
+  // ---- the rollup's rows (design §4.5a *Sessions: rollup*, *rollup: press and menus*; TD-1203, built by
+  // TD-1204). A row's key is its layout item's (`team:<name>`, `repo:<name>`, `strip:<repo>`, `norepo`) and
+  // its hash the URL's (`team=<name>`, …): a press lands on the item, a load with the hash does once.
+  const HASH_KEY = { team: "team:", repo: "repo:", strip: "strip:" };
+  AO.rollupKey = function (hash) {
+    const h = String(hash || "").replace(/^#/, "");
+    if (h === "norepo") return "norepo";
+    const at = h.indexOf("="), kind = h.slice(0, at), name = at > 0 ? h.slice(at + 1) : "";
+    if (!(kind in HASH_KEY) || !name) return "";
+    try { return HASH_KEY[kind] + decodeURIComponent(name); } catch (e) { return ""; }
+  };
+  AO.rollupHash = function (key) {
+    if (key === "norepo") return "norepo";
+    const kind = Object.keys(HASH_KEY).find((k) => key.startsWith(HASH_KEY[k]));
+    return kind ? `${kind}=${encodeURIComponent(key.slice(HASH_KEY[kind].length))}` : "";
+  };
+  // the press: the filter box cleared when it hides the target, a folded team opened and the opening stored,
+  // the heading scrolled into view below the held bar and marked for 1.2 s, the hash written. False when the
+  // page draws nothing of that key, and nothing moves.
+  function rollupLand(key) {
+    const find = () => $$("#groups [data-key]").find((el) => el.dataset.key === key);
+    let el = find(); if (!el) return false;
+    const f = $("#filter");
+    if (f && f.value && !el.getClientRects().length) { f.value = ""; layout(); el = find() || el; }
+    if (el.classList.contains("tgroup") && isFolded(el)) { AO.rollupGo(el.dataset.team, null, true, store.set); layout(); el = find() || el; }
+    const head = $(".ghead", el) || el;
+    head.scrollIntoView({ block: "start" });
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      head.classList.add("landed"); setTimeout(() => head.classList.remove("landed"), 1200);
+    }
+    history.replaceState(null, "", "#" + AO.rollupHash(key));
+    return true;
+  }
+  // the two menus, one open at a time; a delta's swap waits while one is (`AO.swapRollup`), and on close
+  // focus goes back to the same row's same button, found by the row's key, or the first row's link
+  let rollupMenu = null, rollupHeld = null;
+  function rollupClose(refocus) {
+    if (!rollupMenu) return;
+    const { btn, menu } = rollupMenu;
+    menu.hidden = true; btn.setAttribute("aria-expanded", "false"); rollupMenu = null;
+    if (rollupHeld !== null) {
+      const row = btn.closest("tr").dataset.row, which = btn.dataset.menu, html = rollupHeld;
+      rollupHeld = null; AO.swapRollup(html);
+      // focus goes back only on a close from the menu itself (Esc, an item): a press elsewhere keeps its own
+      if (refocus) { const to = rollupButton(row, which) || $("#rollup .ru-go"); if (to) to.focus({ preventScroll: true }); }
+    } else if (refocus) btn.focus({ preventScroll: true });
+  }
+  const rollupButton = (row, which) => {
+    const tr = $$("#rollup tr[data-row]").find((el) => el.dataset.row === row);
+    return tr ? $(`[data-menu="${which}"]`, tr) : null;
+  };
+  function rollupOpen(btn) {
+    if (rollupMenu && rollupMenu.btn === btn) return rollupClose(true);
+    const row = btn.closest("tr").dataset.row, which = btn.dataset.menu;
+    rollupClose(false);
+    // the close may have applied a held swap: the button pressed is then the fresh row's, found by its key
+    if (!btn.isConnected) btn = rollupButton(row, which);
+    if (!btn) return;
+    const menu = btn.nextElementSibling;
+    menu.hidden = false; btn.setAttribute("aria-expanded", "true"); rollupMenu = { btn, menu };
+    const first = $("[role=menuitem]", menu); if (first) first.focus();
+  }
+  AO.swapRollup = function (html) {
+    const box = $("#rollup"); if (!box) return;
+    if (rollupMenu) { rollupHeld = html; return; }
+    box.innerHTML = html;
+    syncSummaries();  // the window's PR words and the copied counts, which the server's markup does not know
+  };
+  function rollupKeys(e) {
+    if (!rollupMenu || !(rollupMenu.menu.contains(e.target) || e.target === rollupMenu.btn)) return;
+    const items = $$("[role=menuitem]", rollupMenu.menu), i = items.indexOf(document.activeElement);
+    // the menu's keys are its own: the page's ring (`j` / `k`, the arrows) never moves past an open menu
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); rollupClose(true); }
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault(); e.stopPropagation();
+      const n = items.length, j = e.key === "ArrowDown" ? (i + 1) % n : (i - 1 + n) % n;
+      if (items[j]) items[j].focus();
+    } else if (e.key === "Tab") rollupClose(false);
+  }
+  // a press inside the rollup: a menu's button, an item (the menu closed first, then the act with its
+  // control's own confirm, or the link), a row anywhere but its buttons, an Agents pill, *n from teams*
+  function rollupPress(e) {
+    const btn = e.target.closest("[data-menu]");
+    if (btn) { e.preventDefault(); return rollupOpen(btn); }
+    const item = e.target.closest("[role=menuitem]");
+    if (item) {
+      rollupClose(true);
+      if (item.dataset.press) {
+        const sec = sections().find((s) => s.dataset.key === "team:" + item.dataset.team);
+        const b = sec && $$(".ghead [data-team-act]", sec).find((x) => x.dataset.teamAct === item.dataset.press);
+        if (b) b.click();
+        return;
+      }
+      if (!item.matches("[data-open-team], [data-open-card]")) return;  // Add entry…'s own handler, or a link
+    }
+    const go = e.target.closest("[data-open-team], [data-open-card]");
+    if (go) {
+      e.preventDefault();
+      const team = go.dataset.openTeam || "", sec = team ? sections().find((s) => s.dataset.team === team) : null;
+      AO.rollupGo(team, $("#filter"), !!sec && isFolded(sec), store.set);
+      layout();
+      const at = document.getElementById(go.getAttribute("href").slice(1));
+      if (at) at.scrollIntoView({ block: "start" });
+      return;
+    }
+    const pill = e.target.closest("[data-state-filter]");
+    if (pill) {
+      const f = $("#filter");
+      f.value = AO.orgToggleWord(f.value, "state:" + pill.dataset.stateFilter);
+      return layout();
+    }
+    const row = e.target.closest("tr[data-row]");
+    if (row && !e.target.closest(".ru-menu, button, .ru-tot a")) { e.preventDefault(); rollupLand(row.dataset.row); }
+  }
   function syncTeams() {
     sections().forEach((sec) => {
       const team = sec.dataset.team, b = $(".ghead .fold", sec), head = $(".ghead", sec);
@@ -2445,6 +2559,8 @@
       $$(".seg[data-pick=win] button", ro).forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === win ? "true" : "false"));
       const n = $("#personneeds"), into = $("[data-inbox-needs]", ro);
       if (n && into) into.textContent = n.textContent.trim() || "0";
+      const q = $("#queueneeds"), qinto = $("[data-queue-needs]", ro);  // *q on the Queue*: the tab's number
+      if (q && qinto) qinto.textContent = q.textContent.trim() || "0";
       // …and *m overdue* beside it (§4.5 screen 1, TD-178), from the last poll; unknown keeps what it showed
       const od = $("[data-inbox-overdue]", ro);
       if (od && overdueN !== null) { od.textContent = String(overdueN); od.parentElement.classList.toggle("hidden", !overdueN); }
@@ -3752,28 +3868,21 @@
     });
     // Start, Wind down and Stop now are all on the team's card, and so is its fold.
     wireGroups(box);
-    // the rollup (TD-176 slice 4): its window picker is the page's one value, and an Agents pill
-    // types `state:<word>` into the filter box — pressed again, it takes the word out
+    // the rollup (TD-1204): a row's press, its two menus, an Agents pill typing `state:<word>` into the filter
+    // box (pressed again, it takes the word out); a press outside an open menu closes it
     const rollupBox = $("#rollup");
-    if (rollupBox) rollupBox.addEventListener("click", (e) => {
-      const p = e.target.closest(".seg[data-pick] button");
-      if (p) return pickSummary(p);
-      const go = e.target.closest("[data-open-team], [data-open-card]");
-      if (go) {
-        e.preventDefault();
-        const team = go.dataset.openTeam || "", sec = team ? sections().find((s) => s.dataset.team === team) : null;
-        AO.rollupGo(team, $("#filter"), !!sec && isFolded(sec), store.set);
-        layout();
-        const at = document.getElementById(go.getAttribute("href").slice(1));
-        if (at) at.scrollIntoView({ block: "start" });
-        return;
-      }
-      const pill = e.target.closest("[data-state-filter]"); if (!pill) return;
-      const f = $("#filter");
-      f.value = AO.orgToggleWord(f.value, "state:" + pill.dataset.stateFilter);
-      layout();
-    });
+    if (rollupBox) {
+      rollupBox.addEventListener("click", rollupPress);
+      rollupBox.addEventListener("keydown", rollupKeys);
+      // …never for a press whose target a held swap has just replaced: that press opened the menu now open
+      document.addEventListener("click", (e) => {
+        if (rollupMenu && e.target.isConnected && !rollupMenu.menu.parentElement.contains(e.target)) rollupClose(false);
+      });
+    }
     layout();
+    // a load with a row's hash lands there once the groups are drawn; a hash naming nothing drawn is dropped
+    const landKey = AO.rollupKey(location.hash);
+    if (landKey && !rollupLand(landKey)) history.replaceState(null, "", location.pathname + location.search);
     if (popChan()) popChan().postMessage({ who: true });  // the popped windows answer with their ids
     connectEvents((ev) => groupsEvent(ev, ""));
   };

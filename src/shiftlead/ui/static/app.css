@@ -758,17 +758,82 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .sc.plus:hover { background: var(--hover); }
 .tsum .lv, .tsum .wv, .tsum .fv, .tsum .mv { display: flex; flex-direction: column; gap: 5px; }
 .tsum .lv[hidden], .tsum .wv[hidden], .tsum .fv[hidden], .tsum .mv[hidden] { display: none; }
-/* the Org rollup (§4.5a *Sessions: rollup*, TD-176 slice 4) */
-.rollup { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1fr; gap: 12px; margin: 12px 0 18px; }
-@media (max-width: 1100px) { .rollup { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
-@media (max-width: 640px) { .rollup { grid-template-columns: minmax(0, 1fr); } }
-.rollup.quiet { grid-template-columns: minmax(0, 22rem); } /* no team live: Needs you alone (TD-406) */
-.rollup.lone { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } /* one team live: Agents and Needs you (TD-418) */
-@media (max-width: 640px) { .rollup.lone { grid-template-columns: minmax(0, 1fr); } }
-.rollup button.pill { border: 0; cursor: pointer; font-family: inherit; }
-.rollup .fneeds.answering { background: var(--warn-bg); border-color: var(--warn-line); }
-.rollup .nrow { display: flex; gap: 8px; align-items: baseline; }
-.rollup .big { font-size: var(--t-title); color: var(--needs-fg); }
+/* the Org rollup (§4.5a *Sessions: rollup*, *rollup: press and menus*; TD-1203, built by TD-1204): a table of the
+   page's teams and repos, a row each, then the totals line; below 720 px a row is three lines */
+.rollup { margin: 12px 0 18px; background: var(--card); border: 1px solid var(--line); border-radius: 6px; }
+.rollup .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.rollup-list { width: 100%; border-collapse: collapse; table-layout: auto; }
+.rollup-list th { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); text-align: left; padding: 8px 10px 4px; white-space: nowrap; }
+.rollup-list td { padding: 6px 10px; border-top: 1px solid var(--line); vertical-align: middle; }
+.rollup-list th:first-child, .rollup-list td:first-child { padding-left: 14px; }
+.rollup-list .ru-r { text-align: right; }
+.rollup-list .ru-row { position: relative; cursor: pointer; }
+.rollup-list .ru-row:hover { background: var(--hover); }
+.rollup-list .ru-row.ru-attn > td:first-child { box-shadow: inset 3px 0 0 var(--needs); }  /* *answer needed* above 0 */
+.rollup-list .ru-go { display: flex; align-items: baseline; gap: 8px; color: var(--fg); text-decoration: none; white-space: nowrap; min-width: 0; }
+.rollup-list .ru-rp { color: var(--link); font-weight: 600; }
+.rollup-list .ru-rp.ru-plain { color: var(--fg); }  /* a repo this host does not read */
+.rollup-list .ru-tm { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s, var(--t-small)); color: var(--strong); }
+.rollup-list .ru-tm.ru-only { padding-left: 0; }
+.rollup-list .ru-tm.ru-none { font-family: inherit; font-style: italic; color: var(--muted); }
+.rollup-list .ru-sub { padding-left: 18px; }
+.rollup-list .ru-debt { width: 34%; min-width: 220px; }
+.rollup-list .ru-debt .bar { height: 14px; gap: 1px; }
+.rollup-list .ru-debt .bseg { font-size: var(--t-cap); min-width: 16px; padding: 0 3px; }
+.rollup-list .ru-debt .bseg.ru-bare { min-width: 4px; padding: 0; color: transparent; }  /* too narrow for its count */
+.rollup-list .ru-dim { opacity: .7; }
+.rollup-list .ru-open { font-variant-numeric: tabular-nums; color: var(--muted); font-size: var(--t-small); }
+.rollup-list .ru-mem { white-space: nowrap; }
+.rollup-list .ru-mem, .rollup-list .ru-lw { font-size: var(--t-small); color: var(--muted); }
+.rollup-list .ru-blocks { display: inline-flex; align-items: flex-end; gap: 2px; height: 20px; vertical-align: middle; margin-right: 8px; }
+.rollup-list .ru-blocks i { width: 7px; height: 9px; border-radius: 2px; }
+.rollup-list .ru-blocks i.s-working { height: 20px; background: var(--working); }
+.rollup-list .ru-blocks i.s-needs { height: 20px; background: var(--needs); }
+.rollup-list .ru-blocks i.s-waiting { height: 14px; background: transparent; box-shadow: inset 0 0 0 2px var(--waiting); }
+.rollup-list .ru-blocks i.s-idle { background: var(--idle); opacity: .6; }
+.rollup-list .ru-blocks i.s-oncall { height: 6px; background: transparent; outline: 1px dashed var(--ended-fg); outline-offset: -1px; }
+.rollup-list .ru-blocks i.ru-stub { height: 4px; background: var(--line2); box-shadow: inset 0 0 0 1px var(--border); }
+.rollup-list .ru-n b { color: var(--working); font-weight: 700; }
+.rollup-list .ru-lw { white-space: nowrap; }
+.rollup-list .ru-age { font-family: "JetBrains Mono", monospace; color: var(--strong); }
+.rollup-list .ru-who { font-family: "JetBrains Mono", monospace; text-decoration: underline dotted var(--border); text-underline-offset: 3px; }
+.rollup-list .ru-c { min-width: 28px; font: inherit; font-size: var(--t-small); font-weight: 600; color: var(--needs-fg); background: var(--needs-bg); border: 0; border-radius: 3px; padding: 2px 8px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.rollup-list .ru-c.ru-ans { background: var(--needs); color: var(--bg); }  /* solid while an answer is needed */
+.rollup-list .ru-more { width: 28px; text-align: right; }
+.rollup-list .ru-dots-btn { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 4px; width: 26px; height: 24px; font-size: var(--t-title); line-height: 1; cursor: pointer; }
+.rollup-list .ru-row:hover .ru-dots-btn, .rollup-list .ru-dots-btn[aria-expanded="true"] { border-color: var(--line); color: var(--fg); }
+.rollup-list .ru-menu { position: absolute; right: 14px; top: calc(100% - 4px); z-index: 20; background: var(--card); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0, 0, 0, .35); padding: 4px 0; min-width: 220px; font-size: var(--t-small); text-align: left; cursor: default; }
+.rollup-list .ru-nymenu { right: 52px; min-width: 300px; }
+.rollup-list .ru-menu[hidden] { display: none; }
+.rollup-list .ru-menu > a, .rollup-list .ru-menu > button { display: flex; gap: 10px; width: 100%; padding: 6px 14px; color: var(--fg); background: none; border: 0; font: inherit; text-align: left; text-decoration: none; cursor: pointer; white-space: nowrap; }
+.rollup-list .ru-menu > a:hover, .rollup-list .ru-menu > button:hover, .rollup-list .ru-menu > :focus { background: var(--hover); outline: none; }
+.rollup-list .ru-menu .ru-sep { border-top: 1px solid var(--line); margin-top: 4px; }
+.rollup-list .ru-menu .ru-stopc { color: var(--alarm-fg); }
+.rollup-list .ru-menu .ru-h { padding: 6px 14px 4px; font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.rollup-list .ru-menu .ru-cnt { color: var(--needs-fg); font-weight: 600; min-width: 14px; text-align: right; }
+.rollup-list .ru-menu .ru-k { margin-left: auto; color: var(--muted); font-family: "JetBrains Mono", monospace; }
+.rollup-list .ru-legend td { border-top: 1px solid var(--line); padding-top: 6px; padding-bottom: 8px; }
+.rollup .ru-tot { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; border-top: 1px solid var(--line); padding: 10px 14px; font-size: var(--t-small); color: var(--muted); }
+.rollup:not(:has(.rollup-list)) .ru-tot { border-top: 0; }  /* the flat page: the totals line alone */
+.rollup .ru-tot .kind { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); margin-right: 4px; }
+.rollup .ru-tot .ru-grp { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rollup .ru-tot a { color: var(--link); text-decoration: none; }
+.rollup button.pill { border: 0; cursor: pointer; font-family: inherit; font-size: var(--t-cap); }
+/* the press's landing (§4.5a *rollup: press and menus*): the Inbox's edge, 1.2 s, none under reduced motion */
+#groups .landed { box-shadow: inset 3px 0 0 var(--link); }
+@media (max-width: 720px) {
+  .rollup-list thead { display: none; }
+  .rollup-list, .rollup-list tbody { display: block; }
+  .rollup-list .ru-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; grid-template-areas: "nm nm ny more" "debt debt debt open" "mem mem lw lw"; gap: 6px 10px; padding: 8px 14px; border-top: 1px solid var(--line); }
+  .rollup-list .ru-row > td { border: 0; padding: 0; }
+  .rollup-list .ru-nm { grid-area: nm; } .rollup-list .ru-debt { grid-area: debt; width: auto; min-width: 0; }
+  .rollup-list .ru-open { grid-area: open; } .rollup-list .ru-mem { grid-area: mem; } .rollup-list .ru-ny { grid-area: ny; }
+  .rollup-list .ru-lw { grid-area: lw; justify-self: end; } .rollup-list .ru-more { grid-area: more; }
+  .rollup-list .ru-who { display: none; }  /* the doer dropped; the age stays */
+  .rollup-list .ru-debt:empty, .rollup-list .ru-open:empty { display: none; }
+  .rollup-list .ru-legend { display: block; padding: 6px 14px; } .rollup-list .ru-legend td { display: block; border: 0; padding: 0; }
+  .rollup-list .ru-menu { right: 8px; }
+}
 .bseg.phase { border-radius: 2px; } .legend .ph-add { background: var(--ph-add); } .legend .ph-design { background: var(--ph-design); }
 .legend .ph-grind { background: var(--ph-grind); } .legend .ph-review { background: var(--ph-review); }
 /* the Repo page (design §4.5 screen 11, TD-176 slice 5) */
