@@ -1685,14 +1685,13 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed 2026-10-25 (the designer): design §5 *The seams* (ShiftLead requires dev-cadence; a repo lacking its tree, gate or ledger is *unserved*; *How the readers find dev-cadence*, *Which dev-cadence*, *ledgerboard by its header*), §4.7 `ao repo add`, §4.8 *The person's own additions*, §4.9b (the preferences in the layer; the home commits, the person pushes), §6 rule 10 and *Sync*, §4.4, §4.4a, §4.5a, §4.9, §8, the glossary's *unserved*. Builds: TD-1010 (`ao repo add`), TD-1011 (unserved; `gate:`, the sentences and `ao repo init` gone), TD-1012 (`OLDEST`), TD-1013 (the ledgerboard header), TD-1014 (the resolver; dev-cadence TD-129), TD-1015 (TD-681's replacement), TD-1016 (the layer's `shiftlead/` texts; dev-cadence TD-132), TD-1017 (the *told at start* sources); TD-662 and TD-663 are blocked by TD-1016 for the preferences' new home. Before: decided 2026-10-25 by Paul (*Go with your recommendations*): [ADR 2026-10-25](decisions/2026-10-25-shiftlead-requires-dev-cadence.md), option 4, Q1 and Q2 yes, Q2a and Q2b as recommended; its dev-cadence companion (dev-cadence TD-129, *pinned, not synced*) decided the same day as option C.
-**Blocked by:** TD-1010, TD-1011, TD-1012, TD-1013, TD-1014, TD-1015, TD-1016, TD-1017
 **Location:** `docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md`; design §8 (*recommends dev-cadence and requires only a ledger*), §5 (*The layout slots*), §4.7 (`ao repo init`), §4.8 (brief supplements), §4.9b (TD-657's preference layers); `src/shiftlead/repoconfig.py` (`entry_text`, `layout`), `src/sessionorc/cadence.py`, `src/sessionorc/sync.py`
 
 **Why:** Paul, 2026-10-25, after TD-993 made the start context visible: *as soon as users can see it they will want the ability to modify it*; then *we talked previously about letting someone use a different cadence mechanism (other than dev-cadence) but I wonder if that is needless complication, especially given that we are building personal prefs into dev-cadence now*. ShiftLead keeps a path for a repo without dev-cadence that no repo uses, and has no home of the person's own for its briefs and start prompts (`entry.md` and `work.md` cannot be changed at all), while dev-cadence's personal layer (its TD-126) already follows the person across repos and machines.
 
 **Fix:** the design sections above change first, then one build entry each — Q1: the adoption offer when a repo is registered; the refusals in place of the fallbacks, with the cadence's seams, sentences and `ao repo init` removed; the one resolver with the readers moved onto it (with dev-cadence TD-129's build); the oldest-commit check; TD-681's replacement; the ledgerboard header check. Q2: dev-cadence's `--json` listing of layer roots (a TD-126 slice there); the `shiftlead/` layer reader with the brief, entry and work additions; TD-657's preferences moved before TD-662 builds; the home's commits into the layer clone (Q2b, with TD-663); the Session card row's sources (with TD-993).
 
-**Done when** the design sections say what the ADR decided and every build entry named above is filed, each with its `Blocked by:`.
+**Done when** the design sections say what the ADR decided and every build entry named above is filed, each with its `Blocked by:` and naming this entry in `Part of:`.
 
 **Related:** TD-993, TD-657, TD-662, TD-681, TD-588; dev-cadence TD-126, TD-128, TD-129, TD-130 (following another's layer: Q2a's rule applies), TD-132, TD-133; ADR 2026-10-12, ADR 2026-10-08.
 
@@ -1705,6 +1704,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Kind:** build
 **Status:** Open — build; the bump's check (steps 1–2 as `sync._check_bump`, step 3's wait on a review of the compare, §4.4's test counting `docs/cadence.toml`, §6 *Sync* rewritten) in the PR of this line; left: the lock road leaves `sync.check` once no served repo holds a lock (the Done when's last clause)
 **Waits:** event — no served repo holds `docs/cadence-sync.lock` (each migrates to a pin in its own sessions' PR)
+**Part of:** TD-1009
 **Location:** `src/sessionorc/sync.py` (`check`, the pass), `agent_sync`; `tests/test_sync_pass.py`; design §6 *Sync: a mechanical sync PR is merged at the home*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 5): with a pin there is no lock and no copied file to replay; TD-681 is replaced, not trimmed.
@@ -1725,6 +1725,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Waits:** event — every registered consumer repo at or after dev-cadence 611d911 (TD-132, `cadence_layer.py --json`, #326), the commit `OLDEST` is raised to: its pin's `ref` in `docs/cadence.toml` where it has one (dev-cadence TD-129; a served repo is pinned only once TD-1014 reads a pin), else its `docs/cadence-sync.lock`'s `files_commit` (reworded 2026-10-26, Paul: the pin migration drops the lock); read 2026-10-25 (grinder-ao-2), each lock's `files_commit`: samscrape, contractmatch and ledgerboard at 4453db4, pneuma-ops and guardians-devenv at 3384140, shiftlead at 232f2ad — none holds it. Each repo's sync is its own sessions' work
 **Status:** Open — build
 **Blocked by:** dev-cadence#TD-132, TD-1012
+**Part of:** TD-1009
 **Location:** new `src/shiftlead/layers.py` (the listing and the reads), `src/sessionorc/cadence.py` (`OLDEST` raised), `src/sessionorc/brief.py` (`fill`: the `{person}` slot and its `sources`), `src/shiftlead/briefs/*.md` (the slot and the sentence before *This repo's rules*), `src/shiftlead/repoconfig.py` (`entry_text`, `work_text`: the additions), `src/shiftlead/cli.py` (`ao prefs`'s layer line); tests beside `tests/test_brief_replay.py` and `tests/test_repoconfig.py`; design §4.8 *The person's own additions*, §4.9b *Preferences, in layers*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 7–9, Q2a): the person's texts get one home that follows them, their dev-cadence layer; `entry.md` and `work.md` cannot be changed at all today.
@@ -1752,6 +1753,7 @@ A smaller problem came up in the same session. `ao msg samscrape --kind note …
 **Kind:** build
 **Status:** Open — build
 **Blocked by:** TD-1016
+**Part of:** TD-1009
 **Location:** the start context on the record (§4.3; its parts and their sources), `src/shiftlead/ui/` (the Session card's *told at start* row, TD-996); its UI test; design §4.5a *Focus side panel, Session card: told at start*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 9): once a layer adds to the text, the person must see which part came from where.

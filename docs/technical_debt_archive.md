@@ -19469,6 +19469,7 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Owner:** grinder
 **Kind:** build
 **Status:** Done
+**Part of:** TD-1009
 **Location:** `src/sessionorc/ledgerboard.py`'s first line (read, never edited: a synced file), `src/sessionorc/seams.py` (the header's release), `src/shiftlead/doctor.py`, `src/shiftlead/ui/repo.py`; `tests/test_repo_seams.py`; design §5 *ledgerboard by its header*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 6): parity rests on a copy in the repo, which the pin (dev-cadence TD-129) removes.
@@ -19491,6 +19492,7 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Owner:** grinder
 **Kind:** live-check #2351
 **Status:** Done
+**Part of:** TD-1009
 **Location:** `src/sessionorc/seams.py` (`reading`), `src/sessionorc/cadence.py` (`gate`), `src/shiftlead/repoconfig.py` (`layout`, the slot sentences), `src/shiftlead/doctor.py` (`repos`, `missing_seams`, `ledger_lack`), `src/shiftlead/ui/repo.py` (`missing_seams`), `src/shiftlead/cli.py` (`cmd_repo_init` removed; `ao team start`), the home's passes that act on a repo (`agent_sync`, the promote pass, the lanes' reading, the write-back, `settle`, `pr_order` and `teamrun.red_prs`: no order in an unserved repo but a sync PR of an older tree), `src/shiftlead/orgcheck.py` (`check`, `checkout_warnings`: a `gate:` named), every shipped text that names *no gate* — `src/shiftlead/briefs/` (`grinder.stage.md`, `auditor.md`, `hunter.md`, `manager.md`, `techlead.md`, `techlead.stage.md`) and `src/shiftlead/flows/` (`build-review/build.md`, `build/build.md`, `td/build.md`, `td/review.md`) — and `src/shiftlead/team_skill.md` (its `ao repo init` and `gate:` lines), `src/shiftlead/repoinit.py` (removed), `src/shiftlead/ui/repo.py` (`missing_seams`); their tests (`tests/test_repo_seams.py`, `tests/test_cadence_policy.py`, `tests/test_sync_pass.py`, `tests/test_ui_repo_page.py`, `tests/test_ui_repo_org.py`, `tests/test_cli_teams.py`, `tests/test_repoconfig.py`, `tests/test_briefs_layout.py`); design §5 *The seams*, §6 rule 10 and *Sync*, §4.4 *The seams*, §4.5a *Repo page: missing seams*, §4.7 `ao doctor` **repos**
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 2): ShiftLead requires dev-cadence, so the path for a repo without it — the fallbacks, `gate:`, the absent-seam sentences, `ao repo init` — is kept right for no repo.
@@ -19524,6 +19526,7 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Owner:** grinder
 **Kind:** build
 **Status:** Done
+**Part of:** TD-1009
 **Location:** `src/sessionorc/cadence.py` (new `OLDEST`), `src/sessionorc/sync.py` (`parse_lock`'s `files_commit`), `src/sessionorc/seams.py` (the `oldest` lack); `tests/test_repo_seams.py`; design §5 *Which dev-cadence*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 4): dev-cadence has no versions, so the build must say which commits it can read.
@@ -19567,6 +19570,7 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Owner:** grinder
 **Kind:** build
 **Status:** Done
+**Part of:** TD-1009
 **Location:** `src/shiftlead/cli.py` (`cmd_repo`: the `add` word, beside `init`'s dispatch; the adopt's run and the PR), a new `add_repo` RPC at the home (`agent_serve`, person-only through `agent_common.person_only`), `src/sessionorc/hosts.py` (`default_repos_registry()`, the home's `repos.txt`), `src/sessionorc/gitinfo.py` (a scratch clone); a new `tests/test_repo_add.py`; design §4.7 **`ao repo add`**, §5 *Repos*
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 1): adoption is a PR the person sees, and registering a repo today is a hand-edited line in `repos.txt`.
@@ -20306,6 +20310,7 @@ Each cycle costs 12 minutes, and a shorter run gives main less time to move.
 **Kind:** build
 **Status:** Open — build; slice 1 (the resolver: the launcher vendored frozen as `sessionorc/dev_cadence.py`, dev-cadence 8008a10; `cadence.pin`/`pinned`/`command`/`tree`; a pinned repo with no lock served, its gate run through the resolver, its age its pin's `ref`, its ledgerboard release the pinned tree's; the pin's lacks by name) merged as #2365; slice 2 (`repoconfig.layout`'s `{gate}`, `{ledger_check}` and `{cadence_rules}` for a pinned repo: `cadence.typed`, the resolver's argv without `-C`) merged as #2368; slice 3 (the convention notices: `conventions.has_script` and `read` run the pinned tree's `cadence_changes.py` through the resolver, `has_script` in the tick's thread; a pinned repo tells no one until TD-1025) merged as #2371; `sync`'s other readers are the lock era's and leave with TD-1015, and `adopt`'s and `add_repo`'s are (4); slice 4 (`ao repo add` reads a pinned repo as adopted: `cadence.holds`, the lock, the pin or the source, for the `add_repo` RPC and the word, and `adopt` refuses an origin that pins dev-cadence before `sync.sh` writes a copy) merged as #2374; slice 6 (the home's `td_next` runs a pinned repo's `ledger_next_id.py` through the resolver; a pin that does not resolve, or a tree with no id script, refused) merged as #2379. The `dev-cadence` console script (`sessionorc/dev_cadence_entry.py`) and the node's guarded `/usr/local/bin/dev-cadence` link, of (5), merged as #2381. `ao host up` ships the tree the node's checkout pins (`containers.ship_cadence`: the home's launcher cache's `trees/<commit>` to `~/.shiftlead/nodes/<name>/cadence/<commit>/`, then into the container's `${XDG_CACHE_HOME:-~/.cache}/dev-cadence/trees/`; a pin the home cannot resolve, a copy that fails or a cache step that fails inside said by name and `host up` going on; `host forget --purge` removes the read-only trees), of (5), in its PR. Not done there: shipped trees of an older pin are kept, not pruned; only the node's checkout's pin is shipped, so a worktree on a bump branch pinning another commit finds no tree in the container until the bump merges and `host up` runs again; and a cold pin's first resolve can hold `ao host up` up to `cadence.TREE_TIMEOUT`. Left: (5) a node's brief names the node's own interpreter and launcher (`containers.INSIDE_VENV`), where slice 2's `cadence.typed` names the home's, since `layout` cannot tell a node's path from a home's; then the Done-when grep (no reader builds a dev-cadence path outside `cadence.py` and `sync.py`, `agent_ids` included). Noted by slice 1's review: a cold pin's first fetch can hold one repo-read pass up to `cadence.TREE_TIMEOUT` (330 s), since the pass reads repos in turn. Noted by slice 6's review: a cold pin's first resolve under `td_next` is bounded by the call's budget (about 45 s), and a timeout is cached in `cadence._trees` for `TREE_FOR` (60 s), so the repo reads unserved for that minute.
 **Blocked by:** TD-1011
+**Part of:** TD-1009
 **Location:** `src/sessionorc/cadence.py` (new `command(repo, word, *args) -> (argv, env)`), every reader of a dev-cadence path (`cadence.gate`, `sync`, `seams`, `repoconfig.layout`'s `{gate}` / `{ledger_check}` / `{cadence_rules}`, the convention notices), `src/sessionorc/dev_cadence.py` (the launcher, vendored), `src/sessionorc/containers.py` / `ao host up` (the trees beside the wheel); design §5 *How the readers find dev-cadence*, §4.4a
 
 **Why:** TD-1009 (ADR 2026-10-25, *Decision* 3): under dev-cadence TD-129 a repo carries a pin, not the files, so no reader can read a path in the checkout.
