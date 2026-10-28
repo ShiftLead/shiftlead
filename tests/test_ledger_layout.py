@@ -386,7 +386,10 @@ def test_the_ticks_change_test_reads_a_directory_but_not_its_rank_file(tmp_path)
 
 def test_the_queues_archive_reads_a_v2_archive_as_its_v1_twin(tmp_path):
     """§4.4 *Completed cards*' cache: a v2 `archive/` reads the v1 archive's entries (a set by id), and an
-    unchanged directory is served from the cache."""
+    unchanged directory is served from the cache; an entry file edited in place, which moves no directory
+    mtime, is read again (TD-1172)."""
+    import os
+
     from sessionorc import queue
 
     one, two = _v1(tmp_path / "one"), _v2(tmp_path / "two")
@@ -398,6 +401,11 @@ def test_the_queues_archive_reads_a_v2_archive_as_its_v1_twin(tmp_path):
     assert queue.archive_entries(path) is b
     (path / "TD-999.md").write_text(_entry(999, "late"), encoding="utf-8")
     assert "TD-999" in {e["id"] for e in queue.archive_entries(path)}
+    dir_st, f = path.stat(), path / "TD-999.md"
+    f.write_text(_entry(999, "edit"), encoding="utf-8")
+    os.utime(f, ns=(f.stat().st_atime_ns, f.stat().st_mtime_ns + 10**9))
+    os.utime(path, ns=(dir_st.st_atime_ns, dir_st.st_mtime_ns))
+    assert {e["id"]: e["title"] for e in queue.archive_entries(path)}["TD-999"] == "edit"
 
 
 def test_the_rank_prunes_archive_reads_a_v2_archive(tmp_path):
