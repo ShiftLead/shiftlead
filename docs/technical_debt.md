@@ -94,7 +94,7 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1188 | The per-clone-setup and roster warnings for a lock repo name `sync.sh <checkout>`, which dev-cadence #429 made a refusal; TD-1183's `Resolved` says §5's cures already named the launcher | Medium | Open — build |
 | TD-1190 | The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass | Medium | Open — design-first |
 | TD-1191 | `member_submit`'s *shell (no agent)* pick (`profile == SHELL_PICK`) is set in no test: drop the guard and the suite stays green | Low | Open — build |
-| TD-1192 | The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green | Low | Open — build |
+| TD-1193 | The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green | Low | Open — build |
 
 ---
 
@@ -1995,7 +1995,7 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1192: The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green
+## TD-1193: The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green
 
 **Priority:** Low
 **Type:** debt
