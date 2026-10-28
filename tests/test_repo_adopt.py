@@ -265,9 +265,13 @@ def test_an_open_adoption_pr_is_the_cure_its_lacks_name():
 
 
 DEV_CADENCE = Path(os.environ.get("DEV_CADENCE_SOURCE", "~/dev-cadence")).expanduser()
+DC_SYNC = DEV_CADENCE / "sync.sh"
+# dev-cadence #429 (its TD-129's closing slice): `sync.sh` no longer copies, so the adopt it runs is refused (TD-1183)
+COPIES = DC_SYNC.is_file() and "sync.sh no longer copies into a repo" not in DC_SYNC.read_text(errors="replace")
 
 
-@pytest.mark.skipif(not (DEV_CADENCE / "sync.sh").is_file(), reason="no dev-cadence checkout on this machine")
+@pytest.mark.skipif(not DC_SYNC.is_file(), reason="no dev-cadence checkout on this machine")
+@pytest.mark.skipif(not COPIES, reason="this dev-cadence's sync.sh no longer copies (TD-1183)")
 def test_the_offer_leaves_dev_cadences_roster_as_it_was_and_the_temp_root_is_the_reason(world, tmp_path, monkeypatch):
     """dev-cadence TD-068: `sync.sh` registers a target outside every temp root, so the scratch clone is made
     under `$TMPDIR`. The roster lives outside the temp roots (`CADENCE_TEMP_ROOTS` names the test's
