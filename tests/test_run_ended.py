@@ -90,6 +90,8 @@ async def test_a_persons_restart_keeps_a_run_only_member_run_only_and_refuses_on
         assert _ended(new)
         with pytest.raises(AgentError, match="its run ended: start the team, or add one from the form"):
             await person.call("restart", id=sid)
+        with pytest.raises(AgentError, match="its run ended: start the team"):
+            await person.call("relaunch", id=sid, launch={"prompt": "x"})  # Apply's words are not the flow's
 
 
 @pytest.mark.integration
