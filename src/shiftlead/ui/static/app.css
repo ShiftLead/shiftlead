@@ -649,16 +649,18 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 }
 
 /* ---- the team-first Org (design §4.5 screen 1, §4.5a *team card: summary*, TD-176 slice 3) ---- */
-.tsum { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr); gap: 12px; margin-bottom: 12px; }
-/* a team card's two facets, the Repo facet being its repo line's (§4.5a *team card: summary*, TD-725) */
-.tsum:not(:has(.frepo)) { grid-template-columns: minmax(0, .85fr) minmax(0, 1.2fr); }
+/* each facet drawn keeps its own share, Repo 1 : TDs in motion 1.15 : Doing 1.05, so two split the row by
+   theirs (§4.5a *team card: summary*, TD-1189) */
+.tsum { display: flex; gap: 12px; margin-bottom: 12px; }
+.tsum > .frepo { flex: 1 1 0; } .tsum > .fmotion { flex: 1.15 1 0; } .tsum > .fface { flex: 1.05 1 0; }
 /* the Sessions page's project heading and repo line (§4.9 *The Sessions page*, TD-725): above the repo's teams */
 #groups > .phead { padding: 6px 2px 0; } #groups > .phead[hidden], #groups > .rline[hidden] { display: none; }
 #groups > .rline { display: flex; flex-direction: column; gap: 6px; margin-bottom: -10px; border-radius: 6px; }
 #groups > .rline:focus { outline: none; } #groups > .rline:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 #groups > .rline .rname .h2 { font-size: var(--t-title); } #groups > .rline .rname .strong { font-weight: 600; }
-#groups > .rline .tsum.rsum { grid-template-columns: minmax(0, 1fr); max-width: 720px; margin-bottom: 0; }
-@media (max-width: 1100px) { .tsum { grid-template-columns: minmax(0, 1fr); } }
+#groups > .rline .tsum.rsum { max-width: 720px; margin-bottom: 0; }
+#groups > .rline .tsum.rsum[hidden] { display: none; }
+@media (max-width: 1100px) { .tsum { flex-direction: column; } .tsum > .facet { flex: none; } }
 .facet { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 /* every facet's head one height, the window picker's, whether it holds one or not (§4.5a *Sessions: rollup*, TD-418);
    a label never wraps: where the head runs out of room the selector drops to its own line, at the right */

@@ -533,8 +533,9 @@ def team_summary(
     live has one too (TD-192): its claims as the members' last records hold them, Doing, and Answer
     needed while a session in it waits on one — a person's own, which keeps nothing live (TD-924).
     `repo` is the definition's (§4.9 *Teams*, TD-725): its reading is the
-    team's, else the one its members sit in (`team_repo`, a badge no definition holds). The Sessions page
-    draws the Repo facet on the repo's line (`org_layout`); the Repo page and the rollup read it here."""
+    team's, else the one its members sit in (`team_repo`, a badge no definition holds). Every Sessions
+    card that draws a summary draws the Repo facet first, with the team's lanes; the Repo page's cards draw
+    none (`team_groups`' `repo_page`, TD-1189), and the rollup reads it here."""
     now = now or datetime.now(UTC)
     r = repo_named(repo, repos or {}) if repo else None
     r = r or team_repo(members, repos or {})

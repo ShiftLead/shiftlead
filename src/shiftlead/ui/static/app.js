@@ -2187,6 +2187,7 @@
     $$("#groups .phead").forEach((head) => {
       head.hidden = filtering && !$$("#groups .rline").some((l) => l.dataset.project === head.dataset.project && !l.hidden);
     });
+    syncLineFacets();
   }
   // The server derives the groups on every render and every delta (only it sees the whole fleet),
   // so a badge or `controllers` change moves cards between groups here without a page reload.
@@ -2365,6 +2366,19 @@
   const FOLD_SKIP = "button, a, input, select, textarea, summary, label, .badge, .pill, .helppanel, .answeredmark, .prswaiting, .flowchanged";
   AO.teamFolded = (team, live, get) => !!team && !!get(foldKey(team), !+live);
   const isFolded = (sec) => !!$(".ghead .fold", sec) && AO.teamFolded(sec.dataset.team, sec.dataset.live, store.get);
+  // a repo's line draws its Repo facet only while no card of the repo shows one (§4.5a *team card: Repo
+  // facet*, TD-1189): each card `{hidden, folded, filtering, facet}` — folded hides the summary unless a
+  // filter is set; a repo with no team, or every card hidden, folded or drawing no Repo facet, shows the line's
+  AO.lineFacetShown = (cards) => !cards.some((c) => !c.hidden && (!c.folded || c.filtering) && c.facet);
+  function syncLineFacets() {
+    $$("#groups .rline").forEach((line) => {
+      const f = $(".rsum", line); if (!f) return;
+      const cards = sections().filter((s) => s.dataset.repo === line.dataset.repo).map((s) => ({
+        hidden: s.hidden, folded: isFolded(s), filtering: s.classList.contains("filtering"), facet: !!$(".tsum > .frepo", s),
+      }));
+      f.hidden = !AO.lineFacetShown(cards);
+    });
+  }
   function toggleFold(sec) {
     store.set(foldKey(sec.dataset.team), !isFolded(sec));
     syncTeams();
@@ -2398,6 +2412,7 @@
     $$("#groups .ghead [data-forget-all]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.forgetAll)));
     syncAnsweredMarks();  // …nor lose the answered-for-you mark the browser counted (§4.9b)
     syncSummaries();
+    syncLineFacets();  // a fold or a swap may show or hide a card's Repo facet (TD-1189)
   }
   // ---- a team's summary: its selectors (design §4.5a *team card: Repo facet*, *Answer needed /
   // Doing*, TD-176 slice 3). Every variant is in the markup; these pick which shows. The window

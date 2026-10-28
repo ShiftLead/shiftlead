@@ -1834,6 +1834,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 info.get("balance"),
                 h.needs_cache["rows"],
                 spend,
+                repo_page=True,
             )
             # no team anywhere (the Org's flat page): the repo's sessions still stand under its line, as a strip
             groups = groups if groups is not None else [{"team": NO_TEAM, "members": vs}]
