@@ -64,7 +64,7 @@ def test_the_sweeper_preset_is_a_seat_whose_brief_holds_every_rule_of_what_it_ma
         "only once you have verified it done",  # a close is verified, and says how
         "Never close on a ref's state alone",
         "`escalate-overdue-days`",  # overdue work is ledgered
-        "`ao td next`",
+        "`ao td reserve`",
         "ALLOW_MAIN_PUSH=1 git push origin <sha>:<default>",  # the stamp-only push
         "Never push your branch to the default branch",
         "redone on the new one",

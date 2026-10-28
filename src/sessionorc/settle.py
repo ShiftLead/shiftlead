@@ -172,7 +172,7 @@ def observe(entries: list[dict[str, Any]], key: str, spans: dict[str, int], now:
     """Record a fresh reading of origin `key` and mark its entries in place (§4.4 *The clock*): an id
     first seen is recorded at `now`, except that **a repo's first reading records every id at the
     epoch**, settled — the first being the first that finds no record with an `at` under the key, so an
-    id pre-held by `ao td next --held` (`prehold`) does not make every other id settle as new. An edit
+    id pre-held by `ao td reserve --held` (`prehold`) does not make every other id settle as new. An edit
     (a changed `sig`) to an entry still settling restarts its window from `now`; one to a held entry
     records the new `sig` and the entry stays held (TD-731), and one to a settled entry only records the
     new `sig`. A pre-held id is held from its first reading, its `sig` recorded, and never settles. An
@@ -287,7 +287,7 @@ def hold(
 
 
 def prehold(key: str, ids: list[str], by: str, now: datetime) -> None:
-    """`ao td next --held` (design §4.4 *An entry can land held*, TD-731): each id handed out is held on
+    """`ao td reserve --held` (design §4.4 *An entry can land held*, TD-731): each id handed out is held on
     origin `key`'s clock before any reading holds it — `{held: {at, by}}`, no `at` or `sig` yet — so its
     entry is held from its first reading and never settles on its own. A record is not a reading: the
     repo's first reading is still the first that finds a record with an `at` (`observe`)."""

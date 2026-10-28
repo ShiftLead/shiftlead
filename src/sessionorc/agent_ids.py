@@ -428,7 +428,7 @@ class IdsMixin:
     async def rpc_td_next(
         self, repo: str = "", count: int = 1, held: bool = False, branch: str = "", caller: Any = None
     ) -> dict[str, Any]:
-        """`ao td next` (design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries*): the next
+        """`ao td reserve` (design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries*): the next
         `count` free ids of the repo named `repo` — its registered name, or its origin's `owner/repo` — and the
         record of who was given them. `by` is the dispatcher's caller, never a parameter. With `held` (`ao td
         next --held`, §4.4 *An entry can land held*, TD-731) each id is held on the settle clock before the

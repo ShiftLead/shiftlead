@@ -55,7 +55,7 @@ Added 2026-09-22 (grinder-ao-1):
   verdict line yourself.
 - A TD number is taken on main between your write and your merge (2026-09-24: TD-126 filed by the
   anchor while a PR carrying its own TD-126 was open). Take every id, and a renumber's, from
-  `ao td next` (cadence §2.10), never from the highest `## TD-` read by hand; keep main's rows and
+  `ao td reserve` (cadence §2.10), never from the highest `## TD-` read by hand; keep main's rows and
   yours row-wise.
 
 - Appending to the archive in Python: read into a variable first. `open(a,'w').write(open(a).read()+x)` truncates before it reads and leaves the archive holding one entry (2026-09-27, PR #677, caught by review).

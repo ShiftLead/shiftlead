@@ -8,7 +8,7 @@ metadata:
 Three things that cost CI cycles on 2026-10-04 (PRs #981, #1006, #1009, #1022), each a design PR that sat open for a steer while grinders merged:
 
 - **A history line goes above the newest lines of its section, not at the tail.** Every grinder slice appends at the tail of the same `docs/design-history.md` section, so a line added there conflicts with each merge; #1022 took three rebases, five minutes of CI each, until its line was moved above the `TD-309 slice` lines. Same date, so the order is still true.
-- **The build entry's number**: ids and renumbers come from `ao td next` (cadence §2.10).
+- **The build entry's number**: ids and renumbers come from `ao td reserve` (cadence §2.10).
 - **While a reviewer reads, the author leaves its tree alone**: cadence §4.8 (dev-cadence TD-136). A second design that touches the same passages is stacked on the first's branch (see [[retarget-a-stacked-pr-with-the-api]]).
 
 **Why:** each is a merge that failed after a green gate, or a number that pointed at someone else's entry.
