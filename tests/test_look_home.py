@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 
 from conftest import pinned_script
@@ -108,3 +109,16 @@ def test_the_home_is_removed_again_when_an_exit_hook_writes_into_it_after_the_fi
     started = time.monotonic()
     lh.remove_home(tmp_path / "never-made", quiet=0.2)  # nothing there: returns after the quiet spell
     assert time.monotonic() - started < 1.0
+
+
+def test_v2_writes_the_fixture_ledger_as_a_directory_the_reader_reads(tmp_path):
+    """TD-1146: `--v2` writes the same fixture as `docs/ledger/`, through `ledgerboard.split()`; the default rule
+    and the one reader find it and its entries (§4.4 *Either layout*)."""
+    pinned_script("nudge_user_attention.py")
+    from sessionorc import ledger
+
+    repo = _load().write_fixtures(tmp_path, v2=True)
+    assert (repo / "docs" / "ledger" / "README.md").is_file() and not (repo / "docs" / "technical_debt.md").exists()
+    assert ledger.ledger_path(repo) == "docs/ledger"
+    got = ledger.reading(repo, datetime.now(UTC), with_history=False)
+    assert {e["id"] for e in got["entries"]} == {"TD-001", "TD-002"}

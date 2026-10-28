@@ -54,7 +54,7 @@
     <span class="meta">{% for l in lists %}{{ l.rows | length }} {{ l.label }}{{ ' · ' if not loop.last }}{% endfor %}</span>
     <button class="imark" type="button" aria-expanded="false" aria-controls="info-debt" title="{{ help_title('board') }}">i</button>
     <span class="grow"></span>
-    {% if ledger_editor %}{% from "file_link.html" import file_link %}{{ file_link(ledger_editor, "‹› Open ledger", "open the ledger in " ~ ledger_editor.label ~ ", at line 1", "btn sm ghost") }}{% endif %}
+    {% if ledger_editor %}{% from "file_link.html" import file_link %}{% if ledger_editor.dir %}{{ file_link(ledger_editor, "‹› Open ledger folder", "open the ledger's folder in " ~ ledger_editor.label, "btn sm ghost") }}{% else %}{{ file_link(ledger_editor, "‹› Open ledger", "open the ledger in " ~ ledger_editor.label ~ ", at line 1", "btn sm ghost") }}{% endif %}{% endif %}
     {% if r.ledger %}<button class="btn sm ghost" type="button" data-addentry="{{ name }}" title="write what you have; a session drafts the entry (design §4.9)">Add entry…</button>{% endif %}</div>
   {% for ln in lanes or [] %}{% with url = '' %}{% include "lanes_line.html" %}{% endwith %}{% endfor %}
   {# what needs a team, and a team the ledger and the definitions disagree on (§4.4 *An entry names its team*, TD-764) #}

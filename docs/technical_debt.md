@@ -96,7 +96,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
 | TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Designed — builds TD-1144–TD-1146 |
 | TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
-| TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
@@ -2059,23 +2058,6 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Done when** both roads give ids above a v2 fixture's highest, with an open PR adding a file and another adding one straight into `archive/`, a v1 fixture reads as today, and `pdm run test` passes.
 
 ---
-
-## TD-1146: The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (the designer, from TD-1143)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1144
-**Location:** `src/shiftlead/repoconfig.py` (`DEFAULT_LEDGER` 55, `ledger` 665, `load` where it resolves, the `{ledger}` slot 261 and 285, `HANDED_ENTRY["{ledger}"]` 165); `src/shiftlead/ui/settings_page.py` (495); `src/shiftlead/ui/app.py` (2730, 3092); `src/sessionorc/reports.py` (`LEDGER_DEFAULT` 33, the record's `ledger`); `src/sessionorc/agent_tick.py` (3949); `scripts/look_home.py` (its fixture ledger); design §5's example `ledger:` line and *unserved* words, already worded by the default rule here, checked against the build; the Repo page's **Open ledger** (`repo_part.html` 57, `ledger_editor`)
-
-**Why:** TD-1143: the configured default is one constant, `docs/technical_debt.md`, shown on the Settings page and carried on each session's record; with the default rule (§4.4 *Either layout*) the unset value is the one the checkout's tree decides, and `look_home.py` must be able to stand up a home over a v2 ledger.
-
-**Fix:** design §4.4 *Either layout*, §5 *the ledger*. The unset `ledger:` resolves **once, in `repoconfig.load`**, through `ledger.ledger_path`'s rule (which keeps whether the value was set, so the seams' *`ledger:` names <path>, which is gone* warning fires only on a set one), so `cfg.ledger` is the resolved path everywhere it is carried (checked, not edited: `ui/app.py` 646, 2465, 2707, 2944, 3148, `teams.py` 156 and 925, `cli.py` 601, `agent.py` 1564) and wherever it is shown (the Settings page's row says *docs/ledger (directory)* or the file, as found; a session's record carries the resolved path, which TD-1144's readers still put through `layout_at`); a brief's `{ledger}` slot carries the resolved path; **Open ledger** on a v2 directory is the folder form with no line, titled *Open ledger folder* (§4.5a), `ledger_editor` given the resolved path; and `HANDED_ENTRY["{ledger}"]` says *that repo's ledger, a file or a directory of one file per entry*; `look_home.py` takes a `--v2` that writes its fixture as a directory through `lb.split()`.
-
-**Done when** the Settings page and a session's record show the resolved ledger for a v1 and a v2 checkout, `look_home.py --v2` stands up a home whose Queue and Repo page read the directory, and `pdm run test` passes.
 
 ## TD-1149: New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief
 

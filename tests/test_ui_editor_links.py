@@ -176,3 +176,20 @@ def test_the_settings_page_s_open_file_is_a_file_link(form, settings_client, sub
     }[form]
     assert "data-folder" not in by[f"{pre}{hosts_yml}:1"]
     assert _attr(by[f"{pre}{yml}:1"], "data-folder").startswith(f"{pre}{root}")
+
+
+@pytest.mark.unit
+def test_open_ledger_on_a_v2_directory_is_the_folder_form_titled_open_ledger_folder(tmp_path, monkeypatch):
+    """§4.5a *Repo page: Open ledger* (TD-1146): a v2 ledger (§4.4 *Either layout*) is a directory, so the
+    button is the editor's folder form, with no line and no folder before it, and reads *Open ledger folder*."""
+    root = tmp_path / "samscrape"
+    (root / "docs" / "ledger").mkdir(parents=True)
+    _host(monkeypatch, tmp_path, False, [str(root)])
+    r = reading(str(root))
+    r["ledger"]["path"] = "docs/ledger"
+    page = repo_client(monkeypatch, tmp_path, fake({str(root): r}, [])).get("/repo/samscrape").text
+    assert not _links(page, "Open ledger")
+    (a,) = _links(page, "Open ledger folder")
+    assert "data-file-link" in a and "data-folder" not in a
+    assert _attr(a, "href") == f"vscode://vscode-remote/ssh-remote+kmaster{root}/docs/ledger?windowId=_blank"
+    assert _attr(a, "title") == "open the ledger's folder in VS Code"

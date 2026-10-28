@@ -21437,3 +21437,21 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Done when** each reader above reads a v2 fixture as it reads its v1 twin (the same entries, archive, history, rank file and seams), a faulted v2 fixture reads as an error naming `v2_problems()`'s words with no entries, and `pdm run test` passes.
 
 ---
+
+## TD-1146: The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1143)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Resolved:** 2026-10-27 (grinder-ao-2, #PR) — the unset `ledger:` resolves once, in `repoconfig.load` (`_resolve_ledger`, by `ledger.ledger_default`; across a link by the directory's `README.md`), and `discover` too, with `ledger_set` keeping whether the file named it; the Settings row says *docs/ledger (directory)* or the file, default while unset; **Open ledger** on a v2 directory is the folder form, one launch, *Open ledger folder* (`common.ledger_link`); `HANDED_ENTRY["{ledger}"]` names a file or a directory; `reports.LEDGER_DEFAULT` is `ledger.DEFAULT`, read through `layout_at`; `look_home.py --v2` writes the fixture through `lb.split()`, its Queue, Repo and Settings pages read on a scratch home.
+**Blocked by:** TD-1144
+**Location:** `src/shiftlead/repoconfig.py` (`DEFAULT_LEDGER` 55, `ledger` 665, `load` where it resolves, the `{ledger}` slot 261 and 285, `HANDED_ENTRY["{ledger}"]` 165); `src/shiftlead/ui/settings_page.py` (495); `src/shiftlead/ui/app.py` (2730, 3092); `src/sessionorc/reports.py` (`LEDGER_DEFAULT` 33, the record's `ledger`); `src/sessionorc/agent_tick.py` (3949); `scripts/look_home.py` (its fixture ledger); design §5's example `ledger:` line and *unserved* words, already worded by the default rule here, checked against the build; the Repo page's **Open ledger** (`repo_part.html` 57, `ledger_editor`)
+
+**Why:** TD-1143: the configured default is one constant, `docs/technical_debt.md`, shown on the Settings page and carried on each session's record; with the default rule (§4.4 *Either layout*) the unset value is the one the checkout's tree decides, and `look_home.py` must be able to stand up a home over a v2 ledger.
+
+**Fix:** design §4.4 *Either layout*, §5 *the ledger*. The unset `ledger:` resolves **once, in `repoconfig.load`**, through `ledger.ledger_path`'s rule (which keeps whether the value was set, so the seams' *`ledger:` names <path>, which is gone* warning fires only on a set one), so `cfg.ledger` is the resolved path everywhere it is carried (checked, not edited: `ui/app.py` 646, 2465, 2707, 2944, 3148, `teams.py` 156 and 925, `cli.py` 601, `agent.py` 1564) and wherever it is shown (the Settings page's row says *docs/ledger (directory)* or the file, as found; a session's record carries the resolved path, which TD-1144's readers still put through `layout_at`); a brief's `{ledger}` slot carries the resolved path; **Open ledger** on a v2 directory is the folder form with no line, titled *Open ledger folder* (§4.5a), `ledger_editor` given the resolved path; and `HANDED_ENTRY["{ledger}"]` says *that repo's ledger, a file or a directory of one file per entry*; `look_home.py` takes a `--v2` that writes its fixture as a directory through `lb.split()`.
+
+**Done when** the Settings page and a session's record show the resolved ledger for a v1 and a v2 checkout, `look_home.py --v2` stands up a home whose Queue and Repo page read the directory, and `pdm run test` passes.
