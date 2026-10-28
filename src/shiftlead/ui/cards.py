@@ -787,11 +787,16 @@ def flow_mark(s: Mapping[str, Any], here: str = "") -> dict[str, str] | None:
     idle node member relaunched, which the tick does not restart, *flow changed — restarts when it
     next works or at the team's next Start*. A record the definition renamed reads *<old> → <new>:
     renamed*, one it dropped *removed from the definition* (§4.9 *A member renamed or removed*, TD-703).
+    A run-only member whose run ended reads *run ended* (§4.9, TD-1166).
     None otherwise; a mark, never pressable."""
     flow = FLOWS.get(str(s.get("team") or "")) or "its flow"
     closed_for = s.get("closed_for") if isinstance(s.get("closed_for"), dict) else {}
     act = FLOW_ACTS.get(str(s.get("id") or ""))
     node = bool(here and s.get("host") and s.get("host") != here)
+    if closed_for.get("why") == "run_ended":  # a run-only member (§4.9 *A member started from the form*, TD-1166)
+        text = "run ended"
+        why = "started for its team's run alone, so it does not come back — its card stays until Forget"
+        return {"text": text, "full": f"{text}: {why}"}
     if (s.get("sit_out") or closed_for.get("why") == "sit_out") and act != "start":  # one the flow starts again: no
         text = f"sits out under {flow}"
         why = "the team's flow has no stage for its role — its card stays until Forget"

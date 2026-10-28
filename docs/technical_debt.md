@@ -93,7 +93,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1165 | The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count | Medium | Open — build, blocked by TD-1164, TD-1166 |
-| TD-1166 | A run-only member: `ao team add [--keep]`, never replayed and marked `run_ended` when its team's run ends, passed over by the rename check | Medium | Open — build, blocked by TD-1164 |
+| TD-1166 | A run-only member: `ao team add [--keep]`, never replayed and marked `run_ended` when its team's run ends, passed over by the rename check | Medium | Open — build; slice 1 in review |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build, blocked by TD-1165, TD-1166 |
 | TD-1179 | `teamrun.resize`'s sit-out, stop-on-failure and run-only branches, and its same-role guard for a size of 0, are set in no test: each can be deleted with `tests/test_team_size.py` green | Low | Open — build |
 | TD-1180 | The presser's words on a held mark (TD-1127) are tested at the template and function level only: the tick's `pressers=` and `_held_words` calls and the Repo page's `held_words` can be dropped with the suite green | Low | Open — build |
@@ -1989,8 +1989,7 @@ That is the design working as written: a Team pick makes *a person's own session
 **Added:** 2026-10-27 (the designer, from TD-1149's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1164
+**Status:** Open — build; slice 1 (the close): any Close of a run-only member marks `run_ended` (the retry, a session's close, a node member's on the home's copy), a person's Restart's own close does not and a `run_ended` record is refused one, `sat_out` reads it, rule 8 replays no run-only record, the card draws *run ended*. Left: (2) the wind-down, stop and conclusion marks, a live run-only member in `crew` and the shape, `renames` passing over one, `ao team add [--keep]`
 **Part of:** TD-1149
 **Location:** **held** (`src/sessionorc/**`, read by the techlead): `src/sessionorc/models.py` (the record); `src/sessionorc/work.py` (`sat_out` 55, `crew`, `team_wound_down`); `src/sessionorc/agent.py` (`_sit_out` 2546) and `src/sessionorc/agent_tick.py` (the home's wind-down, stop and conclusion paths, §6 rules 8–9); `src/shiftlead/ui/cards.py` 785 (the card's `closed_for` reading, which reads `why == "sit_out"`); `src/sessionorc/agent_remote.py` 497 (`_route_act`: `closed_for` is `HOME_OWNED`, models.py 118–135, so a node member's mark is written on the home's copy there); `src/sessionorc/agent_tick.py` (`_work_replays` 2203–2225, the stop/wound-down reading ~1987/2046); `src/shiftlead/teamrun.py` (`renames` 1100, the TD-703 diff); `src/shiftlead/cli.py` (`ao team add`); design §4.9 *A member started from the form*, *A member renamed or removed*, §4.7 `ao team add`
 

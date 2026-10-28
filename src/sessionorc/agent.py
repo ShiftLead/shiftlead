@@ -204,6 +204,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     person_only,  # noqa: F401
     read_checkout,  # noqa: F401
     read_draft_claim,  # noqa: F401
+    run_ended,
     shells_live,  # noqa: F401
     stat_dir,  # noqa: F401
     subagents_live,  # noqa: F401
@@ -2119,7 +2120,12 @@ class HostAgent(
         return s.view()
 
     async def rpc_close(
-        self, id: str, caller: Any = None, closer: dict[str, Any] | None = None, reap: bool | str = True
+        self,
+        id: str,
+        caller: Any = None,
+        closer: dict[str, Any] | None = None,
+        reap: bool | str = True,
+        restart: bool = False,
     ) -> dict[str, Any]:
         """End a session and keep its record (§4.5a **Close**). Writes `closer: {by, why, at}`
         (§4.5 row 5 (b), TD-265): `by` is `person` when the envelope carries no caller, else the
@@ -2128,13 +2134,21 @@ class HostAgent(
         a session can never write *closed by the tick* or another's name. `reap` (§4.1 *A close reaps
         the worktree it made*, TD-979): `True` reaps the worktree the record's start made, `False` is a
         restart's and keeps it saying nothing, a string is the home's why to write as `worktree_kept` —
-        taken only from a call with no session caller on this socket, as `closer` is. A missing one reaps."""
+        taken only from a call with no session caller on this socket, as `closer` is. A missing one reaps.
+        A run-only member's close marks it `closed_for: {why: run_ended}` (`agent_common.run_ended`, §4.9,
+        TD-1166), the home's mark, except `restart`'s: a person's Restart's own close, honoured from no
+        session caller."""
         if isinstance(reap, str) and not mail.is_person(caller):
             raise RpcError("a close's reap why is the home's word: a session closes with reap true or false")
-        return await self._close(id, caller, closer, reap)
+        return await self._close(id, caller, closer, reap, restart)
 
     async def _close(
-        self, id: str, caller: Any = None, closer: dict[str, Any] | None = None, reap: bool | str = True
+        self,
+        id: str,
+        caller: Any = None,
+        closer: dict[str, Any] | None = None,
+        reap: bool | str = True,
+        restart: bool = False,
     ) -> dict[str, Any]:
         """`rpc_close` past its gate. A close the home routed here (`_act`) comes in at this door: a string
         `reap` over the link is the home's why whatever session closed (§4.1), so it is never refused."""
@@ -2145,10 +2159,12 @@ class HostAgent(
             return await self._cancel_start(s, reap)
         if s.state == "closed":
             # a retry (§4.1 *the record*): the reap again, or its branches weighed again; it kills nothing,
-            # and the close's stamps stand — but any close clears the tick's mark (§6 rule 2, TD-237)
-            marked = s.closed_for is not None
+            # and the close's stamps stand — but any close clears the tick's mark (§6 rule 2, TD-237), and
+            # marks a run-only member's run ended (§4.9, TD-1166)
+            mark = None if self.mode == "node" else run_ended(s, caller, restart, s.closed_at or now_iso())
+            marked = s.closed_for != mark
             if marked:
-                s.closed_for = None
+                s.closed_for = mark
                 self.store.save(s)
             if await self._reap_again(s, reap) or marked:
                 await self._push_changes()
@@ -2158,7 +2174,9 @@ class HostAgent(
         s.pane = False
         s.closed_at = now_iso()
         s.closer = closer_of(caller, closer, s.closed_at)
-        s.closed_for = None  # a Close is nobody's restart; the tick writes its own after this returns (§6 rule 2)
+        # a Close is nobody's restart; the tick writes its own after this returns (§6 rule 2). A run-only
+        # member's run ends with it (§4.9, TD-1166): the home's mark, so a node's is written on the home's copy
+        s.closed_for = None if self.mode == "node" else run_ended(s, caller, restart, s.closed_at)
         # A `kill` then a `close` before an intervening tick would otherwise strand a `_killed_at`
         # stamp for `CLOSED_KEEP`: the reconcile skips a closed record before it reaches the guard,
         # so nothing else would ever clear it. Harmless — a closed record is never observed either
@@ -2415,9 +2433,9 @@ class HostAgent(
         read = await self._refill_prompt(s, params, entry)  # before the close: a read that raises touches nothing
         if s.state == "idle":  # a restart keeps the worktree: the new run takes up its directory and branch
             if s.host == self.host:
-                await self.rpc_close(s.id, reap=False)
+                await self.rpc_close(s.id, reap=False, restart=True)  # its own close marks no run ended (§4.9)
             else:
-                await self._route_act("close", {"id": s.id, "reap": False}, None, s.host)
+                await self._route_act("close", {"id": s.id, "reap": False, "restart": True}, None, s.host)
         try:
             if s.host == self.host:
                 view = await self.rpc_create(**params)
@@ -2612,6 +2630,10 @@ class HostAgent(
             raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to restart {rule}")
         if s.state == "scheduled":
             raise RpcError(f"{s.name} is scheduled and has not started: `ao at {s.id} now` starts it {rule}")
+        if isinstance(s.closed_for, dict) and s.closed_for.get("why") == "run_ended":
+            raise RpcError(
+                f"{s.name}: its run ended: start the team, or add one from the form (design §4.9, §6 rule 2)"
+            )
         if s.state not in ("idle", "exited", "closed"):
             raise RpcError(
                 f"{s.name} is {s.state}: a restart is of a session that is idle, exited or closed — wait, or "

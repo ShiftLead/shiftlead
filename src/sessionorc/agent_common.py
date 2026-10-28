@@ -269,6 +269,17 @@ def closer_of(caller: Any, closer: Any, at: str) -> dict[str, Any]:
     return {"by": "person" if mail.is_person(caller) else str(caller), "why": None, "at": at}
 
 
+def run_ended(s: Session, caller: Any, restart: Any, at: str) -> dict[str, Any] | None:
+    """The mark a Close writes on a run-only member (design §4.9 *A member started from the form*, TD-1166):
+    `closed_for: {why: run_ended}`, so rule 8 never replays it and the next Start does not plan it — on any
+    Close but a person's Restart's own (`restart`, honoured only from a call with no session caller, as a
+    handed-in `closer` is), whose create supersedes the record or leaves it pressable again. None for a
+    record that is not run-only."""
+    if not s.run_only or (restart and mail.is_person(caller)):
+        return None
+    return {"why": "run_ended", "closed_at": at}
+
+
 # A checkout's files read across the link for a team start (§4.4a "Teams across hosts", step
 # 4b.3): its repo config and the briefs its roles name. A read across a trust boundary, so bounded:
 # at most this many files per call, each at most this many bytes, and only inside the checkout.
