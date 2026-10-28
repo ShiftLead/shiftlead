@@ -361,7 +361,6 @@ def test_a_pinned_repo_whose_pin_does_not_resolve_fails_the_create_by_name(tmp_p
     assert (repo / ".claude" / "worktrees" / "unresolved" / ".git").is_file()
 
 
-
 def _git_calls(monkeypatch):
     """Every git process the code under test starts, as `(argv, env)` (TD-1181)."""
     calls: list[tuple[list, dict | None]] = []
@@ -384,7 +383,7 @@ def _git_calls(monkeypatch):
 def test_every_polled_git_status_skips_the_optional_index_lock(tmp_path, monkeypatch):
     """TD-1181: a `git status` the host agent polls runs with `GIT_OPTIONAL_LOCKS=0`, so it never holds
     `index.lock` while a session's own `git add` in the same checkout wants it; another git call is left as it was."""
-    from sessionorc import board, gitinfo, promote, workorders
+    from sessionorc import board, gitinfo, promote, sync, workorders
 
     repo = tmp_path / "r"
     repo.mkdir()
@@ -394,6 +393,7 @@ def test_every_polled_git_status_skips_the_optional_index_lock(tmp_path, monkeyp
     (repo / "a.txt").write_text("1")
     run("git", "add", ".", cwd=repo)
     run("git", "commit", "-q", "-m", "init", cwd=repo)
+    run("git", "update-ref", "refs/remotes/origin/main", "HEAD", cwd=repo)  # checkout_why reads it before its status
     (repo / "a.txt").write_text("2")
     calls = _git_calls(monkeypatch)
     reads = {
@@ -404,6 +404,7 @@ def test_every_polled_git_status_skips_the_optional_index_lock(tmp_path, monkeyp
         "board._git": lambda: board._git(repo, "status", "--porcelain"),
         "promote._git": lambda: promote._git(repo, "status", "--porcelain"),
         "workorders._git": lambda: workorders._git(repo, ["status", "--porcelain"], 5.0),
+        "sync.checkout_why": lambda: sync.checkout_why(repo),  # through workorders._git
     }
     for name, read in reads.items():
         del calls[:]
