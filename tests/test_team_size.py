@@ -7,9 +7,9 @@ import json
 
 import pytest
 import yaml
-from test_cli_teams import HOST, world  # noqa: F401 — the fixture, by name
+from test_cli_teams import HOST, creates, started, world  # noqa: F401 — the fixture, by name
 
-from shiftlead import cli, teams
+from shiftlead import cli, teamrun, teams
 from shiftlead import org as orgmod
 
 
@@ -48,7 +48,9 @@ def test_the_setting_is_a_map_of_whole_numbers_from_zero():
     with pytest.raises(ValueError, match="size is a mapping"):
         settings_mod.parse_team({"size": 3})
     # the reader's side drops what does not parse, line by line
-    assert settings_mod.teams({"teams": {"t": {"size": {"a": -1, "b": 2}}}}) == {"t": {"size": {"b": 2}}}
+    assert settings_mod.teams({"teams": {"t": {"size": {"a": -1, "": 1, "b": 2}}}}) == {"t": {"size": {"b": 2}}}
+    with pytest.raises(ValueError, match="a member line's name is needed"):
+        settings_mod.parse_team({"size": {"": 1}})
 
 
 async def test_set_settings_refuses_a_bad_size_and_writes_a_good_one(agent):
@@ -68,9 +70,10 @@ def test_the_size_reaches_the_definition_and_its_names(world, tmp_path):  # noqa
     team = org.teams["ao-grind"]
     assert [m.size for m in raw.members] == [None, None]  # a copy: the definition never carries it
     assert team.size == {"grind": 3, "hunt": 0, "nope": 2}
+    assert orgmod.with_settings(orgmod.load(), {"ao-grind": {"size": {}}}).teams["ao-grind"].members == raw.members
     assert [m.names() for m in team.members] == [["grind-1", "grind-2", "grind-3"], []]
     assert team.session_names() == ["orc-ao", "grind-1", "grind-2", "grind-3"]
-    assert team.staffed() == {"grinder"}
+    assert team.staffed() == {"grinder"} and raw.staffed() == {"grinder", "hunter"}
     assert team.unsized() == ["nope"]
     assert team.next_name("grinder") == "grind-4"  # past the size, never a name the size gives
 
@@ -110,3 +113,17 @@ def test_team_list_and_the_settings_line_say_a_differing_size(world, tmp_path, c
     line = cli._team_setting_line("ao-grind", {"size": {"grind": 2, "hunt": 2}}, team)
     assert line.endswith("size hunt 2 (file says 1)")
     assert cli._team_setting_line("ao-grind", {"size": {"hunt": 2}}).endswith("size hunt 2")  # no org read
+
+
+def test_the_members_view_and_a_live_add_read_the_sized_names(world, tmp_path):  # noqa: F811
+    """Review of #2568: a line sized 0 holds no session in the Members view, and a live Add starts only
+    the name it adds — the names before it are read sized, as the names after it are."""
+    _, state = world
+    path = tmp_path / "home" / "org.yml"
+    v = teamrun.members_view(_sized(world, tmp_path, {"grind": 3, "hunt": 0}), "ao-grind", [])
+    assert [len(e["sessions"]) for e in v["members"]] == [3, 0] and not any(e["twice"] for e in v["members"])
+    _sized(world, tmp_path, {"grind": 3})
+    started(state)
+    got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="hunter")
+    assert [c["name"] for c in creates(state)] == ["hunter"]  # grind-3 is not started again
+    assert [r["name"] for r in got["created"]] == ["hunter"]

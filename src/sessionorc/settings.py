@@ -492,7 +492,9 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
             raise ValueError(f"size is a mapping of member line names to numbers (§4.9 *A team's size*), not {v!r}")
         out: dict[str, int] = {}
         for line, n in v.items():
-            if not str(line or "").strip():
+            if not isinstance(line, str) or not line.strip():
+                if drop:  # the reader's side drops the one key, as a bad number below
+                    continue
                 raise ValueError("size: a member line's name is needed")
             if isinstance(n, bool) or not isinstance(n, int) or n < 0:
                 if drop:
