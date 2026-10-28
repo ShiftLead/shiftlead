@@ -102,10 +102,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
 | TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
-| TD-1150 | A browser tab says nothing by its icon: no page has a favicon, so a Focus tab's state is read only from its title's words | Medium | Designed — build TD-1155 |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
-| TD-1155 | Build a tab icon per page and per Focus state: the Tile set as static SVG files, a `<link rel="icon">` in every page, Focus's kept current with its title | Medium | Open — build |
 
 ---
 
@@ -2202,23 +2200,6 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1150: A browser tab says nothing by its icon: no page has a favicon, so a Focus tab's state is read only from its title's words
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (Paul, through Add entry; drafted by the `tab-icons` session)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-27 (the designer) — design §4.5 *Browser mechanics* *A tab's icon* and *Pop out*'s title, §4.5a **tab icon**: direction A, *Tile*, as Paul picked it; eleven state icons, one per state class the Focus pill draws (on call and unreachable added to the mockup's nine; *idle · unseen* keeps idle's), nine page icons, a one-unit edge so the dark tile reads on a dark strip, hashed static SVG files, the title's `▲ ` kept. The whole set is drawn in `docs/mockups/reviews/2026-10-27-td1150-tile.html` (`.png`). Was: Open — design-first. Three directions are drawn in `docs/mockups/reviews/tab-icons/index.html`: **A** *Tile*, **B** *Mark and badge*, **C** *Shift key*; Paul picked **A** on 2026-10-27.
-**Blocked by:** TD-1155
-**Location:** `src/shiftlead/ui/templates/base.html` (the `<head>`, 6: a `<title>` block and no `<link rel="icon">`); `src/shiftlead/ui/templates/focus.html` (4, the title block); `src/shiftlead/ui/static/app.js` (`AO.focusTitle` 498, set at 5339 and 5794 — the icon changes where the title does; the forgotten title 6265); every page's `{% block title %}` (`org.html`, `inbox.html`, `inbox_entry.html`, `queue.html`, `repo.html`, `settings.html`, `help.html`, `spend.html`, `new.html`, `transcript.html`; `refused.html` sets its own `<title>`, 8); `src/shiftlead/ui/static/app.css` (the state colours 16–28 and the pills' glyphs 154–160); design §4.5 *Pop out* (*The title is the point*) and *Browser mechanics*, §4.5a **state icon**
-
-**Why:** The person works with many tabs and popped-out windows, and the title is the only thing that says what each one is: a Focus title reads `▲ <name> · <state>`, cut short in a narrow tab, and every other page has the browser's blank icon. A Focus tab that needs the person cannot be told from one that is working without reading its words, and a ShiftLead tab cannot be told from any other site's. An icon per state, in the colours and glyphs the state pills already use, makes the tab strip read like the Sessions page; one family for every page makes the app's tabs findable.
-
-**Fix:** a design round on §4.5 (*Pop out*'s title paragraph and *Browser mechanics*): direction A, *Tile* (Paul, 2026-10-27) — one rounded square on every tab, the top bar's dark with a page glyph on a page, the state's colour with its pill glyph on a Focus tab; one icon per state (§4.5a **state icon**'s list: needs you, working, idle, idle · unseen, stalled?, limited, scheduled, exited, on call, closed, unreachable; and waiting, whose ⋯ is in `app.css` 159 alone, TD-418) and one per page; drawn as SVG paths, never font glyphs; how it is served (an inline `data:` SVG set by `AO.focusTitle`'s callers, or static files under `static/` with their `?v=` hash); how a dark icon stays visible on a dark tab strip; whether the title's `▲ ` stays beside the icon. The design files the builds.
-
-**Done when** the design is merged with its builds filed.
-
 ## TD-1153: A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR
 
 **Priority:** Medium
@@ -2255,18 +2236,3 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1155: Build a tab icon per page and per Focus state: the Tile set as static SVG files, a `<link rel="icon">` in every page, Focus's kept current with its title
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (the designer, from TD-1150's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/ui/static/icons/` (new: twenty `.svg` files); `src/shiftlead/ui/templates/base.html` (the `<head>`); every page extending it (`org.html`, `inbox.html`, `inbox_entry.html`, `queue.html`, `repo.html`, `settings.html`, `help.html`, `spend.html`, `new.html`, `transcript.html`, `focus.html`); `src/shiftlead/ui/static/app.js` (`AO.focusTitle` 498 and its two callers, the forgotten title); `src/shiftlead/ui/common.py` `static_url`; design §4.5 *Browser mechanics* *A tab's icon*, *Pop out*, §4.5a **tab icon**
-
-**Why:** TD-1150: no page has a favicon, so a ShiftLead tab looks like any site's and a Focus tab's state is read only from its title's words, cut short in a narrow tab.
-
-**Fix:** as design §4.5 *A tab's icon* says. (1) Twenty SVG files under `static/icons/`, `viewBox="0 0 16 16"`, each a tile (a rounded square, `rx` 3.5, inset 0.5, its one-unit edge stroked on that inset rect) and its glyph as paths, never text, scaled 0.8 about the centre: nine `page-<name>.svg` (sessions, inbox, queue, repo, settings, help, spend, new, transcript) on `--top` (`#1c2128`) with a `--muted` edge (`#6b7280`) and a `--topfg` glyph (`#e6e9ee`), and eleven `state-<class>.svg` (needs, working, idle, waiting, stalled, limited, scheduled, exited, closed, oncall, unreachable) on that state's light `app.css` token with an edge of `rgba(0,0,0,.18)`, `--ended` for scheduled, exited, closed, on call and unreachable, the glyph `--top` on amber and grey, white on the rest. The paths are `docs/mockups/reviews/2026-10-27-td1150-tile.html`'s, as its `page()` and `state()` draw them; copy them, do not redraw. (2) `cards.STATE_ICON_CLASSES`: the eleven classes, derived from `typing.get_args(sessionorc.models.State)` through the map at `cards.py` 225 (`needs-you`→`needs`, `stalled?`→`stalled`) plus `oncall` and `waiting`; and a template global `state_icons()` giving `{class: static_url("icons/state-<class>.svg")}` over it. `static_url` already serves a subdirectory's file through the `/static` mount, hashed and cached once per process; nothing changes there. (3) `base.html`'s `<head>`: `{% set icon_name %}{% block icon %}page-sessions{% endblock %}{% endset %}` (captured, so the block prints nothing of its own), then `<link rel="icon" type="image/svg+xml" href="{{ static_url('icons/' ~ icon_name|trim ~ '.svg') }}"{% block icon_attrs %}{% endblock %}>`; every page sets its own block: `org.html` `page-sessions`, `inbox.html` and `inbox_entry.html` `page-inbox`, `queue.html` `page-queue`, `repo.html` `page-repo`, `settings.html` `page-settings`, `help.html` `page-help`, `spend.html` `page-spend`, `new.html` `page-new`, `transcript.html` `page-transcript`, `focus.html` `state-{{ s.state_class }}`. (4) Focus: `focus.html`'s `icon_attrs` block is ` data-icons='{{ state_icons()|tojson }}'` (the file's own pattern, as `data-pr-marks` at 280). `AO.focusIcon(v)` in `app.js` finds `link[rel=icon]`, parses its `data-icons` once (missing or unreadable: it does nothing), and sets the `href` to `v.state_class`'s URL, a class with no URL leaving it as it is; it is called beside both `document.title = AO.focusTitle(…)` lines (`AO.focus` at load and `render`), and the forgotten branch calls `AO.focusIcon({state_class: "exited"})`. `refused.html` is untouched.
-
-**Done when** tests pin: each page extending `base.html`, rendered, links the icon the Fix's map in (3) names, written out in the test, and that file exists; `STATE_ICON_CLASSES` equals the set of `static/icons/state-*.svg` names; each state file's tile fill equals its `app.css` light token, read from the first `:root` block (`--ended` for the five) and its edge is `rgba(0,0,0,.18)`, each page file's fill is `--top` and its edge `--muted`; no SVG holds a `<text>`; a rendered Focus page's link names its state's file and `data-icons` holds all eleven; `/static/icons/<file>?v=<hash>` is served `image/svg+xml` with the immutable cache header. The page is looked at in headless Chromium (design §4.9b): a light and a dark tab strip's worth of icons, the shot named in the PR. `pdm run test` and `pdm run lint` pass.
