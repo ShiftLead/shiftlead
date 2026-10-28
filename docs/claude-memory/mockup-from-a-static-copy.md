@@ -13,8 +13,8 @@ A fast way to mock a change to a live ShiftLead page, with real data: read-only 
 
 Worked examples, one shape per argument: `docs/mockups/reviews/td1189-src/td1189_shots.py` and `docs/mockups/reviews/rollup-src/rollup_shots.py`.
 
-Two traps that each cost a re-render in TD-1203 (2026-10-28):
-- **Prefix every mockup class** (`ru-…`). Short names like `.tl`, `.tr`, `.n` or `.c` collide with `app.css` rules, and the grid silently falls apart.
+Two traps from TD-1203 (2026-10-28); the second is what broke its rows:
+- **Prefix every mockup class** (`ru-…`). `app.css` already defines short generic names — `.st`, `.off`, `.age`, `.grow`, `.row`, `.bar`, `.kind`, `.meta`, `.pill` — so an unprefixed mockup class can pick up the page's rules. Check a name against `app.css`, or prefix them all.
 - **Never put a link inside a link.** Cloned page parts carry `<a class="bseg">` segments. Inside an `<a>` row, the HTML parser closes the outer link at the inner one, which scatters the row into empty boxes. Turn cloned links into `<span>`s, or make the row a non-link element.
 
 Also: an empty `data-team=""` section is a repo's no-team strip (the person's sessions in that repo), not a duplicate repo.
