@@ -102,6 +102,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
 | TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first |
+| TD-1150 | A browser tab says nothing by its icon: no page has a favicon, so a Focus tab's state is read only from its title's words | Medium | Open — design-first, waits on Paul's pick of a direction |
 | TD-1151 | `cmd_status` (#2509) ranks by the shown state and passes the home-read wait, and no test fails with either put back | Low | Open — build |
 
 ---
@@ -2190,6 +2191,27 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix (proposed; the design round settles it):** when the Team pick is a team and the Role is one of its member roles, the form fills from **that member line**, as `ao team start` would create it: the name from the team's pattern with the first free number (*dc-grinder-2*, the Members dialog's rule), the line's `profile`, `lane` and `brief` (layered over the preset's, as at a team start), the team's manager as controller (live, or its seat on call, by the record's id), and the mode unattended and supervised, with **run it under me instead** still offered for a person who wants their own session in the team — so §4.9 *A person in the team* becomes that choice, no longer the default. Each field stays editable before Start. The round decides whether such a start is a live **member** of the running team (counted in `ao team status` and its shape, wound down with it) or a one-off beside it, and whether it writes nothing (a repo's definition stays a PR's, TD-163) — Paul's words ask only that the form fill itself.
 
 **Done when** the design says what a Team and member-role pick fills, its build is filed, built and live, and a dev-cadence grinder started from the form carries the member line's brief, profile, lane, controller and mode.
+
+---
+
+## TD-1150: A browser tab says nothing by its icon: no page has a favicon, so a Focus tab's state is read only from its title's words
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by the `tab-icons` session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design-first. Three directions are drawn in `docs/mockups/reviews/tab-icons/index.html`: **A** *Tile* (one rounded square; dark with a page glyph on a page, the state's colour with its pill glyph on a Focus), **B** *Mark and badge* (a Shift-key mark on every tab, a state badge in a Focus tab's corner), **C** *Shift key* (the mark as the icon, filled with the state's colour). Paul picks one, or a mix, before the design is written.
+**Blocked by:** decision (paul) — pick the direction from the three drawn
+**Location:** `src/shiftlead/ui/templates/base.html` (the `<head>`, 6: a `<title>` block and no `<link rel="icon">`); `src/shiftlead/ui/templates/focus.html` (4, the title block); `src/shiftlead/ui/static/app.js` (`AO.focusTitle` 498, set at 5339 and 5794 — the icon changes where the title does; the forgotten title 6265); every page's `{% block title %}` (`org.html`, `inbox.html`, `inbox_entry.html`, `queue.html`, `repo.html`, `settings.html`, `help.html`, `spend.html`, `new.html`, `transcript.html`; `refused.html` sets its own `<title>`, 8); `src/shiftlead/ui/static/app.css` (the state colours 16–28 and the pills' glyphs 154–160); design §4.5 *Pop out* (*The title is the point*) and *Browser mechanics*, §4.5a **state icon**
+
+**Why:** The person works with many tabs and popped-out windows, and the title is the only thing that says what each one is: a Focus title reads `▲ <name> · <state>`, cut short in a narrow tab, and every other page has the browser's blank icon. A Focus tab that needs the person cannot be told from one that is working without reading its words, and a ShiftLead tab cannot be told from any other site's. An icon per state, in the colours and glyphs the state pills already use, makes the tab strip read like the Sessions page; one family for every page makes the app's tabs findable.
+
+**Fix:** a design round on §4.5 (*Pop out*'s title paragraph and *Browser mechanics*): the direction Paul picks; one icon per state (§4.5a **state icon**'s list: needs you, working, idle, idle · unseen, stalled?, limited, scheduled, exited, on call, closed, unreachable; and waiting, whose ⋯ is in `app.css` 159 alone, TD-418) and one per page; drawn as SVG paths, never font glyphs; how it is served (an inline `data:` SVG set by `AO.focusTitle`'s callers, or static files under `static/` with their `?v=` hash); how a dark icon stays visible on a dark tab strip; whether the title's `▲ ` stays beside the icon. The design files the builds.
+
+**Done when** the design is merged with its builds filed.
+
+---
 
 ## TD-1151: `cmd_status` (#2509) ranks by the shown state and passes the home-read wait, and no test fails with either put back
 
