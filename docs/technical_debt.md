@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
 | TD-1187 | The top bar scrolls away with the page: once scrolled down, the tabs, + New and the counts are out of reach | Medium | Open — design-first |
-| TD-1188 | The per-clone-setup and roster warnings for a lock repo name `sync.sh <checkout>`, which dev-cadence #429 made a refusal; TD-1183's `Resolved` says §5's cures already named the launcher | Medium | Open — build |
 
 ---
 
@@ -1938,20 +1937,3 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1188: The per-clone-setup and roster warnings for a lock repo name `sync.sh <checkout>`, which dev-cadence #429 made a refusal
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-28 (docs-audit-ao-1, auditing #2590)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/seams.py` (the `shimmed` cure ~373, the roster cure ~380); `docs/design/5-configuration.md` (~353–355); `docs/design/4.7-cli.md` (346, the Repo page warning); `docs/technical_debt_archive.md` TD-1183's `Resolved`
-
-**Why:** #2590 (TD-1183) made the adopt run the launcher because dev-cadence #429 stopped `sync.sh` copying: `~/dev-cadence/sync.sh` now exits 1 for a target alone, *sync.sh no longer copies into a repo (TD-129): adopt a new repo with `dev-cadence -C <this clone> adopt <repo>`* (its line 39). Yet `seams.py` still builds `` `<dev-cadence>/sync.sh {root}` `` as the cure for *dev-cadence's per-clone setup not run in this checkout* and *sync-all will not reach it* in an unpinned repo, and design §5 (~353: *the person's `<dev-cadence>/sync.sh <checkout>` run cures both*) and §4.7 (346) say the same, so the Repo page tells the person to run a command that refuses. TD-1183's `Resolved` line says *§5's pinned-repo cures already named the launcher*, true of the pinned wording only; TD-1183's own **Fix** named §5's `sync.sh` lines (353–362) for the present tense and the PR left them.
-
-**Fix:** change both cures to `dev-cadence -C <dev-cadence> adopt <checkout>` (what `adopt.after` now prints) where the dev-cadence checkout has a launcher, keeping `sync.sh` only for an older checkout with none; update §5 and §4.7 in the same PR to match, the doc-bound tests with them, and the history line under §5.
-
-**Done when** the lock-repo warnings name a command dev-cadence accepts, §4.7, §5 and `seams.py` agree, and `pdm run test` passes.
-
----

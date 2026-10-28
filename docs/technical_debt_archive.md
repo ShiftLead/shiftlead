@@ -22165,3 +22165,25 @@ Mail tells the member now. The table's entry is what lasts.
 **Related:** TD-638 (the design), TD-644 (ShiftLead's side).
 
 **Resolved:** 2026-10-28 (Paul, in session `queue-deps`; moved, not fixed): the fix is dev-cadence's (the `Agent-Model:` trailer), so the entry is filed there as **dev-cadence#TD-181** (its PR #447, squash 69c99bf) and closes here, under Paul's rule that dev-cadence work goes on dev-cadence's ledger and a grinder never works another repo. The fix reaches this repo at its next dev-cadence pin bump.
+
+---
+
+## TD-1188: The per-clone-setup and roster warnings for a lock repo name `sync.sh <checkout>`, which dev-cadence #429 made a refusal
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-28 (docs-audit-ao-1, auditing #2590)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/seams.py` (the `shimmed` cure ~373, the roster cure ~380); `docs/design/5-configuration.md` (~353–355); `docs/design/4.7-cli.md` (346, the Repo page warning); `docs/technical_debt_archive.md` TD-1183's `Resolved`
+
+**Why:** #2590 (TD-1183) made the adopt run the launcher because dev-cadence #429 stopped `sync.sh` copying: `~/dev-cadence/sync.sh` now exits 1 for a target alone, *sync.sh no longer copies into a repo (TD-129): adopt a new repo with `dev-cadence -C <this clone> adopt <repo>`* (its line 39). Yet `seams.py` still builds `` `<dev-cadence>/sync.sh {root}` `` as the cure for *dev-cadence's per-clone setup not run in this checkout* and *sync-all will not reach it* in an unpinned repo, and design §5 (~353: *the person's `<dev-cadence>/sync.sh <checkout>` run cures both*) and §4.7 (346) say the same, so the Repo page tells the person to run a command that refuses. TD-1183's `Resolved` line says *§5's pinned-repo cures already named the launcher*, true of the pinned wording only; TD-1183's own **Fix** named §5's `sync.sh` lines (353–362) for the present tense and the PR left them.
+
+**Fix:** change both cures to `dev-cadence -C <dev-cadence> adopt <checkout>` (what `adopt.after` now prints) where the dev-cadence checkout has a launcher, keeping `sync.sh` only for an older checkout with none; update §5 and §4.7 in the same PR to match, the doc-bound tests with them, and the history line under §5.
+
+**Done when** the lock-repo warnings name a command dev-cadence accepts, §4.7, §5 and `seams.py` agree, and `pdm run test` passes.
+
+**Resolved:** 2026-10-28 (grinder-ao-1, #2599) — the cure is not the **Fix**'s `adopt`, which refuses a repo carrying synced copies (dev-cadence `launcher/words.py` `w_adopt`). `seams.warnings` names the move to a pin for a repo still on the copy: *dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh --pin <checkout>`* and *not on dev-cadence's roster: the copy is retired, so move it to a pin — `<dev-cadence>/sync.sh --pin <checkout>`*. §5 *The seams* and §4.7 **`ao repo add`** say so in the present tense (after a launcher's adopt the repo is pinned, and its warnings are a pinned repo's), with history lines under each; `tests/test_seams.py` and `tests/test_pinned_cures.py` hold the words.
+
+---
