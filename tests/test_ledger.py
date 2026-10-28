@@ -1,7 +1,7 @@
-"""The ledger's own rules, checked against the two files that state them.
+"""The ledger's own rules, checked against the ledger and archive that state them.
 
-docs/technical_debt.md says IDs are "assigned in order and never reused", and that its summary
-table "lists exactly the entries that have a body in this file". Both were broken on 2026-09-13:
+The ledger says IDs are "assigned in order and never reused", and its v1 summary table listed
+"exactly the entries that have a body in this file". Both were broken on 2026-09-13:
 TD-043 was assigned twice — once for a tmux paste-buffer race that was fixed and archived, and
 once, hours later and by a different session, for a vocabulary entry — because nothing reads the
 two files together. A concurrent fleet re-reads a resolved entry's number all the time; these
@@ -9,28 +9,26 @@ tests are the check the prose asked for.
 """
 
 import importlib.util
-import pathlib
 import re
 import sys
 from collections import Counter
 from typing import NamedTuple
 
 import pytest
-from conftest import pinned_script
+from conftest import pinned_script, repo_ledger
 
 from sessionorc import ledger
 from sessionorc import ledgerboard as lb
 
-DOCS = pathlib.Path(__file__).parents[1] / "docs"
-OPEN = DOCS / "technical_debt.md"
-ARCHIVE = DOCS / "technical_debt_archive.md"
-
-ROW = re.compile(r"^\| (TD-\d{3,}) \|", re.M)  # past TD-999 an id has four digits (TD-1000, 2026-10-24)
+# The ledger and its archive as the home reads them, in either layout (TD-1195): `docs/ledger/` joins
+# its README and one file per entry into the text the v1 file held, without its summary table.
+OPEN, ARCHIVE = "the ledger", "the archive"
+TEXTS = dict(zip((OPEN, ARCHIVE), repo_ledger(), strict=True))
 
 
 def text(path):
     # The entry template lives in an HTML comment and is headed TD-001, which is a real id.
-    return ledger.strip_comments(path.read_text())
+    return ledger.strip_comments(TEXTS[path])
 
 
 def headings(path):
@@ -57,21 +55,14 @@ def test_an_open_entry_and_an_archived_one_never_share_a_number():
     assert not clash, f"resolved and open entries share a number: {clash}"
 
 
-def test_the_summary_table_lists_exactly_the_entries_with_a_body():
-    table = OPEN.read_text().split("<!-- Entry template:")[0]
-    rows, bodies = set(ROW.findall(table)), set(headings(OPEN))
-    assert not rows - bodies, f"summary rows with no entry below them: {sorted(rows - bodies)}"
-    assert not bodies - rows, f"entries missing a summary row: {sorted(bodies - rows)}"
-
-
 def test_ids_are_assigned_in_order_within_each_file():
     for path in (OPEN, ARCHIVE):
         ids = headings(path)
-        assert ids, f"{path.name} has no entries"
+        assert ids, f"{path} has no entries"
         # The archive is append-ordered by resolution, not by id; only the open file is sorted.
-        if path is OPEN:
+        if path == OPEN:
             # by number: past TD-999 a string sort puts TD-1000 before TD-993
-            assert ids == sorted(ids, key=lambda i: int(i[3:])), f"{path.name} entries are out of id order: {ids}"
+            assert ids == sorted(ids, key=lambda i: int(i[3:])), f"{path}'s entries are out of id order: {ids}"
 
 
 def test_every_entry_has_a_body_and_not_someone_elses():
@@ -84,8 +75,8 @@ def test_every_entry_has_a_body_and_not_someone_elses():
     """
     for path in (OPEN, ARCHIVE):
         for id_, body in entries(path):
-            assert "**Priority:**" in body, f"{path.name} {id_} has a heading but no entry under it"
-            assert "**Why:**" in body, f"{path.name} {id_} has no **Why:**"
+            assert "**Priority:**" in body, f"{path} {id_} has a heading but no entry under it"
+            assert "**Why:**" in body, f"{path} {id_} has no **Why:**"
         for id_, body in entries(ARCHIVE):
             assert "**Resolved:**" in body, f"an archived entry records how it was resolved: {id_}"
 
@@ -108,9 +99,7 @@ def test_no_two_entries_share_a_body():
             why = body[body.index("**Why:**") :].split("\n\n")[0].strip() if "**Why:**" in body else ""
             if why and why in whys.values():
                 other = next(k for k, v in whys.items() if v == why)
-                raise AssertionError(
-                    f"{path.name}: {id_} and {other} have the same **Why:** — one is under the wrong title"
-                )
+                raise AssertionError(f"{path}: {id_} and {other} have the same **Why:** — one is under the wrong title")
             whys[id_] = why
 
 
@@ -129,7 +118,7 @@ def test_no_entry_body_dangles_below_the_entry_it_belongs_to():
             # below an entry unnoticed otherwise (re-review of PR #138).
             for fld in ("Location", "Why", "Resolved", "Related"):
                 n = len(re.findall(rf"^\*\*{fld}:\*\*", body, re.M))
-                assert n <= 1, f"{path.name}: {id_} has {n} {fld} lines — an unheaded entry is dangling below it"
+                assert n <= 1, f"{path}: {id_} has {n} {fld} lines — an unheaded entry is dangling below it"
 
 
 def test_the_open_file_holds_open_work_only():
@@ -167,7 +156,7 @@ class Declared(NamedTuple):
 
 @pytest.fixture(scope="module")
 def declared() -> Declared:
-    words, flags = _script().declared(OPEN.read_text())
+    words, flags = _script().declared(TEXTS[OPEN])
     return Declared(words, flags, set(words.get("owner", ())), set(words.get("kind", ())))
 
 
@@ -187,7 +176,7 @@ def test_the_preamble_declares_the_owner_and_kind_words(declared):
     DECLARED, OWNERS, KINDS = declared.words, declared.owners, declared.kinds
     assert not declared.flags, declared.flags
     assert OWNERS and KINDS, f"the preamble's Fields: line declares Owner and Kind, read as {DECLARED}"
-    pre = OPEN.read_text().split("\n## ", 1)[0]
+    pre = TEXTS[OPEN].split("\n## ", 1)[0]
     prose = {"Owner": OWNERS, "Kind": KINDS}
     for name, words in prose.items():
         said = re.search(rf"\*\*{name}\*\* — [^(]*\(([^)]*)\)", pre)
@@ -222,6 +211,6 @@ def test_no_entry_writes_a_pickable_line(declared):
     that cannot be written cannot disagree with the derived reading. The template in the preamble's
     comment is held to it too, since a new entry is copied from there.
     """
-    lines = [ln for ln in OPEN.read_text().splitlines() if ln.startswith("**Pickable:**")]
+    lines = [ln for ln in TEXTS[OPEN].splitlines() if ln.startswith("**Pickable:**")]
     assert not lines, f"the ledger writes Pickable on {len(lines)} line(s): say what blocks it as Blocked by"
     assert "pickable" not in declared.words, "the preamble's Fields: line declares no Pickable words"

@@ -27,7 +27,7 @@
 - [Reviewer prompts keep out of the anchor](reviewer-prompts-keep-out-of-the-anchor.md) — cadence §4.8: refs or its own worktree; name the anchor path only for `git fetch`
 - [Scratch-worktree tests import the main checkout](scratch-worktree-tests-import-main-checkout.md) — run a branch's tests with `PYTHONPATH=$PWD/src` and the main venv
 - [Retarget a stacked PR with the API](retarget-a-stacked-pr-with-the-api.md) — `gh pr edit` (--base, --body-file) fails on projectCards; PATCH pulls/N, rebase --onto, delete the base last
-- [Summary-table conflicts resolve row-wise](summary-table-conflicts-resolve-row-wise.md) — cadence §2.5: one row per id after a rebase; `ao --json` goes before the subcommand
+- [Summary-table conflicts resolve row-wise](summary-table-conflicts-resolve-row-wise.md) — since TD-1195 the ledger is one file per entry, with no table to conflict on; v1 repos: cadence §2.5, one row per id; `ao --json` goes before the subcommand
 - [Designer run lessons 2026-09-25](designer-run-lessons-2026-09-25.md) — a steer, and a techlead reply with `--source`, is refused when the person inbox is full (board line / `Source:` first line instead); reviewer agents read refs (cadence §4.8); a build entry's id from `ao td next`
 - [An interactive UI/UX review makes the change visible](ui-review-screenshots.md) — significant UI changes reviewed with Paul always come with something to look at: screenshots, renderings or a design page (one per compared shape), kept under docs/mockups/reviews/ and sent into the chat
 - [Design help text is bound to help.py](design-help-text-is-bound-to-help-py.md) — a design PR never rewords §4.5a's help list; the wording goes in the build entry; run the doc-bound tests before pushing

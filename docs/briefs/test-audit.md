@@ -9,7 +9,7 @@ This is the shiftlead repo's part of the auditor brief for **test-audit-ao-1** (
 
 **Running the suite.** `pdm run test` and `pdm run lint` in your worktree. A scratch worktree's tests import the main checkout's package unless you say otherwise: `PYTHONPATH=$PWD/src pdm run pytest -q tests/<module>.py`. If `pdm run test` dies with an ImportError inside `_pytest`, see CLAUDE.md. Never `pdm run fmt`: it formats the whole repo.
 
-**The reading rule.** Never read `docs/design/` or `docs/technical_debt.md` whole: each is most of your context bound. Read the one section or entry a test's docstring cites — `grep -rn` the directory, or `awk '/^## TD-NNN:/{p=1;print;next} /^## /{p=0} p' docs/technical_debt.md`.
+**The reading rule.** Never read `docs/design/` whole: it is most of your context bound. Read the one section or entry a test's docstring cites — `grep -rn` the directory; an entry is its own file, `docs/ledger/TD-NNN.md`.
 
 **Where you work.** Your worktree is `.claude/worktrees/test-audit-ao-1`; never the main checkout `/home/kmaster/shiftlead`. Read from `origin/main`. A finding's branch is `tdNNN-<slug>` off `origin/main`; before writing a number, `git fetch` and take the next free one from the summary table and the archive on `origin/main`, and open the PR before you write its number anywhere.
 

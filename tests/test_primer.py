@@ -6,6 +6,7 @@ prose to the truth, which is why the primer is never cited as a source."""
 import re
 from pathlib import Path
 
+from conftest import repo_ledger
 from design_doc import section, whole
 
 REPO = Path(__file__).resolve().parents[1]
@@ -43,8 +44,6 @@ def test_every_path_the_primer_names_exists():
 
 
 def test_every_ledger_entry_the_primer_names_exists():
-    ledger = (REPO / "docs" / "technical_debt.md").read_text(encoding="utf-8")
-    archive = (REPO / "docs" / "technical_debt_archive.md").read_text(encoding="utf-8")
-    have = set(re.findall(r"^## (TD-\d+)", ledger + "\n" + archive, flags=re.M))
+    have = set(re.findall(r"^## (TD-\d+)", "\n".join(repo_ledger()), flags=re.M))
     named = set(re.findall(r"\bTD-\d+\b", _text()))
     assert named and not named - have, f"ledger entries that do not exist: {sorted(named - have)}"

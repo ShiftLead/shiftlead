@@ -9,4 +9,4 @@ The help texts listed in design §4.5a (`docs/design/4.5a-controls.md`) (the *i*
 
 **Why:** the list in the design is the source the code copies, and the test keeps them from drifting — so the wording can only change in the PR that changes `help.py`.
 
-**How to apply:** in a design round leave the help list alone and write the new wording into the build entry's *Fix* as a step. Before pushing any docs PR run the tests that read the docs, not only `test_primer.py`: `grep -l -E 'design\.md|technical_debt|mockups' tests/*.py`, then pytest on those with `PYTHONPATH=$PWD/src` (see [[scratch-worktree-tests-import-main-checkout]]).
+**How to apply:** in a design round leave the help list alone and write the new wording into the build entry's *Fix* as a step. Before pushing any docs PR run the tests that read the docs, not only `test_primer.py`: `grep -l -E 'design\.md|repo_ledger|technical_debt|mockups' tests/*.py`, then pytest on those with `PYTHONPATH=$PWD/src` (see [[scratch-worktree-tests-import-main-checkout]]).
