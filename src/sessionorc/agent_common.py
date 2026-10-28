@@ -187,7 +187,7 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "cre
 # The home does it the other way round — it marks its own record, which owns the field, and routes
 # only the `kill`. `modes.HOME_EDITS` is the other table, and `suspend` **is** in that one: a node
 # asked to suspend forwards the whole act here, or its mark would be wiped by the home's next copy.
-HOME_EDITS = frozenset({"set_mode", "set_stop", "set_start", "set_grants", "set_controllers"})
+HOME_EDITS = frozenset({"set_mode", "set_stop", "set_start", "set_grants", "set_controllers", "keep"})
 # What the home reads from the node whose name is the record's `host` (§4.4a, step 4b.1): a pane's
 # screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
@@ -611,7 +611,7 @@ def _prune_tallies(r: Session) -> None:
 LAUNCH_KEYS = (
     "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
     "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
-    "seat", "review", "context_bound", "prompt_from", "start_context",
+    "seat", "review", "context_bound", "prompt_from", "start_context", "run_only",
 )  # fmt: skip
 
 

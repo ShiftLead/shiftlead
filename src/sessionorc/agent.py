@@ -1166,6 +1166,7 @@ class HostAgent(
         caller: str | None = None,
         keep_mail: bool = False,
         supervised: bool = False,
+        run_only: bool | None = None,  # None, not False: a launch record keeps it only where it was set
         seat: dict[str, Any] | None = None,
         review: dict[str, Any] | None = None,
         context_bound: int | None = None,
@@ -1222,6 +1223,8 @@ class HostAgent(
         and a resume of a supervised record stays supervised whether or not it says so — the field
         is cleared by nothing but Forget. With it, the create writes the session's launch record
         (`_write_launch`), here unless this is a node, whose home writes it when it routes the create.
+        `run_only` (§4.9 *A member started from the form*, TD-1164): kept on the record and in the launch
+        record, so a replay of it is run-only too; `keep` clears both.
 
         `keep_mail` (design §4.9b, TD-075 step 4): a fresh start under a name moves the mail of
         the record it supersedes — inbox, outbox, tallies, wake decisions — as a resume does, and
@@ -1487,6 +1490,7 @@ class HostAgent(
                 supervised=bool(supervised)
                 or bool(resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.supervised)
                 or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
+                run_only=bool(run_only),
                 seat=dict(seat) if seat else None,
                 review=reading,
                 context_bound=bound,
@@ -3216,6 +3220,24 @@ class HostAgent(
         self._save(s)
         # pushed now, as `set_stop` is: another tab's Focus re-attaches read-only or with the keyboard
         # at the press, not on the next tick (§4.6, TD-096)
+        await self._push_changes()
+        return self._view(s)
+
+    async def rpc_keep(self, id: str) -> dict[str, Any]:
+        """A size step up adopting a run-only member (design §4.9 *A team's size*, TD-1164): `run_only`
+        cleared on the record and in its launch record, so a restart brings it back kept. A home-owned
+        edit as `set_mode` is (§4.4a): on a node's member the home's copy takes it once the replica has,
+        and the launch record is the home's alone."""
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
+        s.run_only = False
+        self._save(s)
+        if self.mode != "node":
+            path = paths.launch_dir() / f"{self._address(s)}.json"
+            with contextlib.suppress(OSError, ValueError):
+                launch = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(launch, dict) and launch.get("run_only"):
+                    launch.pop("run_only")
+                    self._write_launch(self._address(s), s, {k: v for k, v in launch.items() if k not in ("id", "at")})
         await self._push_changes()
         return self._view(s)
 

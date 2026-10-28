@@ -110,6 +110,7 @@ ACTING_RPCS = frozenset(
         "kill",
         "close",
         "set_mode",
+        "keep",
         "remove",
         "create",
         "decide",
