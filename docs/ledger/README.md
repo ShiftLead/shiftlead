@@ -4,7 +4,7 @@ Ledgerboard: 2
 
 Known issues, compromises, and deferred work. Add an entry any time a problem is identified but not immediately fixed — no exceptions, however small (cadence §2: `dev-cadence path cadence.md`).
 
-**This directory holds open work only, one `TD-NNN.md` per entry** (Ledgerboard 2, TD-1195). A new entry is a new file, its id from `ao td next`. No summary table is stored: `dev-cadence run ledger.py --summary` prints it from the entries, and the Queue and Repo page show it. When an entry is fully resolved, `git mv` its file into [`archive/`](archive/), set its Status, and replace **Fix** with the resolution date plus a pointer to whichever doc or code now carries the lasting content. An entry that is only *partly* resolved stays here, with what shipped and what remains spelled out in its **Status**.
+**This directory holds open work only, one `TD-NNN.md` per entry** (Ledgerboard 2, TD-1195). A new entry is a new file, its id from `ao td reserve`. No summary table is stored: `dev-cadence run ledger.py --summary` prints it from the entries, and the Queue and Repo page show it. When an entry is fully resolved, `git mv` its file into [`archive/`](archive/), set its Status, and replace **Fix** with the resolution date plus a pointer to whichever doc or code now carries the lasting content. An entry that is only *partly* resolved stays here, with what shipped and what remains spelled out in its **Status**.
 
 IDs are `TD-` plus a number zero-padded to three digits (four from TD-1000 on), assigned in order and never reused. Priority is a field, never part of the ID.
 

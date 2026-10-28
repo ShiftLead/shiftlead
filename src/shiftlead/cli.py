@@ -3417,7 +3417,7 @@ def cmd_board_edit(args: argparse.Namespace) -> int:
 
 
 def _td_repo(repo: str | None) -> tuple[str, str]:
-    """`(raw, root)` for `ao td add` and `ao td next`: the registry's own spelling of the repo — `--repo`, or
+    """`(raw, root)` for `ao td add` and `ao td reserve`: the registry's own spelling of the repo — `--repo`, or
     the one this directory is in, by its **main checkout** (a worktree's path is not in the registry) — and
     its resolved path. The registry's spelling names a repo, as `ao repo` and the form read it (a symlinked
     checkout is named by its link)."""
@@ -3450,15 +3450,16 @@ def _origin_key(root: str) -> str:
 
 
 def cmd_td_next(args: argparse.Namespace) -> int:
-    """`ao td next [--repo <name>] [--count <n>] [--held]` (design §4.7 *Entries*, §4.4 *A ledger entry's id
-    is handed out by the home*; TD-696): the next free ledger id of the repo, or `n` in a row, from the home's
-    `td_next`, one a line. Open to every session and the person; `--held` (§4.4 *An entry can land held*,
-    TD-731) lands each id held, the person's and an interactive session's. The repo goes by its registered name, or by
-    its origin's `owner/repo` when checkouts of different origins share that name; an open PR the home could
-    not read is said on standard error, and so are an id not reserved on origin's counter and each of the
-    script's warnings (TD-970), the exit still 0. The branch of the directory it runs in goes with the call when
-    that directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Taken by:**`
-    line, where the home gives one, is said on standard error."""
+    """`ao td reserve [--repo <name>] [--count <n>] [--held]` (design §4.7 *Entries*, §4.4 *A ledger entry's id is
+    handed out by the home*; TD-696, TD-1200): the next free ledger id of the repo, or `n` in a row, from the home's
+    `td_next`, one a line, *reserved TD-n*. `ao td next` is its old name, kept as an alias: the bare ids on standard
+    output, and its new name on standard error after the call. Open to every session and the person; `--held` (§4.4 *An
+    entry can land held*, TD-731) lands each id held, the person's and an interactive session's. The repo goes by its
+    registered name, or by its origin's `owner/repo` when checkouts of different origins share that name; an open PR the
+    home could not read is said on standard error, and so are an id not reserved on origin's counter and each of the
+    script's warnings (TD-970), the exit still 0. The branch of the directory it runs in goes with the call when that
+    directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Taken by:**` line, where
+    the home gives one, is said on standard error."""
     if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
         try:
             _td_repo(args.repo)
@@ -3474,7 +3475,7 @@ def cmd_td_next(args: argparse.Namespace) -> int:
 
 
 def _td_branch(key: str) -> str:
-    """The branch of the directory `ao td next` runs in, when its top level's origin is `key` (§4.4 *The
+    """The branch of the directory `ao td reserve` runs in, when its top level's origin is `key` (§4.4 *The
     branch*): none for another repo's directory, a detached head, or no `git`."""
     here = os.getcwd()
     try:
@@ -3516,7 +3517,15 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
     }
     if got.get("held"):
         out["held"] = True
-    return emit(args, out, lambda: print("\n".join(out["ids"])))
+    if getattr(args, "td_alias", False):  # the old name (TD-1200): its bare ids, and its new name said once
+        code = emit(args, out, lambda: print("\n".join(out["ids"])))
+        if out["ids"]:
+            gave = "reserved" if reserved else "handed out"
+            print(f"ao td next is now ao td reserve — it {gave} {', '.join(out['ids'])}", file=sys.stderr)
+        return code
+    if reserved:
+        return emit(args, out, lambda: print("\n".join(f"reserved {i}" for i in out["ids"])))
+    return emit(args, out, lambda: print("\n".join(f"{i} (not reserved on origin's counter)" for i in out["ids"])))
 
 
 def cmd_td_hold(args: argparse.Namespace) -> int:
@@ -5081,7 +5090,7 @@ def build_parser() -> argparse.ArgumentParser:
     )  # fmt: skip
     q.set_defaults(fn=cmd_board_edit)
 
-    p = add("td", help="the ledger's entries: hand the techlead one, or take the next free id (design §4.7)")
+    p = add("td", help="the ledger's entries: hand the techlead one, or reserve the next free id (design §4.7)")
     dsub = p.add_subparsers(dest="action", required=True)
     q = dsub.add_parser("add", help="the words go to the repo's techlead seat as an ask it owes an outcome on")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
@@ -5095,18 +5104,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     q.add_argument("words", nargs="*", metavar='"words"', help="what the entry is; standard input when there is none")
     q.set_defaults(fn=cmd_td_add)
-    q = dsub.add_parser(
-        "next", help="the next free ledger id, handed out by the home and recorded (§4.4); open to every session"
-    )
-    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="{repo, ids, unread}")
-    q.add_argument("--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)")
-    q.add_argument("--count", type=int, default=1, help="how many ids in a row, 1 to 10 (default: 1)")
-    q.add_argument(
-        "--held",
-        action="store_true",
-        help="land each id held until the person's Release (§4.4); the person's and an interactive session's",
-    )
-    q.set_defaults(fn=cmd_td_next)
+    for verb, what in (
+        (
+            "reserve",
+            "reserve the next free ledger id, handed out by the home and recorded (§4.4); open to every session. "
+            "Every call spends the ids it prints, --held too: run it to file entries, and probe the home with "
+            "ao repo or ao status",
+        ),
+        ("next", "the old name of ao td reserve: the same call, the bare ids, and its new name on standard error"),
+    ):
+        q = dsub.add_parser(verb, help=what)
+        q.add_argument(
+            "--json",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line}, and held true with --held",
+        )
+        q.add_argument(
+            "--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)"
+        )
+        q.add_argument("--count", type=int, default=1, help="how many ids in a row, 1 to 10 (default: 1)")
+        q.add_argument(
+            "--held",
+            action="store_true",
+            help="land each id held until the person's Release (§4.4); the person's and an interactive session's",
+        )
+        q.set_defaults(fn=cmd_td_next, td_alias=verb == "next")
     q = dsub.add_parser(
         "hold",
         help="hold any open entry, settling or settled, or release a held one (§4.4); the person's own, and a "

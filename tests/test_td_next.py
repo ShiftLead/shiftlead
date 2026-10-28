@@ -1003,3 +1003,93 @@ async def test_a_v2_ledgers_taken_by_line_reads_its_readme(home, gh, tmp_path, r
     (root / "scripts" / "ledgerboard.py").write_text(SIBLING)
     got = await home.rpc_td_next(repo="shiftlead", caller="ao-w")
     assert got["taken_by_line"] == ("**Taken by:** ao-w" if line else None)
+
+
+# -- TD-1201: `ao td reserve`, and `ao td next` its old name (§4.7 *Entries*, TD-1200) ------------------------------
+
+
+@pytest.mark.unit
+def test_reserve_says_reserved_and_next_keeps_the_bare_ids_and_names_its_new_name(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    sent: list[tuple[str, dict]] = []
+    reply = {"repo": "shiftlead", "ids": ["TD-001", "TD-002"], "unread": ["open PR #3 not read: x"]}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.append((m, p)) or dict(reply))
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--count", "2"]) == 0
+    out, err = capsys.readouterr()
+    assert out == "reserved TD-001\nreserved TD-002\n" and "ao td next is now" not in err
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead", "--count", "2"]) == 0
+    out, err = capsys.readouterr()
+    assert out == "TD-001\nTD-002\n"
+    assert err.splitlines() == [
+        "open PR #3 not read: x",
+        "ao td next is now ao td reserve — it reserved TD-001, TD-002",
+    ]
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead", "--json"]) == 0
+    reserve_json = capsys.readouterr().out
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead", "--json"]) == 0
+    out, err = capsys.readouterr()
+    assert out == reserve_json, "the alias's --json is reserve's, byte for byte"
+    assert err.splitlines()[-1] == "ao td next is now ao td reserve — it reserved TD-001, TD-002"
+    assert {m for m, _ in sent} == {"td_next"} and len({json.dumps(p, sort_keys=True) for _, p in sent}) == 2
+
+
+@pytest.mark.unit
+def test_an_unreserved_take_says_so_on_each_line_and_the_alias_says_handed_out(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    reply = {"repo": "shiftlead", "ids": ["TD-005"], "unread": [], "reserved": False, "why": "no push rights"}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: reply)
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead"]) == 0
+    out, err = capsys.readouterr()
+    assert out == "TD-005 (not reserved on origin's counter)\n" and "no push rights" in err
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
+    out, err = capsys.readouterr()
+    assert out == "TD-005\n" and err.splitlines()[-1] == "ao td next is now ao td reserve — it handed out TD-005"
+
+
+@pytest.mark.unit
+def test_the_alias_says_nothing_more_on_a_refusal_or_a_reply_with_no_ids(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"ids": [], "unread": []})
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
+    assert "ao td next is now" not in capsys.readouterr().err
+
+    def refuse(m, **p):
+        raise cli.AgentError("busy: the counter's lock was not taken")
+
+    monkeypatch.setattr(cli, "call_sync", refuse)
+    for json_flag in ([], ["--json"]):
+        assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead", *json_flag]) != 0
+        assert "ao td next is now" not in capsys.readouterr().err
+
+
+@pytest.mark.unit
+def test_held_goes_through_both_names(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    monkeypatch.chdir(tmp_path)
+    sent: list[dict] = []
+    reply = {"ids": ["TD-001"], "unread": [], "held": True}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.append(p) or reply)
+    for verb in ("reserve", "next"):
+        assert cli.main(["td", verb, "--repo", "ShiftLead/shiftlead", "--held", "--json"]) == 0
+        assert json.loads(capsys.readouterr().out)["held"] is True
+    assert [p.get("held") for p in sent] == [True, True]
+
+
+@pytest.mark.unit
+def test_the_help_says_reserve_spends_and_next_is_its_old_name(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["td", "--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert "reserve the next free ledger id" in text and "Every call spends the ids it prints" in text
+    assert "the old name of ao td reserve" in text
+    with pytest.raises(SystemExit):
+        cli.main(["td", "reserve", "--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert "{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line}, and held true with --held" in text
