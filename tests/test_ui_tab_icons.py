@@ -190,3 +190,20 @@ def test_focus_icon_follows_the_state_and_leaves_what_it_cannot_name():
     first = "/static/icons/state-idle.svg?v=1"
     assert probe("-") == [first, first, first, first]  # read once, missing: never read again
     assert probe("{not json") == [first, first, first, first]
+
+
+@pytest.mark.unit
+def test_focus_sets_the_icon_wherever_it_sets_the_title():
+    """TD-1168: the probe above pins `AO.focusIcon`, not that Focus calls it. Each `document.title = …`
+    in Focus's code — the first paint, `render` on every feed event, the *forgotten* window — is followed
+    by the icon of the same state, or the tab keeps the tile it was served with (§4.5 *A tab's icon*)."""
+    js = (UI / "static" / "app.js").read_text()
+    focus = js[js.index("AO.focus = function") :]
+    focus = focus[: focus.index("\n  };\n")]
+    lines = [line.strip() for line in focus.splitlines() if line.strip()]
+    titled = [(line, lines[i + 1]) for i, line in enumerate(lines) if line.startswith("document.title = ")]
+    assert titled == [
+        ("document.title = AO.focusTitle(s);", "AO.focusIcon(s);"),
+        ("document.title = AO.focusTitle(v);", "AO.focusIcon(v);"),
+        ("document.title = `${s.name} · forgotten`;", 'AO.focusIcon({ state_class: "exited" });'),
+    ]
