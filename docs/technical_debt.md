@@ -425,7 +425,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Fix:** design first. The round settles: (1) the seat — one per home or per team, its preset and brief, and how it differs from the techlead seat (which answers asks) and a manager's triage; (2) what it may answer — written allow/deny rules per role (deterministic, checked first), its own judgement for the rest, and what always reaches the person (a question or menu, anything touching `~/.shiftlead`, `~/.claude`, systemd, another worktree); (3) never an interactive session's prompt (§9 invariant 5); (4) every answer told to the person, as the techlead's are (§4.9b *Everything answered for the person is told to the person*), with the rule or reason; (5) how it squares with *Allow for this session* having been declined; (6) the grant it holds (§4.8). The design names the build entries.
 
-**Done when** the design says who answers which prompts for the person and the build entries are filed with `Blocked by` lines.
+**Done when** the design says who answers which prompts for the person and the build entries are filed, each naming this entry in `Part of:`.
 
 **Related:** TD-637, TD-638 (the same ADR's other picks), the manager brief's triage, §4.9b.
 
