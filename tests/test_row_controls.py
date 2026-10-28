@@ -307,3 +307,51 @@ def test_a_held_marks_title_names_its_presser_from_the_readings_words(tmp_path):
     assert row["hold_by"] == "the person's session paul-1"
     drawn = str(Markup(ui.templates.get_template("inbox_row.html").module.ledger({**row, "home": "queue"}, "later")))
     assert 'title="held by the person&#39;s session paul-1"' in drawn
+
+
+async def test_the_tick_hands_a_holds_presser_to_the_queue_and_the_repo_view(agent, tmp_path, monkeypatch):
+    """TD-1180: the home's two call sites, not the functions alone — `_queue_pass` passes `pressers` to the
+    Queue's reading and `_repo_view` runs `_held_words`, so both live readings carry `held.words`."""
+    from conftest import park_ticks
+    from test_queue import NOW
+
+    await park_ticks(agent)
+    root, r = _ledger(tmp_path)
+    by = {e["id"]: e for e in r["ledger"]["entries"]}
+    by["TD-002"]["held"] = {"at": NOW.isoformat(), "by": "s-1", "why": "after Friday"}
+    agent._repos = {root: r}
+    monkeypatch.setattr(agent, "_presser_words", lambda b: "the person's session paul-1" if b == "s-1" else b)
+
+    async def push(ev: dict[str, object]) -> None:
+        pass
+
+    monkeypatch.setattr(agent, "_broadcast", push)
+    await agent._queue_pass(NOW)
+    q = await agent.rpc_queue()
+    rows = {x["id"]: x for c in q["cards"] for x in (c["top"], *c["rows"])}
+    assert rows["TD-002"]["held"]["words"] == "the person's session paul-1", "the queue's pass names the presser"
+    view = agent._repo_view(root)
+    held = {e["id"]: e["held"] for e in view["ledger"]["entries"] if e.get("held")}
+    assert held["TD-002"]["words"] == "the person's session paul-1", "the repos view names the presser"
+
+
+def test_the_repo_ledger_rows_settle_mark_titles_the_presser_from_the_reading(tmp_path):
+    """TD-1180: `ledger_lists` carries a reading's `held.words` onto its row as `held_words`, and the row it
+    returns, not one handed the key by hand, draws the settle mark with *held by <words>* in its `title`."""
+    from test_queue import NOW
+
+    from shiftlead.ui import repo
+
+    root, r = _ledger(tmp_path)
+    by = {e["id"]: e for e in r["ledger"]["entries"]}
+    by["TD-002"]["held"] = {
+        "at": NOW.isoformat(),
+        "by": "s-1",
+        "why": "after Friday",
+        "words": "the person's session paul-1",
+    }
+    rows = {e["id"]: e for lst in repo.ledger_lists(r, [], None, NOW) for e in lst["rows"]}
+    assert rows["TD-002"]["held_words"] == "the person's session paul-1"
+    assert rows["TD-005"]["held_words"] == "", "an entry nobody held has none"
+    ext = ui.templates.env.from_string('{% import "queue_row.html" as q %}{{ q.extras(e, "/c/r") }}')
+    assert 'title="held by the person&#39;s session paul-1">· held' in ext.render(e=rows["TD-002"])

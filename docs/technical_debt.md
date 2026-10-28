@@ -96,7 +96,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1166 | A run-only member: `ao team add [--keep]`, never replayed and marked `run_ended` when its team's run ends, passed over by the rename check | Medium | Open — build, blocked by TD-1164 |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build, blocked by TD-1165, TD-1166 |
 | TD-1179 | `teamrun.resize`'s sit-out, stop-on-failure and run-only branches, and its same-role guard for a size of 0, are set in no test: each can be deleted with `tests/test_team_size.py` green | Low | Open — build |
-| TD-1180 | The presser's words on a held mark (TD-1127) are tested at the template and function level only: the tick's `pressers=` and `_held_words` calls and the Repo page's `held_words` can be dropped with the suite green | Low | Open — build |
 
 ---
 
@@ -2040,20 +2039,3 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1180: The presser's words on a held mark (TD-1127) are tested at the template and function level only: the tick's `pressers=` and `_held_words` calls and the Repo page's `held_words` can be dropped with the suite green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_row_controls.py` (`test_a_held_marks_title_names_its_presser_from_the_readings_words`); `tests/test_ui_queue_cards.py`; `src/sessionorc/agent_tick.py` (`_queue_pass`, `_repo_view`); `src/shiftlead/ui/repo.py` (`ledger_lists`)
-
-**Why:** #2566 (TD-1127 step 2) passes the words three ways, and the tests hand each result in by hand. On `origin/main` (1484705c5), each edit leaves `tests/test_row_controls.py`, `tests/test_ui_queue_cards.py` and `tests/test_queue.py` green (51 passed): (1) `queue_mod.reading(..., doing=doing, pressers=self._presser_words)` → without `pressers=` (no Queue row ever carries `held.words` live); (2) `v = self._held_words(v)` deleted from `_repo_view` (no repo reading carries it); (3) `ui/repo.py`'s `"held_words": ...` → `""` (the Repo row's settle mark loses its `title`: the test only renders the macro with `held_words` already set). The test's docstring says the readings "carry a hold's presser in words", but the tick's two call sites run in no test.
-
-**Fix:** a tick test (the `_queue_pass` / `_repo_view` fixtures `tests/test_queue.py` and `tests/test_rank.py` use) with a held entry whose `held.by` is a known session: assert the queue row's and the repo view's `held.words`; and a Repo page request whose reading has `held.words` asserting the settle mark's `title`. Re-run the three mutations in **Why**: each must fail.
-
-**Done when** each mutation named in **Why** fails a test and `pdm run test` passes.
-
----
