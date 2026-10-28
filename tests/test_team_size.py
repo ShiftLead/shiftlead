@@ -341,6 +341,50 @@ def test_a_size_of_zero_passes_where_another_line_holds_the_role(world, tmp_path
     assert got["size"] == 0 and state["teams"]["ao-grind"]["size"] == {"grind": 0}
 
 
+def test_start_member_refuses_a_line_the_flow_sits_out_and_creates_nothing(world, tmp_path):  # noqa: F811
+    _, state = world
+    _flows(tmp_path, {"role": "designer", "name": "designer-ao"})
+    started(state)
+    org = orgmod.with_home_settings(orgmod.load())
+    with pytest.raises(teams.TeamError, match="^designer-ao sits out under build-review: nothing started$"):
+        teamrun.start_member(cli.call_sync, org, "ao-grind", "designer-ao", HOST, run_only=True)
+    assert not creates(state)
+
+
+def test_start_member_refuses_a_name_a_live_session_holds_and_creates_nothing(world, tmp_path):  # noqa: F811
+    _, state = world
+    started(state)
+    state["verdicts"]["grind-3"] = {"name": "grind-3", "verdict": "live"}
+    org = orgmod.with_home_settings(orgmod.load())
+    with pytest.raises(teams.TeamError, match="^grind-3 is held by a live session, so nothing was created$"):
+        teamrun.start_member(cli.call_sync, org, "ao-grind", "grind", HOST, run_only=True)
+    assert not creates(state)
+
+
+def test_a_failed_keep_stops_the_step_up_and_says_what_was_done(world, tmp_path):  # noqa: F811
+    from sessionorc.client import AgentError
+
+    _, state = world
+    started(state)
+    org = orgmod.with_home_settings(orgmod.load())
+    teamrun.start_member(cli.call_sync, org, "ao-grind", "grind", HOST, run_only=True)
+    state["sessions"][-1]["run_only"] = True  # grind-3, live and run-only: the step up's first name
+    state["calls"].clear()
+    fake = cli.call_sync
+
+    def call(method, **params):
+        if method == "keep":
+            state["calls"].append((method, params))
+            raise AgentError("the link is down")
+        return fake(method, **params)
+
+    got = teamrun.resize(call, org, "ao-grind", "grind", 4, HOST)
+    assert got["text"] == "grind: 4 (file says 2) — stopped at grind-3: the link is down; started or kept nothing"
+    assert [p["id"] for m, p in state["calls"] if m == "keep"] == ["ao-shiftlead-grind-3"]
+    assert not creates(state) and not got["created"] and not got["adopted"]  # grind-4 is never reached
+    assert state["teams"]["ao-grind"]["size"] == {"grind": 4}, "the setting stays written"
+
+
 @pytest.mark.parametrize("n", [True, 2.0, "2"])
 def test_a_size_that_is_not_a_whole_number_is_refused(world, tmp_path, n):  # noqa: F811
     _, state = world
