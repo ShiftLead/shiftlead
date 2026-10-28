@@ -36,7 +36,7 @@
 - [Gate everything after a merge on its state](gate-everything-after-a-merge-on-its-state.md) — cadence §1.4: `MERGED` before deleting or reporting; a closed PR comes back by pushing the same sha and reopening
 - [The primer is a held path](primer-is-a-held-path.md) — docs/briefs/techlead-context.md is under docs/briefs/**; a design PR leaves it to the build entry's briefs slice
 - [ao msg: options before recipients](ao-msg-options-before-recipients.md) — `ao msg person --kind note "…"` exited 2 until TD-1001 is live (options anywhere after it); never pipe a send through `tail`
-- [A designed entry needs a Blocked by line](designed-entry-needs-blocked-by.md) — cadence §2.4: pickable is derived, no Pickable line; name the build entries in Blocked by
+- [A designed entry's builds name it in Part of](designed-entry-needs-blocked-by.md) — cadence §2.4: pickable is derived, no Pickable line; each build carries `Part of: TD-n`, the design's Blocked by names no build
 - [Steer replies land on the board](steer-replies-land-on-the-board.md) — Paul's Reply to a steer reaches main's board via the anchor, not a new run's inbox; grep the board for each open steer id before merging at a bound
 - [Edit scripts assert before writing](edit-script-asserts-before-writing.md) — check every replacement count first, then write, re-reading per replacement; never chain `git commit` after an edit script
 - [Never count the unread inbox](never-count-the-unread-inbox.md) — `ao inbox --unread` marks entries read; save it to a file, never pipe it through `jq length`; check open questions from the full inbox before stopping

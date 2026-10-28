@@ -1997,9 +1997,8 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Added:** 2026-10-27 (the designer, from TD-1129)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build
+**Status:** Open — build. The promote holds (read 2026-10-27, grinder-ao-2): live 557f9c0 carries TD-1130 and TD-1132, and `ao doctor` reads the one container node, contractmatch, at the home's build. Step 1, `docs/briefs/`: #PR.
 **Blocked by:** TD-1130, TD-1131, TD-1132
-**Waits:** event — TD-1130 and TD-1132 promoted live (the host agent, `ao`, and every container node's wheel)
 **Location:** `docs/briefs/designer-ao-1.md` and every team brief under `docs/briefs/` (held: `docs/briefs/**`); `docs/technical_debt_archive.md` (each converted design's archived builds); `docs/technical_debt.md` (every open `design-first` entry whose `Blocked by:` names an open or archived build, found by reading each one's `Blocked by:` against its builds by hand — the ledger cannot tell a build from a blocker; 18 by the ADR's hand count of 2026-10-27, about 20 naming any local id. The check's *legacy edge* ℹ only flags a pair half converted); the fallbacks TD-1130 writes (`src/sessionorc/ledger.py`, `src/sessionorc/queue.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/inbox.py`)
 
 **Why:** TD-1129: until a design's builds carry `Part of:`, its card still reads it as blocked by them (design §4.4 *Rows*, *A design not yet backfilled*). An older reader reads a backfilled design as pickable, so the backfill waits for the promote.
