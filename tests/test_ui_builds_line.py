@@ -157,6 +157,7 @@ def test_a_design_whose_builds_are_all_archived_still_lists_them(tmp_path):
 
 def test_ids_written_either_way_are_one_entry():
     entries = [
+        # each id is spelled one way in `parts_open` and the other on its row, on purpose
         {"id": "TD-042", "kind": "design-first", "parts_open": ["TD-043", "TD-44"]},
         {"id": "TD-43", "kind": "build", "blocked_by": ["TD-44", "decision (paul)", "x#TD-1"]},
         {"id": "TD-044", "kind": "build", "blocked_by": []},
