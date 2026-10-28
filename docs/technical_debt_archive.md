@@ -21353,5 +21353,3 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Done when** the test reads the grace without wall-clock races and passes under `pdm run test -n 8` repeatedly.
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2524) — the cause was the first tick's supervision record (the fixture's 0.15 s grace) still standing when the build went stale under load, so the test read it as the grace record; the test now waits for that record to be gone too, runs a 30 s grace ended by hand, and asserts its `next` a grace away. Test only; three full `pdm run test` runs green.
-
----
