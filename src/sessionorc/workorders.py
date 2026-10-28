@@ -29,7 +29,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import ledgerboard, paths, reports
+from sessionorc import gitinfo, ledgerboard, paths, reports
 
 BOARD = Path("docs") / "user_attention.md"  # `board:`'s default (§5 *The seams*)
 NO_BOARD = "no board: the Inbox is the person's channel"  # the seam's fixed words (§5)
@@ -112,6 +112,7 @@ def _git(root: Path, args: list[str], timeout: float) -> subprocess.CompletedPro
         **os.environ,
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o ConnectTimeout=5",
+        **(gitinfo.READ_ONLY_ENV if args[:1] == ["status"] else {}),
     }
     argv = ["git", "-C", str(root), *args]
     with subprocess.Popen(

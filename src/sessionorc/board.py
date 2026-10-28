@@ -29,7 +29,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import ledgerboard, paths, workorders
+from sessionorc import gitinfo, ledgerboard, paths, workorders
 
 BOARD = workorders.BOARD
 ACTIONS = ("snooze", "done", "reply", "decide")
@@ -131,8 +131,9 @@ def message(text: str, action: str, due: str | None = None, *, answer: str = "",
 def _git(root: Path, *args: str, timeout: float = GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
     """One git call; a git that cannot be run or does not finish is a refusal, never a raw error."""
     try:
+        env = gitinfo.read_only_env() if args[:1] == ("status",) else None
         return subprocess.run(
-            ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=timeout, check=False
+            ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=timeout, check=False, env=env
         )
     except subprocess.TimeoutExpired:
         raise Refused(f"git {args[0]} did not finish in {timeout:g} s in {root}") from None

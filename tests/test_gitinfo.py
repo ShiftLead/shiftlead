@@ -359,3 +359,63 @@ def test_a_pinned_repo_whose_pin_does_not_resolve_fails_the_create_by_name(tmp_p
     with pytest.raises(WorktreeError, match="hydrate_worktree.sh failed: .*ref must be a full 40-hex commit"):
         ensure_worktree(repo, "unresolved")
     assert (repo / ".claude" / "worktrees" / "unresolved" / ".git").is_file()
+
+
+
+def _git_calls(monkeypatch):
+    """Every git process the code under test starts, as `(argv, env)` (TD-1181)."""
+    calls: list[tuple[list, dict | None]] = []
+    real_run, real_popen = subprocess.run, subprocess.Popen
+
+    def spy_run(argv, *a, **kw):
+        calls.append((list(argv), kw.get("env")))
+        return real_run(argv, *a, **kw)
+
+    class SpyPopen(real_popen):
+        def __init__(self, argv, *a, **kw):
+            calls.append((list(argv), kw.get("env")))
+            super().__init__(argv, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", spy_run)
+    monkeypatch.setattr(subprocess, "Popen", SpyPopen)
+    return calls
+
+
+def test_every_polled_git_status_skips_the_optional_index_lock(tmp_path, monkeypatch):
+    """TD-1181: a `git status` the host agent polls runs with `GIT_OPTIONAL_LOCKS=0`, so it never holds
+    `index.lock` while a session's own `git add` in the same checkout wants it; another git call is left as it was."""
+    from sessionorc import board, gitinfo, promote, workorders
+
+    repo = tmp_path / "r"
+    repo.mkdir()
+    run("git", "init", "-q", "-b", "main", cwd=repo)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    (repo / "a.txt").write_text("1")
+    run("git", "add", ".", cwd=repo)
+    run("git", "commit", "-q", "-m", "init", cwd=repo)
+    (repo / "a.txt").write_text("2")
+    calls = _git_calls(monkeypatch)
+    reads = {
+        "git_info": lambda: git_info(repo),
+        "changed_files": lambda: gitinfo.changed_files(repo, None, 20),
+        "_dirty": lambda: gitinfo._dirty(repo, 5.0),
+        "ignored_blockers": lambda: gitinfo.ignored_blockers(repo, repo),
+        "board._git": lambda: board._git(repo, "status", "--porcelain"),
+        "promote._git": lambda: promote._git(repo, "status", "--porcelain"),
+        "workorders._git": lambda: workorders._git(repo, ["status", "--porcelain"], 5.0),
+    }
+    for name, read in reads.items():
+        del calls[:]
+        read()
+        status = [env for argv, env in calls if "status" in argv]
+        assert status, f"{name} ran no git status"
+        assert all(env and env.get("GIT_OPTIONAL_LOCKS") == "0" for env in status), name
+    for name, other in {
+        "board._git": lambda: board._git(repo, "rev-parse", "HEAD"),
+        "promote._git": lambda: promote._git(repo, "rev-parse", "HEAD"),
+        "workorders._git": lambda: workorders._git(repo, ["rev-parse", "HEAD"], 5.0),
+    }.items():
+        del calls[:]
+        other()
+        assert calls and all("GIT_OPTIONAL_LOCKS" not in (env or {}) for _, env in calls), f"{name}: only a status"
