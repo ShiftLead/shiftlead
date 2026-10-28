@@ -375,6 +375,11 @@ def test_the_ticks_change_test_reads_a_directory_but_not_its_rank_file(tmp_path)
     entry = next(base.glob("TD-*.md"))
     os.utime(entry, (2000, 2000))
     assert ledger.stamp(two) == ("docs/ledger", 2000)
+    archived = next((base / lb.LEDGER_ARCHIVE).glob("TD-*.md"))  # an archived entry edited in place
+    os.utime(archived, (3000, 3000))
+    assert ledger.stamp(two) == ("docs/ledger", 3000)
+    os.utime(base / lb.LEDGER_README, (4000, 4000))
+    assert ledger.stamp(two) == ("docs/ledger", 4000)
     one = _v1(tmp_path / "one")
     assert ledger.stamp(one)[0] == "docs/technical_debt.md"
 
