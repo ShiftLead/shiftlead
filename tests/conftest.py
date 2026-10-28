@@ -398,7 +398,6 @@ async def agent(tmp_path, monkeypatch):
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))
-
     # the tick loop too (TD-1087): `serve` binds the socket a loop step before it makes `_ticker`, so a
     # test that parked the ticks in that step found none to park, and the loop started under it
     def up() -> bool:
