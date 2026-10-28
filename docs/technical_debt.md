@@ -2022,7 +2022,7 @@ That is the design working as written: a Team pick makes *a person's own session
 
 **Priority:** Medium
 **Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1)
+**Added:** 2026-10-27 (test-audit-ao-1)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
