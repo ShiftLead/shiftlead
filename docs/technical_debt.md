@@ -95,7 +95,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1165 | The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count | Medium | Open — build, blocked by TD-1164, TD-1166 |
 | TD-1166 | A run-only member: `ao team add [--keep]`, never replayed and marked `run_ended` when its team's run ends, passed over by the rename check | Medium | Open — build; slice 1 in review |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build, blocked by TD-1165, TD-1166 |
-| TD-1179 | `teamrun.resize`'s sit-out, stop-on-failure and run-only branches, and its same-role guard for a size of 0, are set in no test: each can be deleted with `tests/test_team_size.py` green | Low | Open — build |
 
 ---
 
@@ -2017,24 +2016,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** as §4.5a's rows say. (1) `teams_for_form` carries each team's member lines (name, role, profile, lane, brief, the next free name, and the current flow's compiled lane, reader and stage brief where a flow is set). (2) Under a Team pick, a Role a member line names (each line by name where a role has two) fills the form from the line: the name, profile, lane and brief, the manager as controller, unattended and supervised; Start makes a run-only member through TD-1166's create; on a team not running the form refuses with *<team> is not running: start it first* and offers the team's **Start**. (3) **keep as a team member**, off by default: ticked, the line's fields are drawn locked with *a kept member is the line's: change the line in the definition*, and Start is TD-1165's **+**, after the same running check (refused on a team not running, Start offered). (4) **run it under me instead** on such a pick starts the person's own session in the team as today, the manager still ticked as its controller, and hides the tick; it needs no running team. *Interactive*, `plain` and a role no line names are unchanged.
 
 **Done when** tests pin: the fill for a repo-defined team's grinder line (dev-cadence's `dc-grinder` shape: brief `docs/briefs/grinder-dc-1.md`, profile, lane, the manager's id, unattended and supervised); a Start making a run-only record with those fields; the refusal on a team not running, with Start offered; the line's fields locked under the tick; a team whose manager is a person (`manager: person`: no controller ticked, running when any crew record is live); two lines of one role offered each by its name; the *a kept member is the line's* note under the tick; the tick writing the size and creating a kept member; *run it under me instead* giving TD-160's record. The form is looked at in headless Chromium (design §4.9b) with a member line picked, ticked and unticked, the shots named in the PR. `pdm run test` and `pdm run lint` pass.
-
----
-
-## TD-1179: `teamrun.resize`'s sit-out, stop-on-failure and run-only branches, and its same-role guard for a size of 0, are set in no test: each can be deleted with `tests/test_team_size.py` green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_team_size.py`; `src/shiftlead/teamrun.py` (`resize`)
-
-**Why:** #2569 (TD-1164 step 2) adds `resize` with branches its docstring states and no test reaches. On `origin/main` (1484705c5), each of these edits in `src/shiftlead/teamrun.py` leaves all 18 tests of `tests/test_team_size.py` passing: (1) `if want in plan.sit_out:` → `if False:` (a line the current flow does not use is *counted, not started*); (2) the step-down skip `if s is None or s.get("run_only") or s.get("sit_out") or sat_out(s):` → `if s is None:` (a run-only or already-sat-out member is wound down again); (3) the `AgentError` arm's `— stopped at {gone}: {e}` text dropped; (4) the step-up `— stopped at {want}: a live session holds the name; started {made}` text dropped; (5) `rest = sum(...)` → `rest = 0` (a size of 0 on a line whose role another line also holds is refused as if it were the last); (6) `mine.append(rec)` removed. Only the `free != want` skip is pinned (the last step of `test_a_resize_on_a_live_team_creates_one_and_winds_one_down`). `isinstance(n, bool) or not isinstance(n, int)` is likewise reached only by `-1`, never by `True` or a non-int.
-
-**Fix:** one test per branch against the `world` fixture: a flow-unused line stepped up (nothing created, text says *counted, not started*); a step down over a run-only and a sat-out record (neither relaunched); a `relaunch` that raises `AgentError` and a `name_check` that answers `live` mid-walk (the text names where it stopped and what was done, the setting stays written); a size 0 on a line whose role a second line holds (accepted); `resize(..., True)` refused. Re-run each mutation in **Why**: each must fail.
-
-**Done when** each mutation named in **Why** fails a test and `pdm run test` passes.
 
 ---
 

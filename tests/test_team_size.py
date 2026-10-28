@@ -278,3 +278,72 @@ def test_a_step_up_adopts_a_live_run_only_member_that_holds_the_next_name(world,
     got = teamrun.resize(call, org, "ao-grind", "grind", 5, HOST)
     assert [p["id"] for m, p in state["calls"] if m == "keep"] == ["ao-shiftlead-grind-4"]
     assert [p["name"] for p in creates(state)] == ["grind-5"] and "run_only" not in creates(state)[0]
+
+
+# ── TD-1179: each of `resize`'s branches, set by a test ────────────────────────────────────────────
+
+
+def _flows(tmp_path, *members):
+    """`ao-grind` under listed flows (`build-review` current, `td` beside it), with `members` appended."""
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["teams"]["ao-grind"].update(flows=["build-review", "td"], techlead={"name": "techlead-ao"})
+    doc["teams"]["ao-grind"]["members"].extend(members)
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+
+
+def test_a_step_up_on_a_line_the_flow_does_not_use_is_counted_not_started(world, tmp_path):  # noqa: F811
+    _, state = world
+    _flows(tmp_path, {"role": "designer", "name": "designer-ao"})
+    started(state)
+    got = teamrun.resize(cli.call_sync, orgmod.with_home_settings(orgmod.load()), "ao-grind", "designer-ao", 2, HOST)
+    assert got["text"] == "designer-ao: 2 (file says 1) — designer-ao sits out under build-review: counted, not started"
+    assert not creates(state) and state["teams"]["ao-grind"]["size"] == {"designer-ao": 2}
+
+
+def test_a_step_down_passes_over_a_run_only_and_a_sat_out_member(world, tmp_path):  # noqa: F811
+    _, state = world
+    started(state)
+    by = {s["name"]: s for s in state["sessions"]}
+    by["grind-2"]["run_only"] = True
+    by["grind-1"]["sit_out"] = {"at": "now"}  # a counted line's names: grind-1, grind-2
+    got = teamrun.resize(cli.call_sync, orgmod.with_home_settings(orgmod.load()), "ao-grind", "grind", 0, HOST)
+    assert not [c for c in state["calls"] if c[0] == "relaunch"] and got["wound_down"] == []
+    assert got["text"] == "grind: 0 (file says 2)"
+
+
+def test_a_failed_wind_down_stops_the_walk_and_says_what_was_done(world, tmp_path):  # noqa: F811
+    _, state = world
+    started(state)
+    state["refuse"] = {"ao-shiftlead-grind-1": "the link is down"}
+    got = teamrun.resize(cli.call_sync, orgmod.with_home_settings(orgmod.load()), "ao-grind", "grind", 0, HOST)
+    assert [p["id"] for m, p in state["calls"] if m == "relaunch"] == ["ao-shiftlead-grind-2", "ao-shiftlead-grind-1"]
+    assert got["text"].startswith(
+        "grind: 0 (file says 2) — stopped at grind-1: the link is down — grind-2 is wound down"
+    )
+    assert state["teams"]["ao-grind"]["size"] == {"grind": 0}, "the setting stays written"
+
+
+def test_a_step_up_stops_where_a_live_session_holds_the_name(world, tmp_path):  # noqa: F811
+    _, state = world
+    started(state)
+    state["verdicts"]["grind-4"] = {"name": "grind-4", "verdict": "live"}
+    got = teamrun.resize(cli.call_sync, orgmod.with_home_settings(orgmod.load()), "ao-grind", "grind", 4, HOST)
+    assert [p["name"] for p in creates(state)] == ["grind-3"]
+    assert got["text"] == "grind: 4 (file says 2) — stopped at grind-4: a live session holds the name; started grind-3"
+    assert state["teams"]["ao-grind"]["size"] == {"grind": 4}, "the setting stays written"
+
+
+def test_a_size_of_zero_passes_where_another_line_holds_the_role(world, tmp_path):  # noqa: F811
+    _, state = world
+    _flows(tmp_path, {"role": "grinder", "name": "mill"})
+    got = teamrun.resize(cli.call_sync, orgmod.with_home_settings(orgmod.load()), "ao-grind", "grind", 0, HOST)
+    assert got["size"] == 0 and state["teams"]["ao-grind"]["size"] == {"grind": 0}
+
+
+@pytest.mark.parametrize("n", [True, 2.0, "2"])
+def test_a_size_that_is_not_a_whole_number_is_refused(world, tmp_path, n):  # noqa: F811
+    _, state = world
+    with pytest.raises(teams.TeamError, match="grind: a size is a whole number of sessions, 0 or more, not "):
+        teamrun.resize(cli.call_sync, orgmod.with_home_settings(orgmod.load()), "ao-grind", "grind", n, HOST)
+    assert "teams" not in state
