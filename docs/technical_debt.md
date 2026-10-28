@@ -94,7 +94,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
 | TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Designed — builds TD-1130–TD-1133 |
 | TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
-| TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Designed — builds TD-1144–TD-1146 |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
@@ -2010,32 +2009,6 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 4. The *Done when … Blocked by: names them* sentences (TD-748, TD-909, TD-857, TD-1009) are fixed as they are touched.
 
 **Done when** no open `design-first` entry's `Blocked by:` names a local entry that is its build (read by hand), no *legacy edge* ℹ stands on the ledger, every open design's builds name it in `Part of:`, the fallbacks are gone, and the Queue's cards read by *part of* alone.
-
----
-
-## TD-1143: ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (ao-dev-cadence-dc-grinder, through `ao td add --repo`, from dev-cadence#TD-160; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-27 — design §4.4 *Repo facts* (*The ledger* and its history, **Either layout**, the resolver, the archive), *Completed cards*' cache, *The rank file*, *A ledger entry's id is handed out by the home*, §5 *the ledger*, the glossary's *ledger*. The builds wait on TD-1130's vendor bump (ledgerboard v2.1, carrying v2.0's loader).
-**Blocked by:** TD-1144, TD-1145, TD-1146
-**Location:** `src/sessionorc/ledgerboard.py` (vendored v1.3; ledgerboard v2.0 is tagged, `bd47174`); `src/sessionorc/ledger.py` (`ledger_path`, `archive_path`, the `git show` of the ledger and its file read); the readers through them: `agent_ids.py`, `agent_rank.py` (the rank file, `ledgerboard.rank_path`), `agent_tick.py` (a ledger's mtime), `queue.py`, `seams.py`; `reports.py` (`LEDGER_DEFAULT`); `src/shiftlead/repoconfig.py` (`DEFAULT_LEDGER`; `.shiftlead.yml`'s `ledger:` may name a directory); `src/shiftlead/ui/app.py`, `ui/settings_page.py` (through `repoconfig.DEFAULT_LEDGER`); `scripts/look_home.py` (its fixture ledger); design §4.4 *Repo facts* and *A ledger entry's id is handed out by the home*, §5 `.shiftlead.yml` `ledger:`
-
-**Why:** dev-cadence is splitting its ledger format so that each entry is one file. Under dev-cadence#TD-160 and its plan `docs/plans/2026-10-27-ledger-per-entry.md`, a v2 ledger is a directory `docs/ledger/`: one `TD-NNN.md` per entry, `archive/` for archived ones, and a `README.md` preamble carrying `Ledgerboard: 2`, with no stored Summary table. The reason is that concurrent filings conflict on the one file's Summary table and on bodies next to each other. Here that cost #2408 three rebases and #2480 two, and each rebase cost a precheck. Step 4 of the plan is that ShiftLead's readers take either layout, and nothing splits before that lands. Step 5, migrating a repo, is Paul's. Every reader here assumes one file and an `_archive` file beside it, so a split repo's ledger would read as missing.
-
-**Fix:** design first, then build. The round settles:
-- **The layout as §4.4 and §5 describe it.** A ledger is a file or, for v2, a directory. `ledger:` may name either. The archive is found by `ledgerboard`'s `load()` and the rank file by its `rank_path()`, not by `archive_path`'s name rule.
-- **One way to read.** Every reader goes through ledgerboard v2's `load(path, ls, read) -> (ledger_text, archive_text)`, with I/O passed in: a file read for the checkout, and a git-backed pair (one `ls-tree`, one `cat-file --batch`) for a read of `origin/<default>`. dev-cadence's `files/scripts/ledger.py` `git_io()` is a worked example.
-- **What a fault does.** A v2 ledger that `v2_problems()` faults is reported on the Repo page and in `ao repo`, not read.
-- **What changes with no file.** A reader's change test (the tick's mtime: the newest file in the directory), and the id road (`ao td next`'s `--ledger`/`--archive` to the script).
-- **The vendor bump is TD-1130's, not this entry's.** TD-1130's first PR vendors ledgerboard v2.1, which brings v2.0's directory loader (`load`, `entry_path`, `v2_problems`) over the vendored v1.3. This entry's builds start once it lands, and keep v1 fixtures beside v2 ones.
-
-**Done when** the design says how each reader finds and reads either layout. Then the build entries are filed, holding: every reader above takes either layout through `load()` / `rank_path()`, tests run v1 and v2 fixtures side by side (`scripts/look_home.py` among them), and a faulted v2 ledger is reported, not read.
-
-**Related:** dev-cadence#TD-160 (the split, its plan's step 4 this, step 5 Paul's); ShiftLead/ledgerboard#20, #21 (v2.0); TD-1130 (vendors ledgerboard v2.1, and reads `Part of:` in `ledger.py` and the Queue: the same files, so a build of this entry rebases on it); TD-585 (ledgerboard read in-process), TD-970 (`ao td next` over the id script); #2408, #2480 (the conflicts).
 
 ---
 
