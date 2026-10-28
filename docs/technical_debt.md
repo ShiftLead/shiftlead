@@ -2199,7 +2199,7 @@ That is the design working as written: a Team pick makes *a person's own session
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Location:** `src/shiftlead/cli.py` `cmd_status` (the `waits` map, the `sessions.sort(key=… shown_state(s, waits[s["id"]])[0] …)` line, `print(status_line(s, w, waits[s["id"]]))`); `tests/test_cli.py::test_status_says_working_for_an_idle_record_working_on_its_own`; design §4.7 ("ranked with the working … under `-v` a wait the home reads wins, as on the card")
+**Location:** `src/shiftlead/cli.py` `cmd_status` (the `waits` map, the `sessions.sort(key=… shown_state(s, waits[s["id"]])[0] …)` line, `print(status_line(s, w, waits[s["id"]]))`); `tests/test_cli.py::test_status_says_working_for_an_idle_record_working_on_its_own`; design §4.7 ("ranked with the working … under `-v` a wait the home reads (§4.2 *Waiting*) wins, as on the card")
 
 **Why:** The new test calls `cli.status_line` directly, so it pins the line and `shown_state` but never `cmd_status`, where design §4.7 puts the other two claims: the record is *ranked with the working*, and under `-v` a wait the home reads wins. Probes in the worktree, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_cli.py` (91 passed unchanged): (1) change the sort key to `STATE_RANK.get(s["state"], 9)` (the raw state) — 91 passed; (2) change `print(status_line(s, w, waits[s["id"]]))` to `print(status_line(s, w))` — 91 passed. Only removing the `pending` guard in `shown_state` fails the test. So an idle-working record can sort among the idle, and a waiting record print *working* under `-v`, with a green suite.
 
