@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -262,13 +262,16 @@ def reading(
     *,
     waiting: Collection[str] = (),
     doing: Mapping[str, list[Mapping[str, Any]]] | None = None,
+    pressers: Callable[[str], str] | None = None,
 ) -> dict[str, Any]:
     """The `queue` reading (§4.4 *The Queue*): `{cards, completed, other_work, at}`.
 
     `repos` are the home's repo readings by root; `records` the live graph's `Session`s (an ended one
     holds nothing); `waiting` the ids of sessions that wait on a question (the person's, or a reader
     holding their ask), which keeps an idle holder from reading *stalled*; `doing` the doing log by
-    team (`{team: [{id, text, at}]}`), whose first line after a claim is a passed-over flag's reason.
+    team (`{team: [{id, text, at}]}`), whose first line after a claim is a passed-over flag's reason;
+    `pressers` a hold's `by` in words (`mail.presser_words` over the home's graph, TD-1127), which a held
+    row carries as `held.words` for its mark's `title`.
 
     Each **card**: `id` (its top entry's `<repo>#TD-n`), `key` and `lined`, `top` and `rows` (each a row:
     `qid`, `repo`, `id`, `title`, `priority`, `state` — the one word of §4.4 *A row's state*, '' for a
@@ -423,7 +426,7 @@ def reading(
                 "needs": needs,
                 "pr": (prs.get(q) or {}).get("number"),
                 "holder": _holder(claim[0][0]) if claim else None,
-                "held": dict(e["held"]) if isinstance(e.get("held"), dict) else None,  # {at, why?} (TD-905)
+                "held": _held(e.get("held"), pressers),  # {at, by, why?, words?} (TD-905, TD-1127)
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
                 "page": str(e.get("for_page") or ""),
@@ -479,6 +482,13 @@ def reading(
         "other_work": other,
         "at": now.isoformat(),
     }
+
+
+def _held(held: Any, pressers: Callable[[str], str] | None) -> dict[str, Any] | None:
+    """A row's `held`: the reading's mark, with its presser in words where the home gave `pressers`."""
+    if not isinstance(held, dict):
+        return None
+    return {**held, "words": pressers(str(held.get("by") or ""))} if pressers else dict(held)
 
 
 def _holder(rec: Any) -> dict[str, Any]:
