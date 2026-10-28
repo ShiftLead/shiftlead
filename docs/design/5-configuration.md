@@ -170,7 +170,7 @@ roles:                                # §4.8 presets; every key optional, built
                     {label: waiting on me, text: "What is waiting on me across this repo's board and my inbox?"}]}   # prompts: §4.8, the chips beside Send (TD-161)
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
-ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to: a ledger in ledgerboard format (*The seams*)
+# ledger:                             # unset: docs/ledger where that is a directory, else docs/technical_debt.md (§4.4 *Either layout*) — what a TD-NNN reference resolves to: a ledger in ledgerboard format (*The seams*)
 board: docs/user_attention.md         # the person's board, dev-cadence's seed (*The seams*); missing: a warning, the Inbox the channel
 worktree_setup: scripts/hydrate_worktree.sh   # run in every new worktree (*The seams*)
 held: ["src/sessionorc/**"]           # §4.9c: the paths a review stage holds (the `build` flow holds nothing)
@@ -234,7 +234,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     below); under dev-cadence TD-129, the pin in `docs/cadence.toml`, resolved (*How the readers find
     dev-cadence*, below);
   - **the gate**, dev-cadence's `check_cadence.py` (§6 rule 10);
-  - **the ledger**, in ledgerboard format at `ledger:` (default `docs/technical_debt.md`), the format
+  - **the ledger**, in ledgerboard format at `ledger:` — a file, or a v2 directory of one file per entry
+    (§4.4 *Either layout*; default `docs/ledger` where that is a directory, else `docs/technical_debt.md`) — the format
     `ShiftLead/ledgerboard`'s `SPEC.md` defines and its `ledgerboard.py` reads — the one parser,
     vendored as `src/sessionorc/ledgerboard.py` and held byte-equal to the synced
     `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
@@ -258,9 +259,12 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   launcher interface reads *it needs launcher interface <n>, this build carries <m> — a newer ShiftLead*),
   *unserved: no gate (no scripts/check_cadence.py) — `ao repo add <path> --adopt`*, *unserved: no gate (no
   check_cadence.py in the pinned tree) — bump the pin*, *unserved: no ledger at
-  docs/technical_debt.md — `ao repo add <path> --adopt`*, *unserved: the ledger at
-  docs/technical_debt.md does not parse — <the reader's reason>* (no adopt cures it), *unserved:
-  dev-cadence at <commit> is older than this build reads (<oldest>) — sync it* (`sync.sh`; for a pinned
+  <ledger> — `ao repo add <path> --adopt`*, *unserved: the ledger at
+  <ledger> does not parse — <the reader's reason>* (no adopt cures it; `<ledger>` the resolved path, §4.4
+  *Either layout*), *unserved:
+  dev-cadence at <commit> is older than this build reads (<oldest>) — sync it*, *unserved: the ledger is a
+  directory and dev-cadence at <commit> predates its v2 reader (b9236c8) — sync it* (a pinned repo's: *— bump
+  the pin*; the seams' ledger state `predates`, and `ao td next` refuses in the same words) (`sync.sh`; for a pinned
   repo, whose pin's `ref` is the commit, *— bump the pin*, a bump PR); where an adoption PR is open (the repo's PR reading's open PR whose
   head is `cadence-adopt`, §4.4), its cure reads *adoption PR #n open* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
   the PRs that show an adoption PR) and **the two passes that make it served**:
@@ -307,7 +311,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (the gate,
   `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as `<n>` after the rest), `{board}`
   (the board's path, whether or not the file is there: a missing board is the Repo page's warning,
-  and the board's own reader says the Inbox is then the channel), `{ledger}`, `{ledger_check}`, `{cadence_rules}` (*read docs/cadence.md §1–§4*) —
+  and the board's own reader says the Inbox is then the channel), `{ledger}` (the resolved ledger, a file or a
+  v2 directory, §4.4 *Either layout*), `{ledger_check}`, `{cadence_rules}` (*read docs/cadence.md §1–§4*) —
   the cadence's, with no sentence for an absent one, since an unserved repo composes no brief —
   and the repo's own, each with its sentence: `{test}` (*no test command: run what the repo's README
   says*), `{lint}` (*no lint command: keep to the style of the code around the change*) and
@@ -386,7 +391,9 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   included, which a ShiftLead release cures — makes the repo unserved by name, never skipped.
   **Which dev-cadence** (*Decision* 4, TD-1012): the build names the oldest dev-cadence commit it reads
   (`sessionorc.cadence.OLDEST`) and, under TD-129, the launcher interface it needs; a lock's
-  `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. Ancestry is read in
+  `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. A v2 ledger (§4.4 *Either layout*, TD-1143) asks
+  more: one that does not descend from `OLDEST_V2` (`b9236c8`, dev-cadence #405, where its `ledger_next_id.py` first reads a
+  directory and `ledger.py` gains `layout_at`; `ledger.py` has read one since `d92d663`, #403) is the lack *the ledger is a directory and dev-cadence at <commit> predates its v2 reader*. Ancestry is read in
   the roster's dev-cadence checkout after its fetch (`git merge-base --is-ancestor`), else through the
   forge's compare of the two commits; an age that cannot be read is a warning, *dev-cadence's age not
   read: <why>*, never a lack, so a missing clone unserves nothing. The newer side is
@@ -424,7 +431,7 @@ director: {profile: grind, brief: docs/briefs/director.md}   # TD-636, §4.9b *T
 A repo without the file gets defaults: `adapter: claude-code`, worktrees under
 `.claude/worktrees`, `ready_when: [tree_clean, branch_pushed, no_subagents]`, no commands, no
 unattended mode, the three built-in presets with the package's brief templates, and
-`docs/technical_debt.md` as the ledger. The `unattended:` block is where every time-shaped
+the ledger by the default rule (§4.4 *Either layout*). The `unattended:` block is where every time-shaped
 setting lives (window, stop times); the usage gate's reserves are the
 person's and live in `settings.yml`. A `roles:` preset never carries a schedule, and a
 grant never carries one either. A directory session (no repo) reduces to `ready_when:

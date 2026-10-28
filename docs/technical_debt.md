@@ -97,7 +97,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1131 | A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter | Medium | Open — build, blocked by TD-1130 |
 | TD-1132 | The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:` | Medium | Open — build, blocked by TD-1130 |
 | TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
-| TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Open |
+| TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Designed — builds TD-1144–TD-1146 |
+| TD-1144 | The ledger reading takes either layout: one `load()` road with `fs_io`/`git_io`, the default rule, the v2 history, and a faulted v2 ledger reported, not read | Medium | Open — build, blocked by TD-1130 |
+| TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
+| TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
 
 ---
 
@@ -2082,18 +2085,81 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Added:** 2026-10-27 (ao-dev-cadence-dc-grinder, through `ao td add --repo`, from dev-cadence#TD-160; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
-**Location:** `src/sessionorc/ledgerboard.py` (vendored v1.3; ledgerboard v2.0 is tagged, `bd47174`); `src/sessionorc/ledger.py` (`ledger_path`, `archive_path`, the `git show` of the ledger and its file read); the readers through them: `agent_ids.py`, `agent_rank.py` (the rank file, `ledgerboard.rank_path`), `agent_tick.py` (a ledger's mtime), `queue.py`, `seams.py`, `held.py`; `reports.py` (`LEDGER_DEFAULT`); `src/shiftlead/repoconfig.py` (`DEFAULT_LEDGER`; `.shiftlead.yml`'s `ledger:` may name a directory); `src/shiftlead/ui/app.py`, `ui/settings_page.py` (through `repoconfig.DEFAULT_LEDGER`); `scripts/look_home.py` (its fixture ledger); design §4.4 *Repo facts* and *A ledger entry's id is handed out by the home*, §5 `.shiftlead.yml` `ledger:`
+**Status:** Designed 2026-10-27 — design §4.4 *Repo facts* (*The ledger* and its history, **Either layout**, the resolver, the archive), *Completed cards*' cache, *The rank file*, *A ledger entry's id is handed out by the home*, §5 *the ledger*, the glossary's *ledger*. The builds wait on TD-1130's vendor bump (ledgerboard v2.1, carrying v2.0's loader).
+**Blocked by:** TD-1144, TD-1145, TD-1146
+**Location:** `src/sessionorc/ledgerboard.py` (vendored v1.3; ledgerboard v2.0 is tagged, `bd47174`); `src/sessionorc/ledger.py` (`ledger_path`, `archive_path`, the `git show` of the ledger and its file read); the readers through them: `agent_ids.py`, `agent_rank.py` (the rank file, `ledgerboard.rank_path`), `agent_tick.py` (a ledger's mtime), `queue.py`, `seams.py`; `reports.py` (`LEDGER_DEFAULT`); `src/shiftlead/repoconfig.py` (`DEFAULT_LEDGER`; `.shiftlead.yml`'s `ledger:` may name a directory); `src/shiftlead/ui/app.py`, `ui/settings_page.py` (through `repoconfig.DEFAULT_LEDGER`); `scripts/look_home.py` (its fixture ledger); design §4.4 *Repo facts* and *A ledger entry's id is handed out by the home*, §5 `.shiftlead.yml` `ledger:`
 
 **Why:** dev-cadence is splitting its ledger format so that each entry is one file. Under dev-cadence#TD-160 and its plan `docs/plans/2026-10-27-ledger-per-entry.md`, a v2 ledger is a directory `docs/ledger/`: one `TD-NNN.md` per entry, `archive/` for archived ones, and a `README.md` preamble carrying `Ledgerboard: 2`, with no stored Summary table. The reason is that concurrent filings conflict on the one file's Summary table and on bodies next to each other. Here that cost #2408 three rebases and #2480 two, and each rebase cost a precheck. Step 4 of the plan is that ShiftLead's readers take either layout, and nothing splits before that lands. Step 5, migrating a repo, is Paul's. Every reader here assumes one file and an `_archive` file beside it, so a split repo's ledger would read as missing.
 
 **Fix:** design first, then build. The round settles:
-- **The layout as §4.4 and §5 describe it.** A ledger is a file or, for v2, a directory. `ledger:` may name either. The archive and the rank file are found by `ledgerboard`'s own `entry_path()` and `rank_path()`, not by `archive_path`'s name rule.
+- **The layout as §4.4 and §5 describe it.** A ledger is a file or, for v2, a directory. `ledger:` may name either. The archive is found by `ledgerboard`'s `load()` and the rank file by its `rank_path()`, not by `archive_path`'s name rule.
 - **One way to read.** Every reader goes through ledgerboard v2's `load(path, ls, read) -> (ledger_text, archive_text)`, with I/O passed in: a file read for the checkout, and a git-backed pair (one `ls-tree`, one `cat-file --batch`) for a read of `origin/<default>`. dev-cadence's `files/scripts/ledger.py` `git_io()` is a worked example.
 - **What a fault does.** A v2 ledger that `v2_problems()` faults is reported on the Repo page and in `ao repo`, not read.
 - **What changes with no file.** A reader's change test (the tick's mtime: the newest file in the directory), and the id road (`ao td next`'s `--ledger`/`--archive` to the script).
 - **The vendor bump is TD-1130's, not this entry's.** TD-1130's first PR vendors ledgerboard v2.1, which brings v2.0's directory loader (`load`, `entry_path`, `v2_problems`) over the vendored v1.3. This entry's builds start once it lands, and keep v1 fixtures beside v2 ones.
 
-**Done when** the design says how each reader finds and reads either layout. Then the build entries are filed, holding: every reader above takes either layout through `load()` / `entry_path()`, tests run v1 and v2 fixtures side by side (`scripts/look_home.py` among them), and a faulted v2 ledger is reported, not read.
+**Done when** the design says how each reader finds and reads either layout. Then the build entries are filed, holding: every reader above takes either layout through `load()` / `rank_path()`, tests run v1 and v2 fixtures side by side (`scripts/look_home.py` among them), and a faulted v2 ledger is reported, not read.
 
 **Related:** dev-cadence#TD-160 (the split, its plan's step 4 this, step 5 Paul's); ShiftLead/ledgerboard#20, #21 (v2.0); TD-1130 (vendors ledgerboard v2.1, and reads `Part of:` in `ledger.py` and the Queue: the same files, so a build of this entry rebases on it); TD-585 (ledgerboard read in-process), TD-970 (`ao td next` over the id script); #2408, #2480 (the conflicts).
+
+---
+
+## TD-1144: The ledger reading takes either layout: one `load()` road with `fs_io`/`git_io`, the default rule, the v2 history, and a faulted v2 ledger reported, not read
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1143)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build. It waits on all of TD-1130, not only its vendor bump: both change `ledger.py` and `queue.py`, so this build starts on TD-1130's merged reading rather than rebasing across it.
+**Blocked by:** TD-1130
+**Location:** `src/sessionorc/ledger.py` (the module docstring 3 and `DEFAULT` 39, `ledger_path` 645, `archive_path` 549, the resolver's `LEDGER`/`ARCHIVE` 590 and its `read` ~615, `history` ~720, `entries_before` ~757–775, `reading` ~787–816); `src/sessionorc/seams.py` (71–83); `src/sessionorc/agent_tick.py` (the mtime, 3508); `src/sessionorc/queue.py` (the archive read and its cache, 281); `src/sessionorc/agent_rank.py` (151, `_rank_lined` 277–292); `src/sessionorc/reports.py` (`_ledger_rows_on_main` 1074); `src/sessionorc/agent_tick.py` (rules 6 and 8's `s.ledger or led.get("path")` into `entries_before`, 1751 and 2062; `derive`'s, 3949); tests beside each
+
+**Why:** TD-1143: every reader here assumes one ledger file with `_archive` beside it, so a repo that splits into dev-cadence#TD-160's `docs/ledger/` would read as having no ledger.
+
+**Fix:** design §4.4 *Repo facts* — *The ledger* (its history), **Either layout**, the cross-repo resolver, the archive sentence, *Completed cards*' cache, *The rank file* — and §5 *the ledger*.
+1. **One road**: `sessionorc.ledger` gains `fs_io(root)` and `git_io(root, ref, under)` — `under` the common parent of the ledger path and the v1 archive path, so both layouts are listed and `layout_at` finds the other (`under` empty: the top level and the ledger's directory, never the tree recursively); unlike dev-cadence's, its `read` batches only the paths asked for (the v1 pair, or `README.md`, entry files and `archive/`), never a directory's other files — (dev-cadence's `files/scripts/ledger.py` `fs_io`/`git_io` the worked example: one `ls-tree`, one `cat-file --batch` per directory) and every read of the ledger and its archive goes through `lb.load(path, ls, read)`: `reading`, `entries_before`, the resolver (which now reads that checkout's ledger by the default rule, not the fixed `DEFAULT`), the Queue's archive read, `_rank_lined`'s archive. Rank paths stay `lb.rank_path`.
+2. **The default rule**: `ledger_path` returns `ledger:` when set, else `docs/ledger` where that is a directory in the checkout, else `docs/technical_debt.md`. **A path read at a revision or carried** — `entries_before` (rules 6 and 8 pass a record's `ledger`), `_ledger_rows_on_main`, a record's `ledger` wherever it is read — goes through `layout_at(rel, archive, io)` — `sessionorc.ledger`'s own copy of dev-cadence's rule (`files/scripts/ledger.py` ~216–240), as `fs_io` and `git_io` are, with a test holding the rule and its constants equal to the pinned tree's (as `test_ledger_derived.py` holds `pickable`) — so a commit or a record from before a split still reads. The record's carried path is never trusted as is.
+3. **A faulted v2 ledger**: `lb.v2_problems()` beside every `load()` of a directory, and a README that does not declare `Ledgerboard: 2` (`format_major` reads none as 1); any problem makes the reading's ledger an error with its words, no entry read, and the seams' ledger row (`seams.py` 66–135) *unreadable* with them, and for a v2 ledger whose pinned dev-cadence is older than `OLDEST_V2` (`b9236c8`, dev-cadence #405, where `ledger_next_id.py` first reads a directory and `ledger.py` gains `layout_at`; `ledger.py` has read one since `d92d663`, #403) the seams' ledger state `predates`, §5's *unserved: the ledger is a directory and dev-cadence at <commit> predates its v2 reader (b9236c8) — sync it* (*— bump the pin* for a pinned repo); *absent* is a path that is neither a file nor a directory (`ls` and `read` both None — `load()` reads a missing path as empty, and `is_file()` is false for a directory). The seams read a v2 major from the README. The cross-repo resolver keeps the block on a faulted ledger. **A set `ledger:` read live** goes through `layout_at` too, with the seams' warning *`ledger:` names <path>, which is gone: reading <the other>*; a trailing `/` is dropped.
+4. **What changes with no file**: the tick's change test is the newest mtime among the directory, its `archive/` and the `TD-NNN.md` files of both and the `README.md` (its `Fields:` and major) — `rank.yml` alone left out, so a rank write re-reads nothing; the tick keeps `(resolved path, newest mtime)`, so a path that resolves anew re-reads (a `git mv` changes only the directories'); a faulted ledger at a past revision makes `entries_before` return none with the words, and the history is read whatever the fault; `history` reads a directory with `git log --first-parent --diff-merges=first-parent --no-renames --name-status -- <dir>`, merged with the v1 file's own log (never its archive's) through `layout_at` (*Across a split*: the commit adding the README opens and closes nothing, an entry keeps its v1 opening, one closed before the split stays closed) — a `TD-NNN.md` added directly under it opens, one removed from there closes, its PR and sha as today, titles from the loaded text; `_ledger_rows_on_main` takes the `TD-NNN.md` files the squash commit adds directly under the directory, none for the commit that adds the `README.md` (the split) (`--no-renames --name-status`, so a move into `archive/` adds nothing there, and a file added straight into `archive/` is not counted, as a v1 archive's heading is not today); the Queue's archive cache (`archive_entries`, `queue.py` 111–131) keys a v2 archive by its stat first (`archive/`'s mtime, file count and newest file mtime), then the sha of the text `load()` joins.
+5. Tests run v1 and v2 fixtures side by side for each reader (a v2 fixture made with `lb.split()` from the v1 one, so both read the same entries; an archive compared as a set by id, since `load()` orders it by id and a v1 archive by archiving).
+
+**Done when** each reader above reads a v2 fixture as it reads its v1 twin (the same entries, archive, history, rank file and seams), a faulted v2 fixture reads as an error naming `v2_problems()`'s words with no entries, and `pdm run test` passes.
+
+---
+
+## TD-1145: `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1143)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1144
+**Location:** `src/sessionorc/agent_ids.py` (the script road ~425–440, `_ids_give` ~480–500, `_ids_prs` 505 and `files_jq`); tests
+
+**Why:** TD-1143: the id road passes `--ledger <file> --archive <file>` to dev-cadence's `ledger_next_id.py` and, on the fallback road, reads main's two files and the open PRs' patches on those two paths. A v2 ledger has neither file.
+
+**Fix:** design §4.4 *A ledger entry's id is handed out by the home* (*The run*, *Free*, `taken_by_line`). For a v2 directory: a pinned dev-cadence older than `OLDEST_V2` (§4.4 *Either layout*) refuses the call in §5's *unserved* words, never handing the script a directory; the script gets `--ledger <dir>` and no `--archive` (the pinned script reads `archive/` through `load()`); the fallback road reads `origin/<default>` through `layout_at` against that tree (`git_io`), its ids the file names of one `git ls-tree` of the directory and its `archive/`; an open PR's ids are matched on **both** layouts' paths — the names of the `TD-NNN.md` files it adds under the directory or `archive/` (`status: added`, no patch read; a `renamed` file counts by its new name only when its previous path was not an entry file, since a move into `archive/` files nothing), and the `+## TD-NNN:` lines of the v1 file and archive patches, since a PR opened before a split still edits them — through the paginated listing, cut at `FILES_CAP` as now (a split PR reads as *its listing is cut*); `taken_by_line` reads the `Fields:` line from `load()`'s preamble over `fs_io` (`README.md`'s), and a faulted v2 ledger gives no line. A v1 file is read as today.
+
+**Done when** both roads give ids above a v2 fixture's highest, with an open PR adding a file and another adding one straight into `archive/`, a v1 fixture reads as today, and `pdm run test` passes.
+
+---
+
+## TD-1146: The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1143)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Blocked by:** TD-1144
+**Location:** `src/shiftlead/repoconfig.py` (`DEFAULT_LEDGER` 55, `ledger` 665, `load` where it resolves, the `{ledger}` slot 261 and 285, `HANDED_ENTRY["{ledger}"]` 165); `src/shiftlead/ui/settings_page.py` (495); `src/shiftlead/ui/app.py` (2730, 3092); `src/sessionorc/reports.py` (`LEDGER_DEFAULT` 33, the record's `ledger`); `src/sessionorc/agent_tick.py` (3949); `scripts/look_home.py` (its fixture ledger); design §5's example `ledger:` line and *unserved* words, already worded by the default rule here, checked against the build; the Repo page's **Open ledger** (`repo_part.html` 57, `ledger_editor`)
+
+**Why:** TD-1143: the configured default is one constant, `docs/technical_debt.md`, shown on the Settings page and carried on each session's record; with the default rule (§4.4 *Either layout*) the unset value is the one the checkout's tree decides, and `look_home.py` must be able to stand up a home over a v2 ledger.
+
+**Fix:** design §4.4 *Either layout*, §5 *the ledger*. The unset `ledger:` resolves **once, in `repoconfig.load`**, through `ledger.ledger_path`'s rule (which keeps whether the value was set, so the seams' *`ledger:` names <path>, which is gone* warning fires only on a set one), so `cfg.ledger` is the resolved path everywhere it is carried (checked, not edited: `ui/app.py` 646, 2465, 2707, 2944, 3148, `teams.py` 156 and 925, `cli.py` 601, `agent.py` 1564) and wherever it is shown (the Settings page's row says *docs/ledger (directory)* or the file, as found; a session's record carries the resolved path, which TD-1144's readers still put through `layout_at`); a brief's `{ledger}` slot carries the resolved path; **Open ledger** on a v2 directory is the folder form with no line, titled *Open ledger folder* (§4.5a), `ledger_editor` given the resolved path; and `HANDED_ENTRY["{ledger}"]` says *that repo's ledger, a file or a directory of one file per entry*; `look_home.py` takes a `--v2` that writes its fixture as a directory through `lb.split()`.
+
+**Done when** the Settings page and a session's record show the resolved ledger for a v1 and a v2 checkout, `look_home.py --v2` stands up a home whose Queue and Repo page read the directory, and `pdm run test` passes.
