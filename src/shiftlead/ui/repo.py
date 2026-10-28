@@ -804,6 +804,9 @@ def team_groups(
                 "def_manager": row.get("manager"),  # the definition's word, for a card with no sessions yet
                 "def_members": row.get("members"),
                 "def_techlead": row.get("techlead"),  # the seat's name (§4.9b), when the definition has one
+                # every seat the definition names, once each: a stopped team's rollup row stubs those with no
+                # counted card (§4.5a *Sessions: rollup*, TD-1204), never a person-held manager
+                "seat_names": seat_names(row),
                 # *nothing running* and *nothing left to run* are different facts (§4.9a)
                 "wound_down": row.get("wound_down"),
                 "wound_down_age": row.get("wound_down_age"),
@@ -860,6 +863,15 @@ def team_groups(
         key=lambda g: (2 if g["team"] and g["stopped"] else 1 if not g["team"] else 0, not g["needs"], g["team"])
     )
     return groups
+
+
+def seat_names(row: Mapping[str, Any]) -> list[str]:
+    """The session names a team's definition (`teamrun.rows`' row) names, in its order, once each: its
+    roles' holders, its manager, its techlead seat and its seats — never `person`, a person-held manager."""
+    names = [str(n) for r in row.get("roles") or () for n in r.get("names") or ()]
+    names += [str(x) for x in (row.get("manager"), row.get("techlead")) if x]
+    names += [str(x.get("name")) for x in row.get("seats") or () if isinstance(x, dict) and x.get("name")]
+    return [n for i, n in enumerate(names) if n != "person" and n not in names[:i]]
 
 
 # the keys the client keys the page's elements on, each kind its own prefix, so no name meets another's
@@ -936,6 +948,7 @@ def org_layout(
         for root, r in (repos or {}).items()
         if isinstance(r, dict) and r.get("name")
     }
+    roots = {name: root for root, name in by_root.items()}  # *New session here*'s directory (TD-1204)
     teams = [g for g in groups if g["team"] != NO_TEAM]
     loose = next((g["members"] for g in groups if g["team"] == NO_TEAM), [])
     by_repo: dict[str, list[dict[str, Any]]] = {}
@@ -971,13 +984,14 @@ def org_layout(
                     "project": key,
                     "heading": len(names) == 1,  # the repo's line is the heading (§4.9)
                     "url": f"/repo/{n}",
+                    "root": roots.get(n, ""),
                     "facet": repo_line(n, readings.get(n), here, fleet, now),
                 }
             )
             out += [{**g, "kind": "team", "key": TEAM_KEY + g["team"], "project": key} for g in here]
             if mine := strays.pop(n, []):
                 said = f"{len(mine)} session{'' if len(mine) == 1 else 's'}, no team"
-                out.append(strip_group(STRIP + n, said, mine, n, key))
+                out.append({**strip_group(STRIP + n, said, mine, n, key), "root": roots.get(n, "")})
     # a team whose repo is told nowhere (a badge whose records sit in no registered repo), then *No repo*
     left = sorted((g for gs in by_repo.values() for g in gs), key=lambda g: (not g["live"], g["order"]))
     out += [{**g, "kind": "team", "key": TEAM_KEY + g["team"], "project": ""} for g in left]

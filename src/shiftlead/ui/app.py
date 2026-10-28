@@ -346,6 +346,8 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     PHASES,  # noqa: F401
     PRIORITY_BARS,  # noqa: F401
     REF_WIDTH,  # noqa: F401
+    ROLLUP_CLS,  # noqa: F401
+    ROLLUP_ROWS,  # noqa: F401
     ROLLUP_STATES,  # noqa: F401
     SHAPE_KEYS,
     WINDOWS,  # noqa: F401
@@ -355,6 +357,8 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     _https,  # noqa: F401
     _own_stop,  # noqa: F401
     _pr_states,  # noqa: F401
+    _rollup_block,  # noqa: F401
+    _rollup_debt,  # noqa: F401
     answer_blocks,  # noqa: F401
     answer_members,  # noqa: F401
     ask_blocks,  # noqa: F401
@@ -374,6 +378,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     repo_named,  # noqa: F401
     rollup,  # noqa: F401
     rollup_counted,  # noqa: F401
+    rollup_rows,  # noqa: F401
     team_lanes,  # noqa: F401
     team_named,  # noqa: F401
     team_repo,  # noqa: F401
@@ -441,6 +446,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     repo_items,
     repo_line,  # noqa: F401
     repo_window,
+    seat_names,  # noqa: F401
     send_folds,
     settle_mark,  # noqa: F401
     strip_group,  # noqa: F401
@@ -1523,8 +1529,10 @@ def create_app() -> FastAPI:
                 needs,  # a member's open ask to the person: its team's *asked you* line (TD-354)
                 spend,
             )
-            ro = templates.get_template("rollup.html").render(ro=rollup(groups, vs))
-            return {"groups": render_heads(org_layout(groups, repos, projects, vs)), "rollup": ro}
+            # the layout made once, for the groups and the rollup's rows (TD-1204)
+            layout = org_layout(groups, repos, projects, vs)
+            ro = templates.get_template("rollup.html").render(ro=rollup(layout, vs))
+            return {"groups": render_heads(layout), "rollup": ro}
 
         # off the loop (TD-670): a view of every record and every header rendered held the loop up to
         # ~300 ms a regroup on the live home with a Sessions page open; the events run calls this under
@@ -1718,23 +1726,26 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             {
                 "sessions": vs,
                 # project → repo → team (§4.9 *The Sessions page*, TD-725), from the team groups
-                "groups": org_layout(
-                    groups := team_groups(
-                        vs,
-                        strip["teams"],
+                "groups": (
+                    layout := org_layout(
+                        team_groups(
+                            vs,
+                            strip["teams"],
+                            repos,
+                            doing,
+                            work,
+                            flows,
+                            {} if agent_down else (info or {}).get("balance"),
+                            h.needs_cache["rows"],
+                            {} if agent_down else await h.team_spend(),
+                        ),
                         repos,
-                        doing,
-                        work,
-                        flows,
-                        {} if agent_down else (info or {}).get("balance"),
-                        h.needs_cache["rows"],
-                        {} if agent_down else await h.team_spend(),
-                    ),
-                    repos,
-                    (await h.defs()).projects.values(),
-                    vs,
+                        (await h.defs()).projects.values(),
+                        vs,
+                    )
                 ),
-                "rollup": rollup(groups, vs),  # the flat page's sessions are `vs` (TD-924)
+                # the layout's items, the rows in the page's order (TD-1204); the flat page's sessions are `vs`
+                "rollup": rollup(layout, vs),
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),

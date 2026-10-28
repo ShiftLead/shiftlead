@@ -460,19 +460,24 @@ def asked_line(
 ) -> dict[str, Any] | None:
     """**The *asked you* line** (§4.5a *team card: Answer needed / Doing*, TD-353, built by TD-354):
     the team's open asks to the person summed into one line — how many, the oldest's id (the line
-    links its Inbox row) and age, and each ask's member and first line for the tooltip. None while
-    no ask is open. Never a block and never counted in Answer needed: a prompt stops a session now,
-    and a question in the mail waits."""
+    links its Inbox row) and age, and each ask's member and first line for the tooltip; `by`, one item per
+    member with an open ask, in the order of its oldest — its count and that oldest's Inbox row, the rollup's
+    needs-you menu's member lines (TD-1204). None while no ask is open. Never a block and never counted in
+    Answer needed: a prompt stops a session now, and a question in the mail waits."""
     asks = ask_blocks(members, needs, now)
     if not asks:
         return None
     first = asks[0]
+    by: dict[str, dict[str, Any]] = {}
+    for a in asks:
+        by.setdefault(a["member"], {"member": a["member"], "name": a["name"], "n": 0, "id": a["id"]})["n"] += 1
     return {
         "n": len(asks),
         "id": first["id"],
         "at": first["at"],
         "age": first["age"],
         "who": [{"name": a["name"], "text": a["text"]} for a in asks],
+        "by": list(by.values()),
     }
 
 
@@ -664,8 +669,14 @@ def rollup_counted(
     whatever its team's state, an `exited` member of a live team (a person's own in it too), and a seat on
     call, whose record stays exited or closed — never a stopped team's or a no-team session's exited
     record, never a `closed` one that is no seat, never a command run (`kind: command`). `groups` is
-    `team_groups`' list; on the flat page (`None`) the sessions are `views`, none of them in a team."""
-    pairs = [(str(g.get("team") or NO_TEAM), g, m) for g in groups for m in g["members"]] if groups else []
+    `team_groups`' list or `org_layout`'s items, whose headings and repo lines hold no session (TD-1204);
+    on the flat page (`None`) the sessions are `views`, none of them in a team."""
+    pairs = [
+        (str(g.get("team") or NO_TEAM), g, m)
+        for g in groups or ()
+        if g.get("kind") not in ("heading", "repo")
+        for m in g["members"]
+    ]
     if groups is None:
         pairs = [(NO_TEAM, {}, v) for v in views]
     out = []
@@ -676,6 +687,114 @@ def rollup_counted(
         if m.get("seat") or state not in DEAD or (state == "exited" and team != NO_TEAM and g.get("live")):
             out.append((team, m))
     return out
+
+
+ROLLUP_CLS = {w: (c, label) for w, c, label in ROLLUP_STATES}
+ROLLUP_ROWS = ("team", "repo", "strip", "norepo")  # the layout's items a rollup row is made from (TD-1204)
+
+
+def _rollup_block(m: Mapping[str, Any]) -> dict[str, Any]:
+    """A member's block in a rollup row's Members cell: its state's word and class, its name for the hover."""
+    word = str(m.get("pill_word") or m.get("state") or "")
+    cls, label = ROLLUP_CLS.get(word, (str(m.get("state_class") or word), str(m.get("state_label") or word)))
+    return {"id": m["id"], "name": str(m.get("name") or m["id"]), "word": word, "cls": cls, "label": label}
+
+
+def _rollup_debt(facet: Mapping[str, Any] | None) -> dict[str, Any]:
+    """A row's Technical debt and open cells from the Repo facet's own reading: its kind segments and open
+    count, or *could not look* with the reading's error; all blank where the row's repo has no reading."""
+    if not facet:
+        return {"segs": [], "open": None, "error": "", "ledger": False}
+    led = facet.get("ledger") or {}
+    if led.get("error"):
+        return {"segs": [], "open": None, "error": str(led["error"]), "ledger": False}
+    return {"segs": led.get("kind") or [], "open": led.get("n"), "error": "", "ledger": led.get("n") is not None}
+
+
+def rollup_rows(items: list[dict[str, Any]], counted: Collection[str]) -> list[dict[str, Any]]:
+    """The rollup's **rows** (§4.5a *Sessions: rollup*, *rollup: press and menus*, TD-1203, built by TD-1204),
+    from `org_layout`'s items in the page's order: each team a row; a registered repo with no team a row
+    reading *no team*; a repo's no-team strip a sub-row, drawn only with a counted card; *No repo* the same.
+    `counted` is the ids `rollup_counted` counts, the one set every number is over. A second team on one repo
+    leaves the repo, debt and open cells blank (`first` false). Each row carries its `key` (the client's, the
+    layout's own), its link's name and `hash`, its cells, its needs-you split and menu lines, and its ⋯ acts."""
+    teamed = {str(i.get("repo") or "") for i in items if i.get("kind") == "team"}
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for it in items:
+        kind = it.get("kind")
+        if kind not in ROLLUP_ROWS or (kind == "repo" and it["repo"] in teamed):
+            continue
+        cards = sorted((m for m in it.get("members") or () if m["id"] in counted), key=card_order)
+        if kind in ("strip", "norepo") and not cards:
+            continue
+        answers = answer_blocks(cards)
+        row: dict[str, Any] = {
+            "kind": kind,
+            "key": it["key"],
+            "repo": str(it.get("repo") or ""),
+            "repo_url": "",
+            "team": "",
+            "first": True,
+            **_rollup_debt(None),
+            "blocks": [_rollup_block(m) for m in cards],
+            "working": sum(1 for m in cards if (m.get("pill_word") or m.get("state")) == "working"),
+            "stubs": [],
+            "word": "",
+            "last": None,
+            "answer": answer_members(answers),
+            # where *answer needed* goes: the team's facet, or the strip's first waiting card (TD-1204)
+            "answer_card": answers[0]["id"] if answers and kind != "team" else "",
+            "asked": None,
+            "acts": [],
+            "root": str(it.get("root") or ""),
+        }
+        if kind == "team":
+            team, summary = str(it["team"]), it.get("summary") or {}
+            facet = summary.get("repo")
+            row.update(team=team, name=" · ".join(x for x in (row["repo"], team) if x), hash=f"team={team}")
+            row["first"] = not row["repo"] or row["repo"] not in seen
+            seen.add(row["repo"])
+            if facet:
+                row["repo_url"] = str(facet.get("url") or "")
+            if row["first"]:
+                row.update(_rollup_debt(facet))
+            if it.get("stopped"):
+                names = {str(m.get("name") or "") for m in cards}
+                row["stubs"] = [n for n in it.get("seat_names") or () if n not in names]
+                if it.get("concluded_age"):
+                    row["word"] = f"concluded {it['concluded_age']} ago"
+                elif it.get("wound_down_age"):
+                    row["word"] = f"wound down {it['wound_down_age']} ago"
+                else:
+                    row["word"] = "stopped"
+            if summary.get("doing"):
+                d = summary["doing"][0]
+                row["last"] = {k: d.get(k) for k in ("at", "age", "name", "text")}
+            row["asked"] = summary.get("asked")
+            has_ledger = bool(facet) and _rollup_debt(facet)["ledger"]
+            row["acts"] = (
+                [*(["add-entry"] if has_ledger else []), "new-team", "start"]
+                if it.get("stopped")
+                else [*(["add-entry"] if has_ledger else []), "new-team", "wind-down", "stop-now"]
+            )
+            if it.get("stopped"):  # a stopped team's ⋯: Start first (§4.5a *rollup: press and menus*)
+                row["acts"] = ["start", *row["acts"][:-1]]
+        elif kind == "repo":
+            facet = it.get("facet")
+            row.update(name=f"{row['repo']} · no team", hash=f"repo={row['repo']}", repo_url=str(it.get("url") or ""))
+            row.update(_rollup_debt(facet))
+            row["acts"] = [*(["add-entry"] if row["ledger"] else []), *(["new-here"] if row["root"] else [])]
+            row["blocks"], row["working"] = [], 0
+        elif kind == "strip":
+            n = len(cards)
+            row.update(name=f"no team · {n} session{'' if n == 1 else 's'}", hash=f"strip={row['repo']}")
+            row["acts"] = ["new-here"] if row["root"] else []
+        else:
+            row.update(name="No repo", hash="norepo", repo="")
+        row["needs"] = row["answer"] + int((row["asked"] or {}).get("n") or 0)
+        rows.append(row)
+    return rows
 
 
 def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]] = ()) -> dict[str, Any]:
@@ -689,8 +808,16 @@ def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]
     holding the oldest ask (`asked_team`). The layout: no team live and no session counted — the Needs you
     facet alone (`quiet`, TD-406); one team live, or none and a session counted — Agents and Needs you
     (`lone`, TD-418); two or more live — all four. The Inbox's count is the top bar's, filled in by the
-    client."""
-    live = [g for g in groups or [] if g.get("team") and g.get("summary") and g.get("live")]
+    client.
+
+    `groups` is `org_layout`'s items (TD-1204), the page's order, from which `rows` are made
+    (`rollup_rows`), and `n_from_teams` is their needs-you numbers added up; on the flat page (`None`) there
+    are no rows and `n_from_teams` is *answer needed* over `views`."""
+    live = [
+        g
+        for g in groups or []
+        if g.get("kind", "team") == "team" and g.get("team") and g.get("summary") and g.get("live")
+    ]
     counted = rollup_counted(groups, views)
     tally: dict[str, int] = {}
     for _, m in counted:
@@ -727,7 +854,10 @@ def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]
     # *asked you* (TD-354): every team's line summed, live or not, the oldest's age and its team (TD-924)
     asked = [(g["team"], g["summary"]["asked"]) for g in groups or [] if (g.get("summary") or {}).get("asked")]
     oldest = min(asked, key=lambda ta: ta[1]["at"], default=None)
+    rows = rollup_rows(groups, {m["id"] for _, m in counted}) if groups is not None else []
     return {
+        "rows": rows,
+        "n_from_teams": sum(r["needs"] for r in rows) if groups is not None else answer_members(answers),
         "quiet": not live and not counted,
         "lone": len(live) == 1 or (not live and bool(counted)),
         "agents": agents,
