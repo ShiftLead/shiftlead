@@ -933,6 +933,8 @@ async def test_a_v2_ledgers_ids_are_its_file_names_and_an_open_prs_added_files_o
     gh["prs"][11] = [(LEDGER, "+## TD-050: opened before the split\n")]
     gh["prs"][12] = [("docs/ledger/archive/TD-060.md", "renamed", "notes/TD-060.md")]  # moved in from no entry
     assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-061"]
+    gh["prs"][13] = [("docs/ledger/TD-070.md", "renamed", "docs/ledger/TD-001.md")]  # renamed to a new id
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-071"]
 
 
 @pytest.mark.integration
@@ -953,6 +955,15 @@ async def test_the_script_gets_the_directory_and_no_archive(home, gh, tmp_path):
     assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-050"]
     argv = json.loads(log.read_text())["argv"]
     assert argv[argv.index("--ledger") + 1] == "docs/ledger" and "--archive" not in argv
+
+
+@pytest.mark.integration
+async def test_a_checkout_with_no_ledger_passes_its_own_path_as_before(home, gh, tmp_path):
+    root = _one(tmp_path, gh, files={"README.md": "x\n"})
+    log = _stub(root)
+    await home.rpc_td_next(repo="shiftlead")
+    argv = json.loads(log.read_text())["argv"]
+    assert argv[argv.index("--ledger") :][:4] == ["--ledger", LEDGER, "--archive", ARCHIVE]
 
 
 @pytest.mark.integration

@@ -100,22 +100,26 @@ def entry_id(path: str, directory: str) -> int | None:
 
 def dir_added(f: dict[str, Any], directory: str) -> int | None:
     """The id a PR's listed file under the v2 `directory` files (§4.4 *Free*, TD-1145): an entry file it adds,
-    or one renamed in from a path that was no entry file — a move into `archive/` files nothing."""
+    or one renamed to an id its previous path did not carry — a move into `archive/` files nothing."""
     tid = entry_id(str(f.get("f") or ""), directory)
     if tid is None:
         return None
     if f.get("s") == "added":
         return tid
-    if f.get("s") == "renamed" and entry_id(str(f.get("o") or ""), directory) is None:
+    if f.get("s") == "renamed" and entry_id(str(f.get("o") or ""), directory) != tid:
         return tid
     return None
 
 
 def layout(root: str, rel: str) -> tuple[str, str | None, bool]:
     """`(ledger, archive, directory?)` of the checkout's working tree, through `ledger.layout_at`, so a set
-    `ledger:` gone from the tree reads the other layout beside it (§4.4 *Either layout*)."""
+    `ledger:` gone from the tree reads the other layout beside it (§4.4 *Either layout*); where neither is
+    there, the path as given, as before the split."""
     io = ledger_mod.fs_io(root)
-    led, arel = ledger_mod.layout_at(rel, ledger_mod.archive_path(rel) if rel.endswith(".md") else None, io)
+    arch = ledger_mod.archive_path(rel) if rel.endswith(".md") else None
+    led, arel = ledger_mod.layout_at(rel, arch, io)
+    if io[0](led) is None and io[1](led) is None:
+        led, arel = rel, arch
     return led, arel, io[0](led) is not None
 
 

@@ -21446,7 +21446,7 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Owner:** grinder
 **Kind:** build
 **Status:** Resolved
-**Resolved:** 2026-10-27 (grinder-ao-1, #2530) — the script road passes a v2 directory as `--ledger <dir>` with no `--archive`, refused in the seams' *predates its v2 reader* words (`seams.predates_v2`) where dev-cadence's tree is older than `OLDEST_V2`; the fallback road reads main through `layout_at` over `git_io` (a directory's and `archive/`'s file names), and an open PR's ids on both layouts' paths (entry files added, or renamed in from no entry file; the v1 pair's `+## TD-NNN:` lines); `taken_by_line` reads the preamble through `read_pair`.
+**Resolved:** 2026-10-27 (grinder-ao-1, #2530) — the script road passes a v2 directory as `--ledger <dir>` with no `--archive`, refused in the seams' *predates its v2 reader* words (`seams.predates_v2`) where dev-cadence's tree is older than `OLDEST_V2`; the fallback road reads main through `layout_at` over `git_io` (a directory's and `archive/`'s file names), and an open PR's ids on both layouts' paths (entry files added, or renamed to an id the old path did not carry; the v1 pair's `+## TD-NNN:` lines); `taken_by_line` reads the preamble through `read_pair`.
 **Blocked by:** TD-1144
 **Location:** `src/sessionorc/agent_ids.py` (the script road ~425–440, `_ids_give` ~480–500, `_ids_prs` 505 and `files_jq`); tests
 
