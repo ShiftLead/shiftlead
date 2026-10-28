@@ -95,6 +95,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
 | TD-1182 | `teamrun.start_member`'s two refusals (a line the flow sits out, a name a live session holds) and `resize`'s stop on a failed `keep` are set in no test: each can be deleted with the suite green | Low | Open — build |
 | TD-1183 | `ao repo add`'s adopt runs `sync.sh`, which dev-cadence #429 made a refusal: the offer and `--adopt` fail with sync.sh's own error | Medium | Open — build |
+| TD-1185 | `member_submit`'s profile override (a Profile picked over the line's) is set in no test: delete it and the suite stays green | Low | Open — build |
+| TD-1186 | `next_members`' *sits out under <flow>* answer (`/api/team_line`'s `why`, the form's blocked Start) is set in no test: delete it and the suite stays green | Low | Open — build |
 
 ---
 
@@ -2014,5 +2016,41 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** run the launcher's `adopt` (`dev-cadence -C <dc> adopt <scratch clone>`, dev-cadence's `launcher/words.py`) in the scratch clone in place of `sync.sh`, after confirming it writes nothing outside the clone (a roster line, per-clone settings in the common directory) and accepts one: `words.py`'s adopt refuses a target that is not a main checkout (~800) and a dev-cadence clone that is dirty or off origin's default branch, which a `git clone --shared` scratch clone may meet. Make the PR body's after-merge line what dev-cadence now says to run, then re-point the real-checkout test at the launcher and drop its TD-1183 skip. Design §4.7 and §5's `sync.sh` lines (§5 353–362, the per-clone setup cure) change to the present tense in the same PR. If the launcher's `adopt` cannot run in a scratch clone, refuse in `_syncs` before any clone, as TD-1024's words do, and say so in §4.7.
 
 **Done when** `ao repo add` on a checkout without dev-cadence offers the files the launcher's `adopt` writes, `--adopt` opens them as a PR, the real-checkout test runs against `~/dev-cadence` without a skip, and `pdm run test` passes.
+
+---
+
+## TD-1185: `member_submit`'s profile override (a Profile picked over the line's) is set in no test: delete it and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1, auditing #2583)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/ui/app.py` (`member_submit`, the `fields.update(profile=profile, adapter=profile_adapter(profile))` line); `tests/test_ui_member_line.py`
+
+**Why:** #2583's `member_submit` carries what the person typed over the line's into the record: `name`, `prompt`, `lane` and `profile`. `tests/test_ui_member_line.py::test_what_the_person_typed_over_the_line_is_the_records_for_its_run` types the first three and never a Profile (`_post` posts none but the fill's own `paul` in the unedited test). Probe, 2026-10-28: replace that line with `pass` and run `tests/test_ui_member_line.py test_team_size.py test_ui_members_size.py test_cli_teams.py test_ui_teams.py test_flows.py` — 279 passed; replacing the `refs != list(x.lane)` clause instead fails the `lane` test, so the other three are pinned.
+
+**Fix:** extend that test (or add one) to post a `profile` unlike the line's and assert the created record carries it and its adapter.
+
+**Done when** deleting the `profile` line fails `tests/test_ui_member_line.py`.
+
+---
+
+## TD-1186: `next_members`' *sits out under <flow>* answer (`/api/team_line`'s `why`, the form's blocked Start) is set in no test: delete it and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1, auditing #2583)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/teamrun.py` (`next_members`, the `want in plan.sit_out or want not in by_name` arm); `src/shiftlead/ui/app.py` (`api_team_line`'s `isinstance(x, str)` and `x is None` arms); `tests/test_ui_member_line.py`
+
+**Why:** #2583's docstring says `next_members` returns *why the form cannot start one (the line sits out under the current flow)*, and `/api/team_line` hands that string back as `why`, which blocks Start in `app.js`. No test builds a team whose current flow sits a line out: `test_next_members_reads_every_line_in_one_plan` and the fill tests only reach the `Launch` arm. Probe, 2026-10-28: change the arm to `if False else by_name.get(want, "x")` and run `tests/test_ui_member_line.py test_team_size.py test_ui_members_size.py test_cli_teams.py test_ui_teams.py test_flows.py` — 279 passed. (`start_member`'s own sit-out refusal is TD-1182's.)
+
+**Fix:** a test with a flow that omits a line: `next_members` returns the string for it and a `Launch` for the others, `/api/team_line` answers its `why`, and a `/new` post for that line is refused.
+
+**Done when** the mutation above fails `tests/test_ui_member_line.py`.
 
 ---
