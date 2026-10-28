@@ -217,6 +217,17 @@ def swept_words(s: Mapping[str, Any], repos: Mapping[str, Any] | None) -> str:
     return " · swept today" if days <= 0 else f" · swept {days} d ago"
 
 
+def record_editor(s: dict[str, Any]) -> tuple[dict[str, str] | None, str]:
+    """A record's editor button and the reach it was drawn from (§4.5a, §4.4a "Reach"): `editor_link`
+    for its `dir` when it is on this host, or a container node's by the reach link the home derived;
+    any other host's record has none. The Session card's gate, and `POST /api/paths`' (§4.6 *A path
+    in the Inbox and the Queue is a link too*, TD-1108)."""
+    here = (s.get("host") or host_name()) == host_name()
+    hl = s.get("host_link") or {}
+    reach = "" if here else str((hl.get("reach") or {}).get("vscode") or "")
+    return (editor_link(str(s.get("dir") or ""), reach) if here or reach else None), reach
+
+
 def view(
     s: dict[str, Any],
     fleet: list[dict[str, Any]] | None = None,
@@ -316,8 +327,7 @@ def view(
     # The editor button (§4.5a, §5 *The person's own*, TD-095): the person's `open_in:`. A container
     # node's record reaches VS Code by attaching to that container (§4.4a "Reach"), from what the
     # home derived when the node dialed in; any other host's record has no link.
-    reach = "" if here else str((hl.get("reach") or {}).get("vscode") or "")
-    d["editor"] = editor_link(str(s.get("dir") or ""), reach) if here or reach else None
+    d["editor"], reach = record_editor(s)
     # …and its file form beside it, which Focus fills with a path the host resolved (§4.6 *A path in
     # the pane is a link*, TD-501): no button, no file links — and what a press sends, the person's
     # `file_link` (§5; TD-536): `first`, the folder launch before the file, and `wait`, the seconds between

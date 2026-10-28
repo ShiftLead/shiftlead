@@ -72,5 +72,6 @@ def test_a_clipped_line_gets_its_whole_text_and_no_other_line_a_title():
 @pytest.mark.unit
 def test_a_hover_reaches_the_rule_for_the_subject_and_answer_lines():
     got = _probe()
-    assert got["selector"] == [".mailrow .subj, .msgsubj, .btn.answer .alabel"]
+    # the rule's selector among the document's hovers (an Inbox row's paths have one of their own, TD-1115)
+    assert ".mailrow .subj, .msgsubj, .btn.answer .alabel" in got["selector"]
     assert got["hovered"] == "a subject" and got["no_closest"] == "nothing"

@@ -1162,17 +1162,23 @@
 </div>
 {%- endmacro %}
 
+{#- §4.6 *A path in the Inbox and the Queue is a link too* (TD-1108): the context a row's paths resolve
+    by, written on the mail, board and ledger roots and a thread row, never on a trail or state row -#}
+{% macro paths_attr(e) -%}
+{%- set pc = paths_ctx(e) %}{% if pc %} data-paths-ctx="{{ pc }}"{% endif %}
+{%- endmacro %}
+
 {#- every row carries an error line (§4.5a *Inbox row: pending*, TD-340): a refused write, or a press
     that took its row away and was refused, drawn there once the refresh brings the row back. A board row
     carries its line's text once, as `data-text`, and its buttons read it from the row (TD-738) -#}
 {% macro row(e, section, origin_first=False) -%}
 {%- if e.row == 'board' %}
-<div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-teams="{{ (e.teams or []) | join(' ') }}" data-repo="{{ e.repo_name or '' }}" data-repo-label="{{ e.repo }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %} data-text="{{ e.text }}">
+<div class="mailrow boardrow" tabindex="0"{{ paths_attr(e) }} data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-teams="{{ (e.teams or []) | join(' ') }}" data-repo="{{ e.repo_name or '' }}" data-repo-label="{{ e.repo }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %} data-text="{{ e.text }}">
 {% call read_line(e, section) %}{{ board(e, section, origin_first) }}{% endcall %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row == 'ledger' %}
-<div class="mailrow ledgerrow" tabindex="0" data-msg="{{ e.row_id }}" data-at="{{ e.at or '' }}" data-kind="ledger" data-rkind="ledger" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
+<div class="mailrow ledgerrow" tabindex="0"{{ paths_attr(e) }} data-msg="{{ e.row_id }}" data-at="{{ e.at or '' }}" data-kind="ledger" data-rkind="ledger" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
 {% call read_line(e, section) %}{{ ledger(e, section) }}{% endcall %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
@@ -1191,7 +1197,7 @@
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- else %}
-<div class="mailrow" tabindex="0" data-page="/inbox/{{ e.id }}" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
+<div class="mailrow" tabindex="0" data-page="/inbox/{{ e.id }}"{{ paths_attr(e) }} data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not drawn_on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
 {%- call read_line(e, section) %}

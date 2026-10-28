@@ -32,6 +32,7 @@ from markupsafe import Markup
 from sessionorc import gitinfo, hosts, mail, naming, paths
 from sessionorc import ledger as ledger_mod
 from sessionorc import settle as settle_mod
+from sessionorc.agent_common import PATHS_RUN_CHARS, PATHS_RUNS_MAX
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.containers import attach_argv_in, container_nodes
 from sessionorc.models import (
@@ -94,6 +95,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     prompt_line,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401
+    record_editor,
     repo_pr_marks,
     restarted_view,  # noqa: F401
     review_wait,  # noqa: F401
@@ -173,6 +175,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     node_org_note,  # noqa: F401
     org_here,  # noqa: F401
     page_origin,  # noqa: F401
+    paths_ctx,  # noqa: F401
     promote_reading,  # noqa: F401
     repos_of,  # noqa: F401
     restart_note,  # noqa: F401
@@ -887,6 +890,59 @@ async def agent_call(method: str, **params: Any) -> Any:
         raise HTTPException(503, f"host agent unreachable: {e}") from e
     except AgentError as e:
         raise HTTPException(400, str(e)) from e
+
+
+async def paths_for(call: Any, body: dict[str, Any]) -> dict[str, Any]:
+    """`POST /api/paths` (§4.6 *A path in the Inbox and the Queue is a link too*, TD-1108): the runs one
+    item names, resolved by its context — `id:<record id>` on that record's host by `dir`, `repo:<root>`
+    against that checkout at the home, `home` for absolute and `~/` runs alone — with the context's
+    editor file form. The grammar and the bounds are a 400 before anything is read; a forgotten record
+    or an unregistered repo is a 200 that says `refused`, every run `null`; anything else that fails
+    is the RPC's own non-200, so the page caches nothing."""
+    runs, ctx = body.get("runs"), body.get("ctx")
+    if not isinstance(runs, list) or not all(isinstance(r, str) for r in runs):
+        raise HTTPException(400, "paths takes runs, a list of strings (design §4.6)")
+    if len(runs) > PATHS_RUNS_MAX or any(len(r) > PATHS_RUN_CHARS for r in runs):
+        raise HTTPException(400, f"paths: at most {PATHS_RUNS_MAX} runs of {PATHS_RUN_CHARS} characters (design §4.6)")
+    kind, colon, rest = ctx.partition(":") if isinstance(ctx, str) else ("", "", "")
+    if not ((kind == "home" and not colon) or (kind in ("id", "repo") and rest)):
+        raise HTTPException(400, f"paths: ctx is id:<record>, repo:<root> or home, not {ctx!r} (design §4.6)")
+    fl = uiconf.file_link()
+    out: dict[str, Any] = {"label": uiconf.open_in().label, "file": None, "wait": fl["wait"]}
+    none = dict.fromkeys(runs)
+    if kind == "id":
+        try:
+            s = await call("get", id=rest)
+        except HTTPException as e:
+            if e.status_code != 400:
+                raise
+            return {**out, "paths": none, "refused": str(e.detail)}
+        ed, reach = record_editor(s)
+        if not ed or not (form := editor_file(reach)):
+            return {**out, "paths": none}  # no file form: its host is never asked
+        got = (await call("paths", id=rest, runs=runs))["paths"]
+        folder = ed["url"] if fl["folder_first"] else None
+        return {**out, "file": form, "paths": {r: {"path": p, "folder": folder} if p else None for r, p in got.items()}}
+    if not (form := editor_file()):
+        return {**out, "paths": none}
+    if kind == "repo":
+        try:
+            real = os.path.realpath(os.path.expanduser(rest))
+            known = real in {os.path.realpath(os.path.expanduser(r)) for r in hosts.local_host().repos()}
+        except (OSError, ValueError, RuntimeError):
+            known = False
+        if not known:
+            return {**out, "paths": none, "refused": f"{rest} is no checkout in the repos registry"}
+        got = (await call("paths", repo=rest, runs=runs))["paths"]
+    else:
+        got = (await call("paths", runs=runs))["paths"]
+
+    def folder(path: str) -> str | None:
+        root = checkout_of(path) if fl["folder_first"] else ""
+        ed = editor_link(root) if root else None
+        return ed["url"] if ed else None
+
+    return {**out, "file": form, "paths": {r: {"path": p, "folder": folder(p)} if p else None for r, p in got.items()}}
 
 
 def not_own_shell(rec: dict[str, Any], name: str, directory: str) -> str | None:
@@ -3227,6 +3283,15 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         return JSONResponse(await call("paths", id=sid, runs=body.get("runs")))
 
+    @app.post("/api/paths")
+    async def item_paths(request: Request):
+        """design §4.5a **a path is a link** on an Inbox row, the message page, a Queue card's item and
+        a Repo page row (§4.6 *A path in the Inbox and the Queue is a link too*, TD-1108): `{runs, ctx}`
+        answered `{label, file, wait, paths, refused}` by `paths_for`. A read, gated by nobody beyond
+        the UI's own (§9 invariant 11)."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        return JSONResponse(await paths_for(call, body if isinstance(body, dict) else {}))
+
     @app.get("/api/sessions/{sid}/git_files")
     async def git_files(sid: str, pick: str = "tree"):
         """design §4.5a *Focus side panel, Git card: the pick* (§4.2 *The Git card's pick*, TD-856): the
@@ -4470,6 +4535,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             {
                 **t,
                 "from_name": "person" if t.get("from") == "person" else names.get(t.get("from")) or t.get("from"),
+                "from_open": t.get("from") if t.get("from") in names else "",  # its paths' context (TD-1108)
                 "age": _age(t.get("at"), datetime.now(UTC)),
             }
             for t in th.get("entries") or ()

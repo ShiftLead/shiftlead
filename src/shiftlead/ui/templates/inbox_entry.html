@@ -15,7 +15,7 @@
 {#- a thread entry: who, what kind, about what, when, and its text in its shape — nothing pressable
     but a link the text itself makes (§4.10) -#}
 {% macro thread_row(t) -%}
-<div class="mailrow threadrow" tabindex="0" data-msg="{{ t.id }}">
+<div class="mailrow threadrow" tabindex="0" data-msg="{{ t.id }}"{{ r.paths_attr(t) }}>
   <div class="row gap wrap mhead">
     <span class="ref" title="{{ t['from'] }}">{{ t.from_name or t['from'] }}</span>
     <span class="badge kindmark k-{{ t.kind }}">{{ t.kind }}</span>
