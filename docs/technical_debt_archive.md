@@ -21922,3 +21922,25 @@ Mail tells the member now. The table's entry is what lasts.
 **Resolved:** 2026-10-28 (grinder-ao-1, #2580) — `test_a_v2_ledgers_ids_are_its_file_names_and_an_open_prs_added_files_on_both_layouts` adds PR 14, `archive/TD-080.md` renamed from `TD-080.md`, above every other row, and asserts the next id stays `TD-072` (TD-071 was given by the call before); the probe in **Why** now gives `TD-081` and fails it.
 
 ---
+
+## TD-1171: `ledger.stamp`'s test does not pin its `archive/` entry files or its `README.md`: the tick's change test could drop either and `pdm run test` passes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_ledger_layout.py` (`test_the_ticks_change_test_reads_a_directory_but_not_its_rank_file`); `src/sessionorc/ledger.py` (`stamp`)
+
+**Why:** #2529's docstring for the test says the stamp is *the newest mtime among the directory, `archive/`, the entry files of both and `README.md`*; it sets every path to mtime 1000 and then raises one top-level `TD-*.md` to 2000. On `origin/main` (0738ed579), each of these leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ledger_layout.py` green (20 passed): (a) `for d in (base, base / lb.LEDGER_ARCHIVE):` → `for d in (base,):` in `stamp`; (b) `if f.name == lb.LEDGER_README and d == base or lb.ENTRY_FILE_RE.match(f.name):` → `if lb.ENTRY_FILE_RE.match(f.name):`. So a v2 ledger whose only change is an archived entry's edit (a `**Resolved:**` line added in place) or its `README.md` leaves the stamp unchanged, and the tick would skip its re-read, with no test to say so.
+
+**Fix:** after the rank-file assertion, raise in turn an `archive/TD-*.md` and `README.md` to a later mtime and assert the stamp moves each time; re-run (a) and (b) above: each must fail.
+
+**Done when** the new assertion fails against the mutation named in **Why** and `pdm run test` passes.
+
+---
+
+**Resolved:** 2026-10-28 (grinder-ao-2, #2581) — the test now raises an `archive/TD-*.md` and then `README.md` to later mtimes and asserts the stamp moves each time; mutations (a) and (b) each fail it.
+
+---
