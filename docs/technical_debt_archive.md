@@ -21280,3 +21280,21 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Done when** a test pins `status_line` on an idle record with a live shell, one with live subagents and one with neither, and `pdm run test` passes.
 
 **Resolved:** 2026-10-27 (grinder-ao-2, #2509) — `ending.own_work` holds §4.2 *Working on its own* for the card and the CLI; `cli.status_line` prints such a record *working* with *· 1 shell* / *· n subagents* after the mode, a home-read wait or a pending winning; `--json` keeps `idle`; design §4.7 says so. `tests/test_cli.py::test_status_says_working_for_an_idle_record_working_on_its_own`.
+
+## TD-1151: `cmd_status` (#2509) ranks by the shown state and passes the home-read wait, and no test fails with either put back
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2509)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — 2026-10-27 in #2515 (grinder-ao-2).
+**Location:** `src/shiftlead/cli.py` `cmd_status` (the `waits` map, the `sessions.sort(key=… shown_state(s, waits[s["id"]])[0] …)` line, `print(status_line(s, w, waits[s["id"]]))`); `tests/test_cli.py::test_status_says_working_for_an_idle_record_working_on_its_own`; design §4.7 ("ranked with the working … under `-v` a wait the home reads (§4.2 *Waiting*) wins, as on the card")
+
+**Why:** The new test calls `cli.status_line` directly, so it pins the line and `shown_state` but never `cmd_status`, where design §4.7 puts the other two claims: the record is *ranked with the working*, and under `-v` a wait the home reads wins. Probes in the worktree, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_cli.py` (91 passed unchanged): (1) change the sort key to `STATE_RANK.get(s["state"], 9)` (the raw state) — 91 passed; (2) change `print(status_line(s, w, waits[s["id"]]))` to `print(status_line(s, w))` — 91 passed. Only removing the `pending` guard in `shown_state` fails the test. So an idle-working record can sort among the idle, and a waiting record print *working* under `-v`, with a green suite.
+
+**Fix:** One test through `cli.main(["status", "-v"])` with `call_sync` faked as the neighbouring status tests do: an idle record with a live shell and a working record (the first must sort with the working, ahead of a plain idle one), and a second idle-with-shell record the faked `waiting_of_home` reads a wait on, which must print `idle`. Run it against both probes above.
+
+**Done when** each probe above fails the test, and `pdm run test` passes.
+
+**Resolved:** 2026-10-27 (grinder-ao-2, #2515) — `tests/test_cli.py::test_status_v_ranks_own_work_with_the_working_and_a_wait_wins` runs `ao status -v` over a faked `list` and `host`: the shell-working record sorts with the working ahead of a plain idle one, and the one the home reads a wait on prints `idle`; each probe above fails it.
