@@ -150,12 +150,18 @@ class MemberDef:
     profile: str | None = None
     grants: list[str] | None = None  # None: the role's
     unattended: bool = True
+    # `teams.<team>.size.<name>` (§4.9 *A team's size*, TD-1164): how many sessions the line runs, the
+    # setting's — `with_settings` writes it on the client's copy, no file sets it. None: its `count:`
+    size: int | None = None
 
-    def names(self) -> list[str]:
-        """The session names this member starts: the prefix, suffixed `-1`, `-2`, … above one."""
+    def names(self, n: int | None = None) -> list[str]:
+        """The session names this member line starts at `n` (default: its size, else its count) — the
+        definition's names first, then the next numbers, so no name moves when the number does (§4.9 *The
+        names never move*): a `count: 1` line is the bare prefix, then `-2`, `-3`; a counted line `-1` … `-n`."""
+        k = n if n is not None else self.size if self.size is not None else self.count
         if self.count == 1:
-            return [self.name]
-        return [f"{self.name}-{i}" for i in range(1, self.count + 1)]
+            return [self.name if i == 1 else f"{self.name}-{i}" for i in range(1, k + 1)]
+        return [f"{self.name}-{i}" for i in range(1, k + 1)]
 
 
 @dataclass
@@ -177,9 +183,22 @@ class TeamDef:
     # `teams.<team>.flow` in `settings.yml` (§4.9c, §5): the flow a person picked — the setting, not
     # the definition, so no file sets it; `with_settings` does, on the client's own copy. "" is none
     flow: str = ""
+    # `teams.<team>.size` (§4.9 *A team's size*, §5): member line name → sessions, as the setting holds it,
+    # a key no line names included (`ao org check` says so); each line's own is on its `MemberDef.size`
+    size: dict[str, int] = field(default_factory=dict)
     # a definition written before TD-722 (§4.9): each old key as written, `projects` or `<who>.home`
     # → its value, which `_validate` refuses by name, saying the fix
     old: dict[str, Any] = field(default_factory=dict)
+
+    def staffed(self) -> set[str]:
+        """The roles the definition **and its sizes** start a member of — a line sized 0 starts none
+        (§4.9c *Every listed flow must be followable*, §4.9 *A team's size*)."""
+        return {m.role for m in self.members if m.role and m.names()}
+
+    def unsized(self) -> list[str]:
+        """The `size` keys no member line of the definition names, which are ignored (§4.9 *A team's size*)."""
+        lines = {m.name for m in self.members}
+        return [k for k in self.size if k not in lines]
 
     def entry_role(self, type_: str) -> str:
         """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
@@ -220,7 +239,7 @@ class TeamDef:
         same = [m for m in self.members if m.role == role]
         counted = next((m for m in same if m.count > 1), None)
         if counted is not None:
-            return f"{counted.name}-{counted.count + 1}"
+            return f"{counted.name}-{len(counted.names()) + 1}"  # past its size (§4.9 *A team's size*)
         base = same[-1].name if same else role
         stem = re.sub(r"-\d+$", "", base)
         if not same and base not in taken:
@@ -555,18 +574,29 @@ def with_repos(
 
 def with_settings(org: Org, teams: Mapping[str, Any] | None) -> Org:
     """`org` with each team's `teams.<team>.flow` from the home's `settings.yml` (§4.9c *A team lists
-    its flows, and the person picks one*), as the agent's `settings` read gives `teams`. A copy: the
-    definition is read and cached elsewhere, and a setting is never written into it. A value the
-    team no longer lists is kept as read — `teams.current_flow` reads it as the first, and says so."""
-    picked = {
-        name: str(t["flow"])
-        for name, t in (teams or {}).items()
-        if isinstance(t, dict) and t.get("flow") and name in org.teams
-    }
+    its flows, and the person picks one*), as the agent's `settings` read gives `teams`, and its
+    `teams.<team>.size` on the team and each member line it names, whatever flow is picked (§4.9 *A team's
+    size*, TD-1164). A copy: the definition is read and cached elsewhere, and a setting is never written
+    into it. A flow the team no longer lists is kept as read — `teams.current_flow` reads it as the first,
+    and says so."""
+    picked: dict[str, dict[str, Any]] = {}
+    for name, t in (teams or {}).items():
+        if not isinstance(t, dict) or name not in org.teams:
+            continue
+        got: dict[str, Any] = {}
+        if t.get("flow"):
+            got["flow"] = str(t["flow"])
+        if isinstance(t.get("size"), dict):
+            size = {str(k): v for k, v in t["size"].items() if isinstance(v, int) and not isinstance(v, bool)}
+            lines = org.teams[name].members
+            members = [dataclasses.replace(m, size=size[m.name]) if m.name in size else m for m in lines]
+            got.update(size=size, members=members)
+        if got:
+            picked[name] = got
     if not picked:
         return org
     out = copy.copy(org)
-    out.teams = {n: dataclasses.replace(t, flow=picked[n]) if n in picked else t for n, t in org.teams.items()}
+    out.teams = {n: dataclasses.replace(t, **picked[n]) if n in picked else t for n, t in org.teams.items()}
     return out
 
 

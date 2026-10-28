@@ -356,7 +356,7 @@ def weights(doc: dict[str, Any]) -> dict[str, Any]:
 
 # -- teams, repos, person (§5, TD-146)-------------------------------------------------------------
 
-TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow")
+TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow", "size")
 ON_WORK = (
     "ask",
     "start",
@@ -398,7 +398,7 @@ def _keyed(doc: dict[str, Any], key: str, parse: Any) -> dict[str, Any]:
 
 
 def teams(doc: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """`teams:` as `{team: {schedule?, until?, reserve?, balance?, on_work?}}` — each field that is not
+    """`teams:` as `{team: {schedule?, until?, reserve?, balance?, on_work?, flow?, size?}}` — each field that is not
     valid dropped."""
     return _keyed(doc, "teams", parse_team)
 
@@ -466,7 +466,9 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
     reads it), `until` (an instant, §6 *Team stop time*) and `reserve` (a flat percent added to the
     profile's reserve for the team's sessions, §6 *Usage gate*), `balance` (§6 *Balance*),
     `on_work` (§6 rule 8: `ask`, `start` or `off`) and `flow` (§4.9c: the name of the flow the team
-    runs now — the client checks it against the team's `flows:`; the agent reads no definition)."""
+    runs now — the client checks it against the team's `flows:`; the agent reads no definition) and
+    `size` (§4.9 *A team's size*: `{<member line>: <n ≥ 0>}`, the whole map replaced; the client names the
+    lines)."""
 
     def schedule(v: Any) -> dict[str, Any]:
         if not isinstance(v, dict) or not v:
@@ -484,6 +486,21 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
             raise ValueError(f"flow is the name of a flow the team lists (§4.9c), not {v!r}")
         return word
 
+    def size(v: Any) -> dict[str, int]:
+        # §4.9 *A team's size*: member line name → sessions; which lines the team has is the client's to read
+        if not isinstance(v, dict):
+            raise ValueError(f"size is a mapping of member line names to numbers (§4.9 *A team's size*), not {v!r}")
+        out: dict[str, int] = {}
+        for line, n in v.items():
+            if not str(line or "").strip():
+                raise ValueError("size: a member line's name is needed")
+            if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+                if drop:
+                    continue
+                raise ValueError(f"size.{line} is a whole number of sessions, 0 or more, not {n!r}")
+            out[str(line)] = n
+        return out
+
     value = _fields(value, TEAM_KEYS, "a team's settings", drop)
     checks = {
         "schedule": schedule,
@@ -492,6 +509,7 @@ def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
         "balance": lambda v: parse_balance(v, drop),
         "on_work": on_work,
         "flow": flow,
+        "size": size,
     }
     return _each(value, checks, drop)
 

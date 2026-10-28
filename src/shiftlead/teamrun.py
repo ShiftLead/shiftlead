@@ -418,6 +418,20 @@ def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
     return out
 
 
+def size_words(size: Mapping[str, Any] | None, team: orgmod.TeamDef | None) -> list[str]:
+    """Each line `teams.<team>.size` sets to other than its count, as `ao team list`, the settings line
+    and the Members dialog say it — *grinder-ao 2 (file says 1)* (§4.9 *A team's size*). With no
+    definition to read, the number alone; a key no line names is `ao org check`'s to say, not here."""
+    counts = {m.name: m.count for m in team.members} if team is not None else {}
+    out: list[str] = []
+    for line, n in (size or {}).items():
+        if team is not None and line not in counts:
+            continue
+        if counts.get(line) != n:
+            out.append(f"{line} {n} (file says {counts[line]})" if line in counts else f"{line} {n}")
+    return out
+
+
 def role_holders(t: orgmod.TeamDef) -> list[dict[str, Any]]:
     """The roles a definition names, in its order — the manager, the techlead seat, the seats with a
     trigger, then the members — each once, with the session names that hold it and whether it is a
@@ -532,6 +546,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
                 "seats": [{"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after} for s in t.seats],
                 "members": sum(len(m.names()) for m in t.members),
+                # each line its size sets to other than its count (§4.9 *A team's size*, TD-1164)
+                "sizes": size_words(t.size, t),
                 # the definition's roles in its order, each with the names that hold it — the team's
                 # *who for what* lines (design §4.5a ***i*** mark, TD-171)
                 "roles": role_holders(t),
