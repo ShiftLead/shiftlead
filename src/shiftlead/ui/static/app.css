@@ -779,7 +779,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .rollup-list .ru-sub { padding-left: 18px; }
 .rollup-list .ru-debt { width: 34%; min-width: 220px; }
 .rollup-list .ru-debt .bar { height: 14px; gap: 1px; }
-.rollup-list .ru-debt .bseg { font-size: 11px; min-width: 16px; padding: 0 3px; }
+.rollup-list .ru-debt .bseg { font-size: var(--t-cap); min-width: 16px; padding: 0 3px; }
 .rollup-list .ru-debt .bseg.ru-bare { min-width: 4px; padding: 0; color: transparent; }  /* too narrow for its count */
 .rollup-list .ru-dim { opacity: .7; }
 .rollup-list .ru-open { font-variant-numeric: tabular-nums; color: var(--muted); font-size: var(--t-small); }
@@ -800,7 +800,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .rollup-list .ru-c { min-width: 28px; font: inherit; font-size: var(--t-small); font-weight: 600; color: var(--needs-fg); background: var(--needs-bg); border: 0; border-radius: 3px; padding: 2px 8px; cursor: pointer; font-variant-numeric: tabular-nums; }
 .rollup-list .ru-c.ru-ans { background: var(--needs); color: var(--bg); }  /* solid while an answer is needed */
 .rollup-list .ru-more { width: 28px; text-align: right; }
-.rollup-list .ru-dots-btn { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 4px; width: 26px; height: 24px; font-size: 16px; line-height: 1; cursor: pointer; }
+.rollup-list .ru-dots-btn { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 4px; width: 26px; height: 24px; font-size: var(--t-title); line-height: 1; cursor: pointer; }
 .rollup-list .ru-row:hover .ru-dots-btn, .rollup-list .ru-dots-btn[aria-expanded="true"] { border-color: var(--line); color: var(--fg); }
 .rollup-list .ru-menu { position: absolute; right: 14px; top: calc(100% - 4px); z-index: 20; background: var(--card); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 20px rgba(0, 0, 0, .35); padding: 4px 0; min-width: 220px; font-size: var(--t-small); text-align: left; cursor: default; }
 .rollup-list .ru-nymenu { right: 52px; min-width: 300px; }
