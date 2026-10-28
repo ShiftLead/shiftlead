@@ -658,6 +658,7 @@ def team_groups(
     balance: Mapping[str, Any] | None = None,
     needs: Collection[dict[str, Any]] = (),
     spend: Mapping[str, Any] | None = None,
+    repo_page: bool = False,
 ) -> list[dict[str, Any]] | None:
     """Design §4.5a Sessions **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
@@ -697,7 +698,10 @@ def team_groups(
     mark, one with no `repo` too, which no checkout's reading in `repos` carries.
 
     `spend` is today's `seats` row by team (`Readings.team_spend`): the header's **spend** figure (§4.5a
-    *team card: spend*, TD-832), absent while the team spent nothing today."""
+    *team card: spend*, TD-832), absent while the team spent nothing today.
+
+    `repo_page`: the Repo page's cards draw no Repo facet, its line drawing it always; on the Sessions page
+    every card that draws a summary draws it first (§4.5a *team card: Repo facet*, TD-1189)."""
     defs = {str(r["name"]): r for r in rows}
     order = {name: i for i, name in enumerate(defs)}  # definition order, within a repo (§4.9 *The Sessions page*)
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
@@ -759,9 +763,10 @@ def team_groups(
             for m in members:
                 m["compact"], m["compact_line"] = True, compact_line(m, repos)
                 m["lane_count"] = lane_count(m, lanes)  # the member's own count, in its pill (TD-428)
-            # a team with nothing live draws only the facets that hold something (TD-418), and no team
-            # card draws the Repo facet: it is the repo's, drawn once on its line (§4.9, TD-725)
-            summary["drawn"] = [f for f in (drawn_facets(summary) if not live else FACETS) if f != "repo"]
+            # a team with nothing live draws only the facets that hold something (TD-418); the Repo page's
+            # cards draw no Repo facet, its line drawing it (§4.5a *team card: Repo facet*, TD-1189)
+            drawn = drawn_facets(summary) if not live else [f for f in FACETS if f != "repo" or summary.get("repo")]
+            summary["drawn"] = [f for f in drawn if f != "repo" or not repo_page]
         groups.append(
             {
                 "team": team,
@@ -889,9 +894,9 @@ def repo_line(
     now: datetime,
 ) -> dict[str, Any] | None:
     """The **Repo facet** a repo's line draws (§4.5a *team card: Repo facet*, §4.9 *The Sessions page*,
-    TD-725): the repo's numbers, once, whatever teams service it. Its lanes *i* carries one line per
-    team on the repo; its bars' hovers are the first such team's. None where this host reads no repo of
-    that name: the line is then its name alone."""
+    TD-725) while no card of the repo shows one (TD-1189), and always on the Repo page. Its lanes *i*
+    carries one line per team on the repo; its bars' hovers are the first such team's. None where this host
+    reads no repo of that name: the line is then its name alone."""
     if r is None:
         return None
     lines = [got for g in teams if (got := team_lanes(str(g["team"]), fleet, r))]
@@ -912,7 +917,8 @@ def org_layout(
     project, its `title` else its name, with its repos in its list's order — then the repos no project
     lists, in the registry's order (`repos`, the home's readings), then any team's repo neither names.
     **A project of one repo draws one heading**, the repo's: its line is the heading. Under each repo,
-    its **line** (its name and the Repo facet, drawn here once and on no team card), its **teams** —
+    its **line** (its name and the Repo facet, which the client shows only while no card of the repo shows
+    its own, TD-1189), its **teams** —
     the live and concluded first, then those with nothing live, each in definition order — and a
     **no-team strip** of the repo's sessions with no team badge. Then a team whose repo is not told,
     and last **No repo**, the sessions in no registered repo. A registered repo with no team is its

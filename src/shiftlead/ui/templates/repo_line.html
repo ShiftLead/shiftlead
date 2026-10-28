@@ -1,6 +1,7 @@
 {# A repo's **line** on the Sessions page (design §4.9 *The Sessions page*, §4.5a *team card: Repo facet*, TD-725):
-   its name, a link to its Repo page, and the Repo facet — the repo's numbers, drawn here once and on no
-   team card, however many teams service it. Where its project holds only this repo the line is the
+   its name, a link to its Repo page, and the Repo facet — the repo's numbers, with the repo's lanes. The
+   server renders it for every repo it reads; the client shows it only while no team card of the repo shows
+   its own (`AO.lineFacetShown`, TD-1189), and always on the Repo page, whose cards draw none. Where its project holds only this repo the line is the
    heading (`g.heading`). The facet's entries selector is remembered per repo (`data-team` *repo:<name>*,
    the key the client stores it under). A stop in the ring, before the repo's team cards (§4.5a *Sessions:
    keys*). Rendered on page load and re-sent with the groups on every delta. #}

@@ -8,8 +8,8 @@
 {% set m = g.summary %}
 {%- set drawn = m.drawn if m.drawn is defined else ('repo', 'motion', 'face') %}
 <div class="tsum" id="tsum-{{ g.team }}" data-team="{{ g.team }}" data-face-default="{{ m.face }}" data-answer-key="{{ m.answer_key }}">
-  {# -- Repo (§4.5a *team card: Repo facet*) -- #}
-  {% if 'repo' in drawn %}{% include "repo_facet.html" %}{% endif %}
+  {# -- Repo (§4.5a *team card: Repo facet*, TD-1189): first, with no name row — the repo's line above says it -- #}
+  {% if 'repo' in drawn %}{% set on_line = true %}{% include "repo_facet.html" %}{% endif %}
   {# -- TDs in motion (§4.5a *team card: TDs in motion*) -- #}
   {# **Columns** (§4.5a, TD-252): phase · priority · reference · title · holders · PR on one grid, every
      track but the title's a fixed width — the reference's, the holders' and the PR's the server's (`ref_w`,

@@ -82,7 +82,8 @@ def test_the_repo_facet_draws_the_bars_the_blocks_and_could_not_look():
         }
     )
     assert "Technical debt (2 open)" in html and "Pull requests (1 open)" in html and "1 High" in html
-    assert 'href="/repo/samscrape"' in html
+    assert 'href="/repo/samscrape#debt"' in html  # its segments link to the Repo page
+    assert 'href="/repo/samscrape"' not in html and "open →" not in html  # no name row on a card (TD-1189)
     # a PR read that failed with no reading before it: *could not look*, never zero
     bad = reading("/r/samscrape", prs={"error": "gh: offline", "failed_at": _iso(NOW)})
     s = ui.team_summary("grind", [member("a")], {"/r/samscrape": bad}, {}, now=NOW)
@@ -362,8 +363,8 @@ def test_a_wound_down_team_shows_what_it_left():
     # session in no team are leftovers — so Needs you alone (TD-406, TD-924)
     ro = ui.rollup(groups)
     assert ro["quiet"] and ro["n_agents"] == 0 and ro["answer_needed"] == 0
-    # the two that hold something; the Repo facet is the repo line's, never a team card's (TD-725)
-    assert s["drawn"] == ["motion", "face"] and s["repo"]
+    # the three that hold something; the Repo facet first on the card (TD-1189)
+    assert s["drawn"] == ["repo", "motion", "face"] and s["repo"]
     # nothing here, nothing claimed, no doing row: no facet, and no summary drawn (TD-418)
     (quiet,) = ui.team_groups([member("q", state="exited", rank=1, slot={}, place="x")], (), {}, {})
     assert quiet["summary"]["motion"] == [] and quiet["summary"]["drawn"] == []
@@ -486,9 +487,9 @@ def test_a_stopped_team_draws_only_the_facets_that_hold_something():
 
     # two: a repo here and a claim, no doing row
     g = stopped(member("a", progress=[claim("TD-301")]))
-    assert g["summary"]["drawn"] == ["motion"]  # the repo here is its line's facet (TD-725)
+    assert g["summary"]["drawn"] == ["repo", "motion"]  # the repo here, first on the card (TD-1189)
     html = render(g=g)
-    assert 'class="facet frepo"' not in html and 'class="facet fmotion"' in html and "fface" not in html
+    assert html.index('class="facet frepo"') < html.index('class="facet fmotion"') and "fface" not in html
     # one: the doing log alone, no repo here and nothing claimed
     g = stopped(member("b", repo="/elsewhere"), doing={"grind": [{"id": "b", "text": "x", "at": _iso(NOW)}]})
     assert g["summary"]["drawn"] == ["face"]
@@ -522,13 +523,18 @@ def test_an_answer_or_an_ask_alone_draws_the_face_facet():
 def test_the_facets_heads_and_bars_are_one_height_and_the_summary_is_sized_by_what_it_holds():
     """§4.5a *Sessions: rollup*, *team card: summary* and *Repo facet* (TD-418): every facet head one height
     (the window picker's), the bars and blocks one height so they line up, a label that never wraps
-    with the selector dropping to its own line at the right, the summary in 1.15 : 0.85 : 1.2, and
-    Doing's head the word alone."""
+    with the selector dropping to its own line at the right, each facet drawn keeping its share — Repo 1,
+    TDs in motion 1.15, Doing 1.05, so two split the row by theirs — one column below 1100 px in the same
+    order (TD-1189), and Doing's head the word alone."""
     css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
     assert ".facet .fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }" in css
     assert "white-space: nowrap; }\n.facet .fhead > .seg { margin-left: auto; }" in css
     assert ".bar, .blocks { display: flex; gap: 2px; height: 26px; }" in css and "min-height: 30px" not in css
-    assert "grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr);" in css
+    assert ".tsum { display: flex; gap: 12px; margin-bottom: 12px; }" in css
+    shares = ".tsum > .frepo { flex: 1 1 0; } .tsum > .fmotion { flex: 1.15 1 0; } .tsum > .fface { flex: 1.05 1 0; }"
+    assert shares in css
+    assert "@media (max-width: 1100px) { .tsum { flex-direction: column; } .tsum > .facet { flex: none; } }" in css
+    assert ":not(:has(.frepo))" not in css  # no pair of tracks of its own: a facet's share is its own
     s = ui.team_summary("grind", [member("g1")], {}, {"grind": [{"id": "g1", "text": "x", "at": _iso(NOW)}]}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
     assert '<span class="kind">Doing</span><span class="grow"></span>' in html

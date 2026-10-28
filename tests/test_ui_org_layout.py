@@ -98,23 +98,34 @@ def page(items) -> str:
     )
 
 
-def test_two_teams_on_one_repo_are_two_cards_under_one_line_and_the_repo_facet_is_drawn_once(tmp_path, monkeypatch):
-    """§4.9: two teams on one repo are two whole cards under one repo line, and the Repo facet is the
-    line's — drawn once, never on a team card; its lanes *i* is one line per team."""
+def test_two_teams_on_one_repo_are_two_cards_under_one_line_each_drawing_the_repo_facet(tmp_path, monkeypatch):
+    """§4.9, §4.5a *team card: Repo facet* (TD-1189): two teams on one repo are two whole cards under one
+    repo line, each drawing the Repo facet first with its own lanes *i*; the line's is rendered too, for
+    the client to show only while no card shows one, its lanes *i* one line per team."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    lane = ["free-pick", "owner:grinder"]
     views = [
-        sess("a1", team="alpha", repo="/r/shiftlead", state="working"),
-        sess("b1", team="beta", repo="/r/shiftlead", state="working"),
+        sess("a1", team="alpha", repo="/r/shiftlead", state="working", lane=lane),
+        sess("b1", team="beta", repo="/r/shiftlead", state="working", lane=lane),
     ]
     items = layout(views, [row("alpha", "shiftlead"), row("beta", "shiftlead")], ["shiftlead"])
     assert shape(items) == ["repo:shiftlead*", "team:alpha", "team:beta"]
+    assert items[0]["facet"]["ledger"]["lanes"]["text"].splitlines() == [
+        "in alpha's lanes: 0 pickable, 0 design",
+        "in beta's lanes: 0 pickable, 0 design",
+    ]  # the line's: the repo's, one line per team
     html = page(items)
-    assert html.count('class="facet frepo"') == 1
+    assert html.count('class="facet frepo"') == 3  # the line's, and each card's
     line = html[html.index('class="rline') : html.index('<section class="tgroup" data-team="alpha"')]
     assert 'class="facet frepo"' in line and 'href="/repo/shiftlead"' in line
     for team in ("alpha", "beta"):
         sec = html[html.index(f'<section class="tgroup" data-team="{team}"') :]
-        assert "frepo" not in sec[: sec.index("</section>")]
+        sec = sec[: sec.index("</section>")]
+        tsum = sec[sec.index('class="tsum"') :]
+        assert tsum.index('class="facet frepo"') < tsum.index('class="facet fmotion"')  # first on the card
+        assert "open →" not in tsum  # no name row: the line above says it
+        lanes = next(it for it in items if it.get("team") == team)["summary"]["repo"]["ledger"]["lanes"]
+        assert lanes["text"] == f"in {team}'s lanes: 0 pickable, 0 design"  # the card's: the team's own lanes *i*
 
 
 def test_a_project_of_two_repos_is_one_heading_with_its_title_and_one_of_one_repo_is_the_repos_line(
@@ -166,7 +177,7 @@ def test_a_registered_repo_with_no_team_draws_its_line_and_facet(tmp_path, monke
     assert shape(items) == ["repo:main*", "team:t", "repo:quiet*"]
     assert items[-1]["facet"] and items[-1]["facet"]["name"] == "quiet"
     html = page(items)
-    assert html.count('class="facet frepo"') == 2
+    assert html.count('class="facet frepo"') == 3  # main's line and its card, and quiet's line
 
 
 def test_a_session_with_no_team_sits_in_its_repos_strip_or_under_no_repo(tmp_path, monkeypatch):
