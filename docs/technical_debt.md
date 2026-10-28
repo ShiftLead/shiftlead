@@ -2049,7 +2049,7 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Added:** 2026-10-27 (the designer, from TD-1143)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build. It waits on all of TD-1130, not only its vendor bump: both change `ledger.py` and `queue.py`, so this build starts on TD-1130's merged reading rather than rebasing across it.
+**Status:** Open — build, in three slices (grinder-ao-1). Slice 1 (#2527): `fs_io`, `git_io`, `layout_at` and the default rule, with `reading`, `entries_before` and the resolver through `lb.load()`. Slice 2: a faulted v2 ledger and the seams. Slice 3: history, the tick's mtime, `_ledger_rows_on_main`, the Queue's archive and `_rank_lined`. Until slice 3, a v2 ledger's history reads as not read.
 **Blocked by:** TD-1130
 **Location:** `src/sessionorc/ledger.py` (the module docstring 3 and `DEFAULT` 39, `ledger_path` 645, `archive_path` 549, the resolver's `LEDGER`/`ARCHIVE` 590 and its `read` ~615, `history` ~720, `entries_before` ~757–775, `reading` ~787–816); `src/sessionorc/seams.py` (71–83); `src/sessionorc/agent_tick.py` (the mtime, 3508); `src/sessionorc/queue.py` (the archive read and its cache, 281); `src/sessionorc/agent_rank.py` (151, `_rank_lined` 277–292); `src/sessionorc/reports.py` (`_ledger_rows_on_main` 1074); `src/sessionorc/agent_tick.py` (rules 6 and 8's `s.ledger or led.get("path")` into `entries_before`, 1751 and 2062; `derive`'s, 3949); tests beside each
 
