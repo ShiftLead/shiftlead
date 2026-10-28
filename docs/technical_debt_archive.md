@@ -22065,3 +22065,23 @@ Mail tells the member now. The table's entry is what lasts.
 **Resolved:** 2026-10-28 (grinder-ao-1, #2590) — `adopt._adopter` runs the dev-cadence checkout's `launcher/dev_cadence.py -C <dc> adopt <clone>` where it has one, else an older checkout's `sync.sh`, and refuses one with neither before any clone; the PR's commit is the pin's `ref` (else the lock's), and the reply and the body name `dev-cadence -C <dc> adopt <checkout>` as the after-merge run (`adopt.after`). The real-checkout test runs the launcher against `~/dev-cadence`, skipped only while its adopt would refuse (dirty, or HEAD off origin's default branch); a fake-launcher test pins the argv, the pin's `ref` and both after-merge lines. Design §4.7 **`ao repo add`** says so, with its line under §4.7 in `docs/design-history.md`; §5's pinned-repo cures already named the launcher.
 
 ---
+
+## TD-1185: `member_submit`'s profile override (a Profile picked over the line's) is set in no test: delete it and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1, auditing #2583)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/app.py` (`member_submit`, the `fields.update(profile=profile, adapter=profile_adapter(profile))` line); `tests/test_ui_member_line.py`
+
+**Why:** #2583's `member_submit` carries what the person typed over the line's into the record: `name`, `prompt`, `lane` and `profile`. `tests/test_ui_member_line.py::test_what_the_person_typed_over_the_line_is_the_records_for_its_run` types the first three and never a Profile (`_post` posts none but the fill's own `paul` in the unedited test). Probe, 2026-10-28: replace that line with `pass` and run `tests/test_ui_member_line.py test_team_size.py test_ui_members_size.py test_cli_teams.py test_ui_teams.py test_flows.py` — 279 passed; replacing the `refs != list(x.lane)` clause instead fails the `lane` test, so the other three are pinned.
+
+**Fix:** extend that test (or add one) to post a `profile` unlike the line's and assert the created record carries it and its adapter.
+
+**Done when** deleting the `profile` line fails `tests/test_ui_member_line.py`.
+
+**Resolved:** 2026-10-28 (grinder-ao-2, #2591) — `test_a_profile_picked_over_the_lines_is_the_records_with_its_adapter` posts a `gem` profile over the line's `paul` and asserts the create carries it and its `gemini` adapter; the `pass` mutation in **Why** now fails it.
+
+---
