@@ -2439,6 +2439,7 @@ def ledger_for_you(
                     or bool(e.get("parts_open")),  # an open part counts as an open blocker (TD-1130)
                     "builds_open": ledger_mod.builds_open(e),
                     "hold_why": str((hold or {}).get("why") or ""),
+                    "hold_by": str((hold or {}).get("words") or ""),  # the mark's `title` (TD-1127)
                     "url": f"/repo/{quote(name)}#{quote(e['id'])}",
                 }
             )

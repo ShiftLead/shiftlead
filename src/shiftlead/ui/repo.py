@@ -393,6 +393,8 @@ def ledger_lists(
                     **e,
                     "held": held.get(e["id"], ""),
                     "settle": settle_mod.words(e, now),
+                    # who pressed the person's hold, the settle mark's `title` (§4.8, TD-1127)
+                    "held_words": str(e["held"].get("words") or "") if isinstance(e.get("held"), dict) else "",
                     "settle_mark": settle_mark(e, now, lane=key in ledger.LANE_KINDS or bool(held.get(e["id"]))),
                     # what it waits for (§4.5a *Repo page: waits mark*, TD-716): the line whole on hover
                     "wait": teamrun.wait_words(e, short=True),

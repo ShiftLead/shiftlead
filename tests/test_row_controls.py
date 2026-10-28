@@ -258,3 +258,52 @@ def test_a_parents_open_parts_keep_done_off_and_back_to_design_on(tmp_path):
     by["TD-001"]["held"] = {"at": NOW.isoformat(), "why": "x"}
     inbox = {x["id"]: x for x in ui.ledger_for_you({root: r}, [], {}, NOW)["groups"][0]["rows"]}
     assert (inbox["TD-001"]["blocked_open"], inbox["TD-001"]["builds_open"]) == (True, True)
+
+
+def test_a_held_marks_title_names_its_presser_from_the_readings_words(tmp_path):
+    """TD-1127 (§4.8 *The record names who pressed*): the `queue` and `repos` readings carry a hold's presser
+    in words beside `held.by` — the queue's `pressers`, the home's `_held_words` — and the *held (person)*
+    mark, the Queue row's and the Queue card's held row's, draws them in its `title`; the word stays."""
+    from types import SimpleNamespace
+
+    from markupsafe import Markup
+    from test_queue import NOW
+
+    from sessionorc import queue
+    from sessionorc.agent_tick import TickMixin
+
+    root, r = _ledger(tmp_path)
+    by = {e["id"]: e for e in r["ledger"]["entries"]}
+    by["TD-002"]["held"] = {"at": NOW.isoformat(), "by": "s-1", "why": "after Friday"}
+    words = {"s-1": "the person's session paul-1"}.get
+    rows = lambda q: {x["id"]: x for c in q["cards"] for x in (c["top"], *c["rows"])}  # noqa: E731
+    held = rows(queue.reading({root: r}, [], NOW, pressers=lambda b: words(b) or b))["TD-002"]
+    assert held["state"] == "held (person)"
+    assert held["held"] == {
+        "at": NOW.isoformat(),
+        "by": "s-1",
+        "why": "after Friday",
+        "words": "the person's session paul-1",
+    }
+    assert "words" not in rows(queue.reading({root: r}, [], NOW))["TD-002"]["held"], "no graph, no words"
+    tpl = ui.templates.env.from_string('{% import "queue_row.html" as q %}{{ q.state(r) }}')
+    got = tpl.render(r=held)
+    assert 'title="held by the person&#39;s session paul-1"' in got and "held (person) — after Friday" in got
+    assert "title=" not in tpl.render(r={"state": "held (person)", "held": {"at": "t", "by": "person"}})
+    ext = ui.templates.env.from_string('{% import "queue_row.html" as q %}{{ q.extras(e, "/c/r") }}')
+    got = ext.render(e={"settle": "held 2h", "held_words": "the person's session paul-1", "settle_mark": "held"})
+    assert 'title="held by the person&#39;s session paul-1">· held 2h' in got, "the Repo row's settle mark"
+
+    home = SimpleNamespace(_presser_words=lambda b: words(b) or "the person")
+    view = TickMixin._held_words(home, r)  # type: ignore[arg-type]
+    assert {e["id"]: e["held"].get("words") for e in view["ledger"]["entries"] if e.get("held")} == {
+        "TD-002": "the person's session paul-1"
+    }
+    assert "words" not in by["TD-002"]["held"], "the stored reading is left as it is"
+    by["TD-002"].pop("held")
+    assert TickMixin._held_words(home, r) is r, "nothing held: the reading itself"
+    by["TD-002"]["held"] = next(e["held"] for e in view["ledger"]["entries"] if e["id"] == "TD-002")
+    row = next(x for x in ui.ledger_for_you({root: r}, [], {}, NOW)["groups"][0]["rows"] if x["id"] == "TD-002")
+    assert row["hold_by"] == "the person's session paul-1"
+    drawn = str(Markup(ui.templates.get_template("inbox_row.html").module.ledger({**row, "home": "queue"}, "later")))
+    assert 'title="held by the person&#39;s session paul-1"' in drawn
