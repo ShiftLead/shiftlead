@@ -16,7 +16,7 @@ from test_ui_keys import PROBE, UI
 from test_ui_team_summary import NOW, _iso, claim, member, reading
 
 from shiftlead.ui import app as ui
-from shiftlead.ui.org import drawn_facets
+from shiftlead.ui.org import REF_WIDTH, drawn_facets
 
 pytestmark = pytest.mark.unit
 
@@ -74,6 +74,31 @@ def test_eight_rows_then_more_linking_to_the_merged_column_and_the_empty_windows
     html = render(s)
     assert '<a class="meta more" href="/repo/samscrape?win=week#completed">+3 more</a>' in html
     assert "nothing completed today" in html and "+11" not in html
+
+
+def test_each_row_shows_its_short_age_and_each_empty_window_says_its_own_word():
+    closes = [close("TD-1", 101, 1), close("TD-2", 102, 26)]  # an hour ago; past a day, within the week
+    s = summary([member("a", progress=[claim(c["id"], status="done") for c in closes])], closes)
+    assert [r["age"] for r in s["completed"]["week"]["rows"]] == ["1h", "1d"]
+    done = render(s)[render(s).index('data-mv="completed"') :]
+    assert f'data-doing-at="{closes[0]["closed"]}" title="{closes[0]["closed"]}">1h</span>' in done
+    assert f'title="{closes[1]["closed"]}">1d</span>' in done
+    html = render(summary([member("a")], []))
+    assert all(f"nothing completed {w}" in html for w in ("today", "this week", "this month"))
+    old = [close("TD-3", 103, 24 * 10)]  # ten days ago: the month's alone
+    html = render(summary([member("a", progress=[claim("TD-3", status="done")])], old))
+    assert "nothing completed today" in html and "nothing completed this week" in html
+    assert "nothing completed this month" not in html
+
+
+def test_the_completed_reference_track_is_the_longest_id_shown_capped_at_ref_width():
+    closes = [close("TD-1", 101, 1), close("TD-1234", 102, 2)]
+    s = summary([member("a", progress=[claim(c["id"], status="done") for c in closes])], closes)
+    assert s["done_ref_w"] == len("TD-1234")
+    assert "--ref-n: 7; --who-n: 0;" in render(s)
+    long = [close("TD-123456789", 103, 1)]  # 12 characters, past the column's cap
+    s = summary([member("a", progress=[claim("TD-123456789", status="done")])], long)
+    assert s["done_ref_w"] == REF_WIDTH == 10 and f"--ref-n: {REF_WIDTH};" in render(s)
 
 
 def test_the_face_opens_on_in_motion_with_a_claim_else_completed_and_the_toggle_is_drawn():
