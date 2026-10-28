@@ -398,6 +398,7 @@ async def agent(tmp_path, monkeypatch):
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))
+
     # the tick loop too (TD-1087): `serve` binds the socket a loop step before it makes `_ticker`, so a
     # test that parked the ticks in that step found none to park, and the loop started under it
     def up() -> bool:
@@ -560,6 +561,18 @@ def served(root) -> None:
 # source (CI), a slow fetch: a test skips on these. Anything else — a malformed pin, a commit the source
 # does not have, an interface this build is too old for — is a broken pin, and fails.
 _UNREACHABLE = ("git ", "the launcher gave no answer", "the launcher could not run", "another launcher has held")
+
+
+def repo_ledger() -> tuple[str, str]:
+    """(ledger text, archive text) of this checkout's own ledger, through the reader the home uses
+    (`ledger.read_pair`, §4.4 *Either layout*): a v2 `docs/ledger/` reads as the text a v1 file would
+    hold, without its summary table, so a test of the repo's own entries never names a layout (TD-1195)."""
+    from sessionorc import ledger
+
+    root = Path(__file__).resolve().parents[1]
+    _, text, archive, faults = ledger.read_pair(ledger.ledger_path(root), ledger.fs_io(root))
+    assert text is not None and not faults, faults or "this checkout's ledger cannot be read"
+    return text, archive or ""
 
 
 def pinned_script(name: str) -> Path:

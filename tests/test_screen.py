@@ -5,6 +5,7 @@ import pathlib
 from pathlib import Path
 
 import pytest
+from conftest import repo_ledger
 from design_doc import files as design_files
 from design_doc import whole
 
@@ -146,6 +147,15 @@ def test_the_standdown_rule_needs_both_of_the_banners_markers():
     assert m.explain(para) is None and m.explain([" ".join(para)]) is None
 
 
+def _sources():
+    """(name, text) of each file that talks about the screen rules: the rules, this test, the design and the
+    ledger (one text in either layout, TD-1195)."""
+    root = pathlib.Path(__file__).parents[1]
+    for rel in (RULES_FILE, root / "tests" / "test_screen.py", *design_files()):
+        yield rel, pathlib.Path(rel).read_text()
+    yield "the ledger", repo_ledger()[0]
+
+
 def test_the_rules_own_sources_do_not_trip_the_rule_they_describe():
     """The fourth review of PR #125: `all` and `any` may be satisfied by different lines of the
     window, so the rule's own comment — which quoted both counter-examples a line apart — fired on
@@ -155,10 +165,8 @@ def test_the_rules_own_sources_do_not_trip_the_rule_they_describe():
     that talk about the rule, in the same 20-line windows the tick would hand it.
     """
     m = Manifest.load(RULES_FILE)
-    root = pathlib.Path(__file__).parents[1]
-    for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
-                *design_files()):  # fmt: skip
-        lines = pathlib.Path(rel).read_text().splitlines()
+    for rel, text in _sources():
+        lines = text.splitlines()
         for i in range(max(1, len(lines) - 19)):
             got = m.explain(lines[i : i + 20])
             assert not (got and got.rule == "remote-control-standdown"), f"{rel} line {i + 1}"
@@ -192,10 +200,8 @@ def test_a_held_peer_message_needs_a_person_and_prose_about_it_does_not():
     ]
     for lines in quiet:
         assert m.explain(lines) is None, lines
-    root = pathlib.Path(__file__).parents[1]
-    for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
-                *design_files()):  # fmt: skip
-        lines = pathlib.Path(rel).read_text().splitlines()
+    for rel, text in _sources():
+        lines = text.splitlines()
         for i in range(max(1, len(lines) - 14)):
             got = m.explain(lines[i : i + 15])
             assert not (got and got.rule == "held-peer-message"), f"{rel} line {i + 1}"
@@ -221,10 +227,8 @@ def test_claude_codes_first_run_screens_need_a_person_and_prose_about_them_does_
     ]
     for lines in quiet:
         assert m.explain(lines) is None, lines
-    root = pathlib.Path(__file__).parents[1]
-    for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
-                *design_files()):  # fmt: skip
-        lines = pathlib.Path(rel).read_text().splitlines()
+    for rel, text in _sources():
+        lines = text.splitlines()
         for i in range(max(1, len(lines) - 14)):
             got = m.explain(lines[i : i + 15])
             assert not (got and got.rule.startswith("first-run-")), f"{rel} line {i + 1}"

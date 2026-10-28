@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from conftest import pinned_script
+from conftest import pinned_script, repo_ledger
 
 from sessionorc import ledger
 
@@ -43,9 +43,7 @@ def _same(script: dict, home: dict[str, dict]) -> None:
 def test_the_home_derives_what_the_script_derives_on_this_ledger(tmp_path):
     """The equality test: the whole record, not only the ids. Neither reader
     has a roster, so a `<repo>#TD-NNN` item keeps its block in both."""
-    text = (ROOT / "docs" / "technical_debt.md").read_text(encoding="utf-8")
-    archive = (ROOT / "docs" / "technical_debt_archive.md").read_text(encoding="utf-8")
-    home = _home(text, archive, [])
+    home = _home(*repo_ledger(), [])
     _same(_script(ROOT, tmp_path / "no-roster"), home)
     assert any(e["pickable"] == "yes" for e in home.values()) and any(e["pickable"] == "no" for e in home.values())
 
