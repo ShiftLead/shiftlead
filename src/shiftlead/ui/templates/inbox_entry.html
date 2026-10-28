@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {#- §4.5 screen 6 *The message page*: the entry's subject heads the page and its tab (TD-566) -#}
 {% block title %}{% if entry and not gone %}{{ row_subject(entry) }} · {% endif %}Inbox · ShiftLead{% endblock %}
+{% block icon %}page-inbox{% endblock %}
 {# design §4.5 screen 6 *The message page*, §4.5a **Inbox message page** (TD-129, built by TD-136;
    mockup `InboxMessage.dc.html`). Three parts, in Paul's order: **the entry** — its row, drawn by
    the row's own macro in the section the list has it in, so the head, the text (*details* open: a

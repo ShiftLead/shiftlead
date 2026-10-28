@@ -14,6 +14,9 @@
     load never draws the server's *All* and *day* first. Three seconds on, they are shown whatever the script did. -#}
 <script>(function () { if (location.pathname !== "/queue") return; var d = document.documentElement, w, p; try { w = JSON.parse(localStorage.getItem("ao.qwin")); p = JSON.parse(localStorage.getItem("ao.qpicks")); } catch (e) {} if (w && w !== "day") d.dataset.qpend = "1"; if (!location.search && typeof p === "string" && p.charAt(0) === "?") { history.replaceState(null, "", "/queue" + p + location.hash); d.dataset.qpend = "1"; } if (d.dataset.qpend) setTimeout(function () { delete d.dataset.qpend; }, 3000); })();</script>
 <link rel="stylesheet" href="{{ static_url('app.css') }}">
+{#- design §4.5 *A tab's icon* (TD-1155): each page its own tile, Focus its state's, kept current by `AO.focusIcon` -#}
+{% set icon_name %}{% block icon %}page-sessions{% endblock %}{% endset %}
+<link rel="icon" type="image/svg+xml" href="{{ static_url('icons/' ~ icon_name|trim ~ '.svg') }}"{% block icon_attrs %}{% endblock %}>
 {% block head %}{% endblock %}
 </head>
 {#- design goal 12, §5 `person.terminal` (TD-148): the person's face and size, for every terminal this page opens -#}

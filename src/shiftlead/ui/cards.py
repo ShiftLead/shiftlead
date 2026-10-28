@@ -6,6 +6,7 @@ re-exported from it, so a route, a template or a test reads each name from the a
 
 from __future__ import annotations
 
+import typing
 from collections.abc import Collection, Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -17,6 +18,7 @@ from sessionorc.agent_common import CLOSED_KEEP, RESTART_CEILING, RESTART_WINDOW
 from sessionorc.models import (
     GRANTS,
     STATE_RANK,
+    State,
     context_over,
     context_reading,
     has_control,
@@ -46,8 +48,23 @@ from shiftlead.ending import (
 from shiftlead.org import MANAGER_WHEN
 
 from . import uiconf
-from .common import _age, _instant, editor_file, editor_link, host_name
+from .common import _age, _instant, editor_file, editor_link, host_name, static_url, templates
 from .transcript import transcript_editor
+
+# A record's state as its card's class (§4.5 *The card's anatomy*): the two whose word is not a class name
+STATE_CLASS = {"needs-you": "needs", "stalled?": "stalled"}
+# Every class a Focus tab's icon is drawn for (§4.5 *A tab's icon*, TD-1155): each state's, then the two
+# the card composes over a state — an empty seat's *on call* and a declared wait's *waiting*
+STATE_ICON_CLASSES = frozenset({STATE_CLASS.get(s, s) for s in typing.get_args(State)} | {"oncall", "waiting"})
+
+
+def state_icons() -> dict[str, str]:
+    """Each state class's tab icon, `static/icons/state-<class>.svg` by its hashed URL: what Focus's
+    link carries in `data-icons`, so `AO.focusIcon` swaps it as the state moves (TD-1155)."""
+    return {c: static_url(f"icons/state-{c}.svg") for c in sorted(STATE_ICON_CLASSES)}
+
+
+templates.env.globals["state_icons"] = state_icons
 
 # -- identity alarms (design §4.8a, TD-077 step 2) -------------------------------------------------
 
@@ -222,7 +239,7 @@ def view(
     state = s["state"]
     # `closed` is its own class since TD-095: it was `done`, drawn green, and on a card green now
     # means working and nothing else (design §4.5 *The card's anatomy*) — closed is over, and grey.
-    d["state_class"] = {"needs-you": "needs", "stalled?": "stalled"}.get(state, state)
+    d["state_class"] = STATE_CLASS.get(state, state)
     d["state_label"] = {"needs-you": "needs you", "closed": "closed"}.get(state, state)
     d["rank"] = STATE_RANK.get(state, 9)
     # Finished while nobody was looking (design §4.2, TD-017): not a state, a rendering of `idle`
