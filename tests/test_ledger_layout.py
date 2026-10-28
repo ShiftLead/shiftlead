@@ -276,3 +276,136 @@ def test_a_v2_ledger_under_a_tree_that_predates_its_reader_is_unserved(tmp_path,
     asked.clear()
     seams.reading(two, old=got)  # the age is carried: ancestry never changes
     assert asked == []
+
+
+_HEAD = "# Technical debt\n\n"
+
+
+def _entry(n: int, title: str) -> str:
+    return f"## TD-{n:03d}: {title}\n\n**Priority:** Low\n**Status:** Open.\n\n---\n"
+
+
+def _commit_as(root: Path, subject: str) -> None:
+    _git(root, "add", "-A")
+    _git(root, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", subject)
+
+
+def _split_history(tmp_path: Path) -> Path:
+    """A v1 ledger with TD-001 and TD-002; TD-002 archived (#5); the split (#6); TD-003 added as a file (#7);
+    TD-001 moved into `archive/` (#8). `origin/main` at the tip."""
+    root = tmp_path / "h"
+    (root / "docs").mkdir(parents=True)
+    _git(tmp_path, "init", "-q", str(root))
+    led, arch = root / "docs" / "technical_debt.md", root / "docs" / "technical_debt_archive.md"
+    led.write_text(_HEAD + _entry(1, "one") + "\n" + _entry(2, "two"), encoding="utf-8")
+    arch.write_text("# Archive\n\n", encoding="utf-8")
+    _commit_as(root, "open both (#4)")
+    led.write_text(_HEAD + _entry(1, "one"), encoding="utf-8")
+    arch.write_text("# Archive\n\n" + _entry(2, "two"), encoding="utf-8")
+    _commit_as(root, "archive TD-002 (#5)")
+    files = lb.split(led.read_text(encoding="utf-8"), arch.read_text(encoding="utf-8"))
+    led.unlink()
+    arch.unlink()
+    for rel, text in files.items():
+        p = root / "docs" / "ledger" / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+    _commit_as(root, "split the ledger (#6)")
+    (root / "docs" / "ledger" / "TD-003.md").write_text(_entry(3, "three"), encoding="utf-8")
+    _commit_as(root, "TD-003 (#7)")
+    _git(root, "mv", "docs/ledger/TD-001.md", "docs/ledger/archive/TD-001.md")
+    _commit_as(root, "archive TD-001 (#8)")
+    _git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
+    return root
+
+
+def test_a_v2_ledgers_history_reads_across_its_split(tmp_path):
+    """§4.4 *Either layout*, *Across a split*: the split opens and closes nothing, an entry keeps its v1
+    opening, one closed before the split stays closed, a file added under the directory opens and one moved
+    into `archive/` closes, with its PR."""
+    root = _split_history(tmp_path)
+    text = lb.load("docs/ledger", *ledger.fs_io(root))[0]
+    life = ledger.history(root, "docs/ledger", text)
+    assert life is not None and set(life) == {"TD-001", "TD-002", "TD-003"}
+    assert life["TD-002"].closed is not None and life["TD-002"].pr == 5
+    assert life["TD-001"].opened == life["TD-002"].opened  # its v1 opening, through the split
+    assert life["TD-001"].closed is not None and life["TD-001"].pr == 8
+    assert life["TD-003"].closed is None and life["TD-003"].title == "three"
+    got = ledger.reading(root, datetime.now(UTC))
+    assert "history_error" not in got and {e["id"] for e in got["recent"]} >= {"TD-001", "TD-003"}
+
+
+def test_a_ledger_born_v2_opens_its_first_files(tmp_path):
+    """A commit adding `README.md` with no v1 headings removed is no split: its entry files open."""
+    two = _v2(tmp_path / "two")
+    _commit_as(two, "a v2 ledger (#3)")
+    text = lb.load("docs/ledger", *ledger.fs_io(two))[0]
+    life = ledger.history(two, "docs/ledger", text)
+    assert life and {e["id"] for e in lb.entries(LEDGER)} <= set(life)
+
+
+def test_the_rows_a_merged_pr_added_read_a_v2_ledger(tmp_path):
+    """§4.4 *Either layout*: `_ledger_rows_on_main` takes the `TD-NNN.md` files a squash commit adds directly
+    under the directory, none for the split, none for a move into `archive/`; a carried v1 path still reads."""
+    from sessionorc import reports
+
+    root = _split_history(tmp_path)
+    assert reports._ledger_rows_on_main(root, 7, "docs/ledger") == ["TD-003"]
+    assert reports._ledger_rows_on_main(root, 7, "docs/technical_debt.md") == ["TD-003"]  # carried from before
+    assert reports._ledger_rows_on_main(root, 6, "docs/ledger") == []  # the split adds its README
+    assert reports._ledger_rows_on_main(root, 8, "docs/ledger") == []  # a move into archive/
+    assert reports._ledger_rows_on_main(root, 4, "docs/ledger") == ["TD-001", "TD-002"]  # before it: the file
+
+
+def test_the_ticks_change_test_reads_a_directory_but_not_its_rank_file(tmp_path):
+    """§4.4 *What changes with no one file*: the newest mtime among the directory, `archive/`, the entry
+    files of both and `README.md`, with the resolved path; `rank.yml` alone moves nothing."""
+    import os
+
+    two = _v2(tmp_path / "two")
+    base = two / "docs" / "ledger"
+    rank = two / lb.rank_path("docs/ledger")
+    rank.write_text("TD-001: 0\n", encoding="utf-8")
+    for p in [base, *base.rglob("*")]:
+        os.utime(p, (1000, 1000))
+    first = ledger.stamp(two)
+    assert first == ("docs/ledger", 1000)
+    rank.write_text("TD-001: 1\n", encoding="utf-8")  # a rank write, in place: the directory's mtime stays
+    assert rank.stat().st_mtime > 1000 and ledger.stamp(two) == first
+    entry = next(base.glob("TD-*.md"))
+    os.utime(entry, (2000, 2000))
+    assert ledger.stamp(two) == ("docs/ledger", 2000)
+    one = _v1(tmp_path / "one")
+    assert ledger.stamp(one)[0] == "docs/technical_debt.md"
+
+
+def test_the_queues_archive_reads_a_v2_archive_as_its_v1_twin(tmp_path):
+    """§4.4 *Completed cards*' cache: a v2 `archive/` reads the v1 archive's entries (a set by id), and an
+    unchanged directory is served from the cache."""
+    from sessionorc import queue
+
+    one, two = _v1(tmp_path / "one"), _v2(tmp_path / "two")
+    a = queue.archive_entries(ledger.archive_of(one, "docs/technical_debt.md"))
+    path = ledger.archive_of(two, "docs/ledger")
+    assert path == two / "docs" / "ledger" / "archive"
+    b = queue.archive_entries(path)
+    assert a and {e["id"] for e in a} == {e["id"] for e in b}
+    assert queue.archive_entries(path) is b
+    (path / "TD-999.md").write_text(_entry(999, "late"), encoding="utf-8")
+    assert "TD-999" in {e["id"] for e in queue.archive_entries(path)}
+
+
+def test_the_rank_prunes_archive_reads_a_v2_archive(tmp_path):
+    """§4.4 *The rank file*: `_rank_lined` weighs a v2 ledger's `archive/` as it does a v1 archive file."""
+    from sessionorc.agent_rank import RankMixin
+
+    got = {}
+    for name, root in (("one", _v1(tmp_path / "one")), ("two", _v2(tmp_path / "two"))):
+        rel = "docs/technical_debt.md" if name == "one" else "docs/ledger"
+        archived = next(e["id"] for e in lb.entries(ARCHIVE))
+        open_id = next(e["id"] for e in lb.entries(LEDGER))
+        rank = root / lb.rank_path(rel)
+        rank.write_text(f"{archived}: 0\n{open_id}: 1\nTD-9999: 2\n", encoding="utf-8")
+        led = ledger.reading(root, NOW, with_history=False)
+        got[name] = RankMixin._rank_lined(None, {name: (str(root), lb.rank_path(rel), led)})[name]
+    assert got["one"] == got["two"] and len(got["one"]) == 2

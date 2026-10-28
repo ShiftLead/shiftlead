@@ -284,8 +284,10 @@ class RankMixin:
                 continue
             try:
                 lined = rank_mod.lined_ids((Path(root) / rel).read_text(encoding="utf-8", errors="replace"))
-                archive = (Path(root) / ledger_mod.archive_path(str(led["path"]))).read_text(encoding="utf-8")
             except OSError:
+                continue
+            archive = ledger_mod.read_pair(str(led["path"]), ledger_mod.fs_io(root))[2]  # either layout
+            if archive is None:
                 continue
             known = ledger_mod.ids_in(archive) | {str(e.get("id")) for e in led["entries"]}
             out[name] = [t for t in lined if t in known]

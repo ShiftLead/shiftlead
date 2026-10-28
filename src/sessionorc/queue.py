@@ -49,7 +49,7 @@ ENTRY_HEAD = re.compile(r"^## (TD-\d+):", re.M)
 RESOLVED_LINE = re.compile(r"^\*\*Resolved:\*\*[ \t]*(.+)$", re.M)
 
 # the archive's entries per file: (mtime_ns, size, blob sha, entries) — re-parsed only when its blob changes
-_ARCHIVES: dict[str, tuple[int, int, str, list[dict[str, Any]]]] = {}
+_ARCHIVES: dict[str, tuple[Any, Any, str, list[dict[str, Any]]]] = {}  # `_archive_stat`, the text's sha, entries
 
 
 def qid(repo: str, tid: str) -> str:
@@ -108,26 +108,40 @@ def blob_sha(data: bytes) -> str:
     return hashlib.sha1(b"blob %d\0" % len(data) + data, usedforsecurity=False).hexdigest()
 
 
+def _archive_stat(path: Path) -> tuple[Any, Any]:
+    """The cache's first key: a file's mtime and size; a v2 `archive/` directory's mtime, and its entry
+    files' count and newest mtime (§4.4 *Completed cards*' cache, TD-1144). Raises OSError as `stat` does."""
+    st = path.stat()
+    if not path.is_dir():
+        return st.st_mtime_ns, st.st_size
+    files = [f.stat().st_mtime_ns for f in path.iterdir() if lb.ENTRY_FILE_RE.match(f.name)]
+    return st.st_mtime_ns, (len(files), max(files, default=0))
+
+
 def archive_entries(path: Path) -> list[dict[str, Any]]:
-    """ledgerboard's `entries()` of an archive file, cached by its blob sha (a stat first, so an
-    unchanged file is not even read), each entry's `fields` carrying its `resolved` line wherever the
-    body writes it. A file that cannot be read has none."""
+    """ledgerboard's `entries()` of an archive — a v1 file, or a v2 ledger's `archive/` directory joined
+    by `lb.load()` — cached by the sha of its text (a stat first, so an unchanged archive is not even read),
+    each entry's `fields` carrying its `resolved` line wherever the body writes it. One that cannot be read
+    has none."""
     key = str(path)
     try:
-        st = path.stat()
+        st = _archive_stat(path)
     except OSError:
         _ARCHIVES.pop(key, None)
         return []
     got = _ARCHIVES.get(key)
-    if got and got[0] == st.st_mtime_ns and got[1] == st.st_size:
+    if got and (got[0], got[1]) == st:
         return got[3]
-    try:
-        data = path.read_bytes()
-    except OSError:
-        return []
+    if path.is_dir():
+        data = lb.load(path.name, *ledger_mod.fs_io(path.parent))[0].encode()
+    else:
+        try:
+            data = path.read_bytes()
+        except OSError:
+            return []
     sha = blob_sha(data)
     if got and got[2] == sha:
-        _ARCHIVES[key] = (st.st_mtime_ns, st.st_size, sha, got[3])
+        _ARCHIVES[key] = (*st, sha, got[3])
         return got[3]
     text = ledger_mod.strip_comments(data.decode("utf-8", errors="replace"))
     ents = lb.entries(text)
@@ -140,7 +154,7 @@ def archive_entries(path: Path) -> list[dict[str, Any]]:
     for e in ents:
         if "resolved" not in e["fields"] and e["id"] in resolved:
             e["fields"] = {**e["fields"], "resolved": resolved[e["id"]]}
-    _ARCHIVES[key] = (st.st_mtime_ns, st.st_size, sha, ents)
+    _ARCHIVES[key] = (*st, sha, ents)
     return ents
 
 
@@ -279,7 +293,7 @@ def reading(
                 open_.setdefault(qid(name, e["id"]), {**e, "repo": name})
     archived: dict[str, dict[str, Any]] = {}  # every archived entry, by qid
     for name, r in rs.by_name.items():
-        path = Path(rs.roots[name]) / ledger_mod.archive_path(str(r["ledger"].get("path") or ledger_mod.DEFAULT))
+        path = ledger_mod.archive_of(rs.roots[name], str(r["ledger"].get("path") or ledger_mod.DEFAULT))
         for a in archive_entries(path):
             archived.setdefault(qid(name, a["id"]), {**a, "repo": name})
     closed_at: dict[str, Mapping[str, Any]] = {}  # *What closed* (TD-604): the closing commit's time and PR
