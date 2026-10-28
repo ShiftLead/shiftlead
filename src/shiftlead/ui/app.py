@@ -160,10 +160,11 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     checkout_of,  # noqa: F401
     close_state,  # noqa: F401
     editor_file,  # noqa: F401
-    editor_file_link,
+    editor_file_link,  # noqa: F401
     editor_link,  # noqa: F401
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
+    ledger_link,
     live_divider,  # noqa: F401
     live_unknown,  # noqa: F401
     log,  # noqa: F401
@@ -1866,8 +1867,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "doing": drows[0],
                 "chips": doing_chips(drows[0], [g["team"] for g in serving]),
                 "doer_w": drows[1],
-                # a file link (§4.6, TD-689): the file form with `:1`, the repo's checkout opened first
-                "ledger_editor": editor_file_link(ledger_file) if ledger_file else None,
+                # a file link (§4.6, TD-689): the file form with `:1`, the repo's checkout opened first; a v2
+                # directory's is the folder form with no line, one launch (§4.5a *Open ledger*, TD-1146)
+                "ledger_editor": ledger_link(ledger_file) if ledger_file else None,
                 # the seams the repo leaves unset, and a ledger that is not there (§4.5a, TD-591)
                 "seams": missing_seams(r),
                 "host": host_name(),

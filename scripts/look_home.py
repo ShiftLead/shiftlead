@@ -16,6 +16,7 @@ its `/tmp/aolook-*` home are then left for you to remove.
 
     pdm run python scripts/look_home.py            # prints `look home: http://127.0.0.1:<port>/`
     pdm run python scripts/look_home.py --port 8799 --sessions 0
+    pdm run python scripts/look_home.py --v2       # its ledger a v2 directory, docs/ledger/
 
 Run it with the worktree's own interpreter: the children import `src/` of this checkout first.
 """
@@ -135,17 +136,25 @@ def child_env(home: Path, sock: str) -> dict[str, str]:
     return env
 
 
-def write_fixtures(home: Path) -> Path:
-    """The home's files and the fixture repo; returns the repo's path."""
+def write_fixtures(home: Path, v2: bool = False) -> Path:
+    """The home's files and the fixture repo; returns the repo's path. `v2`: its ledger is a directory of one
+    file per entry, `docs/ledger/`, split from the same fixture by `ledgerboard.split()` (§4.4 *Either layout*)."""
     repo = home / "repo"
     (repo / "docs").mkdir(parents=True)
     today = time.strftime("%Y-%m-%d")
     (repo / "docs" / "user_attention.md").write_text(BOARD.format(today=today), encoding="utf-8")
-    (repo / "docs" / "technical_debt.md").write_text(LEDGER, encoding="utf-8")
-    # the Inbox runs the board reader a registered repo carries. This checkout pins dev-cadence (TD-129) and
-    # carries no copies, so the fixture repo is a synced one made from the pinned tree's files
     sys.path.insert(0, str(SRC))
     from sessionorc import cadence
+    from sessionorc import ledgerboard as lb
+
+    if v2:
+        for rel, text in lb.split(LEDGER, "").items():
+            (repo / "docs" / "ledger" / rel).parent.mkdir(parents=True, exist_ok=True)
+            (repo / "docs" / "ledger" / rel).write_text(text, encoding="utf-8")
+    else:
+        (repo / "docs" / "technical_debt.md").write_text(LEDGER, encoding="utf-8")
+    # the Inbox runs the board reader a registered repo carries. This checkout pins dev-cadence (TD-129) and
+    # carries no copies, so the fixture repo is a synced one made from the pinned tree's files
 
     tree, why = cadence.tree(ROOT)
     if tree is None:
@@ -226,6 +235,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--port", type=int, default=0, help="the UI's port (default: a free one)")
     ap.add_argument("--home", type=Path, help="the scratch SHIFTLEAD_HOME, which must not exist (default: under /tmp)")
     ap.add_argument("--sessions", type=int, default=len(FIXTURE_SESSIONS), help="fixture shell sessions to start")
+    ap.add_argument("--v2", action="store_true", help="the fixture repo's ledger is a v2 directory, docs/ledger/")
     ap.add_argument("--agent", metavar="SOCKET", help=argparse.SUPPRESS)  # the child's own mode
     args = ap.parse_args(argv)
     if args.agent:
@@ -255,7 +265,7 @@ def main(argv: list[str] | None = None) -> int:
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, on_signal)
     try:
-        repo = write_fixtures(home)
+        repo = write_fixtures(home, v2=args.v2)
         agent = subprocess.Popen([sys.executable, __file__, "--agent", sock], env=env, cwd=ROOT)
         procs.append(agent)
         if not wait_for(lambda: stopping or (home / "agent.sock").exists() or agent.poll() is not None, 15):

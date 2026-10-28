@@ -697,3 +697,18 @@ def test_a_malformed_permissions_rule_is_named_where_the_page_shows_settings_yml
         assert "permbad" not in client.get("/settings").text.split('id="sec-settingsfile"')[1]
     finally:  # the module's agent outlives this test: its file is put back
         f.write_text(was) if was is not None else f.unlink(missing_ok=True)
+
+
+@pytest.mark.unit
+def test_the_ledger_row_says_the_resolved_ledger_and_whether_the_file_set_it(tmp_path):
+    """§4.4 *Either layout*, TD-1146: the row shows the ledger as found — *docs/ledger (directory)* for a v2
+    checkout, the file for a v1 one — marked default while `.shiftlead.yml` sets no `ledger:`."""
+    v1, v2 = tmp_path / "v1", tmp_path / "v2"
+    v1.mkdir()
+    (v2 / "docs" / "ledger").mkdir(parents=True)
+    a, b = ({r["key"]: r for r in c["rows"]}["ledger"] for c in setmod.repo_cards([str(v1), str(v2)], {}))
+    assert a == {"key": "ledger", "value": "docs/technical_debt.md", "default": True}
+    assert b == {"key": "ledger", "value": "docs/ledger (directory)", "default": True}
+    (v1 / ".shiftlead.yml").write_text("ledger: docs/technical_debt.md\n")
+    (a,) = ({r["key"]: r for r in c["rows"]}["ledger"] for c in setmod.repo_cards([str(v1)], {}))
+    assert a == {"key": "ledger", "value": "docs/technical_debt.md", "default": False}

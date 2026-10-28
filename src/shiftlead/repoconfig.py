@@ -40,6 +40,8 @@ from typing import Any
 import yaml
 
 from sessionorc import cadence, paths, workorders
+from sessionorc import ledger as ledger_mod
+from sessionorc import ledgerboard as lb
 from sessionorc import settle as settle_mod
 from sessionorc.models import GRANTS, normalize_context, normalize_review, owner_word
 
@@ -52,7 +54,7 @@ RETIRED = {
     "anchor": "the anchor seat is retired — no seat runs in a main checkout (design §4.9b *No anchor seat*, "
     "§9 invariant 2); delete the key",
 }
-DEFAULT_LEDGER = "docs/technical_debt.md"
+DEFAULT_LEDGER = ledger_mod.DEFAULT  # unset, `load` resolves it by the default rule (§4.4 *Either layout*)
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
 ROLE_KEYS = (
     "brief", "lane", "grants", "profile", "controllers", "icon", "label", "review", "context", "message", "prompts",
@@ -162,7 +164,8 @@ HANDED_ENTRY = {
     "{repo}": "the repo its `entry` names",
     "{type}": "the `type` its `entry` carries",
     "{priority}": "the `priority` its `entry` carries",
-    "{ledger}": "that repo's ledger file (`.shiftlead.yml`'s `ledger:`, `docs/technical_debt.md` by default)",
+    "{ledger}": "that repo's ledger, a file or a directory of one file per entry (`.shiftlead.yml`'s `ledger:`, by "
+    "default `docs/ledger` where it is a directory, else `docs/technical_debt.md`)",
 }
 
 
@@ -662,7 +665,8 @@ class RepoConfig:
     unattended: dict[str, Any] | None = None  # the whole block, or None: no unattended mode
     roles: dict[str, dict[str, Any]] = field(default_factory=dict)  # the repo's own overrides, per key
     controllers: list[str] = field(default_factory=list)
-    ledger: str = DEFAULT_LEDGER
+    ledger: str = DEFAULT_LEDGER  # as resolved by `load` when unset: the checkout's `docs/ledger` or the v1 file
+    ledger_set: bool = False  # the file names `ledger:` (§5): unset, `ledger` is the default rule's
     ready_when: list[str] = field(default_factory=lambda: list(DEFAULT_READY_WHEN))
     commands: dict[str, str] = field(default_factory=dict)  # name → command; `test`, `lint` fill the briefs (§5)
     teams: dict[str, Any] = field(default_factory=dict)  # §4.9; read by the team step, passed through here
@@ -716,11 +720,25 @@ def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
     path = root / FILE
     cfg = load_text(reader(path), root, path=path)
     cfg.read = read
+    _resolve_ledger(cfg, read)
     for name in cfg.roles:
         # an overlay is not a definition (design §4.9c): a key naming no preset and no directory is refused
         if name not in PRESETS and definition(cfg, name) is None:
             raise ValueError(f"{cfg.path}: `roles`.{name}: {_unknown(cfg, name)}")
     return cfg
+
+
+def _resolve_ledger(cfg: RepoConfig, read: Reader | None) -> None:
+    """The unset `ledger:` resolved once, here, by `sessionorc.ledger`'s default rule (§4.4 *Either layout*,
+    TD-1146): `docs/ledger` where it is a directory in the checkout, else `docs/technical_debt.md`. A checkout
+    read across a link (`read`) is asked for the directory's `README.md`, which every v2 ledger carries."""
+    if cfg.ledger_set or cfg.root is None:
+        return
+    if read is None:
+        cfg.ledger = ledger_mod.ledger_default(cfg.root)
+    else:
+        v2 = read(cfg.root / ledger_mod.LEDGER_DIR_REL / lb.LEDGER_README) is not None
+        cfg.ledger = ledger_mod.LEDGER_DIR_REL if v2 else ledger_mod.DEFAULT
 
 
 def load_text(text: str | None, repo_root: Path | str, *, path: Path | None = None) -> RepoConfig:
@@ -754,7 +772,9 @@ def discover(start: Path | str) -> RepoConfig:
         if (d / FILE).is_file():
             return load(d)
         if (d / ".git").exists():
-            return RepoConfig(root=d)
+            cfg = RepoConfig(root=d)
+            _resolve_ledger(cfg, None)
+            return cfg
     return RepoConfig(root=here)
 
 
@@ -763,7 +783,7 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
     if key == "ledger":
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{where} must be a non-empty string")
-        cfg.ledger = value.strip()
+        cfg.ledger, cfg.ledger_set = value.strip().rstrip("/") or value.strip(), True
     elif key == "unattended":
         if value is None:
             cfg.unattended = None

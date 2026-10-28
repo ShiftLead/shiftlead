@@ -644,3 +644,27 @@ def test_a_text_is_parsed_once_and_each_reader_gets_its_own_copy(tmp_path, monke
         repoconfig.load_text("a: [", tmp_path)
     with pytest.raises(ValueError, match="not valid YAML"):  # a failure is not remembered as a parse
         repoconfig.load_text("a: [", tmp_path)
+
+
+def test_an_unset_ledger_resolves_by_the_default_rule_and_a_set_one_is_kept(tmp_path):
+    """§4.4 *Either layout*, TD-1146: the unset `ledger:` resolves once, in `load`, to `docs/ledger` where it
+    is a directory, else the v1 file; a set one is kept as written (a trailing `/` dropped) and marked set.
+    A checkout read across a link is asked for the directory's `README.md`; `discover` resolves it too."""
+    assert repoconfig.load(tmp_path).ledger == "docs/technical_debt.md"
+    (tmp_path / "docs" / "ledger").mkdir(parents=True)
+    cfg = repoconfig.load(tmp_path)
+    assert cfg.ledger == "docs/ledger" and not cfg.ledger_set
+    (tmp_path / ".git").mkdir()
+    assert repoconfig.discover(tmp_path / "docs").ledger == "docs/ledger"
+    (tmp_path / ".shiftlead.yml").write_text("ledger: notes/debt/\n")
+    cfg = repoconfig.load(tmp_path)
+    assert cfg.ledger == "notes/debt" and cfg.ledger_set
+    asked = []
+
+    def far(path):
+        asked.append(path)
+        return "# Ledger\n\nLedgerboard: 2\n" if path.name == "README.md" else None
+
+    assert repoconfig.load(tmp_path / "away", read=far).ledger == "docs/ledger"
+    assert asked[-1] == tmp_path / "away" / "docs" / "ledger" / "README.md"
+    assert repoconfig.load(tmp_path / "away", read=lambda p: None).ledger == "docs/technical_debt.md"

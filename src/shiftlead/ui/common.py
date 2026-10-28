@@ -1043,6 +1043,16 @@ def editor_file_link(path: str, folder: bool = True, line: int = 1) -> dict[str,
     )
 
 
+def ledger_link(path: str) -> dict[str, Any] | None:
+    """**Open ledger**'s link (§4.5a, TD-1146): `editor_file_link` on a v1 file; on a v2 directory (§4.4 *Either
+    layout*) the editor's folder form, with no line and no folder before it, and `dir` set — the button then
+    reads *Open ledger folder*. None where no button is drawn."""
+    if not os.path.isdir(path):  # this host's disk: the Repo page's checkout is the registry's, here
+        return editor_file_link(path)
+    ed = editor_link(path)
+    return {**ed, "folder": None, "wait": uiconf.file_link()["wait"], "dir": True} if ed else None
+
+
 templates.env.globals["editor_link"] = editor_link
 templates.env.globals["editor_file_link"] = editor_file_link  # every file button (§4.6, §4.5a; TD-689)
 templates.env.globals["person_terminal"] = uiconf.terminal  # every page hands it to its terminals (goal 12)

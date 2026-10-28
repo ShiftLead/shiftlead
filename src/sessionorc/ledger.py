@@ -828,6 +828,12 @@ def ledger_path(root: Path | str) -> str:
     A set path gone from the tree is read through `layout_at` by every reader, as a carried one is."""
     if (got := ledger_set(root)) is not None:
         return got
+    return ledger_default(root)
+
+
+def ledger_default(root: Path | str) -> str:
+    """The unset `ledger:` of the checkout at `root`: `docs/ledger` where that is a directory, else
+    `docs/technical_debt.md` (§4.4 *Either layout*) — `shiftlead.repoconfig.load` resolves its default by it."""
     return LEDGER_DIR_REL if (Path(root) / LEDGER_DIR_REL).is_dir() else DEFAULT
 
 

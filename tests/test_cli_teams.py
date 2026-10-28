@@ -509,9 +509,10 @@ def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
     assert asked and all(p["host"] == "devenv" and p["dir"] == there for p in asked)
     # the repo's file and brief, then what the layout slots look for: whether it is dev-cadence's source
     # (`sync.sh`, then `files/`, TD-1011), whether it is pinned (the lock, then the pin, TD-1014) and its
-    # design directory (TD-588)
+    # design directory (TD-588); and, the file naming no `ledger:`, whether its ledger is a v2 directory (TD-1146)
     layout = {"sync.sh", "launcher/INTERFACE", "docs/cadence-sync.lock", "docs/cadence.toml", "docs/design"}
-    assert {x for p in asked for x in p["paths"]} == {".shiftlead.yml", "docs/grind.md", *layout}
+    ledger = {"docs/ledger/README.md"}
+    assert {x for p in asked for x in p["paths"]} == {".shiftlead.yml", "docs/grind.md", *layout, *ledger}
     made = {p["name"]: p for p in creates(state)}
     assert "grind on the node: free-pick" in made["grind-1"]["prompt"] and made["grind-1"]["profile"] == "repo-grind"
     assert all(p["host"] == "devenv" and p["dir"] == there for p in made.values())

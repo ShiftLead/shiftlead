@@ -492,7 +492,12 @@ def repo_cards(
             continue
         card["exists"] = cfg.path is not None
         card["rows"] = [
-            _row("ledger", cfg.ledger, repoconfig.DEFAULT_LEDGER),
+            # the ledger as resolved (§4.4 *Either layout*, TD-1146): a directory says so, unset is the default
+            _row(
+                "ledger",
+                f"{cfg.ledger} (directory)" if (root / cfg.ledger).is_dir() else cfg.ledger,
+                is_default=not cfg.ledger_set,
+            ),
             _row("roles", sorted(cfg.roles), is_default=not cfg.roles),
             _row("controllers", cfg.controllers, is_default=not cfg.controllers),
             _row("teams", sorted(cfg.teams), is_default=not cfg.teams),

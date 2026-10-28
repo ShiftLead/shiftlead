@@ -30,7 +30,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # A work branch is named for its ledger reference (cadence §4: `tdNNN-<slug>`). Only that one shape
 # is read: anything looser would turn `release-2` and `ui-3-fix` into ledger references.
 BRANCH_RE = re.compile(r"^td-?(\d{1,4})(?:[-_].*)?$", re.IGNORECASE)
-LEDGER_DEFAULT = "docs/technical_debt.md"  # §5's `ledger:` key overrides it per record (`Session.ledger`)
+# a record with no `ledger` (one made before the client carried it): `derive` reads it through `layout_at`,
+# so a v2 checkout's `docs/ledger` is found beside it (§4.4 *Either layout*)
+LEDGER_DEFAULT = ledger.DEFAULT
 DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 
 
