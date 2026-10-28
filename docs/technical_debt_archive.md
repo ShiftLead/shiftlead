@@ -21214,7 +21214,7 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Added:** 2026-10-27 (test-audit-ao-1, auditing #2475)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Done — built 2026-10-27 in #2505 (grinder-ao-1).
 **Location:** `src/shiftlead/ui/app.py` (`entry_place`, `api_entry_session`), `src/shiftlead/teams.py` (`no_checkout`); `tests/test_ui_entry_host.py`
 
 **Why:** Test audit of #2475 (TD-1092 (2)), 2026-10-27. Mutation probe on `origin/main`: each change below, made alone, leaves `pdm run pytest -q tests/test_ui_entry_host.py tests/test_ui_entry.py tests/test_ui_teams.py tests/test_ui_repo_org.py tests/test_org.py tests/test_cli_org.py tests/test_cli_teams.py` at 302 passed. (1) `repo=plan["dir"]` in `api_entry_session`'s `create` → `repo=root` (only `dir=` is pinned): a node session would carry the home's path as its repo. (2) `entry_role(..., files)` → no `files`, and `files = files_on(...)` → `files = None`: the docstring says a feature on a node opens its flow's design role; a node whose flow differs is not tested. (3) `if cfg is None and container and not why:` → `if False:`: a container node's ledger name. (4) `except ValueError` around `config_on` → another type: a node whose `.shiftlead.yml` is invalid. (5) the 409 *no entry-<n> … is free in … on <host>*. (6) `no_checkout`'s `heading is not None` branch (the `projects.<name>.repos.<repo>` hint). The other twelve mutants of the PR's lines fail a test.
