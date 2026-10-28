@@ -21665,3 +21665,43 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Resolved:** 2026-10-27 (PR #2561) — `paths` takes `repo` and an `id`-less form; `POST /api/paths` (`paths_for`); `data-paths-ctx` on every mail, board, ledger and thread row (`common.paths_ctx`); the page's linker in `app.js` (`AO.itemAsker`, `AO.linkItemText`). Tests: `tests/test_ui_item_paths.py`. The lasting content is design §4.6 *A path in the Inbox and the Queue is a link too*.
 
 ---
+
+## TD-1177: `rpc_paths`' neither-form test cannot tell a relative run left unresolved from one resolved against the home: its fixture has no `src/x.py` under the home
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_ui_item_paths.py` (`test_paths_takes_repo_and_neither_beside_id`); `src/sessionorc/agent.py` (`rpc_paths`)
+
+**Why:** #2561 (TD-1115) made an `id`-less, `repo`-less ask resolve only absolute and `~/` runs (docstring: "with neither, only an absolute or `~/` run is resolved, the rest `None`"). The test asserts `"src/x.py": None` for that form, but no `src/x.py` exists under the home it resolves against, so `None` is what a resolved-against-home run would also answer. On `origin/main` (a443f7662), replacing `bare = [r for r in runs if r.startswith(("/", "~/"))]` with `bare = list(runs)` leaves `tests/test_ui_item_paths.py` and `tests/test_ui_whole_on_hover.py` green (9 passed). A relative run would then read the home's files, which the home context exists to refuse.
+
+**Fix:** in the test's fixture write `src/x.py` (and `x`) under the user's home directory so a relative run would resolve if it were tried; the existing `None` assertions then hold only if the filter does. Re-run the mutation in **Why**: it must fail.
+
+**Done when** the mutation named in **Why** fails the test and `pdm run test` passes.
+
+**Resolved:** 2026-10-28 (grinder-ao-2, #2563) — the neither-form fixture writes `src/x.py` and `x` under the home's user and `x` above it; with `bare = list(runs)` the test now fails (three runs resolve).
+
+---
+
+## TD-1178: The message page's `from_open` (`inbox_entry_page`, which marks a thread row's sender known to the home) is set in no test: the row tests hand it in
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_ui_item_paths.py` (`test_every_mail_board_ledger_and_thread_row_carries_its_context`); `src/shiftlead/ui/app.py` (`inbox_entry_page`)
+
+**Why:** #2561 (TD-1115) adds `"from_open": t.get("from") if t.get("from") in names else ""` so a thread row's paths resolve by `id:<record>` only for a sender the home knows (`paths_ctx`'s docstring). The thread-row test builds its rows with `from_open="ao-w1"` / `""` already set and renders the macro, so the page's own computation is never run. On `origin/main` (a443f7662), replacing it with `"from_open": t.get("from"),` leaves the module and `tests/test_ui_whole_on_hover.py` green (9 passed): a forgotten or `person` sender's row would carry `id:<gone>`, whose first hover is refused by the route and goes quiet instead of resolving by `home`.
+
+**Fix:** load `/inbox/<mid>` (the route test's client) for a thread with one known and one forgotten sender and assert the rows' `data-paths-ctx` are `id:<known>` and `home`; re-run the mutation in **Why**: it must fail.
+
+**Done when** the mutation named in **Why** fails the new assertion and `pdm run test` passes.
+
+**Resolved:** 2026-10-28 (grinder-ao-2, #2563) — `test_the_message_page_gives_each_thread_row_its_senders_paths_context` loads `/inbox/<mid>` and reads `id:<sender>` and `home` on its thread rows; with `"from_open": t.get("from"),` it fails (`id:person`).
+
+---
