@@ -1071,8 +1071,12 @@ def _default_ref(directory: Path | str) -> str | None:
     return None
 
 
-def _ledger_rows_on_main(directory: Path | str, pr: int, ledger: str) -> list[str]:
-    """The ledger references a merged PR added to main, from its squash-merge commit. Empty unless
+def _ledger_rows_on_main(directory: Path | str, pr: int, rel: str) -> list[str]:
+    """The ledger references a merged PR added to main, from its squash-merge commit, the ledger at `rel` read
+    there through `ledger.layout_at` (§4.4 *Either layout*): a v1 file's added headings and rows; a v2
+    directory's `TD-NNN.md` files added directly under it (`--no-renames`, so a move into `archive/` adds
+    nothing there, and a file added straight into `archive/` is not counted), none for the commit that adds
+    its `README.md` (the split). Empty unless
     that commit is in this clone's `origin/<default>` — a clone that has not fetched since the merge
     simply derives nothing yet."""
     base = _default_ref(directory)
@@ -1081,7 +1085,21 @@ def _ledger_rows_on_main(directory: Path | str, pr: int, ledger: str) -> list[st
     sha = _git(directory, "log", base, "-n", "1", "--format=%H", "-F", f"--grep=(#{pr})")
     if not (sha := (sha or "").strip()):
         return []
-    diff = _git(directory, "show", "--format=", "-U0", sha, "--", ledger)
+    io = ledger.git_io(directory, sha, ledger.common_parent(rel), rel=rel)
+    rel = ledger.layout_at(rel, None, io)[0] if io is not None else rel  # a carried path from before a split
+    if io is not None and io[0](rel) is not None:
+        # a v2 directory: the entry files the commit adds directly under it; none for the split (its README)
+        names = _git(directory, "show", "--format=", "--no-renames", "--name-status", sha, "--", rel) or ""
+        added = [p for st, _, p in (x.partition("\t") for x in names.splitlines()) if st == "A"]
+        if f"{rel}/{lb.LEDGER_README}" in added:
+            return []
+        files = (p.rpartition("/") for p in added)
+        return list(
+            dict.fromkeys(
+                normalize_ref(m.group(0)[:-3]) for d, _, n in files if d == rel and (m := lb.ENTRY_FILE_RE.match(n))
+            )
+        )
+    diff = _git(directory, "show", "--format=", "-U0", sha, "--", rel)
     if not diff:
         return []
     # a row the ledger gained: an entry's heading, or its row in the summary table (ledgerboard's predicates)

@@ -625,7 +625,7 @@ def fs_io(root: Path | str) -> Io:
     return ls, read
 
 
-def _under(rel: str) -> str:
+def common_parent(rel: str) -> str:
     """The common parent of a ledger path and its v1 archive's — the directory `layout_at` looks in."""
     parent = PurePosixPath(rel).parent.as_posix()
     return "" if parent == "." else parent
@@ -796,7 +796,7 @@ class Registry:
         if root not in self._read:
             ref = default_ref(root)
             rel = ledger_path(root)
-            io = fs_io(root) if ref is None else git_io(root, ref, _under(rel), rel=rel)
+            io = fs_io(root) if ref is None else git_io(root, ref, common_parent(rel), rel=rel)
             at, led, arch, faults = read_pair(rel, io) if io is not None else (rel, None, None, [])
             if led is None:
                 self._why[root] = fault_words(at, faults) if faults else f"{rel} cannot be read"
@@ -856,17 +856,69 @@ class Change:
     sha: str | None = None
 
 
-def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
-    """The changes from `git log --reverse -p --unified=0`: a commit is a `\\x00C <sha> <iso> <subject>`
-    line, then its diff; a heading on a `+` line is in the file after that commit, on a `-` line it left.
-    A heading both removed and added in one commit (an entry moved in the file, its title edited)
-    stays. An entry closed and later re-added is open again from its first opening."""
+Event = tuple[str | None, datetime | None, int | None, dict[str, str], set[str]]  # sha, at, pr, added, removed
+
+
+def _commit_line(line: str) -> tuple[str | None, datetime | None, int | None]:
+    """A `\\x00C <sha> <iso> <subject>` line's sha, instant and squash PR."""
+    parts = line.split(" ", 3)
+    try:
+        at = datetime.fromisoformat(parts[2].strip())
+    except (IndexError, ValueError):
+        at = None
+    m = SQUASH.search(parts[3]) if len(parts) > 3 else None
+    return (parts[1] if len(parts) > 1 else None), at, (int(m.group(1)) if m else None)
+
+
+def _log_events(out: str, skip: set[str]) -> list[Event]:
+    """Each commit of `git log --reverse -p --unified=0`: a heading on a `+` line is in the file after that
+    commit, on a `-` line it left."""
+    events: list[Event] = []
+    for line in out.splitlines():
+        if line.startswith("\x00C "):
+            events.append((*_commit_line(line), {}, set()))
+        elif events and line[:1] in "+-" and (tid := lb.entry_id(line[1:])) and tid not in skip:
+            if line[0] == "+":
+                events[-1][3][tid] = line[1:].partition(":")[2].strip()
+            else:
+                events[-1][4].add(tid)
+    return events
+
+
+def _dir_events(out: str, directory: str, titles: dict[str, str]) -> tuple[list[Event], set[str]]:
+    """Each commit of a v2 directory's `git log --reverse --name-status`: a `TD-NNN.md` added directly under
+    it opens its entry (its title `titles`'), one removed from there closes it; and the shas of the commits
+    that add its `README.md` (the split)."""
+    events: list[Event] = []
+    split: set[str] = set()
+    for line in out.splitlines():
+        if line.startswith("\x00C "):
+            events.append((*_commit_line(line), {}, set()))
+            continue
+        status, _, path = line.partition("\t")
+        if not events or status not in ("A", "D"):
+            continue
+        d, _, name = path.rpartition("/")
+        if status == "A" and path == f"{directory}/{lb.LEDGER_README}" and events[-1][0]:
+            split.add(events[-1][0])
+        if d == directory and (m := lb.ENTRY_FILE_RE.match(name)):
+            tid = f"TD-{m.group(1)}"  # spelled as its heading spells it, as the file is named
+            if status == "A":
+                events[-1][3][tid] = titles.get(tid, "")
+            else:
+                events[-1][4].add(tid)
+    return events, split
+
+
+def _replay(events: list[Event]) -> dict[str, Change]:
+    """Every entry's life from the commits' events in order. A heading both removed and added in one commit
+    (an entry moved in the file, its title edited) stays. An entry closed and later re-added is open again
+    from its first opening."""
     life: dict[str, Change] = {}
     present: set[str] = set()
-
-    def apply(at: datetime | None, pr: int | None, sha: str | None, added: dict[str, str], removed: set[str]) -> None:
+    for sha, at, pr, added, removed in events:
         if at is None:
-            return
+            continue
         for tid in removed - set(added):
             if tid in present:
                 present.discard(tid)
@@ -879,58 +931,83 @@ def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
                 if tid not in present:
                     life[tid].closed, life[tid].pr, life[tid].sha = None, None, None
             present.add(tid)
-
-    at: datetime | None = None
-    pr: int | None = None
-    sha: str | None = None
-    added: dict[str, str] = {}
-    removed: set[str] = set()
-    for line in out.splitlines():
-        if line.startswith("\x00C "):
-            apply(at, pr, sha, added, removed)
-            added, removed = {}, set()
-            parts = line.split(" ", 3)
-            sha = parts[1] if len(parts) > 1 else None
-            try:
-                at = datetime.fromisoformat(parts[2].strip())
-            except (IndexError, ValueError):
-                at = None
-            m = SQUASH.search(parts[3]) if len(parts) > 3 else None
-            pr = int(m.group(1)) if m else None
-            continue
-        if line[:1] in "+-" and (tid := lb.entry_id(line[1:])):
-            if tid in skip:
-                continue
-            if line[0] == "+":
-                added[tid] = line[1:].partition(":")[2].strip()
-            else:
-                removed.add(tid)
-    apply(at, pr, sha, added, removed)
     return life
 
 
-def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -> dict[str, Change] | None:
-    """Every entry's opened / closed instants from the ledger file's git history in `root`, or None
-    when git could not be asked (not a repo, git missing, a timeout) — *could not look*, never
-    *nothing changed*. `text` is the file as it stands, so the ids of headings that sit only in a
-    comment (the entry template's) are left out. A file rewritten without a history reads as
-    opened at its first commit, which is all its history says."""
-    skip = {m.group(1) for m in lb.HEADING_RE.finditer(text)} - {
-        m.group(1) for m in lb.HEADING_RE.finditer(strip_comments(text))
-    }
+def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
+    """The changes from `git log --reverse -p --unified=0` of a v1 file (`_log_events`, `_replay`)."""
+    return _replay(_log_events(out, skip))
+
+
+def _log(root: Path | str, timeout: float, *args: str) -> str | None:
     try:
         cp = subprocess.run(
-            [
-                "git", "log", "--first-parent", "--diff-merges=first-parent", "--reverse", "--no-renames",
-                "--format=%x00C %H %cI %s", "-p", "--unified=0", "--", rel,
-            ],
+            ["git", "log", "--first-parent", "--diff-merges=first-parent", "--reverse", "--no-renames", *args],
             capture_output=True, text=True, errors="replace", timeout=timeout, cwd=str(root),
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired):
         return None
-    if cp.returncode != 0:
+    return cp.stdout if cp.returncode == 0 else None
+
+
+def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -> dict[str, Change] | None:
+    """Every entry's opened / closed instants from the ledger's git history in `root`, or None
+    when git could not be asked (not a repo, git missing, a timeout) — *could not look*, never
+    *nothing changed*. `text` is the ledger as it stands (`load()`'s, for a directory), so the ids of
+    headings that sit only in a comment (the entry template's) are left out. A file rewritten without a
+    history reads as opened at its first commit, which is all its history says. A v2 directory's
+    `--name-status` log is merged with its v1 file's patches (never its archive's), *Across a split* (§4.4
+    *Its history*): the commit adding the directory's `README.md` opens and closes nothing, so an entry keeps
+    its v1 opening and one closed before the split stays closed."""
+    skip = {m.group(1) for m in lb.HEADING_RE.finditer(text)} - {
+        m.group(1) for m in lb.HEADING_RE.finditer(strip_comments(text))
+    }
+    fmt = "--format=%x00C %H %cI %s"
+    if not (Path(root) / rel).is_dir():
+        out = _log(root, timeout, fmt, "-p", "--unified=0", "--", rel)
+        return None if out is None else _parse_log(out, skip)
+    v1 = layout_at(rel, None, (lambda p: None, lambda p: None))[0]  # the v1 file beside the directory
+    one = _log(root, timeout, fmt, "-p", "--unified=0", "--", v1)
+    two = _log(root, timeout, fmt, "--name-status", "--", rel)
+    order = _log(root, timeout, "--format=%H", "--", v1, rel)
+    if one is None or two is None or order is None:
         return None
-    return _parse_log(cp.stdout, skip)
+    archive = lb.load(rel, *fs_io(root))[1]
+    titles = {m.group(1): m.group(3).strip() for m in lb.HEADING_RE.finditer(f"{text}\n{archive}")}
+    events, split = _dir_events(two, rel, titles)
+    at = {sha: i for i, sha in enumerate(order.split())}
+    merged = sorted(_log_events(one, skip) + events, key=lambda e: at.get(e[0] or "", -1))
+    return _replay([e for e in merged if e[0] not in split])
+
+
+def archive_of(root: Path | str, rel: str) -> Path:
+    """The archive of the ledger at `rel` in the working tree: a directory's `archive/`, else the v1 file
+    beside it (`archive_path`)."""
+    return Path(root) / rel / lb.LEDGER_ARCHIVE if (Path(root) / rel).is_dir() else Path(root) / archive_path(rel)
+
+
+def stamp(root: Path | str) -> tuple[str, float] | None:
+    """What the tick's change test compares (§4.4 *What changes with no one file*): the resolved ledger
+    path and its newest mtime — a v1 file's own; a directory's newest among itself, its `archive/`, the
+    `TD-NNN.md` files of both and its `README.md`, its `rank.yml` alone left out, so a rank write re-reads
+    nothing. None when there is no ledger to stat. A path that resolves anew always differs."""
+    io = fs_io(root)
+    rel = layout_at(ledger_path(root), None, io)[0]
+    base = Path(root) / rel
+    try:
+        if not base.is_dir():
+            return rel, base.stat().st_mtime
+        times = [base.stat().st_mtime]
+        for d in (base, base / lb.LEDGER_ARCHIVE):
+            if not d.is_dir():
+                continue
+            times.append(d.stat().st_mtime)
+            for f in d.iterdir():
+                if f.name == lb.LEDGER_README and d == base or lb.ENTRY_FILE_RE.match(f.name):
+                    times.append(f.stat().st_mtime)
+        return rel, max(times)
+    except OSError:
+        return None
 
 
 def entries_before(
@@ -954,7 +1031,7 @@ def entries_before(
             continue  # no such ref here: the next name
         if not (sha := sha.strip()):
             return None, f"no commit of {ref} before {before.isoformat() if before else 'now'}"
-        io = git_io(root, sha, _under(rel), timeout=timeout, rel=rel)
+        io = git_io(root, sha, common_parent(rel), timeout=timeout, rel=rel)
         led, text, archive, faults = read_pair(rel, io) if io is not None else (rel, None, None, [])
         if faults:
             return None, f"{fault_words(led, faults)} at {ref} {sha[:8]}"
@@ -1020,9 +1097,6 @@ def reading(
         "at": now.isoformat(),
     }
     if not with_history:
-        return out
-    if io[0](rel) is not None:
-        out["history_error"] = "a v2 ledger's history is not read yet (TD-1144)"
         return out
     life = history(root, rel, text)
     if life is None:

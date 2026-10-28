@@ -3501,14 +3501,9 @@ class TickMixin:
         return {"since": since, "repo": repo, "crossed": crossed}
 
     @staticmethod
-    def _ledger_mtimes(roots: list[str]) -> dict[str, float | None]:
-        out: dict[str, float | None] = {}
-        for root in roots:
-            try:
-                out[root] = (Path(root) / ledger_mod.ledger_path(root)).stat().st_mtime
-            except OSError:
-                out[root] = None
-        return out
+    def _ledger_mtimes(roots: list[str]) -> dict[str, tuple[str, float] | None]:
+        """Each root's `ledger.stamp`: the resolved path and its newest mtime, either layout (§4.4)."""
+        return {root: ledger_mod.stamp(root) for root in roots}
 
     def _live_commits(self) -> dict[str, str]:
         """Each repo's live commit as the promote reading holds it (§6 *Promote*), by the repo's
