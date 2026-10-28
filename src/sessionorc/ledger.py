@@ -195,6 +195,18 @@ def ids_in(text: str | None) -> set[str]:
     return {f"TD-{n:03d}" for n in lb.heading_nums(text)}
 
 
+def parts_of_open(archive: str | None, open_: list[dict[str, Any]]) -> set[str]:
+    """The archived ids whose `Part of:` names an open entry (ADR 2026-10-27 §3, TD-1130): an archived
+    part of an open parent, each written `TD-NNN`, its line parsed as an open entry's is."""
+    live = {_norm(e["id"]) for e in open_}
+    out: set[str] = set()
+    for e in lb.entries(archive or ""):
+        par = lb.parse_part_of(e.get("part_of_raw"))[0]
+        if par and _norm(par) in live:
+            out.add(_norm(e["id"]))
+    return out
+
+
 # a `<repo>#TD-NNN` item → `(state, why)`, ledgerboard's resolver: `archived`, `open` or `unresolved`
 Resolve = lb.Resolve
 Live = Callable[[int], bool]  # a PR number → whether its squash commit is in the repo's live commit
@@ -256,6 +268,7 @@ def kind_of(entry: dict[str, Any]) -> str:
     one: *for you* — what waits on the person, and only that (TD-367): `Owner: paul`, or blocked by
     `decision (paul)`; *blocked* — `Blocked by:` holds any item other than a `decision (…)` (an open
     id, a cross-repo or unreadable one), whatever the Kind and whatever decision stands beside it;
+    or some open entry names it in `Part of:` (`parts_open`, TD-1130);
     *design* — `Kind: design-first`, or blocked by `decision (designer)` alone; *live check* —
     `Kind: live-check`, its build live or not; *pickable* — pickable, `Kind: build` or none;
     *evaluation* — `Kind: evaluation`, which no lane takes since the anchor seat is retired (§4.9b
@@ -263,7 +276,7 @@ def kind_of(entry: dict[str, Any]) -> str:
     an unblocked `Kind: decision` that is not the person's among it."""
     if str(entry.get("owner") or "").lower() == PERSON_OWNER or decided_by(entry, PERSON_OWNER):
         return "for-you"
-    if any(not b.startswith("decision (") for b in entry.get("blocked_by") or []):
+    if any(not b.startswith("decision (") for b in entry.get("blocked_by") or []) or entry.get("parts_open"):
         return "blocked"
     if entry.get("kind") == "design-first" or decided_by(entry, DESIGNER_OWNER):
         return "design"
@@ -474,8 +487,10 @@ def entries(
     an unread item quoted — `blocked_ids`, the whole line's local ids, archived ones kept —
     `xrepo_ids`, its `<repo>#TD-NNN` ids — and `pickable`, `yes` or `no`, derived by cadence §2.4's rule (§4.4
     *Repo facts*, TD-228) as ledgerboard's `pickable` derives it (TD-585): blocked while `Blocked by:`
-    names an id not in `archive` (open, or in neither file), a decision, or an item it cannot read;
-    an id headed twice is blocked by what blocks either (ledgerboard keys its reading by id). A
+    names an id not in `archive` (open, or in neither file), a decision, or an item it cannot read, or
+    while an open entry names it in `Part of:` — `parts_open`, those entries' ids, kept out of `blocked_by`,
+    beside `part_of`, its own line's parent or None (cadence §2.4, TD-1130); an id headed twice is blocked
+    by what blocks either (ledgerboard keys its reading by id). A
     `<repo>#TD-NNN` item asks `resolve` for `(state, why)`, and anything but `archived` keeps the
     block; with no `resolve` it is unresolved. A written `**Pickable:**` line is not read (TD-228
     slice 4): what blocks an entry is said in `Blocked by:`. `for_page` is the page's kind. A field
@@ -496,11 +511,17 @@ def entries(
     teams = declared_teams(text)
     heads = list(lb.HEADING_RE.finditer(t))
     derived: dict[str, list[str]] = {}
+    parts: dict[str, list[str]] = {}
+    held: set[str] = set()
     ranked: dict[str, dict[str, Any]] = {}
     for n, r in enumerate(lb.pickable(t, archive or "", resolve, rank_text=rank_text, repo=repo)["entries"]):
         got = derived.setdefault(r["id"], [])
         got += [b for b in r["blocked_by"] if b not in got]
-        ranked.setdefault(r["id"], {"key": r["key"], "card_key": r["card_key"], "order": n})
+        got = parts.setdefault(r["id"], [])
+        got += [p for p in r["parts_open"] if p not in got]
+        if not r["pickable"]:
+            held.add(r["id"])
+        ranked.setdefault(r["id"], {"key": r["key"], "card_key": r["card_key"], "order": n, "part_of": r["part_of"]})
     lined = {int(tid[3:]) for tid in lb.rank(rank_text or "")[0]}
     out: list[dict[str, Any]] = []
     for m, read in zip(heads, lb.entries(t), strict=True):
@@ -518,7 +539,8 @@ def entries(
             "blocked_by": blocked_by,
             "blocked_ids": blocked_ids(read["blocked_raw"]),
             "xrepo_ids": xrepo_ids(read["blocked_raw"]),
-            "pickable": "no" if blocked_by else "yes",
+            "parts_open": list(parts[m.group(1)]),
+            "pickable": "no" if m.group(1) in held else "yes",
             **ranked[m.group(1)],
             "lined": int(m.group(1)[3:]) in lined,
             "sig": hashlib.sha256(t[m.start() : nxt.start() if nxt else len(t)].encode()).hexdigest()[:16],
@@ -800,7 +822,8 @@ def reading(
     (`lb.rank_path`) gives each entry its `key` and `order`. `windows` is `{day|week|month: {opened, closed}}` from
     the history and `recent` the entries opened or closed in the longest window, newest first — both absent when the
     history was not read, and marked `history_error` when git could not be asked. `archived` is the archived ids
-    some entry's `blocked_ids` names, never the whole archive (§4.5 screen 11 *Its builds*, TD-693).
+    some entry's `blocked_ids` names, or whose `Part of:` names an open entry (TD-1130), never the whole archive
+    (§4.5 screen 11 *Its builds*, TD-693).
     `declared_teams` is the `Fields:` line's `Team` vocabulary in its order, and `needs_team` the ids marked so
     (§4.4 *An entry names its team*, TD-730)."""
     rel = rel or ledger_path(root)
@@ -822,7 +845,7 @@ def reading(
         "entries": got,
         "by_priority": {p: sum(1 for e in got if e["priority"] == p) for p in PRIORITIES},
         "by_kind": {k: sum(1 for e in got if e["for_page"] == k) for k in KINDS},
-        "archived": sorted(ids_in(archive) & {b for e in got for b in e["blocked_ids"]}),
+        "archived": sorted(ids_in(archive) & {b for e in got for b in e["blocked_ids"]} | parts_of_open(archive, got)),
         "declared_teams": list(declared_teams(text)),
         "needs_team": [e["id"] for e in got if e.get("needs_team")],
         "at": now.isoformat(),
