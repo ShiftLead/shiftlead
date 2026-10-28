@@ -94,7 +94,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build |
 | TD-1168 | `AO.focusIcon`'s three call sites in `app.js` (#2520) are pinned by no test: delete any one and the Focus tab icon stops following the state with a green suite | Low | Open — build |
-| TD-1171 | `ledger.stamp`'s test does not pin its `archive/` entry files or its `README.md`: the tick's change test could drop either and `pdm run test` passes | Medium | Open — build |
 | TD-1172 | The Queue's v2 archive cache key (`queue._archive_stat`) has no test for an in-place edit of an archive entry file | Low | Open — build |
 | TD-1174 | The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it | Low | Open |
 | TD-1181 | The tick's `git status` in every session's directory takes `index.lock`, so a session's own `git add` can fail beside it | Medium | Open — build |
@@ -1997,24 +1996,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** drive the three sites from the node probe where its stub reaches them (the feed callback with a `state_class`, then read the link's `href`); where it cannot, a test that each `document.title = …` line in Focus's code is followed by `AO.focusIcon(` is the floor. Run it against the three probes above.
 
 **Done when** each probe above fails a test, and `pdm run test` passes.
-
----
-
-## TD-1171: `ledger.stamp`'s test does not pin its `archive/` entry files or its `README.md`: the tick's change test could drop either and `pdm run test` passes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `tests/test_ledger_layout.py` (`test_the_ticks_change_test_reads_a_directory_but_not_its_rank_file`); `src/sessionorc/ledger.py` (`stamp`)
-
-**Why:** #2529's docstring for the test says the stamp is *the newest mtime among the directory, `archive/`, the entry files of both and `README.md`*; it sets every path to mtime 1000 and then raises one top-level `TD-*.md` to 2000. On `origin/main` (0738ed579), each of these leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ledger_layout.py` green (20 passed): (a) `for d in (base, base / lb.LEDGER_ARCHIVE):` → `for d in (base,):` in `stamp`; (b) `if f.name == lb.LEDGER_README and d == base or lb.ENTRY_FILE_RE.match(f.name):` → `if lb.ENTRY_FILE_RE.match(f.name):`. So a v2 ledger whose only change is an archived entry's edit (a `**Resolved:**` line added in place) or its `README.md` leaves the stamp unchanged, and the tick would skip its re-read, with no test to say so.
-
-**Fix:** after the rank-file assertion, raise in turn an `archive/TD-*.md` and `README.md` to a later mtime and assert the stamp moves each time; re-run (a) and (b) above: each must fail.
-
-**Done when** the new assertion fails against the mutation named in **Why** and `pdm run test` passes.
 
 ---
 
