@@ -143,13 +143,16 @@ def design_builds(
     held: Mapping[str, str],
     prs: Mapping[str, Mapping[str, Any]],
 ) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]]]:
-    """**Its builds** (§4.5 screen 11, §4.5a *Repo page: its builds line*, TD-693): for each `design-first`
-    entry whose `blocked_ids` is not empty, by its id, `{builds, done}` — `builds` its ids in that order,
-    each `{id, state, pr, url, held, blocked_by, row}`: `state` *archived* (in `archived`), else *review*
-    with its holder's claim `pr` and its `url` (`prs`, the motion rows'), else *held* by `held`'s names, else *open*;
-    `blocked_by` the design's other builds its own `blocked_by` still names; `row` the id as the ledger
-    writes it when it has a row to link to, else ''. `done` is every build archived. And by each
-    build's ledger id, the designs it builds (the back-link), from the same pass."""
+    """**Its builds** (§4.5 screen 11, §4.5a *Repo page: its builds line*, TD-693, read from `Part of:` by
+    TD-1130): for each entry that entries name in `Part of:` (its `parts_open` and `parts_archived`), by its
+    id, `{builds, done}` — `builds` those ids in id order; a `design-first` entry no entry names so, not yet
+    backfilled (§4.4 *Rows*), lists its `blocked_ids` instead, in that order. Each build is
+    `{id, state, pr, url, held, blocked_by, row}`: `state` *archived* (in `archived`, which holds the archived parts),
+    else *review* with its holder's claim `pr` and its `url` (`prs`, the motion rows'), else *held* by `held`'s
+    names, else *open*; `blocked_by` the entry's other builds its own `blocked_by` still names; `row` the id as
+    the ledger writes it when it has a row to link to, else ''. `done` is every build archived. And by each
+    build's ledger id, the designs it builds (the back-link): its own `Part of:` parent where that is an open
+    row, else each not-backfilled design whose `Blocked by:` names it, from the same pass."""
     by_tid = {_tid(str(e.get("id") or "")): e for e in entries}
     held_t = {_tid(k): v for k, v in held.items() if _tid(k)}
     prs_t = {_tid(k): v for k, v in prs.items() if _tid(k) and isinstance(v.get("pr"), int)}
@@ -157,8 +160,14 @@ def design_builds(
     lines: dict[str, dict[str, Any]] = {}
     back: dict[str, list[str]] = {}
     for e in entries:
-        ids = [b for b in e.get("blocked_ids") or [] if _tid(b)]
-        if e.get("kind") != "design-first" or not ids:
+        parts = [_tid(str(x)) for x in [*(e.get("parts_open") or []), *(e.get("parts_archived") or [])]]
+        if parts:
+            ids = sorted({x for x in parts if x}, key=lambda x: int(x[3:]))
+        elif e.get("kind") == "design-first":
+            ids = [b for b in e.get("blocked_ids") or [] if _tid(b)]
+        else:
+            continue
+        if not ids:
             continue
         mine = {_tid(b) for b in ids}
         builds = []

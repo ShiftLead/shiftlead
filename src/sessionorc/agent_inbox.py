@@ -978,8 +978,12 @@ class InboxMixin:
             raise RpcError(f"{id} is yours to do: its own Done says what was done")
         if road == "design" and not (
             page in ("pickable", "live-check")
-            # blocked by an id still open: the page's `blocked_open`, asked again here (review of #2162)
-            or (page == "blocked" and any(str(b) in open_ids for b in e.get("blocked_by") or ()))
+            # blocked by an id still open, or with an open part: the page's `blocked_open`, asked again here
+            # (review of #2162, TD-1130)
+            or (
+                page == "blocked"
+                and (any(str(b) in open_ids for b in e.get("blocked_by") or ()) or e.get("parts_open"))
+            )
         ):
             raise RpcError(f"{id} is {page or 'of no page kind'}: Back to design is on a pickable, live check or "
                            "id-blocked entry (design §4.5 screen 12)")  # fmt: skip

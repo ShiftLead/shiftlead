@@ -198,3 +198,30 @@ def test_a_build_in_review_links_its_pr(tmp_path, monkeypatch):
     line = line[: line.index("</div>")]
     want = '<span class="bstate">in review <a href="https://github.com/o/samscrape/pull/815" target="_blank"'
     assert want in line and ">#815</a>" in line
+
+
+def test_its_builds_read_part_of_and_fall_back_for_a_design_not_yet_backfilled():
+    """TD-1130 (§4.5 screen 11 *Its builds*): an entry's builds are the entries naming it in `Part of:`,
+    open and archived, in id order, whatever its Kind; its `Blocked by:` then names blockers, not builds.
+    A `design-first` entry nothing names so lists its `Blocked by:` as before. The back-link is a part's
+    own `Part of:` parent."""
+    entries = [
+        {"id": "TD-050", "kind": "build", "blocked_ids": ["TD-060"], "parts_open": ["TD-53", "TD-051"],
+         "parts_archived": ["TD-049", "TD-1000"]},
+        {"id": "TD-051", "kind": "build", "part_of": "TD-050", "blocked_by": ["TD-053", "TD-060"]},
+        {"id": "TD-53", "kind": "build", "part_of": "TD-50", "blocked_by": []},
+        {"id": "TD-060", "kind": "design-first", "blocked_ids": ["TD-061"]},
+        {"id": "TD-061", "kind": "build", "blocked_by": []},
+    ]  # fmt: skip
+    lines, back = design_builds(entries, ["TD-049", "TD-1000"], {}, {"TD-051": {"pr": 9, "url": "u"}})
+    got = lines["TD-050"]
+    assert [(b["id"], b["state"]) for b in got["builds"]] == [
+        ("TD-049", "archived"),
+        ("TD-051", "review"),
+        ("TD-53", "open"),
+        ("TD-1000", "archived"),
+    ]
+    assert got["builds"][1]["blocked_by"] == ["TD-053"], "a sibling blocks it; TD-060 is no build of TD-050"
+    assert got["done"] is False
+    assert [b["id"] for b in lines["TD-060"]["builds"]] == ["TD-061"], "not yet backfilled"
+    assert back == {"TD-051": ["TD-050"], "TD-53": ["TD-050"], "TD-061": ["TD-060"]}

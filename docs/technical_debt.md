@@ -93,7 +93,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
 | TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Designed — builds TD-1130–TD-1133 |
-| TD-1130 | `Part of:` is read: ledgerboard v2.1 vendored, and the ledger reader and the Queue's reading tell a part from a blocker | Medium | Open — build; slice 1 #2517 merged, slice 2 in #2519 |
+| TD-1130 | `Part of:` is read: ledgerboard v2.1 vendored, and the ledger reader and the Queue's reading tell a part from a blocker | Medium | Open — build; slices 1–2 merged (#2517, #2519), slice 3 in #2521 |
 | TD-1131 | A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter | Medium | Open — build, blocked by TD-1130 |
 | TD-1132 | The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:` | Medium | Open — build, blocked by TD-1130 |
 | TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
@@ -104,6 +104,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
+| TD-1169 | `test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_level_is_left_alone` fails under a loaded precheck: its sleeps race the supervisor's grace | Low | Open |
 
 ---
 
@@ -2002,7 +2003,7 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Added:** 2026-10-27 (the designer, from TD-1129)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build; slice 1 (Fix 1, the dev-cadence bump to 36d8e73 vendoring ledgerboard v2.1) merged in #2517; slice 2 (Fix 2 and 5, `ledger.py` reads `Part of:`) in #2519; Fix 3–4, the Queue's reading and `builds_open`, next (grinder-ao-2, 2026-10-27)
+**Status:** Open — build; slice 1 (Fix 1, the dev-cadence bump to 36d8e73 vendoring ledgerboard v2.1) merged in #2517; slice 2 (Fix 2 and 5, `ledger.py` reads `Part of:`) merged in #2519; slice 3 (Fix 4, `builds_open`, Back to design and *Its builds*) in #2521; Fix 3, the Queue's reading, next (grinder-ao-2, 2026-10-27)
 **Location:** `scripts/vendor_ledgerboard.sh`, `src/sessionorc/ledgerboard.py` (vendored), `tests/test_ledgerboard_fixtures.py:40`; `src/sessionorc/ledger.py` (pickable at 521, `kind_of` 254, `archived` 825); `src/sessionorc/queue.py` (`touch`/`names_open` ~300–316, `builds_open` 400, `_card` 496–560 with the within-card pick loop 545–550, `_start` 571, `_status` 592, `_wait` 625, `_completed` 753–790); `src/sessionorc/agent_inbox.py` (Back to design's `blocked_open`); `src/shiftlead/ui/inbox.py` (`blocking` ~2381, `blocked_open`/`builds_open` 2439–2440); `src/shiftlead/ui/repo.py` (`design_builds` 140)
 
 **Why:** TD-1129: a Queue card's tree joins `Blocked by:` edges in either direction, so its indent says only *joined*, and a design's `Blocked by:` does two jobs (its builds and its real blockers). [ADR 2026-10-27](decisions/2026-10-27-part-of.md) gives a part a `Part of:` line naming its parent; this build makes shiftlead read it.
@@ -2236,3 +2237,20 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
+## TD-1169: `test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_level_is_left_alone` fails under a loaded precheck: its sleeps race the supervisor's grace
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, from #2521's precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_containers.py:948` (the test), `src/sessionorc/containers.py` (`SUPERVISE_GRACE`)
+
+**Why:** #2521's precheck on a30ab6e failed this one test (`assert not [f for f in fakes[before:] if f.execs("pip install")]`, line 971: an install had started inside the 0.5 s it expects to stay quiet within a 1.5 s grace) while 4470 passed; the same test passes three runs of three on the branch alone. #2521 touches nothing under containers. The test times the grace with wall-clock sleeps, so a loaded `-n` run can start the install before the assertion reads.
+
+**Fix:** drive the grace from a clock the test controls (or a wider grace than the quiet window it asserts), so the assertion does not depend on the scheduler.
+
+**Done when** the test reads the grace without wall-clock races and passes under `pdm run test -n 8` repeatedly.
+
+---
