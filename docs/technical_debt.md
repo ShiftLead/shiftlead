@@ -93,7 +93,6 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1187 | The top bar scrolls away with the page: once scrolled down, the tabs, + New and the counts are out of reach | Medium | Open — design-first |
 | TD-1189 | A team card shows the repo's Technical debt only on the repo's line, and TDs in motion never what the team just finished | Medium | Open — design-first, waits on Paul |
 | TD-1190 | The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass | Medium | Open — design-first |
-| TD-1193 | The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green | Low | Open — build |
 
 ---
 
@@ -1979,20 +1978,3 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1193: The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1, from #2590)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/adopt.py` (`_word`); `tests/test_repo_adopt.py` (`test_adopt_opens_the_pr_adds_the_repo_unserved_and_the_merged_adoption_serves_it`, line 134)
-
-**Why:** `_word` names the adopt in the PR body: the launcher's `adopt` where `launcher/dev_cadence.py` exists, else `<dc>/sync.sh`. The launcher arm is pinned (`test_a_dev_cadence_checkout_with_a_launcher_adopts_through_its_adopt_and_names_the_pin`). The older-checkout test asserts the body's *dev-cadence at abc1234* and the after-merge `sync.sh <checkout>` line (which `after` writes, not `_word`), never *written by `<dc>/sync.sh`*. Probe on `origin/main` (2026-10-28): replace `_word`'s body with `return f"dev-cadence -C {dc} adopt"` and run `tests/test_repo_adopt.py` — 11 passed, while a `sync.sh` checkout's PR would then say a launcher wrote it.
-
-**Fix:** assert `written by` plus the `sync.sh` path in the older-checkout test's body check (line 134).
-
-**Done when** that assertion exists and fails with `_word`'s `sync.sh` arm removed.
-
----

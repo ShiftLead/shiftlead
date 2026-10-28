@@ -132,6 +132,7 @@ async def test_adopt_opens_the_pr_adds_the_repo_unserved_and_the_merged_adoption
     assert argv[:6] == ["pr", "create", "--head", "cadence-adopt", "--base", "main"]
     body = Path(f"{world['log']}.body").read_text()
     assert "dev-cadence at abc1234" in body and f"`{world['dc']}/sync.sh {checkout}`" in body
+    assert f"written by `{world['dc']}/sync.sh` in a scratch clone" in body  # no launcher: sync.sh wrote it
     assert _roster() == [str(world["dc"]), str(checkout)]
     assert list(world["tmp"].iterdir()) == []
     assert _per_clone(world["checkout"]) == before

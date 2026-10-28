@@ -22207,3 +22207,23 @@ Mail tells the member now. The table's entry is what lasts.
 **Resolved:** 2026-10-28 (grinder-ao-2, #2602) — §4.5a *New session: member line fill* says *shell (no agent)* is no member's and the line's profile stands (what #2583 built), with its history line; `test_shell_no_agent_picked_over_a_member_line_keeps_the_lines_profile` posts `:shell` and asserts the line's `paul` / `claude-code`, and fails with the `SHELL_PICK` clause dropped.
 
 ---
+
+## TD-1193: The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1, from #2590)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/adopt.py` (`_word`); `tests/test_repo_adopt.py` (`test_adopt_opens_the_pr_adds_the_repo_unserved_and_the_merged_adoption_serves_it`, line 134)
+
+**Why:** `_word` names the adopt in the PR body: the launcher's `adopt` where `launcher/dev_cadence.py` exists, else `<dc>/sync.sh`. The launcher arm is pinned (`test_a_dev_cadence_checkout_with_a_launcher_adopts_through_its_adopt_and_names_the_pin`). The older-checkout test asserts the body's *dev-cadence at abc1234* and the after-merge `sync.sh <checkout>` line (which `after` writes, not `_word`), never *written by `<dc>/sync.sh`*. Probe on `origin/main` (2026-10-28): replace `_word`'s body with `return f"dev-cadence -C {dc} adopt"` and run `tests/test_repo_adopt.py` — 11 passed, while a `sync.sh` checkout's PR would then say a launcher wrote it.
+
+**Fix:** assert `written by` plus the `sync.sh` path in the older-checkout test's body check (line 134).
+
+**Done when** that assertion exists and fails with `_word`'s `sync.sh` arm removed.
+
+**Resolved:** 2026-10-28 (grinder-ao-2, #2603) — the older-checkout adopt test asserts the body's *written by `<dc>/sync.sh` in a scratch clone*; `_word` made to return the launcher's adopt always now fails it.
+
+---
