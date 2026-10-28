@@ -172,7 +172,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
 - [x] **What may a manager do with the repo's numbers?** (raised 2026-09-25, Paul: *if I want to
       make sure the team is balanced, I can make sure the PR count is not growing too much — the
       grinders outpacing the techlead; this may lead to automatic checks by the manager*). The
-      numbers come first, visible on the team card and the rollup and readable by `ao repo` (§4.5 screens 1 and 11, §4.7),
+      numbers come first, visible on the team card, the rollup's rows showing the debt by kind, and readable by `ao repo` (§4.5 screens 1 and 11, §4.7),
       so a person watches them before any rule keys on them. The rule under consideration
       (TD-177, design-first): a per-team **balance** setting — open PRs above `n`, or the oldest
       past `d`, or the reader's queue past its `bound` (§4.9b) — on which the manager hands out
