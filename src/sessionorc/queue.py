@@ -430,7 +430,7 @@ def reading(
                 # what it waits on, apart from its state word: each open blocker, *after TD-n* (TD-1130)
                 "after": sorted(blockers.get(q) or (), key=lambda b: _key_sort(str(open_[b].get("key") or ""), b)),
                 "blocked_open": bool(blockers.get(q)) or bool(e.get("parts_open")),  # an open part counts (TD-1130)
-                "builds_open": ledger_mod.builds_open(e, bool(blockers.get(q)), any(q in b for b in blockers.values())),
+                "builds_open": ledger_mod.builds_open(e),
                 "key": e.get("key") or "",
                 "lined": bool(e.get("lined")),
                 "archived": False,
