@@ -16142,6 +16142,7 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Owner:** grinder
 **Kind:** build
 **Status:** Done #2084 (2026-10-17, grinder-ao-2)
+**Part of:** TD-820
 **Location:** design §4.8 *A designer's context*, §6 rule 5; `src/shiftlead/briefs/designer.md` (the shipped template; a repo's own part under `docs/briefs/` is the repo's and is not edited here)
 
 **Why:** TD-820: within a design, the reads that grow the designer's context are large replies read whole, and review transcripts.
