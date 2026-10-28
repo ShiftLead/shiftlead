@@ -87,6 +87,38 @@ def _instant(iso: Any) -> datetime | None:
     return at if at.tzinfo else at.replace(tzinfo=UTC)
 
 
+def shells_of(s: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The record's background shells (§4.2 *A background shell task*, TD-761), oldest `since` first and
+    one with no readable `since` last, so the oldest named is one whose age can be said; a malformed
+    entry is left out rather than costing the card."""
+    got = [sh for sh in (s.get("shells") or []) if isinstance(sh, dict)] if isinstance(s.get("shells"), list) else []
+    return sorted(got, key=lambda sh: (_instant(sh.get("since")) is None, str(sh.get("since") or "")))
+
+
+def own_work(s: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
+    """**Working on its own** (§4.2, TD-734, TD-761, TD-1147): an `idle` record with a live subagent or a
+    live background shell (the view's `subagents_live`, `shells_live`) — the card and `ao status` both draw
+    it *working*. The ending's parts (*1 subagent*, *2 shells*, never *0 subagents*) and what is live
+    (*subagents*, *background shells*); None when it is not idle or nothing of its own is live. A wait the
+    caller reads (§4.2 *Waiting*) wins over it, and the record stays `idle` in every payload."""
+    if s.get("state") != "idle":
+        return None
+    n = s.get("subagents") if isinstance(s.get("subagents"), int) else 0
+    shells = shells_of(s)
+    live_subs, live_shells = s.get("subagents_live") is True, s.get("shells_live") is True and bool(shells)
+    if not (live_subs or live_shells):
+        return None
+    parts: list[str] = []
+    what: list[str] = []
+    if live_subs and n:
+        parts.append(f"{n} subagent{'' if n == 1 else 's'}")
+        what.append("subagents")
+    if live_shells:
+        parts.append(f"{len(shells)} shell{'' if len(shells) == 1 else 's'}")
+        what.append("background shells")
+    return parts, what
+
+
 def clock(iso: Any, now: datetime | None = None) -> str:
     """An instant as the host's local clock, *12:31*, with the day once it is not today (*Thu 12:31*) —
     the card's form. "" for anything unreadable."""

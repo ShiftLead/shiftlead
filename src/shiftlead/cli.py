@@ -50,7 +50,7 @@ from sessionorc.models import (
 from sessionorc.tmux import attach_argv
 from shiftlead import connect, doctor, orgcheck, repoconfig, service, teamrun, teams
 from shiftlead import org as orgmod
-from shiftlead.ending import closer_words, exit_words, restart_words, waiting_words, worktree_words
+from shiftlead.ending import closer_words, exit_words, own_work, restart_words, waiting_words, worktree_words
 
 
 def _age(iso: str) -> str:
@@ -249,13 +249,24 @@ def pending_words(p: Any) -> str:
     return f"  ← {p['kind']}: {p['text']}{who}"
 
 
-def status_line(s: dict[str, Any], w: int = 0) -> str:
+def shown_state(s: Mapping[str, Any], waiting: bool = False) -> tuple[str, str]:
+    """The state `ao status` prints and the ending after the mode: an `idle` record working on its own
+    (§4.2, TD-1147) reads *working*, ending *· 1 shell*, as its card does, unless it waits (`waiting`, the
+    home's reading under `-v`) or something is pending; `--json` keeps `idle`."""
+    own = None if waiting or s.get("pending") else own_work(s)
+    if own is None:
+        return str(s["state"]), ""
+    return "working", "".join(f" · {p}" for p in own[0])
+
+
+def status_line(s: dict[str, Any], w: int = 0, waiting: bool = False) -> str:
     """A record's one line as `ao status` prints it: id, state (`~` when scraped), age, adapter, mode
     and what is pending. `ao restart` prints the new record with it (design §4.7)."""
     conf = " ~" if s["confidence"] == "scraped" else ""  # a guess alone; a `tick` state is observed (TD-490)
     pend = pending_words(s.get("pending"))
     mode = " [unattended]" if s.get("unattended") else ""
-    return f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}"
+    state, own = shown_state(s, waiting)
+    return f"{s['id']:<{w}}  {state:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{own}{pend}"
 
 
 def restarts_line(restarts: Any, shown: int = 3) -> str:
@@ -309,11 +320,13 @@ def cmd_status(args: argparse.Namespace) -> int:
         # what each session waits on from the person (§4.5a **waiting** mark, TD-274): the home's reading
         with contextlib.suppress(Exception):
             asked = teamrun.waiting_of_home(call_sync)
-    sessions.sort(key=lambda s: (STATE_RANK.get(s["state"], 9), s["name"]))
+    # a wait the home reads wins over working on its own (§4.2 *Waiting*), as on the card
+    waits = {s["id"]: bool(waiting_words(asked.get(s["id"]))) for s in sessions}
+    sessions.sort(key=lambda s: (STATE_RANK.get(shown_state(s, waits[s["id"]])[0], 9), s["name"]))
     w = max(len(s["id"]) for s in sessions)
     id_names = {str(s["id"]): str(s.get("name") or "") for s in sessions}
     for s in sessions:
-        print(status_line(s, w))
+        print(status_line(s, w, waits[s["id"]]))
         if args.verbose:
             if s["state"] == "closed":  # who closed it, in the card's words (§4.5 row 5 (b), TD-265)
                 when = f" {_age(s['closed_at'])} ago" if s.get("closed_at") else ""

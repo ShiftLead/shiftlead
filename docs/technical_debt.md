@@ -101,7 +101,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1144 | The ledger reading takes either layout: one `load()` road with `fs_io`/`git_io`, the default rule, the v2 history, and a faulted v2 ledger reported, not read | Medium | Open — build, blocked by TD-1130 |
 | TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
 | TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
-| TD-1147 | `ao status` prints *idle* for a session whose background shell or subagent is still working, where the cards draw it *working* | Medium | Open — build |
 
 ---
 
@@ -2164,19 +2163,3 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Fix:** design §4.4 *Either layout*, §5 *the ledger*. The unset `ledger:` resolves **once, in `repoconfig.load`**, through `ledger.ledger_path`'s rule (which keeps whether the value was set, so the seams' *`ledger:` names <path>, which is gone* warning fires only on a set one), so `cfg.ledger` is the resolved path everywhere it is carried (checked, not edited: `ui/app.py` 646, 2465, 2707, 2944, 3148, `teams.py` 156 and 925, `cli.py` 601, `agent.py` 1564) and wherever it is shown (the Settings page's row says *docs/ledger (directory)* or the file, as found; a session's record carries the resolved path, which TD-1144's readers still put through `layout_at`); a brief's `{ledger}` slot carries the resolved path; **Open ledger** on a v2 directory is the folder form with no line, titled *Open ledger folder* (§4.5a), `ledger_editor` given the resolved path; and `HANDED_ENTRY["{ledger}"]` says *that repo's ledger, a file or a directory of one file per entry*; `look_home.py` takes a `--v2` that writes its fixture as a directory through `lb.split()`.
 
 **Done when** the Settings page and a session's record show the resolved ledger for a v1 and a v2 checkout, `look_home.py --v2` stands up a home whose Queue and Repo page read the directory, and `pdm run test` passes.
-
-## TD-1147: `ao status` prints *idle* for a session whose background shell or subagent is still working, where the cards draw it *working*
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/cli.py` (`status_line` 252, `cmd_status` 274); design §4.7's `ao status` bullets, beside §4.2 *Working on its own* and §4.5 screen 1's *working* pill (TD-734, TD-761)
-
-**Why:** Paul, 2026-10-27, on dev-cadence's grinder: "lets add a td for ao status saying a session is idle when it is working." `ao status` showed `ao-dev-cadence-dc-grinder  idle  4m  claude-code [unattended]` while it held TD-090 and its precheck for #414 ran in a background shell (`timeout 1500 python3 files/scripts/precheck.py --pr 414`); the `list` RPC it reads carried `shells_live: true` for that record all along. §4.2 *Working on its own* draws such a record *working* on every page — the card, the team header, the Sessions rollup — read from the view's `subagents_live` and `shells_live`, but `status_line` prints the raw `state`. So the one CLI surface a person or a lead reads to ask "who is free?" says a busy worker is idle: the person concluded dev-cadence's grinder had nothing to do while TD-165 waited, and a lead reading it would think the same.
-
-**Fix:** `status_line` reads the view's `subagents_live` and `shells_live` as `cards.py` does (`own_work`, 433–450): an `idle` record with either live and nothing pending or `waiting` on the record prints `working` in the state column with the card's ending after the mode — *· 1 shell*, *· 2 subagents* — under the card's guards (a shell counts only where `shells_live` is true and `shells_of` lists one; a subagent ending only where `subagents` is above zero), through one helper the card and the CLI share rather than a second copy; the card's review wait, which needs the fleet and repos, stays the card's alone. `idle` stays `idle` in `--json`, as in every payload (§4.2). A new bullet among §4.7's `ao status` lines says so in the same PR.
-
-**Done when** a test pins `status_line` on an idle record with a live shell, one with live subagents and one with neither, and `pdm run test` passes.
