@@ -1053,7 +1053,26 @@ def ledger_link(path: str) -> dict[str, Any] | None:
     return {**ed, "folder": None, "wait": uiconf.file_link()["wait"], "dir": True} if ed else None
 
 
+def paths_ctx(e: dict[str, Any]) -> str:
+    """The context an Inbox row's paths resolve by, as the row's `data-paths-ctx` (§4.6 *A path in the
+    Inbox and the Queue is a link too*, TD-1108): `repo:<root>` for a board line or a ledger row by
+    its checkout, `id:<record>` for a mail or thread row from a record the home knows (`from_open`),
+    `home` for anything else; "" — no attribute, nothing linked — for a trail, state or history row,
+    and on every row where the home has no editor file form."""
+    if not editor_file():
+        return ""
+    row = e.get("row")
+    if row in ("board", "ledger"):
+        root = str(e.get("root") or "")
+        return f"repo:{root}" if root else "home"
+    if row:
+        return ""
+    sid = "" if e.get("handed_row") else str(e.get("from_open") or "")
+    return f"id:{sid}" if sid else "home"
+
+
 templates.env.globals["editor_link"] = editor_link
+templates.env.globals["paths_ctx"] = paths_ctx  # every row's `data-paths-ctx` (§4.6, TD-1108)
 templates.env.globals["editor_file_link"] = editor_file_link  # every file button (§4.6, §4.5a; TD-689)
 templates.env.globals["person_terminal"] = uiconf.terminal  # every page hands it to its terminals (goal 12)
 

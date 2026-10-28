@@ -343,6 +343,20 @@ def _resolve_paths(runs: list[str], cwd: Path) -> dict[str, str | None]:
     return out
 
 
+def _registered_checkout(repo: Any) -> Path | None:
+    """`rpc_paths`' `repo`: its real path (`~` expanded) when that is one of `hosts.local_host().repos()`'
+    real paths, by equality — a directory inside a checkout is none — else `None`, an empty, non-string
+    or unreadable one among them (`realpath("")` would be the process's working directory)."""
+    if not isinstance(repo, str) or not repo:
+        return None
+    try:
+        real = os.path.realpath(os.path.expanduser(repo))
+        roots = {os.path.realpath(os.path.expanduser(r)) for r in hosts.local_host().repos()}
+    except (OSError, ValueError, RuntimeError):
+        return None
+    return Path(real) if real in roots else None
+
+
 def _write_attachment(where: Path, name: str, raw: bytes) -> Path:
     """`raw` as a new `0600` file in `where` (made `0700`), named by `_place_attachment`."""
     where.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -3114,7 +3128,9 @@ class HostAgent(
             raise RpcError(f"no transcript for {id or adapter_id}: the tool's file is not on {self.host}")
         return t.to_dict()
 
-    async def rpc_paths(self, id: str, runs: list[str] | None = None) -> dict[str, Any]:
+    async def rpc_paths(
+        self, id: str | None = None, runs: list[str] | None = None, repo: str | None = None
+    ) -> dict[str, Any]:
         """The Focus pane's file check (design §4.6 *A path in the pane is a link*, TD-501): for each
         run a row of the pane named, the real absolute path when it is a regular file anywhere on this
         host that this user can read (TD-688), its real path judged, so a symlink answers its target —
@@ -3122,15 +3138,29 @@ class HostAgent(
         credential file stays text) alike, since the page needs no reason. A relative run is resolved
         against `dir`, `~` is this user's home. It stats and reads nothing else. Served
         here, on the record's host — a node's record reaches its node through `read` (`NODE_READS`).
+        With `repo` in place of `id` (§4.6 *A path in the Inbox and the Queue is a link too*, TD-1108)
+        a relative run resolves against that main checkout, answered only when its real path is one of
+        the registry's; with neither, only an absolute or `~/` run is resolved, the rest `None`. An
+        `id`-less ask has no address to forward by, so it is served where it arrives, the home.
         A read: never gated (§9 invariant 11)."""
-        s = self._get(id)
         if not isinstance(runs, list) or not all(isinstance(r, str) for r in runs):
             raise RpcError("paths takes runs, a list of strings (design §4.6)")
         if len(runs) > PATHS_RUNS_MAX:
             raise RpcError(f"paths: {len(runs)} runs, past the {PATHS_RUNS_MAX} one row may ask about (design §4.6)")
         if long := [r for r in runs if len(r) > PATHS_RUN_CHARS]:
             raise RpcError(f"paths: a run of {len(long[0])} characters, past the {PATHS_RUN_CHARS} one may be")
-        return {"paths": await asyncio.to_thread(_resolve_paths, runs, Path(s.dir))}
+        if id is not None and repo is not None:
+            raise RpcError("paths takes id or repo, not both (design §4.6)")
+        if id is not None:
+            return {"paths": await asyncio.to_thread(_resolve_paths, runs, Path(self._get(id).dir))}
+        if repo is not None:
+            root = await asyncio.to_thread(_registered_checkout, repo)
+            if root is None:
+                raise RpcError(f"paths: {repo!r} is no checkout in this host's repos registry (design §4.6)")
+            return {"paths": await asyncio.to_thread(_resolve_paths, runs, root)}
+        bare = [r for r in runs if r.startswith(("/", "~/"))]
+        got = await asyncio.to_thread(_resolve_paths, bare, Path.home())
+        return {"paths": {r: got.get(r) for r in runs}}
 
     async def rpc_git_files(self, id: str, pick: str = "tree") -> dict[str, Any]:
         """The Focus Git card's pick (design §4.2 *The Git card's pick*, TD-856): the record's newest ten

@@ -1402,6 +1402,8 @@
       if (foldsShut.has(d.dataset.fold)) d.open = false;
       else if (foldsOpen.has(d.dataset.fold)) { d.open = true; AO.fillFold(d); }
     });
+    // a row a poll redrew keeps its links, from what its context knows, asking nothing (§4.6, TD-1108)
+    (root ? $$(".mailrow[data-paths-ctx]", root) : []).forEach((row) => AO.linkItem(row, row, true));
   };
   // design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): a fold a Queue card draws
   // closed comes as its summary alone (`data-lazy`); its first open reads its body, `GET /api/fold?key=`,
@@ -1413,6 +1415,8 @@
     const key = d.dataset.fold, put = (html) => {
       Array.from(d.children).forEach((c) => { if (c.tagName !== "SUMMARY") c.remove(); });
       d.insertAdjacentHTML("beforeend", html);
+      const row = d.closest && d.closest(".mailrow[data-paths-ctx]");  // its paths, linked (§4.6, TD-1108)
+      if (row && AO.linkItem) AO.linkItem(row, d, false);
     };
     d.dataset.filled = "1";
     if (foldBodies.has(key)) put(foldBodies.get(key));
@@ -4971,6 +4975,8 @@
     };
     return {
       resolve(paths) { const p = chain.then(() => run(paths)); chain = p; return p; },
+      // what is known already, asking nothing: a row a poll redrew is relinked from it (TD-1108)
+      cached(paths) { return Object.fromEntries(paths.filter((p) => known.get(p)).map((p) => [p, known.get(p)])); },
     };
   };
   // …a text with each resolved run an `a.editor` the click handler opens on Ctrl or Cmd alone
@@ -5000,6 +5006,95 @@
       els.forEach((el, i) => { if (runs[i].some((r) => got[r.path])) el.innerHTML = AO.pathLinksHtml(el.textContent, got, editor); });
     });
   };
+  // **A path in the Inbox and the Queue is a link too** (§4.6, §4.5a, TD-1108): the texts `AO.ITEM_TEXT` names
+  // in a row the server gave a context (`data-paths-ctx`: `id:<record>`, `repo:<root>` or `home`), asked of
+  // `POST /api/paths` on the row's first hover by one asker per context, kept for the page's life. A context
+  // the route refused, or whose first answer has no file form, goes quiet: every later batch answers `null`
+  // with no fetch. The answer's `file`, `label` and `wait` are kept from the first answer.
+  AO.ITEM_TEXT = ".body, .boardreply";
+  const itemAskers = new Map();
+  AO.itemAsker = function (ctx) {
+    if (itemAskers.has(ctx)) return itemAskers.get(ctx);
+    const meta = { file: null, label: "", wait: undefined, answered: false, quiet: false };
+    const asker = AO.pathsAsker(async (runs) => {
+      if (meta.quiet) return { paths: Object.fromEntries(runs.map((r) => [r, null])) };
+      const r = await fetch("/api/paths", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ runs, ctx }),
+      });
+      if (!r.ok) throw new Error(String(r.status));  // nothing cached: the next hover of a new row asks again
+      const got = await r.json();
+      if (!meta.answered) {
+        meta.answered = true;
+        Object.assign(meta, { file: got.file || null, label: got.label || "", wait: got.wait });
+        if (!got.file) meta.quiet = true;
+      }
+      if (got.refused) meta.quiet = true;
+      return got;
+    });
+    const one = { asker, meta };
+    itemAskers.set(ctx, one);
+    return one;
+  };
+  // …each answered run in an element's text nodes an `a.editor` the click handler opens on Ctrl or Cmd,
+  // the node split around it, so `<code>`, `<b>` and links stay; nothing under an `a`, a `button` or a
+  // `summary` (a Read line's plain click opens its item), and nothing redrawn from `textContent`
+  AO.linkItemText = function (el, got, meta) {
+    if (!el || !meta.file || (el.closest && el.closest("a, button, summary"))) return;
+    const doc = el.ownerDocument || document, label = meta.label || "the editor";
+    const split = (t) => {
+      const s = String(t.nodeValue), parent = t.parentNode;
+      let at = 0;
+      for (const r of AO.pathRuns(s)) {
+        const to = got[r.path];
+        if (!to || r.start < at) continue;
+        if (r.start > at) parent.insertBefore(doc.createTextNode(s.slice(at, r.start)), t);
+        const a = doc.createElement("a");
+        a.className = "editor tpath";
+        a.setAttribute("data-ctrl", "");
+        a.setAttribute("href", AO.fileUrl(meta.file, to.path, r.line, r.col));
+        a.setAttribute("data-label", label);
+        a.setAttribute("title", `Ctrl+click: ${to.path} in ${label}`);
+        if (to.folder) {
+          a.setAttribute("data-folder", to.folder);
+          if (typeof meta.wait === "number") a.setAttribute("data-wait", String(meta.wait));
+        }
+        a.textContent = r.run;
+        parent.insertBefore(a, t);
+        at = r.end;
+      }
+      if (!at) return;
+      if (at < s.length) parent.insertBefore(doc.createTextNode(s.slice(at)), t);
+      parent.removeChild(t);
+    };
+    const walk = (n) => Array.from(n.childNodes || []).forEach((c) => {
+      if (c.nodeType === 3) split(c);
+      else if (c.nodeType === 1 && !/^(A|BUTTON|SUMMARY)$/i.test(c.nodeName)) walk(c);
+    });
+    walk(el);
+  };
+  // …the texts under `box` (a row, or a fold's body inside one), their runs asked — or, `cacheOnly`, read
+  // from what the row's context already knows — and linked
+  AO.linkItem = function (row, box, cacheOnly) {
+    const ctx = row && row.dataset && row.dataset.pathsCtx;
+    if (!ctx || (cacheOnly && !itemAskers.has(ctx))) return null;
+    const els = [...(box || row).querySelectorAll(AO.ITEM_TEXT)];
+    const paths = [...new Set(els.flatMap((el) => AO.pathRuns(el.textContent).map((r) => r.path)))];
+    if (!paths.length) return null;
+    const { asker, meta } = AO.itemAsker(ctx);
+    const link = (got) => els.forEach((el) => AO.linkItemText(el, got, meta));
+    if (cacheOnly) { link(asker.cached(paths)); return null; }
+    return asker.resolve(paths).then(link);
+  };
+  // …a row's first hover asks, once, whatever the answer
+  AO.askItem = function (row) {
+    if (!row || !row.dataset || row.dataset.pathsAsked) return null;
+    row.dataset.pathsAsked = "1";
+    return AO.linkItem(row, row, false);
+  };
+  document.addEventListener?.("mouseover", (ev) => {
+    const row = ev.target && ev.target.closest && ev.target.closest(".mailrow[data-paths-ctx]");
+    if (row) AO.askItem(row);
+  });
   // The Session card's **recent files** (§4.5 item 4, §4.5a, TD-525): the record's `files`, newest
   // first, each drawn relative to the session's directory (else its repo) with the absolute path and
   // its time on hover — the file's, or the commit's and its short sha (TD-538) — **M** before one
