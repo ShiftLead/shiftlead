@@ -3392,6 +3392,20 @@ def test_the_message_page_draws_the_entry_its_answer_and_its_thread(client, tmp_
     assert "off main, please" in thread and ">person<" in thread and "data-act=" not in thread  # read, never pressed
 
 
+def test_the_message_page_gives_each_thread_row_its_senders_paths_context(client, tmp_path):
+    """TD-1178: the page computes each thread row's `from_open` itself (`inbox_entry_page`): a sender
+    the home knows resolves its row's paths by `id:<record>`, and `person` — a sender no record is —
+    by `home` (design §4.6 *A path in the Inbox and the Queue is a link too*, TD-1108)."""
+    from test_ui_item_paths import _ctx
+
+    sid = sender_session(client, tmp_path)
+    ask = send(sid, text="merge #9?", kind="ask")
+    mine = client.post("/api/person/reply", json={"reply_to": ask["id"], "text": "off main"}).json()["id"]
+    again = send(sid, text="and src/x.py?", kind="ask", reply_to=mine)
+    thread = client.get(f"/inbox/{ask['id']}").text.split('class="isec msgthread"')[1]
+    assert _ctx(thread, again["id"]) == f"id:{sid}" and _ctx(thread, mine) == "home"
+
+
 def test_the_message_page_of_a_gone_entry_and_of_another_hosts_reads_words(client):
     """TD-136 *Done when* (3): an entry the person inbox no longer holds, and one another host holds,
     read their words — never a blank page or a 500."""

@@ -66,6 +66,12 @@ async def test_paths_takes_repo_and_neither_beside_id(agent, tmp_path, monkeypat
     (user / ".ssh").mkdir(parents=True)
     (user / ".ssh" / "config").write_text("x\n")
     (user / "h.txt").write_text("h\n")
+    # files a relative run would find were it resolved against the home's user (TD-1177): neither's
+    # `None` below then holds only because a relative run is never tried
+    (user / "src").mkdir()
+    (user / "src" / "x.py").write_text("x\n")
+    (user / "x").write_text("x\n")
+    (tmp_path / "x").write_text("x\n")
     monkeypatch.setenv("HOME", str(user))
     async with LocalClient() as person:
         # the repo form: a relative run against the registered checkout, given by its path
