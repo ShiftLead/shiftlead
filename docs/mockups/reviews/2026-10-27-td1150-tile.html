@@ -1,0 +1,96 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TD-1150 Tile icons</title>
+<style>
+/* design §4.5 *Browser mechanics* *A tab's icon* (TD-1150): direction A, Tile, the whole set, as the build draws it.
+   Colours are app.css's light tokens; the glyphs are tab-icons/index.html's, with on call and unreachable added. */
+body { background: #f4f5f7; color: #1c2128; font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 24px 16px 40px; }
+main { max-width: 1120px; margin: 0 auto; display: grid; gap: 22px; }
+h1 { font-size: 21px; margin: 0; } h2 { font-size: 15px; margin: 0; color: #374151; }
+p { margin: 0; max-width: 78ch; color: #4b5563; font-size: 14px; }
+.strip { border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden; }
+.chrome { display: flex; flex-wrap: wrap; gap: 1px; padding: 6px 6px 0; }
+.chrome.light { background: #dee1e6; --tab: #eceef0; --on: #fff; --fg: #1f2328; }
+.chrome.dark { background: #1f2125; --tab: #2a2c30; --on: #35363a; --fg: #e8eaed; }
+.tab { display: flex; align-items: center; gap: 8px; width: 170px; padding: 7px 10px; background: var(--tab); color: var(--fg); border-radius: 8px 8px 0 0; font-size: 12px; white-space: nowrap; overflow: hidden; margin-bottom: 4px; }
+.tab.on { background: var(--on); }
+.tab img { width: 16px; height: 16px; flex: none; } .tab span { overflow: hidden; text-overflow: ellipsis; }
+.ladder { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: end; }
+.cell { display: grid; justify-items: center; gap: 4px; font: 11px ui-monospace, monospace; color: #6b7280; }
+.cell .sizes { display: flex; gap: 6px; align-items: end; padding: 6px; border-radius: 4px; }
+.cell .sizes.dk { background: #1f2125; }
+.cell img.s16 { width: 16px; } .cell img.s32 { width: 32px; }
+</style>
+<main>
+  <h1>TD-1150 — the Tile set (direction A), whole</h1>
+  <p>Eleven state icons, one per state class a Focus pill draws, and nine page icons. Each is a 16-unit rounded square with a one-unit edge, so the dark page tile still reads on a dark tab strip. Each cell shows 16 and 32 px on a light strip, then on a dark one. The file name under each cell is the build's <code>static/icons/&lt;name&gt;.svg</code>.</p>
+  <div id="root" style="display:grid;gap:22px"></div>
+</main>
+<script>
+const S = {
+  needs:      { c: "#f59e0b", ink: "#1c2128", g: "tri",     t: "▲ grinder-ao-2 · needs you" },
+  working:    { c: "#16a34a", ink: "#fff",    g: "wave",    t: "designer-ao-1 · working" },
+  idle:       { c: "#2563eb", ink: "#fff",    g: "prompt",  t: "techlead · idle · unseen" },
+  waiting:    { c: "#0d9488", ink: "#fff",    g: "dots",    t: "grinder-ao-1 · waiting" },
+  stalled:    { c: "#dc2626", ink: "#fff",    g: "q",       t: "reviewer · stalled?" },
+  limited:    { c: "#7c3aed", ink: "#fff",    g: "pie",     t: "grinder-ao-3 · limited" },
+  scheduled:  { c: "#9ca3af", ink: "#1c2128", g: "clock",   t: "night-grind · scheduled" },
+  exited:     { c: "#9ca3af", ink: "#1c2128", g: "ring",    t: "shell-2 · exited" },
+  closed:     { c: "#9ca3af", ink: "#1c2128", g: "check",   t: "grinder-ao-4 · closed" },
+  oncall:     { c: "#9ca3af", ink: "#1c2128", g: "diamond", t: "director · on call" },
+  unreachable:{ c: "#9ca3af", ink: "#1c2128", g: "nope",    t: "node-2 shell · unreachable" },
+};
+const P = {
+  sessions: { g: "grid", t: "Sessions · ShiftLead" }, inbox: { g: "tray", t: "Inbox · ShiftLead" },
+  queue: { g: "bars", t: "Queue · ShiftLead" }, repo: { g: "branch", t: "shiftlead · ShiftLead" },
+  settings: { g: "sliders", t: "Settings · ShiftLead" }, help: { g: "i", t: "Help · ShiftLead" },
+  spend: { g: "coin", t: "Spend · ShiftLead" }, new: { g: "plus", t: "New session · ShiftLead" },
+  transcript: { g: "lines", t: "techlead · transcript" },
+};
+const MARK = "#1c2128", MARKFG = "#e6e9ee", EDGE = "#6b7280";
+// Each glyph is drawn in a 16-unit box; `k` is its ink colour.
+function glyph(name, k, scale = 1, cx = 8, cy = 8) {
+  const sw = (w = 1.8) => `fill="none" stroke="${k}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"`;
+  const st = sw();
+  const G = {
+    tri: `<path d="M8 3.2 13.2 12.4H2.8Z" fill="${k}"/>`,
+    wave: `<path d="M2.8 8.6c1.3-3.6 3.9-3.6 5.2 0s3.9 3.6 5.2 0" ${st}/>`,
+    prompt: `<path d="M3.4 5 6.4 8 3.4 11M8.4 11.6h4.4" ${st}/>`,
+    dots: `<circle cx="4" cy="8" r="1.6" fill="${k}"/><circle cx="8" cy="8" r="1.6" fill="${k}"/><circle cx="12" cy="8" r="1.6" fill="${k}"/>`,
+    q: `<path d="M5.6 6a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5" ${st}/><circle cx="8" cy="12.6" r="1.1" fill="${k}"/>`,
+    pie: `<circle cx="8" cy="8" r="4.8" ${sw(1.5)}/><path d="M8 8V3.2A4.8 4.8 0 0 1 12.8 8Z" fill="${k}"/>`,
+    clock: `<circle cx="8" cy="8" r="4.8" ${sw(1.5)}/><path d="M8 5.3V8h2.4" ${sw(1.5)}/>`,
+    ring: `<circle cx="8" cy="8" r="4.6" ${sw(1.6)} stroke-dasharray="2.2 1.8"/>`,
+    check: `<path d="M3.8 8.4 6.8 11.4 12.4 4.8" ${sw(2)}/>`,
+    grid: `<rect x="3" y="3" width="4.2" height="4.2" rx="1" fill="${k}"/><rect x="8.8" y="3" width="4.2" height="4.2" rx="1" fill="${k}"/><rect x="3" y="8.8" width="4.2" height="4.2" rx="1" fill="${k}"/><rect x="8.8" y="8.8" width="4.2" height="4.2" rx="1" fill="${k}" opacity=".55"/>`,
+    tray: `<path d="M2.8 9h3l1.2 1.8h2L10.2 9h3M2.8 9l1.8-5h6.8l1.8 5v3.8H2.8Z" ${sw(1.5)}/>`,
+    bars: `<rect x="3" y="3.4" width="10" height="2.2" rx="1" fill="${k}"/><rect x="3" y="6.9" width="7.2" height="2.2" rx="1" fill="${k}"/><rect x="3" y="10.4" width="4.4" height="2.2" rx="1" fill="${k}"/>`,
+    branch: `<circle cx="5" cy="4" r="1.6" fill="${k}"/><circle cx="5" cy="12" r="1.6" fill="${k}"/><circle cx="11" cy="5.5" r="1.6" fill="${k}"/><path d="M5 5v6M11 7c0 3-6 2-6 4" ${sw(1.5)}/>`,
+    sliders: `<path d="M3 5h10M3 11h10" ${sw(1.5)}/><circle cx="10" cy="5" r="1.9" fill="${k}"/><circle cx="6" cy="11" r="1.9" fill="${k}"/>`,
+    i: `<circle cx="8" cy="4.2" r="1.3" fill="${k}"/><path d="M8 7.2v5.4" ${sw(2.2)}/>`,
+    coin: `<ellipse cx="8" cy="5" rx="4.6" ry="1.9" ${sw(1.4)}/><path d="M3.4 5v3.2c0 1 2 1.9 4.6 1.9s4.6-.9 4.6-1.9V5M3.4 8.2v3c0 1 2 1.9 4.6 1.9s4.6-.9 4.6-1.9v-3" ${sw(1.4)}/>`,
+    plus: `<path d="M8 3.5v9M3.5 8h9" ${sw(2.2)}/>`,
+    lines: `<path d="M3.5 4.5h9M3.5 8h9M3.5 11.5h5.5" ${sw(1.6)}/>`,
+    diamond: `<path d="M8 3.2 12.8 8 8 12.8 3.2 8Z" ${sw(1.6)}/>`,
+    nope: `<circle cx="8" cy="8" r="4.6" ${sw(1.6)}/><path d="M4.6 11.4 11.4 4.6" ${sw(1.6)}/>`,
+    shift: `<path d="M8 2.4 13.6 8.4H10.6V13.4H5.4V8.4H2.4Z" fill="none" stroke="${k}" stroke-width="1.5" stroke-linejoin="round"/>`,
+    shiftfill: `<path d="M8 2.4 13.6 8.4H10.6V13.4H5.4V8.4H2.4Z" fill="${k}"/>`,
+  };
+  const s = G[name];
+  if (scale === 1) return s;
+  return `<g transform="translate(${cx} ${cy}) scale(${scale}) translate(-8 -8)">${s}</g>`;
+}
+const uri = (body) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">${body}</svg>`);
+// the tile: a 16-unit rounded square, its one-unit edge drawn inside it
+const tile = (fill, edge) => `<rect x=".5" y=".5" width="15" height="15" rx="3.5" fill="${fill}" stroke="${edge}" stroke-width="1"/>`;
+const page = (p) => uri(tile(MARK, EDGE) + glyph(p.g, MARKFG, .8));
+const state = (s) => uri(tile(s.c, "rgba(0,0,0,.18)") + glyph(s.g, s.ink, .8));
+const root = document.getElementById("root");
+const tabs = (theme) => `<div class="strip"><div class="chrome ${theme}">` +
+  ["sessions", "inbox", "queue", "repo"].map((k, i) => `<div class="tab${i ? "" : " on"}"><img alt="" src="${page(P[k])}"><span>${P[k].t}</span></div>`).join("") +
+  Object.values(S).map((s) => `<div class="tab"><img alt="" src="${state(s)}"><span>${s.t}</span></div>`).join("") + `</div></div>`;
+const cell = (src, label) => `<div class="cell"><div style="display:flex"><div class="sizes"><img class="s16" alt="" src="${src}"><img class="s32" alt="" src="${src}"></div><div class="sizes dk"><img class="s16" alt="" src="${src}"><img class="s32" alt="" src="${src}"></div></div>${label}</div>`;
+root.innerHTML = `<h2>Tab strips, light and dark</h2>${tabs("light")}${tabs("dark")}
+  <h2>A Focus tab or window: one per state class</h2><div class="ladder">${Object.entries(S).map(([k, s]) => cell(state(s), "state-" + k)).join("")}</div>
+  <h2>Every other page</h2><div class="ladder">${Object.entries(P).map(([k, p]) => cell(page(p), "page-" + k)).join("")}</div>`;
+</script>
