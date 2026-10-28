@@ -388,7 +388,9 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   included, which a ShiftLead release cures — makes the repo unserved by name, never skipped.
   **Which dev-cadence** (*Decision* 4, TD-1012): the build names the oldest dev-cadence commit it reads
   (`sessionorc.cadence.OLDEST`) and, under TD-129, the launcher interface it needs; a lock's
-  `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. Ancestry is read in
+  `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. A v2 ledger (§4.4 *Either layout*, TD-1143) asks
+  more: one that does not descend from `OLDEST_V2` (`b9236c8`, dev-cadence #405, where its `ledger.py` and
+  `ledger_next_id.py` first read a directory) is the lack *the pinned dev-cadence predates the v2 reader*. Ancestry is read in
   the roster's dev-cadence checkout after its fetch (`git merge-base --is-ancestor`), else through the
   forge's compare of the two commits; an age that cannot be read is a warning, *dev-cadence's age not
   read: <why>*, never a lack, so a missing clone unserves nothing. The newer side is
