@@ -1079,8 +1079,9 @@ def _pairing(
     orphans = [
         r
         for n in gone
-        if (r := _current(n, mine)) is not None and not (r.get("sit_out") or sat_out(r) or r.get("superseded_by"))
-    ]
+        if (r := _current(n, mine)) is not None
+        and not (r.get("sit_out") or sat_out(r) or r.get("superseded_by") or r.get("run_only"))
+    ]  # a run-only member, live or exited inside its run, is neither: it ends with the run (§4.9, TD-1166)
     carried = {str(r.get("name")) for r in badged(plan.team, sessions) if not r.get("superseded_by")}
     newcomers = [x for x in plan.launches if x.name not in carried]
     held: dict[str, dict[str, Any]] = {}
@@ -1118,13 +1119,14 @@ def renames(
 ) -> tuple[list[tuple[dict[str, Any], teams.Launch]], list[dict[str, Any]]]:
     """A team's records the definition renamed or dropped (design §4.9 *A member renamed or removed in
     the definition*, TD-703), as `(renames, removals)`. The **orphans** are the team's crew records
-    (`crew`: never a person's session) that are current (not superseded) and not sat out, whose name the
-    definition no longer holds; the **newcomers** the launches whose name no current record of the team
-    carries. Within one role (the record's `role` against the launch's) the orphans, by `created`, are
-    paired with the newcomers, in the definition's order: each pair `(record, launch)` is a rename, an
-    orphan left over a removal, and a newcomer left over the start it already is. An orphan whose
-    `relaunch` mark already carries a newcomer's `name` was applied: it is neither, and the newcomer is
-    held by it. The card, `ao team list`, `ao team flow`, Apply and Start read this one pairing."""
+    (`crew`: never a person's session) that are current (not superseded), not sat out and not run-only (§4.9
+    *A member started from the form*, TD-1166), whose name the definition no longer holds; the **newcomers**
+    the launches whose name no current record of the team carries. Within one role (the record's `role`
+    against the launch's) the orphans, by `created`, are paired with the newcomers, in the definition's
+    order: each pair `(record, launch)` is a rename, an orphan left over a removal, and a newcomer left over
+    the start it already is. An orphan whose `relaunch` mark already carries a newcomer's `name` was
+    applied: it is neither, and the newcomer is held by it. The card, `ao team list`, `ao team flow`, Apply
+    and Start read this one pairing."""
     pairs, removals, _ = _pairing(plan, sessions)
     return pairs, removals
 
@@ -1937,6 +1939,39 @@ def start_member(
         raise teams.TeamError(f"{want} is held by a live session, so nothing was created")
     text = "".join(f" — {w}" for w in said)
     return {"team": name, "line": line, "created": rec, "text": f"started {want}" + text}
+
+
+def not_running(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> str:
+    """Why a member start on `team` is refused (§4.9 *A member started from the form*, TD-1166), or "": a team
+    with nothing live, or whose defined manager is neither live nor a seat on call, is not running — a team a
+    person leads (`manager: person`) is running when any of its crew records is live — so a member started
+    there would have no manager and no run to end it."""
+    mine = crew(team.name, sessions)
+    if live(mine):
+        if team.manager.role == orgmod.PERSON:
+            return ""
+        lead = _current(team.manager.name, mine)
+        if lead is not None and (lead["state"] not in DEAD or on_call(lead)):
+            return ""
+    return f"{team.name} is not running: start it first"
+
+
+def add(
+    call: Call, org: orgmod.Org, name: str, line: str, host: str, *, keep: bool = False, caller: str | None = None
+) -> dict[str, Any]:
+    """`ao team add <team> <line> [--keep]` (§4.7, §4.9 *A member started from the form*, TD-1166): the line's
+    next member started for this run alone (`start_member(run_only=True)`), or with `keep` the line's size one
+    higher (`resize`), its refusals included — each refused on a team that is not running (`not_running`)."""
+    team = teams.find(org, name)
+    if why := not_running(team, call("list")):
+        raise teams.TeamError(why)
+    if not keep:
+        return start_member(call, org, name, line, host, run_only=True, caller=caller)
+    try:
+        n = len(team.line(line).names()) + 1
+    except ValueError as e:
+        raise teams.TeamError(str(e)) from None
+    return resize(call, org, name, line, n, host, caller=caller)
 
 
 def _sit_out_member(call: Call, s: dict[str, Any]) -> str:

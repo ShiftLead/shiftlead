@@ -2238,6 +2238,22 @@ def cmd_team_size(args: argparse.Namespace) -> int:
     return emit(args, got, lambda: print(got["text"]))
 
 
+def cmd_team_add(args: argparse.Namespace) -> int:
+    """`ao team add <team> <line> [--keep]` (design §4.7, §4.9 *A member started from the form*, TD-1166): the
+    member line's next member started for this run alone — never replayed after it, and no file or setting
+    written — or with `--keep` the line's size one higher as `ao team size` writes it; refused on a team that
+    is not running, and to a session. Prints the name it started."""
+    if os.environ.get("SHIFTLEAD_SESSION"):
+        return fail(args, "ao team add starts a member: a person's own, refused to a session (design §4.7)", 1)
+    try:
+        org = _org_here()
+        name = _defined_team(args, org)
+        got = teamrun.add(call_sync, org, name, args.line, hosts.local_host().name, keep=args.keep)
+    except (ValueError, teams.TeamError, AgentError) as e:
+        return fail(args, str(e), 1)
+    return emit(args, got, lambda: print(got["text"]))
+
+
 def cmd_team_flow(args: argparse.Namespace) -> int:
     """`ao team flow <team> [<flow> | --apply]` (design §4.7, §4.9c): with no flow, the team's flows
     in order, the current one marked, each one's flow strip and why the team cannot use it, and, for a
@@ -4755,6 +4771,14 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("line", help="the member line's name: (its role where it writes none)")
     q.add_argument("n", type=int, help="a whole number from 0; on a live team, members started or wound down to match")
     q.set_defaults(fn=cmd_team_size)
+
+    q = add_team(
+        "add", help="start a member line's next member for this run alone (§4.9 A member started from the form)"
+    )
+    q.add_argument("name")
+    q.add_argument("line", help="the member line's name: (its role where it writes none)")
+    q.add_argument("--keep", action="store_true", help="a kept member instead: the line's size one higher")
+    q.set_defaults(fn=cmd_team_add)
 
     q = add_team("flow", help="the team's flows, the one it runs marked; with a flow, pick it (§4.9c)")
     q.add_argument("name")

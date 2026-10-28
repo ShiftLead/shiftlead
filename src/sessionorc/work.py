@@ -126,11 +126,11 @@ def _how_stopped(r: Session) -> str | None:
 
 def stopped_by(records: Iterable[Session]) -> dict[str, str]:
     """How a team stopped (§6 rule 8 *A team that stopped*): `{by, at}` over its **current** crew records (not
-    superseded, not sat out). `at` is the newest end among them (`record_end`), and `by` is read from the
-    records whose end falls within `FINISHED_SETTLE` of it alone — the team's ending, not a member a person
-    closed a day earlier: `person` where one was ended by the person, else `until` where one was ended by the
-    stop time, else `other`."""
-    current = [r for r in crew(records) if not r.superseded_by and not sat_out(r)]
+    superseded, not sat out, not run-only, §4.9 *A member started from the form*). `at` is the newest end among
+    them (`record_end`), and `by` is read from the records whose end falls within `FINISHED_SETTLE` of it alone —
+    the team's ending, not a member a person closed a day earlier: `person` where one was ended by the person,
+    else `until` where one was ended by the stop time, else `other`."""
+    current = [r for r in crew(records) if not r.superseded_by and not sat_out(r) and not r.run_only]
     ends = [(r, at) for r in current if (at := _instant(record_end(r))) is not None]
     if not ends:
         return {"by": "other", "at": ""}
