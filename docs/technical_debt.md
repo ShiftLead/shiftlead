@@ -92,6 +92,7 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
 | TD-1187 | The top bar scrolls away with the page: once scrolled down, the tabs, + New and the counts are out of reach | Medium | Open — design-first |
 | TD-1188 | The per-clone-setup and roster warnings for a lock repo name `sync.sh <checkout>`, which dev-cadence #429 made a refusal; TD-1183's `Resolved` says §5's cures already named the launcher | Medium | Open — build |
+| TD-1189 | A team card shows the repo's Technical debt only on the repo's line, and TDs in motion never what the team just finished | Medium | Open — design-first, waits on Paul |
 | TD-1190 | The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass | Medium | Open — design-first |
 
 ---
@@ -1954,6 +1955,27 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** change both cures to `dev-cadence -C <dev-cadence> adopt <checkout>` (what `adopt.after` now prints) where the dev-cadence checkout has a launcher, keeping `sync.sh` only for an older checkout with none; update §5 and §4.7 in the same PR to match, the doc-bound tests with them, and the history line under §5.
 
 **Done when** the lock-repo warnings name a command dev-cadence accepts, §4.7, §5 and `seams.py` agree, and `pdm run test` passes.
+
+---
+
+## TD-1189: A team card shows the repo's Technical debt only on the repo's line above it, and TDs in motion shows only what is held now, never what the team just finished
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-28 (Paul, through Add entry; drafted by ao-shiftlead-team-cards)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first, waits on Paul (worked interactively)
+**Blocked by:** decision (paul) — Paul asked to talk both changes through with a session; drop the line when he says go
+**Location:** `src/shiftlead/ui/templates/team_summary.html` (the summary's facets: TDs in motion, Answer needed / Doing and its *answer · doing* toggle); `src/shiftlead/ui/templates/repo_facet.html` (Technical debt and Pull requests) and `repo_line.html` (the facet drawn once per repo); `src/shiftlead/ui/org.py` (`completed_in` 94, `motion_rows` 313, `drawn_facets` 508, `team_summary` 520); `src/shiftlead/ui/repo.py` (`completed_rows` 266, the Repo page's Recently completed); `src/shiftlead/ui/static/app.js` (the `.tsum .seg[data-pick]` handler 2311 and the summary's picks 2398); `src/shiftlead/ui/static/app.css` (the summary's facet row, `.fmotion`'s columns 698); design §4.5a rows *team card: summary* 163, *team card: Repo facet* 164, *TDs in motion (n)* 165, *Answer needed / Doing* 166 and *Sessions: repo line* 204; §4.5 screen 1 *A team's card*; §4.9 *The Sessions page* (TD-722, TD-725)
+
+**Why:** Paul, 2026-10-28: *Our teams on the Session page currently shows technical debt as an overview for the team, then TDS IN MOTION and Doing cards on each repo in the team. Lets talk about putting the technical debt as a third card (listed before the tds in motion). Lets also talk about adding a "Recently completed" option on the tds in motion card - to show tds that were done recently - probably similar to the way the answer|doing option works on the doing card.* Today the repo's **Technical debt** (with **Pull requests**) is the Repo facet, drawn once on the repo's line above its teams (TD-722, TD-725), and a team card has two facets, TDs in motion and Answer needed / Doing. So the debt a team works sits apart from the team's own card, and TDs in motion empties the moment a claim closes: what the team just finished is on the Repo page's **Merged** column or behind the facet's *closed* block's hover, never on the card that showed it in motion.
+
+**Fix (to design, with Paul):**
+1. **Technical debt as the team card's third facet**, first in the row: Technical debt · TDs in motion · Answer needed / Doing. The round settles: whether **Pull requests** moves with it or stays on the repo's line (and whether the line keeps anything but the name and *open →*); a repo two teams service, where the facet would be drawn on each card (the reason TD-722 drew it once); the row's proportions (0.85 : 1.2 today) and the one-column break below 1100 px; and a team with nothing live (`drawn_facets`, TD-418).
+2. **Recently completed on TDs in motion**: a toggle at the facet's right, *in motion · completed*, as Answer needed / Doing's *answer · doing*, the completed face listing the entries the team closed recently — newest first, each its id, title, the PR that closed it and the close's age, from the repo reading's `completed` (`completed_in`, §4.4 *What closed, and by which PR*) as the Repo page's Merged column reads it. The round settles: the window (a fixed day, or the *day · week · month* picker the facet's *closed* block has), how a close is the team's (its PR's author is a member, or the closing claim was a member's) and not another team's in the same repo, a fold past n rows, and whether the face is remembered per team as the *answer · doing* pick is.
+
+**Done when** the design says what a team card's facets are and in what order, where Pull requests is drawn, and what the TDs in motion facet's completed face lists, with a mockup of a team card in each face (wide and one-column), and its builds are filed as `Part of: TD-1189`.
 
 ---
 
