@@ -11011,6 +11011,7 @@ words), TD-079 (the attention trail).
 **Owner:** grinder
 **Kind:** build
 **Status:** Done
+**Part of:** TD-637
 **Location:** design §4.8 *A `done` with a PR is told what its checks read*, §4.7, §6 rule 10; `src/sessionorc/agent.py` (`rpc_progress` ~L2485: on `status == "done"` with `pr`, the read and the verdict before anything is written; `--slice` too), `src/sessionorc/reports.py` (the repo reading: `required: {<base>: [names]}` from `gh api repos/<o>/<r>/branches/<base>/protection/required_status_checks` and `gh api repos/<o>/<r>/rules/branches/<base>` — the `required_status_checks` rules — on `REPOS_EVERY`; a read that fails keeps the last), `src/sessionorc/models.py` (`ProgressEntry`: `ci: str` — `pending` / `unknown`; not `checks`, which rule 10's record field and the PR reading already use), `src/sessionorc/cadence.py` (rule 10: a `ci: pending` entry read on its cadence like any `done`, its read at the head clearing `ci`), `src/shiftlead/cli.py` (the refusal printed as the agent words it; the reply's *checks unknown*, *closed unmerged*, non-required names), the card's report line (`src/shiftlead/ui/cards.py`: *done · checks pending*); `tests/test_progress*.py` or `tests/test_agent*.py`, `tests/test_reports.py`, `tests/test_cadence*.py`
 
 **Why:** TD-637: Paul, 2026-10-13 — *an agent should not say its done if its PR is not green*; a `done` is accepted today and checked afterwards, on rule 10's cadence.
