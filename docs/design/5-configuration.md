@@ -56,6 +56,7 @@ teams:                                        # per team, by the name org.yml or
     on_work: start                            # §6 rule 8: start | ask | off, when a wound-down team's lanes, or a finished member's lane, gain work; start when absent
     flow: build-review                        # §4.9c: which of the team's flows it runs now; absent, the first
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance*: over any of these the team's members take no new claim; absent, no rule
+    size: {grinder-ao: 3}                     # §4.9 *A team's size* (TD-1149): sessions per member line, by its name:, over its count:; a line absent runs its count
 permissions:                                  # TD-636, §4.9b *The director seat*: per role, the adapter's rule syntax; a deny wins
   grinder: {allow: ["Bash(pdm run test:*)", "Bash(gh pr view:*)"], deny: ["Bash(rm -rf:*)"]}
 sweep: {on: false, every: 7d, profile: grind}   # TD-1061, §4.9b *The sweep*: on, ao team start gives every team it starts a sweeper seat, one filled per repo, due once its board's Swept: stamp is `every` old (read each tick); profile from the next start, absent the role's precedence; a team's own sweeper seat wins
