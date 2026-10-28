@@ -1022,7 +1022,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
   - nothing, if the cost per finished design is already lowest as it is.
 - TD-818's spend per finished entry is the measure once it exists. Until then, the hand read is the same as TD-460's.
 
-**Done when** the reading says where the designer's context goes, and the design either gives the designer a restart point or a bound with its build entries filed and named in `Blocked by:`, or says, with the numbers, why it stays as it is.
+**Done when** the reading says where the designer's context goes, and the design either gives the designer a restart point or a bound with its build entries filed, each naming this entry in `Part of:`, or says, with the numbers, why it stays as it is.
 
 **Related:** TD-460 (the grinders' bound trial), TD-378 (the prompt cache, archived), TD-818 (spend per seat), rule 5.
 
