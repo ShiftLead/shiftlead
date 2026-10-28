@@ -62,3 +62,5 @@
 - [`!` commands run as this session](bang-commands-run-as-this-session.md) — person-only acts (`ao promote`, `clear`) are refused from a `!` line; `ao service install` there needs `XDG_RUNTIME_DIR`
 - [Shiftlead is pinned: run dev-cadence's scripts](shiftlead-is-pinned-run-dev-cadence-scripts.md) — since #2391 no `scripts/ledger.py`/`check_cadence.py`/`precheck.py`; `dev-cadence run <script>`
 - [Precheck and merge in one command](precheck-and-merge-in-one-command.md) — ~12 min precheck, main moves the ledger under it; precheck, gate and merge as one background command
+- [Show the unconstrained design pass](show-the-unconstrained-design-pass.md) — frontend-design on a mockup: render the skill's own pick beside the house-style refinement (TD-1203, 2026-10-28)
+- [Mockup from a static copy](mockup-from-a-static-copy.md) — edit a script-free copy of the live page in Playwright; prefix the mockup's classes, never nest links
