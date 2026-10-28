@@ -19267,6 +19267,7 @@ waits on a dialog the pane draws a moment later (captured mid-turn, `subagent-pe
 **Owner:** grinder
 **Kind:** build
 **Status:** Done
+**Part of:** TD-986
 **Location:** `src/shiftlead/ui/static/app.js` (beside the terminal's `wheel` listener and `AO.wheelStep`; the `contextmenu` listener that pastes), `src/shiftlead/ui/static/app.css` (`.termbox`); design §4.6 *Scrollback is tmux's, reached through tmux* (**A finger's drag scrolls it too**), §4.5a **Focus pane: a finger's drag**, *Copy / Paste*
 
 **Why:** TD-986: on a phone the terminal's history can be reached only by chance, since a drag sends no `wheel`.
