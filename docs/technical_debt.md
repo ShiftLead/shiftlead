@@ -6,9 +6,9 @@ Known issues, compromises, and deferred work. Add an entry any time a problem is
 
 IDs are `TD-` plus a number zero-padded to three digits (four from TD-1000 on), assigned in order and never reused. Priority is a field, never part of the ID.
 
-Two header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`designer`, `grinder`, `paul`, `dev-cadence`; the anchor seat is retired, design §4.9b *No anchor seat*); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`). Every open entry carries them; keep them true when the Status changes. A third, **Waits**, is written only on an entry that is pickable and still waits on something no `Blocked by:` item names (TD-715, design §4.4 *An entry says what it waits for*): `until <date>` (*`**Waits:** until 2026-10-16 — CI runs on or after 10-16`*) or `event` (*`**Waits:** event — the next cadence-sync PR`*). What waits on the person is `Blocked by: decision (paul) — <what they must do>`, or `Owner: paul`, never a `Waits:` line. **Pickable is derived, never written** (cadence §2.4, TD-228): an entry is pickable while its `**Blocked by:**` names nothing still open and no decision, and no open entry is `Part of:` it, so what waits on another entry or on a person's word says so there, with its pointer; what nothing blocks and a grinder still cannot build — a live look, an evaluation, the person's edit — is said by its **Kind** or its **Owner**, and the Status says what is next. **Part of** (cadence §2.4, TD-1129) names the one parent an entry is a part of, in this ledger: each build of a design, and each subtask of a feature, writes `**Part of:** TD-n`, and the parent's own `Blocked by:` keeps only what must land first, never its parts (a part blocked by its parent is a cycle `ledger.py --check` refuses). A parent is ordered after its parts and archives with its last one, in that part's PR (design §4.9c *A design entry archives with its last build*); a design still listing its builds in `Blocked by:` is read the old way until it is backfilled. A `live-check` is followed on its line by its build's last merged PR — `**Kind:** live-check #<n>`, written by the PR that makes the entry a live check — and once that PR is live (`ao promote status`) the check is in a `free-pick` lane whose owner it has (design §4.9b, TD-320); cadence's script reads the word alone. A grinder's pick list is therefore `ao repo` (its pickable entries, a live check whose build is live among them), and `python3 scripts/ledger.py --list --pickable yes --owner grinder --kind build` lists the builds alone; the designer's is `--owner designer --kind design-first`. The line below is the one list of the **Owner** and **Kind** words (cadence §2.12): `scripts/ledger.py` flags a value outside it, and `tests/test_ledger.py` reads its sets from it and checks the two lines' shape, so a new word is added there and nowhere else.
+Two header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`designer`, `grinder`, `paul`; the anchor seat is retired, design §4.9b *No anchor seat*). Another repo's work is never an entry here: it is filed on that repo's ledger, with `ao td add --repo <repo>` (its techlead drafts it), and what waits on it here names it as `<repo>#TD-NNN` in `Blocked by` (Paul, 2026-10-28); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`). Every open entry carries them; keep them true when the Status changes. A third, **Waits**, is written only on an entry that is pickable and still waits on something no `Blocked by:` item names (TD-715, design §4.4 *An entry says what it waits for*): `until <date>` (*`**Waits:** until 2026-10-16 — CI runs on or after 10-16`*) or `event` (*`**Waits:** event — the next cadence-sync PR`*). What waits on the person is `Blocked by: decision (paul) — <what they must do>`, or `Owner: paul`, never a `Waits:` line. **Pickable is derived, never written** (cadence §2.4, TD-228): an entry is pickable while its `**Blocked by:**` names nothing still open and no decision, and no open entry is `Part of:` it, so what waits on another entry or on a person's word says so there, with its pointer; what nothing blocks and a grinder still cannot build — a live look, an evaluation, the person's edit — is said by its **Kind** or its **Owner**, and the Status says what is next. **Part of** (cadence §2.4, TD-1129) names the one parent an entry is a part of, in this ledger: each build of a design, and each subtask of a feature, writes `**Part of:** TD-n`, and the parent's own `Blocked by:` keeps only what must land first, never its parts (a part blocked by its parent is a cycle `ledger.py --check` refuses). A parent is ordered after its parts and archives with its last one, in that part's PR (design §4.9c *A design entry archives with its last build*); a design still listing its builds in `Blocked by:` is read the old way until it is backfilled. A `live-check` is followed on its line by its build's last merged PR — `**Kind:** live-check #<n>`, written by the PR that makes the entry a live check — and once that PR is live (`ao promote status`) the check is in a `free-pick` lane whose owner it has (design §4.9b, TD-320); cadence's script reads the word alone. A grinder's pick list is therefore `ao repo` (its pickable entries, a live check whose build is live among them), and `python3 scripts/ledger.py --list --pickable yes --owner grinder --kind build` lists the builds alone; the designer's is `--owner designer --kind design-first`. The line below is the one list of the **Owner** and **Kind** words (cadence §2.12): `scripts/ledger.py` flags a value outside it, and `tests/test_ledger.py` reads its sets from it and checks the two lines' shape, so a new word is added there and nowhere else.
 
-Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-first | live-check | evaluation | decision; Waits = until | event
+Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-check | evaluation | decision; Waits = until | event
 
 ---
 
@@ -30,14 +30,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-297 | The parts of the live looks of 2026-10-03 nobody could see: each waits on a press, a live event or a fixture, for a scratch home or the next time it happens | Low | Open |
 | TD-299 | Run the guardians and contractmatch teams inside their devcontainers: provision the nodes for workers, define guardians' team, land both by `place:` | Medium | Paul's — contractmatch done; guardians' team, node and `place:` left |
 | TD-300 | A look's screenshots from a sender on another host draw their names alone: the shot route reads this host's registry only | Low | Live check #993 — waits on a look from a node (TD-299) |
-| TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
-| TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
-| TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644, TD-645 build it |
-| TD-640 | `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637) | Low | Open |
+| TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639 built; dev-cadence#TD-178 builds the rest |
+| TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644 built; dev-cadence#TD-181 builds the rest |
 | TD-641 | Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI | Medium | Built (#1697, #1708, #1714); live check waits for the person's first `permissions:` rule and a profile set to `permission_prompts: ask` |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
-| TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-656 | Build TD-646 (3): the Cloudflare route — the Access token check on the route port, `ao connect cloudflare`, its doctor line and guide | Low | Open — built when asked |
 | TD-657 | The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets | Medium | Designed — TD-661, TD-662, TD-663 build it |
 | TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
@@ -68,7 +65,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-934 | A single-owner flow: one session designs and builds, review stays fresh — built as an opt-in beside `td` | Medium | Open — blocked by decision (paul): Paul runs the design session |
 | TD-938 | The top bar's readings and tools past one developer: the build chip's audience, the host reading across nodes, + New's place under a director | Medium | Open — blocked by decision (paul): Paul runs the design round |
 | TD-943 | A team over an umbrella repo cannot see its sibling repos' PRs: `--pr`, `held:` and the PR readings are the one repo's | Medium | Open — waits on Paul's paired-PR answer (guardians-devenv TD-028) |
-| TD-946 | The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part) | Low | Open — dev-cadence's SYNCED file |
+| TD-946 | The *no checks means conflicting* and *wait for CI with gh pr checks --watch* memories still tell a session to read `gh pr checks` itself, where `ao pr wait N` says *conflicting* (TD-940's third part) | Low | Open — blocked by dev-cadence#TD-180 |
 | TD-959 | A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file | Medium | Open |
 | TD-964 | The end of a session on Focus, second round: the ending banner and the ending card (what the session cost), Hand back in Take over's place, the side panel folded with a value on each summary, a Sent card | Medium | Designed and reviewed 2026-10-21; hold lifted 2026-10-22 — build |
 | TD-971 | The home's own id reads are removed once every repo it serves has synced the counter's script; a checkout without it is refused, naming the sync | Medium | Open — waits on every registered repo's sync |
@@ -391,22 +388,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-292 (the row), TD-299 (teams on nodes), TD-057 (the home and node split).
 
-## TD-512: A PR that truncates `docs/technical_debt_archive.md` passes every gate: nothing reads what the archive lost
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-09 (grinder-ao-2, found on #1421)
-**Owner:** dev-cadence
-**Kind:** build
-**Status:** Open
-**Location:** `scripts/check_cadence.py` (the `ledger` row; a SYNCED FILE, dev-cadence's), `tests/test_ledger.py`
-
-**Why:** On #1421 (TD-461) an archive edit written as `open(a, "w").write(open(a).read() + entry)` truncated the file before reading it: the archive went from 8,363 lines to 22, its header and every entry from TD-011 to TD-455 gone. `pdm run pytest tests/test_ledger.py` passed (11 passed), and the cadence check's `ledger` row reads only that the PR names its TD and touches a ledger file. Only the Sonnet fact-check caught it, by reading the diff's `@@ -1,8363 +1,22 @@`. The archive is append-only by its own header ("appended in resolution order", "Each keeps its original TD number forever"), so a PR that deletes archived entries is never right.
-
-**Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
-
-**Related:** TD-461 (#1421).
-
 ## TD-636: A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated
 
 **Priority:** Medium
@@ -434,7 +415,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-13 (ao-paul, with Paul — the lessons ADR, lesson 4)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-13 (the designer) — (1) **refused while a required check failed** on the exact head, in words naming them; **accepted as *checks pending*** while one runs, rule 10 reading it again and a later failure its *fail*, the declaration standing (invariant 10); (2) **green reads the base branch's required checks** — protection and rulesets, read with the repo reading as `required` — and every run on the head where nothing is required; a non-required failure refuses nothing and is named; (3) a **merged** PR is accepted unread, a repo with **no CI** accepted, a **read the home could not make** accepted with *checks unknown*, a PR closed unmerged accepted and said; (4) **`check_cadence.py`'s `ci` row** reading the required set is dev-cadence's change, filed as TD-640. §4.8 *A `done` with a PR is told what its checks read*, §4.7, §6 rule 10. Built by TD-639 and TD-640. Was: Open.
+**Status:** Designed 2026-10-13 (the designer) — (1) **refused while a required check failed** on the exact head, in words naming them; **accepted as *checks pending*** while one runs, rule 10 reading it again and a later failure its *fail*, the declaration standing (invariant 10); (2) **green reads the base branch's required checks** — protection and rulesets, read with the repo reading as `required` — and every run on the head where nothing is required; a non-required failure refuses nothing and is named; (3) a **merged** PR is accepted unread, a repo with **no CI** accepted, a **read the home could not make** accepted with *checks unknown*, a PR closed unmerged accepted and said; (4) **`check_cadence.py`'s `ci` row** reading the required set is dev-cadence's change, filed as TD-640. §4.8 *A `done` with a PR is told what its checks read*, §4.7, §6 rule 10. Built by TD-639 and TD-640. Was: Open. **TD-640 moved to dev-cadence 2026-10-28** as dev-cadence#TD-178 (#447), so this waits on it there.
+**Blocked by:** dev-cadence#TD-178
 **Location:** design §4.7 (`ao progress done <ref> --pr <n>`), §6 rule 10 (*The cadence check*, run at the home after the declaration); `scripts/check_cadence.py` `row_ci` (reads every check run on the head, not the protected branch's required set; the script is dev-cadence's)
 
 **Why:** Paul, 2026-10-13: *"I agree an agent should not say its done if its PR is not green."* Today the declaration is accepted and checked afterwards on the reports' cadence: the member is told its failing rows, and a second fail becomes an Inbox row. Hermes Agent's PR completion contract refuses a task's completion until the required checks pass on the exact head (`docs/decisions/2026-10-13-hermes-agent.md`).
@@ -454,7 +436,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-13 (ao-paul, with Paul — the lessons ADR, lesson 8)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-13 (the designer) — (1) **one trailer, `Agent-Model: <adapter>/<model>`**, not a second `Co-Authored-By` (a model is no git identity, and the forge draws a co-author as a person); (2) **the hook reads a file**, `AGENT_MODEL_FILE` (`<absolute git-dir>/shiftlead-agent-model`, one per worktree), which the host agent writes with the full id whenever the record's model in use is set or changes (both set-sites: the hook's SessionStart and `PostModelSwitch`, the tick's transcript read), with `AGENT_MODEL` (the profile's alias with its adapter, `claude-code/opus`, the full id being unknown at launch) as the fallback, the trailer replaced, not added, on an amend and nothing where neither is set — the synced hook never asks `ao` (§8); (3) a review's model stays the `cadence-review:` line's; a subagent's is not named, the commit being the session's; (4) the hook is dev-cadence's (TD-645), the launch's variables and the file ShiftLead's (TD-644). §4.2, §4.2a, §8. Built by TD-644 and TD-645. Was: Open.
+**Status:** Designed 2026-10-13 (the designer) — (1) **one trailer, `Agent-Model: <adapter>/<model>`**, not a second `Co-Authored-By` (a model is no git identity, and the forge draws a co-author as a person); (2) **the hook reads a file**, `AGENT_MODEL_FILE` (`<absolute git-dir>/shiftlead-agent-model`, one per worktree), which the host agent writes with the full id whenever the record's model in use is set or changes (both set-sites: the hook's SessionStart and `PostModelSwitch`, the tick's transcript read), with `AGENT_MODEL` (the profile's alias with its adapter, `claude-code/opus`, the full id being unknown at launch) as the fallback, the trailer replaced, not added, on an amend and nothing where neither is set — the synced hook never asks `ao` (§8); (3) a review's model stays the `cadence-review:` line's; a subagent's is not named, the commit being the session's; (4) the hook is dev-cadence's (TD-645), the launch's variables and the file ShiftLead's (TD-644). §4.2, §4.2a, §8. Built by TD-644 and TD-645. Was: Open. **TD-645 moved to dev-cadence 2026-10-28** as dev-cadence#TD-181 (#447), so this waits on it there.
+**Blocked by:** dev-cadence#TD-181
 **Location:** `scripts/git-hooks/prepare-commit-msg` (dev-cadence's, cadence §9.9: `Co-Authored-By: $AGENT_NAME <…>` from the `AGENT_NAME` the orchestrator exports); design §4.2a (the model in use, TD-031), §4.3 (a metered profile's `Turn` carries `model`)
 
 **Why:** Paul, 2026-10-13: *"As we start using more models, recording which did what is a good idea. We get some of this by including the session name as a git contributor, but could expand it to list the actual model."* Today a squash commit carries the session's trailer (`ao-paul <ao-paul@shiftlead.placeholder>`) and, from Claude Code's own attribution, `Claude Opus 5.5`; a tool that adds no attribution of its own (Codex, Gemini CLI) leaves only the session, and a mid-run model switch or a subagent on another model is in neither.
@@ -464,27 +447,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** the design says how a commit names the model that made it and the build entries are filed.
 
 **Related:** TD-636, TD-637, TD-031, cadence §9.9.
-
----
-
-## TD-640: `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (the designer, TD-637's round)
-**Owner:** dev-cadence
-**Kind:** build
-**Status:** Open
-**Part of:** TD-637
-**Location:** `scripts/check_cadence.py` `row_ci` (a SYNCED FILE, dev-cadence's: the change is made there and synced)
-
-**Why:** TD-637: ShiftLead's `done … --pr` now reads the base branch's required checks (§4.8), while the cadence check's `ci` row reads every check run on the head; a non-required check that fails fails the row and a required one the forge would block on reads the same as any. Two readers of *green* that disagree tell a member two things.
-
-**Fix:** in dev-cadence, `row_ci` reads the base branch's required set (branch protection's required contexts and the rulesets' `required_status_checks`), passes when those passed on the head, names a failed non-required check as a note, and keeps *every run* where nothing is required; then the sync brings it here.
-
-**Done when** the `ci` row passes a PR whose required checks passed and a non-required one failed, fails one whose required check failed, and dev-cadence's sync lands it.
-
-**Related:** TD-637 (the design), TD-639 (ShiftLead's side).
 
 ---
 
@@ -542,27 +504,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** an unattended member's prompt no rule covers is answered by the director seat with a reason told to the person, or passed up in words, never touching an interactive session or the always-the-person prompts, and the tests above pass.
 
 **Related:** TD-636 (the design), TD-641 (the rules), TD-151 (the techlead seat), §6 rule 3.
-
----
-
-## TD-645: `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638)
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-13 (the designer, TD-638's round)
-**Owner:** dev-cadence
-**Kind:** build
-**Status:** Open
-**Part of:** TD-638
-**Location:** `scripts/git-hooks/prepare-commit-msg` (a SYNCED FILE, dev-cadence's: the change is made there and synced; cadence §9.9)
-
-**Why:** TD-638: ShiftLead now names the model in use in `AGENT_MODEL_FILE` and the declared one in `AGENT_MODEL` (design §4.2); the hook that writes `AGENT_NAME` as a co-author writes no model.
-
-**Fix:** in dev-cadence, beside the `Co-Authored-By` trailer: read the first line of `$AGENT_MODEL_FILE` when it is set and readable, else `$AGENT_MODEL`, and add `Agent-Model: <value>` with `git interpret-trailers --if-exists replace` for that key (an amend after a model switch names the new model, never two); nothing when neither is set; tool-neutral, never calling `ao`. Then the sync brings it here.
-
-**Done when** a commit made in a session with either variable carries one `Agent-Model:` trailer naming the model then in use, one made without carries none, and dev-cadence's sync lands it.
-
-**Related:** TD-638 (the design), TD-644 (ShiftLead's side).
 
 ---
 
@@ -1358,23 +1299,22 @@ builds are in the ledger.
 
 ---
 
-## TD-946: The cadence procedure says the pair `ao pr wait N && scripts/check_cadence.py --pr N`, and the *no checks means conflicting* memory is retired (TD-940's third part)
+## TD-946: The *no checks means conflicting* and *wait for CI with gh pr checks --watch* memories still tell a session to read `gh pr checks` itself, where `ao pr wait N` says *conflicting* (TD-940's third part)
 
 **Priority:** Low
 **Type:** debt
 **Added:** 2026-10-21 (grinder-ao-1, split from TD-940 once its build merged in #2244)
-**Owner:** dev-cadence
+**Owner:** grinder
 **Kind:** build
-**Status:** Open
-**Location:** `docs/procedures/cadence.md` (a SYNCED FILE, dev-cadence's: the change is made there and synced); `docs/claude-memory/no-checks-means-conflicting.md` and its `MEMORY.md` line
+**Status:** Open — the procedure half moved to dev-cadence 2026-10-28 (Paul, in session `queue-deps`) as dev-cadence#TD-180 (#447); the memories retire once it reaches this repo's pin
+**Blocked by:** dev-cadence#TD-180
+**Location:** `docs/claude-memory/no-checks-means-conflicting.md`, `docs/claude-memory/wait-for-ci-with-gh-pr-checks-watch.md` and their `MEMORY.md` lines
 
-**Why:** TD-940 built `ao pr wait <n>` (#2241, #2244), which folds a PR's checks into one word and says *conflicting* where `gh pr checks` printed nothing. Its Fix had the cadence say the pair, so no session hand-rolls a CI poll, but the procedure is a dev-cadence SYNCED file a grinder here cannot edit.
+**Why:** TD-940 built `ao pr wait <n>` (#2241, #2244), which folds a PR's checks into one word and says *conflicting* where `gh pr checks` printed nothing. The two memories still teach the hand-rolled read. They can go only once the procedure every session follows names the pair, which is dev-cadence's file.
 
-**Fix:**
-- `docs/procedures/cadence.md`: `ao pr wait N && scripts/check_cadence.py --pr N` is how a kmaster session waits for a PR's checks; a cloud session has no `ao` to call (ADR 2026-09-24), so its CI wait stays the GitHub MCP tools' and the cadence check runs from kmaster on its PR's number. Written in dev-cadence (where `ao` is shiftlead's and a repo without it keeps `gh pr checks --watch`) and synced here.
-- Once synced: `docs/claude-memory/no-checks-means-conflicting.md` retired, its `MEMORY.md` line pointing at `ao pr wait` instead (the wait says *conflicting*); the *wait for CI with gh pr checks --watch* memory likewise.
+**Fix:** once this repo's dev-cadence pin includes dev-cadence#TD-180: retire both memories, and point their `MEMORY.md` lines at `ao pr wait` (the wait says *conflicting*), or drop them.
 
-**Done when** the synced procedure names the pair and neither memory tells a session to read `gh pr checks` itself.
+**Done when** the pinned procedure names the pair and neither memory tells a session to read `gh pr checks` itself.
 
 ## TD-959: A Gemini profile signed in with Google shows no usage chip: its quota is read only by the tool, with a token in its encrypted file
 

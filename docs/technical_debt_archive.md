@@ -22105,3 +22105,67 @@ Mail tells the member now. The table's entry is what lasts.
 **Resolved:** 2026-10-28 (grinder-ao-1, #2592) — `tests/test_ui_member_line.py` adds `test_a_line_the_current_flow_sits_out_fills_with_why_and_start_is_refused`: under `build-review` a designer line sits out, `next_members` returns its string and a `Launch` for the others, `/api/team_line` answers its `why`, and a `/new` post for it is refused and creates nothing; the mutation in **Why** now fails it.
 
 ---
+
+## TD-512: A PR that truncates `docs/technical_debt_archive.md` passes every gate: nothing reads what the archive lost
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-09 (grinder-ao-2, found on #1421)
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Moved to dev-cadence
+**Location:** `scripts/check_cadence.py` (the `ledger` row; a SYNCED FILE, dev-cadence's), `tests/test_ledger.py`
+
+**Why:** On #1421 (TD-461) an archive edit written as `open(a, "w").write(open(a).read() + entry)` truncated the file before reading it: the archive went from 8,363 lines to 22, its header and every entry from TD-011 to TD-455 gone. `pdm run pytest tests/test_ledger.py` passed (11 passed), and the cadence check's `ledger` row reads only that the PR names its TD and touches a ledger file. Only the Sonnet fact-check caught it, by reading the diff's `@@ -1,8363 +1,22 @@`. The archive is append-only by its own header ("appended in resolution order", "Each keeps its original TD number forever"), so a PR that deletes archived entries is never right.
+
+**Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
+
+**Related:** TD-461 (#1421).
+
+**Resolved:** 2026-10-28 (Paul, in session `queue-deps`; moved, not fixed): the fix is dev-cadence's (a deleted archived entry fails the ledger row, re-read for the split layout), so the entry is filed there as **dev-cadence#TD-179** (its PR #447, squash 69c99bf) and closes here, under Paul's rule that dev-cadence work goes on dev-cadence's ledger and a grinder never works another repo. The fix reaches this repo at its next dev-cadence pin bump.
+
+## TD-640: `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (the designer, TD-637's round)
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Moved to dev-cadence
+**Part of:** TD-637
+**Location:** `scripts/check_cadence.py` `row_ci` (a SYNCED FILE, dev-cadence's: the change is made there and synced)
+
+**Why:** TD-637: ShiftLead's `done … --pr` now reads the base branch's required checks (§4.8), while the cadence check's `ci` row reads every check run on the head; a non-required check that fails fails the row and a required one the forge would block on reads the same as any. Two readers of *green* that disagree tell a member two things.
+
+**Fix:** in dev-cadence, `row_ci` reads the base branch's required set (branch protection's required contexts and the rulesets' `required_status_checks`), passes when those passed on the head, names a failed non-required check as a note, and keeps *every run* where nothing is required; then the sync brings it here.
+
+**Done when** the `ci` row passes a PR whose required checks passed and a non-required one failed, fails one whose required check failed, and dev-cadence's sync lands it.
+
+**Related:** TD-637 (the design), TD-639 (ShiftLead's side).
+
+---
+
+**Resolved:** 2026-10-28 (Paul, in session `queue-deps`; moved, not fixed): the fix is dev-cadence's (the `ci` row reads the required checks), so the entry is filed there as **dev-cadence#TD-178** (its PR #447, squash 69c99bf) and closes here, under Paul's rule that dev-cadence work goes on dev-cadence's ledger and a grinder never works another repo. The fix reaches this repo at its next dev-cadence pin bump.
+
+## TD-645: `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638)
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-638's round)
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Moved to dev-cadence
+**Part of:** TD-638
+**Location:** `scripts/git-hooks/prepare-commit-msg` (a SYNCED FILE, dev-cadence's: the change is made there and synced; cadence §9.9)
+
+**Why:** TD-638: ShiftLead now names the model in use in `AGENT_MODEL_FILE` and the declared one in `AGENT_MODEL` (design §4.2); the hook that writes `AGENT_NAME` as a co-author writes no model.
+
+**Fix:** in dev-cadence, beside the `Co-Authored-By` trailer: read the first line of `$AGENT_MODEL_FILE` when it is set and readable, else `$AGENT_MODEL`, and add `Agent-Model: <value>` with `git interpret-trailers --if-exists replace` for that key (an amend after a model switch names the new model, never two); nothing when neither is set; tool-neutral, never calling `ao`. Then the sync brings it here.
+
+**Done when** a commit made in a session with either variable carries one `Agent-Model:` trailer naming the model then in use, one made without carries none, and dev-cadence's sync lands it.
+
+**Related:** TD-638 (the design), TD-644 (ShiftLead's side).
+
+---
+
+**Resolved:** 2026-10-28 (Paul, in session `queue-deps`; moved, not fixed): the fix is dev-cadence's (the `Agent-Model:` trailer), so the entry is filed there as **dev-cadence#TD-181** (its PR #447, squash 69c99bf) and closes here, under Paul's rule that dev-cadence work goes on dev-cadence's ledger and a grinder never works another repo. The fix reaches this repo at its next dev-cadence pin bump.
