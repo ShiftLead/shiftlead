@@ -76,10 +76,11 @@ def test_the_rows_are_drawn_depth_first_each_under_its_own_parent():
     q["cards"][0]["rows"] = [rows[0], rows[2], rows[1], rows[3]]
     got = queue_view(q, NOW)["up_next"][0]["rows"]
     assert [r["id"] for r in got] == ["TD-2", "TD-4", "TD-3", "TD-5"]
-    # a row whose parent is not on the card keeps its place, at the end
+    # a row whose parent is not on the card is a loose row after the top entry's parts: no rule (TD-1131)
     q["cards"][0]["rows"] = [row(9, parent="s#TD-99", depth=2, state="ready"), *rows]
     got = queue_view(q, NOW)["up_next"][0]["rows"]
-    assert [r["id"] for r in got] == ["TD-2", "TD-4", "TD-3", "TD-5", "TD-9"] and got[-1]["rails"] == ["open", "open"]
+    assert [r["id"] for r in got] == ["TD-2", "TD-4", "TD-3", "TD-5", "TD-9"] and got[-1]["rails"] == [""]
+    assert (got[-1]["depth"], got[-1]["meter"]) == (1, None)
 
 
 def test_the_card_draws_its_edge_and_its_rails():

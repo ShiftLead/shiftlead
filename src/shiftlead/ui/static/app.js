@@ -4177,6 +4177,14 @@
       const head = e.target.closest(".qdline.opens > .qdhead");
       if (head && !e.target.closest("a, button")) openLine(head.parentElement);
     });
+    // *after TD-n* lights the row it names while it is hovered or focused (§4.5 screen 12 *A card*, TD-1131)
+    const lit = (on) => (e) => {
+      const a = e.target.closest && e.target.closest(".qafter a.qon[data-on]");
+      const el = a && onCard(a.dataset.on);
+      if (el) el.classList.toggle("qlit", on);
+    };
+    box.addEventListener("mouseover", lit(true)); box.addEventListener("mouseout", lit(false));
+    box.addEventListener("focusin", lit(true)); box.addEventListener("focusout", lit(false));
     box.addEventListener("keydown", (e) => {
       const key = (e.key === "Enter" || e.key === " ") && e.target.matches;
       if (key && e.target.matches(".qghead")) { e.preventDefault(); return toggleGroup(e.target.closest(".qgroup")); }

@@ -1614,6 +1614,8 @@ def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
             fold = fold or 'class="qread"' in tag
             # …or a Read item's one line on a card (TD-911): its row with controls, never closed by a press
             fold = fold or 'class="cardline"' in tag
+            # …or a Queue card's *✓ n done* (TD-1131): finished rows with their ⋯, never closed by a press
+            fold = fold or 'class="qfold' in tag
             # …or the Session card's *told at start* row (TD-996): text only, closed at every load
             fold = fold or 'class="toldfold"' in tag
             # …or a Focus side card (TD-156): a fold the Focus page remembers, never closed by a press

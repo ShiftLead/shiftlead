@@ -1,6 +1,6 @@
 {# A Queue card's row (design §4.5 screen 12 *A card*, §4.5a *Queue page: card*; TD-770): its id, Priority
    badge, title, one state word and the holder's pill, two letters in a level; *after TD-n* for each open
-   blocker (its `afters`, TD-1130). `r.ext` is what the Repo page's row carries beyond the Queue's (§4.5 screen 11 item 2):
+   blocker (its `afters`, TD-1130), a link that scrolls to and rings that row, lit on hover or focus (TD-1131). `r.ext` is what the Repo page's row carries beyond the Queue's (§4.5 screen 11 item 2):
    its kind, its owner, *needs a team*, the settle mark with Hold / Release, a design's builds — absent on
    the Queue page. No red anywhere: a state is a word with a small mark. #}
 {% macro pbadge(p) %}{% set p = (p or '') | lower %}<span class="qpri qp-{{ p or 'none' }}" title="{{ p | capitalize or 'no priority' }}">{{ (p[:1] or '?') | upper }}</span>{% endmacro %}
@@ -101,15 +101,34 @@
 {# the card's pill (§4.5 screen 12 *A card*): its Decide and Do counts, amber, in every group where it has one #}
 {% macro pill(c) %}{% set n = (c.wants or {}).get('n') or {} %}{% if n.decide or n.do %}<span class="qstatus needsyou qwpill" title="what on this card waits on you: Decide and Do items">{% if n.decide %}Decide {{ n.decide }}{% endif %}{% if n.decide and n.do %} · {% endif %}{% if n.do %}Do {{ n.do }}{% endif %}</span>{% endif %}{% endmacro %}
 
+{# a part's meter (§4.5 screen 12 *A card*, TD-1131): one segment per part in `branch()`'s colour, its id and
+   state word in its title, then *d/n*; drawn on every parent row and on the header when the top entry is one #}
+{% macro meter(m) %}{% if m %}<span class="qmeter" role="img" aria-label="{{ m.d }} of {{ m.n }} parts done">{% for s in m.segs %}<i class="qseg b-{{ s.b }}" title="{{ s.title }}"></i>{% endfor %}</span><span class="qmcount meta">{{ m.d }}/{{ m.n }}</span>{% endif %}{% endmacro %}
+
+{# what a row waits on, beside its word (§4.4 *A row's state*, TD-1131): *after TD-n*, each a link that scrolls
+   to and rings that row (`AO`'s `a.qon` press), lit on hover or focus #}
+{% macro afters(r) %}{% for a in r.afters or [] %}<span class="meta qafter">after <a class="qon" href="#{{ a }}" data-on="{{ a }}" title="waits on {{ a }}: scroll to it">{{ a }}</a></span>{% endfor %}{% endmacro %}
+
 {# a row: its state word, and the holder's pill unless the word already names it (*held by X*); the tree drawn
-   (§4.5 screen 12 *A card*, TD-915) — a 2 px rule down each level's left edge in its branch's colour, `r.rails`
-   one per level, its ancestors' then its own #}
+   (§4.5 screen 12 *A card*, TD-915, TD-1131) — a part hangs on its parent's spine, a 2 px rule down each level's
+   left edge in its branch's colour, `r.rails` one per level, its ancestors' then its own, "" where a level is a
+   loose row's and draws none; a parent's parts meter beside its word #}
 {% macro row(r, repo='') %}
   <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
-    {%- for b in r.rails or [] %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endfor %}
+    {%- for b in r.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}
     <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}</span>
-    <span class="qright">{{ extras(r.ext, repo) }}{% if r.afters %}<span class="meta">after {{ r.afters | join(', ') }}</span>{% endif %}{{ state(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
+    <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r) }}{{ afters(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
     {{ builds(r.ext) }}
     {{ mentioned(r) }}
   </div>
+{% endmacro %}
+
+{# finished rows folded (§4.4 *Rows*, §4.5 screen 12 *A card*; TD-1131): a parent's finished parts to one line,
+   *✓ n done*, first on its spine, at the parts' level; finished loose rows to the same line, unindented, at the
+   card's end; a press opens it in place #}
+{% macro fold(f, repo='') %}
+  <details class="qfold{% if f.loose %} loose{% endif %}"><summary class="qrow qfoldsum" style="--qd: {{ f.depth or 1 }}">
+    {%- for b in f.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}<span class="qtick" aria-hidden="true">✓</span> {{ f.n }} done</summary>
+    {%- for r in f.fold %}{{ row(r, repo) }}{% endfor %}
+  </details>
 {% endmacro %}
