@@ -165,17 +165,18 @@ def _show(q: str, one_repo: bool) -> str:
 
 
 def _row(r: Mapping[str, Any], one_repo: bool, mentioned: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """A card's row (or its top entry) as the partials take it: `show`, `also`, `anchor` (the id a
-    `/queue#TD-n` finds, its open rows alone), no `ext` — the Repo page's extras are not the Queue's — and
-    `mentioned`, the first words of each item that names it beside another row, one per item (`attach`). What is
-    attached to it is the card's, in the card's wants, never the row's (§4.5 screen 12 *Three wants*)."""
+    """A card's row (or its top entry) as the partials take it: `show`, `afters` (its `after`, TD-1130),
+    `anchor` (the id a `/queue#TD-n` finds, its open rows alone), no `ext` — the Repo page's extras are not the
+    Queue's — and `mentioned`, the first words of each item that names it beside another row, one per item
+    (`attach`). What is attached to it is the card's, in the card's wants, never the row's (§4.5 screen 12
+    *Three wants*)."""
     q = str(r.get("qid") or "")
     return {
         "mentioned": list(((mentioned or {}).get(q) or {}).values()),
         **r,
         "priority": str(r.get("priority") or "").lower(),
         "show": _show(q, one_repo),
-        "also": [_show(str(a), one_repo) for a in r.get("also_after") or []],
+        "afters": [_show(str(a), one_repo) for a in r.get("after") or []],
         "anchor": "" if r.get("archived") else _show(q, one_repo),
         "ext": None,
     }
@@ -400,13 +401,13 @@ def card_edge(group: str, status: str, wants: Mapping[str, Any]) -> str:
 def branch(r: Mapping[str, Any]) -> str:
     """A row's colour in the card's tree (§4.5 screen 12 *A card*, TD-915): `done` (green) an archived row,
     `needs` (amber) the person's — *yours to do*, *your decision*, *held (person)* — `waiting` (teal) one that
-    waits — *waits until*, *waits on an event*, *after TD-n*, *settling* — else `open` (grey)."""
+    waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling* — else `open` (grey)."""
     state = str(r.get("state") or "")
     if r.get("archived"):
         return "done"
     if r.get("needs") or state == "held (person)":
         return "needs"
-    if state.startswith(("waits ", "after ")) or state == "settling":
+    if state.startswith("waits ") or state in ("waiting", "settling"):
         return "waiting"
     return "open"
 

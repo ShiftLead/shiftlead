@@ -56,7 +56,7 @@ def test_the_edge_is_amber_for_a_want_then_teal_waiting_then_green_in_progress_t
 def test_each_row_carries_its_ancestors_branches_then_its_own():
     assert branch({"archived": True, "needs": "owner"}) == "done"
     assert branch({"state": "held (person)"}) == branch({"needs": "decision"}) == "needs"
-    for state in ("waits until 2026-10-30", "waits on an event", "after TD-7", "settling"):
+    for state in ("waits until 2026-10-30", "waits on an event", "waiting", "settling"):
         assert branch({"state": state}) == "waiting"
     for state in ("ready", "in review #4", "held by w", ""):
         assert branch({"state": state}) == "open"

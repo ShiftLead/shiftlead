@@ -424,8 +424,8 @@ def debt_cards(queue: Mapping[str, Any] | None, name: str, lists: list[dict[str,
     progress first, then Up next by key), for the Queue's partials — or None where the home serves no
     cards (a node, a home before its first tick, an older home), and the page draws the kind lists.
 
-    Each row (the card's `top` and its `rows`) gains `show`, its id as this page writes it, `also`, its
-    `also_after` so written, `anchor`, the id a `#TD-n` link finds (this repo's rows alone), and `ext`,
+    Each row (the card's `top` and its `rows`) gains `show`, its id as this page writes it, `afters`, its
+    `after` so written (TD-1130), `anchor`, the id a `#TD-n` link finds (this repo's rows alone), and `ext`,
     what the ledger row carried beyond the Queue's (`ledger_lists`' row for the entry, its kind's `label`
     as `kind_label`): the owner, *needs a team*, the settle mark with **Hold** / **Release**, the builds line,
     the live check's words. An open entry of the repo no card holds yet (filed since the home's last
@@ -451,7 +451,7 @@ def debt_cards(queue: Mapping[str, Any] | None, name: str, lists: list[dict[str,
             **r,
             "priority": str(r.get("priority") or "").lower(),
             "show": _shown(str(r.get("qid") or ""), name),
-            "also": [_shown(str(a), name) for a in r.get("also_after") or []],
+            "afters": [_shown(str(a), name) for a in r.get("after") or []],
             "anchor": str(r.get("id") or "") if own and not r.get("archived") else "",
             "ext": ext.get(str(r.get("id"))) if own and not r.get("archived") else None,
         }
@@ -470,7 +470,7 @@ def debt_cards(queue: Mapping[str, Any] | None, name: str, lists: list[dict[str,
             continue
         q = f"{name}#{i}"
         top = row({"qid": q, "repo": name, "id": i, "title": e.get("title") or "", "priority": e.get("priority"),
-                   "state": "", "holder": None, "archived": False, "also_after": []})  # fmt: skip
+                   "state": "", "holder": None, "archived": False, "after": []})  # fmt: skip
         out.append({"id": q, "top": top, "rows": [], "ids": [q], "group": "", "place": None, "status": "", "new": True})
     upnext = [str(c["id"]) for c in cards if c.get("group") == "up_next"]
     return {"cards": out, "upnext": upnext}

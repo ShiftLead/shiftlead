@@ -39,7 +39,7 @@ def row(repo: str, tid: str, title: str, **kw) -> dict:
 def card(top: dict, rows=(), group="up_next", place=None, status="ready", **kw) -> dict:
     members = [top["qid"], *(r["qid"] for r in rows if not r["archived"])]
     done = sum(1 for r in rows if r["archived"])
-    return {"id": top["qid"], "key": "0i", "lined": True, "top": {**top, "parent": None, "depth": 0, "also_after": []},
+    return {"id": top["qid"], "key": "0i", "lined": True, "top": {**top, "parent": None, "depth": 0, "after": []},
             "rows": list(rows), "done": done, "of": len(members) + done, "status": status, "group": group, "place": place,
             "order": members, "repos": sorted({top["repo"], *(r["repo"] for r in rows)}), "passed_over": [], **kw}  # fmt: skip
 
@@ -86,7 +86,7 @@ def queue(repo2: bool = False) -> dict:
         ),
         card(
             row("s", "TD-20", "the queue's design", priority="High"),
-            [row("s", "TD-21", "build the queue", state="after TD-20", depth=1, parent="s#TD-20")],
+            [row("s", "TD-21", "build the queue", state="waiting", depth=1, parent="s#TD-20", after=["s#TD-20"])],
             place=1,
         ),
         card(row("s", "TD-30", "keep this one back", state="held (person)"), place=2, status="needs you"),
@@ -859,3 +859,11 @@ def test_a_cards_items_fit_a_phone_width():
         ".qsech, .qmail, .qrows > .qsec .qsech, .qrows > .qsec .qmail, .qread > summary.qsech,\n"
         "  .qread .qsec .qsech, .qread .qsec .qmail { padding-left: 0; }"
     ) in narrow
+
+
+def test_a_waiting_row_is_teal_in_the_tree():
+    """TD-1130: the reading's *waiting* word (an open blocker or an open part) colours the rail teal."""
+    from shiftlead.ui.queue import branch
+
+    assert branch({"state": "waiting"}) == "waiting" and branch({"state": "waits until 2026-10-30"}) == "waiting"
+    assert branch({"state": "ready"}) == "open"

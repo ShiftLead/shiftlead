@@ -230,7 +230,7 @@ def board(
                     "state": f"held by {e['held']}" if e.get("held") else "",
                     "holder": None,
                     "archived": False,
-                    "also": [],
+                    "afters": [],
                     "anchor": e["id"],
                     "ext": {**e, "kind_label": lst["label"]},
                 }

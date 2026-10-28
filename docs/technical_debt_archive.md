@@ -21353,3 +21353,23 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Done when** the test reads the grace without wall-clock races and passes under `pdm run test -n 8` repeatedly.
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2524) — the cause was the first tick's supervision record (the fixture's 0.15 s grace) still standing when the build went stale under load, so the test read it as the grace record; the test now waits for that record to be gone too, runs a 30 s grace ended by hand, and asserts its `next` a grace away. Test only; three full `pdm run test` runs green.
+
+---
+
+## TD-1130: `Part of:` is read: ledgerboard v2.1 vendored, and the ledger reader and the Queue's reading tell a part from a blocker
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1129)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `scripts/vendor_ledgerboard.sh`, `src/sessionorc/ledgerboard.py` (vendored), `tests/test_ledgerboard_fixtures.py:40`; `src/sessionorc/ledger.py` (pickable at 521, `kind_of` 254, `archived` 825); `src/sessionorc/queue.py` (`touch`/`names_open` ~300–316, `builds_open` 400, `_card` 496–560 with the within-card pick loop 545–550, `_start` 571, `_status` 592, `_wait` 625, `_completed` 753–790); `src/sessionorc/agent_inbox.py` (Back to design's `blocked_open`); `src/shiftlead/ui/inbox.py` (`blocking` ~2381, `blocked_open`/`builds_open` 2439–2440); `src/shiftlead/ui/repo.py` (`design_builds` 140)
+
+**Why:** TD-1129: a Queue card's tree joins `Blocked by:` edges in either direction, so its indent says only *joined*, and a design's `Blocked by:` does two jobs (its builds and its real blockers). [ADR 2026-10-27](decisions/2026-10-27-part-of.md) gives a part a `Part of:` line naming its parent; this build makes shiftlead read it.
+
+**Resolved:** 2026-10-27 (PR #2517, #2519, #2521, #2523) — #2517 bumped dev-cadence to 36d8e73 and vendored ledgerboard v2.1; #2519 made `ledger.py` read `Part of:` (`part_of`, `parts_open`, pickable from ledgerboard, `kind_of`); #2521 made `builds_open`, Back to design and *Its builds* read it; #2523 made the Queue's reading tell a part from a blocker (the tree, the top entry, *waiting* with `after`, open parts in the wait tests, the archived hop both ways). Design §4.4 *The Queue*, §4.5 screens 11–12, §4.9c say it; `tests/test_queue.py::test_a_td748_shaped_card_hangs_parts_under_their_parent_and_never_tops_an_archived_one` pins the card.
+
+**Done when** the tests on a TD-748-shaped card — a design, its parts, a trial, a part blocked from another group, a cross-repo blocker, an archived part and an archived parent with an open part — pin each row's parent, state, relation words and order and the card's top entry (never the archived parent), and a not-backfilled design still reads as today; and `pdm run test` passes.
+
+---

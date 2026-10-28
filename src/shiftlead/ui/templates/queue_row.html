@@ -1,6 +1,6 @@
 {# A Queue card's row (design §4.5 screen 12 *A card*, §4.5a *Queue page: card*; TD-770): its id, Priority
-   badge, title, one state word and the holder's pill, two letters in a level; *also after TD-n* where it
-   has two parents. `r.ext` is what the Repo page's row carries beyond the Queue's (§4.5 screen 11 item 2):
+   badge, title, one state word and the holder's pill, two letters in a level; *after TD-n* for each open
+   blocker (its `afters`, TD-1130). `r.ext` is what the Repo page's row carries beyond the Queue's (§4.5 screen 11 item 2):
    its kind, its owner, *needs a team*, the settle mark with Hold / Release, a design's builds — absent on
    the Queue page. No red anywhere: a state is a word with a small mark. #}
 {% macro pbadge(p) %}{% set p = (p or '') | lower %}<span class="qpri qp-{{ p or 'none' }}" title="{{ p | capitalize or 'no priority' }}">{{ (p[:1] or '?') | upper }}</span>{% endmacro %}
@@ -108,7 +108,7 @@
   <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
     {%- for b in r.rails or [] %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endfor %}
     <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}</span>
-    <span class="qright">{{ extras(r.ext, repo) }}{% if r.also %}<span class="meta">also after {{ r.also | join(', ') }}</span>{% endif %}{{ state(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
+    <span class="qright">{{ extras(r.ext, repo) }}{% if r.afters %}<span class="meta">after {{ r.afters | join(', ') }}</span>{% endif %}{{ state(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
     {{ builds(r.ext) }}
     {{ mentioned(r) }}
   </div>
