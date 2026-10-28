@@ -222,3 +222,59 @@ def test_a_lowered_size_on_a_stopped_team_is_a_removal_start_marks(world, tmp_pa
     acts = [(m, p) for m, p in state["calls"] if m in ("create", "relaunch")]
     assert acts[0] == ("relaunch", {"id": "ao-shiftlead-grind-2", "sit_out": True, "dropped": True})
     assert "grind-2" not in {p["name"] for m, p in acts if m == "create"}
+
+
+# ── slice 3: a run-only member, `start_member`, and a step up adopting one ─────────────────────────
+
+
+def _keeps(state):
+    """The fake agent, taught the `keep` act: `run_only` cleared on the record it names."""
+    fake = cli.call_sync
+
+    def call(method, **params):
+        if method != "keep":
+            return fake(method, **params)
+        state["calls"].append((method, params))
+        s = next(s for s in state["sessions"] if s["id"] == params["id"])
+        s["run_only"] = False
+        return s
+
+    return call
+
+
+def test_start_member_creates_the_lines_next_name_past_its_size_run_only(world, tmp_path):  # noqa: F811
+    _, state = world
+    started(state)
+    org = orgmod.with_home_settings(orgmod.load())
+    got = teamrun.start_member(cli.call_sync, org, "ao-grind", "grind", HOST, run_only=True)
+    made = creates(state)
+    assert [p["name"] for p in made] == ["grind-3"] and made[0]["run_only"] is True
+    assert made[0]["controllers"] == ["ao-shiftlead-orc-ao"] and made[0]["supervised"] is True
+    assert got["text"] == "started grind-3"
+    state["calls"].clear()
+    teamrun.start_member(cli.call_sync, org, "ao-grind", "hunt", HOST)  # a kept one sends no `run_only`
+    assert [(p["name"], "run_only" in p) for p in creates(state)] == [("hunt-2", False)]
+    with pytest.raises(teams.TeamError, match="no member line 'mill'"):
+        teamrun.start_member(cli.call_sync, org, "ao-grind", "mill", HOST)
+
+
+def test_a_step_up_adopts_a_live_run_only_member_that_holds_the_next_name(world, tmp_path, capsys):  # noqa: F811
+    _, state = world
+    started(state)
+    org = orgmod.with_home_settings(orgmod.load())
+    teamrun.start_member(cli.call_sync, org, "ao-grind", "grind", HOST, run_only=True)
+    state["sessions"][-1]["run_only"] = True  # as the home writes it on the create's record
+    state["calls"].clear()
+    call = _keeps(state)
+    got = teamrun.resize(call, org, "ao-grind", "grind", 3, HOST)
+    assert ("keep", {"id": "ao-shiftlead-grind-3"}) in state["calls"] and not creates(state)  # nothing created
+    assert [r["name"] for r in got["adopted"]] == ["grind-3"] and not got["created"]
+    assert "grind-3 is kept, no longer for this run alone" in got["text"]
+    # a resize of more than one passes it: grind-4 adopted, grind-5 created
+    teamrun.start_member(cli.call_sync, org, "ao-grind", "grind", HOST, run_only=True)
+    state["sessions"][-1]["run_only"] = True
+    state["calls"].clear()
+    org = orgmod.with_home_settings(orgmod.load())
+    got = teamrun.resize(call, org, "ao-grind", "grind", 5, HOST)
+    assert [p["id"] for m, p in state["calls"] if m == "keep"] == ["ao-shiftlead-grind-4"]
+    assert [p["name"] for p in creates(state)] == ["grind-5"] and "run_only" not in creates(state)[0]

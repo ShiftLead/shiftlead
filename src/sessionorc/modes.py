@@ -54,6 +54,8 @@ from sessionorc.mail import as_person, self_decide_refusal
 # sent from the home.
 # **`ci_rerun`** (§4.5a *Inbox row: CI not starting*, TD-687): the spells and readings it names are the home's,
 # and the spell it writes is on the home's `host` record.
+# **`keep`** (§4.9 *A team's size*, TD-1164): clears `run_only`, which the home owns, on the record and in
+# the launch record the home holds.
 HOME_EDITS = frozenset(
     {
         "set_controllers",
@@ -61,6 +63,7 @@ HOME_EDITS = frozenset(
         "set_stop",
         "set_start",
         "set_mode",
+        "keep",
         "suspend",
         "identity_log",
         "promote",

@@ -1894,7 +1894,7 @@ def _lead_id(plan: teams.Plan, up: list[dict[str, Any]]) -> str:
 
 
 def _create_member(
-    call: Call, x: teams.Launch, lead_id: str, caller: str | None
+    call: Call, x: teams.Launch, lead_id: str, caller: str | None, run_only: bool = False
 ) -> tuple[dict[str, Any] | None, list[str]]:
     """One member created into a live team as `ao team start` creates one, the name check first: the
     record and what keeping its mail said, or `(None, [])` where a live session holds the name."""
@@ -1903,7 +1903,40 @@ def _create_member(
         return None, []
     keeps, said = keep_mail_for(call, {x.name: verdict}, caller, concluded=False)
     keep = {"keep_mail": True} if keeps else {}
-    return call("create", **x.create_params([lead_id] if lead_id else []), **keep), said
+    extra = {**keep, **({"run_only": True} if run_only else {})}
+    return call("create", **x.create_params([lead_id] if lead_id else []), **extra), said
+
+
+def start_member(
+    call: Call, org: orgmod.Org, name: str, line: str, host: str, *, run_only: bool = False, caller: str | None = None
+) -> dict[str, Any]:
+    """A member line's next member created (§4.9 *One road for every caller*, TD-1164): the line's next free
+    name past its size (`TeamDef.next_free`), created as `ao team start` creates a member — under the live
+    manager, the current flow's lane, reader and stage brief, the name check first — and, with `run_only`,
+    `run_only` on the create's record and its launch record. The dialog's **Add member**, which edits
+    `org.yml`, is `add_member`. Refused for a line the definition does not name, one the current flow
+    does not use, and a name a live session holds; a team that is not running is its caller's to refuse
+    (`ao team add`, TD-1166) — with no live manager, the member is created under no one."""
+    team = teams.find(org, name)
+    try:
+        m = team.line(line)
+    except ValueError as e:
+        raise teams.TeamError(str(e)) from None
+    mine = crew(name, call("list"))
+    want = team.next_free(line, mine)
+    i = len(m.names())
+    while m.names(i + 1)[i] != want:
+        i += 1
+    sized = orgmod.with_settings(org, {name: {"size": {**team.size, line: i + 1}}})  # the plan names it
+    plan = teams.plan(sized, name, host, files=files_via(call))
+    if want in plan.sit_out:
+        raise teams.TeamError(f"{line} sits out under {plan.flow}: nothing started")
+    x = next(x for x in plan.members if x.name == want)
+    rec, said = _create_member(call, x, _lead_id(plan, live(mine)), caller, run_only=run_only)
+    if rec is None:
+        raise teams.TeamError(f"{want} is held by a live session, so nothing was created")
+    text = "".join(f" — {w}" for w in said)
+    return {"team": name, "line": line, "created": rec, "text": f"started {want}" + text}
 
 
 def _sit_out_member(call: Call, s: dict[str, Any]) -> str:
@@ -1925,7 +1958,8 @@ def resize(
     `teams.<team>.size` written through `set_settings` (a person's own, refused to a session), and on
     a live team the line's sessions created or wound down one at a time to match, walking its sized
     names — a step up creates the first sized name no current record holds (a line the current flow does
-    not use is counted, not started), a step down winds the highest-numbered kept member down by the
+    not use is counted, not started), or adopts a live run-only member that holds it through the `keep`
+    act, creating nothing; a step down winds the highest-numbered kept member down by the
     sit-out form. A step that fails stops the walk and says what was done; the setting stays written."""
     team = teams.find(org, name)
     try:
@@ -1948,7 +1982,9 @@ def resize(
     org = orgmod.with_settings(org, got.get("teams"))
     team = teams.find(org, name)
     said = f"{line}: {n}" + (f" (file says {m.count})" if n != m.count else "")
-    out: dict[str, Any] = {"team": name, "line": line, "size": n, "count": m.count, "created": [], "wound_down": []}
+    out: dict[str, Any] = {
+        "team": name, "line": line, "size": n, "count": m.count, "created": [], "adopted": [], "wound_down": [],
+    }  # fmt: skip
     mine = crew(name, call("list"))
     up = live(mine)
     if not up:
@@ -1973,6 +2009,16 @@ def resize(
         if want in plan.sit_out:
             out["text"] = said + f" — {line} sits out under {plan.flow}: counted, not started"
             return out
+        held = _current(want, mine)
+        if held is not None and held.get("run_only") and held.get("state") not in DEAD:
+            try:  # adopted, not created: kept from here, on the record and in its launch record
+                out["adopted"].append(call("keep", id=held["id"]))
+            except AgentError as e:
+                made = ", ".join(str(r.get("name")) for r in out["created"] + out["adopted"]) or "nothing"
+                out["text"] = said + f" — stopped at {want}: {e}; started or kept {made}"
+                return out
+            said_too.append(f"{want} is kept, no longer for this run alone")
+            continue
         free = team.next_free(line, mine, from_=team.line(line).names().index(want))
         if free != want:
             continue  # a current record holds it already

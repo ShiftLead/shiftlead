@@ -128,6 +128,7 @@ HOME_OWNED = frozenset(
         "run_until",
         "start_at",
         "supervised",
+        "run_only",
         "by_person",
         "restarts",
         "restart_ceiling",
@@ -1228,6 +1229,11 @@ class Session:
     # it, every create writes the session's launch record (`launch/<id>.json`), which is what a
     # restart replays; the policies that act on it key on it and on `unattended` together.
     supervised: bool = False
+    # *A run-only member* (design §4.9 *A member started from the form*, TD-1149): a team member started
+    # for this run alone, by `teamrun.start_member(run_only=True)`; carried by its launch record, so a
+    # restart inside the run is one too, and cleared by the `keep` act (adopted by a size step up). The
+    # home's intent (§4.4a). Nothing else reads it until TD-1166.
+    run_only: bool = False
     # *The person started it by hand* (design §4.10 *between the person's own sessions*, TD-1069): written
     # once by the create — the caller the person or their own shell, the start not `supervised` and no
     # `seat` — and never changed; None on a record written before the field, which `mail.by_person`
