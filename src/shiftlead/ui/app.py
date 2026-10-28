@@ -926,12 +926,15 @@ async def paths_for(call: Any, body: dict[str, Any]) -> dict[str, Any]:
     if not (form := editor_file()):
         return {**out, "paths": none}
     if kind == "repo":
-        try:
-            real = os.path.realpath(os.path.expanduser(rest))
-            known = real in {os.path.realpath(os.path.expanduser(r)) for r in hosts.local_host().repos()}
-        except (OSError, ValueError, RuntimeError):
-            known = False
-        if not known:
+
+        def registered() -> bool:  # two file reads and a realpath each: off the loop
+            try:
+                real = os.path.realpath(os.path.expanduser(rest))
+                return real in {os.path.realpath(os.path.expanduser(r)) for r in hosts.local_host().repos()}
+            except (OSError, ValueError, RuntimeError):
+                return False
+
+        if not await asyncio.to_thread(registered):
             return {**out, "paths": none, "refused": f"{rest} is no checkout in the repos registry"}
         got = (await call("paths", repo=rest, runs=runs))["paths"]
     else:
