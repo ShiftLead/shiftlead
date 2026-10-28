@@ -2587,3 +2587,27 @@ def test_status_says_working_for_an_idle_record_working_on_its_own():
     pending = {**on_shell, "pending": {"kind": "permission", "text": "Bash"}}
     assert "working" not in cli.status_line(pending)
     assert on_shell["state"] == base["state"] == "idle"
+
+
+def test_status_v_ranks_own_work_with_the_working_and_a_wait_wins(monkeypatch, capsys):
+    """§4.7 (TD-1147, TD-1151): `cmd_status` ranks an `idle` record working on its own with the working,
+    ahead of a plain idle one, and under `-v` a wait the home reads keeps such a record *idle*."""
+    at = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=5)).isoformat()
+    base = {"state": "idle", "confidence": "hook", "since": at, "adapter": "claude-code"}
+    shell = {"shells": [{"cmd": "timeout 1500 gh pr checks 9 --watch", "since": at}], "shells_live": True}
+    records = [
+        {**base, "id": "ao-r-a", "name": "a"},  # plain idle
+        {**base, "id": "ao-r-b", "name": "b", **shell},  # idle, working on its own
+        {**base, "id": "ao-r-c", "name": "c", "state": "working"},
+        {**base, "id": "ao-r-d", "name": "d", **shell},  # the same, but waiting on the person
+    ]
+    waiting = {"ao-r-d": [{"id": "m-1", "ref": "TD-222", "bound": None}]}
+
+    def call(method, **_):
+        return records if method == "list" else {"waiting": waiting} if method == "host" else {}
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    assert cli.main(["status", "-v"]) == 0
+    lines = {m.group(1): m.group(2) for m in re.finditer(r"^(ao-r-\w)\s+(\w+)", capsys.readouterr().out, re.M)}
+    assert list(lines) == ["ao-r-b", "ao-r-c", "ao-r-a", "ao-r-d"], lines
+    assert lines == {"ao-r-b": "working", "ao-r-c": "working", "ao-r-a": "idle", "ao-r-d": "idle"}

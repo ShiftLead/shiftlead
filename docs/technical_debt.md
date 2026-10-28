@@ -103,7 +103,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first |
 | TD-1150 | A browser tab says nothing by its icon: no page has a favicon, so a Focus tab's state is read only from its title's words | Medium | Open — design-first; Paul picked direction A, *Tile* |
-| TD-1151 | `cmd_status` (#2509) ranks by the shown state and passes the home-read wait, and no test fails with either put back | Low | Open — build |
 
 ---
 
@@ -2209,21 +2208,3 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** a design round on §4.5 (*Pop out*'s title paragraph and *Browser mechanics*): direction A, *Tile* (Paul, 2026-10-27) — one rounded square on every tab, the top bar's dark with a page glyph on a page, the state's colour with its pill glyph on a Focus tab; one icon per state (§4.5a **state icon**'s list: needs you, working, idle, idle · unseen, stalled?, limited, scheduled, exited, on call, closed, unreachable; and waiting, whose ⋯ is in `app.css` 159 alone, TD-418) and one per page; drawn as SVG paths, never font glyphs; how it is served (an inline `data:` SVG set by `AO.focusTitle`'s callers, or static files under `static/` with their `?v=` hash); how a dark icon stays visible on a dark tab strip; whether the title's `▲ ` stays beside the icon. The design files the builds.
 
 **Done when** the design is merged with its builds filed.
-
----
-
-## TD-1151: `cmd_status` (#2509) ranks by the shown state and passes the home-read wait, and no test fails with either put back
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (test-audit-ao-1, auditing #2509)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/cli.py` `cmd_status` (the `waits` map, the `sessions.sort(key=… shown_state(s, waits[s["id"]])[0] …)` line, `print(status_line(s, w, waits[s["id"]]))`); `tests/test_cli.py::test_status_says_working_for_an_idle_record_working_on_its_own`; design §4.7 ("ranked with the working … under `-v` a wait the home reads (§4.2 *Waiting*) wins, as on the card")
-
-**Why:** The new test calls `cli.status_line` directly, so it pins the line and `shown_state` but never `cmd_status`, where design §4.7 puts the other two claims: the record is *ranked with the working*, and under `-v` a wait the home reads wins. Probes in the worktree, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_cli.py` (91 passed unchanged): (1) change the sort key to `STATE_RANK.get(s["state"], 9)` (the raw state) — 91 passed; (2) change `print(status_line(s, w, waits[s["id"]]))` to `print(status_line(s, w))` — 91 passed. Only removing the `pending` guard in `shown_state` fails the test. So an idle-working record can sort among the idle, and a waiting record print *working* under `-v`, with a green suite.
-
-**Fix:** One test through `cli.main(["status", "-v"])` with `call_sync` faked as the neighbouring status tests do: an idle record with a live shell and a working record (the first must sort with the working, ahead of a plain idle one), and a second idle-with-shell record the faked `waiting_of_home` reads a wait on, which must print `idle`. Run it against both probes above.
-
-**Done when** each probe above fails the test, and `pdm run test` passes.
