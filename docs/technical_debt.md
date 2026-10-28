@@ -92,7 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Designed — builds TD-1164–TD-1167 |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
-| TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build |
+| TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
 | TD-1168 | `AO.focusIcon`'s three call sites in `app.js` (#2520) are pinned by no test: delete any one and the Focus tab icon stops following the state with a green suite | Low | Open — build |
 | TD-1172 | The Queue's v2 archive cache key (`queue._archive_stat`) has no test for an in-place edit of an archive entry file | Low | Open — build |
 | TD-1174 | The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it | Low | Open |
@@ -1968,8 +1968,9 @@ That is the design working as written: a Team pick makes *a person's own session
 **Type:** feature
 **Added:** 2026-10-27 (the designer, from TD-1149's design)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — build
+**Kind:** live-check #2583
+**Waits:** event — the person's next member started from the New session form on the live copy (a Team and a member-line Role, Start)
+**Status:** Built (2026-10-28, #2583): `/api/team_line` fills the form from a member line, `/new` with `line` takes `ao team add`'s road (run-only, or **keep**: the line's size), a team not running refuses Start and offers its Start; the scratch home's UI check is on the PR. Live check, once #2583 is live (`ao promote status`): read (never press) the next record a person starts from the form on a team's member line — `ao status -v` / its record: `run_only: true` (or, kept, no `run_only` and `teams.<team>.size` one higher in `settings.yml`), the line's name past its size, profile, lane and brief (`prompt_from` its brief file), `controllers` the team's manager, unattended and supervised. It holds: TD-1149 archives with it (its *Done when*: a dev-cadence grinder started from the form, a second added without a PR).
 **Part of:** TD-1149
 **Location:** `src/shiftlead/ui/static/app.js` (`applyTeam` 4809, `tickTeamManager`, `teamRoles`, `applyRole`); `src/shiftlead/ui/templates/new.html` (the Team picker 70–79); `src/shiftlead/ui/common.py` (`teams_for_form` 901: the member lines); `src/shiftlead/ui/app.py` (`new_submit` 2423); design §4.9 *A member started from the form*, *A person in the team*, §4.5a *New session* **Team** picker and **member line** fill + **keep as a team member**
 
