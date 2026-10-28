@@ -91,7 +91,6 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
 | TD-1187 | The top bar scrolls away with the page: once scrolled down, the tabs, + New and the counts are out of reach | Medium | Open — design-first |
-| TD-1188 | The per-clone-setup and roster warnings for a lock repo name `sync.sh <checkout>`, which dev-cadence #429 made a refusal; TD-1183's `Resolved` says §5's cures already named the launcher | Medium | Open — build |
 | TD-1189 | A team card shows the repo's Technical debt only on the repo's line, and TDs in motion never what the team just finished | Medium | Open — design-first, waits on Paul |
 | TD-1190 | The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass | Medium | Open — design-first |
 | TD-1191 | `member_submit`'s *shell (no agent)* pick (`profile == SHELL_PICK`) is set in no test: drop the guard and the suite stays green | Low | Open — build |
@@ -1939,24 +1938,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** design it first, then a build. It is a layout choice with knock-ons the design should settle, not one CSS line: (1) the bar held at the top of the viewport (`position: sticky; top: 0` on `.topbar`, with a z-index above cards and below menus, dialogs and toasts), or another approach Paul left open: a slim bar that keeps the tabs and **+ New** once scrolled, or a back-to-top control; (2) the Sessions and Inbox rail, sticky at `top: 12px` today, would slide under a held bar, so its offset follows the bar's height; (3) on a phone (≤720px) the bar wraps to two rows, and holding both eats the screen (TD-003's narrow Focus), so the design says whether a phone holds it, holds the tabs row only, or lets it scroll; (4) Focus sizes its terminal from the viewport, so a held bar must not shrink it twice or overlap it, and a popped-out Focus has no bar; (5) an anchor or `scrollIntoView` target (a row the Inbox jumps to) needs `scroll-margin-top` so a held bar does not cover it. Write the rule in §4.5 *Browser mechanics* and §4.5a's top-bar row, with a shot of each page scrolled, wide and phone, then file the build as `Part of: TD-1187`.
 
 **Done when** the design says what the top bar does when a page is scrolled, on a wide screen and on a phone, and a build entry that implements it is filed as its part.
-
----
-
-## TD-1188: The per-clone-setup and roster warnings for a lock repo name `sync.sh <checkout>`, which dev-cadence #429 made a refusal
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-28 (docs-audit-ao-1, auditing #2590)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/seams.py` (the `shimmed` cure ~373, the roster cure ~380); `docs/design/5-configuration.md` (~353–355); `docs/design/4.7-cli.md` (346, the Repo page warning); `docs/technical_debt_archive.md` TD-1183's `Resolved`
-
-**Why:** #2590 (TD-1183) made the adopt run the launcher because dev-cadence #429 stopped `sync.sh` copying: `~/dev-cadence/sync.sh` now exits 1 for a target alone, *sync.sh no longer copies into a repo (TD-129): adopt a new repo with `dev-cadence -C <this clone> adopt <repo>`* (its line 39). Yet `seams.py` still builds `` `<dev-cadence>/sync.sh {root}` `` as the cure for *dev-cadence's per-clone setup not run in this checkout* and *sync-all will not reach it* in an unpinned repo, and design §5 (~353: *the person's `<dev-cadence>/sync.sh <checkout>` run cures both*) and §4.7 (346) say the same, so the Repo page tells the person to run a command that refuses. TD-1183's `Resolved` line says *§5's pinned-repo cures already named the launcher*, true of the pinned wording only; TD-1183's own **Fix** named §5's `sync.sh` lines (353–362) for the present tense and the PR left them.
-
-**Fix:** change both cures to `dev-cadence -C <dev-cadence> adopt <checkout>` (what `adopt.after` now prints) where the dev-cadence checkout has a launcher, keeping `sync.sh` only for an older checkout with none; update §5 and §4.7 in the same PR to match, the doc-bound tests with them, and the history line under §5.
-
-**Done when** the lock-repo warnings name a command dev-cadence accepts, §4.7, §5 and `seams.py` agree, and `pdm run test` passes.
 
 ---
 

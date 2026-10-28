@@ -335,7 +335,7 @@ def session_start(root: Path | str) -> list[str]:
 
 def on_cadence_roster(root: Path | str) -> bool | None:
     """Whether the checkout is on dev-cadence's own roster (`hosts.DEV_CADENCE_ROSTER`), which its
-    `sync-all.sh` walks and ShiftLead never writes (§4.7 `ao repo add`); None where that roster could not
+    `adopt` and `gc` read and ShiftLead never writes (§4.7 `ao repo add`); None where that roster could not
     be read, so nothing is said of it."""
     try:
         lines = Path(hosts.DEV_CADENCE_ROSTER).expanduser().read_text(encoding="utf-8").splitlines()
@@ -359,8 +359,8 @@ def warnings(
     no worktree setup, a checkout without dev-cadence's hook shim, dev-cadence's age where it could not
     be read (§5 *Which dev-cadence*), and a `served` repo missing from dev-cadence's own roster (§4.7 `ao
     repo add`, TD-1010) — never dev-cadence's source, which no sync reaches. The two per-clone cures are the
-    era's: `sync.sh` on the copy, the launcher in a `pinned` repo (`cadence.hook_pinned`, TD-1024). A repo is
-    served whatever they say."""
+    era's: a repo still on the copy is moved to a pin, `sync.sh --pin` (the copy is retired, TD-1188), the
+    launcher in a `pinned` repo (`cadence.hook_pinned`, TD-1024). A repo is served whatever they say."""
     out: list[str] = []
     if (led or {}).get("named"):
         out.append(f"`ledger:` names {led['named']}, which is gone: reading {led.get('path')}")
@@ -369,7 +369,7 @@ def warnings(
     if setup.get("state") == "absent":
         out.append("no worktree setup")
     if shimmed(root, pinned) is False:
-        cure = f"dev-cadence -C {root} run install_git_hooks.sh" if pinned else f"<dev-cadence>/sync.sh {root}"
+        cure = f"dev-cadence -C {root} run install_git_hooks.sh" if pinned else f"<dev-cadence>/sync.sh --pin {root}"
         out.append(f"dev-cadence's per-clone setup not run in this checkout — `{cure}`")
     if dc_age and dc_age.get("why"):
         out.append(f"dev-cadence's age not read: {dc_age['why']}")
@@ -377,7 +377,7 @@ def warnings(
         if pinned:
             cure = f"its gc may remove the tree this repo pins — `dev-cadence -C <dev-cadence> adopt {root}`"
         else:
-            cure = f"sync-all will not reach it — `<dev-cadence>/sync.sh {root}`"
+            cure = f"the copy is retired, so move it to a pin — `<dev-cadence>/sync.sh --pin {root}`"
         out.append(f"not on dev-cadence's roster: {cure}")
     return out
 

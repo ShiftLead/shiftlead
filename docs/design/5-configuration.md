@@ -349,20 +349,23 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   file and never rewrites this one, `adopt` included, so the copy is the person's; a hand-written pin older than
   dev-cadence ddd2f99, the seed's pinned mode, holds a pre-pin seed and is bumped first, `dev-cadence bump`). Two more
   warnings come from dev-cadence's per-clone setup: a checkout without its hook shim and one missing from
-  dev-cadence's own roster. Their cure is the era's (§4.7 `ao repo add`): in a repo still on the copy (a
-  lock, no pin), the person's `<dev-cadence>/sync.sh <checkout>` run cures both, words *dev-cadence's per-clone
-  setup not run in this checkout — `<dev-cadence>/sync.sh <checkout>`* and *not on dev-cadence's roster:
-  sync-all will not reach it — `<dev-cadence>/sync.sh <checkout>`*; in a pinned repo, where `sync.sh` and
-  `sync-all.sh` are retiring (dev-cadence's plan, *Decision* 11), the shim warning reads *dev-cadence's
+  dev-cadence's own roster. Their cure is the era's (§4.7 `ao repo add`): a repo still on the copy (a
+  lock, no pin) is one dev-cadence no longer syncs — its #429 (2026-10-28) retired the copy and `sync-all.sh`, and
+  `sync.sh` with a target alone refuses — and `adopt` refuses a repo that carries synced copies, so the cure of both
+  is the move to a pin, the person's `<dev-cadence>/sync.sh --pin <checkout>` (dev-cadence's migration: it writes
+  the pin, removes the copies still matching the lock and the lock, installs the shims and registers the checkout,
+  and commits nothing, so what it wrote is the person's PR), words *dev-cadence's per-clone setup not run in this
+  checkout — `<dev-cadence>/sync.sh --pin <checkout>`* and *not on dev-cadence's roster: the copy is retired, so
+  move it to a pin — `<dev-cadence>/sync.sh --pin <checkout>`* (TD-1188); in a pinned repo the shim warning reads *dev-cadence's
   per-clone setup not run in this checkout — `dev-cadence -C <checkout> run install_git_hooks.sh`* (the pinned
   tree's own installer), and also fires for a shim that predates the pin (its text has no `dev-cadence hook "`, the launcher call only the TD-129 shim
   makes — the bare `dev-cadence hook` is in every shim's TD-055 marker, so it runs a copied hook that is gone); the roster warning stays, since dev-cadence's `adopt` and `gc` still read the
   roster (`~/.config/dev-cadence/repos.txt`), and reads *not on dev-cadence's roster: its gc may remove the tree
   this repo pins — `dev-cadence -C <dev-cadence> adopt <checkout>`* (`adopt` on a pinned repo keeps its pin and
   every file it would seed that is already there, installs the shims and registers it, so it cures both; a repo moved by dev-cadence's migration, `sync.sh --pin`, has no lock
-  left and `adopt` warns past an edited copy it kept and registers it — dev-cadence #341, open on 2026-10-26; before
-  it, and for a repo pinned by hand with its lock still there, `adopt` refuses, and the roster line is the person's
-  to append by hand; `adopt` also refuses from a dirty dev-cadence clone or one whose HEAD origin lacks — its default branch, once #341 lands — and says so). The roster's loss is small — a tree `gc` removed is fetched again on the next run — but a node or an
+  left and `adopt` warns past an edited copy it kept and registers it (dev-cadence #341, merged 2026-10-26); for a
+  repo pinned by hand with its lock still there `adopt` refuses, and the roster line is the person's to append by
+  hand; `adopt` also refuses from a dirty dev-cadence clone or one whose HEAD is not on origin's default branch, and says so). The roster's loss is small — a tree `gc` removed is fetched again on the next run — but a node or an
   offline machine cannot fetch it, so it is said. The host agent reads the
   file's SessionStart commands into the repo facts as text (§4.4), and `hook_pinned` beside them, so a client on another machine sees
   them, and the clients (`shiftlead.doctor`, the Repo page) compare them with each adapter's own
