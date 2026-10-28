@@ -98,7 +98,7 @@ def test_the_completed_reference_track_is_the_longest_id_shown_capped_at_ref_wid
     assert "--ref-n: 7; --who-n: 0;" in render(s)
     long = [close("TD-123456789", 103, 1)]  # 12 characters, past the column's cap
     s = summary([member("a", progress=[claim("TD-123456789", status="done")])], long)
-    assert s["done_ref_w"] == REF_WIDTH == 10 and f"--ref-n: {REF_WIDTH};" in render(s)
+    assert s["done_ref_w"] == REF_WIDTH == 10 and f"--ref-n: {REF_WIDTH}; --who-n: 0;" in render(s)
 
 
 def test_the_face_opens_on_in_motion_with_a_claim_else_completed_and_the_toggle_is_drawn():
