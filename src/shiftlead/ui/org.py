@@ -772,14 +772,11 @@ def rollup_rows(items: list[dict[str, Any]], counted: Collection[str]) -> list[d
                 d = summary["doing"][0]
                 row["last"] = {k: d.get(k) for k in ("at", "age", "name", "text")}
             row["asked"] = summary.get("asked")
-            has_ledger = bool(facet) and _rollup_debt(facet)["ledger"]
-            row["acts"] = (
-                [*(["add-entry"] if has_ledger else []), "new-team", "start"]
-                if it.get("stopped")
-                else [*(["add-entry"] if has_ledger else []), "new-team", "wind-down", "stop-now"]
-            )
-            if it.get("stopped"):  # a stopped team's ⋯: Start first (§4.5a *rollup: press and menus*)
-                row["acts"] = ["start", *row["acts"][:-1]]
+            # the card's own acts: Start, Wind down and Stop now are a defined team's (its header's buttons);
+            # a stopped team's ⋯ has Start first (§4.5a *rollup: press and menus*)
+            entry = ["add-entry"] if bool(facet) and _rollup_debt(facet)["ledger"] else []
+            run = (["start"] if it.get("stopped") else ["wind-down", "stop-now"]) if it.get("defined") else []
+            row["acts"] = [*run, *entry, "new-team"] if it.get("stopped") else [*entry, "new-team", *run]
         elif kind == "repo":
             facet = it.get("facet")
             row.update(name=f"{row['repo']} · no team", hash=f"repo={row['repo']}", repo_url=str(it.get("url") or ""))
@@ -798,21 +795,16 @@ def rollup_rows(items: list[dict[str, Any]], counted: Collection[str]) -> list[d
 
 
 def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]] = ()) -> dict[str, Any]:
-    """The Org **rollup** (§4.5a *Sessions: rollup*, TD-176 slice 4, TD-924). **Agents** — the pills by
-    state — and *answer needed* (`answer_blocks`, one per session) count the page's sessions as
+    """The Org **rollup** (§4.5a *Sessions: rollup*; TD-176, TD-924, TD-1203 built by TD-1204): its **rows**
+    (`rollup_rows`) from `groups`, `org_layout`'s items in the page's order, and its totals line. **Agents** —
+    the pills by state — and *answer needed* (`answer_blocks`, one per session) count the page's sessions as
     `rollup_counted` says, whatever their team's state; *asked you* sums every team's line, live or not;
-    TDs in motion by phase (each phase's link the Repo page of the team holding the most of it) and PRs
-    in motion per window over the teams' repos (a repo two teams share counted once) sum the live teams.
-    *answer needed* goes to the first waiting session in the grid's one order (`card_order`): its team's
-    facet (`answer_team`), or its own card when it is in no team (`answer_card`); *asked you* to the team
-    holding the oldest ask (`asked_team`). The layout: no team live and no session counted — the Needs you
-    facet alone (`quiet`, TD-406); one team live, or none and a session counted — Agents and Needs you
-    (`lone`, TD-418); two or more live — all four. The Inbox's count is the top bar's, filled in by the
-    client.
-
-    `groups` is `org_layout`'s items (TD-1204), the page's order, from which `rows` are made
-    (`rollup_rows`), and `n_from_teams` is their needs-you numbers added up; on the flat page (`None`) there
-    are no rows and `n_from_teams` is *answer needed* over `views`."""
+    *n from teams* is the rows' needs-you numbers added up, so the rows add up to the totals. **PRs** per
+    window over the live teams' repos (a repo two teams share counted once). *n from teams* goes to the first
+    waiting session in the grid's one order (`card_order`): its team's facet (`answer_team`), or its own card
+    when it is in no team (`answer_card`); else to the team holding the oldest ask (`asked_team`). On the flat
+    page (`None`) there are no rows and *n from teams* is *answer needed* over `views`. The Queue's and the
+    Inbox's counts are the top bar's, filled in by the client."""
     live = [
         g
         for g in groups or []
@@ -824,14 +816,6 @@ def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]
         word = str(m.get("pill_word") or m.get("state"))
         tally[word] = tally.get(word, 0) + 1
     agents = [{"word": w, "cls": c, "label": label, "n": tally[w]} for w, c, label in ROLLUP_STATES if tally.get(w)]
-    phases: dict[str, int] = {ph: 0 for ph in PHASES}
-    lead: dict[str, str] = {}
-    for ph in PHASES if live else ():
-        best = max(live, key=lambda g: g["summary"]["phases"].get(ph, 0))
-        phases[ph] = sum(g["summary"]["phases"].get(ph, 0) for g in live)
-        if phases[ph] and best["summary"].get("repo"):
-            lead[ph] = f"{best['summary']['repo']['url']}?phase={ph}"
-    motion = sum(phases.values())
     repos: dict[str, dict[str, Any]] = {}
     for g in live:
         r = g["summary"].get("repo")
@@ -857,17 +841,10 @@ def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]
     rows = rollup_rows(groups, {m["id"] for _, m in counted}) if groups is not None else []
     return {
         "rows": rows,
-        "n_from_teams": sum(r["needs"] for r in rows) if groups is not None else answer_members(answers),
-        "quiet": not live and not counted,
-        "lone": len(live) == 1 or (not live and bool(counted)),
+        # every row's number added up: the rows partition the counted set, so it is the two counts' sum
+        "n_from_teams": answer_members(answers) + sum(a["n"] for _, a in asked),
         "agents": agents,
         "n_agents": len(counted),
-        "phases": [
-            {"key": ph, "n": phases[ph], "pct": round(100 * phases[ph] / motion, 1), "url": lead.get(ph, "")}
-            for ph in PHASES
-            if phases[ph]
-        ],
-        "motion": motion,
         "prs": {w: _blocks(wins[w]) for w in WINDOWS},
         "prs_open": n_open,
         "prs_url": f"{busiest['url']}#prs" if busiest else "",

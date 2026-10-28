@@ -360,9 +360,9 @@ def test_a_wound_down_team_shows_what_it_left():
     assert "TD-301" in html and "TD-301: the last test" in html
     assert none["summary"] is None and not any(m.get("compact") for m in none["members"])
     # nothing live and no session counted — a stopped team's exited cards, a closed record, an exited
-    # session in no team are leftovers — so Needs you alone (TD-406, TD-924)
+    # session in no team are leftovers — so nothing counted (TD-924)
     ro = ui.rollup(groups)
-    assert ro["quiet"] and ro["n_agents"] == 0 and ro["answer_needed"] == 0
+    assert not ro["agents"] and ro["n_agents"] == 0 and ro["answer_needed"] == 0
     # the three that hold something; the Repo facet first on the card (TD-1189)
     assert s["drawn"] == ["repo", "motion", "face"] and s["repo"]
     # nothing here, nothing claimed, no doing row: no facet, and no summary drawn (TD-418)
@@ -397,20 +397,21 @@ def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
     groups = ui.team_groups([*a, *b], (), {"/r/samscrape": reading("/r/samscrape")}, {})
     ro = ui.rollup(groups)
     assert [(x["word"], x["n"]) for x in ro["agents"]] == [("needs-you", 1), ("working", 2)]
-    assert {p["key"]: p["n"] for p in ro["phases"]} == {"design": 1, "grind": 1, "review": 1} and ro["motion"] == 3
+    assert "phases" not in ro and "motion" not in ro  # TDs in motion is each team card's facet (TD-1203)
     assert ro["prs"]["day"] == {"opened": 3, "closed": 2, "opct": 60.0}  # one repo, counted once
     assert ro["prs_open"] == 1 and ro["answer_needed"] == 1 and ro["answer_team"] == "grind"
     html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=4)
     assert 'data-state-filter="needs-you"' in html and "needs you (1)" in html
-    assert 'href="#tsum-grind"' in html and "data-inbox-needs>4<" in html
+    assert '<a href="#tsum-grind" data-open-team="grind">1 from teams</a>' in html and "data-inbox-needs>4<" in html
     # …and the fold's `aria-controls` never renames the summary the link lands on (TD-194)
     js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
     assert "if (!el.id) el.id = `tgrid-${team}`" in js
-    assert "Agents (3)" in html and "TDs in motion (3)" in html and "PRs in motion (1)" in html
+    assert "Agents (3)" in html and "TDs in motion" not in html and "(1) open" in html
+    assert '<span class="wv" data-wv="day"> · 3 opened 2 closed today</span>' in html and 'data-pick="win"' not in html
     # the repos whose PRs could not be read, one per line on the hover (TD-270)
     bad = ui.templates.get_template("rollup.html").render(ro={**ro, "prs_errors": ["a: x", "b: y"]}, person_needs=4)
     assert 'title="a: x\nb: y"' in bad
-    assert ui.rollup(None)["quiet"] and ui.rollup([g for g in groups if not g["team"]])["quiet"]
+    assert ui.rollup(None)["n_agents"] == 0 and ui.rollup([g for g in groups if not g["team"]])["n_agents"] == 0
     # a wound-down team beside them carries a summary now (TD-192), and adds nothing to the sums
     gone = [{**member("z1", state="exited", progress=[claim("TD-290")]), "team": "gone", "rank": 1, "slot": {}}]
     more = ui.team_groups([*a, *b, *gone], (), {"/r/samscrape": reading("/r/samscrape")}, {})
@@ -418,14 +419,16 @@ def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
     assert ui.rollup(more) == ro
 
 
-def test_with_no_team_live_the_rollup_is_needs_you_alone():
-    """§4.5a *Sessions: rollup* (TD-406): with no team live there is nothing to sum, and the Inbox's count
-    and its overdue still need a place — the Needs you facet alone, *in the Inbox*, no team rows."""
-    html = ui.templates.get_template("rollup.html").render(ro=ui.rollup([]), person_needs=7, person_overdue=2)
-    assert 'class="rollup quiet"' in html and "Needs you" in html
+def test_a_page_with_no_row_to_draw_is_the_totals_line_alone():
+    """§4.5a *Sessions: rollup* (TD-1203, built by TD-1204): a page with no row to draw is the totals line
+    alone — Agents, *n from teams*, *q on the Queue*, *i in the Inbox* and its overdue, no table."""
+    html = ui.templates.get_template("rollup.html").render(
+        ro=ui.rollup([]), person_needs=7, person_overdue=2, person_queue_n=3
+    )
+    assert "rollup-list" not in html and 'class="ru-tot"' in html and "Agents (0)" in html
     assert "data-inbox-needs>7<" in html and "data-inbox-overdue>2<" in html and 'href="/inbox"' in html
-    assert "Agents (" not in html and "TDs in motion" not in html and "PRs in motion" not in html
-    assert "answer needed" not in html and "asked you" not in html
+    assert "data-queue-needs>3<" in html and 'href="/queue"' in html and "0 from teams</a>" in html
+    assert "TDs in motion" not in html and "PRs" not in html  # no live team's repo: no PRs group
 
 
 def _live(team: str, *ms: dict) -> list[dict]:
@@ -434,42 +437,25 @@ def _live(team: str, *ms: dict) -> list[dict]:
     return list(ms)
 
 
-def test_the_rollup_with_zero_one_and_two_live_teams():
-    """§4.5a *Sessions: rollup* (TD-418, built by TD-428 slice 2): no team live — Needs you alone (TD-406);
-    one — Agents and Needs you, that team's own facets saying the rest; two — all four. Agents' blurb is
-    an *i* (a tooltip, nothing to press) and nothing is written under the pills; *answer needed* is
-    drawn above 0 only."""
+def test_the_totals_lines_agents_is_an_i_and_pills_and_the_rows_head_names_its_columns():
+    """§4.5a *Sessions: rollup* (TD-1204): Agents' blurb is an *i* (a tooltip, nothing to press) beside the
+    pills, nothing written under them; the table's head line names its columns in `th` cells, *Teams (n)*
+    the team rows."""
     render = ui.templates.get_template("rollup.html").render
     repos = {"/r/samscrape": reading("/r/samscrape")}
-    zero = render(ro=ui.rollup(ui.team_groups([], (), repos, {})), person_needs=1)
-    assert 'class="rollup quiet"' in zero and "Agents (" not in zero and "answer needed" not in zero
-    one = ui.team_groups(_live("grind", member("g1", progress=[claim("TD-301")]), member("g2")), (), repos, {})
-    ro = ui.rollup(one)
-    assert ro["lone"] and ro["answer_needed"] == 0
+    ms = _live("grind", member("g1", progress=[claim("TD-301")]), member("g2"))
+    groups = ui.team_groups(ms, (), repos, {})
+    ro = ui.rollup(ui.org_layout(groups, repos, (), ms, NOW), ms)
     html = render(ro=ro, person_needs=1)
-    assert 'class="rollup lone"' in html and "Agents (2)" in html and "Needs you" in html
-    assert "TDs in motion" not in html and "PRs in motion" not in html
-    assert "answer needed" not in html  # 0: not drawn
+    assert "Agents (2)" in html and "answer needed" not in html  # 0: not drawn
     tip = "in urgency order, as the cards sort · a pill filters the page to that state"
     assert f'<span class="tipmark" tabindex="0" role="img" aria-label="{tip}" title="{tip}">i</span>' in html
     assert f'<div class="meta">{tip}</div>' not in html and "helpmark" not in html  # no panel to open
-    perm = {"kind": "permission", "text": "Bash x", "tool_use_id": "t1"}
-    two = ui.team_groups(
-        [
-            *_live("grind", member("g1", progress=[claim("TD-301")])),
-            *_live("other", member("h1", state="needs-you", pending=perm)),
-        ],
-        (),
-        repos,
-        {},
-    )
-    ro2 = ui.rollup(two)
-    html2 = render(ro=ro2, person_needs=1)
-    assert not ro2["lone"] and 'class="rollup"' in html2
-    assert "Agents (2)" in html2 and "TDs in motion (1)" in html2 and "PRs in motion (1)" in html2
-    assert '>1</b> <a href="#tsum-other"' in html2 and "answer needed</a>" in html2
+    heads = re.findall(r'<th scope="col"[^>]*>(.*?)</th>', html)
+    assert heads[:6] == ["Teams (1) · repos", "Technical debt, by kind", "open", "Members", "Last work", "Needs you"]
+    assert 'class="rollup quiet"' not in html and 'class="rollup lone"' not in html
     css = (ui.Path(ui.__file__).parent / "static" / "app.css").read_text()
-    assert ".rollup.lone { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }" in css
+    assert ".rollup.lone" not in css and ".rollup.quiet" not in css
 
 
 def test_a_stopped_team_draws_only_the_facets_that_hold_something():
@@ -566,11 +552,10 @@ def test_the_rollup_counts_the_board_items_past_their_date_beside_in_the_inbox()
     secs = ui.inbox_sections([], boards=boards, now=now)
     assert secs["count"] == 2 and secs["overdue_n"] == 1
     assert ui.inbox_sections([], boards=boards[1:], now=now)["overdue_n"] == 0
-    ro = {"agents": [], "n_agents": 0, "phases": [], "motion": 0, "prs_open": 0, "has_repo": False,
-          "answer_needed": 0, "answer_team": ""}  # fmt: skip
+    ro = ui.rollup([])
     html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2, person_overdue=1)
     assert "data-inbox-needs>2<" in html and "data-inbox-overdue>1</span> overdue" in html
-    assert 'class="meta overdue hidden"' in ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2)
+    assert 'class="overdue hidden"' in ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2)
 
 
 def test_an_ended_member_keeps_its_last_reference_with_the_prs_mark():
@@ -729,10 +714,8 @@ def test_a_members_open_ask_to_the_person_is_the_teams_asked_you_line():
     assert ro["answer_needed"] == 0 and ro["asked"] == 2 and ro["asked_team"] == "grind"
     assert ro["asked_at"] == needs[1]["at"], "the oldest ask's age"
     out = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=2)
-    assert '<a href="#tsum-grind"' in out and ">asked you</a>" in out and "or whose ask to you is open" not in out
-    # at 0 the row is hidden; nothing open, no line on the card
-    zero = ui.templates.get_template("rollup.html").render(ro={**ro, "asked": 0}, person_needs=0)
-    assert ">asked you</a>" not in zero
+    # *n from teams* goes to the team holding the oldest ask while nothing waits on an answer (TD-1204)
+    assert '<a href="#tsum-grind" data-open-team="grind">2 from teams</a>' in out
     assert ui.team_summary("grind", ms, {}, {}, now=NOW)["asked"] is None
 
 
@@ -993,12 +976,12 @@ def test_a_working_member_of_a_team_with_nothing_live_and_a_needs_you_session_in
     groups = ui.team_groups(ms, (), {}, {})
     assert not any(g["live"] for g in groups if g["team"])
     ro = ui.rollup(groups)
-    assert ro["lone"] and not ro["quiet"] and ro["n_agents"] == 2
+    assert ro["n_agents"] == 2 and ro["n_from_teams"] == 1
     assert _tally(ro) == {"needs-you": 1, "working": 1}
     assert ro["answer_needed"] == 1 and ro["answer_card"] == "n1" and ro["answer_team"] == ""
     html = ui.templates.get_template("rollup.html").render(ro=ro, person_needs=0)
-    assert 'class="rollup lone"' in html and "Agents (2)" in html and "TDs in motion" not in html
-    assert '<a href="#card-n1" data-open-card="n1"' in html and "answer needed</a>" in html
+    assert "Agents (2)" in html and "TDs in motion" not in html
+    assert '<a href="#card-n1" data-open-card="n1">1 from teams</a>' in html
 
 
 def test_an_exited_member_of_a_live_team_counts_and_a_stopped_teams_exited_card_and_a_closed_record_do_not():
@@ -1030,25 +1013,24 @@ def test_the_flat_pages_sessions_are_counted_and_its_exited_cards_are_not():
     vs = [_s("a", "working", team=""), _s("b", "needs-you", team="", pending=PERM), _s("c", "exited", team="")]
     assert ui.team_groups(vs, (), {}, {}) is None  # no badge, nothing defined: the flat page
     ro = ui.rollup(None, vs)
-    assert ro["lone"] and _tally(ro) == {"needs-you": 1, "working": 1}
+    assert ro["rows"] == [] and _tally(ro) == {"needs-you": 1, "working": 1}
     assert ro["answer_card"] == "b" and ro["answer_needed"] == 1
-    assert ui.rollup(None, [vs[2]])["quiet"]
+    assert ui.rollup(None, [vs[2]])["n_agents"] == 0
 
 
-def test_with_no_team_live_the_row_is_agents_and_needs_you_or_needs_you_alone_with_asked_you():
-    """No team live: a counted session gives Agents and Needs you; none gives Needs you alone, which
-    still holds *asked you* while a stopped team's line holds an open ask (§4.5a *Sessions: rollup*)."""
+def test_with_no_team_live_the_totals_still_count_a_stopped_teams_open_ask():
+    """No team live: *n from teams* still holds a stopped team's open ask, and goes to that team's facet
+    (§4.5a *Sessions: rollup*, TD-1204)."""
     render = ui.templates.get_template("rollup.html").render
     stopped = [_s("g1", "exited")]
     needs = [_ask("m-1", "g1")]
     ro = ui.rollup(ui.team_groups(stopped, (), {}, {}, needs=needs))
-    assert ro["quiet"] and ro["asked"] == 1 and ro["asked_team"] == "grind"
+    assert ro["n_agents"] == 0 and ro["asked"] == 1 and ro["asked_team"] == "grind" and ro["n_from_teams"] == 1
     html = render(ro=ro, person_needs=1)
-    assert 'class="rollup quiet"' in html and "Agents (" not in html
-    assert '<a href="#tsum-grind" data-open-team="grind"' in html and ">asked you</a>" in html
+    assert "Agents (0)" in html and '<a href="#tsum-grind" data-open-team="grind">1 from teams</a>' in html
     lone = ui.rollup(ui.team_groups([*stopped, _s("n1", "idle", team="")], (), {}, {}))
-    assert lone["lone"] and not lone["quiet"] and lone["n_agents"] == 1
-    assert 'class="rollup lone"' in render(ro=lone, person_needs=0)
+    assert lone["n_agents"] == 1
+    assert "Agents (1)" in render(ro=lone, person_needs=0)
 
 
 def test_answer_needed_goes_to_the_first_waiting_session_in_card_order_and_asked_you_to_the_oldest_ask():
@@ -1091,7 +1073,11 @@ for (const [team, folded] of [["grind", true], ["grind", false], ["", false]]) {
   AO.rollupGo(team, filter, folded, (k, v) => (set[k] = v));
   out.push({ filter: filter.value, set });
 }
-console.log(JSON.stringify(out));
+// a row's hash and its layout key, both ways (TD-1204); a hash naming no kind, or no name, is no key
+const keys = ["team=grind", "#repo=ledger%20board", "strip=samscrape", "norepo", "#foo=1", "team=", "", "#card-x"]
+  .map((h) => AO.rollupKey(h));
+const hashes = ["team:grind", "repo:ledger board", "strip:samscrape", "norepo", "head:x"].map((k) => AO.rollupHash(k));
+console.log(JSON.stringify({ out, keys, hashes }));
 """
 
 
@@ -1113,11 +1099,15 @@ def test_a_press_on_the_rollups_link_clears_the_filter_and_opens_a_folded_team_s
     js = ui.Path(ui.__file__).parent / "static" / "app.js"
     run = subprocess.run([node, str(probe), str(js)], capture_output=True, text=True, timeout=30)
     assert run.returncode == 0, run.stderr
-    assert json.loads(run.stdout) == [
+    got = json.loads(run.stdout)
+    assert got["out"] == [
         {"filter": "", "set": {"fold:grind": False}},
         {"filter": "", "set": {}},
         {"filter": "", "set": {}},
     ]
+    # a rollup row's hash (§4.5a *rollup: press and menus*, TD-1204): `#team=`, `#repo=`, `#strip=`, `#norepo`
+    assert got["keys"] == ["team:grind", "repo:ledger board", "strip:samscrape", "norepo", "", "", "", ""]
+    assert got["hashes"] == ["team=grind", "repo=ledger%20board", "strip=samscrape", "norepo", ""]
     src = js.read_text()
     # the handler: the link's target read, the team's section found, the fold read, then the layout and the scroll
     assert 'const go = e.target.closest("[data-open-team], [data-open-card]");' in src
@@ -1168,5 +1158,5 @@ def test_the_flat_pages_rollup_counts_its_sessions_on_load_and_on_a_delta(tmp_pa
             ev = json.loads(ws.receive_text())
     assert ev["event"] == "session" and ev["groups"] is None  # the flat page
     for html in (loaded, ev["rollup"]):
-        assert 'class="rollup lone"' in html and "Agents (2)" in html
-        assert '<a href="#card-n1" data-open-card="n1"' in html and "answer needed</a>" in html
+        assert "rollup-list" not in html and "Agents (2)" in html  # the flat page: the totals line alone
+        assert '<a href="#card-n1" data-open-card="n1">1 from teams</a>' in html
