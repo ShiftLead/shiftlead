@@ -631,9 +631,10 @@ def _under(rel: str) -> str:
     return "" if parent == "." else parent
 
 
-def git_io(root: Path | str, ref: str, under: str = "", timeout: float = 10.0) -> Io | None:
+def git_io(root: Path | str, ref: str, under: str = "", timeout: float = 10.0, rel: str = "") -> Io | None:
     """(ls, read) over the tree at `ref` in `root`, or None when it cannot be listed: one `git ls-tree` of
-    `under` (empty: the top level, and the v2 directory's name there, never the tree recursively), and a
+    `under` (empty: the top level, and there `ledger/` and `rel` — the ledger asked for, where it is a
+    directory — never the tree recursively), and a
     read of a v2 entry file or `README.md` fetches its directory's others with it in one `git cat-file
     --batch` — only those, never the directory's other files; any other path is fetched alone. dev-cadence's
     `files/scripts/ledger.py` `git_io` is the worked example (TD-1144)."""
@@ -641,7 +642,8 @@ def git_io(root: Path | str, ref: str, under: str = "", timeout: float = 10.0) -
         listed = _git(root, "ls-tree", "-r", "-z", "--full-tree", ref, "--", under, timeout=timeout)
     else:
         top = _git(root, "ls-tree", "-z", "--full-tree", ref, timeout=timeout)
-        sub = _git(root, "ls-tree", "-r", "-z", "--full-tree", ref, "--", PurePosixPath(LEDGER_DIR_REL).name)
+        dirs = dict.fromkeys(d for d in (PurePosixPath(LEDGER_DIR_REL).name, rel) if d and not d.endswith(".md"))
+        sub = _git(root, "ls-tree", "-r", "-z", "--full-tree", ref, "--", *dirs, timeout=timeout)
         listed = None if top is None or sub is None else top + sub
     if listed is None:
         return None
@@ -772,7 +774,7 @@ class Registry:
         if root not in self._read:
             ref = default_ref(root)
             rel = ledger_path(root)
-            io = fs_io(root) if ref is None else git_io(root, ref, _under(rel))
+            io = fs_io(root) if ref is None else git_io(root, ref, _under(rel), rel=rel)
             led, arch = read_pair(rel, io)[1:] if io is not None else (None, None)
             self._read[root] = None if led is None else (ids_in(led), ids_in(arch))
         return self._read[root]
@@ -922,7 +924,7 @@ def entries_before(
             continue  # no such ref here: the next name
         if not (sha := sha.strip()):
             return None, f"no commit of {ref} before {before.isoformat() if before else 'now'}"
-        io = git_io(root, sha, _under(rel), timeout=timeout)
+        io = git_io(root, sha, _under(rel), timeout=timeout, rel=rel)
         text, archive = read_pair(rel, io)[1:] if io is not None else (None, None)
         if text is None:
             return None, f"no {rel} at {ref} {sha[:8]}"
@@ -964,7 +966,8 @@ def reading(
     io = fs_io(root)
     rel, text, archive = read_pair(rel or ledger_path(root), io)
     if text is None:
-        return {"path": rel, "error": f"{rel}: No such file or directory", "at": now.isoformat()}
+        why = "cannot be read" if (Path(root) / rel).exists() else "No such file or directory"
+        return {"path": rel, "error": f"{rel}: {why}", "at": now.isoformat()}
     rank_text = io[1](lb.rank_path(rel))  # none: every entry's key is its implicit one
     got = entries(text, archive, resolve, live, rank_text=rank_text, repo=repo_key(root))
     done_parts = parts_of_open(archive, got)

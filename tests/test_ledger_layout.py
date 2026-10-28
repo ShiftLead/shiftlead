@@ -122,6 +122,11 @@ def test_git_io_reads_a_directory_and_batches_only_entry_files(tmp_path):
     top_ls, top_read = ledger.git_io(two, "HEAD")  # empty `under`: the top level and its `ledger/`, never all of it
     assert "todo.md" in top_ls("") and top_ls("ledger") == ["README.md"] and top_read("todo.md") == "# Todo\n"
     assert top_ls("docs/ledger") is None and top_read("docs/ledger/README.md") is None
+    (two / "tasks").mkdir()
+    (two / "tasks" / "TD-001.md").write_text("## TD-001: a\n", encoding="utf-8")
+    _commit(two)
+    tasks_ls, _ = ledger.git_io(two, "HEAD", rel="tasks")  # a set top-level directory is listed too
+    assert tasks_ls("tasks") == ["TD-001.md"]
 
 
 _PARITY = """
