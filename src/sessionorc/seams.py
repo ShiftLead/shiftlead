@@ -122,7 +122,7 @@ def with_adoption(seams: dict[str, Any] | None, root: Path | str, prs: dict[str,
 
 def ledger_lack(led: dict[str, Any] | None, root: Path | str) -> str | None:
     """The ledger seam's lack in §5's words, or None when it parses: *unserved: no ledger at <path> —
-    <cure>*, *ledger is Ledgerboard 2, this build reads 1 (sync)*, or *unserved: the ledger at <path>
+    <cure>*, *ledger is Ledgerboard 3, this build reads 2 (sync)*, or *unserved: the ledger at <path>
     does not parse — <the reader's reason>*, which no adoption cures."""
     led = led or {}
     state, path = led.get("state"), led.get("path") or "the ledger path"

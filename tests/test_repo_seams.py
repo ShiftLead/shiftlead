@@ -46,7 +46,7 @@ def lines(rows):
 
 def test_a_served_repo_is_ok_a_warning_warns_and_each_lack_unserves_it():
     """TD-1011, §4.7 **repos**: each lack in §5's words is a lack, naming its cure; a warning a warning."""
-    newer = {"path": "docs/technical_debt.md", "state": "newer", "major": 2, "entries": None, "why": "Ledgerboard: 2"}
+    newer = {"path": "docs/technical_debt.md", "state": "newer", "major": 3, "entries": None, "why": "Ledgerboard: 3"}
     gate = f"unserved: no gate (no scripts/check_cadence.py) — {CURE}"
     got = doctor.repos(
         {
@@ -60,7 +60,7 @@ def test_a_served_repo_is_ok_a_warning_warns_and_each_lack_unserves_it():
         }
     )
     assert lines(got) == [
-        ("lacking", f"repo later — ledger is Ledgerboard 2, this build reads {ledgerboard.FORMAT_MAJOR} (sync)"),
+        ("lacking", f"repo later — ledger is Ledgerboard 3, this build reads {ledgerboard.FORMAT_MAJOR} (sync)"),
         ("lacking", f"repo notes — {gate} · no board at docs/user_attention.md"),
         ("warning", "repo old — seams not read yet"),
         ("warning", "repo samscrape — no worktree setup"),

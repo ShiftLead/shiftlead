@@ -227,7 +227,8 @@
     "# Board\n\nLedgerboard: 2\n\n- [ ] 2026-01-05 (session s) — x.\n",
     "# Board\n\n- [ ] 2026-01-05 (session s) — x.\nLedgerboard: 3\n",
     "# Board\n\n- [docs](x)\nLedgerboard: 2\n\n- [ ] 2026-01-05 (session s) — x.\n",
-    "# T\n\n## Summary\n\nLedgerboard: 2\n\n## TD-001: x\n"
+    "# T\n\n## Summary\n\nLedgerboard: 2\n\n## TD-001: x\n",
+    "# Ledger\n\nLedgerboard: 3\n\n## TD-001: x\n"
   ],
   "bold_heads": [
     "2026-01-05 (session s-1 on h) — **Fix the export** before Friday. Due: 2026-01-20.",
@@ -556,11 +557,13 @@
   "rank_paths": [
     "docs/technical_debt.md",
     "technical_debt.md",
-    "a/b/ledger.md"
+    "a/b/ledger.md",
+    "docs/ledger"
   ],
   "components": [
     "ledger/ranked.md",
     "ledger/ranked.archive.md",
-    "ledger/basic.md"
+    "ledger/basic.md",
+    "ledger/parts.md"
   ]
 }

@@ -1,10 +1,11 @@
-# ledgerboard v1.3 sha256:db17c348ccfc676da0790bef88084c2de1b20324df228d04806cfcc9bbe7cc09
+# ledgerboard v2.1 sha256:8cb3403afd795c75d3cec4d86791192f81ae81032d09d2e8507799bed06ba776
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard.py (vendored by dev-cadence as files/scripts/ledgerboard.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
 
 A **ledger** (``docs/technical_debt.md``) is a file of ``## TD-NNN: title`` entries, each with a
-header block of ``**Name:** value`` fields, a summary table, and an archive beside it. A **board**
+header block of ``**Name:** value`` fields, a summary table, and an archive beside it — or, from
+v2, a directory of one ``TD-NNN.md`` per entry (``docs/ledger/``) that ``load()`` reads as the same text. A **board**
 (``docs/user_attention.md``) is a file of ``- [ ] [kind] YYYY-MM-DD (session …) — text`` items with
 trailing ``Due:``/``Answers:``/``Decided:`` fields, reply tails and a detail block.
 
@@ -13,9 +14,9 @@ What a caller needs from outside the text is passed in — the cross-repo resolv
 ``pickable()``, today's date. Two consumers vendor this file (dev-cadence's scripts, ShiftLead);
 neither keeps a second parser of either format.
 
-Sections: the ledger (entries, ``Fields:``, ``Blocked by``, derived pickable, ``check``); the rank
+Sections: the ledger (entries, ``Fields:``, ``Blocked by``, ``Part of``, derived pickable, ``check``); the rank
 (cards, keys, the rank file, the pick order); the board
-(items, the item record, keys and refs); edits (``edit_line``, composing an item, the commit
+(items, the item record, keys and refs); the ledger as a directory (``load``, ``split``); edits (``edit_line``, composing an item, the commit
 subject of a write and its parser); line predicates for diff walkers; the format version.
 """
 
@@ -39,9 +40,10 @@ SECTION_RE = re.compile(r"^## ", re.MULTILINE)
 ROW_RE = re.compile(r"^\|\s*(TD-(\d+))\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|", re.MULTILINE)
 FIELD_RE = re.compile(r"^\*\*([A-Za-z][^*:\n]*?):\*\*[ \t]*(.*?)[ \t]*$")  # one line, one field
 FIELDS_DECL_RE = re.compile(r"^Fields:[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # the preamble's declaration
-CADENCE_FIELDS = ("priority", "type", "added", "status", "blocked by", "location")  # the spec's own fields
+CADENCE_FIELDS = ("priority", "type", "added", "status", "blocked by", "location", "part of")  # the spec's own fields
 PRIORITY_RE = re.compile(r"^\*\*Priority:\*\*\s*(\w+)", re.MULTILINE)
 BLOCKED_RE = re.compile(r"^\*\*Blocked by:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # one line only
+PART_OF_RE = re.compile(r"^\*\*Part of:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # one parent, same ledger (v2.1)
 TYPE_RE = re.compile(r"^\*\*Type:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 TYPES = ("debt", "feature")  # pick order within a Priority; the first is the default
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)  # the seed template's example entry lives in one
@@ -50,7 +52,7 @@ XREPO_ITEM_RE = re.compile(r"^([\w.-]+(?:/[\w.-]+)?)#(TD-\d+)$")
 DECISION_RE = re.compile(r"\bdecision\s*\(([^)]+)\)", re.IGNORECASE)
 WORD_RE = re.compile(r"[^\s,;]+")
 PRIORITIES = ("high", "medium", "low")
-EDIT_ERRORS = ("pickable-disagrees", "undeclared-field")  # information on a standing ledger, an error in a new edit
+EDIT_ERRORS = ("pickable-disagrees", "undeclared-field", "cycle", "legacy-part")  # information on a standing ledger, an error in a new edit
 
 # A resolver answers one ``<repo>#TD-NNN`` item: ``(state, why)`` or a mapping carrying at least
 # ``state`` and ``why`` (any other keys ride along into the entry's ``cross_repo``). ``state`` is
@@ -130,8 +132,8 @@ def entries(text: str) -> list[dict]:
     """The ledger's entry bodies, in file order: id, title, priority, blocked (raw or None), fields.
 
     HTML comments are dropped first: the seed ledger's entry template is a commented-out
-    `## TD-001: …` that is not an entry. Priority, Type and Blocked by come from the header
-    block; one written further down the body is still read (the safe direction) and flagged."""
+    `## TD-001: …` that is not an entry. Priority, Type, Blocked by and Part of come from the
+    header block; one written further down the body is still read (the safe direction) and flagged."""
     text = COMMENT_RE.sub("", text)
     out = []
     for m in HEADING_RE.finditer(text):
@@ -139,7 +141,8 @@ def entries(text: str) -> list[dict]:
         body = text[m.end(): nxt.start() if nxt else len(text)]
         fields = header_block(body)
         below = []
-        for key, rx in (("priority", PRIORITY_RE), ("type", TYPE_RE), ("blocked by", BLOCKED_RE)):
+        for key, rx in (("priority", PRIORITY_RE), ("type", TYPE_RE), ("blocked by", BLOCKED_RE),
+                        ("part of", PART_OF_RE)):
             if key not in fields:
                 bm = rx.search(body)
                 if bm:
@@ -151,7 +154,8 @@ def entries(text: str) -> list[dict]:
         out.append({"id": m.group(1), "title": m.group(3).strip(),
                     "priority": prio.capitalize() if prio else None,
                     "type_raw": (type_raw.split() or [None])[0] if type_raw else None,  # a value of only \r or NBSP is no Type
-                    "blocked_raw": blocked, "fields": fields, "below": below})
+                    "blocked_raw": blocked, "part_of_raw": fields.get("part of") or None,
+                    "fields": fields, "below": below})
     return out
 
 
@@ -179,6 +183,113 @@ def parse_blocked(raw: str) -> tuple[list[str], list[str], list[str]]:
         else:
             bad.append(item)
     return ids, who, bad
+
+
+def parse_part_of(raw: str | None) -> tuple[str | None, str | None]:
+    """(the parent's id, what cannot be read) of one Part of value (v2.1). The parent is the
+    value's first item, a ``TD-NNN`` in the same ledger; the rest of the line is a free comment,
+    except a second id after a comma, which names a second parent. Another repo's entry
+    (``<repo>#TD-NNN``) is never a parent: a parent's pickable needs every entry naming it."""
+    first, _, rest = (raw or "").strip().partition(",")
+    item = first.split()[0].rstrip(".;:") if first.split() else ""
+    if not item:
+        return None, None
+    if XREPO_ITEM_RE.match(item):
+        return None, f"names {item}, another repo's entry — a parent is in the same ledger"
+    if not ID_ITEM_RE.match(item):
+        return None, f"cannot read {item!r} — write TD-NNN"
+    second = rest.strip().split()[0].rstrip(".;:") if rest.strip() else ""
+    if ID_ITEM_RE.match(second) or XREPO_ITEM_RE.match(second):
+        return None, f"names a second parent ({second}) — an entry is part of one"
+    return item, None
+
+
+def _parents(live: list[dict]) -> tuple[dict[str, str], dict[str, tuple[str | None, str | None]]]:
+    """({part: its open parent's id as the ledger spells it}, {id: parse_part_of() of its line}) of the
+    live entries; a parent matches by number, as a blocker does (``TD-7`` is ``TD-007``)."""
+    num: dict[int, str] = {}
+    for e in live:
+        num.setdefault(_num(e["id"]), e["id"])
+    parent_of, part_of = {}, {}
+    for e in live:
+        if e.get("part_of_raw"):
+            part_of[e["id"]] = parse_part_of(e["part_of_raw"])
+            par = part_of[e["id"]][0]
+            if par and _num(par) in num:
+                parent_of.setdefault(e["id"], num[_num(par)])
+    return parent_of, part_of
+
+
+def _descendants(tid: str, parts: Mapping[str, list[str]]) -> list[str]:
+    """Every open part of ``tid``, and their parts, breadth first; a cycle ends the walk."""
+    out, seen, todo = [], {tid}, list(parts.get(tid, ()))
+    while todo:
+        t = todo.pop(0)
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+            todo.extend(parts.get(t, ()))
+    return out
+
+
+def _waits_on(live: list[dict], parent_of: dict[str, str]) -> dict[str, set[str]]:
+    """The live entries' waits-on edges (v2.1): X → Y when X is Blocked by Y, P → C when C is
+    Part of P (a parent waits on its parts); local ids only, matched by number."""
+    num = {}
+    for e in live:
+        num.setdefault(_num(e["id"]), e["id"])
+    out: dict[str, set[str]] = {e["id"]: set() for e in live}
+    for e in live:
+        for b in parse_blocked(e["blocked_raw"] or "")[0]:
+            if "#" not in b and _num(b) in num:
+                out[e["id"]].add(num[_num(b)])
+    for c, p in parent_of.items():
+        out.setdefault(p, set()).add(c)
+    return out
+
+
+def _on_cycles(edges: dict[str, set[str]]) -> list[list[str]]:
+    """The strongly connected groups of ``edges`` that hold a cycle (two or more members, or one
+    that waits on itself), each in its members' order of ``edges``; Tarjan's, iterative."""
+    index: dict[str, int] = {}
+    low: dict[str, int] = {}
+    stack: list[str] = []
+    on: set[str] = set()
+    found = []
+    for root in edges:
+        if root in index:
+            continue
+        work = [(root, iter(sorted(edges[root], key=_num)))]
+        index[root] = low[root] = len(index)
+        stack.append(root)
+        on.add(root)
+        while work:
+            v, it = work[-1]
+            w = next(it, None)
+            if w is not None:
+                if w not in index:
+                    index[w] = low[w] = len(index)
+                    stack.append(w)
+                    on.add(w)
+                    work.append((w, iter(sorted(edges.get(w, ()), key=_num))))
+                elif w in on:
+                    low[v] = min(low[v], index[w])
+                continue
+            work.pop()
+            if work:
+                low[work[-1][0]] = min(low[work[-1][0]], low[v])
+            if low[v] == index[v]:
+                group = []
+                while True:
+                    w = stack.pop()
+                    on.discard(w)
+                    group.append(w)
+                    if w == v:
+                        break
+                if len(group) > 1 or v in edges.get(v, ()):
+                    pos = {t: i for i, t in enumerate(edges)}
+                    found.append(sorted(group, key=pos.__getitem__))
+    return found
 
 
 def _resolved(item: str, resolve: Resolve | None) -> dict:
@@ -217,17 +328,22 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
     """Every live entry in pick order, with its derived pickable, open blockers and raw fields; plus flags.
 
     **Pickable is derived, never written:** an entry is pickable when it has no Blocked by field,
-    or every entry it names is archived and it names no decision. ``resolve`` answers a
+    or every entry it names is archived and it names no decision — and no open entry is Part of
+    it (v2.1; its ``parts_open``, kept apart from ``blocked_by``). ``resolve`` answers a
     ``<repo>#TD-NNN`` item (see ``Resolve``); without one, such an item keeps its block.
     ``undeclared`` also flags a header field with no vocabulary, when the ledger declares any.
 
     **Pick order is the rank** (SPEC *The rank*): ``rank_text`` is the rank file's text (None or
     "": no lines), ``repo`` the last component of an implicit key. Each record carries its ``key``
     (its line's, else its implicit key) and its ``card_key``; entries sort by card, then within a
-    card by dependency, then key."""
+    card by dependency (after its blockers and its parts), then key."""
     live = entries(ledger)
     live_nums = {_num(e["id"]) for e in live}
     archived = heading_nums(archive)
+    parent_of, part_of = _parents(live)
+    parts_open: dict[str, list[str]] = {}
+    for c, par in parent_of.items():
+        parts_open.setdefault(par, []).append(c)
     table = {int(m.group(2)): m.group(4) for m in ROW_RE.finditer(COMMENT_RE.sub("", ledger))}
     vocab, decl_flags = declared(ledger)
     flags = _Flags()
@@ -265,7 +381,22 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
         keys.setdefault(e["id"], lined.get(n) or implicit_key(prio, etype, e["id"], repo))
         rec = {"id": e["id"], "title": e["title"], "priority": prio, "type": etype,
                "blocked_by": [], "cross_repo": [], "pickable": True, "fields": e["fields"],
-               "key": keys[e["id"]], "card_key": ""}
+               "key": keys[e["id"]], "card_key": "", "part_of": None, "parts_open": []}
+        par, why = part_of.get(e["id"], (None, None))
+        if why:
+            flags.add(f"⚠ {e['id']}: its Part of {why}", e["id"], "part of", "part-of-item")
+        elif par:
+            rec["part_of"] = par
+            if _num(par) not in live_nums:
+                if _num(par) in archived:
+                    flags.add(f"ℹ {e['id']}: Part of {par}, which is archived — read as an open part of a "
+                              "finished parent", e["id"], "part of", "part-of-archived")
+                else:
+                    flags.add(f"⚠ {e['id']}: Part of {par}, which names no entry in the ledger or the archive",
+                              e["id"], "part of", "part-of-unknown")
+        if parts_open.get(e["id"]):
+            rec["parts_open"] = list(parts_open[e["id"]])
+            rec["pickable"] = False
         if e["blocked_raw"] is not None:
             ids, who, bad = parse_blocked(e["blocked_raw"])
             for item in bad:
@@ -291,18 +422,31 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
                               e["id"], "blocked by", "blocked-unknown")
                     open_ids.append(b)  # unknown: keep the block — the safe direction
             if not open_ids and not who and not bad:
-                flags.add(f"ℹ {e['id']}: every blocker is archived ({', '.join(ids)}) — pickable; "
+                now = "pickable; " if rec["pickable"] else "it still waits on its open parts; "
+                flags.add(f"ℹ {e['id']}: every blocker is archived ({', '.join(ids)}) — {now}"
                           "the Blocked by field can go", e["id"], "blocked by", "blockers-archived")
             else:
                 rec["blocked_by"] = open_ids + [f"decision ({w})" for w in who] + [repr(b) for b in bad]
                 rec["pickable"] = False
+            below_me = _descendants(e["id"], parts_open)
+            legacy = [b for b in ids if "#" not in b and any(_num(b) == _num(d) for d in below_me)]
+            if legacy:
+                flags.add(f"ℹ {e['id']}: its Blocked by names {', '.join(legacy)}, Part of it — a parent's "
+                          "parts keep it unpicked by their Part of line; drop them from Blocked by",
+                          e["id"], "blocked by", "legacy-part")
         written = first_word(e["fields"].get("pickable"))
         if written in ("yes", "no") and (written == "yes") != rec["pickable"]:
             flags.add(f"ℹ {e['id']}: its Pickable line says {written}, the derived pickable is "
                       f"{'yes' if rec['pickable'] else 'no'} — the line is only a field (cadence.md §2.12)",
                       e["id"], "pickable", "pickable-disagrees")
         (pick if rec["pickable"] else blocked).append(rec)
-    order = _card_order(live, keys, lined)
+    for group in _on_cycles(_waits_on(live, parent_of)):
+        for t in group:
+            on = f"on a waits-on cycle with {', '.join(x for x in group if x != t)}" if len(group) > 1 \
+                else "waits on itself"
+            flags.add(f"ℹ {t}: {on} — none of it can be picked; break it (a part is never blocked "
+                      "by its parent or an ancestor)", t, "blocked by", "cycle")
+    order = _card_order(live, keys, lined, parent_of)
     for r in pick + blocked:
         r["card_key"] = order[r["id"]][1]
     for lst in (pick, blocked):
@@ -352,7 +496,10 @@ QUEUE_SUBJECT_RE = re.compile(r"^queue: (?:rank|join|prune) TD-\d+(?:, TD-\d+)* 
 
 
 def rank_path(ledger_path: str) -> str:
-    """The rank file of the ledger at ``ledger_path``: ``<ledger stem>_rank.yml`` beside it."""
+    """The rank file of the ledger at ``ledger_path``: ``<ledger stem>_rank.yml`` beside a v1 file,
+    ``rank.yml`` inside a v2 directory (a path not ending in ``.md``)."""
+    if not ledger_path.endswith(".md"):
+        return _sub(ledger_path, "rank.yml")
     head, sep, name = ledger_path.rpartition("/")
     stem = name[:-3] if name.endswith(".md") else name
     return f"{head}{sep}{stem}_rank.yml"
@@ -479,7 +626,7 @@ def set_rank(text: str, lines: Mapping[str, str | None]) -> str:
 
 def components(ents: list[dict]) -> list[dict]:
     """The connected components of ``ents`` (``entries()`` of a ledger or an archive) over their
-    Blocked by ids, both directions: ``{ids, others, cross_repo}`` — the members in file order, the
+    Blocked by ids and their Part of parent (v2.1), both directions: ``{ids, others, cross_repo}`` — the members in file order, the
     local ids they name that are not among ``ents`` (an archived or unknown entry: not a member,
     joins nothing), and the ``<repo>#TD-NNN`` ids they name, for a caller to join across repos.
     Components are in the file order of their first member."""
@@ -497,6 +644,9 @@ def components(ents: list[dict]) -> list[dict]:
     named: dict[str, tuple[list[str], list[str]]] = {}
     for e in ents:
         ids = parse_blocked(e["blocked_raw"])[0] if e.get("blocked_raw") else []
+        par = parse_part_of(e.get("part_of_raw"))[0]
+        if par and all(_num(par) != _num(b) for b in ids if "#" not in b):
+            ids = [*ids, par]  # another repo's entry is never a parent: parse_part_of() reads none
         others, xrepo = [], []
         for b in ids:
             if "#" in b:
@@ -518,10 +668,12 @@ def components(ents: list[dict]) -> list[dict]:
     return list(groups.values())
 
 
-def _card_order(live: list[dict], keys: dict[str, str], lined: dict[int, str]) -> dict[str, tuple[tuple, str]]:
+def _card_order(live: list[dict], keys: dict[str, str], lined: dict[int, str],
+                parent_of: Mapping[str, str] | None = None) -> dict[str, tuple[tuple, str]]:
     """Each live entry's (sort value, card key). The card key is the best lined key among the card's
     members when any has a line, else the best implicit key; the sort value is that key, the card's
-    lowest id, then the entry's place in the card — after every member it is blocked by, else by key."""
+    lowest id, then the entry's place in the card — after every member it is blocked by and every
+    part of it (``parent_of``: {part: parent}), else by key."""
     out: dict[str, tuple[tuple, str]] = {}
     raw = {e["id"]: e["blocked_raw"] for e in live}
     for comp in components(live):
@@ -532,6 +684,9 @@ def _card_order(live: list[dict], keys: dict[str, str], lined: dict[int, str]) -
         num = {_num(t): t for t in ids}
         deps = {t: {num[_num(b)] for b in parse_blocked(raw[t] or "")[0]
                     if "#" not in b and _num(b) in num and num[_num(b)] != t} for t in ids}
+        for c, par in (parent_of or {}).items():
+            if par in deps and c in deps and c != par:
+                deps[par].add(c)
         left, pos = set(ids), 0
         while left:
             ready = [t for t in left if not deps[t] & left] or list(left)  # a cycle: key order breaks it
@@ -1182,10 +1337,187 @@ def is_stamp(line: str, names: tuple[str, ...] | None = None) -> bool:
 
 
 # ---------------------------------------------------------------------------------------------
+# The ledger as a directory (v2): one file per entry, read back as one text
+# ---------------------------------------------------------------------------------------------
+
+LEDGER_README = "README.md"  # a v2 ledger's opening prose and preamble lines
+LEDGER_ARCHIVE = "archive"  # a v2 ledger's archived entries, each file moved there
+ENTRY_FILE_RE = re.compile(r"^TD-(\d+)\.md$")  # an entry's file, named as its heading spells the id
+
+Ls = Callable[[str], "list[str] | None"]  # a directory's file names, or None when the path is not a directory
+Read = Callable[[str], "str | None"]  # a file's text, or None when there is none
+
+
+def _sub(path: str, name: str) -> str:
+    return f"{path.rstrip('/')}/{name}" if path else name
+
+
+def archive_path(ledger_path: str) -> str:
+    """A v1 ledger's archive: ``<ledger stem>_archive.md`` beside it (``docs/technical_debt_archive.md``)."""
+    return ledger_path[:-3] + "_archive.md" if ledger_path.endswith(".md") else ledger_path + "_archive.md"
+
+
+def _entry_names(names: list[str]) -> list[str]:
+    """The entry files among a directory's names, in id order (by number; then by name)."""
+    found = [(int(m.group(1)), n) for n in names for m in [ENTRY_FILE_RE.match(n)] if m]
+    return [n for _, n in sorted(found)]
+
+
+def _joined(head: str | None, parts: list[str]) -> str:
+    texts = [t.rstrip("\n") + "\n" for t in ([head] if head else []) + parts if t and t.strip()]
+    return "\n".join(texts)
+
+
+def _dir_text(path: str, names: list[str], read: Read, head: str | None = None) -> str:
+    return _joined(head, [t for t in (read(_sub(path, n)) for n in _entry_names(names)) if t is not None])
+
+
+def load(path: str, ls: Ls, read: Read) -> tuple[str, str]:
+    """(ledger text, archive text) of the ledger at ``path``, whichever major it is written in.
+
+    A v1 ledger is a file: its text, and its archive's beside it (``archive_path()``). A v2 ledger is
+    a directory: ``README.md`` and then every ``TD-NNN.md`` in id order, joined by blank lines, is
+    the text a v1 ledger would hold without its summary table; ``archive/`` gives the archive's the
+    same way. Every parser here reads that text unchanged. The module opens no file: ``ls`` and
+    ``read`` are the caller's (a file system, or one ``git ls-tree`` and ``git cat-file --batch`` at
+    a revision), so a read at a commit is the same call. A missing file reads as empty."""
+    names = ls(path)
+    if names is None:
+        return read(path) or "", read(archive_path(path)) or ""
+    arch = _sub(path, LEDGER_ARCHIVE)
+    return (_dir_text(path, names, read, head=read(_sub(path, LEDGER_README))),
+            _dir_text(arch, ls(arch) or [], read))
+
+
+def entry_path(path: str, tid: str, ls: Ls) -> str | None:
+    """The one file holding entry ``tid`` (``TD-7`` finds ``TD-007.md``) in the v2 ledger at
+    ``path``, open before archived; None when there is none, or when ``path`` is a v1 file, whose
+    entries all live in the text ``load()`` reads."""
+    names = ls(path)
+    if names is None:
+        return None
+    want = _num(tid)
+    for d, ns in ((path, names), (_sub(path, LEDGER_ARCHIVE), ls(_sub(path, LEDGER_ARCHIVE)) or [])):
+        for n in _entry_names(ns):
+            if int(ENTRY_FILE_RE.match(n).group(1)) == want:
+                return _sub(d, n)
+    return None
+
+
+def _sections(text: str) -> list[tuple[str | None, str]]:
+    """``text`` cut at each `## ` heading outside an HTML comment: (the TD id, or None for any other
+    heading and for the text before the first), and the section's text byte for byte."""
+    hidden = [m.span() for m in COMMENT_RE.finditer(text)]  # as entries() reads them
+    cuts = [m.start() for m in SECTION_RE.finditer(text)
+            if not any(a <= m.start() < b for a, b in hidden)]
+    out = []
+    for a, b in zip([0, *cuts], [*cuts, len(text)]):
+        part = text[a:b]
+        m = HEADING_RE.match(part) if a in cuts else None
+        if part:
+            out.append((m.group(1) if m else None, part))
+    return out
+
+
+def split(ledger: str, archive: str) -> dict[str, str]:
+    """The v2 directory of a v1 ledger and its archive: {relative path: text}. Each entry's text,
+    from its heading to the next `## ` heading, is its file (trailing blank lines trimmed to one
+    newline); the ledger's text before its first `## ` heading is ``README.md``, with
+    ``Ledgerboard: 2`` under its title, and the ``## Summary`` section's lines other than the table
+    and blanks follow it (a ``Fields:`` line there stays in the preamble); the archive's text before
+    its first entry is dropped. Refused for a ledger that is not v1, another `## ` section, an id
+    twice, a result that would not read back the same entries (by id), ``Fields:`` and version, or
+    one ``v2_problems()`` names (an HTML comment left open in an entry)."""
+    if format_major(ledger) != 1:
+        raise Refused(f"the ledger declares Ledgerboard: {format_major(ledger)} — only a v1 ledger splits")
+    files: dict[str, str] = {}
+    seen: set[int] = set()
+    readme, kept = "", []
+    for where, text in (("", ledger), (LEDGER_ARCHIVE, archive)):
+        for i, (tid, part) in enumerate(_sections(text)):
+            if tid is None:
+                if i == 0 and not part.startswith("## "):
+                    readme = readme if where else part
+                    continue
+                title, _, rest = part.partition("\n")
+                if not where and title.strip().lower() == "## summary":
+                    kept += [ln for ln in rest.splitlines() if ln.strip() and not ln.lstrip().startswith("|")]
+                    continue
+                raise Refused(f"{title!r} in the {'archive' if where else 'ledger'} is not an entry — "
+                              "move it into an entry or the README first; nothing was split")
+            if _num(tid) in seen:
+                raise Refused(f"{tid} appears twice — one file per entry cannot hold both; nothing was split")
+            seen.add(_num(tid))
+            files[_sub(where, f"{tid}.md")] = part.rstrip("\n") + "\n"
+    files[LEDGER_README] = _v2_readme(readme, kept)
+    new_ledger, new_archive = load("", _dict_ls(files), files.get)
+    for old, new, what in ((ledger, new_ledger, "ledger"), (archive, new_archive, "archive")):
+        if sorted(entries(old), key=lambda e: _num(e["id"])) != entries(new):
+            raise Refused(f"the split {what} would not read back the same entries — nothing was split")
+    if declared(ledger) != declared(new_ledger) or declarations(ledger) != declarations(new_ledger):
+        raise Refused("the split README would not declare the same Fields: — nothing was split")
+    if format_major(new_ledger) != 2:
+        raise Refused("the split README would not read as Ledgerboard: 2 — nothing was split")
+    problems = v2_problems("", _dict_ls(files), files.get)
+    if problems:
+        raise Refused(f"the split would not read as its files say ({'; '.join(problems)}) — nothing was split")
+    return files
+
+
+def _v2_readme(text: str, kept: list[str]) -> str:
+    """``README.md`` from a v1 ledger's opening prose: ``Ledgerboard: 2`` under its title (any
+    ``Ledgerboard: 1`` line dropped), then ``kept`` — the Summary section's lines that are not table."""
+    lines = [ln for ln in text.rstrip("\n").split("\n") if not VERSION_RE.match(ln)] if text.strip() else []
+    at = 1 if lines and lines[0].startswith("# ") else 0
+    lines[at:at] = (["", "Ledgerboard: 2"] if at else ["Ledgerboard: 2", ""])
+    out = "\n".join(lines).rstrip("\n") + "\n"
+    return out + ("\n" + "\n".join(kept) + "\n" if kept else "")
+
+
+def v2_problems(path: str, ls: Ls, read: Read) -> list[str]:
+    """Why the v2 ledger at ``path`` may not read as its files say, or []: each ``TD-NNN.md`` must
+    open with its one `## TD-NNN:` heading, the number its name's, with every HTML comment closed in
+    the file, and one file per number across the ledger and its archive. A hand edit can break each
+    of these, and ``load()`` would then join a file into its neighbour; a consumer calls this beside
+    ``version_problem()`` before it trusts a v2 read. [] for a v1 file."""
+    names = ls(path)
+    if names is None:
+        return []
+    out, seen = [], {}
+    arch = _sub(path, LEDGER_ARCHIVE)
+    for d, ns in ((path, names), (arch, ls(arch) or [])):
+        for n in _entry_names(ns):
+            rel, want = _sub(d, n), int(ENTRY_FILE_RE.match(n).group(1))
+            if want in seen:
+                out.append(f"{rel}: TD-{want} has a file already ({seen[want]}) — one file per entry")
+            seen.setdefault(want, rel)
+            text = read(rel) or ""
+            if text.count("<!--") != len(COMMENT_RE.findall(text)):
+                out.append(f"{rel}: an HTML comment is not closed in the file — it would hide the next entry")
+            heads = HEADING_RE.findall(COMMENT_RE.sub("", text))
+            first = HEADING_RE.match(text)
+            if not first or len(heads) != 1 or _num(first.group(1)) != want:
+                out.append(f"{rel}: must open with its one `## TD-{want}:` heading "
+                           f"(found {', '.join(h[0] for h in heads) or 'none'})")
+    return out
+
+
+def _dict_ls(files: Mapping[str, str]) -> Ls:
+    """``ls`` over a {relative path: text} mapping, as ``load()`` takes it ("" is the root)."""
+    def ls(path: str) -> list[str] | None:
+        pre = f"{path.rstrip('/')}/" if path else ""
+        names = [p[len(pre):] for p in files if p.startswith(pre) and "/" not in p[len(pre):]]
+        if not names and not any(p.startswith(pre) for p in files):
+            return None
+        return sorted(names)
+    return ls
+
+
+# ---------------------------------------------------------------------------------------------
 # The format version
 # ---------------------------------------------------------------------------------------------
 
-FORMAT_MAJOR = 1  # the newest major version of the formats this module reads
+FORMAT_MAJOR = 2  # the newest major version of the formats this module reads
 VERSION_RE = re.compile(r"^Ledgerboard:\s*(\d+)\s*$", re.MULTILINE)
 
 

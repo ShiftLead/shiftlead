@@ -1,0 +1,750 @@
+{
+ "blocked": [
+  "TD-032",
+  "TD-030",
+  "TD-043",
+  "TD-044",
+  "TD-045",
+  "TD-047",
+  "TD-046",
+  "TD-049",
+  "TD-048",
+  "TD-051"
+ ],
+ "check": [
+  {
+   "field": "part of",
+   "id": "TD-036",
+   "kind": "part-of-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-036: Part of TD-037, which is archived — read as an open part of a finished parent"
+  },
+  {
+   "field": "part of",
+   "id": "TD-038",
+   "kind": "part-of-unknown",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-038: Part of TD-099, which names no entry in the ledger or the archive"
+  },
+  {
+   "field": "part of",
+   "id": "TD-039",
+   "kind": "part-of-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-039: its Part of names far#TD-005, another repo's entry — a parent is in the same ledger"
+  },
+  {
+   "field": "part of",
+   "id": "TD-040",
+   "kind": "part-of-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-040: its Part of names a second parent (TD-042) — an entry is part of one"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-048",
+   "kind": "legacy-part",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-048: its Blocked by names TD-049, TD-050, Part of it — a parent's parts keep it unpicked by their Part of line; drop them from Blocked by"
+  },
+  {
+   "field": "part of",
+   "id": "TD-052",
+   "kind": "below-header",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-052: its Part of line is below the header block — read anyway; move it up (cadence.md §2.12)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-043",
+   "kind": "cycle",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-043: on a waits-on cycle with TD-044 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-044",
+   "kind": "cycle",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-044: on a waits-on cycle with TD-043 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-045",
+   "kind": "cycle",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-045: on a waits-on cycle with TD-046, TD-047 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-046",
+   "kind": "cycle",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-046: on a waits-on cycle with TD-045, TD-047 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-047",
+   "kind": "cycle",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-047: on a waits-on cycle with TD-045, TD-046 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-051",
+   "kind": "cycle",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-051: waits on itself — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "part of",
+   "id": "TD-036",
+   "kind": "part-of-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-036: Part of TD-037, which is archived — read as an open part of a finished parent"
+  },
+  {
+   "field": "part of",
+   "id": "TD-038",
+   "kind": "part-of-unknown",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-038: Part of TD-099, which names no entry in the ledger or the archive"
+  },
+  {
+   "field": "part of",
+   "id": "TD-039",
+   "kind": "part-of-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-039: its Part of names far#TD-005, another repo's entry — a parent is in the same ledger"
+  },
+  {
+   "field": "part of",
+   "id": "TD-040",
+   "kind": "part-of-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-040: its Part of names a second parent (TD-042) — an entry is part of one"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-048",
+   "kind": "legacy-part",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-048: its Blocked by names TD-049, TD-050, Part of it — a parent's parts keep it unpicked by their Part of line; drop them from Blocked by"
+  },
+  {
+   "field": "part of",
+   "id": "TD-052",
+   "kind": "below-header",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-052: its Part of line is below the header block — read anyway; move it up (cadence.md §2.12)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-043",
+   "kind": "cycle",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-043: on a waits-on cycle with TD-044 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-044",
+   "kind": "cycle",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-044: on a waits-on cycle with TD-043 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-045",
+   "kind": "cycle",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-045: on a waits-on cycle with TD-046, TD-047 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-046",
+   "kind": "cycle",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-046: on a waits-on cycle with TD-045, TD-047 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-047",
+   "kind": "cycle",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-047: on a waits-on cycle with TD-045, TD-046 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-051",
+   "kind": "cycle",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-051: waits on itself — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "1|0|000031",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-030 (its first build)",
+    "priority": "High",
+    "status": "Open"
+   },
+   "id": "TD-031",
+   "key": "1|0|000031",
+   "part_of": "TD-030",
+   "parts_open": [],
+   "pickable": true,
+   "priority": "High",
+   "title": "Its first part",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-031"
+   ],
+   "card_key": "1|0|000031",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-031",
+    "part of": "TD-030",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-032",
+   "key": "3|0|000032",
+   "part_of": "TD-030",
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Its second part, after the first",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "1|0|000031",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-030",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-052",
+   "key": "3|0|000052",
+   "part_of": "TD-030",
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "A part whose line is below the header",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "1|0|000031",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Medium",
+    "status": "Open",
+    "type": "feature"
+   },
+   "id": "TD-030",
+   "key": "2|1|000030",
+   "part_of": null,
+   "parts_open": [
+    "TD-031",
+    "TD-032",
+    "TD-052"
+   ],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A parent with open parts",
+   "type": "feature"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000034",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-034",
+   "key": "2|0|000034",
+   "part_of": null,
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "A parent whose parts are all archived",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000036",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-037",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-036",
+   "key": "2|0|000036",
+   "part_of": "TD-037",
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "A part of an archived parent",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000043",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-043",
+   "key": "2|0|000043",
+   "part_of": null,
+   "parts_open": [
+    "TD-044"
+   ],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A parent its part waits on",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-043"
+   ],
+   "card_key": "2|0|000043",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-043",
+    "part of": "TD-043",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-044",
+   "key": "2|0|000044",
+   "part_of": "TD-043",
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A part blocked by its parent",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000045",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-045",
+   "key": "2|0|000045",
+   "part_of": null,
+   "parts_open": [
+    "TD-046"
+   ],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A grandparent",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-045"
+   ],
+   "card_key": "2|0|000045",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-045",
+    "part of": "TD-046",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-047",
+   "key": "2|0|000047",
+   "part_of": "TD-046",
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A grandchild blocked by its grandparent",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000045",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-045",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-046",
+   "key": "2|0|000046",
+   "part_of": "TD-045",
+   "parts_open": [
+    "TD-047"
+   ],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Its part, a parent",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000048",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-049",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-050",
+   "key": "2|0|000050",
+   "part_of": "TD-049",
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "A listed part of a part",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000048",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-048",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-049",
+   "key": "2|0|000049",
+   "part_of": "TD-048",
+   "parts_open": [
+    "TD-050"
+   ],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A listed part",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-049",
+    "TD-050"
+   ],
+   "card_key": "2|0|000048",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-049, TD-050",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-048",
+   "key": "2|0|000048",
+   "part_of": null,
+   "parts_open": [
+    "TD-049"
+   ],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A parent that still lists its parts as blockers",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000038",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-099",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-038",
+   "key": "3|0|000038",
+   "part_of": "TD-099",
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "A part of an unknown entry",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000039",
+   "cross_repo": [],
+   "fields": {
+    "part of": "far#TD-005",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-039",
+   "key": "3|0|000039",
+   "part_of": null,
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "A part of another repo's entry",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000040",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-041, TD-042",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-040",
+   "key": "3|0|000040",
+   "part_of": null,
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "A part of two parents",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000051",
+   "cross_repo": [],
+   "fields": {
+    "part of": "TD-51",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-051",
+   "key": "3|0|000051",
+   "part_of": "TD-51",
+   "parts_open": [
+    "TD-051"
+   ],
+   "pickable": false,
+   "priority": "Low",
+   "title": "A part of itself",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "part of",
+   "id": "TD-036",
+   "kind": "part-of-archived",
+   "level": "info",
+   "text": "ℹ TD-036: Part of TD-037, which is archived — read as an open part of a finished parent"
+  },
+  {
+   "field": "part of",
+   "id": "TD-038",
+   "kind": "part-of-unknown",
+   "level": "error",
+   "text": "⚠ TD-038: Part of TD-099, which names no entry in the ledger or the archive"
+  },
+  {
+   "field": "part of",
+   "id": "TD-039",
+   "kind": "part-of-item",
+   "level": "error",
+   "text": "⚠ TD-039: its Part of names far#TD-005, another repo's entry — a parent is in the same ledger"
+  },
+  {
+   "field": "part of",
+   "id": "TD-040",
+   "kind": "part-of-item",
+   "level": "error",
+   "text": "⚠ TD-040: its Part of names a second parent (TD-042) — an entry is part of one"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-048",
+   "kind": "legacy-part",
+   "level": "info",
+   "text": "ℹ TD-048: its Blocked by names TD-049, TD-050, Part of it — a parent's parts keep it unpicked by their Part of line; drop them from Blocked by"
+  },
+  {
+   "field": "part of",
+   "id": "TD-052",
+   "kind": "below-header",
+   "level": "info",
+   "text": "ℹ TD-052: its Part of line is below the header block — read anyway; move it up (cadence.md §2.12)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-043",
+   "kind": "cycle",
+   "level": "info",
+   "text": "ℹ TD-043: on a waits-on cycle with TD-044 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-044",
+   "kind": "cycle",
+   "level": "info",
+   "text": "ℹ TD-044: on a waits-on cycle with TD-043 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-045",
+   "kind": "cycle",
+   "level": "info",
+   "text": "ℹ TD-045: on a waits-on cycle with TD-046, TD-047 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-046",
+   "kind": "cycle",
+   "level": "info",
+   "text": "ℹ TD-046: on a waits-on cycle with TD-045, TD-047 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-047",
+   "kind": "cycle",
+   "level": "info",
+   "text": "ℹ TD-047: on a waits-on cycle with TD-045, TD-046 — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-051",
+   "kind": "cycle",
+   "level": "info",
+   "text": "ℹ TD-051: waits on itself — none of it can be picked; break it (a part is never blocked by its parent or an ancestor)"
+  }
+ ],
+ "pickable": [
+  "TD-031",
+  "TD-052",
+  "TD-034",
+  "TD-036",
+  "TD-050",
+  "TD-038",
+  "TD-039",
+  "TD-040"
+ ],
+ "rows": [
+  {
+   "id": "TD-030",
+   "priority": "Medium",
+   "title": "A parent with open parts"
+  },
+  {
+   "id": "TD-031",
+   "priority": "High",
+   "title": "Its first part"
+  },
+  {
+   "id": "TD-032",
+   "priority": "Low",
+   "title": "Its second part, after the first"
+  },
+  {
+   "id": "TD-034",
+   "priority": "Medium",
+   "title": "A parent whose parts are all archived"
+  },
+  {
+   "id": "TD-036",
+   "priority": "Medium",
+   "title": "A part of an archived parent"
+  },
+  {
+   "id": "TD-038",
+   "priority": "Low",
+   "title": "A part of an unknown entry"
+  },
+  {
+   "id": "TD-039",
+   "priority": "Low",
+   "title": "A part of another repo's entry"
+  },
+  {
+   "id": "TD-040",
+   "priority": "Low",
+   "title": "A part of two parents"
+  },
+  {
+   "id": "TD-043",
+   "priority": "Medium",
+   "title": "A parent its part waits on"
+  },
+  {
+   "id": "TD-044",
+   "priority": "Medium",
+   "title": "A part blocked by its parent"
+  },
+  {
+   "id": "TD-045",
+   "priority": "Medium",
+   "title": "A grandparent"
+  },
+  {
+   "id": "TD-046",
+   "priority": "Medium",
+   "title": "Its part, a parent"
+  },
+  {
+   "id": "TD-047",
+   "priority": "Medium",
+   "title": "A grandchild blocked by its grandparent"
+  },
+  {
+   "id": "TD-048",
+   "priority": "Medium",
+   "title": "A parent that still lists its parts as blockers"
+  },
+  {
+   "id": "TD-049",
+   "priority": "Medium",
+   "title": "A listed part"
+  },
+  {
+   "id": "TD-050",
+   "priority": "Medium",
+   "title": "A listed part of a part"
+  },
+  {
+   "id": "TD-051",
+   "priority": "Low",
+   "title": "A part of itself"
+  },
+  {
+   "id": "TD-052",
+   "priority": "Low",
+   "title": "A part whose line is below the header"
+  }
+ ]
+}

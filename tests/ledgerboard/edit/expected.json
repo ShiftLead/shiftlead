@@ -54,6 +54,90 @@
     ]
    }
   ],
+  "ledger/parts.md": [
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-030",
+     "TD-031",
+     "TD-032",
+     "TD-052"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-034"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-036"
+    ],
+    "others": [
+     "TD-037"
+    ]
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-038"
+    ],
+    "others": [
+     "TD-099"
+    ]
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-039"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-040"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-043",
+     "TD-044"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-045",
+     "TD-046",
+     "TD-047"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-048",
+     "TD-049",
+     "TD-050"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-051"
+    ],
+    "others": []
+   }
+  ],
   "ledger/ranked.archive.md": [
    {
     "cross_repo": [],
@@ -419,6 +503,7 @@
  ],
  "rank_paths": {
   "a/b/ledger.md": "a/b/ledger_rank.yml",
+  "docs/ledger": "docs/ledger/rank.yml",
   "docs/technical_debt.md": "docs/technical_debt_rank.yml",
   "technical_debt.md": "technical_debt_rank.yml"
  },
@@ -523,7 +608,7 @@
   },
   {
    "major": 2,
-   "problem": "this file declares Ledgerboard: 2, newer than this ledgerboard.py reads (1) — vendor a newer release; nothing was read"
+   "problem": null
   },
   {
    "major": 1,
@@ -531,11 +616,15 @@
   },
   {
    "major": 2,
-   "problem": "this file declares Ledgerboard: 2, newer than this ledgerboard.py reads (1) — vendor a newer release; nothing was read"
+   "problem": null
   },
   {
    "major": 2,
-   "problem": "this file declares Ledgerboard: 2, newer than this ledgerboard.py reads (1) — vendor a newer release; nothing was read"
+   "problem": null
+  },
+  {
+   "major": 3,
+   "problem": "this file declares Ledgerboard: 3, newer than this ledgerboard.py reads (2) — vendor a newer release; nothing was read"
   }
  ]
 }
