@@ -274,3 +274,77 @@ def test_a_node_that_stops_answering_between_the_plan_and_the_press_creates_noth
     r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": "w"})
     assert (r.status_code, r.json()["detail"]) == (409, "node1 did not answer: the link dropped")
     assert created == []
+
+
+def test_a_machine_nodes_session_carries_the_nodes_path_as_its_repo(tmp_path, monkeypatch):
+    """TD-1126 (1): the create's `repo` is the node's checkout, as its `dir` is, never the home's path."""
+    world(tmp_path)
+    created = []
+    c = client(monkeypatch, tmp_path, fake(calls=[], created=created))
+    r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": "w"})
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert (kw["dir"], kw["repo"]) == (NODE_DIR, NODE_DIR)
+
+
+def test_a_feature_on_a_machine_node_opens_the_nodes_flows_design_role(tmp_path, monkeypatch):
+    """TD-1126 (2): a feature with no `entries:` word takes the role of the current flow's
+    `design-first` stage, its flow read against the node's checkout through `host_files`."""
+    world(tmp_path, team_extra={"flows": ["td"], "members": [{"role": "designer"}, {"role": "grinder"}]})
+    got = plan(client(monkeypatch, tmp_path, fake(calls=[])), type="feature")
+    assert (got["why"], got["role"]) == ("", "designer")
+
+
+def test_a_container_nodes_ledger_is_the_shared_checkouts(tmp_path, monkeypatch):
+    """TD-1126 (3): a container node's checkout is the home's own directory, so its `.shiftlead.yml`
+    names the ledger the plan and the press carry."""
+    repo = world(tmp_path, container=True)
+    (repo / ".shiftlead.yml").write_text("ledger: docs/shared-ledger.md\n")
+    created = []
+    c = client(monkeypatch, tmp_path, fake(calls=[], created=created))
+    assert plan(c)["ledger"] == "docs/shared-ledger.md"
+    r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": "w"})
+    assert r.status_code == 200, r.text
+    assert created[0]["ledger"] == "docs/shared-ledger.md"
+
+
+def test_a_machine_node_whose_config_is_invalid_disables_the_session_way(tmp_path, monkeypatch):
+    """TD-1126 (4): the node's `.shiftlead.yml` that does not load is the plan's `why`, in the loader's
+    words — the plan still answers, so **Hand to the techlead** reads it."""
+    world(tmp_path)
+    monkeypatch.setitem(NODE_FILES, ".shiftlead.yml", "ledger: [unclosed\n")
+    c = client(monkeypatch, tmp_path, fake(calls=[]))
+    r = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"})
+    assert r.status_code == 200, r.text
+    got = r.json()
+    assert got["why"] and got["why"] == got["name_why"] and got["default"] == ""
+    assert c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt"}).status_code == 409
+
+
+def test_a_node_with_every_entry_name_taken_is_refused_naming_its_host(tmp_path, monkeypatch):
+    """TD-1126 (5): no `entry-<n>` free on the node up to `ENTRY_TRIES`: 409 naming the repo and host."""
+    from shiftlead.ui.repo import ENTRY_TRIES
+
+    world(tmp_path)
+    taken = tuple(f"entry-{n}" for n in range(1, ENTRY_TRIES + 1))
+    c = client(monkeypatch, tmp_path, fake(calls=[], worktrees=taken))
+    r = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"})
+    assert (r.status_code, r.json()["detail"]) == (
+        409,
+        f"no entry-<n> up to {ENTRY_TRIES} is free in samscrape on node1",
+    )
+
+
+def test_no_checkout_on_the_host_names_the_org_files_projects_line(tmp_path, monkeypatch):
+    """TD-1126 (6): a repo under a project heading is told the line to add there; one under none is
+    told to register the checkout."""
+    from shiftlead import org as orgmod
+    from shiftlead import teams
+
+    world(tmp_path, node_path=False)
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    org = orgmod.load()
+    got = teams.no_checkout(org, "samscrape", "node1", "Open a session")
+    assert "add `node1: <path>` under `projects.sam.repos.samscrape` in org.yml" in got
+    assert "register the checkout" not in teams.no_checkout(org, "samscrape", "node1", "x")
+    assert "register the checkout on node1 (design §5 *Repos*)" in teams.no_checkout(org, "other", "node1", "x")
