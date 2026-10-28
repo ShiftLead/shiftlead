@@ -1123,7 +1123,7 @@
 {%- endif %}
 <div class="row gap wrap mfoot">
   {%- if e.claimed %}
-  <span class="st">held in {{ e.name }}'s ledger{% if e.hold_why %} ({{ e.hold_why }}){% endif %} — no lane takes it until you release it</span>
+  <span class="st"{% if e.hold_by %} title="held by {{ e.hold_by }}"{% endif %}>held in {{ e.name }}'s ledger{% if e.hold_why %} ({{ e.hold_why }}){% endif %} — no lane takes it until you release it</span>
   <span class="grow"></span>
   {%- else %}
   <span class="st">in {{ e.name }}'s ledger — waits on you, with no date; an answer is written on {{ e.name }}'s board as a decided line, its session's work order</span>

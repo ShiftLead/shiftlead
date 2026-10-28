@@ -481,3 +481,13 @@ def test_the_repo_page_numbers_a_card_by_its_place_in_the_repo_and_sends_the_sco
     body = js[js.index("async function moveCard(") :]
     body = body[: body.index("\n    }\n")]
     assert "AO.rankMoveScoped(before, own, card.dataset.card, how)" in body and "...(scope ? { scope } : {})" in body
+
+
+def test_the_repo_pages_held_row_names_who_pressed_in_its_title(tmp_path, monkeypatch):
+    """TD-1127 (§4.8 *The record names who pressed*): the Repo page draws an entry the person holds as the
+    ledger's held row, *held in <repo>'s ledger*, and its `title` carries the reading's `held.words`."""
+    rs = repos(tmp_path)
+    held = {"at": NOW.isoformat(), "by": "s-1", "words": "the person's session paul-1"}
+    next(e for r in rs.values() for e in r["ledger"]["entries"] if e["id"] == "TD-30")["held"] = held
+    html = client(monkeypatch, tmp_path, fake(rs, queue())).get("/repo/samscrape").text
+    assert """<span class="st" title="held by the person&#39;s session paul-1">held in samscrape's ledger""" in html
