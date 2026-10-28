@@ -1968,7 +1968,7 @@ That is the design working as written: a Team pick makes *a person's own session
 **Added:** 2026-10-27 (the designer, from TD-1149's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — build
+**Status:** Open — build; slice 1 (#2568): the setting, `MemberDef.names(n)`, the merge in `with_settings`, `plan` and the followable check by sizes, `ao org check`'s unknown key, `ao team list` and the settings line. Left: (2) `next_free`, `start_member`/`resize`, `ao team size`, `renames` by size; (3) `run_only` and the `keep` act
 **Part of:** TD-1149
 **Location:** `src/shiftlead/org.py` (`MemberDef.names` 154); `src/shiftlead/teams.py` (`plan` 1028); `src/sessionorc/models.py` (`run_only` on the record, `HOME_OWNED`), `src/sessionorc/agent.py` (the `keep` act) and `src/sessionorc/settings.py` (`TEAM_KEYS` 359 and the teams validation ~493 — **held**: `src/sessionorc/**`, read by the techlead); `src/shiftlead/flowdefs.py` (`unfollowable` 338, the followable check, called from `teams.py` 415 and 646); `src/shiftlead/cli.py` (`ao team on-work` 2205 as the pattern; `ao team list`; `ao org check`); design §4.9 *A team's size*, §4.9c *Every listed flow must be followable*, §5 `teams.<team>.size`, §4.7 `ao team size`
 

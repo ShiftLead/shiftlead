@@ -418,6 +418,20 @@ def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
     return out
 
 
+def size_words(size: Mapping[str, Any] | None, team: orgmod.TeamDef | None) -> list[str]:
+    """Each line `teams.<team>.size` sets to other than its count, as `ao team list`, the settings line
+    and the Members dialog say it — *grinder-ao 2 (file says 1)* (§4.9 *A team's size*). With no
+    definition to read, the number alone; a key no line names is `ao org check`'s to say, not here."""
+    counts = {m.name: m.count for m in team.members} if team is not None else {}
+    out: list[str] = []
+    for line, n in (size or {}).items():
+        if team is not None and line not in counts:
+            continue
+        if counts.get(line) != n:
+            out.append(f"{line} {n} (file says {counts[line]})" if line in counts else f"{line} {n}")
+    return out
+
+
 def role_holders(t: orgmod.TeamDef) -> list[dict[str, Any]]:
     """The roles a definition names, in its order — the manager, the techlead seat, the seats with a
     trigger, then the members — each once, with the session names that hold it and whether it is a
@@ -532,6 +546,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
                 "seats": [{"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after} for s in t.seats],
                 "members": sum(len(m.names()) for m in t.members),
+                # each line its size sets to other than its count (§4.9 *A team's size*, TD-1164)
+                "sizes": size_words(t.size, t),
                 # the definition's roles in its order, each with the names that hold it — the team's
                 # *who for what* lines (design §4.5a ***i*** mark, TD-171)
                 "roles": role_holders(t),
@@ -1790,7 +1806,8 @@ def members_view(
                 "lane": list(m.lane),
                 "count": m.count,
                 "sessions": [held(n) for n in m.names()],
-                "twice": m.names()[-1] in twice,  # its Remove leaves the session to the other entry
+                # its Remove leaves the session to the other entry; a line sized 0 names none (TD-1164)
+                "twice": any(n in twice for n in m.names()[-1:]),
             }
         )
     out: dict[str, Any] = {
@@ -1836,7 +1853,7 @@ def add_member(
     live team, the one new member created under the manager as `ao team start` creates one — the
     plan's own launch, the name check first — so its card appears without a restart. On a stopped
     team, the definition only: the next Start brings the new shape."""
-    before = _names(orgmod.load(path), name)
+    before = _names(orgmod.with_home_settings(orgmod.load(path)), name)  # sized as `new` is (TD-1164)
     did = orgmod.edit_members(path, name, add={"role": role, "name": member, "lane": lane or []})
     _commit(call, f"org: {name} {did}")
     org = orgmod.with_home_settings(orgmod.load(path))  # under the picked flow (§4.9c)
@@ -1892,11 +1909,11 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, h
         need = teams.flow_needs(org, team, m.role, team.host or host or here, here, files_via(call)) if left < 1 else ""
         if need:
             raise teams.TeamError(f"{need} needs a {m.role}: drop {need} from flows: first")
-    gone = team.members[index].names()[-1]
+    gone = next(iter(team.members[index].names()[-1:]), "")  # a line sized 0 holds no session (TD-1164)
     did = orgmod.edit_members(path, name, remove=index, role=role)
     _commit(call, f"org: {name} {did}")
     out: dict[str, Any] = {"team": name, "did": did, "wound_down": None, "text": f"org.yml: {did}"}
-    if gone and gone in teams.find(orgmod.load(path), name).session_names():
+    if gone and gone in teams.find(orgmod.with_home_settings(orgmod.load(path)), name).session_names():
         # a name the definition held twice: another entry still names the session, so it runs on (TD-268)
         out["text"] += f" — another entry still names {gone}, so it runs on"
         return out

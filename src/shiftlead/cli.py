@@ -1225,6 +1225,8 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                         print(f"{'':<{w}}  {line}")
                 if unread:  # a node's checkout this host cannot read: not judged here
                     print(f"{'':<{w}}  flows not read from here: {unread}")
+            if r.get("sizes"):  # *size: grinder-ao 2 (file says 1)* (§4.9 *A team's size*)
+                print(f"{'':<{w}}  size: {', '.join(r['sizes'])}")
             if r.get("differences"):  # …a seat the run lacks, under a flow or none (§4.9c, TD-399), a rename (TD-703)
                 word = "definition" if teamrun.definition_changed(r["differences"], r.get("flow")) else "flow"
                 print(f"{'':<{w}}  {word} changed — Apply (ao team flow {r['name']} --apply):")
@@ -2156,7 +2158,7 @@ def _defined_team(args: argparse.Namespace, org: orgmod.Org | None = None) -> st
 ON_WORK_WORDS = {"ask": "ask me", "start": "start the team", "off": "do nothing"}
 
 
-def _team_setting_line(name: str, t: dict[str, Any]) -> str:
+def _team_setting_line(name: str, t: dict[str, Any], team: orgmod.TeamDef | None = None) -> str:
     until = stop_note({"run_until": t.get("until")}).replace("stops", "members stop") if t.get("until") else ""
     if t.get("passed"):
         until += " (passed)"
@@ -2170,6 +2172,8 @@ def _team_setting_line(name: str, t: dict[str, Any]) -> str:
         parts.append(f"balance {_balance_words(t['balance'])}")
     if t.get("on_work"):  # §6 rule 8: said only where the file holds the key; absent, the team starts (TD-457)
         parts.append(f"when work appears: {ON_WORK_WORDS.get(t['on_work'], t['on_work'])}")
+    if words := teamrun.size_words(t.get("size"), team):  # §4.9 *A team's size*: a line its size differs on
+        parts.append("size " + ", ".join(words))
     return f"{name}: " + " · ".join(parts)
 
 
@@ -2597,8 +2601,11 @@ def cmd_settings(args: argparse.Namespace) -> int:
         if not got.get("usage_gate"):
             print("  none — the gate pauses nothing")
         print("teams:")
+        defined: dict[str, orgmod.TeamDef] = {}
+        with contextlib.suppress(ValueError, OSError, AgentError, AgentUnavailable):  # *file says* needs the org
+            defined = _org_notes()[0].teams
         for name, t in (got.get("teams") or {}).items():
-            print("  " + _team_setting_line(name, t))
+            print("  " + _team_setting_line(name, t, defined.get(name)))
         if not got.get("teams"):
             print("  none")
         print("repos:")

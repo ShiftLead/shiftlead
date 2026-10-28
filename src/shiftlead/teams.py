@@ -398,7 +398,7 @@ def flow_rows(
     except (TeamError, ValueError, OSError) as e:
         why = str(e).strip(chr(34))
         return [{"name": n, "current": n == now, "strip": "", "cannot": "", "unread": why} for n in team.flows]
-    staffed = {m.role for m in team.members if m.role}
+    staffed = team.staffed()  # by the sizes: a line sized 0 staffs nothing (§4.9 *A team's size*)
     out: list[dict[str, Any]] = []
     for name in team.flows:
         row: dict[str, Any] = {"name": name, "current": name == now, "strip": "", "cannot": ""}
@@ -630,7 +630,7 @@ def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, fi
             continue  # an unknown role is `org._entries_resolve`'s line, said where the file is read
         if kind not in ("worker", "seat"):
             raise TeamError(f"{where}: entries.{t} takes a worker or a seat, and {rname!r} is a {kind} (design §4.9c)")
-    staffed = {m.role for m in team.members if m.role}
+    staffed = team.staffed()  # by the sizes: a line sized 0 staffs nothing (§4.9 *A team's size*)
     for name in team.flows:
         try:
             flow = flowdefs.load(name, cfg, org.roles, read=read)

@@ -337,6 +337,12 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
             # Members… edits the org file only; a repo's team is changed by PR (TD-229)
             hint = " (Members… → Remove keeps the session)" if org.path and team.source == org.path else ""
             lack(f"team {name} names {twice} twice — take one of its lines out of {src}{hint}")
+        for key in team.unsized():  # §4.9 *A team's size*: ignored, and said
+            lines = ", ".join(m.name for m in team.members) or "none"
+            warnings.append(
+                f"teams.{name}.size.{key} in settings.yml: no member line of {name} is called {key} "
+                f"(its lines: {lines}) — ignored"
+            )
         if name in org.unlanded:
             continue  # said above, in the landing's own words
         try:
