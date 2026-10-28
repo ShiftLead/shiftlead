@@ -1975,7 +1975,6 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed 2026-10-27 — [ADR 2026-10-27](decisions/2026-10-27-part-of.md) (agreed with Paul, Fable round 5 and Sonnet round 6 READY) written into design §4.4 *The Queue* (*A card*, *The top entry*, *Rows*, *A row's state*, the within-card order, *Completed cards*), §4.5 screens 11–12, §4.5a *Queue page: card*, §4.9c *A design entry archives with its last build* and the glossary (*part*). The builds are written the old way, listed below, since shiftlead's ledger cannot carry `Part of:` until it vendors ledgerboard v2.1 (TD-1130); TD-1133's backfill converts them with the rest. All wait on dev-cadence#TD-165 (the ledgerboard release and cadence §2.4/§2.12, filed from the ADR).
-**Blocked by:** TD-1130, TD-1131, TD-1132, TD-1133
 **Location:** `src/sessionorc/ledger.py` (pickable, `kind_of`, `archived`), `src/sessionorc/queue.py` (`_card`: the rows breadth first by `adj`, either direction; archived rows one hop under the better-keyed member); `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); `src/shiftlead/ui/repo.py` (`design_builds`); the briefs and flows ADR §4 step 5 lists; design §4.4 *The Queue: cards, and the rank that orders them* (*Rows*, *A row's state*), §4.5 screen 12 *A card*, §4.5a *Queue page: card*
 
 **Why:** Paul, 2026-10-27, on TD-748's card: "it seems some finished items are laid out like they depend on unfinished items. Is that true?" They do not, but the page says they do. §4.4 *Rows* builds the tree "by `Blocked by:` edges taken in either direction", so nesting says only *joined*, and its direction flips from level to level on the same card:
@@ -2003,6 +2002,7 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Kind:** build
 **Status:** Open — build. The promote holds (read 2026-10-27, grinder-ao-2): live 557f9c0 carries TD-1130 and TD-1132, and `ao doctor` reads the one container node, contractmatch, at the home's build. Step 1, `docs/briefs/`: #2532.
 **Blocked by:** TD-1130, TD-1131, TD-1132
+**Part of:** TD-1129
 **Location:** `docs/briefs/designer-ao-1.md` and every team brief under `docs/briefs/` (held: `docs/briefs/**`); `docs/technical_debt_archive.md` (each converted design's archived builds); `docs/technical_debt.md` (every open `design-first` entry whose `Blocked by:` names an open or archived build, found by reading each one's `Blocked by:` against its builds by hand — the ledger cannot tell a build from a blocker; 18 by the ADR's hand count of 2026-10-27, about 20 naming any local id. The check's *legacy edge* ℹ only flags a pair half converted); the fallbacks TD-1130 writes (`src/sessionorc/ledger.py`, `src/sessionorc/queue.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/inbox.py`)
 
 **Why:** TD-1129: until a design's builds carry `Part of:`, its card still reads it as blocked by them (design §4.4 *Rows*, *A design not yet backfilled*). An older reader reads a backfilled design as pickable, so the backfill waits for the promote.

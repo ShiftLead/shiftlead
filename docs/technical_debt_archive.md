@@ -21388,6 +21388,7 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Owner:** grinder
 **Kind:** build
 **Status:** Resolved
+**Part of:** TD-1129
 **Location:** `scripts/vendor_ledgerboard.sh`, `src/sessionorc/ledgerboard.py` (vendored), `tests/test_ledgerboard_fixtures.py:40`; `src/sessionorc/ledger.py` (pickable at 521, `kind_of` 254, `archived` 825); `src/sessionorc/queue.py` (`touch`/`names_open` ~300–316, `builds_open` 400, `_card` 496–560 with the within-card pick loop 545–550, `_start` 571, `_status` 592, `_wait` 625, `_completed` 753–790); `src/sessionorc/agent_inbox.py` (Back to design's `blocked_open`); `src/shiftlead/ui/inbox.py` (`blocking` ~2381, `blocked_open`/`builds_open` 2439–2440); `src/shiftlead/ui/repo.py` (`design_builds` 140)
 
 **Why:** TD-1129: a Queue card's tree joins `Blocked by:` edges in either direction, so its indent says only *joined*, and a design's `Blocked by:` does two jobs (its builds and its real blockers). [ADR 2026-10-27](decisions/2026-10-27-part-of.md) gives a part a `Part of:` line naming its parent; this build makes shiftlead read it.
@@ -21407,6 +21408,7 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Kind:** build
 **Status:** Resolved
 **Blocked by:** TD-1130
+**Part of:** TD-1129
 **Location:** `src/shiftlead/flows/td/build.md`, `src/shiftlead/flows/td/design.md`, `src/shiftlead/briefs/grinder.md`, `src/shiftlead/briefs/designer.md`, `src/shiftlead/briefs/entry.md`, `docs/technical_debt.md` (the preamble's Owner/Kind paragraph)
 
 **Why:** TD-1129: the texts the wheel carries tell a designer to list builds in a design's `Blocked by:`, and a grinder to take an entry when nothing its `Blocked by:` names is open. Once the reader knows `Part of:` they must say what a parent with open parts is.
@@ -21425,6 +21427,7 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Owner:** grinder
 **Kind:** build
 **Status:** Resolved
+**Part of:** TD-1129
 **Location:** `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); `src/shiftlead/ui/static/app.css`; `src/shiftlead/ui/help.py` (help text bound to §4.5a)
 
 **Why:** TD-1129's page half: the reading of TD-1130 tells a part from a blocker; the card must draw it.
