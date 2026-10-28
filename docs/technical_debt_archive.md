@@ -21335,3 +21335,23 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Done when** tests pin: each page extending `base.html`, rendered, links the icon the Fix's map in (3) names, written out in the test, and that file exists; `STATE_ICON_CLASSES` equals the set of `static/icons/state-*.svg` names; each state file's tile fill equals its `app.css` light token, read from the first `:root` block (`--ended` for the five) and its edge is `rgba(0,0,0,.18)`, each page file's fill is `--top` and its edge `--muted`; no SVG holds a `<text>`; a rendered Focus page's link names its state's file and `data-icons` holds all eleven; `/static/icons/<file>?v=<hash>` is served `image/svg+xml` with the immutable cache header. The page is looked at in headless Chromium (design §4.9b): a light and a dark tab strip's worth of icons, the shot named in the PR. `pdm run test` and `pdm run lint` pass.
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2520) — twenty tiles under `static/icons/` (the mockup's paths, ported), `cards.STATE_ICON_CLASSES` and the `state_icons()` global, `base.html`'s icon link from each page's `{% block icon %}`, Focus's `data-icons` and `AO.focusIcon` beside both `focusTitle` calls and the forgotten branch. Tests: `tests/test_ui_tab_icons.py`; the UI check and its shot `docs/mockups/reviews/2026-10-27-td1155-tab-icons.png` are on the PR.
+
+## TD-1169: `test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_level_is_left_alone` fails under a loaded precheck: its sleeps race the supervisor's grace
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, from #2521's precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_containers.py:948` (the test), `src/sessionorc/containers.py` (`SUPERVISE_GRACE`)
+
+**Why:** #2521's precheck on a30ab6e failed this one test (`assert not [f for f in fakes[before:] if f.execs("pip install")]`, line 971: an install had started inside the 0.5 s it expects to stay quiet within a 1.5 s grace) while 4470 passed; the same test passes three runs of three on the branch alone. #2521 touches nothing under containers. The test times the grace with wall-clock sleeps, so a loaded `-n` run can start the install before the assertion reads.
+
+**Fix:** drive the grace from a clock the test controls (or a wider grace than the quiet window it asserts), so the assertion does not depend on the scheduler.
+
+**Done when** the test reads the grace without wall-clock races and passes under `pdm run test -n 8` repeatedly.
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2524) — the cause was the first tick's supervision record (the fixture's 0.15 s grace) still standing when the build went stale under load, so the test read it as the grace record; the test now waits for that record to be gone too, runs a 30 s grace ended by hand, and asserts its `next` a grace away. Test only; three full `pdm run test` runs green.
+
+---
