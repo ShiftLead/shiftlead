@@ -31,7 +31,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import build, cadence, paths, reports
+from sessionorc import build, cadence, gitinfo, paths, reports
 
 PROMOTE_EVERY = 300.0  # seconds between full readings: the reports' cadence (§6)
 PROMOTE_WATCH = 15.0  # seconds between `check` reads while a run is in flight
@@ -90,7 +90,8 @@ def block(root: str | Path) -> dict[str, str] | None:
 def _git(root: str | Path, *args: str, timeout: float = GIT_TIMEOUT) -> tuple[str | None, str]:
     """`(stdout stripped, "")` or `(None, why)`."""
     try:
-        cp = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=timeout)
+        env = gitinfo.read_only_env() if args[:1] == ("status",) else None
+        cp = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, timeout=timeout, env=env)
     except (OSError, subprocess.TimeoutExpired) as e:
         return None, f"git {args[0]}: {type(e).__name__}"
     if cp.returncode != 0:

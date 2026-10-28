@@ -96,7 +96,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1168 | `AO.focusIcon`'s three call sites in `app.js` (#2520) are pinned by no test: delete any one and the Focus tab icon stops following the state with a green suite | Low | Open — build |
 | TD-1172 | The Queue's v2 archive cache key (`queue._archive_stat`) has no test for an in-place edit of an archive entry file | Low | Open — build |
 | TD-1174 | The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it | Low | Open |
-| TD-1181 | The tick's `git status` in every session's directory takes `index.lock`, so a session's own `git add` can fail beside it | Medium | Open — build |
 
 ---
 
@@ -2035,20 +2034,3 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1181: The tick's `git status` in every session's directory takes `index.lock`, so a session's own `git add` can fail beside it
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-28 (grinder-ao-2, from #2554's precheck)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/sessionorc/gitinfo.py` (`git_info` 196, its `git status --porcelain=v2`; `changed_files` 252); `src/sessionorc/agent_tick.py` (3896, `git_info` over every due session's `dir`); `tests/test_ui_focus_reaped.py`
-
-**Why:** `git status` refreshes the index and, when stat data changed, rewrites it under an optional `index.lock` (git's `GIT_OPTIONAL_LOCKS`, on by default). The tick runs `git_info` in every session's directory, so a session's own `git add` / `git commit` in its worktree can meet the lock and exit 128 (*Unable to create '…/index.lock': File exists*). Seen 2026-10-28 in #2554's precheck: `test_a_reaped_record_draws_no_git_card_and_a_kept_one_says_why` failed at `git -C …/worktrees/ah add f` (exit 128) on a ledger-only PR, and passed three times alone. Nothing in `src/` sets `GIT_OPTIONAL_LOCKS`; editors that poll `git status` run it lock-free for this reason.
-
-**Fix:** run `git_info`'s `git status` with `GIT_OPTIONAL_LOCKS=0` in its environment, and the same for any other read-only `git status` the host agent polls (`changed_files` where it reads the porcelain, `board.py` 547 and 753, `sync.py` 659) — read-only, so nothing is lost.
-
-**Done when** a test pins that `git_info` passes `GIT_OPTIONAL_LOCKS=0` (a `subprocess.run` spy on its `env`), and `tests/test_ui_focus_reaped.py` no longer races the tick.
-
----

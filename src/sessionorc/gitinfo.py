@@ -16,6 +16,15 @@ import yaml
 
 from sessionorc import cadence, paths
 
+# a `git status` the host agent polls skips git's optional index refresh, so it never takes `index.lock`
+# beside a session's own `git add` in the same checkout, as an editor's polling status does (TD-1181)
+READ_ONLY_ENV = {"GIT_OPTIONAL_LOCKS": "0"}
+
+
+def read_only_env() -> dict[str, str]:
+    """The environment of a read-only `git status` the host agent polls (TD-1181)."""
+    return {**os.environ, **READ_ONLY_ENV}
+
 
 @dataclass
 class GitInfo:
@@ -200,6 +209,7 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=read_only_env(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -454,7 +464,9 @@ def _git(directory: Path | str, *args: str, timeout: float) -> str | None:
     """One read-only git command, or None when it could not be run or failed. The host agent never
     fetches for any of this: it reads the refs it has (design §4.2)."""
     try:
-        cp = subprocess.run(["git", "-C", str(directory), *args], capture_output=True, text=True, timeout=timeout)
+        cp = subprocess.run(
+            ["git", "-C", str(directory), *args], capture_output=True, text=True, timeout=timeout, env=read_only_env()
+        )
     except (OSError, subprocess.TimeoutExpired):
         return None
     return cp.stdout if cp.returncode == 0 else None
@@ -586,7 +598,8 @@ def ignored_blockers(wt: Path, repo: Path, timeout: float = REAP_STEP) -> list[s
     None when git could not say. Every ignored path blocks except a symlink, a `.claude/settings.local.json`
     the hydrate script calls disposable, a nested worktree its `--check` judges, and a path under
     `DISPOSABLE_IGNORED`; a nested `.git` directory always blocks."""
-    cp = _run(["git", "-C", str(wt), "status", "--porcelain", "-z", "--ignored", "--untracked-files=all"], timeout)
+    argv = ["git", "-C", str(wt), "status", "--porcelain", "-z", "--ignored", "--untracked-files=all"]
+    cp = _run(argv, timeout, env=read_only_env())
     if cp is None or cp.returncode != 0:
         return None
     hydrate = hydrate_command(repo) is not None
@@ -618,7 +631,11 @@ def ignored_blockers(wt: Path, repo: Path, timeout: float = REAP_STEP) -> list[s
 def _dirty(wt: Path, timeout: float) -> int | None:
     """The tracked and untracked files `git_info` counts as `dirty`, read in one `git status` and none of
     `git_info`'s follow-up reads, so the test stays inside one step's allowance; None when git could not say."""
-    cp = _run(["git", "-C", str(wt), "status", "--porcelain=v2", "-z", "--untracked-files=normal"], timeout)
+    cp = _run(
+        ["git", "-C", str(wt), "status", "--porcelain=v2", "-z", "--untracked-files=normal"],
+        timeout,
+        env=read_only_env(),
+    )
     if cp is None or cp.returncode != 0:
         return None
     n, fields, i = 0, cp.stdout.split("\0"), 0
