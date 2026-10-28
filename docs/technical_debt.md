@@ -604,7 +604,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed 2026-10-13 (the designer) — design §4.9b *The director answers what is passed up to it, from the person's preferences*, with §4.5a (the *preferences proposed* row, the Settings page's **Director** card, **Remember this**, the level on *answered for you*), §4.7 `ao prefs`, §4.9 (the home's work tree tracks `preferences.md`), §5 (`director: {level, groom}`, `repos.<repo>.director.level`), §6 rule 3 (the director's `asks` and `groom`), the glossary's *preferences*. The six points: (1) `--pass-up` goes to the director where the org defines one, once per passer (`passes`), the director's pass to the person; (2) the layers — `src/shiftlead/briefs/preferences.md` → **`~/.shiftlead/preferences.md`** (the person's, private, tracked by the home's work tree) → a repo's `.shiftlead/preferences.md` → the person's `## <repo>` section; the floor (*Always ask me*, the Never list, *What always reaches the person*) no layer lowers; the package and person layers filled into the brief as `{preferences}`, the repo's read in the asker's repo, a preference cited where it is written; (3) `director.level` (`conservative` default, `extrapolate`, `liberal`), overridden per repo, on `answered.level` and the row; (4) prompts judged against the preferences too, at the level; (5) the groom pass (`director.groom`, `7d`; **Groom now**), seeded on its first run from the boards' `Decided:` lines and the person's dated quotes, **Remember this** on a reply to a director's pass, the interview (an interactive session of the person's), every change a proposal (`ao prefs propose`) the person **Accept**s; (6) **Open file** on the Director card's layers and on an *answered for you* row citing a preferences file. TD-661, TD-662 and TD-663 build it. The defaults the person may care about — the person's layer in the home's work tree, every change by Accept, Remember this off until ticked, a weekly groom — were a steer to the techlead, m-b94fe34f403f, answered *go with your default* the same day (m-91cf2eed11f6, from the ledger's Why and §4.9).
-**Blocked by:** TD-661, TD-662, TD-663
 **Location:** design §4.9b *The director seat answers permission prompts for the person* (TD-636), *Passing up keeps the thread and the asker* (`pass_up` is *only to the person*), *Its standing context: a primer*, *What it may answer*; §5 (`settings.yml`, `org.yml`); §2 goal 6 (*Jump out*); briefs' layering (`src/shiftlead/briefs/`, `docs/briefs/`)
 
 **Why:** TD-636's design (#1661) makes the director one per org, judging permission prompts by its brief (`director.md`). Paul, the same day, set its larger shape:
@@ -632,6 +631,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Kind:** build
 **Status:** Open
 **Blocked by:** TD-642
+**Part of:** TD-657
 **Location:** design §4.9b *Passing up keeps the thread and the asker*, *The director answers what is passed up to it*, §6 rule 3 (`asks` on the director seat), §4.5a *Inbox row: passed up*; `src/sessionorc/agent_mail.py` (`rpc_pass_up` ~L981, the `passed_up` refusal ~L1009 and ~L161), `src/sessionorc/agent_tick.py` (rule 3's `seat_due` for the director), `src/shiftlead/ui/` (the passed-up row), `src/shiftlead/briefs/techlead.md`, `director.md` (TD-642's)
 
 **Why:** TD-657: Paul, 2026-10-13 — *techleads would pass questions that they could not answer to it*; today `pass_up` goes only to the person.
@@ -658,6 +658,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Kind:** build
 **Status:** Open
 **Blocked by:** TD-642, TD-1016
+**Part of:** TD-657
 **Location:** design §4.9b *The director answers what is passed up to it* (*Preferences, in layers*, *Its first read*, *A level the person sets*), §4.5a (Settings page **Director** card, *Inbox row: answered for you*), §4.7 `ao prefs`, §5 `settings.yml` `director:`; `src/shiftlead/briefs/` (new `preferences.md`; `director.md`), `src/sessionorc/brief.py` (`fill`: `{preferences}`), `src/sessionorc/settings.py` (the keys), `src/sessionorc/agent_mail.py` (`answered.level`), `src/shiftlead/cli.py`, `src/shiftlead/ui/` (Settings, Inbox)
 
 **Why:** TD-657: Paul, 2026-10-13 — *preferences per repo … with some set of defaults like we do for briefs*; *conservative … reasonably extrapolated, or answer liberally*; *a button for the user to be able to open the pref file in an editor*.
@@ -687,6 +688,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Kind:** build
 **Status:** Open
 **Blocked by:** TD-661, TD-662, TD-1016
+**Part of:** TD-657
 **Location:** design §4.9b *The director answers what is passed up to it* (*Grown and groomed*, *Remember this*, *The interview*), §4.5a (*Inbox row: preferences proposed*, *Inbox row: passed up*'s Remember this, the Director card's Groom now and Interview), §4.7 `ao prefs`, §4.9 *What is left at the home has a history*, §6 rule 3 (`groom`); `src/sessionorc/agent_settings.py` (`_commit_defs` ~L326 / `rpc_commit_defs` ~L312 left as they are, tracking no `preferences.md`; new `prefs_propose`, `prefs_accept`, `prefs_discard`), `src/sessionorc/agent_tick.py` (the `groom` cause), `src/sessionorc/agent_mail.py` (`remember` on a reply, kept until a pass concludes), `src/shiftlead/briefs/` (new `interview.md`; `director.md`'s groom half), `src/shiftlead/cli.py`, `src/shiftlead/ui/`
 
 **Why:** TD-657: Paul, 2026-10-13 — *we would want the preferences routinely groomed so that it becomes general sentiments instead of specifics*; *would we need an interview to set those up?*
