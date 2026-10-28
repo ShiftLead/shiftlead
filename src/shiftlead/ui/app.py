@@ -66,6 +66,8 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     NO_TEAM,  # noqa: F401
     NODE_RESTART,  # noqa: F401
     SHELL_CMD_CUT,  # noqa: F401
+    STATE_CLASS,  # noqa: F401
+    STATE_ICON_CLASSES,  # noqa: F401
     _clock,  # noqa: F401
     _count,  # noqa: F401
     _declared,  # noqa: F401
@@ -99,6 +101,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     shell_cmd,  # noqa: F401
     shells_of,  # noqa: F401
     state_counts,  # noqa: F401
+    state_icons,  # noqa: F401
     subagent_held,  # noqa: F401
     suspended_note,  # noqa: F401
     swept_words,  # noqa: F401
