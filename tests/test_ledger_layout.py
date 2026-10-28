@@ -335,6 +335,15 @@ def test_a_v2_ledgers_history_reads_across_its_split(tmp_path):
     assert "history_error" not in got and {e["id"] for e in got["recent"]} >= {"TD-001", "TD-003"}
 
 
+def test_a_ledger_born_v2_opens_its_first_files(tmp_path):
+    """A commit adding `README.md` with no v1 headings removed is no split: its entry files open."""
+    two = _v2(tmp_path / "two")
+    _commit_as(two, "a v2 ledger (#3)")
+    text = lb.load("docs/ledger", *ledger.fs_io(two))[0]
+    life = ledger.history(two, "docs/ledger", text)
+    assert life and {e["id"] for e in lb.entries(LEDGER)} <= set(life)
+
+
 def test_the_rows_a_merged_pr_added_read_a_v2_ledger(tmp_path):
     """§4.4 *Either layout*: `_ledger_rows_on_main` takes the `TD-NNN.md` files a squash commit adds directly
     under the directory, none for the split, none for a move into `archive/`; a carried v1 path still reads."""
@@ -355,13 +364,14 @@ def test_the_ticks_change_test_reads_a_directory_but_not_its_rank_file(tmp_path)
 
     two = _v2(tmp_path / "two")
     base = two / "docs" / "ledger"
+    rank = two / lb.rank_path("docs/ledger")
+    rank.write_text("TD-001: 0\n", encoding="utf-8")
     for p in [base, *base.rglob("*")]:
         os.utime(p, (1000, 1000))
     first = ledger.stamp(two)
     assert first == ("docs/ledger", 1000)
-    (base / lb.rank_path("docs/ledger").rpartition("/")[2]).write_text("lines: []\n", encoding="utf-8")
-    os.utime(base, (1000, 1000))
-    assert ledger.stamp(two) == first
+    rank.write_text("TD-001: 1\n", encoding="utf-8")  # a rank write, in place: the directory's mtime stays
+    assert rank.stat().st_mtime > 1000 and ledger.stamp(two) == first
     entry = next(base.glob("TD-*.md"))
     os.utime(entry, (2000, 2000))
     assert ledger.stamp(two) == ("docs/ledger", 2000)

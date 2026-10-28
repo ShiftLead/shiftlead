@@ -966,7 +966,8 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
     if not (Path(root) / rel).is_dir():
         out = _log(root, timeout, fmt, "-p", "--unified=0", "--", rel)
         return None if out is None else _parse_log(out, skip)
-    v1 = layout_at(rel, None, (lambda p: None, lambda p: None))[0]  # the v1 file beside the directory
+    # the v1 file beside the directory, by dev-cadence's names (`layout_at`): a custom-named v1 file is not read
+    v1 = layout_at(rel, None, (lambda p: None, lambda p: None))[0]
     one = _log(root, timeout, fmt, "-p", "--unified=0", "--", v1)
     two = _log(root, timeout, fmt, "--name-status", "--", rel)
     order = _log(root, timeout, "--format=%H", "--", v1, rel)
@@ -976,7 +977,9 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
     titles = {m.group(1): m.group(3).strip() for m in lb.HEADING_RE.finditer(f"{text}\n{archive}")}
     events, split = _dir_events(two, rel, titles)
     at = {sha: i for i, sha in enumerate(order.split())}
-    merged = sorted(_log_events(one, skip) + events, key=lambda e: at.get(e[0] or "", -1))
+    old = _log_events(one, skip)
+    split &= {e[0] for e in old if e[4]}  # a split moves v1 headings out; a ledger born v2 opens its files
+    merged = sorted(old + events, key=lambda e: at.get(e[0] or "", -1))
     return _replay([e for e in merged if e[0] not in split])
 
 
