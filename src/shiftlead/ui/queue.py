@@ -444,8 +444,11 @@ def _tree(rows: list[dict[str, Any]], top: dict[str, Any]) -> list[dict[str, Any
         kids.setdefault(p if p in on else "", []).append(r)  # a parent not on the card: a loose row
     top["meter"] = meter(kids.get(str(top.get("qid") or "")) or [])
 
-    def finished(r: Mapping[str, Any]) -> bool:
-        return bool(r.get("archived")) and all(finished(k) for k in kids.get(str(r.get("qid") or "")) or ())
+    def finished(r: Mapping[str, Any], up: frozenset[int] = frozenset()) -> bool:
+        """Archived, and every part of it too; a `parent` cycle reads as not finished, so it is drawn, never lost."""
+        if id(r) in up or not r.get("archived"):
+            return False
+        return all(finished(k, up | {id(r)}) for k in kids.get(str(r.get("qid") or "")) or ())
 
     out: list[dict[str, Any]] = []
     seen: set[int] = set()
@@ -457,7 +460,8 @@ def _tree(rows: list[dict[str, Any]], top: dict[str, Any]) -> list[dict[str, Any
         r["rails"] = [*up, branch(r)] if spine else [*up, ""]
         r["meter"] = meter(kids.get(str(r.get("qid") or "")) or [])
         into.append({"row": r})
-        hang(str(r.get("qid") or ""), r["rails"], into, depth + 1)
+        if r.get("qid"):  # `kids[""]` is the loose rows, never a row's parts
+            hang(str(r["qid"]), r["rails"], into, depth + 1)
 
     def hang(q: str, up: list[str], into: list[dict[str, Any]], depth: int) -> None:
         ks = [k for k in kids.get(q) or () if id(k) not in seen]

@@ -152,3 +152,10 @@ def test_the_card_draws_the_spine_the_fold_the_meter_and_after_links():
 def test_after_lights_the_row_it_names_on_hover_or_focus():
     js = JS.read_text()
     assert ".qafter a.qon[data-on]" in js and '"focusin", lit(true)' in js and '"mouseover", lit(true)' in js
+
+
+def test_a_cycle_of_archived_parts_is_drawn_once_never_lost():
+    q = {"at": NOW.isoformat(), "cards": [{"id": "s#TD-1", "group": "up_next", "status": "ready", "top": row(1),
+         "rows": [done(2, 3), done(3, 2), row(4, state="ready")], "order": ["s#TD-1", "s#TD-4"]}]}  # fmt: skip
+    c = queue_view(q, NOW)["up_next"][0]
+    assert sorted(r["id"] for r in c["rows"]) == ["TD-2", "TD-3", "TD-4"]
