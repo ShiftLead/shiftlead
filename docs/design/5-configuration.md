@@ -308,7 +308,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (the gate,
   `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as `<n>` after the rest), `{board}`
   (the board's path, whether or not the file is there: a missing board is the Repo page's warning,
-  and the board's own reader says the Inbox is then the channel), `{ledger}`, `{ledger_check}`, `{cadence_rules}` (*read docs/cadence.md §1–§4*) —
+  and the board's own reader says the Inbox is then the channel), `{ledger}` (the resolved ledger, a file or a
+  v2 directory, §4.4 *Either layout*), `{ledger_check}`, `{cadence_rules}` (*read docs/cadence.md §1–§4*) —
   the cadence's, with no sentence for an absent one, since an unserved repo composes no brief —
   and the repo's own, each with its sentence: `{test}` (*no test command: run what the repo's README
   says*), `{lint}` (*no lint command: keep to the style of the code around the change*) and
