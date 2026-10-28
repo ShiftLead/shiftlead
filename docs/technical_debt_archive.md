@@ -21881,3 +21881,24 @@ Mail tells the member now. The table's entry is what lasts.
 **Resolved:** 2026-10-28 (grinder-ao-2, #2573, #2576) — slice 1 (#2573): any Close of a run-only member marks `run_ended` (the retry, a session's close, a node member's on the home's copy), a person's Restart's own close does not and a `run_ended` record is refused one, `sat_out` reads it, rule 8 replays no run-only record, the card draws *run ended*; slice 2 (#2576): the tick marks a dead run-only record when its team has nobody live or rule 9 concludes it, `stopped_by` and the rename check pass over one, `ao team add [--keep]`.
 
 ---
+
+## TD-1165: The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-27 (the designer, from TD-1149's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Part of:** TD-1149
+**Location:** `src/shiftlead/org.py` (`edit_members` 1060); `src/shiftlead/ui/app.py` (the members route); the Members dialog's template and `app.js`; design §4.9 *A team's size* (**− / +**, *Add member and Remove keep the definition's share*), §4.5a *team card: Members…*, *Members dialog* **− / +** and **Add member / Remove**, *Members… on a repo-defined team*
+
+**Why:** TD-1149 part 2: the size's two controls are the dialog's **− / +** and the form's tick (TD-1167); the dialog is disabled today on a repo-defined team, where the size is wanted most.
+
+**Fix:** as §4.5a's rows say. (1) The dialog opens on a repo-defined team, Add member and Remove disabled with today's reason and **Open file**, **− / +** live. (2) **− / +** beside each member line's count, *2 (file says 1)* where the size differs, through `teamrun.resize` one step at a time (TD-1164); − confirms with the session it winds down; **+** on a line whose next name a live run-only record holds adopts it — `run_only` cleared, nothing created — and on a team with nothing live the row adds *· from the next Start*; adoption is `teamrun.resize`'s (TD-1164). (3) **Add member** appends a member line and never bumps a `count:`; **Remove** deletes the whole line, never decrements a count (`edit_members` 1133–1136); `TeamDef.next_name` (`org.py` 211–230), Add member's role-keyed default, stays and defaults Add's name past the **sized** names, and `edit_members`' duplicate check reads the sized names, not `session_names()`'s. (4) The dialog's help paragraph (§4.5a *The help text*), if it names the count bump, is reworded in this PR with `help.py` in step.
+
+**Done when** tests pin: the dialog opening on a repo-defined team with Add member and Remove disabled; + and − on a stopped and a live org team and a repo-defined one (the setting written, the member created or wound down, no definition byte changed); − refused at 0 and at a listed flow's need, with its words; Add member on a role with a counted line appending a line rather than bumping, and refusing a name a sized line holds (`count: 1, size: 3` against `<name>-2`); Remove deleting a counted line whole; + adopting a live run-only member, which a rule 7 restart then brings back still kept; the row's *· from the next Start* on a stopped team; −'s confirm naming the session it winds down. The dialog is looked at in headless Chromium (design §4.9b) on an org team and a repo team, the shots named in the PR. `pdm run test` and `pdm run lint` pass.
+
+**Resolved:** 2026-10-28 (grinder-ao-2, #2579) — the dialog's **− / +** on each member line through `teamrun.resize` (`action: size`), on every team a repo's included, setting only; *3 (file says 2)*, *· from the next Start* and −'s confirm naming its session; a repo team's Members… opens with Add member and Remove disabled, the reason and Open file beside them; Add member appends a line and never bumps a count, its duplicate check on the sized names; Remove deletes the whole line and winds down each session it held; the help text reworded with `help.py` in step. TD-1149 stays open for TD-1167.
+
+---
