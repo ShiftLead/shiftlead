@@ -21373,3 +21373,22 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Done when** the tests on a TD-748-shaped card — a design, its parts, a trial, a part blocked from another group, a cross-repo blocker, an archived part and an archived parent with an open part — pin each row's parent, state, relation words and order and the card's top entry (never the archived parent), and a not-backfilled design still reads as today; and `pdm run test` passes.
 
 ---
+
+## TD-1132: The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1129)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Blocked by:** TD-1130
+**Location:** `src/shiftlead/flows/td/build.md`, `src/shiftlead/flows/td/design.md`, `src/shiftlead/briefs/grinder.md`, `src/shiftlead/briefs/designer.md`, `src/shiftlead/briefs/entry.md`, `docs/technical_debt.md` (the preamble's Owner/Kind paragraph)
+
+**Why:** TD-1129: the texts the wheel carries tell a designer to list builds in a design's `Blocked by:`, and a grinder to take an entry when nothing its `Blocked by:` names is open. Once the reader knows `Part of:` they must say what a parent with open parts is.
+
+**Fix:** design §4.9c *A design entry archives with its last build*; [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §4 step 5. `build.md` archives a parent with its last part by §4.9c's rule (its `Blocked by:` empty or archived, no decision; one level per PR); `design.md` and `designer.md` write `**Part of:** TD-n` on each build filed and stop listing builds in the design's `Blocked by:`; `grinder.md`'s "nothing `**Blocked by:**` names is still open" gains "and no open entry is `Part of:` it"; `entry.md` names the header line `ao td add` writes for a part; **the transition**: `build.md` keeps the `Blocked by:` reading for a design that still names its build (the build carrying no `Part of:`), archiving it by the rule from before until TD-1133's PR for that design; the ledger preamble names `Part of:` and the pick rule (the `Fields:` line does not change: `Part of` is a cadence field). These go live with the promote; `docs/briefs/` is TD-1133's, not this entry's.
+
+**Done when** each text says it, the doc-bound tests pass, and `pdm run test` passes.
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2525) — `flows/td/build.md` (a parent archives with its last part by §4.9c's rule, one level per PR, and a design not yet backfilled the old way), `flows/td/design.md` and `briefs/designer.md` (each build carries `Part of:`, and the design's `Blocked by:` lists none of them), `briefs/grinder.md` (*and no open entry is `Part of:` it*), `briefs/entry.md` (the `Part of:` header line) and the ledger preamble (`Part of`, the pick rule, the order, the archiving). TD-1129 stays: TD-1131 and TD-1133 are open.

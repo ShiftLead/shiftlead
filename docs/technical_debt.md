@@ -94,7 +94,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
 | TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Designed — builds TD-1130–TD-1133 |
 | TD-1131 | A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter | Medium | Open — build, blocked by TD-1130 |
-| TD-1132 | The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:` | Medium | Open — build, blocked by TD-1130 |
 | TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
 | TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Designed — builds TD-1144–TD-1146 |
 | TD-1144 | The ledger reading takes either layout: one `load()` road with `fs_io`/`git_io`, the default rule, the v2 history, and a faulted v2 ledger reported, not read | Medium | Open — build, blocked by TD-1130 |
@@ -2010,25 +2009,6 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Fix:** design §4.5 screen 12 *A card* (the spine, the relation words, the fold, the parts meter, amber spent on the person alone), §4.5a *Queue page: card*; the chosen shape in [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §3 and its review page `docs/mockups/reviews/2026-10-27-queue-card-c.html` (§3 governs where the page differs: the meter's colours and the top entry). Parts hang on their parent's spine by `part_of`; each open blocker is *after TD-n*, a link that scrolls to and rings its row, lit on hover or focus; finished parts fold to *✓ n done*, opening in place, finished loose rows to one line at the card's end; the parts meter, one segment per part in `branch()`'s four colours with *d/n*, on every parent row and on the header; *also after* goes. Phone width as screen 12's rows are today.
 
 **Done when** the page tests pin a TD-748-shaped card's spine, words, fold (first on the spine, directly under the parent) and meter, a headless Chromium shot of the live-shaped card at desktop and phone width is in the PR (`docs/mockups/reviews/<date>-td1131-*.png`), and `pdm run test` passes.
-
----
-
-## TD-1132: The wheel's texts say what a part is: the td flow, the role briefs, `entry.md` and the ledger's preamble name `Part of:`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (the designer, from TD-1129)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1130
-**Location:** `src/shiftlead/flows/td/build.md`, `src/shiftlead/flows/td/design.md`, `src/shiftlead/briefs/grinder.md`, `src/shiftlead/briefs/designer.md`, `src/shiftlead/briefs/entry.md`, `docs/technical_debt.md` (the preamble's Owner/Kind paragraph)
-
-**Why:** TD-1129: the texts the wheel carries tell a designer to list builds in a design's `Blocked by:`, and a grinder to take an entry when nothing its `Blocked by:` names is open. Once the reader knows `Part of:` they must say what a parent with open parts is.
-
-**Fix:** design §4.9c *A design entry archives with its last build*; [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §4 step 5. `build.md` archives a parent with its last part by §4.9c's rule (its `Blocked by:` empty or archived, no decision; one level per PR); `design.md` and `designer.md` write `**Part of:** TD-n` on each build filed and stop listing builds in the design's `Blocked by:`; `grinder.md`'s "nothing `**Blocked by:**` names is still open" gains "and no open entry is `Part of:` it"; `entry.md` names the header line `ao td add` writes for a part; **the transition**: `build.md` keeps the `Blocked by:` reading for a design that still names its build (the build carrying no `Part of:`), archiving it by the rule from before until TD-1133's PR for that design; the ledger preamble names `Part of:` and the pick rule (the `Fields:` line does not change: `Part of` is a cadence field). These go live with the promote; `docs/briefs/` is TD-1133's, not this entry's.
-
-**Done when** each text says it, the doc-bound tests pass, and `pdm run test` passes.
 
 ---
 
