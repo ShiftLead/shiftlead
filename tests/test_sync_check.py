@@ -190,6 +190,15 @@ def test_a_merge_base_with_a_lock_and_no_pin_is_refused(pinned):
     }
 
 
+@pytest.mark.parametrize("toml", ['# settings alone\nreview-model = "sonnet"\n', '[dev-cadence\nref = "x"\n'])
+def test_a_merge_base_whose_toml_holds_no_pin_or_does_not_parse_is_refused(pinned, toml):
+    g(pinned.repo, "checkout", "-q", "main")
+    commit(pinned.repo, {sync.PIN: toml})
+    g(pinned.repo, "push", "-q", "origin", "main")
+    head = pinned.pr({sync.PIN: pinned.pin(pinned.dc_commit({DOC: "two\n"}))})
+    assert pinned.check(head)["why"] == "no [dev-cadence] pin at the merge base: docs/cadence.toml holds none"
+
+
 def test_a_head_that_moved_is_not_checked(pinned):
     head = pinned.pr({sync.PIN: pinned.pin(pinned.dc_commit({DOC: "two\n"}))})
     got = pinned.check("b" * 40)
