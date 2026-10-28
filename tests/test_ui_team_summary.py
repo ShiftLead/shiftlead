@@ -713,6 +713,11 @@ def test_a_members_open_ask_to_the_person_is_the_teams_asked_you_line():
         "at": needs[1]["at"],
         "age": "40m",
         "who": [{"name": "g2", "text": "Which branch for m-0?"}, {"name": "g1", "text": "Which branch for m-1?"}],
+        # one per member, its count and its oldest's row: the rollup's needs-you menu lines (TD-1204)
+        "by": [
+            {"member": "g2", "name": "g2", "n": 1, "id": "m-0"},
+            {"member": "g1", "name": "g1", "n": 1, "id": "m-1"},
+        ],
     }
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
     assert html.count('href="/inbox?row=m-0"') == 2, "one line under each face's head"

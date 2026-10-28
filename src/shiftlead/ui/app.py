@@ -1523,8 +1523,10 @@ def create_app() -> FastAPI:
                 needs,  # a member's open ask to the person: its team's *asked you* line (TD-354)
                 spend,
             )
-            ro = templates.get_template("rollup.html").render(ro=rollup(groups, vs))
-            return {"groups": render_heads(org_layout(groups, repos, projects, vs)), "rollup": ro}
+            # the layout made once, for the groups and the rollup's rows (TD-1204)
+            layout = org_layout(groups, repos, projects, vs)
+            ro = templates.get_template("rollup.html").render(ro=rollup(layout, vs))
+            return {"groups": render_heads(layout), "rollup": ro}
 
         # off the loop (TD-670): a view of every record and every header rendered held the loop up to
         # ~300 ms a regroup on the live home with a Sessions page open; the events run calls this under
@@ -1718,23 +1720,26 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             {
                 "sessions": vs,
                 # project → repo → team (§4.9 *The Sessions page*, TD-725), from the team groups
-                "groups": org_layout(
-                    groups := team_groups(
-                        vs,
-                        strip["teams"],
+                "groups": (
+                    layout := org_layout(
+                        team_groups(
+                            vs,
+                            strip["teams"],
+                            repos,
+                            doing,
+                            work,
+                            flows,
+                            {} if agent_down else (info or {}).get("balance"),
+                            h.needs_cache["rows"],
+                            {} if agent_down else await h.team_spend(),
+                        ),
                         repos,
-                        doing,
-                        work,
-                        flows,
-                        {} if agent_down else (info or {}).get("balance"),
-                        h.needs_cache["rows"],
-                        {} if agent_down else await h.team_spend(),
-                    ),
-                    repos,
-                    (await h.defs()).projects.values(),
-                    vs,
+                        (await h.defs()).projects.values(),
+                        vs,
+                    )
                 ),
-                "rollup": rollup(groups, vs),  # the flat page's sessions are `vs` (TD-924)
+                # the layout's items, the rows in the page's order (TD-1204); the flat page's sessions are `vs`
+                "rollup": rollup(layout, vs),
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),
