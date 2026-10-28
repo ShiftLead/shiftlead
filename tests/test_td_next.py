@@ -5,6 +5,7 @@ call real but `remote get-url`, which names the GitHub origin the fake answers f
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -12,7 +13,8 @@ from pathlib import Path
 import pytest
 from conftest import park_ticks, pinned_script
 
-from sessionorc import agent_ids, cadence, modes, paths
+from sessionorc import agent_ids, cadence, modes, paths, seams
+from sessionorc import ledgerboard as lb
 from sessionorc.agent_common import RpcError
 from sessionorc.models import Session
 from shiftlead import cli
@@ -66,8 +68,8 @@ def _register(*roots: Path | str) -> None:
 @pytest.fixture
 def gh(monkeypatch):
     """The fake: `urls` names each checkout's origin URL; `prs` the open PRs, each a list of `(file, patch)`
-    (patch None where GitHub leaves it out) or a string (the listing's error); `slow` a PR's read delay;
-    `on_list` runs as the list is read. Every other call is the real `_run`."""
+    (patch None where GitHub leaves it out) or `(file, status, previous name)`, or a string (the listing's
+    error); `slow` a PR's read delay; `on_list` runs as the list is read. Every other call is the real `_run`."""
     real = agent_ids._run
     state = {"urls": {}, "prs": {}, "slow": {}, "list_error": None, "on_list": None, "calls": []}
 
@@ -93,7 +95,15 @@ def gh(monkeypatch):
             files = state["prs"][n]
             if isinstance(files, str):
                 return 1, "", files
-            out = [json.dumps({"f": f, "p": p}) if json.dumps(f) in jq else "0" for f, p in files]
+            under = re.findall(r'startswith\(("[^"]*")\)', jq)
+            out = [
+                json.dumps({"f": x[0], "p": x[1]})
+                if len(x) == 2 and json.dumps(x[0]) in jq
+                else json.dumps({"f": x[0], "s": x[1], "o": x[2]})
+                if len(x) == 3 and any(x[0].startswith(json.loads(u)) for u in under)
+                else "0"
+                for x in files
+            ]
             return 0, "\n".join(out) + "\n", ""
         return await real(argv, cwd, timeout, **kw)
 
@@ -897,3 +907,96 @@ def test_the_cli_says_the_taken_by_line_on_stderr_and_an_older_home_gives_both_n
     assert cli.main(["--json", "td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
     got = json.loads(capsys.readouterr().out)
     assert (got["taken_by"], got["taken_by_line"]) == (None, None)
+
+
+# -- TD-1145: a v2 ledger (§4.4 *Either layout*, *A ledger entry's id is handed out by the home*) ------------------
+
+
+def _v2(nums=(1, 2), archived=(10,), readme: str = "# Ledger\n\nLedgerboard: 2\n") -> dict[str, str]:
+    """A v2 ledger's files, as `lb.split` writes them under `docs/ledger/`."""
+    files = lb.split(_ledger(*nums), _ledger(*archived))
+    files["README.md"] = readme
+    return {f"docs/ledger/{rel}": text for rel, text in files.items()}
+
+
+@pytest.mark.integration
+async def test_a_v2_ledgers_ids_are_its_file_names_and_an_open_prs_added_files_on_both_layouts(home, gh, tmp_path):
+    _one(tmp_path, gh, files=_v2(nums=(1, 2), archived=(10,)))
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-011"], "the archive's names count"
+    gh["prs"] = {
+        7: [("docs/ledger/TD-040.md", "added", None), ("src/TD-090.md", "added", None)],
+        8: [("docs/ledger/archive/TD-041.md", "added", None)],  # filed and archived in one PR
+        9: [("docs/ledger/archive/TD-002.md", "renamed", "docs/ledger/TD-002.md")],  # an archive files nothing
+        10: [("docs/ledger/TD-099.md", "modified", None), ("docs/ledger/README.md", "added", None)],
+    }
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-042"]
+    gh["prs"][11] = [(LEDGER, "+## TD-050: opened before the split\n")]
+    gh["prs"][12] = [("docs/ledger/archive/TD-060.md", "renamed", "notes/TD-060.md")]  # moved in from no entry
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-061"]
+    gh["prs"][13] = [("docs/ledger/TD-070.md", "renamed", "docs/ledger/TD-001.md")]  # renamed to a new id
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-071"]
+
+
+@pytest.mark.integration
+async def test_a_checkout_behind_a_split_reads_main_as_main_holds_it(home, gh, tmp_path):
+    root = _one(tmp_path, gh, nums=(1, 2))
+    seed = tmp_path / "split"
+    _git(tmp_path, "clone", "-q", _git(root, "remote", "get-url", "origin"), str(seed))
+    _git(seed, "rm", "-q", LEDGER, ARCHIVE)
+    _push(seed, _v2(nums=(1, 2, 30), archived=(31,)))
+    assert (root / LEDGER).is_file(), "the checkout is still v1"
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-032"]
+
+
+@pytest.mark.integration
+async def test_the_script_gets_the_directory_and_no_archive(home, gh, tmp_path):
+    root = _one(tmp_path, gh, files=_v2())
+    log = _stub(root)
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-050"]
+    argv = json.loads(log.read_text())["argv"]
+    assert argv[argv.index("--ledger") + 1] == "docs/ledger" and "--archive" not in argv
+
+
+@pytest.mark.integration
+async def test_a_checkout_with_no_ledger_passes_its_own_path_as_before(home, gh, tmp_path):
+    root = _one(tmp_path, gh, files={"README.md": "x\n"})
+    log = _stub(root)
+    await home.rpc_td_next(repo="shiftlead")
+    argv = json.loads(log.read_text())["argv"]
+    assert argv[argv.index("--ledger") :][:4] == ["--ledger", LEDGER, "--archive", ARCHIVE]
+
+
+@pytest.mark.integration
+async def test_a_tree_older_than_its_v2_reader_is_refused_in_the_seams_words(home, gh, tmp_path, monkeypatch):
+    root = _one(tmp_path, gh, files=_v2())
+    log = _stub(root)
+    old = {"commit": "abc1234def", "oldest": cadence.OLDEST, "descends": True, "why": None}
+    monkeypatch.setattr(seams, "age", lambda *a, **k: {**old, "oldest_v2": cadence.OLDEST_V2, "descends_v2": False})
+    with pytest.raises(RpcError) as e:
+        await home.rpc_td_next(repo="shiftlead")
+    assert str(e.value) == (
+        "shiftlead's ids were not given: unserved: the ledger is a directory and dev-cadence at abc1234 predates "
+        "its v2 reader (b9236c8) — sync it"
+    )
+    assert not log.exists(), "the script is never handed a directory"
+    monkeypatch.setattr(seams, "age", lambda *a, **k: {**old, "oldest_v2": cadence.OLDEST_V2, "descends_v2": True})
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-050"]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("readme", "line"),
+    [
+        ("# Ledger\n\nLedgerboard: 2\n", True),
+        (FIELDS.split("## ")[0] + "Ledgerboard: 2\n", False),
+        ("# Ledger\n", False),
+    ],
+)
+async def test_a_v2_ledgers_taken_by_line_reads_its_readme(home, gh, tmp_path, readme, line):
+    """The preamble is `README.md`'s, as `load()` heads its text; a README with no `Ledgerboard: 2` is a faulted
+    v2 ledger, which cannot be read, so it gives none."""
+    root = _one(tmp_path, gh, files=_v2(readme=readme))
+    _stub(root, taken_by="ao-w")
+    (root / "scripts" / "ledgerboard.py").write_text(SIBLING)
+    got = await home.rpc_td_next(repo="shiftlead", caller="ao-w")
+    assert got["taken_by_line"] == ("**Taken by:** ao-w" if line else None)

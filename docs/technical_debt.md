@@ -95,7 +95,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Designed — builds TD-1130–TD-1133 |
 | TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
 | TD-1143 | ShiftLead reads only a one-file ledger: before any repo it watches splits into a ledger of one file per entry (ledgerboard v2), every reader must take either layout | Medium | Designed — builds TD-1144–TD-1146 |
-| TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
@@ -2037,25 +2036,6 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Done when** the design says how each reader finds and reads either layout. Then the build entries are filed, holding: every reader above takes either layout through `load()` / `rank_path()`, tests run v1 and v2 fixtures side by side (`scripts/look_home.py` among them), and a faulted v2 ledger is reported, not read.
 
 **Related:** dev-cadence#TD-160 (the split, its plan's step 4 this, step 5 Paul's); ShiftLead/ledgerboard#20, #21 (v2.0); TD-1130 (vendors ledgerboard v2.1, and reads `Part of:` in `ledger.py` and the Queue: the same files, so a build of this entry rebases on it); TD-585 (ledgerboard read in-process), TD-970 (`ao td next` over the id script); #2408, #2480 (the conflicts).
-
----
-
-## TD-1145: `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (the designer, from TD-1143)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Blocked by:** TD-1144
-**Location:** `src/sessionorc/agent_ids.py` (the script road ~425–440, `_ids_give` ~480–500, `_ids_prs` 505 and `files_jq`); tests
-
-**Why:** TD-1143: the id road passes `--ledger <file> --archive <file>` to dev-cadence's `ledger_next_id.py` and, on the fallback road, reads main's two files and the open PRs' patches on those two paths. A v2 ledger has neither file.
-
-**Fix:** design §4.4 *A ledger entry's id is handed out by the home* (*The run*, *Free*, `taken_by_line`). For a v2 directory: a pinned dev-cadence older than `OLDEST_V2` (§4.4 *Either layout*) refuses the call in §5's *unserved* words, never handing the script a directory; the script gets `--ledger <dir>` and no `--archive` (the pinned script reads `archive/` through `load()`); the fallback road reads `origin/<default>` through `layout_at` against that tree (`git_io`), its ids the file names of one `git ls-tree` of the directory and its `archive/`; an open PR's ids are matched on **both** layouts' paths — the names of the `TD-NNN.md` files it adds under the directory or `archive/` (`status: added`, no patch read; a `renamed` file counts by its new name only when its previous path was not an entry file, since a move into `archive/` files nothing), and the `+## TD-NNN:` lines of the v1 file and archive patches, since a PR opened before a split still edits them — through the paginated listing, cut at `FILES_CAP` as now (a split PR reads as *its listing is cut*); `taken_by_line` reads the `Fields:` line from `load()`'s preamble over `fs_io` (`README.md`'s), and a faulted v2 ledger gives no line. A v1 file is read as today.
-
-**Done when** both roads give ids above a v2 fixture's highest, with an open PR adding a file and another adding one straight into `archive/`, a v1 fixture reads as today, and `pdm run test` passes.
 
 ---
 
