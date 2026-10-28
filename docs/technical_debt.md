@@ -92,9 +92,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Designed — builds TD-1164–TD-1167 |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
-| TD-1165 | The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count | Medium | Open — build, blocked by TD-1164, TD-1166 |
-| TD-1166 | A run-only member: `ao team add [--keep]`, never replayed and marked `run_ended` when its team's run ends, passed over by the rename check | Medium | Open — build; slice 1 in review |
-| TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build, blocked by TD-1165, TD-1166 |
+| TD-1165 | The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count | Medium | Open — build |
+| TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build, blocked by TD-1165 |
 
 ---
 
@@ -1968,7 +1967,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Blocked by:** TD-1164, TD-1166
 **Part of:** TD-1149
 **Location:** `src/shiftlead/org.py` (`edit_members` 1060); `src/shiftlead/ui/app.py` (the members route); the Members dialog's template and `app.js`; design §4.9 *A team's size* (**− / +**, *Add member and Remove keep the definition's share*), §4.5a *team card: Members…*, *Members dialog* **− / +** and **Add member / Remove**, *Members… on a repo-defined team*
 
@@ -1980,25 +1978,6 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1166: A run-only member: `ao team add [--keep]`, never replayed and marked `run_ended` when its team's run ends, passed over by the rename check
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-27 (the designer, from TD-1149's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build; slice 1 (the close): any Close of a run-only member marks `run_ended` (the retry, a session's close, a node member's on the home's copy), a person's Restart's own close does not and a `run_ended` record is refused one, `sat_out` reads it, rule 8 replays no run-only record, the card draws *run ended*. Left: (2) the wind-down, stop and conclusion marks, a live run-only member in `crew` and the shape, `renames` passing over one, `ao team add [--keep]`
-**Part of:** TD-1149
-**Location:** **held** (`src/sessionorc/**`, read by the techlead): `src/sessionorc/models.py` (the record); `src/sessionorc/work.py` (`sat_out` 55, `crew`, `team_wound_down`); `src/sessionorc/agent.py` (`_sit_out` 2546) and `src/sessionorc/agent_tick.py` (the home's wind-down, stop and conclusion paths, §6 rules 8–9); `src/shiftlead/ui/cards.py` 785 (the card's `closed_for` reading, which reads `why == "sit_out"`); `src/sessionorc/agent_remote.py` 497 (`_route_act`: `closed_for` is `HOME_OWNED`, models.py 118–135, so a node member's mark is written on the home's copy there); `src/sessionorc/agent_tick.py` (`_work_replays` 2203–2225, the stop/wound-down reading ~1987/2046); `src/shiftlead/teamrun.py` (`renames` 1100, the TD-703 diff); `src/shiftlead/cli.py` (`ao team add`); design §4.9 *A member started from the form*, *A member renamed or removed*, §4.7 `ao team add`
-
-**Why:** TD-1149: a member started for this run must be one of the team's crew while it runs and never come back after it, without a definition edit.
-
-**Fix:** as §4.9 *A member started from the form* and §6 rules 8–9 say. (1) `run_only` on the record and its launch record is TD-1164's; this entry is what reads it. (2) A run-only record does not come back after its run, by two rules: **rule 8 never replays a `run_only` record**, whatever its mark (`_work_replays` skips it, an exited one included), and the home writes `closed_for: {why: run_ended}` on it — on **any Close** of it, both of Close's branches (`agent.py` `_close`: the retry of an already-closed record, and the close itself), on a node member at `_route_act` on the home's copy; when it concludes the team (rule 9); and when the team is wound down or stopped, on every dead run-only crew record not yet marked. The tick's own restart (rules 1, 2, 7) closes through Close and its restart mark, written after the close (`_mark_closed`), stands over the `run_ended`, as today — no exception inside `_close` — and its successor, from the launch record, is `run_only`; a person's Restart's successor too; the close `rpc_restart` makes writes no `run_ended`: a flag on its close, home-only, added to the same condition as a handed-in `closer` in `closer_of` (`agent_common.py`: honoured only when the caller is the person, never mirroring `closer`'s handling of the tick's `by`), on a home member through `rpc_close` and on a node's through `_route_act("close", …)`'s params, honoured at `_route_act`'s home-copy write (a node's `close` drops the unknown param as an older node drops `closer`); so a failed create leaves the record pressable again. The `restart` RPC (`rpc_restart`/`_restart_check`) refuses a record already marked `run_ended`: *its run ended: start the team, or add one from the form*. `sat_out()` reads `run_ended` as `sit_out`; the card's `closed_for` reading (`cards.py` 785) draws *run ended*. A restart inside the run replays it as any member. (3) `teamrun.renames` and Start's and Apply's rename/removal check pass over a run-only record not marked `run_ended`, live or exited inside the run. (4) `ao team add <team> <line> [--keep]`: person-only; refused on a team with nothing live, or whose defined manager is neither live nor on call (*<team> is not running: start it first*; a `manager: person` team is running when any crew record is live); calls `teamrun.start_member(…, run_only=True)` (TD-1164); with `--keep`, `teamrun.resize` one higher instead, after the same running check; prints the name.
-
-**Done when** tests pin: a run-only record in `crew` and the team's shape while live; marked `run_ended` on each of wind-down, stop and conclusion (a finished one too), drawn *run ended*, and not replayed by rule 8 after; `ao team add` refused on a stopped team; a person's lone Close of a run-only member marking it `run_ended`, the retry branch too, the tick's restart's mark winning after its close; an exited run-only member never replayed by rule 8 and marked when the team is wound down; a node member's Close marked on the home's copy; replayed by a restart inside the run; not read as a rename or removal by Apply, live or exited inside the run; a live run-only member alone keeping an otherwise finished team from reading wound down and from concluding; the tick's restart's mark (`_mark_closed`, after `rpc_close`) standing after its close; a person's Restart whose create fails leaving the run-only record pressable again, a node member's too; the flag ignored from a session caller (a manager's Close still marks `run_ended`) and its successor `run_only`; a person's Restart refused on a `run_ended` record, with its words; `ao team add --keep` and the form's kept start refused on a team not running; `ao team add` with and without `--keep`. `pdm run test` and `pdm run lint` pass.
-
----
-
 ## TD-1167: The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick
 
 **Priority:** Medium
@@ -2007,7 +1986,7 @@ That is the design working as written: a Team pick makes *a person's own session
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Blocked by:** TD-1165, TD-1166
+**Blocked by:** TD-1165
 **Part of:** TD-1149
 **Location:** `src/shiftlead/ui/static/app.js` (`applyTeam` 4809, `tickTeamManager`, `teamRoles`, `applyRole`); `src/shiftlead/ui/templates/new.html` (the Team picker 70–79); `src/shiftlead/ui/common.py` (`teams_for_form` 901: the member lines); `src/shiftlead/ui/app.py` (`new_submit` 2423); design §4.9 *A member started from the form*, *A person in the team*, §4.5a *New session* **Team** picker and **member line** fill + **keep as a team member**
 
