@@ -4758,7 +4758,9 @@
     let lineKey = "", lineGot = null, lseq = 0;
     function memberLines() {
       const o = teamSel && teamSel.selectedOptions[0];
-      if (!o || !o.value || !role.value || isShell()) return [];
+      // *another directory…* runs under you only, and a Resume is its record's: neither starts a member
+      const res = $("[name=resume]");
+      if (!o || !o.value || !role.value || isShell() || other() || (res && res.value.trim())) return [];
       let ls = [];
       try { ls = JSON.parse(o.dataset.lines || "[]"); } catch (e) { ls = []; }
       return ls.filter((l) => l.role === role.value);
@@ -4780,7 +4782,7 @@
     }
     async function loadLine(team, line) {
       const my = ++lseq;
-      lineGot = null; memberNote();
+      lineGot = null; memberNote(); memberBlocked = true; gate();  // Start waits for the line's reading
       let got = { why: `${team} did not answer` };
       try { got = await (await fetch(`/api/team_line?team=${encodeURIComponent(team)}&line=${encodeURIComponent(line)}`)).json(); } catch (e) { /* said below */ }
       if (my !== lseq) return;

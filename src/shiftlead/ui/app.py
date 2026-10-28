@@ -2537,7 +2537,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         line: str = Form(""),
         keep: str = Form(""),
     ):
-        if team.strip() and line.strip() and unattended == "on":
+        if team.strip() and line.strip() and unattended == "on" and not resume.strip():  # a Resume is the record's
             # a Role a member line names under a Team pick starts **a member** (§4.5a New session
             # **member line** fill, §4.9 *A member started from the form*, TD-1167): `ao team add`'s road
             return await member_submit(team.strip(), line.strip(), keep == "on", name, prompt, lane, profile)

@@ -166,3 +166,12 @@ def test_next_members_reads_every_line_in_one_plan(world):  # noqa: F811
     held = [{**badged("dc-hunter-2", "dc-grind"), "state": "idle"}]  # a live record holds the line's next name
     got = teamrun.next_members(org, "dc-grind", "kmaster", held)
     assert {k: v.name for k, v in got.items()} == {"dc-grinder": "dc-grinder-2", "dc-hunter": "dc-hunter-3"}
+
+
+def test_a_resume_with_a_member_line_is_the_records_never_a_new_member(world, client):  # noqa: F811
+    tmp_path, fleet = world
+    _dc_team(tmp_path)
+    _running(fleet, "dc-grinder")
+    assert _post(client, tmp_path, name="dc-grinder", resume="abc-123").status_code == 303
+    (made,) = fleet.creates()
+    assert made["resume"] == "abc-123" and made["name"] == "dc-grinder" and "run_only" not in made
