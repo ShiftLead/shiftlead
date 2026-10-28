@@ -21206,3 +21206,23 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Related:** TD-1000 (the `--team`/`--repo` address and `ao td add --repo`), TD-995 (its design), TD-1051/TD-1078 (a seat filled by an answer), TD-1064; dev-cadence#TD-157 (the decision), dev-cadence#TD-156 (the entry that hit it).
 
 **Resolved:** 2026-10-27 (grinder-ao-2, #2495) — `_question_seat` resolves a `closed` `asks` seat rule 3 fills (not superseded, suspended or sat out; supervised and unattended), `_one_seat` ranks live, on call, then closed after the techlead seat, and design §4.10 *A team or a repo as the address* agrees with *A seat is the exception*; the stopped-team edge queues, since rule 3 fills a closed seat a question waits for whatever its team. `tests/test_question_seat.py` pins `entry_add --repo` to a closed seat with the team running and stopped, the fill, and the order.
+
+## TD-1126: #2475's node-side lines of Add entry's **Open a session** can each be reverted and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2475)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — built 2026-10-27 in #2505 (grinder-ao-1).
+**Location:** `src/shiftlead/ui/app.py` (`entry_place`, `api_entry_session`), `src/shiftlead/teams.py` (`no_checkout`); `tests/test_ui_entry_host.py`
+
+**Why:** Test audit of #2475 (TD-1092 (2)), 2026-10-27. Mutation probe on `origin/main`: each change below, made alone, leaves `pdm run pytest -q tests/test_ui_entry_host.py tests/test_ui_entry.py tests/test_ui_teams.py tests/test_ui_repo_org.py tests/test_org.py tests/test_cli_org.py tests/test_cli_teams.py` at 302 passed. (1) `repo=plan["dir"]` in `api_entry_session`'s `create` → `repo=root` (only `dir=` is pinned): a node session would carry the home's path as its repo. (2) `entry_role(..., files)` → no `files`, and `files = files_on(...)` → `files = None`: the docstring says a feature on a node opens its flow's design role; a node whose flow differs is not tested. (3) `if cfg is None and container and not why:` → `if False:`: a container node's ledger name. (4) `except ValueError` around `config_on` → another type: a node whose `.shiftlead.yml` is invalid. (5) the 409 *no entry-<n> … is free in … on <host>*. (6) `no_checkout`'s `heading is not None` branch (the `projects.<name>.repos.<repo>` hint). The other twelve mutants of the PR's lines fail a test.
+
+**Fix:** One test per line above in `tests/test_ui_entry_host.py` (the file's `world()` node helper), each failing when its line is reverted.
+
+**Done when** each of the six mutants fails a test, and the suite is green.
+
+**Resolved:** 2026-10-27 (grinder-ao-1, #2505) — one test per mutant in `tests/test_ui_entry_host.py`: the create's `repo` is the node's path; a feature on a machine node opens the node flow's design role; a container node's ledger is the shared checkout's; an invalid node `.shiftlead.yml` is the plan's `why`; every name taken on the node is the 409 naming its host; `no_checkout` names the `projects` line, else *register the checkout*. Each of the six mutants (seven, (2) in two halves) now fails the file.
+
+**Related:** TD-1092, TD-1064.
