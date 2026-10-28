@@ -797,8 +797,9 @@ class Registry:
             ref = default_ref(root)
             rel = ledger_path(root)
             io = fs_io(root) if ref is None else git_io(root, ref, _under(rel), rel=rel)
-            _, led, arch, faults = read_pair(rel, io) if io is not None else (rel, None, None, [])
-            self._why[root] = fault_words(rel, faults) if faults else f"{rel} cannot be read"
+            at, led, arch, faults = read_pair(rel, io) if io is not None else (rel, None, None, [])
+            if led is None:
+                self._why[root] = fault_words(at, faults) if faults else f"{rel} cannot be read"
             self._read[root] = None if led is None else (ids_in(led), ids_in(arch))
         return self._read[root]
 

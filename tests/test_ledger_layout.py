@@ -197,6 +197,9 @@ def test_a_faulted_v2_ledger_is_reported_not_read(tmp_path):
     open_id = next(e["id"] for e in lb.entries(LEDGER))
     state, why = ledger.Registry([str(two)])(f"two#{open_id}")
     assert state == "unresolved" and why.endswith(f"docs/ledger is faulted: {words}")
+    (two / ".shiftlead.yml").write_text("ledger: docs/technical_debt.md\n", encoding="utf-8")  # set, and gone
+    assert ledger.Registry([str(two)])(f"two#{open_id}")[1].endswith(f"docs/ledger is faulted: {words}")
+    (two / ".shiftlead.yml").unlink()
     _commit(two)
     _git(two, "update-ref", "refs/remotes/origin/main", "HEAD")
     none, why = ledger.entries_before(two, "docs/ledger", None)
