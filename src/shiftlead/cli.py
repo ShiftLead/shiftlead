@@ -1601,7 +1601,7 @@ def cmd_repo_add(args: argparse.Namespace) -> int:
         print(
             f"{root.name} is unserved until it merges" if registered else f"added {root.name}, unserved until it merges"
         )
-        print(f"once it merges, run `{dc}/sync.sh {root}`: dev-cadence's hook shim, and its roster")
+        print(f"once it merges, run `{adopt_mod.after(dc, root)}`: dev-cadence's hook shims, and its roster")
 
     return emit(args, got, prose)
 

@@ -22045,3 +22045,23 @@ Mail tells the member now. The table's entry is what lasts.
 **Resolved:** 2026-10-28 (grinder-ao-2, #2588) — `tests/test_team_size.py` adds `test_start_member_refuses_a_line_the_flow_sits_out_and_creates_nothing`, `test_start_member_refuses_a_name_a_live_session_holds_and_creates_nothing` and `test_a_failed_keep_stops_the_step_up_and_says_what_was_done`; each of the three deletions in **Why** now fails one of them.
 
 ---
+
+## TD-1183: `ao repo add`'s adopt runs `sync.sh`, which dev-cadence #429 made a refusal: the offer and `--adopt` fail with sync.sh's own error
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-28 (grinder-ao-1, from #2578's precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/adopt.py` (`_syncs`, `_sync`, `body`); `tests/test_repo_adopt.py` (`test_the_offer_leaves_dev_cadences_roster_as_it_was_and_the_temp_root_is_the_reason`, skipped since this entry's PR while `~/dev-cadence`'s `sync.sh` no longer copies); design §4.7 **`ao repo add`**, §5 *The seams*
+
+**Why:** dev-cadence #429 (its TD-129's closing slice, merged 2026-10-28 16:31Z) keeps `sync.sh` only for `--pin`: run with a target alone it exits 1, *sync.sh no longer copies into a repo (TD-129): adopt a new repo with `dev-cadence -C <this clone> adopt <repo>`*. `adopt._syncs` refuses only a checkout with no `sync.sh`, so the offer and `--adopt` now make the scratch clone, run `sync.sh` and fail with that text as an `AdoptError`. The real-checkout test failed on main from then on, so every PR's precheck in this repo was red until it was skipped. Design §4.7 already says the adopt is *under TD-129 the launcher's `adopt`*, and the PR body's *run `<dc>/sync.sh <root>`* after the merge is gone too.
+
+**Fix:** run the launcher's `adopt` (`dev-cadence -C <dc> adopt <scratch clone>`, dev-cadence's `launcher/words.py`) in the scratch clone in place of `sync.sh`, after confirming it writes nothing outside the clone (a roster line, per-clone settings in the common directory) and accepts one: `words.py`'s adopt refuses a target that is not a main checkout (~800) and a dev-cadence clone that is dirty or off origin's default branch, which a `git clone --shared` scratch clone may meet. Make the PR body's after-merge line what dev-cadence now says to run, then re-point the real-checkout test at the launcher and drop its TD-1183 skip. Design §4.7 and §5's `sync.sh` lines (§5 353–362, the per-clone setup cure) change to the present tense in the same PR. If the launcher's `adopt` cannot run in a scratch clone, refuse in `_syncs` before any clone, as TD-1024's words do, and say so in §4.7.
+
+**Done when** `ao repo add` on a checkout without dev-cadence offers the files the launcher's `adopt` writes, `--adopt` opens them as a PR, the real-checkout test runs against `~/dev-cadence` without a skip, and `pdm run test` passes.
+
+**Resolved:** 2026-10-28 (grinder-ao-1, #2590) — `adopt._adopter` runs the dev-cadence checkout's `launcher/dev_cadence.py -C <dc> adopt <clone>` where it has one, else an older checkout's `sync.sh`, and refuses one with neither before any clone; the PR's commit is the pin's `ref` (else the lock's), and the reply and the body name `dev-cadence -C <dc> adopt <checkout>` as the after-merge run (`adopt.after`). The real-checkout test runs the launcher against `~/dev-cadence`, skipped only while its adopt would refuse (dirty, or HEAD off origin's default branch); a fake-launcher test pins the argv, the pin's `ref` and both after-merge lines. Design §4.7 **`ao repo add`** says so, with its line under §4.7 in `docs/design-history.md`; §5's pinned-repo cures already named the launcher.
+
+---

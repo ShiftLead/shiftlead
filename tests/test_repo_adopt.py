@@ -1,7 +1,7 @@
 """`ao repo add <path> [--adopt]` on a checkout without dev-cadence (design §4.7 **`ao repo add`**, §5 *The
 seams*, TD-1010): the adoption is offered from a scratch clone and nothing is added; `--adopt` opens it as a
 PR on `cadence-adopt` and adds the repo, unserved until the PR merges. A temp origin stands for GitHub
-through `url.<path>.insteadOf`, a stub `sync.sh` for dev-cadence's adopt and a stub `gh` for the PR."""
+through `url.<path>.insteadOf`, a stub `sync.sh` (or launcher) for dev-cadence's adopt and a stub `gh` for the PR."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ import asyncio
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -30,6 +31,15 @@ printf '{LOCK.replace(chr(10), "\\n")}' > "$t/docs/cadence-sync.lock"
 echo 'x = 1' > "$t/scripts/check_cadence.py"
 git -C "$t" config dev-cadence.shim on
 echo '.cadence-scratch' >> "$t/.git/info/exclude"
+"""
+REF = "4197a277978b1652459ecdf65db0dc033016cb5a"
+# the launcher's `adopt` (dev-cadence TD-129) as far as these tests need it: its argv, a seed and the pin
+LAUNCHER = f"""import os, sys
+open(os.environ["ADOPT_LOG"], "w").write("\\n".join([os.getcwd(), *sys.argv[1:]]))
+t = sys.argv[-1]
+os.makedirs(os.path.join(t, "docs"), exist_ok=True)
+open(os.path.join(t, "AGENTS.md"), "w").write("seeded\\n")
+open(os.path.join(t, "docs", "cadence.toml"), "w").write('[dev-cadence]\\nsource = "/src"\\nref = "{REF}"\\n')
 """
 GH = """#!/bin/sh
 if [ "$2" = list ]; then cat "$GH_OPEN" 2>/dev/null || echo '[]'; exit 0; fi
@@ -184,7 +194,9 @@ async def test_adopt_refuses_a_served_repo_no_dev_cadence_checkout_and_an_origin
     assert "--adopt goes with `ao repo add <path>`" in capsys.readouterr().err
 
 
-async def test_a_dev_cadence_checkout_without_sync_sh_is_picked_and_refused_before_any_clone(agent, world, capsys):
+async def test_a_dev_cadence_checkout_without_a_launcher_or_sync_sh_is_picked_and_refused_before_any_clone(
+    agent, world, capsys
+):
     """TD-1024, §4.7 `ao repo add`: once `sync.sh` retires, a dev-cadence checkout with `launcher/INTERFACE`
     is still the roster's pick, and the adopt — which runs `sync.sh` — refuses it by name, offer and
     `--adopt` alike, with no scratch clone made and nothing pushed."""
@@ -195,9 +207,7 @@ async def test_a_dev_cadence_checkout_without_sync_sh_is_picked_and_refused_befo
     (dc / "launcher").mkdir()
     (dc / "launcher" / "INTERFACE").write_text("1\n")
     assert adopt.dev_cadence(_roster(), checkout) == dc.resolve()
-    words = (
-        f"dev-cadence at {dc.resolve()} has no sync.sh: run `dev-cadence -C {dc.resolve()} adopt {checkout}` yourself"
-    )
+    words = f"dev-cadence at {dc.resolve()} has no launcher or sync.sh: pull it, then run this again"
     for argv in (["repo", "add", str(checkout)], ["repo", "add", str(checkout), "--adopt"]):
         assert await asyncio.to_thread(cli.main, argv) != 0
         assert words in capsys.readouterr().err
@@ -264,19 +274,59 @@ def test_an_open_adoption_pr_is_the_cure_its_lacks_name():
     assert seams.with_adoption(None, "/r", {"open": [{"number": 9, "branch": "cadence-adopt"}]}) is None
 
 
+async def test_a_dev_cadence_checkout_with_a_launcher_adopts_through_its_adopt_and_names_the_pin(
+    agent, world, capsys, monkeypatch
+):
+    """TD-1183 (design §4.7 **`ao repo add`**): a dev-cadence checkout with a launcher adopts through its `adopt`,
+    `<dc>/launcher/dev_cadence.py -C <dc> adopt <clone>`, never its `sync.sh` (which no longer copies since
+    dev-cadence #429); the PR names the pin's `ref`, and the reply and the body name that `adopt` as the
+    person's run after the merge."""
+    await park_ticks(agent)
+    checkout, dc = world["checkout"].resolve(), world["dc"]
+    (dc / "sync.sh").write_text("#!/bin/sh\necho 'sync.sh no longer copies into a repo' >&2\nexit 1\n")
+    (dc / "launcher").mkdir()
+    (dc / "launcher" / "dev_cadence.py").write_text(LAUNCHER)
+    log = world["tmp"].parent / "adopt.log"
+    monkeypatch.setenv("ADOPT_LOG", str(log))
+    assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout)]) == 0
+    out = capsys.readouterr().out
+    assert out.splitlines()[:2] == ["AGENTS.md", "docs/cadence.toml"]
+    cwd, *argv = log.read_text().splitlines()
+    assert argv[:3] == ["-C", str(dc), "adopt"] and Path(argv[3]).name == "notes" and Path(argv[3]) != checkout
+    assert cwd == argv[3]
+    assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(f"adoption PR #7 open: https://github.com/t/notes/pull/7 — dev-cadence {REF[:7]}, 2 files")
+    assert f"once it merges, run `dev-cadence -C {dc} adopt {checkout}`" in out
+    assert git(world["origin"], "log", "-1", "--format=%s", "cadence-adopt").strip() == f"adopt dev-cadence {REF[:7]}"
+    body = Path(f"{world['log']}.body").read_text()
+    assert f"written by `dev-cadence -C {dc} adopt`" in body and f"`dev-cadence -C {dc} adopt {checkout}`" in body
+    assert list(world["tmp"].iterdir()) == []
+
+
 DEV_CADENCE = Path(os.environ.get("DEV_CADENCE_SOURCE", "~/dev-cadence")).expanduser()
-DC_SYNC = DEV_CADENCE / "sync.sh"
-# dev-cadence #429 (its TD-129's closing slice): `sync.sh` no longer copies, so the adopt it runs is refused (TD-1183)
-COPIES = DC_SYNC.is_file() and "sync.sh no longer copies into a repo" not in DC_SYNC.read_text(errors="replace")
 
 
-@pytest.mark.skipif(not DC_SYNC.is_file(), reason="no dev-cadence checkout on this machine")
-@pytest.mark.skipif(not COPIES, reason="this dev-cadence's sync.sh no longer copies (TD-1183)")
+def _adoptable(dc: Path) -> str | None:
+    """Why the machine's dev-cadence cannot run this test's adopt, or None: no launcher (TD-1183), or one its
+    `adopt` refuses to run from — a dirty clone, or a HEAD off origin's default branch (dev-cadence TD-129)."""
+    if not (dc / "launcher" / "dev_cadence.py").is_file():
+        return "no dev-cadence checkout with a launcher on this machine"
+    run = lambda *a: subprocess.run(["git", "-C", str(dc), *a], capture_output=True, text=True)  # noqa: E731
+    if run("status", "--porcelain", "--untracked-files=no").stdout.strip():
+        return f"{dc} has uncommitted changes: its adopt refuses"
+    head = run("symbolic-ref", "-q", "refs/remotes/origin/HEAD").stdout.strip()
+    if not head or run("merge-base", "--is-ancestor", "HEAD", head).returncode != 0:
+        return f"{dc}'s HEAD is not on origin's default branch: its adopt refuses"
+    return None
+
+
+@pytest.mark.skipif(bool(_adoptable(DEV_CADENCE)), reason=_adoptable(DEV_CADENCE) or "")
 def test_the_offer_leaves_dev_cadences_roster_as_it_was_and_the_temp_root_is_the_reason(world, tmp_path, monkeypatch):
-    """dev-cadence TD-068: `sync.sh` registers a target outside every temp root, so the scratch clone is made
+    """dev-cadence TD-068: its adopt registers a target outside every temp root, so the scratch clone is made
     under `$TMPDIR`. The roster lives outside the temp roots (`CADENCE_TEMP_ROOTS` names the test's
-    `$TMPDIR` alone); the offer's real run leaves it byte-identical, and the same run on a clone outside the
-    temp roots registers that clone."""
+    `$TMPDIR` alone); the offer's real run, the launcher's `adopt` (TD-1183), leaves it byte-identical, and the
+    same run on a clone outside the temp roots registers that clone."""
     config = tmp_path / "config"
     roster = config / "dev-cadence" / "repos.txt"
     roster.parent.mkdir(parents=True)
@@ -286,11 +336,17 @@ def test_the_offer_leaves_dev_cadences_roster_as_it_was_and_the_temp_root_is_the
     monkeypatch.setenv("CADENCE_TEMP_ROOTS", str(world["tmp"]))
     root = world["checkout"].resolve()
     got = adopt.offer(root, DEV_CADENCE)
-    assert "docs/cadence-sync.lock" in got["paths"]
+    assert "docs/cadence.toml" in got["paths"]
     assert roster.read_text() == "/somewhere/else\n"
     outside = tmp_path / "outside"
     subprocess.run(["git", "clone", "-q", str(root), str(outside)], check=True, capture_output=True)
-    subprocess.run([str(DEV_CADENCE / "sync.sh"), str(outside)], check=True, capture_output=True, timeout=300)
+    launcher = DEV_CADENCE / "launcher" / "dev_cadence.py"
+    subprocess.run(
+        [sys.executable, str(launcher), "-C", str(DEV_CADENCE), "adopt", str(outside)],
+        check=True,
+        capture_output=True,
+        timeout=300,
+    )
     assert roster.read_text().splitlines() == ["/somewhere/else", str(outside.resolve())]
     shutil.rmtree(outside)
 
