@@ -93,7 +93,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
-| TD-1186 | `next_members`' *sits out under <flow>* answer (`/api/team_line`'s `why`, the form's blocked Start) is set in no test: delete it and the suite stays green | Low | Open — build |
 
 ---
 
@@ -1979,20 +1978,3 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1186: `next_members`' *sits out under <flow>* answer (`/api/team_line`'s `why`, the form's blocked Start) is set in no test: delete it and the suite stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1, auditing #2583)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/teamrun.py` (`next_members`, the `want in plan.sit_out or want not in by_name` arm); `src/shiftlead/ui/app.py` (`api_team_line`'s `isinstance(x, str)` and `x is None` arms); `tests/test_ui_member_line.py`
-
-**Why:** #2583's docstring says `next_members` returns *why the form cannot start one (the line sits out under the current flow)*, and `/api/team_line` hands that string back as `why`, which blocks Start in `app.js`. No test builds a team whose current flow sits a line out: `test_next_members_reads_every_line_in_one_plan` and the fill tests only reach the `Launch` arm. Probe, 2026-10-28: change the arm to `if False else by_name.get(want, "x")` and run `tests/test_ui_member_line.py test_team_size.py test_ui_members_size.py test_cli_teams.py test_ui_teams.py test_flows.py` — 279 passed. (`start_member`'s own sit-out refusal is TD-1182's.)
-
-**Fix:** a test with a flow that omits a line: `next_members` returns the string for it and a `Launch` for the others, `/api/team_line` answers its `why`, and a `/new` post for that line is refused.
-
-**Done when** the mutation above fails `tests/test_ui_member_line.py`.
-
----

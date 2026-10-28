@@ -187,3 +187,27 @@ def test_a_resume_with_a_member_line_is_the_records_never_a_new_member(world, cl
     assert _post(client, tmp_path, name="dc-grinder", resume="abc-123").status_code == 303
     (made,) = fleet.creates()
     assert made["resume"] == "abc-123" and made["name"] == "dc-grinder" and "run_only" not in made
+
+
+def test_a_line_the_current_flow_sits_out_fills_with_why_and_start_is_refused(world, client):  # noqa: F811
+    """`next_members`' other answer (TD-1186): under `build-review`, a designer line sits out, so the fill answers
+    its `why` (the form's Start blocked) and a `/new` post for it creates nothing; the grinder lines still fill."""
+    tmp_path, fleet = world
+    _dc_team(tmp_path)
+    shiftlead_yml = tmp_path / "shiftlead" / ".shiftlead.yml"
+    doc = yaml.safe_load(shiftlead_yml.read_text())
+    doc["held"] = ["src/sessionorc/**"]
+    doc["teams"]["dc-grind"].update(flows=["build-review", "td"], techlead={"name": "dc-techlead"})
+    doc["teams"]["dc-grind"]["members"].append({"role": "designer", "name": "dc-designer"})
+    shiftlead_yml.write_text(yaml.safe_dump(doc))
+    _running(fleet, "dc-grinder")
+    org, _ = uiapp.org_here()
+    got = teamrun.next_members(org, "dc-grind", "kmaster", fleet.sessions)
+    assert got["dc-designer"] == "dc-designer sits out under build-review"
+    assert got["dc-grinder"].name == "dc-grinder-2" and got["dc-hunter"].name == "dc-hunter-2"
+    fill = client.get("/api/team_line", params={"team": "dc-grind", "line": "dc-designer"}).json()
+    assert fill == {"team": "dc-grind", "line": "dc-designer", "why": "dc-designer sits out under build-review"}
+    assert client.get("/api/team_line", params={"team": "dc-grind", "line": "dc-grinder"}).json()["why"] == ""
+    r = _post(client, tmp_path, role="designer", line="dc-designer", name="dc-designer-2")
+    assert r.status_code == 400 and "dc-designer sits out under build-review" in r.json()["detail"]
+    assert not fleet.creates()
