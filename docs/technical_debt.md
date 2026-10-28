@@ -94,6 +94,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1165 | The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count | Medium | Open — build |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build, blocked by TD-1165 |
+| TD-1168 | `AO.focusIcon`'s three call sites in `app.js` (#2520) are pinned by no test: delete any one and the Focus tab icon stops following the state with a green suite | Low | Open — build |
 
 ---
 
@@ -1995,6 +1996,24 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** as §4.5a's rows say. (1) `teams_for_form` carries each team's member lines (name, role, profile, lane, brief, the next free name, and the current flow's compiled lane, reader and stage brief where a flow is set). (2) Under a Team pick, a Role a member line names (each line by name where a role has two) fills the form from the line: the name, profile, lane and brief, the manager as controller, unattended and supervised; Start makes a run-only member through TD-1166's create; on a team not running the form refuses with *<team> is not running: start it first* and offers the team's **Start**. (3) **keep as a team member**, off by default: ticked, the line's fields are drawn locked with *a kept member is the line's: change the line in the definition*, and Start is TD-1165's **+**, after the same running check (refused on a team not running, Start offered). (4) **run it under me instead** on such a pick starts the person's own session in the team as today, the manager still ticked as its controller, and hides the tick; it needs no running team. *Interactive*, `plain` and a role no line names are unchanged.
 
 **Done when** tests pin: the fill for a repo-defined team's grinder line (dev-cadence's `dc-grinder` shape: brief `docs/briefs/grinder-dc-1.md`, profile, lane, the manager's id, unattended and supervised); a Start making a run-only record with those fields; the refusal on a team not running, with Start offered; the line's fields locked under the tick; a team whose manager is a person (`manager: person`: no controller ticked, running when any crew record is live); two lines of one role offered each by its name; the *a kept member is the line's* note under the tick; the tick writing the size and creating a kept member; *run it under me instead* giving TD-160's record. The form is looked at in headless Chromium (design §4.9b) with a member line picked, ticked and unticked, the shots named in the PR. `pdm run test` and `pdm run lint` pass.
+
+---
+
+## TD-1168: `AO.focusIcon`'s three call sites in `app.js` (#2520) are pinned by no test: delete any one and the Focus tab icon stops following the state with a green suite
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2520)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/ui/static/app.js` (`AO.focusIcon(s)` after the first-paint `document.title = AO.focusTitle(s)`, `AO.focusIcon(v)` in `render(v)`, `AO.focusIcon({ state_class: "exited" })` in the *forgotten* branch); `tests/test_ui_tab_icons.py::test_focus_icon_follows_the_state_and_leaves_what_it_cannot_name`; design §4.5 *A tab's icon* (TD-1155)
+
+**Why:** The one JavaScript test evals `app.js` under a stub and calls `AO.focusIcon` itself, so it pins the function and never that Focus calls it. Probes in the worktree, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_tab_icons.py` (7 passed unchanged): deleting the line `AO.focusIcon(s);` (first paint) — 7 passed; deleting `AO.focusIcon(v);` from `render` — 7 passed; deleting `AO.focusIcon({ state_class: "exited" });` from the forgotten branch — 7 passed. Each leaves the tab on the tile the page was served with, so the design's "kept current by the feed" and "a forgotten session goes grey" fail unseen. `grep -rn focusIcon tests` finds only the probe's own file.
+
+**Fix:** drive the three sites from the node probe where its stub reaches them (the feed callback with a `state_class`, then read the link's `href`); where it cannot, a test that each `document.title = …` line in Focus's code is followed by `AO.focusIcon(` is the floor. Run it against the three probes above.
+
+**Done when** each probe above fails a test, and `pdm run test` passes.
 
 ---
 
