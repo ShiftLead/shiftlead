@@ -172,7 +172,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      home then does it the tick's way: the **`restart`** RPC — a person's alone, as `set_settings`
      is (§5; no controller gains it: an `early` or a `repeat` one is the person's by §4.9a, and a
      manager that could restart its members past the marks would be the loop the marks catch) —
-     on a supervised record that has a launch record and is `idle`, `exited` or `closed`, **closes
+     on a supervised record that has a launch record and is `idle`, `exited` or `closed` — never one
+     already marked `closed_for: {why: run_ended}`, refused *its run ended: start the team, or add one
+     from the form* (§4.9 *A member started from the form*, TD-1149) — **closes
      it if it is still there under the same test the tick's own close makes** — the git fields
      known, nothing uncommitted and nothing unpushed; else refused by name with what is left (*git
      state unknown*, *2 uncommitted*, *1 unpushed*), as a wanted restart is held — and **replays it
@@ -201,7 +203,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      stop time has passed — Resume with changes…*), and one whose profile is over its usage line
      (the gate would pause what the press started). Every refusal is made before anything is
      touched. A create that fails after the close is told to the person as the press's answer:
-     the record stays `closed` with its marks, so the row stands and the press can be made again.
+     the record stays `closed` with its marks, so the row stands and the press can be made again —
+     a run-only record too, since the close a restart makes writes no `run_ended` (§4.9, TD-1149).
      A member on a node is closed and created over the link as rule 1's replay is, and waits for
      the link. **Where it is pressed**: **Restart** on the Inbox row *restart* beside Resume
      (§4.5a, with the help saying which is which: *Restart puts it back in its team's run as its
@@ -625,6 +628,16 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   8. **Work for a team that wound down.** A team that winds down closes its members, so rule 6 has
      nobody to tell. A member the current flow sits out (`closed_for: {why: sit_out}`, §4.9c) is
      passed over: no lane of it is watched, and `wound_down` skips it as it skips a `finished` one.
+     **A run-only member** (`run_only: true`, §4.9 *A member started from the form*, TD-1149) is
+     never replayed, an exited one included, and a record marked `closed_for: {why: run_ended}` is
+     passed over as a sat-out one is: the home writes that mark on any Close of a run-only record but a
+     person's Restart's own (§4.9; rule 2),
+     when rule 9 concludes its team, and, when the team winds down or is stopped, on every dead
+     run-only crew record not yet marked. While it is live it is a member like any other: `crew` holds
+     it, so it keeps its team from reading wound down, and rule 9 counts it — the team concludes only
+     once it too is finished. The readings below that leave run-only records out (a stopped team's
+     lanes, the `work_waiting` mark's crew) are of a team with nobody live, and leave it out only of
+     what is replayed and watched.
      The tick keeps `lane_seen` for a member that is gone as it does for a live one, and reads a
      team as **wound down** as its card does (§4.5a *wound down* note), over the team's
      **unattended** sessions as the card's reading is (§4.9 *A person in the team*): none of them
@@ -712,8 +725,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      that runs on has only the members the mark names replayed, each alone — its launch record,
      `why: work` with its `ids`, `start` and `of` counting the members replayed, its mail kept —
      under the same five bounds, the usage line read for its profile, one such start counting as one
-     of the team's `WORK_STARTS_DAY`; a named member at its ceiling, suspended, sat out, or without
-     a launch record is left, and a mark naming only such members holds as `nothing`. Under `ask`
+     of the team's `WORK_STARTS_DAY`; a named member at its ceiling, suspended, sat out, run-only, or
+     without a launch record is left, and a mark naming only such members holds as `nothing`. Under `ask`
      the row reads *ao-grind · grinder-ao-1 finished 00:56 · its lane gained TD-428* (§4.5a **Inbox
      row: team start**), and its
      **Start** replays the named members and not the team, which is running — `work_start {team}`, a
@@ -760,7 +773,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      its ledger).
 
      **How the lanes are read.** The tick reads a stopped team's records exactly as it reads a
-     wound-down team's: the crew less its seats, superseded records and members the flow sat out,
+     wound-down team's: the crew less its seats, superseded records, run-only records and members the flow sat out,
      the manager included where its role carries a lane. It uses the same reading of ledger
      entries and the repo's work orders, the same `gained`, the same `WORK_SETTLE`. **A baseline**
      is added for both kinds of team:
@@ -789,7 +802,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      reading is for a team with nobody live.
 
      **The mark** is the same `work_waiting`, with **`stopped: {by, at}`** beside `members`, read
-     over the team's **current** crew records (not superseded, not sat out):
+     over the team's **current** crew records (not superseded, not sat out, not run-only):
      - A record's **end** is its `ended.at` where `ended` stands, else `closer.at`, else
        `closed_at` (a record closed before those fields existed). A Close that tidies an exited
        card later does not move it. `at` is the newest end among those records.
@@ -887,7 +900,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      findings — rule 8 starts one on lane news alone — so the PR would sit with nobody to read it
      and nobody to fix what the reader finds; any other dead record is
      passed over, as *concluded* passes it over; and a record the current flow sat out
-     (`closed_for: {why: sit_out}`, §4.9c) is passed over whatever it declared — rules 1, 2 and 7
+     (`closed_for: {why: sit_out}`, §4.9c), or whose run ended with it (`run_ended`, §4.9), is passed over whatever it declared — rules 1, 2 and 7
      never recreate it, so a `restart_wanted` on it would otherwise block the reading for good.
      `restart` is true when any counted member carries `restart_wanted`: the page reads
      *concluded · restart wanted* then, mixed with declarations of `out_of_work` or not, and **the
@@ -937,7 +950,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      a team that dissolves is never quiet and never told twice, whoever ended it. **Then the card
      reads *wound down <t> ago · by the tick*** — `wound_down` and rule 8's reading skip the
      manager as they skip a seat when its `closed_for` says `finished`, since the premise of this
-     rule is a manager that never declared — and rule 8 watches its lanes as after any wind-down.
+     rule is a manager that never declared — and rule 8 watches its lanes as after any wind-down. The same conclusion's closes mark each of the
+     team's run-only records, the finished live ones it closes and any dead one not yet marked,
+     `closed_for: {why: run_ended}` (rule 8, TD-1149).
      Seats are not this rule's to close: an idle seat closes under rule 3's grace, and a Start
      closes it. An interactive manager, or member, is a person's: never typed at, never closed,
      and not counted (§9 invariant 5). Not while a member is gated: a paused member has declared
