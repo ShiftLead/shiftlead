@@ -94,7 +94,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
-| TD-1176 | A precheck test of the home's precheck on main can fail when the precheck has not yet started | Low | Open |
 
 ---
 
@@ -2014,20 +2013,3 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1176: A precheck test of the home's precheck on main can fail when the precheck has not yet started
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (grinder-ao-2, from #2545's precheck)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_precheck_on_main.py:301` (`test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck`)
-
-**Why:** #2545, a ledger-only PR, failed its precheck once (cadence/precheck failure on e2a9077, 2026-10-27 22:37 local) and passed on the rerun at the same tree. The assertion `readings[root.name]["prechecking"] == sha and _ran(fake) == [sha]` read `prechecking` as the sha while `_ran(fake)` was still `[]`: the run is recorded as started before the fake precheck is called, so the test reads the call list too early under load (`-n` workers).
-
-**Fix:** wait for the fake's call in the test (as the suite's other async reads do), or assert `_ran` once the pass has finished, so the test reads no half-started precheck.
-
-**Done when** the test waits for the call and passes repeated runs under `pytest -n auto`.
-
----

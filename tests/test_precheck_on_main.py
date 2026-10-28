@@ -51,10 +51,18 @@ def _reading(**kw) -> dict:
 
 
 def _ran(fake) -> list[str]:
+    """The shas the fake was run on, once its line is whole: the shell's `>>` creates `ran` before `echo`
+    writes to it, so an empty file is a run started, not one with nothing in it (TD-1176)."""
     deadline = time.monotonic() + 5
-    while time.monotonic() < deadline and not fake["ran"].exists():
+    while time.monotonic() < deadline and not _whole(fake["ran"]):
         time.sleep(0.05)
     return fake["ran"].read_text().split() if fake["ran"].exists() else []
+
+
+def _whole(ran: Path) -> bool:
+    with suppress(FileNotFoundError):
+        return ran.read_text().endswith("\n")
+    return False
 
 
 def _gone(f: dict) -> None:
