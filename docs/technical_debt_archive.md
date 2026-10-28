@@ -11426,6 +11426,7 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Owner:** grinder
 **Kind:** build
 **Status:** Done
+**Part of:** TD-638
 **Location:** design §4.2 (*And the model*), §4.2a, §8; `src/sessionorc/agent.py` (the launch env ~L1120, beside `AGENT_NAME`: `AGENT_MODEL` = `<adapter>/<the profile's model alias>` (`profiles.py` ~L44 keeps an alias, not a full id), `AGENT_MODEL_FILE` = `git rev-parse --absolute-git-dir` in the session's directory joined with `shiftlead-agent-model`), both places the record's `model` is set — the hook apply `agent_tick.py` ~L3840 (SessionStart, `PostModelSwitch`) and the transcript read ~L3278 — writing the file with `<adapter>/<s.model>` when the value changes (`s.model` is the full id; `short_model`, `adapters.py` ~L214, is display only); `tests/test_agent*.py`, `tests/test_hook*.py`
 
 **Why:** TD-638: Paul, 2026-10-13 — *recording which did what is a good idea … could expand it to list the actual model*; a commit names the session, and only Claude Code's own attribution names a model, never after a `/model` switch.
