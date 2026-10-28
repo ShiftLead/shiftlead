@@ -1365,18 +1365,19 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
 
 def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
     """§4.5a *team card: Members…* (TD-172): on the *i* panel's Definition line (TD-418) of a team
-    `org.yml` defines; on a team a repo defines, drawn disabled with its reason and **Open file**
-    (TD-229); never on *No team*. The exited banner's *one member back* line and the team skill's say the same thing."""
+    `org.yml` defines; on a team a repo defines too, its reason and **Open file** beside it (TD-229) — the
+    dialog opens there with Add member and Remove disabled and its − / + live (TD-1165); never on *No team*.
+    The exited banner's *one member back* line and the team skill's say the same thing."""
     from shiftlead.ui.app import templates
 
     head = templates.get_template("group_head.html")
     base = {"team": "ao-grind", "label": "ao-grind", "defined": True, "stopped": True, "members": [], "live": 0}
     assert 'data-members="ao-grind"' in head.render(g={**base, "in_org": True})
     repo = head.render(g={**base, "in_org": False, "source": "/r/.shiftlead.yml", "source_repo": "r"})
-    # a repo's team (§4.5a *Members… on a repo-defined team*, TD-229 slice 4): disabled, its reason
-    # beside it, and **Open file** on its `.shiftlead.yml` through the person's `open_in`
-    assert "data-members" not in repo and "defined in r&#39;s .shiftlead.yml — changed by PR</span>" in repo
-    assert '<button class="btn sm ghost" disabled title="defined in r&#39;s .shiftlead.yml' in repo
+    # a repo's team (§4.5a *Members… on a repo-defined team*, TD-229 slice 4, TD-1165): pressable, its
+    # reason beside it, and **Open file** on its `.shiftlead.yml` through the person's `open_in`
+    assert 'data-members="ao-grind"' in repo and "defined in r&#39;s .shiftlead.yml — changed by PR</span>" in repo
+    assert "disabled" not in repo[repo.index('data-members="ao-grind"') - 60 : repo.index('data-members="ao-grind"')]
     assert ">Open file</a>" in repo and "/r/.shiftlead.yml" in repo
     panel = repo[repo.index('class="note secinfo helppanel"') :]
     assert panel.index('<div class="defline"><b>Definition</b>') < panel.index(">Open file</a>")

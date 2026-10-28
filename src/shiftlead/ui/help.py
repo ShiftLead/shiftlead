@@ -83,11 +83,12 @@ HELP: tuple[Help, ...] = (
         "the Definition line",
         "a team's help panel",
         (
-            "Says where this team is defined and how its shape is changed: Members… adds or removes a member, "
-            "Open file opens the file that defines it, and Flow on Settings → goes to the flow it follows. Open "
-            "it when the team should be shaped differently — another member, another flow — rather than run "
-            "differently. It changes nothing by itself, and a team a repo defines is changed by a pull request "
-            "to that repo, so its Members… is disabled with the reason."
+            "Says where this team is defined and how its shape is changed: Members… adds or removes a member "
+            "line and sets how many sessions each line runs, Open file opens the file that defines it, and Flow "
+            "on Settings → goes to the flow it follows. Open it when the team should be shaped differently — "
+            "another member, another flow — rather than run differently. It changes nothing by itself, and a "
+            "team a repo defines is changed by a pull request to that repo, so its Members… opens with Add "
+            "member and Remove disabled, the reason beside them, and only its − / + live."
         ),
     ),
     Help(

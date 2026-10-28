@@ -137,8 +137,10 @@
    filled by `app.js` from the one table its `keydown` handler reads — never written here #}
 {#- design §4.5a *Members dialog* (§4.9, TD-163, built by TD-172): the definition's manager, techlead seat
     and member entries, each with the sessions holding it; **Add member** and **Remove** — `org.yml`
-    edited as text in place, a person's act through this page's process. Filled by the script from
-    `/api/teams/<t>/members`; every name in it is drawn as text. -#}
+    edited as text in place, a person's act through this page's process — and on each member line
+    **− / +** beside its size, a setting (§4.9 *A team's size*, TD-1165). On a repo-defined team Add
+    member and Remove are drawn disabled, the reason and **Open file** beside them, and − / + live.
+    Filled by the script from `/api/teams/<t>/members`; every name in it is drawn as text. -#}
 <dialog id="membersdlg" class="card pad maildlg" aria-labelledby="membershead">
   <form method="dialog" class="col gap">
     <div class="row gap"><span class="h2" id="membershead">Members</span><span class="grow"></span><button class="btn sm ghost" value="close">Close</button></div>
@@ -149,6 +151,7 @@
       <label class="field">name <input class="input" id="maddname" placeholder="grinder-ao"></label>
       <label class="field">lane <input class="input" id="maddlane" placeholder="free-pick"></label>
       <button class="btn sm primary" type="button" id="maddgo">Add member</button>
+      <span class="meta hidden" id="maddwhy"></span><span id="maddopen"></span>
     </div>
     <div class="note warn hidden" id="memberserr"></div>
   </form>
