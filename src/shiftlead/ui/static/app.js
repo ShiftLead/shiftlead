@@ -3457,8 +3457,9 @@
     const ss = e.sessions || [];
     const up = ss.filter((x) => x.id && !["exited", "closed", "not live"].includes(x.state)).map((x) => x.name);
     const edit = `removes the ${e.name || e.role} line`;
-    if (e.twice) return `Remove from ${team}? It edits org.yml (${edit}); another entry still names ${(ss[ss.length - 1] || {}).name}, so it runs on.`;  // TD-268
-    return `Remove from ${team}? It edits org.yml (${edit})` + (up.length ? ` and winds down ${up.join(", ")} — Wrap up's prompt, never a kill; each card stays until Forget.` : ".");
+    const shared = new Set(e.shared || []), down = up.filter((n) => !shared.has(n));
+    const runs = e.twice ? `; another entry still names ${ss.filter((x) => shared.has(x.name)).map((x) => x.name).join(", ")}, so it runs on` : "";  // TD-268
+    return `Remove from ${team}? It edits org.yml (${edit})` + (down.length ? ` and winds down ${down.join(", ")} — Wrap up's prompt, never a kill; each card stays until Forget` : "") + runs + ".";
   };
   // **−**'s confirm names the session it winds down (§4.5a *Members dialog* **− / +**); "" where it
   // winds none down — a stopped team, or a line whose last name no kept member holds — and asks nothing
@@ -3473,9 +3474,10 @@
     const held = (e.sessions || []).map(who).join(", ");
     const off = v.editable ? "" : ` disabled title="${esc(v.note || "")}"`;
     const rm = ` <span class="grow"></span><button class="btn sm ghost" type="button" data-mremove="${e.index}"${off}>Remove</button>`;
-    const size = `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="-1"${e.size > 0 ? "" : " disabled"} title="one session fewer on this line — a setting, the definition untouched" aria-label="one fewer ${esc(e.name || e.role)}">−</button>`
+    const twin = e.twice ? ` disabled title="another entry shares a name with this line: rename one of them in the definition"` : "";
+    const size = `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="-1"${twin || (e.size > 0 ? "" : " disabled")} title="one session fewer on this line — a setting, the definition untouched" aria-label="one fewer ${esc(e.name || e.role)}">−</button>`
       + ` <span class="msize">${esc(e.words || String(e.size))}</span> `
-      + `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="1" title="one session more on this line — a setting, the definition untouched" aria-label="one more ${esc(e.name || e.role)}">+</button>`
+      + `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="1"${twin} title="one session more on this line — a setting, the definition untouched" aria-label="one more ${esc(e.name || e.role)}">+</button>`
       + (e.next_start ? ` <span class="meta">· from the next Start</span>` : "");
     return `<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} ·</span>${size}<span class="meta">${held}</span>${rm}</div>`;
   };

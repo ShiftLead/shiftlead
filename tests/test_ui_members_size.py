@@ -191,3 +191,25 @@ def test_the_rows_words_and_minuses_confirm(world, client):  # noqa: F811
     assert '<span class="msize">2 (file says 1)</span>' in got[1]["row"]
     assert "· from the next Start" in got[1]["row"]
     assert 'data-mremove="0" disabled title="defined in shiftlead' in got[1]["row"]
+
+
+def test_a_line_sharing_a_name_keeps_its_session_and_has_no_minus_or_plus(world, client):  # noqa: F811
+    """Review of #2579: `twice` reads every name of a line, not its last — a `count: 3` grind beside a line
+    named grind-2 — so Remove's confirm winds down only the names no other entry holds, and − / + are off
+    on that row, since the line's name cannot tell the two apart (TD-268)."""
+    tmp_path, fleet = world
+    doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
+    doc["teams"]["ao-grind"]["members"] = [
+        {"role": "grinder", "count": 3, "name": "grind"}, {"role": "hunter", "name": "grind-2"},
+    ]  # fmt: skip
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    _live(fleet, "grind-1", "grind-2", "grind-3")
+    v = client.get("/api/teams/ao-grind/members").json()
+    e = v["members"][0]
+    assert e["twice"] and e["shared"] == ["grind-2"] and v["twice"] == ["grind-2"]
+    (got,) = _node([{"team": "ao-grind", "e": e, "v": v}])
+    assert got["remove"] == (
+        "Remove from ao-grind? It edits org.yml (removes the grind line) and winds down grind-1, grind-3 — Wrap up's"
+        " prompt, never a kill; each card stays until Forget; another entry still names grind-2, so it runs on."
+    )
+    assert got["row"].count("data-step") == 2 and got["row"].count("another entry shares a name with this line") == 2

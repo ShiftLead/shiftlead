@@ -1824,8 +1824,10 @@ def members_view(
                 "down": names[-1] if up and names and kept(names[-1]) else "",
                 "next_start": not up and size > m.count,
                 "sessions": [held(n) for n in names],
-                # its Remove leaves the session to the other entry; a line sized 0 names none (TD-1164)
-                "twice": any(n in twice for n in m.names()[-1:]),
+                # a name another entry also holds: Remove leaves that session to it, and − / + are off,
+                # since the line's name cannot tell the two apart (TD-268, TD-1165); a line sized 0 names none
+                "twice": any(n in twice for n in names),
+                "shared": [n for n in names if n in twice],
             }
         )
     out: dict[str, Any] = {
