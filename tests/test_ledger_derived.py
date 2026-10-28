@@ -367,3 +367,36 @@ def test_a_decisions_words_after_its_dash_are_what_it_is_held_until():
     )
     assert ledger.until_of("decision (paul), TD-002") == ""  # a list going on past it: no words of its own
     assert ledger.until_of("TD-001") == ledger.until_of(None) == ""
+
+
+def test_a_part_of_line_holds_its_parent_and_stays_out_of_blocked_by(tmp_path):
+    """TD-1130 (ADR 2026-10-27 §2): pickable is ledgerboard's, so an open part holds its parent; the
+    part is carried as `parts_open`, never in `blocked_by`, and a parent with open parts is *blocked*
+    whatever its Kind. A part names its parent in `part_of`; an archived part of an open parent is in
+    the reading's `archived`."""
+    text = (
+        "## TD-050: the design\n\n**Kind:** design-first\n\n"
+        "## TD-051: a part\n\n**Kind:** build\n**Part of:** TD-50\n\n"
+        "## TD-052: another part, blocked\n\n**Kind:** build\n**Part of:** TD-050\n**Blocked by:** TD-051\n\n"
+        "## TD-053: a loose entry\n\n**Kind:** build\n\n"
+        "## TD-054: a part of a finished parent\n\n**Kind:** build\n**Part of:** TD-049\n"
+    )
+    archive = (
+        "## TD-049: done design\n\n**Kind:** design-first\n\n"
+        "## TD-048: an archived part\n\n**Part of:** TD-050\n\n"
+        "## TD-047: an archived part of an archived parent\n\n**Part of:** TD-049\n"
+    )
+    got = {e["id"]: e for e in ledger.entries(text, archive)}
+    design, part, blocked = got["TD-050"], got["TD-051"], got["TD-052"]
+    assert (design["pickable"], design["blocked_by"], design["parts_open"]) == ("no", [], ["TD-051", "TD-052"])
+    assert design["for_page"] == "blocked" and design["part_of"] is None
+    assert (part["pickable"], part["part_of"], part["parts_open"], part["for_page"]) == ("yes", "TD-50", [], "pickable")
+    assert (blocked["pickable"], blocked["blocked_by"], blocked["for_page"]) == ("no", ["TD-051"], "blocked")
+    assert (got["TD-053"]["part_of"], got["TD-053"]["parts_open"], got["TD-053"]["pickable"]) == (None, [], "yes")
+    assert (got["TD-054"]["part_of"], got["TD-054"]["pickable"]) == ("TD-049", "yes")
+    _repo(tmp_path / "r", text, archive)
+    from datetime import UTC, datetime
+
+    read = ledger.reading(tmp_path / "r", datetime.now(UTC), with_history=False)
+    assert read["archived"] == ["TD-048"], "an archived part of an open parent; never one of an archived parent"
+    assert read["by_kind"]["blocked"] == 2

@@ -72,6 +72,8 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "blocked_by": [],
         "blocked_ids": [],
         "xrepo_ids": [],
+        "parts_open": [],  # no open entry names it in `Part of:`, and it names no parent (TD-1130)
+        "part_of": None,
         "pickable": "yes",
         # its place in the rank (§4.4 *The Queue*, TD-769): no rank file, so its implicit key
         "key": "1|0|000010",
