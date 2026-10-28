@@ -592,6 +592,48 @@
     AO.popOut(a.dataset.focus);
   });
 
+  // §4.5 *Browser mechanics* *The top bar is held* (TD-1187, built by TD-1192): sticky on every page (the CSS),
+  // and on a phone away while the page scrolls down, back on a scroll up. The rules, first match wins, every
+  // threshold strict: held (keyboard focus in the bar, or + New ▾ open) or within the bar's height of the top
+  // (4 px of slack for a jittery scroll) — shown; shown, a scroll down of more than 4 px since the bar last came or
+  // went sends it away; away, a scroll up of more than 4 px brings it back. `y` is clamped by the caller, so a
+  // rubber-band bounce at either end moves nothing.
+  AO.barAway = function (anchorY, y, barH, away, held) {
+    if (held || y <= barH + 4) return { away: false, anchorY: y };
+    if (!away) return y - anchorY > 4 ? { away: true, anchorY: y } : { away: false, anchorY: Math.min(anchorY, y) };
+    return anchorY - y > 4 ? { away: false, anchorY: y } : { away: true, anchorY: Math.max(anchorY, y) };
+  };
+  AO.barDecide = function () {};  // a page without a bar (a popped-out Focus) has nothing to decide
+  // `--barh` follows the bar's height (the scroll padding and every rail's `top` read it); on a wide screen
+  // `decide` returns at once, so a window narrowed into a phone's width mid-session is already wired.
+  AO.holdBar = function () {
+    const bar = $(".topbar");
+    if (!bar || !window.matchMedia) return;
+    const root = document.documentElement;
+    if (window.ResizeObserver) new window.ResizeObserver(() => root.style.setProperty("--barh", `${bar.offsetHeight}px`)).observe(bar);
+    const phone = window.matchMedia("(max-width: 720px)");
+    let away = false, anchorY = 0;
+    const clampedY = () => Math.max(0, Math.min(window.scrollY, root.scrollHeight - window.innerHeight));
+    const held = () => {
+      const menu = $("#newmenu");
+      // keyboard focus only: a tap's focus, which a phone leaves on a tapped button, does not hold the bar
+      try { if (bar.querySelector(":focus-visible")) return true; } catch (e) { /* no :focus-visible: none held */ }
+      return !!(menu && menu.open);
+    };
+    const decide = () => {
+      if (!phone.matches) return;
+      const got = AO.barAway(anchorY, clampedY(), bar.offsetHeight, away, held());
+      away = got.away; anchorY = got.anchorY;
+      bar.classList.toggle("away", away);
+    };
+    phone.addEventListener("change", () => { away = false; anchorY = clampedY(); bar.classList.remove("away"); });
+    window.addEventListener("scroll", decide, { passive: true });
+    bar.addEventListener("focusin", decide);
+    // during `focusout` the leaving element still matches :focus-visible: read the bar a frame later
+    bar.addEventListener("focusout", () => requestAnimationFrame(decide));
+    AO.barDecide = decide;
+  };
+
   // A *more ▾* or *Snooze* menu is drawn fixed to the viewport, placed from its summary's rect
   // (TD-121): drawn inside the card, the card's `overflow: hidden` clipped it to a sliver of border.
   // Right-aligned under the summary; above it where the space below is short; kept on screen.
@@ -610,6 +652,7 @@
     m.style.top = `${p.top}px`; m.style.left = `${p.left}px`;
   };
   document.addEventListener("toggle", (ev) => {
+    AO.barDecide();  // + New ▾ opened or shut: the bar is back in place before its menu is placed from it
     const d = ev.target;
     if (!d.matches || !d.matches("details.more[open]")) return;
     $$("details.more[open]").forEach((o) => { if (o !== d) o.open = false; });
@@ -6691,6 +6734,7 @@
   // rather than in any one page's init (the script tag is at the end of the body: the DOM is up).
   window.addEventListener?.("resize", fitUsage);  // `?.`: the node probe of test_ui_inbox has no real window
   fitUsage();
+  AO.holdBar();
   // design §4.5a the ***i*** mark (TD-157, built by TD-167): the team card's, the Focus header's and
   // the exited banner's. One delegated press for all of them — a header or a banner is redrawn by
   // the stream, which would drop a listener bound to the button — and which are open is this
