@@ -22143,8 +22143,6 @@ Mail tells the member now. The table's entry is what lasts.
 
 **Related:** TD-637 (the design), TD-639 (ShiftLead's side).
 
----
-
 **Resolved:** 2026-10-28 (Paul, in session `queue-deps`; moved, not fixed): the fix is dev-cadence's (the `ci` row reads the required checks), so the entry is filed there as **dev-cadence#TD-178** (its PR #447, squash 69c99bf) and closes here, under Paul's rule that dev-cadence work goes on dev-cadence's ledger and a grinder never works another repo. The fix reaches this repo at its next dev-cadence pin bump.
 
 ## TD-645: `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638)
@@ -22165,7 +22163,5 @@ Mail tells the member now. The table's entry is what lasts.
 **Done when** a commit made in a session with either variable carries one `Agent-Model:` trailer naming the model then in use, one made without carries none, and dev-cadence's sync lands it.
 
 **Related:** TD-638 (the design), TD-644 (ShiftLead's side).
-
----
 
 **Resolved:** 2026-10-28 (Paul, in session `queue-deps`; moved, not fixed): the fix is dev-cadence's (the `Agent-Model:` trailer), so the entry is filed there as **dev-cadence#TD-181** (its PR #447, squash 69c99bf) and closes here, under Paul's rule that dev-cadence work goes on dev-cadence's ledger and a grinder never works another repo. The fix reaches this repo at its next dev-cadence pin bump.
