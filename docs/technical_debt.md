@@ -92,8 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Designed — builds TD-1164–TD-1167 |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
-| TD-1165 | The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count | Medium | Open — build |
-| TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build, blocked by TD-1165 |
+| TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build |
 | TD-1168 | `AO.focusIcon`'s three call sites in `app.js` (#2520) are pinned by no test: delete any one and the Focus tab icon stops following the state with a green suite | Low | Open — build |
 | TD-1170 | tests/test_td_next.py's TD-1145 v2 test cannot tell a rename into `archive/` from an added entry: the archive-move row uses an id below the open PRs' floor | Medium | Open — build |
 | TD-1171 | `ledger.stamp`'s test does not pin its `archive/` entry files or its `README.md`: the tick's change test could drop either and `pdm run test` passes | Medium | Open — build |
@@ -1965,25 +1964,6 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1165: The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-27 (the designer, from TD-1149's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Part of:** TD-1149
-**Location:** `src/shiftlead/org.py` (`edit_members` 1060); `src/shiftlead/ui/app.py` (the members route); the Members dialog's template and `app.js`; design §4.9 *A team's size* (**− / +**, *Add member and Remove keep the definition's share*), §4.5a *team card: Members…*, *Members dialog* **− / +** and **Add member / Remove**, *Members… on a repo-defined team*
-
-**Why:** TD-1149 part 2: the size's two controls are the dialog's **− / +** and the form's tick (TD-1167); the dialog is disabled today on a repo-defined team, where the size is wanted most.
-
-**Fix:** as §4.5a's rows say. (1) The dialog opens on a repo-defined team, Add member and Remove disabled with today's reason and **Open file**, **− / +** live. (2) **− / +** beside each member line's count, *2 (file says 1)* where the size differs, through `teamrun.resize` one step at a time (TD-1164); − confirms with the session it winds down; **+** on a line whose next name a live run-only record holds adopts it — `run_only` cleared, nothing created — and on a team with nothing live the row adds *· from the next Start*; adoption is `teamrun.resize`'s (TD-1164). (3) **Add member** appends a member line and never bumps a `count:`; **Remove** deletes the whole line, never decrements a count (`edit_members` 1133–1136); `TeamDef.next_name` (`org.py` 211–230), Add member's role-keyed default, stays and defaults Add's name past the **sized** names, and `edit_members`' duplicate check reads the sized names, not `session_names()`'s. (4) The dialog's help paragraph (§4.5a *The help text*), if it names the count bump, is reworded in this PR with `help.py` in step.
-
-**Done when** tests pin: the dialog opening on a repo-defined team with Add member and Remove disabled; + and − on a stopped and a live org team and a repo-defined one (the setting written, the member created or wound down, no definition byte changed); − refused at 0 and at a listed flow's need, with its words; Add member on a role with a counted line appending a line rather than bumping, and refusing a name a sized line holds (`count: 1, size: 3` against `<name>-2`); Remove deleting a counted line whole; + adopting a live run-only member, which a rule 7 restart then brings back still kept; the row's *· from the next Start* on a stopped team; −'s confirm naming the session it winds down. The dialog is looked at in headless Chromium (design §4.9b) on an org team and a repo team, the shots named in the PR. `pdm run test` and `pdm run lint` pass.
-
----
-
 ## TD-1167: The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick
 
 **Priority:** Medium
@@ -1992,7 +1972,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — build
-**Blocked by:** TD-1165
 **Part of:** TD-1149
 **Location:** `src/shiftlead/ui/static/app.js` (`applyTeam` 4809, `tickTeamManager`, `teamRoles`, `applyRole`); `src/shiftlead/ui/templates/new.html` (the Team picker 70–79); `src/shiftlead/ui/common.py` (`teams_for_form` 901: the member lines); `src/shiftlead/ui/app.py` (`new_submit` 2423); design §4.9 *A member started from the form*, *A person in the team*, §4.5a *New session* **Team** picker and **member line** fill + **keep as a team member**
 

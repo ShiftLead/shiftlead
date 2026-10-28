@@ -1787,10 +1787,20 @@ def members_view(
     states. `editable` is whether the page may edit it: a team `org.yml` defines, never one a
     repo's `.shiftlead.yml` does (*edit it in the repo; this card only reads it*). `next` is Add
     member's default name for each of `roles` (and the members' own), `twice` the names the
-    definition holds more than once, each entry holding one marked `twice` (TD-268)."""
+    definition holds more than once, each entry holding one marked `twice` (TD-268). Each entry carries
+    its `size` — the sessions the line runs — with `count` its file's, `words` as the row reads it (*2
+    (file says 1)*), `down` the session its **−** winds down on a live team, and `next_start` on a team
+    with nothing live whose size is above its count (*· from the next Start*, §4.9 *A team's size*,
+    TD-1165): **− / +** are live on every team, a repo's included."""
     team = teams.find(org, name)
     twice = team.twice_named()
-    by_name = {str(s.get("name") or ""): s for s in crew(name, sessions)}
+    mine = crew(name, sessions)
+    by_name = {str(s.get("name") or ""): s for s in mine}
+    up = bool(live(mine))
+
+    def kept(n: str) -> bool:  # what −'s step down winds down: never a run-only member (`resize`)
+        s = _current(n, mine)
+        return s is not None and not s.get("run_only") and not s.get("sit_out") and not sat_out(s)
 
     def held(n: str) -> dict[str, Any]:
         s = by_name.get(n)
@@ -1800,6 +1810,8 @@ def members_view(
     repo = Path(team.source).parent.name if team.source else "the repo"
     entries = []
     for i, m in enumerate(team.members):
+        names = m.names()
+        size = len(names)
         entries.append(
             {
                 "index": i,
@@ -1807,9 +1819,15 @@ def members_view(
                 "name": m.name,
                 "lane": list(m.lane),
                 "count": m.count,
-                "sessions": [held(n) for n in m.names()],
-                # its Remove leaves the session to the other entry; a line sized 0 names none (TD-1164)
-                "twice": any(n in twice for n in m.names()[-1:]),
+                "size": size,
+                "words": str(size) + (f" (file says {m.count})" if size != m.count else ""),
+                "down": names[-1] if up and names and kept(names[-1]) else "",
+                "next_start": not up and size > m.count,
+                "sessions": [held(n) for n in names],
+                # a name another entry also holds: Remove leaves that session to it, and − / + are off,
+                # since the line's name cannot tell the two apart (TD-268, TD-1165); a line sized 0 names none
+                "twice": any(n in twice for n in names),
+                "shared": [n for n in names if n in twice],
             }
         )
     out: dict[str, Any] = {
@@ -1818,7 +1836,7 @@ def members_view(
         "editable": editable,
         # the reason the card's disabled Members… gives (§4.5a *Members… on a repo-defined team*, TD-229)
         "note": "" if editable else f"defined in {repo}'s .shiftlead.yml — changed by PR",
-        "live": bool(live(crew(name, sessions))),
+        "live": up,
         "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
         "techlead": held(team.techlead.name) if team.techlead else None,
         "members": entries,
@@ -2073,42 +2091,45 @@ def resize(
 
 
 def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, host: str = "") -> dict[str, Any]:
-    """**Remove** (design §4.9): the entry's `count:` decremented — the highest-numbered member goes
-    — or its line deleted; the member so removed takes the sit-out form a removal from the definition
-    takes (`relaunch {sit_out, dropped}`, §4.9 *A member renamed or removed in the definition*, TD-706):
-    a live one wound down by the home — the wrap-up, never a kill — and an ended one marked as it
-    stands, so rule 8 never replays it; its record stays a card until Forget. Under a team that
-    lists flows, the last member of a role a listed flow's stage needs is refused, naming the flow
-    (§4.9c), the file untouched; `host` is where the team's checkout is read."""
+    """**Remove** (design §4.9): the entry's whole line deleted, whatever its count or size (*Add member and
+    Remove keep the definition's share*, TD-1165), and each session it held takes the sit-out form a removal
+    from the definition takes (`relaunch {sit_out, dropped}`, §4.9 *A member renamed or removed in the
+    definition*, TD-706): a live one wound down by the home — the wrap-up, never a kill — and an ended one
+    marked as it stands, so rule 8 never replays it; its record stays a card until Forget. A name another
+    entry still holds runs on (TD-268), and a run-only member ends with its run. Under a team that lists
+    flows, the last members of a role a listed flow's stage needs are refused, naming the flow (§4.9c), the
+    file untouched; `host` is where the team's checkout is read."""
     org = orgmod.with_home_settings(orgmod.load(path))  # under the picked flow (§4.9c)
     team = teams.find(org, name)
     if not 0 <= index < len(team.members):
         raise teams.TeamError(f"team {name} has no member entry {index + 1} — reload and try again")
     m = team.members[index]
     if m.role and team.flows:
-        left = sum(len(x.names()) for x in team.members if x.role == m.role) - 1
+        left = sum(len(x.names()) for x in team.members if x.role == m.role) - len(m.names())
         here = hosts.local_host().name
         need = teams.flow_needs(org, team, m.role, team.host or host or here, here, files_via(call)) if left < 1 else ""
         if need:
             raise teams.TeamError(f"{need} needs a {m.role}: drop {need} from flows: first")
-    gone = next(iter(team.members[index].names()[-1:]), "")  # a line sized 0 holds no session (TD-1164)
+    gone = m.names()  # a line sized 0 holds no session (TD-1164)
     did = orgmod.edit_members(path, name, remove=index, role=role)
     _commit(call, f"org: {name} {did}")
-    out: dict[str, Any] = {"team": name, "did": did, "wound_down": None, "text": f"org.yml: {did}"}
-    if gone and gone in teams.find(orgmod.with_home_settings(orgmod.load(path)), name).session_names():
-        # a name the definition held twice: another entry still names the session, so it runs on (TD-268)
-        out["text"] += f" — another entry still names {gone}, so it runs on"
-        return out
-    s = _current(gone, crew(name, call("list"))) if gone else None
-    if s is None or s.get("sit_out") or sat_out(s):
-        return out
-    ended = s.get("state") in DEAD
-    try:
-        words = _sit_out_member(call, s)
-    except AgentError as e:  # the file is edited either way: what the record could not take is said
-        out["wound_down"] = {**_entry(s, "member"), "action": f"refused: {e}", "state": s.get("state") or "?"}
-        out["text"] += f" — {gone} could not be marked sat out ({e})"
-        return out
-    out["wound_down"] = {**_entry(s, "member"), "action": "marked" if ended else "wrap-up sent", "state": "?"}
-    out["text"] += f" — {words}"
+    out: dict[str, Any] = {"team": name, "did": did, "wound_down": [], "text": f"org.yml: {did}"}
+    still = set(teams.find(orgmod.with_home_settings(orgmod.load(path)), name).session_names())
+    mine = crew(name, call("list")) if gone else []
+    for n in gone:
+        if n in still:  # a name the definition held twice: another entry still names it (TD-268)
+            out["text"] += f" — another entry still names {n}, so it runs on"
+            continue
+        s = _current(n, mine)
+        if s is None or s.get("run_only") or s.get("sit_out") or sat_out(s):
+            continue
+        ended = s.get("state") in DEAD
+        try:
+            words = _sit_out_member(call, s)
+        except AgentError as e:  # the file is edited either way: what the record could not take is said
+            out["wound_down"].append({**_entry(s, "member"), "action": f"refused: {e}", "state": s.get("state") or "?"})
+            out["text"] += f" — {n} could not be marked sat out ({e})"
+            continue
+        out["wound_down"].append({**_entry(s, "member"), "action": "marked" if ended else "wrap-up sent", "state": "?"})
+        out["text"] += f" — {words}"
     return out

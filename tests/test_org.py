@@ -463,13 +463,21 @@ def _members(tmp_path: Path) -> Path:
     return p
 
 
-def test_add_bumps_a_counted_members_count_in_place_and_keeps_every_other_byte(tmp_path):
+def test_add_appends_a_line_beside_a_counted_one_and_never_bumps_its_count(tmp_path):
+    """§4.9 *Add member and Remove keep the definition's share* (TD-1165): Add member writes a new member
+    line, a second line of a role that has a counted one included; the `count:` is the size's (**+**)."""
     p = _members(tmp_path)
-    did = org.edit_members(p, "ao-grind", add={"role": "grinder", "name": "grinder-ao"})
+    did = org.edit_members(p, "ao-grind", add={"role": "grinder", "name": "grinder-ao-3"})
     after = p.read_text()
-    assert did == "grinder-ao count: 2 → 3"
-    assert after == MEMBERS_YML.replace("count: 2, name: grinder-ao", "count: 3, name: grinder-ao")
-    assert org.load(p).teams["ao-grind"].members[0].names()[-1] == "grinder-ao-3"
+    assert did == "added grinder-ao-3 (grinder)"
+    assert "count: 2, name: grinder-ao, lane: [free-pick]}   # the lane" in after
+    assert after == MEMBERS_YML.replace(
+        "      - {role: hunter, name: hunter-ao, lane: [ui]}\n",
+        "      - {role: hunter, name: hunter-ao, lane: [ui]}\n      - {role: grinder, name: grinder-ao-3}\n",
+    )
+    assert [m.names() for m in org.load(p).teams["ao-grind"].members] == [
+        ["grinder-ao-1", "grinder-ao-2"], ["hunter-ao"], ["grinder-ao-3"],
+    ]  # fmt: skip
 
 
 def test_add_of_another_role_appends_one_line_after_the_last_item(tmp_path):
@@ -484,14 +492,17 @@ def test_add_of_another_role_appends_one_line_after_the_last_item(tmp_path):
     assert [m.role for m in org.load(p).teams["ao-grind"].members] == ["grinder", "hunter", "auditor"]
 
 
-def test_remove_decrements_a_count_or_deletes_the_one_line(tmp_path):
+def test_remove_deletes_a_line_whole_whatever_its_count(tmp_path):
+    """§4.9 *Add member and Remove keep the definition's share* (TD-1165): Remove takes the whole line out,
+    a counted one included — a count is lowered by the size's −, never by Remove."""
     p = _members(tmp_path)
-    assert org.edit_members(p, "ao-grind", remove=0, role="grinder") == "grinder-ao count: 2 → 1"
-    assert "count: 1, name: grinder-ao" in p.read_text()
-    assert org.edit_members(p, "ao-grind", remove=1, role="hunter") == "removed hunter-ao"
+    assert org.edit_members(p, "ao-grind", remove=0, role="grinder") == "removed grinder-ao"
     after = p.read_text()
-    assert "hunter-ao" not in after and "# the lane" in after and "# after the members" in after
+    assert "grinder-ao" not in after and "hunter-ao" in after and "# two grinders" in after
     assert len(after.splitlines()) == len(MEMBERS_YML.splitlines()) - 1
+    assert org.edit_members(p, "ao-grind", remove=0, role="hunter") == "removed hunter-ao"
+    after = p.read_text()
+    assert "hunter-ao" not in after and "# the lane" not in after and "# after the members" in after
 
 
 def test_an_edit_that_cannot_be_one_line_is_refused_and_the_file_untouched(tmp_path):
@@ -521,22 +532,6 @@ def test_an_edit_that_would_not_parse_restores_the_bytes(tmp_path, monkeypatch):
     assert p.read_text() == MEMBERS_YML
 
 
-def test_a_count_is_edited_as_the_field_never_as_text_that_looks_like_it(tmp_path):
-    """Review of PR #608: a name holding the characters `count: 9` before the real `count:` must not
-    be the one edited — the entry's own field is, and nothing else in the line changes."""
-    p = tmp_path / "org.yml"
-    p.write_text(
-        MEMBERS_YML.replace(
-            "{role: grinder, count: 2, name: grinder-ao,", '{role: grinder, name: "prod count: 9 today", count: 2,'
-        )
-    )
-    before = p.read_text()
-    assert org.edit_members(p, "ao-grind", add={"role": "grinder"}) == "prod count: 9 today count: 2 → 3"
-    assert p.read_text() == before.replace('"prod count: 9 today", count: 2,', '"prod count: 9 today", count: 3,')
-    org.edit_members(p, "ao-grind", remove=0, role="grinder")
-    assert p.read_text() == before
-
-
 def test_add_member_defaults_to_the_next_free_name_never_an_existing_one(tmp_path):
     """TD-268: the form offered the existing grinder's name, and Add wrote it again. The default is
     the team's pattern with the first number no name of the team holds."""
@@ -560,15 +555,25 @@ def test_add_member_refuses_a_name_the_team_holds_and_leaves_the_file_byte_ident
         with pytest.raises(ValueError, match=f"ao-grind already has {name}$"):
             org.edit_members(p, "ao-grind", add={"role": "grinder", "name": name})
         assert p.read_bytes() == before
-    # a bump that would name a session another entry holds is refused the same way
-    p.write_text(MEMBERS_YML.replace("{role: hunter, name: hunter-ao,", "{role: hunter, name: grinder-ao-3,"))
-    before = p.read_bytes()
-    with pytest.raises(ValueError, match="ao-grind already has grinder-ao-3$"):
-        org.edit_members(p, "ao-grind", add={"role": "grinder"})
-    assert p.read_bytes() == before
     assert (
         org.edit_members(p, "ao-grind", add={"role": "auditor", "name": "grinder-ao-4"})
         == "added grinder-ao-4 (auditor)"
+    )
+
+
+def test_add_member_refuses_a_name_a_sized_line_holds(tmp_path, monkeypatch):
+    """§4.9 *A team's size* (TD-1165): the duplicate check reads the sized names — a `count: 1` line at
+    `size: 3` holds `<name>-2` and `<name>-3`, so Add member refuses them and the file is untouched."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "settings.yml").write_text("teams: {ao-grind: {size: {hunter-ao: 3}}}\n")
+    p = _members(tmp_path)
+    before = p.read_bytes()
+    with pytest.raises(ValueError, match="ao-grind already has hunter-ao-2$"):
+        org.edit_members(p, "ao-grind", add={"role": "hunter", "name": "hunter-ao-2"})
+    assert p.read_bytes() == before
+    assert (
+        org.edit_members(p, "ao-grind", add={"role": "hunter", "name": "hunter-ao-4"}) == "added hunter-ao-4 (hunter)"
     )
 
 

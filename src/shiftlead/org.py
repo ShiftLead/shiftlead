@@ -1094,34 +1094,16 @@ def _members_block(lines: list[str], team: str) -> tuple[int, list[tuple[int, di
     return m_at, items
 
 
-def _set_count(line: str, body: dict[str, Any], n: int) -> str:
-    """`line` with its entry's `count:` set to `n` — the one `count: <digits>` whose replacement makes
-    the entry parse as it did with only its count changed, since a name or a lane may hold the same
-    characters (review of PR #608). None fits: a ValueError, and the file is not written."""
-    it = _ITEM.match(line.rstrip("\r\n"))
-    want = {**body, "count": n}
-    for m in _COUNT.finditer(line):
-        cand = line[: m.start(2)] + str(n) + line[m.end(2) :]
-        got = _ITEM.match(cand.rstrip("\r\n"))
-        try:
-            parsed = yaml.safe_load(got["body"]) if got else None
-        except yaml.YAMLError:
-            continue
-        if parsed == want and it is not None:
-            return cand
-    raise ValueError("this member's count: cannot be edited as one field of its line — edit it by hand")
-
-
 def edit_members(
     path: Path, team: str, *, add: dict[str, Any] | None = None, remove: int | None = None, role: str = ""
 ) -> str:
     """Add or remove one member of `team` in `org.yml`, **as text, in place** (design §4.9 *Add or
     remove a member from the team card*): comments, order and spacing stay, because nothing is
-    re-serialised. **Add** (`{role, name, lane}`) bumps the `count:` of the member line of that
-    role that carries a count above one — the name pattern gives the next member — else appends one
-    `- {role, name, lane}` line after the block's last item. **Remove** (`remove`, the entry's index
-    in the block, `role` its role, checked) decrements that entry's `count:` — the highest-numbered
-    member goes — or deletes its one line. Refused with the reason when the edit cannot be one
+    re-serialised. **Add** (`{role, name, lane}`) appends one `- {role, name, lane}` line after the
+    block's last item and never bumps a `count:`, which is the size's (§4.9 *Add member and Remove keep
+    the definition's share*, TD-1165); a name the team's **sized** names already hold is refused.
+    **Remove** (`remove`, the entry's index in the block, `role` its role, checked) deletes that whole
+    line, whatever its count. Refused with the reason when the edit cannot be one
     line: a multi-line member, a team without a `members:` block. After the
     write the file is parsed again; a parse that fails restores the bytes and refuses, so a
     definition is never left unreadable. Returns what was done, in words."""
@@ -1135,48 +1117,32 @@ def edit_members(
         want = str(add.get("role") or "")
         if not want:
             raise ValueError("a member needs a role")
-        try:
-            held = load(path).teams[team].session_names()
+        try:  # the names the line's sizes give, not its counts alone (§4.9 *A team's size*, TD-1165)
+            held = with_home_settings(load(path)).teams[team].session_names()
         except Exception:  # an unreadable file is refused by the re-parse below, in its words
             held = []
-        hit = next(
-            (
-                x
-                for x in items
-                if x[2] and x[1].get("role") == want and isinstance(x[1].get("count"), int) and x[1]["count"] > 1
-            ),
-            None,
-        )
-        if hit is not None:
-            i, body, _ = hit
-            n = body["count"]
-            if f"{body.get('name') or want}-{n + 1}" in held:  # the bump would name a session twice (TD-268)
-                raise ValueError(f"{team} already has {body.get('name') or want}-{n + 1}")
-            lines[i] = _set_count(lines[i], body, n + 1)
-            did = f"{body.get('name') or want} count: {n} → {n + 1}"
+        entry = {"role": want}
+        if add.get("name"):
+            entry["name"] = str(add["name"])
+        if entry.get("name", want) in held:  # refused before anything is written (TD-268)
+            raise ValueError(f"{team} already has {entry.get('name', want)}")
+        lane = [str(x) for x in add.get("lane") or [] if str(x).strip()]
+        if lane:
+            entry["lane"] = lane
+        flow = yaml.safe_dump(entry, default_flow_style=True, sort_keys=False, width=10_000).strip()
+        if items:
+            last = items[-1][0]
+            ind = " " * _indent(lines[last])
+            at = last + 1
+            while at < len(lines) and not _quiet(lines[at]) and _indent(lines[at]) > _indent(lines[last]):
+                at += 1  # past a multi-line last item's continuation
         else:
-            entry = {"role": want}
-            if add.get("name"):
-                entry["name"] = str(add["name"])
-            if entry.get("name", want) in held:  # refused before anything is written (TD-268)
-                raise ValueError(f"{team} already has {entry.get('name', want)}")
-            lane = [str(x) for x in add.get("lane") or [] if str(x).strip()]
-            if lane:
-                entry["lane"] = lane
-            flow = yaml.safe_dump(entry, default_flow_style=True, sort_keys=False, width=10_000).strip()
-            if items:
-                last = items[-1][0]
-                ind = " " * _indent(lines[last])
-                at = last + 1
-                while at < len(lines) and not _quiet(lines[at]) and _indent(lines[at]) > _indent(lines[last]):
-                    at += 1  # past a multi-line last item's continuation
-            else:
-                ind = " " * (_indent(lines[m_at]) + 2)
-                at = m_at + 1
-            if at > 0 and not lines[at - 1].endswith("\n"):
-                lines[at - 1] += "\n"
-            lines.insert(at, f"{ind}- {flow}\n")
-            did = f"added {entry.get('name') or want} ({want})"
+            ind = " " * (_indent(lines[m_at]) + 2)
+            at = m_at + 1
+        if at > 0 and not lines[at - 1].endswith("\n"):
+            lines[at - 1] += "\n"
+        lines.insert(at, f"{ind}- {flow}\n")
+        did = f"added {entry.get('name') or want} ({want})"
     elif remove is not None:
         if not 0 <= remove < len(items):
             raise ValueError(f"team {team} has no member entry {remove + 1} — reload and try again")
@@ -1185,13 +1151,8 @@ def edit_members(
             raise ValueError(f"team {team}'s member entry {remove + 1} spans several lines — edit it by hand")
         if role and body.get("role") != role:
             raise ValueError(f"team {team}'s member entry {remove + 1} is not a {role} any more — reload and try again")
-        n = body.get("count", 1)
-        if isinstance(n, int) and n > 1:
-            lines[i] = _set_count(lines[i], body, n - 1)
-            did = f"{body.get('name') or body.get('role')} count: {n} → {n - 1}"
-        else:
-            del lines[i]
-            did = f"removed {body.get('name') or body.get('role')}"
+        del lines[i]  # the whole line: a count is the size's to lower (TD-1165)
+        did = f"removed {body.get('name') or body.get('role')}"
     else:
         raise ValueError("nothing to edit: add or remove")
     path.write_text("".join(lines), encoding="utf-8")

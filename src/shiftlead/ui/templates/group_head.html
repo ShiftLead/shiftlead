@@ -100,16 +100,17 @@
 {#- …and on a live team the start the rule made (§4.5a **work waiting** note): the header's second line #}
 {% if g.work_started %}<div class="meta workstarted" title="the home started this team because its lanes gained work while it was wound down (design §6 rule 8, on_work: start)">started <span title="{{ g.work_started.at }}">{{ g.work_started.age ~ ' ago' if g.work_started.age else g.work_started.at }}</span>{% if g.work_started.first %} for {{ g.work_started.first }}{% if g.work_started.more %} and {{ g.work_started.more }} more{% endif %}{% endif %}{% if g.work_started.failed %}<span class="warn" title="a replay that failed is on that record's restarts entry, with its error (ao status -v); Start on its card, or the team's Start once it winds down, brings it back"> · {{ g.work_started.n }} of {{ g.work_started.of }} records started — {{ g.work_started.failed | join(', ') }} did not</span>{% endif %}</div>{% endif %}
 {#- the team's *i* panel opens on its **Definition** line (§4.5a ***i*** mark, TD-418, built by TD-428):
-    **Members…** (§4.9, TD-163, built by TD-172; on a team a repo defines drawn disabled with its reason
-    — a press that committed to a repo's default branch would go round the repo's review, TD-229),
+    **Members…** (§4.9, TD-163, built by TD-172; on a team a repo defines it opens with Add member and
+    Remove disabled, its reason beside it — a press that committed to a repo's default branch would go
+    round the repo's review, TD-229 — and its − / + live, a setting, TD-1165),
     **Open file** on the definition's source through the person's `open_in`, *Flow on Settings →*, and
     on a live, defined team that is not concluded the ***not concluded:*** line (§6 rule 9, TD-240,
     built by TD-241) — why there is no Start, one clause per unattended session that keeps it from the
     home's reading. **Who for what** (§4.8, TD-171) is in the panel too, not on the header (TD-252) #}
 {% if g.team and g.defined %}{% import "help_mark.html" as hm2 %}{% call hm2.panel('team', 'team-' ~ g.team, g.who) %}
 <div class="defline"><b>Definition</b>
-{% if g.in_org %}<button class="btn sm ghost" data-members="{{ g.team }}" title="the team's definition: add a member or remove one — org.yml is edited in place, and on a live team the member is started or wound down">Members…</button>
-{% else %}{% set why = "defined in " ~ (g.source_repo or "the repo") ~ "'s .shiftlead.yml — changed by PR" %}<button class="btn sm ghost" disabled title="{{ why }}">Members…</button> <span class="meta" title="{{ g.source or 'a repo' }}">{{ why }}</span>
+{% if g.in_org %}<button class="btn sm ghost" data-members="{{ g.team }}" title="the team's definition: add a member line or remove one — org.yml is edited in place — and − / + set how many sessions a line runs; on a live team the member is started or wound down">Members…</button>
+{% else %}{% set why = "defined in " ~ (g.source_repo or "the repo") ~ "'s .shiftlead.yml — changed by PR" %}<button class="btn sm ghost" data-members="{{ g.team }}" title="− / + set how many sessions each member line runs; Add member and Remove are disabled: {{ why }}">Members…</button> <span class="meta" title="{{ g.source or 'a repo' }}">{{ why }}</span>
 {% endif %}
 {%- set ed = editor_file_link(g.source) if g.source else None %}{% if ed %}{% from "file_link.html" import file_link %} {{ file_link(ed, "Open file", "open " ~ g.source ~ " in " ~ ed.label, "btn sm ghost") }}{% endif %}
  <a class="btn sm ghost" href="/settings#team-{{ g.team }}" title="this team's card on the Settings page, where its flow is picked">Flow on Settings →</a></div>

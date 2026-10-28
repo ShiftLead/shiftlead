@@ -3450,14 +3450,36 @@
 
   // design §4.5a *team card: Members…* and the *Members dialog* (§4.9, TD-163, built by TD-172). The
   // listing is the definition as `org.yml` writes it, with the sessions holding each entry; Add and
-  // Remove edit the file through the UI process and, on a live team, start or wind down the one
-  // member. Every name here is text (`esc`); a refusal is said in the dialog, which stays open.
+  // Remove edit the file through the UI process and, on a live team, start or wind down the members;
+  // **− / +** set a line's size, a setting, on every team a repo's included (§4.9 *A team's size*,
+  // TD-1165). Every name here is text (`esc`); a refusal is said in the dialog, which stays open.
   AO.membersConfirm = function (e, team) {
-    const last = (e.sessions || [])[e.sessions.length - 1] || {};
-    const edit = e.count > 1 ? `count: ${e.count} → ${e.count - 1}` : `removes the ${e.name || e.role} line`;
-    const live = last.id && !["exited", "closed", "not live"].includes(last.state);
-    if (e.twice) return `Remove from ${team}? It edits org.yml (${edit}); another entry still names ${last.name}, so it runs on.`;  // TD-268
-    return `Remove from ${team}? It edits org.yml (${edit})` + (live ?` and winds down ${last.name} — Wrap up's prompt, never a kill; its card stays until Forget.` : ".");
+    const ss = e.sessions || [];
+    const up = ss.filter((x) => x.id && !["exited", "closed", "not live"].includes(x.state)).map((x) => x.name);
+    const edit = `removes the ${e.name || e.role} line`;
+    const shared = new Set(e.shared || []), down = up.filter((n) => !shared.has(n));
+    const runs = e.twice ? `; another entry still names ${ss.filter((x) => shared.has(x.name)).map((x) => x.name).join(", ")}, so it runs on` : "";  // TD-268
+    return `Remove from ${team}? It edits org.yml (${edit})` + (down.length ? ` and winds down ${down.join(", ")} — Wrap up's prompt, never a kill; each card stays until Forget` : "") + runs + ".";
+  };
+  // **−**'s confirm names the session it winds down (§4.5a *Members dialog* **− / +**); "" where it
+  // winds none down — a stopped team, or a line whose last name no kept member holds — and asks nothing
+  AO.membersSizeConfirm = function (e, team) {
+    if (!e.down) return "";
+    return `${team}: ${e.name || e.role} ${e.size} → ${e.size - 1}? It winds down ${e.down} — Wrap up's prompt, never a kill; its card stays until Forget.`;
+  };
+  // a member line's row: role · name · lane, then − size + (*2 (file says 1)*), *· from the next Start* on a
+  // stopped team whose size is above its count, the sessions holding it, and Remove (disabled on a repo's team)
+  AO.membersRow = function (e, v) {
+    const who = (h) => h ? `${esc(h.name)} · ${esc(h.state)}` : "";
+    const held = (e.sessions || []).map(who).join(", ");
+    const off = v.editable ? "" : ` disabled title="${esc(v.note || "")}"`;
+    const rm = ` <span class="grow"></span><button class="btn sm ghost" type="button" data-mremove="${e.index}"${off}>Remove</button>`;
+    const twin = e.twice ? ` disabled title="another entry shares a name with this line: rename one of them in the definition"` : "";
+    const size = `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="-1"${twin || (e.size > 0 ? "" : " disabled")} title="one session fewer on this line — a setting, the definition untouched" aria-label="one fewer ${esc(e.name || e.role)}">−</button>`
+      + ` <span class="msize">${esc(e.words || String(e.size))}</span> `
+      + `<button class="btn sm ghost" type="button" data-msize="${e.index}" data-step="1"${twin} title="one session more on this line — a setting, the definition untouched" aria-label="one more ${esc(e.name || e.role)}">+</button>`
+      + (e.next_start ? ` <span class="meta">· from the next Start</span>` : "");
+    return `<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} ·</span>${size}<span class="meta">${held}</span>${rm}</div>`;
   };
   async function openMembers(team) {
     const dlg = $("#membersdlg"); if (!dlg) return;
@@ -3469,20 +3491,20 @@
       v = await r.json();
       if (!r.ok) { say(v.detail || "the definition could not be read"); return; }
       $("#membershead").textContent = `Members of ${team}`;
-      $("#membersnote").textContent = v.note || (v.live ? "live: Add starts the member under the manager, Remove winds it down" : "stopped: an edit is the definition only — the next Start brings it");
+      $("#membersnote").textContent = v.live ? "live: + starts the line's next member under the manager and − winds one down; Add member and Remove edit the definition" : "stopped: an edit is the definition or the size only — the next Start brings it";
       const who = (h) => h ? `${esc(h.name)} · ${esc(h.state)}` : "";
       const rows = [];
       if (v.manager) rows.push(`<div class="row gap"><span class="meta">manager</span> ${who(v.manager)}</div>`);
       if (v.techlead) rows.push(`<div class="row gap"><span class="meta">techlead seat</span> ${who(v.techlead)}</div>`);
-      v.members.forEach((e) => {
-        const held = (e.sessions || []).map(who).join(", ");
-        const rm = v.editable ? ` <span class="grow"></span><button class="btn sm ghost" type="button" data-mremove="${e.index}">Remove</button>` : "";
-        rows.push(`<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} · ${e.count}</span><span class="meta">${held}</span>${rm}</div>`);
-      });
+      v.members.forEach((e) => rows.push(AO.membersRow(e, v)));
       // a definition that already names one session twice says so (TD-268): Remove on either line keeps the session
       if ((v.twice || []).length) rows.push(`<div class="row gap"><span class="meta">named twice: ${v.twice.map(esc).join(", ")} — Remove one line; the session runs on</span></div>`);
       $("#memberslist").innerHTML = rows.join("");
-      $("#membersadd").hidden = !v.editable;
+      // a repo's team: Add member drawn disabled, the reason and **Open file** beside it (§4.5a, TD-1165)
+      ["#maddrole", "#maddname", "#maddlane", "#maddgo"].forEach((q) => { $(q).disabled = !v.editable; });
+      const why = $("#maddwhy"); why.textContent = v.editable ? "" : v.note || ""; why.classList.toggle("hidden", !!v.editable);
+      const of = v.open_file;
+      $("#maddopen").innerHTML = of ? `<a class="editor btn sm ghost" data-file-link href="${esc(of.url)}" data-label="${esc(of.label)}"${of.folder ? ` data-folder="${esc(of.folder)}" data-wait="${esc(String(of.wait))}"` : ""} title="open ${esc(v.source || "")} in ${esc(of.label)}">Open file</a>` : "";
       const sel = $("#maddrole");
       sel.innerHTML = (v.roles || []).filter((x) => x !== "plain").map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
       if ([...sel.options].some((o) => o.value === "grinder")) sel.value = "grinder";
@@ -3492,7 +3514,17 @@
     }
     say(""); await load();
     $("#memberslist").onclick = async (ev) => {
-      const b = ev.target.closest("[data-mremove]"); if (!b) return;
+      const z = ev.target.closest("[data-msize]");
+      if (z) {
+        const e = v.members.find((m) => String(m.index) === z.dataset.msize); if (!e) return;
+        const step = Number(z.dataset.step), ask = step < 0 ? AO.membersSizeConfirm(e, team) : "";
+        if (ask && !confirm(ask)) return;
+        const r = await fetch(`/api/teams/${encodeURIComponent(team)}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "size", line: e.name || e.role, step }) });
+        const got = await r.json();
+        if (!r.ok) return say(got.detail || "refused");
+        say(""); AO.toast(got.text, true); return load();
+      }
+      const b = ev.target.closest("[data-mremove]"); if (!b || b.disabled) return;
       const e = v.members.find((m) => String(m.index) === b.dataset.mremove); if (!e) return;
       if (!confirm(AO.membersConfirm(e, team))) return;
       const r = await fetch(`/api/teams/${encodeURIComponent(team)}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "remove", index: e.index, role: e.role }) });

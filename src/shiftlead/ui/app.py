@@ -3643,6 +3643,9 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except (teams.TeamError, ValueError) as e:
             raise _team_http(e) from None
         v["roles"] = roles
+        # **Open file** beside a repo team's disabled Add member and Remove (§4.5a *Members… on a
+        # repo-defined team*, TD-1165), through the person's `open_in`: None under `none`
+        v["open_file"] = editor_file_link(v["source"]) if v["source"] and not v["editable"] else None
         return v
 
     @app.post("/api/teams/{name}/members")
@@ -3652,6 +3655,18 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             raise HTTPException(409, node_org_note())
         org, _notes = org_here()
         try:
+            if body.get("action") == "size":
+                # **− / +** (§4.5a *Members dialog*, §4.9 *A team's size*, TD-1165): a setting, on every
+                # team a repo's included — one step from the line's size now, through `teamrun.resize`
+                line, step = str(body.get("line") or ""), int(body.get("step"))
+                if step not in (-1, 1):
+                    raise HTTPException(400, "step is -1 or 1")
+                try:
+                    n = len(teams.find(org, name).line(line).names()) + step
+                except ValueError as e:
+                    raise teams.TeamError(str(e)) from None
+                got = await asyncio.to_thread(teamrun.resize, rpc, org, name, line, n, host_name())
+                return JSONResponse({"ok": True, **got})
             view_ = teamrun.members_view(org, name, await call("list"))
             if not view_["editable"] or org.path is None:
                 raise teams.TeamError(f"team {name} is {view_['note'] or 'not in org.yml'}")
@@ -3672,7 +3687,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     host=host_name(),
                 )
             else:
-                raise HTTPException(400, "action is add or remove")
+                raise HTTPException(400, "action is add, remove or size")
         except (teams.TeamError, ValueError, TypeError, AgentError, AgentUnavailable) as e:
             raise _team_http(e) from None
         return JSONResponse({"ok": True, **got})

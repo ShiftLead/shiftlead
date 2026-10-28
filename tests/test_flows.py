@@ -554,7 +554,8 @@ def test_a_session_started_into_a_team_takes_the_flows_reader(world, tmp_path): 
 
 def test_remove_refuses_the_last_member_of_a_role_a_listed_flow_needs(world, tmp_path):  # noqa: F811
     """§4.9c *Every listed flow must be followable*: **Remove** refuses the last designer while `td`
-    is listed, naming the flow, and leaves the file as it was; a grinder of two goes."""
+    is listed, naming the flow, and leaves the file as it was; a line of two grinders goes whole, so it is
+    refused where it holds every grinder (TD-1165), and goes beside another grinder line."""
     from test_cli_teams import org_doc
 
     from shiftlead import cli, teamrun
@@ -570,12 +571,16 @@ def test_remove_refuses_the_last_member_of_a_role_a_listed_flow_needs(world, tmp
     with pytest.raises(teams.TeamError, match=r"^td needs a designer: drop td from flows: first$"):
         teamrun.remove_member(cli.call_sync, path, "ao-grind", index=2, role="designer", host=HOST)
     assert path.read_text() == before
-    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder", host=HOST)
-    assert got["did"] == "grind count: 2 → 1"
     with pytest.raises(teams.TeamError, match=r"^build-review needs a grinder"):
         teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder", host=HOST)
+    t["members"].append({"role": "grinder", "name": "grind-x"})
+    path.write_text(yaml.safe_dump(doc, default_flow_style=None))
+    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder", host=HOST)
+    assert got["did"] == "removed grind"
+    with pytest.raises(teams.TeamError, match=r"^build-review needs a grinder"):
+        teamrun.remove_member(cli.call_sync, path, "ao-grind", index=2, role="grinder", host=HOST)
     # a role no listed flow stages goes, as before
-    assert teamrun.remove_member(cli.call_sync, path, "ao-grind", index=1, role="hunter", host=HOST)["did"] == (
+    assert teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="hunter", host=HOST)["did"] == (
         "removed hunt"
     )
 

@@ -1890,12 +1890,12 @@ def test_members_on_a_stopped_team_edit_the_definition_only(world):
     v = teamrun.members_view(orgmod.load(path), "ao-grind", [])
     assert v["editable"] and not v["live"] and [e["role"] for e in v["members"]] == ["grinder", "hunter"]
     assert v["members"][0]["sessions"][1] == {"name": "grind-2", "id": "", "state": "not live"}
-    got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder")
-    assert got["did"] == "grind count: 2 → 3" and got["created"] == [] and "next Start" in got["text"]
+    got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder", member="grind-3")
+    assert got["did"] == "added grind-3 (grinder)" and got["created"] == [] and "next Start" in got["text"]
     assert not creates(state)
     got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=1, role="hunter")
-    assert got["did"] == "removed hunt" and got["wound_down"] is None
-    assert [m.role for m in orgmod.load(path).teams["ao-grind"].members] == ["grinder"]
+    assert got["did"] == "removed hunt" and got["wound_down"] == []
+    assert [m.name for m in orgmod.load(path).teams["ao-grind"].members] == ["grind", "grind-3"]
 
 
 def test_a_live_add_of_a_role_the_current_flow_does_not_use_is_written_and_sits_out(world):
@@ -1932,13 +1932,13 @@ def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(wo
     tmp_path, state = world
     path = _flow_org(tmp_path)
     started(state)
-    got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder")
+    got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder", member="grind-3")
     (made,) = got["created"]
     assert made["name"] == "grind-3" and made["controllers"] == ["ao-shiftlead-orc-ao"] and made["team"] == "ao-grind"
     assert [p["name"] for p in creates(state)] == ["grind-3"]  # the one member, not the team again
     state["calls"].clear()
-    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder")
-    assert got["did"] == "grind count: 3 → 2" and got["wound_down"]["name"] == "grind-3"
+    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=2, role="grinder")
+    assert got["did"] == "removed grind-3" and [w["name"] for w in got["wound_down"]] == ["grind-3"]
     # the sit-out form a removal from the definition takes (§4.9, TD-706): the home winds it down —
     # the wrap-up, never a kill — and marks it, so rule 8 never replays it
     acts = [(m, p) for m, p in state["calls"] if m in ("relaunch", "send", "kill")]
@@ -1959,10 +1959,15 @@ def test_remove_marks_an_ended_member_sat_out_and_says_a_refusal(world):
         {"id": "ao-shiftlead-hunt", "sit_out": True, "dropped": True}
     ]
     assert by["hunt"]["sit_out"] == {"at": "now", "dropped": True} and "hunt is marked sat out" in got["text"]
+    # a counted line goes whole (TD-1165): each session it held is wound down or marked, a refusal said
     by["grind-2"]["state"] = "exited"
     state["refuse"] = {"ao-shiftlead-grind-2": "the link is down"}
     got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder")
-    assert got["did"] == "grind count: 2 → 1" and got["wound_down"]["action"] == "refused: the link is down"
+    assert got["did"] == "removed grind"
+    assert [(w["name"], w["action"]) for w in got["wound_down"]] == [
+        ("grind-1", "wrap-up sent"), ("grind-2", "refused: the link is down"),
+    ]  # fmt: skip
+    assert "grind-1 is wound down by the home" in got["text"]
     assert "grind-2 could not be marked sat out (the link is down)" in got["text"]
 
 
@@ -1986,7 +1991,7 @@ def test_members_default_to_a_free_name_and_remove_of_a_duplicate_keeps_the_live
     assert v["twice"] == ["hunt"] and [e["twice"] for e in v["members"]] == [False, True, True]
     state["calls"].clear()
     got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=2, role="hunter")
-    assert got["wound_down"] is None and "another entry still names hunt, so it runs on" in got["text"]
+    assert got["wound_down"] == [] and "another entry still names hunt, so it runs on" in got["text"]
     assert not [m for m, _ in state["calls"] if m in ("send", "kill")]
     assert orgmod.load(path).teams["ao-grind"].twice_named() == []
 
@@ -1997,7 +2002,7 @@ def test_members_refuse_a_repo_defined_team_and_a_held_name(world):
     started(state)
     state["verdicts"]["grind-3"] = {"name": "grind-3", "verdict": "live", "holder": "ao-x"}
     with pytest.raises(teams.TeamError, match="grind-3 is held by a live session, so nothing was created"):
-        teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder")
+        teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder", member="grind-3")
     org = orgmod.merge_repo_teams(
         orgmod.load(path),
         tmp_path / "shiftlead",
