@@ -2982,6 +2982,7 @@ Both go away only when the record says who closed it.
 **Owner:** grinder
 **Kind:** build
 **Status:** Slice 1 built — PR #970 (`scripts/look_home.py`: the scratch home, its fixtures and its refusals; `tests/test_look_home.py`). Slice 2 built — PR #972 (the grinder preset's ban; this repo's grinder brief's paragraph *A change to a page is verified by you*; the designer's mockup shots). Slice 3 built — PR #973 (the techlead preset's *A screenshot ask*; the primer's pointer). Slice 4 — PR #975 (TD-292 slice 1), the first page change through it: its UI check made on `scripts/look_home.py` with Playwright, its screenshot committed, no board line.
+**Part of:** TD-290
 **Location:** `scripts/look_home.py` (new, agentorc's own: the scratch home), `tests/conftest.py` (how the suite isolates a host agent: a temp `AGENTORC_HOME` and a `Tmux` on a private socket handed to `HostAgent`), `src/agentorc/briefs/grinder.md` and `src/agentorc/briefs/techlead.md`, `docs/briefs/grinder-ao-*.md`, `docs/briefs/designer-ao-1.md`, `docs/briefs/techlead-context.md`; design §4.9b *A UI change is verified by its builder*
 
 **Why:** design §4.9b (TD-290; Paul, 2026-10-03: *I would expect a grinder who makes ui changes to verify them itself before sending to a reviewer, and only send to a reviewer if needed*). A grinder may not run `ao ui` today, so every merged change to a page reaches Paul unchecked.
