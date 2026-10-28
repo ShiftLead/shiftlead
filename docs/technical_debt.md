@@ -92,6 +92,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
+| TD-1126 | #2475's node-side lines of Add entry's Open a session are reverted without a test failing: the create's `repo=`, `entry_role`'s `files`, the node-config reads, the 409 when no name is free, `no_checkout`'s org.yml hint | Low | Open |
 | TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Designed — builds TD-1130–TD-1133 |
 | TD-1130 | `Part of:` is read: ledgerboard v2.1 vendored, and the ledger reader and the Queue's reading tell a part from a blocker | Medium | Open — build, blocked by dev-cadence#TD-165 |
 | TD-1131 | A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter | Medium | Open — build, blocked by TD-1130 |
@@ -1961,6 +1962,24 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Done when** a grep for each listed word finds only uses that match what runs, the doc-bound tests pass, and the code-side mismatches are filed.
 
 **Related:** the docs-audit seat (`docs/briefs/docs-audit.md`); dev-cadence#TD-129 (the pin, which retired `scripts/` and the sync the docs still name); TD-1116 (the briefs' sentence it adds).
+
+## TD-1126: #2475's node-side lines of Add entry's **Open a session** can each be reverted and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2475)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (`entry_place`, `api_entry_session`), `src/shiftlead/teams.py` (`no_checkout`); `tests/test_ui_entry_host.py`
+
+**Why:** Test audit of #2475 (TD-1092 (2)), 2026-10-27. Mutation probe on `origin/main`: each change below, made alone, leaves `pdm run pytest -q tests/test_ui_entry_host.py tests/test_ui_entry.py tests/test_ui_teams.py tests/test_ui_repo_org.py tests/test_org.py tests/test_cli_org.py tests/test_cli_teams.py` at 302 passed. (1) `repo=plan["dir"]` in `api_entry_session`'s `create` → `repo=root` (only `dir=` is pinned): a node session would carry the home's path as its repo. (2) `entry_role(..., files)` → no `files`, and `files = files_on(...)` → `files = None`: the docstring says a feature on a node opens its flow's design role; a node whose flow differs is not tested. (3) `if cfg is None and container and not why:` → `if False:`: a container node's ledger name. (4) `except ValueError` around `config_on` → another type: a node whose `.shiftlead.yml` is invalid. (5) the 409 *no entry-<n> … is free in … on <host>*. (6) `no_checkout`'s `heading is not None` branch (the `projects.<name>.repos.<repo>` hint). The other twelve mutants of the PR's lines fail a test.
+
+**Fix:** One test per line above in `tests/test_ui_entry_host.py` (the file's `world()` node helper), each failing when its line is reverted.
+
+**Done when** each of the six mutants fails a test, and the suite is green.
+
+**Related:** TD-1092, TD-1064.
 
 ## TD-1129: A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work
 
