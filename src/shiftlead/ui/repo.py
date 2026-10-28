@@ -27,6 +27,7 @@ from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_co
 from .common import _age, host_name, live_divider, promote_reading
 from .inbox import work_note, work_started
 from .org import (
+    COMPLETED_WORD,
     FACETS,
     WINDOWS,
     _https,
@@ -260,7 +261,6 @@ def pr_rows(
 
 
 COMPLETED_FOLD = 8  # Recently completed folds past this many rows, with *+n more* (§4.5 screen 11, TD-604)
-COMPLETED_WORD = {"day": "today", "week": "this week", "month": "this month"}  # the heading's window word
 
 
 def completed_rows(

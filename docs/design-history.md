@@ -837,6 +837,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-05 (TD-144, grinder-ao-2; Paul's look of 2026-10-04 at the live page: *bigger*): `--t-body` raised from 14 px to 15 px and nothing else moved, as the *Type scale* says; the card's rows, slot and foot keep their pixel tokens, so every Org card is still one height (read headless at 1440 and 390 px on a scratch home).
 
 ## 4.5a Controls
+- 2026-10-28 (TD-1194 slice 2, grinder-ao-2): the completed face's empty window reads the Repo page's words, *nothing completed today* (*this week*, *this month*), not *this day*.
 - 2026-10-28 (TD-1189, Paul: *go*): the holds on TD-1189 and TD-1194 are dropped, so the build is pickable once this lands.
 - 2026-10-28 (TD-1189's review, round 4, Fable, READY, no findings, 2 nits, neither needing a change; rounds 2–3 checked as landed): the loop ends, with Sonnet READY at round 3 and Fable READY at round 4. The builds wait on Paul's go.
 - 2026-10-28 (TD-1189's review, round 3, Sonnet, READY, 3 nits, 2 adopted; round 2 checked as landed): TD-1194 names the summary's `completed` key `drawn_facets` reads, and pins a `review_pr`-only close left off; a claim's `slices` stay unmatched, its `ref` covering the case.

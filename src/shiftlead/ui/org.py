@@ -366,6 +366,62 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
     return out
 
 
+COMPLETED_ROWS = 8  # the completed face's rows per window, then *+n more* (§4.5a *team card: TDs in motion*)
+COMPLETED_WORD = {"day": "today", "week": "this week", "month": "this month"}  # the window's word, in a heading
+
+
+def team_named(members: Collection[Mapping[str, Any]]) -> tuple[set[str], set[int]]:
+    """The references and PRs the team's records name as their own work (§4.5a *team card: TDs in motion*,
+    **Completed**, TD-1189): a `progress` entry's `ref` and `pr` of any status — never its `review_pr`, which
+    the tick clears when that PR merges — and each `restarts` entry's `done` (TD-249), so a member that
+    ended or restarted still names what it closed."""
+    refs: set[str] = set()
+    prs: set[int] = set()
+    for m in members:
+        done = [d for x in m.get("restarts") or () if isinstance(x, dict) for d in x.get("done") or ()]
+        for p in [*(m.get("progress") or ()), *done]:
+            if not isinstance(p, dict):
+                continue
+            if p.get("ref"):
+                refs.add(str(p["ref"]))
+            if isinstance(p.get("pr"), int):
+                prs.add(p["pr"])
+    return refs, prs
+
+
+def completed_faces(
+    members: Collection[Mapping[str, Any]], r: Mapping[str, Any] | None, now: datetime
+) -> dict[str, dict[str, Any]]:
+    """**Completed** (§4.5a *team card: TDs in motion*, TD-1189): by *day*, *week* and *month*, the
+    reading's closes (`completed_in`) that are the team's — the entry's id, or the PR that closed it,
+    named by `team_named` — newest first: `{n, more, rows}`, the first `COMPLETED_ROWS` rows each its id,
+    title, PR and its page (None for a close by a commit that names none), the close's time and short age.
+    A close no record of the team names is on no card; the Repo page's Merged column keeps it."""
+    refs, prs = team_named(members)
+    web = _https(str((r or {}).get("remote") or ""))
+    out = {}
+    for w in WINDOWS:
+        got = [
+            c
+            for c in (completed_in(r, w, now) if r else [])
+            if str(c.get("id") or "") in refs or (isinstance(c.get("pr"), int) and c["pr"] in prs)
+        ]
+        rows = [
+            {
+                "id": str(c.get("id") or ""),
+                "title": str(c.get("title") or ""),
+                "pr": c.get("pr") if isinstance(c.get("pr"), int) else None,
+                "url": str(c.get("url") or "")
+                or (f"{web}/pull/{c['pr']}" if web and isinstance(c.get("pr"), int) else ""),
+                "closed": str(c.get("closed") or ""),
+                "age": _short_age(c.get("closed"), now),
+            }
+            for c in got[:COMPLETED_ROWS]
+        ]
+        out[w] = {"n": len(got), "more": max(len(got) - COMPLETED_ROWS, 0), "rows": rows, "word": COMPLETED_WORD[w]}
+    return out
+
+
 def ask_blocks(
     members: Collection[dict[str, Any]], needs: Collection[dict[str, Any]], now: datetime | None = None
 ) -> list[dict[str, Any]]:
@@ -507,11 +563,13 @@ FACETS = ("repo", "motion", "face")
 
 def drawn_facets(summary: Mapping[str, Any]) -> list[str]:
     """The facets a team with nothing live draws (§4.5a *team card: summary*, TD-418): only those that
-    hold something — a repo here, a claim in motion, a Doing row (or an answer or an ask) — so a stopped
-    team reads no *no repo here* and no *nothing claimed*; none at all draws no summary."""
+    hold something — a repo here, a claim in motion or a close in any window (TD-1189), a Doing row (or an
+    answer or an ask) — so a stopped team reads no *no repo here* and no *nothing claimed*; none at all
+    draws no summary."""
+    closes = any(w.get("n") for w in (summary.get("completed") or {}).values())
     holds = {
         "repo": bool(summary.get("repo")),
-        "motion": bool(summary.get("motion")),
+        "motion": bool(summary.get("motion")) or closes,
         "face": bool(summary.get("doing") or summary.get("answers") or summary.get("asked")),
     }
     return [k for k in FACETS if holds[k]]
@@ -540,6 +598,8 @@ def team_summary(
     r = repo_named(repo, repos or {}) if repo else None
     r = r or team_repo(members, repos or {})
     motion = motion_rows(members, r)
+    done = completed_faces(members, r, now)
+    shown = [c for w in done.values() for c in w["rows"]]
     answers = answer_blocks(members)
     return {
         "team": team,
@@ -559,6 +619,12 @@ def team_summary(
         "who_w": min(max((_holders_width(x["members"]) for x in motion), default=1), HOLDERS_WIDTH),
         # …and the PR column's: *#811*, or *#712 merged*; 0 where no row has a PR, so the title takes the room
         "pr_w": max((len(f"#{x['pr']} {x['pr_state']}".rstrip()) for x in motion if x["pr"]), default=0),
+        # the completed face (TD-1189): the team's closes per window, its own reference and PR widths (*no PR* too),
+        # and the face it opens on until the person picks one — *in motion* while the team holds a claim
+        "completed": done,
+        "done_ref_w": min(max((len(c["id"]) for c in shown), default=1), REF_WIDTH),
+        "done_pr_w": max((len(f"#{c['pr']}") if c["pr"] else len("no PR") for c in shown), default=0),
+        "motion_face": "motion" if motion else "completed",
         "answers": answers,
         "n_answer": answer_members(answers),
         # the team's open asks to the person, one line under the facet's head in either face (TD-354)
