@@ -1953,7 +1953,7 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Added:** 2026-10-27 (the designer, from TD-1117)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1 in #2564 (grinder-ao-2, 2026-10-28): Fix 1, 2, 2b, 3, 4, 5, and 2c's `by` on the reading and the claim refusal's presser. Slice 2 left: the `queue` and `repos` readings carry the presser's words (`mail.presser_words`) beside `held.by`, and the Queue's and Repo page's *held (person)* mark draws them in its `title` (a page change: its UI check, design §4.9b)
 **Part of:** TD-1117
 **Location:** `src/sessionorc/mail.py` (`PERSON_SESSION` beside `PERSON_ONLY`; the predicate *an own end with no `controllers`*, inline in `from_role` since TD-1125 (#2493): this build factors it into one `mail` helper that `from_role` and `person_only` both call); `src/sessionorc/agent_common.py` (`person_only`: the RPC's name, the subset, its refusal); `src/sessionorc/agent_ids.py` (`rpc_td_hold`: `held.by`, the holder's note naming the session, `_clear_hold`); `src/sessionorc/settle.py` (`hold`: the protect check under the lock and the reword's `by`; `_marks` carrying `by`; `claim_refusal` taking the presser's words); `src/sessionorc/agent.py` (the claim path passing those words); `src/sessionorc/queue.py` (the mark's `title`); `src/sessionorc/board.py` (`add_decided` and its commit `message` taking `session`, passed to `ledgerboard.subject`'s existing `session=`); `src/sessionorc/agent_inbox.py` (`rpc_ledger_decide`: the roads pass, the road-less answer does not); `src/shiftlead/cli.py` (`ao td done`, `ao td design`); the person-only list test
 

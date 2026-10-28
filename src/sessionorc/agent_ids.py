@@ -233,6 +233,9 @@ def settle_key(root: str, remote: str) -> str:
     return origin_key(remote) if remote else str(root)
 
 
+_UNQUOTABLE = re.compile(r'["`$\\]')
+
+
 class IdsMixin:
     async def rpc_td_hold(
         self,
@@ -252,8 +255,11 @@ class IdsMixin:
         words (TD-905), quoted in those notes; on a held entry new words replace them and nobody is told
         again. **A drop notice** is `tell` (§4.4 *Hold*, TD-905): no hold is written, and the same
         holders and readers are told the entry `<tell>` — **Done…** and **Back to design…** send it
-        before their line. Returns `{repo, id, held, settling, told, readers, untold}`."""
-        agent_common.person_only(caller, "hold a ledger entry", "§4.4 *Hold*", self._graph())
+        before their line. A person's session passes too (`mail.PERSON_SESSION`, §4.8 *A person's session
+        passes two of them*, TD-1117): `held.by` is its id, the notes name it, its drop notice says *(told by
+        <it>)*, and it releases or rewords no hold the person pressed (`settle.hold`'s `presser`).
+        Returns `{repo, id, held, settling, told, readers, untold}`."""
+        agent_common.person_only(caller, "hold a ledger entry", "§4.4 *Hold*", self._graph(), session_ok=True)
         why, tell = " ".join(str(why or "").split())[:WHY_CHARS], " ".join(str(tell or "").split())[:WHY_CHARS]
         if tell and (release or why):
             raise RpcError("a drop notice (tell) writes no hold: it takes neither release nor why (design §4.4 *Hold*)")
@@ -279,8 +285,11 @@ class IdsMixin:
         remote = str(view.get("remote") or "")
         if not remote:
             raise RpcError(f"{name}'s origin is not read yet: its clock is keyed by it, so ask again in a minute")
+        presser = self._presser(caller)
         if tell:
-            told, readers, untold = await self._hold_tell(tid, tell=tell)
+            if presser == "session":
+                tell = f"{tell} (told by {self._presser_words(str(caller))})"
+            told, readers, untold = await self._hold_notice(tid, tell)
             return {
                 "repo": name,
                 "id": tid,
@@ -290,20 +299,24 @@ class IdsMixin:
                 "readers": readers,
                 "untold": untold,
             }
-        key, spans = settle_key(root, remote), settle_mod.spans(root)
-        now = datetime.now(UTC)
-        by = PERSON if caller is None or mail.is_person(caller) else str(caller)
-        was_held = isinstance(entry.get("held"), dict)
-        try:
-            await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=by, release=bool(release), why=why)
-        except settle_mod.Refused as e:
-            raise RpcError(str(e)) from None
-        settle_mod.mark(entries, key, spans, now)  # on the loop: the lanes and a claim read these dicts there
         told: list[str] = []
         readers: list[str] = []
         untold: list[str] = []
-        if not release and not was_held:  # a hold on a held entry tells nobody again
-            told, readers, untold = await self._hold_tell(tid, why=why)
+        if release:
+            await self._clear_hold(root, entry, presser, road=False)
+        else:
+            key, spans = settle_key(root, remote), settle_mod.spans(root)
+            now = datetime.now(UTC)
+            by = PERSON if caller is None or mail.is_person(caller) else str(caller)
+            was_held = isinstance(entry.get("held"), dict)
+            try:
+                await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=by, why=why, presser=presser)
+            except settle_mod.Refused as e:
+                raise RpcError(str(e)) from None
+            settle_mod.mark(entries, key, spans, now)  # on the loop: the lanes and a claim read these dicts there
+            if not was_held:  # a hold on a held entry tells nobody again
+                who = self._presser_words(by) if presser == "session" else ""
+                told, readers, untold = await self._hold_tell(tid, why=why, presser=who)
         return {
             "repo": name,
             "id": tid,
@@ -314,15 +327,56 @@ class IdsMixin:
             "untold": untold,
         }
 
-    async def _hold_tell(self, tid: str, why: str = "", tell: str = "") -> tuple[list[str], list[str], list[str]]:
+    def _presser(self, caller: Any) -> settle_mod.Presser:
+        """The caller's class for `settle.hold` (§4.8 *What a person's session releases*, TD-1117): the
+        person (no caller), the person's shell (`mail.as_person`), or any other caller — which past
+        `person_only` is a person's session."""
+        if caller is None or mail.is_person(caller):
+            return "person"
+        return "shell" if mail.as_person(caller, self._graph()) else "session"
+
+    def _presser_words(self, by: str) -> str:
+        """A hold's presser in words (`mail.presser_words`), read from the one graph now."""
+        return mail.presser_words(by, self._graph())
+
+    async def _clear_hold(
+        self, root: str, entry: dict[str, Any], presser: settle_mod.Presser, *, road: bool = True
+    ) -> None:
+        """A hold's end (§4.8 *What a person's session releases*, TD-1117): the store's release
+        (`settle.hold`, its protect check by `presser`) and the reading's re-mark, so lanes and the page
+        read the end at once. `td_hold --release` (`road=False`) passes its caller's class and is refused on
+        an entry not held; a road passes `person`, the press being the decision, and an entry not held —
+        whatever its reading said — is nothing to do."""
+        view = self._repos.get(root) or {}
+        remote = str(view.get("remote") or "")
+        entries = [e for e in ((view.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
+        key, spans, now = settle_key(root, remote), settle_mod.spans(root), datetime.now(UTC)
+        try:
+            await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=PERSON, release=True, presser=presser)
+        except settle_mod.NotHeld as e:
+            if not road:
+                raise RpcError(str(e)) from None
+        except settle_mod.Refused as e:
+            raise RpcError(str(e)) from None
+        settle_mod.mark(entries, key, spans, now)
+
+    async def _hold_notice(self, tid: str, tell: str) -> tuple[list[str], list[str], list[str]]:
+        """A drop notice (`_hold_tell` with `tell`): `rpc_td_hold`'s, its words already carrying *(told by
+        …)* for a session, and a road's, whose words name the presser themselves (TD-1117)."""
+        return await self._hold_tell(tid, tell=tell)
+
+    async def _hold_tell(
+        self, tid: str, why: str = "", tell: str = "", presser: str = ""
+    ) -> tuple[list[str], list[str], list[str]]:
         """Tell a held entry's claimers (design §4.4 *A claimed entry is held all the same*, TD-731), the hold
         already written: a `note` from the person, `about` the id, to each **unattended** live holder of a
         declared lease (`_lease_holders`), and a second to each seat whose inbox holds an open `ask` carrying
         a PR one of those holders' claims names (`pr` or `review_pr`) — once a seat, the person never, being
         no record. A note that cannot be sent is a line of `untold` and never refuses the hold. `why` is the
         hold's words, quoted; `tell` a drop notice's (TD-905), which says the entry `<tell>` in place of
-        *is held by the person*, with no Release to wait for. Returns `(told, readers, untold)`: every name
-        mailed, the readers among them, and the lines not sent."""
+        *is held by the person*, with no Release to wait for, and is the holder's `--why`. `presser` is a
+        hold's presser in words where it is not the person (*the person's session w1*, TD-1117). Returns
+        `(told, readers, untold)`: every name mailed, the readers among them, and the lines not sent."""
         graph = self._graph()
         holders: list[str] = []
         prs: set[int] = set()
@@ -355,8 +409,10 @@ class IdsMixin:
             told.append(to)
             return True
 
-        said = f"{tid} {tell}" if tell else f"{tid} is held by the person" + (f" (“{why}”)" if why else "")
-        drop = "told by the person" if tell else "held by the person"
+        who = presser or "the person"
+        said = f"{tid} {tell}" if tell else f"{tid} is held by {who}" + (f" (“{why}”)" if why else "")
+        # the notice's words, without what would break or run inside the quoted `--why` (review of #2564)
+        drop = _UNQUOTABLE.sub("", tell.removeprefix("is ")) if tell else f"held by {who}"
         for addr in holders:
             await tell_(
                 addr,

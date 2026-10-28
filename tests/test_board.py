@@ -1442,3 +1442,91 @@ def test_of_two_open_lines_sharing_an_id_the_one_shown_word_for_word_is_found(ke
     assert board._find(lines, None, other, key, keyed) == 1
     assert board._find(lines, None, ITEM, key, keyed) == 0
     assert board._find(lines, None, "", key, keyed) == 0
+
+
+async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_decision(
+    agent, repo, tmp_path, monkeypatch
+):
+    """TD-1127 (§4.8 *A person's session passes two of them*): a session the person started by hand presses
+    **Done…** and **Back to design…** — the commit names it, the holder's note names it once, a hold the
+    person pressed is cleared — and is refused Done on an entry that waits on the person's decision, which
+    the person's shell closes as the person, *n/a* in the commit and *the person* in the note."""
+    import shutil
+    from datetime import UTC, datetime
+
+    from sessionorc import settle
+    from sessionorc.agent_common import RpcError
+    from sessionorc.models import PERSON, ProgressEntry, Session
+
+    shutil.copytree(Path(__file__).resolve().parent.parent / "scripts", repo / "scripts", dirs_exist_ok=True)
+    root = str(repo)
+
+    async def held() -> None:
+        return None
+
+    monkeypatch.setattr(agent, "_refresh_repos", held)
+    await park_ticks(agent)
+    entries = [
+        {"id": "TD-30", "title": "a build", "for_page": "pickable"},
+        {"id": "TD-31", "title": "the person's call", "for_page": "for-you", "blocked_by": ["decision (paul)"]},
+        {"id": "TD-32", "title": "held build", "for_page": "pickable"},
+        {"id": "TD-33", "title": "another build", "for_page": "pickable"},
+        {"id": "TD-34", "title": "held unseen", "for_page": "pickable"},
+        {"id": "TD-35", "title": "seen held", "for_page": "pickable"},
+    ]
+    settle.observe(entries, "o/r", {}, datetime.now(UTC))
+    agent._repos = {
+        root: {"name": "repo", "root": root, "remote": "https://github.com/o/r.git",
+               "ledger": {"entries": entries}, "work_orders": {"orders": []}}
+    }  # fmt: skip
+    agent.sessions["ao-me"] = Session(id="ao-me", name="me", kind="interactive", adapter="claude-code", dir="")
+    agent.sessions["ao-sh"] = Session(id="ao-sh", name="sh", kind="interactive", adapter="shell", dir="")
+    w = Session(id="ao-gw", name="gw", kind="agent", adapter="claude-code", dir="", unattended=True)
+    w.progress += [ProgressEntry(ref=t) for t in ("TD-30", "TD-31", "TD-32")]
+    agent.sessions["ao-gw"] = w
+
+    def notes(tid: str) -> list[str]:
+        return [e.text for e in w.inbox if e.from_ == PERSON and e.about == tid]
+
+    got = await agent.rpc_ledger_decide(repo=root, id="TD-30", road="done", words="built", caller="ao-me")
+    assert got["decided"] == "done — built" and got["told"] == ["ao-gw"] and got["readers"] == []
+    assert got["message"] == "shiftlead: append a build. (session me)"
+    assert notes("TD-30") == [
+        "TD-30 is closed by the person's session me — built: stop at the step in hand, push, leave its PR open and "
+        'unmerged, and drop the entry: `ao progress drop TD-30 --why "closed by the person\'s session me — built"`.'
+    ]
+    with pytest.raises(RpcError, match="TD-31 waits on the person's decision"):
+        await agent.rpc_ledger_decide(repo=root, id="TD-31", road="done", caller="ao-me")
+    assert "TD-31" not in origin_board(repo)
+    with pytest.raises(RpcError, match="ao-me cannot answer a ledger entry"):
+        await agent.rpc_ledger_decide(repo=root, id="TD-31", words="yes", caller="ao-me")
+    got = await agent.rpc_ledger_decide(repo=root, id="TD-31", road="done", caller="ao-sh")
+    assert got["message"].endswith("(session n/a)"), "the person's shell is the person"
+    assert notes("TD-31")[0].startswith("TD-31 is closed by the person: stop"), notes("TD-31")
+    # a hold the person pressed: the session's Done clears it, the press being the decision
+    await agent.rpc_td_hold(repo=root, id="TD-32")
+    assert len(notes("TD-32")) == 1
+    with pytest.raises(RpcError, match="the person's own: they release it"):
+        await agent.rpc_td_hold(repo=root, id="TD-32", release=True, caller="ao-me")
+    got = await agent.rpc_ledger_decide(repo=root, id="TD-32", road="done", caller="ao-me")
+    assert "held" not in entries[2] and "held" not in settle._load()["o/r"]["TD-32"], "the hold is cleared"
+    assert notes("TD-32")[1].startswith("TD-32 is closed by the person's session me: stop"), notes("TD-32")
+    got = await agent.rpc_ledger_decide(repo=root, id="TD-33", road="design", words="split it", caller="ao-me")
+    assert got["decided"] == "back to design — split it" and got["message"].endswith("(session me)")
+    # a reading behind the store: the store's hold is cleared all the same; one ahead of it, nothing to do
+    await agent.rpc_td_hold(repo=root, id="TD-34")
+    entries[4].pop("held")
+    await agent.rpc_ledger_decide(repo=root, id="TD-34", road="done", caller="ao-me")
+    assert "held" not in settle._load()["o/r"]["TD-34"] and "held" not in entries[4]
+    entries[5]["held"] = {"at": "2026-10-28T00:00:00+00:00", "by": "person"}
+    await agent.rpc_ledger_decide(repo=root, id="TD-35", road="done", caller="ao-me")
+    assert "held" not in entries[5], "re-marked from the store"
+    # a person's session on a node, by its id in the home's graph
+    agent.remote = {
+        "laptop": {"ao-me": Session(id="ao-me", name="lap", kind="interactive", adapter="claude-code", dir="")}
+    }
+    await agent.rpc_td_hold(repo=root, id="TD-33", tell="x", caller="ao-me")  # nothing claimed: a no-op notice
+    entries.append({"id": "TD-36", "title": "on a node", "for_page": "pickable"})
+    settle.observe(entries, "o/r", {}, datetime.now(UTC))
+    got = await agent.rpc_ledger_decide(repo=root, id="TD-36", road="done", caller="ao-me@laptop")
+    assert got["message"].endswith("(session lap)")

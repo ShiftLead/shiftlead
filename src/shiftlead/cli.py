@@ -3506,6 +3506,25 @@ def cmd_td_hold(args: argparse.Namespace) -> int:
     return emit(args, got, lambda: print("\n".join(lines)))
 
 
+def cmd_td_road(args: argparse.Namespace) -> int:
+    """`ao td done <id> [--repo <name>] ["<words>"]` and `ao td design <id> …` (design §4.7 *Entries*, §4.4
+    *Hold*; TD-1127): the Queue's and the Inbox's **Done…** and **Back to design…**, the home's
+    `ledger_decide {repo, id, road, words}` on the repo's main checkout, by path as `ao td hold`'s. Prints the
+    road's line and one per name its reply's `told` carries, a reader (`readers`) worded as `ao td hold`
+    words it. The person's and a person's session's (§4.8 *A person's session passes two of them*)."""
+    _, root = _td_repo(args.repo)
+    tid = str(args.entry).strip().upper()
+    words = " ".join(str(args.words or "").split())
+    got = call_sync("ledger_decide", repo=root, id=tid, road=args.road, words=words)
+    lines = [f"{tid} done: its decided line is on the board" if args.road == "done" else f"{tid} sent back to design"]
+    readers = set(got.get("readers") or ())
+    for name in got.get("told") or ():
+        lines.append(
+            f"{name} reads its PR and is told to leave it unmerged" if name in readers else f"{name} told to drop it"
+        )
+    return emit(args, got, lambda: print("\n".join(lines)))
+
+
 def _repo_place(card: Mapping[str, Any], repo: str) -> dict[str, Any] | None:
     """The card's place among `repo`'s Up next cards (design §4.4 *The Queue*, §4.7 `ao repo`; TD-901):
     `{n, differs}`, `differs` true on an undragged card that spans repos, whose lanes' own key can differ
@@ -5033,7 +5052,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     q.set_defaults(fn=cmd_td_next)
     q = dsub.add_parser(
-        "hold", help="hold any open entry, settling or settled, or release a held one (§4.4); the person's own"
+        "hold",
+        help="hold any open entry, settling or settled, or release a held one (§4.4); the person's own, and a "
+        "session the person started by hand (§4.8), which releases no hold the person pressed",
     )
     q.add_argument(
         "--json",
@@ -5046,6 +5067,21 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--release", action="store_true", help="release a held entry: pickable at once")
     q.add_argument("--why", help="the hold's words, on the record and the row; on a held entry they replace the old")
     q.set_defaults(fn=cmd_td_hold)
+    for road, what in (
+        ("done", "Done…: the entry is done, a decided line on the board for its session"),
+        ("design", "Back to design…: the entry goes back to its design, a decided line on the board"),
+    ):
+        q = dsub.add_parser(road, help=f"{what} (§4.4 *Hold*); the person's, and a session the person started by hand")
+        q.add_argument(
+            "--json",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="{repo, id, decided, told, readers, commit, message, pr, line}",
+        )
+        q.add_argument("entry", metavar="id", help="the entry's id, TD-NNN")
+        q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
+        q.add_argument("words", nargs="?", default="", help="what was done or why it goes back, optional as the row's")
+        q.set_defaults(fn=cmd_td_road, road=road)
 
     p = add("msg", help="put a message in a session's inbox, or the person inbox (design §4.10)")
     # `nargs="*"`: `--pick <n>` sends the suggested answer's own text, so the words are optional

@@ -317,19 +317,23 @@ class LeadTyped(RpcError):
     paint a long line over two rows and the composer read returns only the first (review of PR #1158)."""
 
 
-def person_only(caller: Any, act: str, section: str, records: Mapping[str, Session]) -> None:
+def person_only(
+    caller: Any, act: str, section: str, records: Mapping[str, Session], *, session_ok: bool = False
+) -> None:
     """The one check of a person's own act (`mail.PERSON_ONLY`, design §4.8 *A person's own act is a
     named RPC, and the gate is one list*): the first statement of each such RPC, refusing every
     session in one shape — who called, what it may not do, the section that says why — but the
     person's own shell (`mail.person_shell`, TD-580), read from `records` at the call: the one graph
     (`_graph`), so a node's shell forwarding a home edit is read from the home's copy of its record
-    under `id@host`. A caller it does not hold stays a session, refused."""
+    under `id@host`. A caller it does not hold stays a session, refused. With `session_ok` — set by
+    `mail.PERSON_SESSION`'s RPCs alone — a person's session (`mail.person_session`) passes too, and the
+    refusal names it (§4.8 *A person's session passes two of them*, TD-1117)."""
     if mail.as_person(caller, records):
         return
-    raise RpcError(
-        f"{caller} cannot {act}: a person's own act, refused to every session but the person's own shell "
-        f"(design {section})"
-    )
+    if session_ok and isinstance(caller, str) and mail.person_session(records.get(caller)):
+        return
+    but = "the person's own shell" + (" and a session the person started by hand" if session_ok else "")
+    raise RpcError(f"{caller} cannot {act}: a person's own act, refused to every session but {but} (design {section})")
 
 
 def draft_folder(draft: Any, act: str) -> Path:

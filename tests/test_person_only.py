@@ -21,6 +21,17 @@ from sessionorc.models import Session
 # session call for another repo, TD-995)
 CHECKS = {"agent_common.person_only", "self._person_entry", "self._promote_person", "self._entry_session"}
 
+# the refusal's words: today's for every name, and for `mail.PERSON_SESSION`'s the carve-out's (TD-1117)
+OLD = ": a person's own act, refused to every session but the person's own shell (design §"
+NEW = OLD.replace(" (design", " and a session the person started by hand (design")
+
+# what the bare call supplies beyond `None`: a road, without which `ledger_decide` sets no `session_ok`
+SUPPLY = {"ledger_decide": {"road": "done"}}
+
+
+def _refusal(name: str) -> str:
+    return NEW if name in mail.PERSON_SESSION else OLD
+
 
 def _first_call(fn) -> str | None:
     """The dotted name the RPC's first statement (past its docstring) calls, or None."""
@@ -57,15 +68,22 @@ def test_every_name_in_the_list_is_an_rpc_that_refuses_a_session_before_reading_
         fn = rpcs[name]
         params = [p for p in inspect.signature(fn).parameters if p not in ("self", "caller")]
         with pytest.raises(RpcError) as e:
-            call = getattr(bare, f"rpc_{name}")(**dict.fromkeys(params), caller="ao-repo-worker")
+            call = getattr(bare, f"rpc_{name}")(**dict.fromkeys(params) | SUPPLY.get(name, {}), caller="ao-repo-worker")
             if inspect.iscoroutine(call):
                 asyncio.run(call)
         msg = str(e.value)
         assert msg.startswith("ao-repo-worker cannot "), (name, msg)
-        assert ": a person's own act, refused to every session but the person's own shell (design §" in msg, (
-            name,
-            msg,
-        )
+        assert _refusal(name) in msg, (name, msg)
+
+
+def test_the_person_session_subset_is_in_the_list_and_its_rpcs_alone_set_session_ok():
+    """§4.8 *A person's session passes two of them* (TD-1117): the subset is two names of the list, and the
+    check passes `session_ok` in exactly those RPCs' first statements — read from the source."""
+    assert {"td_hold", "ledger_decide"} == mail.PERSON_SESSION and mail.PERSON_SESSION <= mail.PERSON_ONLY
+    rpcs = _rpcs()
+    for name in sorted(mail.PERSON_ONLY):
+        src = textwrap.dedent(inspect.getsource(rpcs[name]))
+        assert ("session_ok=" in src) == (name in mail.PERSON_SESSION), name
 
 
 def test_every_rpc_that_makes_the_check_is_in_the_list():
@@ -110,6 +128,16 @@ NOT_THE_PERSONS = {
     "a team's shell with a controller": {"team": "ao-grind", "controllers": ["ao-repo-lead"]},
 }
 
+# of those, the person's sessions (`mail.person_session`, TD-1117): started by hand, interactive, no
+# controller and no seat, a role not ending it — they pass `PERSON_SESSION`'s two names
+PERSONS_SESSIONS = {"an agent session", "a role's shell", "a team's shell with a role"}
+
+# and sessions refused every name: an unattended agent, and an interactive one holding a seat
+NEVER = {
+    "an unattended agent session": {"adapter": "claude-code", "unattended": True},
+    "a seat's interactive session": {"adapter": "claude-code", "seat": {"trigger": "ask"}},
+}
+
 
 def test_person_shell_is_a_shell_interactive_with_no_role_or_controller():
     assert mail.person_shell(_shell("s"))
@@ -122,33 +150,52 @@ def test_person_shell_is_a_shell_interactive_with_no_role_or_controller():
 
 def test_the_persons_shell_passes_every_act_in_the_list_and_nothing_else_does():
     """The one exception, held against the whole list: called from a person's shell each RPC gets
-    past the check (whatever it fails on next, it is not the refusal); called from an agent session,
-    an unattended, controlled or role's shell, or a caller the host does not hold, each is
-    refused in the new words."""
+    past the check (whatever it fails on next, it is not the refusal); called from an unattended,
+    controlled or seat-holding session, or a caller the host does not hold, each is refused in its
+    words. The third class (TD-1117): a person's session — an interactive agent session, a role's shell,
+    with no controller — passes each name in `PERSON_SESSION` and is refused every other name."""
     rpcs = _rpcs()
-    callers = {"ao-sh": _shell("ao-sh"), "ao-tsh": _shell("ao-tsh", team="ao-grind")} | {
-        f"ao-{i}": _shell(f"ao-{i}", **o) for i, o in enumerate(NOT_THE_PERSONS.values())
+    shells = {"ao-sh": _shell("ao-sh"), "ao-tsh": _shell("ao-tsh", team="ao-grind")}
+    others = {
+        f"ao-{i}": (what, _shell(f"ao-{i}", **o)) for i, (what, o) in enumerate((NOT_THE_PERSONS | NEVER).items())
     }
+    sessions = {sid for sid, (what, _) in others.items() if what in PERSONS_SESSIONS}
+    assert len(sessions) == len(PERSONS_SESSIONS)
     bare = HostAgent.__new__(HostAgent)
-    bare.sessions = callers
+    bare.sessions = shells | {sid: r for sid, (_, r) in others.items()}
     bare.remote = {}
     for name in sorted(mail.PERSON_ONLY):
         params = [p for p in inspect.signature(rpcs[name]).parameters if p not in ("self", "caller")]
 
         def call(caller, name=name, params=params):
-            out = getattr(bare, f"rpc_{name}")(**dict.fromkeys(params), caller=caller)
+            out = getattr(bare, f"rpc_{name}")(**dict.fromkeys(params) | SUPPLY.get(name, {}), caller=caller)
             if inspect.iscoroutine(out):
                 asyncio.run(out)
 
-        for own in ("ao-sh", "ao-tsh"):
+        passing = {*shells, *(sessions if name in mail.PERSON_SESSION else ())}
+        for own in sorted(passing):
             try:
                 call(own)
             except Exception as e:  # noqa: BLE001 — the bare agent fails on whatever it reads next
                 assert "a person's own act" not in str(e), (name, own, str(e))
-        for sid in [*callers.keys() - {"ao-sh", "ao-tsh"}, "ao-gone"]:
-            with pytest.raises(RpcError, match="refused to every session but the person's own shell") as e:
+        for sid in [*sorted(others.keys() - passing), "ao-gone"]:
+            with pytest.raises(RpcError) as e:
                 call(sid)
-            assert str(e.value).startswith(f"{sid} cannot "), (name, sid)
+            assert str(e.value).startswith(f"{sid} cannot ") and _refusal(name) in str(e.value), (name, sid)
+
+
+def test_a_person_session_answers_no_ledger_entry_without_a_road():
+    """`ledger_decide` with no road is the answer to a question put to the person (§4.8): a person's
+    session is refused it, and a non-string road is coerced inside the check, refused and never raised."""
+    bare = HostAgent.__new__(HostAgent)
+    bare.sessions = {"ao-me": _shell("ao-me", adapter="claude-code")}
+    bare.remote = {}
+    for road in ("", None, 0):
+        with pytest.raises(RpcError, match=r"^ao-me cannot answer a ledger entry: .* own shell \(design"):
+            asyncio.run(bare.rpc_ledger_decide(repo="r", id="TD-1", road=road, caller="ao-me"))
+    bare._repos = {}
+    with pytest.raises(RpcError, match="r is not a repo this home reads"):  # past the check: a road it reads
+        asyncio.run(bare.rpc_ledger_decide(repo="r", id="TD-1", road=5, caller="ao-me"))
 
 
 def test_the_right_is_the_records_state_at_the_call():
