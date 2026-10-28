@@ -101,8 +101,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1144 | The ledger reading takes either layout: one `load()` road with `fs_io`/`git_io`, the default rule, the v2 history, and a faulted v2 ledger reported, not read | Medium | Open — build, blocked by TD-1130 |
 | TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
 | TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
-| TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first |
+| TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1150 | A browser tab says nothing by its icon: no page has a favicon, so a Focus tab's state is read only from its title's words | Medium | Open — design-first; Paul picked direction A, *Tile* |
+| TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
+| TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 
 ---
 
@@ -2173,8 +2175,8 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — design first
-**Location:** `src/shiftlead/ui/static/app.js` (`applyTeam` ~4796, `tickTeamManager`, `teamRoles`, `applyRole`); `src/shiftlead/ui/templates/new.html` (the Team picker, 70–79, its `data-` attributes); `src/shiftlead/ui/common.py` (`teams_for_form` 901); `src/shiftlead/ui/app.py` (`new_submit` 2419: the preset resolution through `repoconfig.resolve_role`); design §4.5a *New session* (**the form**, **Team** picker, **Role** pick + **Lane** field), §4.9 *A person in the team* (TD-160) and *Add or remove a member from the team card* (TD-163)
+**Status:** Open — design first, two parts: the form fills from the team's member line, and a team's size is a setting (part 2, Paul 2026-10-27)
+**Location:** `src/shiftlead/ui/static/app.js` (`applyTeam` ~4796, `tickTeamManager`, `teamRoles`, `applyRole`); `src/shiftlead/ui/templates/new.html` (the Team picker, 70–79, its `data-` attributes); `src/shiftlead/ui/common.py` (`teams_for_form` 901); `src/shiftlead/ui/app.py` (`new_submit` 2419: the preset resolution through `repoconfig.resolve_role`); design §4.5a *New session* (**the form**, **Team** picker, **Role** pick + **Lane** field), §4.9 *A person in the team* (TD-160) and *Add or remove a member from the team card* (TD-163); for part 2, `src/shiftlead/org.py` (the member's `count:`, 146), `src/shiftlead/teams.py` (`plan`, 1028), `src/shiftlead/ui/settings_page.py` (the Teams card, beside `on_work`), `src/sessionorc/work.py` (`sat_out`, 55), design §5 *Configuration* (`teams.<team>`), §4.5a *Settings page* **Teams** and the Members rows, §4.9c *Every listed flow must be followable*
 
 **Why:** Paul, 2026-10-27, after starting a second grinder for dev-cadence from the New session form, to take TD-165 beside the grinder holding TD-090: "It seems like the new session form should fill the rest of itself out after I choose the grinder role." He picked Team *dc-grind* and Role *grinder*. The session started and claimed TD-165, but `ao --json status` shows it is not what dc-grind's member is:
 
@@ -2189,7 +2191,14 @@ That is the design working as written: a Team pick makes *a person's own session
 
 **Fix (proposed; the design round settles it):** when the Team pick is a team and the Role is one of its member roles, the form fills from **that member line**, as `ao team start` would create it: the name from the team's pattern with the first free number (*dc-grinder-2*, the Members dialog's rule), the line's `profile`, `lane` and `brief` (layered over the preset's, as at a team start), the team's manager as controller (live, or its seat on call, by the record's id), and the mode unattended and supervised, with **run it under me instead** still offered for a person who wants their own session in the team — so §4.9 *A person in the team* becomes that choice, no longer the default. Each field stays editable before Start. The round decides whether such a start is a live **member** of the running team (counted in `ao team status` and its shape, wound down with it) or a one-off beside it, and whether it writes nothing (a repo's definition stays a PR's, TD-163) — Paul's words ask only that the form fill itself.
 
-**Done when** the design says what a Team and member-role pick fills, its build is filed, built and live, and a dev-cadence grinder started from the form carries the member line's brief, profile, lane, controller and mode.
+**Part 2 — a team's size is a setting (Paul, 2026-10-27).** Paul: "Right now, to increase the grinder count for a team, I need to edit the yml, create PR, merge, sync. We could add a simple form that will allow the user to do this - it could be an option on the new session form (make permanent member." Agreed in this conversation: what a team *is* — its roles, briefs, lanes, flows — stays in its file (`.shiftlead.yml` or `org.yml`), a PR's for a repo; **how many of each role run** is a number the person turns, so it joins the team's other settings (`flow`, `until`, `reserve`, `balance`, `on_work`) in `settings.yml`, as ADR 2026-09-25's line has it (*A definition says what a team, a repo, a host or a profile is and belongs in its file, by hand or by PR; a setting is a number a person turns without redefining anything and belongs in `settings.yml`*). Paul asked whether team setup should move to settings altogether; the answer given was no — the definition is the repo's, versioned and reviewed with the briefs it names — only the knobs.
+- **The size**, per role (`teams.<team>.size: {grinder: 2}` or as the round names it), wins over the definition's `count:`, and the team card says both where they differ (*2 (file says 1)*). It works the same for a team in `org.yml` and one in a repo's `.shiftlead.yml`, where the **Members…** control itself is disabled today, so Add member is never reached.
+- **Two ways to reach it:** on the New session form, under a Team and member-role pick, a **keep as a team member** tick — ticked, the session starts as the team's next member and the size goes up by one; left alone, it is a member **for this run only**: part of the team (its shape, its holds, supervised) until the team next winds down, then it ends with it and the next start does not bring it back (rule 8 never replays it, as for a sat-out member). And on the team card, **+ / −** beside each role's count, − winding down the highest-numbered member (proposed: **Remove** today takes the line the person picks) by the same sit-out wind-down.
+- **The flows still work** (§4.9c *Every listed flow must be followable*, as Remove's refusal today): − refuses to go below what a listed flow's stages need (*td needs a designer*), + of a role the current flow does not use is written and that member sits out, and a flow switch is checked against the sizes as it is against the definition.
+- **Leave room for what follows** (Paul, 2026-10-27: *soon we will want users to be able to control team defs and flows from the UI (maybe a separate page per team), and eventually will auto-size teams based on the workload (if auto is configured)*): the size is designed so an `auto` value can follow (TD-1154: a floor and a ceiling per role, the run-only members above the size as auto's extras), and the + / − and the run-only rule are placed as the first piece of a per-team page (TD-1153), beside the team's other settings, not as a one-off on the card.
+- The round settles the Members dialog's share (adding a *new kind* of member, which stays a definition edit, against counting, which becomes the size) and whether one setting carries both the permanent size and the run-only extras.
+
+**Done when** the design says what a Team and member-role pick fills, what the size setting and its two controls do and how they keep every listed flow followable, its builds are filed, built and live, a dev-cadence grinder started from the form carries the member line's brief, profile, lane, controller and mode, and a second dev-cadence grinder can be added without a PR.
 
 ---
 
@@ -2208,3 +2217,37 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** a design round on §4.5 (*Pop out*'s title paragraph and *Browser mechanics*): direction A, *Tile* (Paul, 2026-10-27) — one rounded square on every tab, the top bar's dark with a page glyph on a page, the state's colour with its pill glyph on a Focus tab; one icon per state (§4.5a **state icon**'s list: needs you, working, idle, idle · unseen, stalled?, limited, scheduled, exited, on call, closed, unreachable; and waiting, whose ⋯ is in `app.css` 159 alone, TD-418) and one per page; drawn as SVG paths, never font glyphs; how it is served (an inline `data:` SVG set by `AO.focusTitle`'s callers, or static files under `static/` with their `?v=` hash); how a dark icon stays visible on a dark tab strip; whether the title's `▲ ` stays beside the icon. The design files the builds.
 
 **Done when** the design is merged with its builds filed.
+
+## TD-1153: A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first, waits on Paul (worked interactively)
+**Blocked by:** decision (paul) — Paul works the design interactively with a session; drop the line when he says go
+**Location:** `src/shiftlead/org.py` (the definitions), `src/shiftlead/ui/app.py` (`/api/teams/{name}/members` 3562–3575, `/api/teams/{name}/flow/apply`), `src/shiftlead/ui/settings_page.py` (the Teams card); design §4.9 *Add or remove a member from the team card* (TD-163), §4.9c *Every listed flow must be followable*, §4.5a *Members dialog* and *Settings page* **Teams**, §5 *Configuration*, [ADR 2026-09-25](decisions/2026-09-25-settings-audit.md)
+
+**Why:** Paul, 2026-10-27: "soon we will want users to be able to control team defs and flows from the UI (maybe a separate page per team)". Today the Members dialog edits only an `org.yml` team, and only its members; a repo's `.shiftlead.yml` team is read-only on the page, so changing its roles, briefs, lanes or flows is a hand edit, a PR, a merge and the checkout's pull. Agreed in TD-1149's conversation: the definition stays in its file — versioned and reviewed with the briefs it names — and the page becomes its editor, beside the team's settings (TD-1149 part 2's size first).
+
+**Fix (to design):** a page per team holding its settings (flow, until, reserve, balance, on_work, the size) and an editor of its definition; an `org.yml` team's edit is written in place as the Members dialog's is, a repo team's lands as a PR on a branch, reviewed and merged under the repo's cadence, and the checkout the team reads is pulled after the merge; every edit is checked against §4.9c before it is written.
+
+**Done when** the design round with Paul has written the page and filed its builds.
+
+## TD-1154: A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first, waits on Paul (worked interactively)
+**Blocked by:** decision (paul) — Paul works the design interactively with a session; drop the line when he says go
+**Location:** `src/sessionorc/agent_shape.py` (`rpc_shape` 164), `src/shiftlead/teamrun.py` (`balance_now` 248), `src/shiftlead/teams.py` (`plan` 1028); design §4.4 *Team shape* (TD-819), §6 *Balance* and rule 8, §4.9c *Every listed flow must be followable*, TD-1149 part 2 (the size and the run-only member)
+
+**Why:** Paul, 2026-10-27: "eventually will auto-size teams based on the workload (if auto is configured)". Today a busy queue waits on the person noticing and adding a worker by hand (TD-165 waited behind TD-090 on dev-cadence's one grinder, 2026-10-27), and an extra worker stays until someone closes it. `ao team shape` already reads the inputs — each role's working and idle-with-work shares, the queue's backed-up and unstaffed shares — and `balance` already throttles claims.
+
+**Fix (to design):** an `auto` size per role, off unless configured, with a floor (the size) and a ceiling; the home's tick reads the shape and adds a run-only member (TD-1149 part 2) when the role's queue stays backed up, and winds one down when it drains, never below what a listed flow needs; usage and reserve gates apply to what it starts, and the team page (TD-1153) shows what auto did and why.
+
+**Done when** the design round with Paul has written it and filed its builds.
