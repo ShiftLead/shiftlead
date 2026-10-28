@@ -20965,6 +20965,7 @@ None of the three files calls `park_ticks`, so the fixture's tick loop running b
 **Owner:** grinder
 **Kind:** build
 **Status:** Done — the fix is in #2470
+**Part of:** TD-1064
 **Location:** `src/sessionorc/identity.py` (`classify`, the `ProcReader` protocol, `LinuxProc` and the tests' fakes); `src/sessionorc/agent_common.py` (`_peer_pid`, re-exported in `agent.py`), `src/sessionorc/agent_serve.py` (`_dispatch`), `src/sessionorc/agent_identity.py` (`_identify`, `_id_channel`); design §4.8a *The channel* (**unknown**), *A session never gains a person-only act by crossing a channel*; §4.4a *A container that is no node has no `ao`*
 
 **Why:** TD-1064: a container that is no node and has the home's `agent.sock` mounted into it would reach the host agent from processes whose ancestry ends at the container runtime, not at a pane, and outside the tmux server's cgroup, so `classify` reads them *outside*: the person, with every person-only act. §4.8a now says such a peer is *unknown*.
