@@ -935,6 +935,9 @@ async def test_a_v2_ledgers_ids_are_its_file_names_and_an_open_prs_added_files_o
     assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-061"]
     gh["prs"][13] = [("docs/ledger/TD-070.md", "renamed", "docs/ledger/TD-001.md")]  # renamed to a new id
     assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-071"]
+    gh["prs"][14] = [("docs/ledger/archive/TD-080.md", "renamed", "docs/ledger/TD-080.md")]  # above every other row
+    # TD-071 was given above; counted as filed, the move would raise the next to TD-081
+    assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-072"], "an archive move files nothing"
 
 
 @pytest.mark.integration
