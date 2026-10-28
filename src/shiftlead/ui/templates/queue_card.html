@@ -13,7 +13,7 @@
    no grip and no arrows, its wait phrase as its status; an In progress one *d/m done* where the status would be. Each card is its own box, its 4 px left edge `c.edge` (amber for a Decide or Do item, else
    teal Waiting, else green In progress, else grey; TD-915). Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
-{% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, want, read, held, pill, menu %}
+{% from "queue_row.html" import row, fold, meter, pbadge, state, holder, extras, builds, mentioned, want, read, held, pill, menu %}
 {% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
 {%- set w = c.wants or {} %}{% set n = w.n or {} %}
 {%- set body = c.rows or w.read or w.held %}
@@ -41,7 +41,7 @@
       {%- elif ss.start and not ss.other %}<button class="btn sm ghost qstart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ sp[0] }}" data-ref="{{ sp[1] }}" data-card="{{ c.id }}" title="{{ help_title('card-start') }}">Start session</button>{% endif %}
       {# the top entry's state where the card's own words do not already say it: *ready* is the status's,
          a need the amber badge's, *held by X* the holder's pill, a Waiting card's leaf its wait phrase #}
-      {{ extras(t.ext, repo) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) %}{{ state(t) }}{% endif %}
+      {{ extras(t.ext, repo) }}{{ meter(t.meter) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) %}{{ state(t) }}{% endif %}
       {#- the header's ⋯ acts on the top entry, the same macro as a row's (§4.5 screen 12 *Three verbs: ⋯*, TD-914) #}
       {%- if not t.ext %}{{ menu(t) }}{% endif %}
       <span class="qgap"></span>
@@ -67,6 +67,6 @@
     {{ want(c, 'decide') }}{{ want(c, 'do') }}
     </div>
   </div>
-  {% if body %}<div class="qrows">{{ held(c) }}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}{{ read(c) }}</div>{% endif %}
+  {% if body %}<div class="qrows">{{ held(c) }}{% for ln in c.lines or [] %}{% if ln.fold %}{{ fold(ln, repo) }}{% else %}{{ row(ln.row, repo) }}{% endif %}{% else %}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}{% endfor %}{{ read(c) }}</div>{% endif %}
 </div>
 {% endmacro %}

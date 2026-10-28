@@ -155,7 +155,11 @@ def test_a_card_in_two_columns_draws_its_rows_with_the_queue_cards_row(tmp_path,
     # the row is the Queue card's row partial: its id (the `#TD-20` link's target), badge, title (TD-903)
     assert '<div class="qrow" style="--qd: 1" id="TD-20"' in design and "qpri qp-high" in design
     assert "the queue&#39;s design" in design and 'id="TD-21"' not in design
-    assert 'id="TD-21"' in build and "after TD-30" in build and 'id="TD-20"' not in build
+    assert (
+        'id="TD-21"' in build
+        and 'after <a class="qon" href="#TD-30" data-on="TD-30"' in build
+        and 'id="TD-20"' not in build
+    )
     assert 'id="TD-19"' not in html  # an archived member is the Queue's, not the board's
 
 

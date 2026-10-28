@@ -412,38 +412,82 @@ def branch(r: Mapping[str, Any]) -> str:
     return "open"
 
 
-def _tree(rows: list[dict[str, Any]], top: str) -> list[dict[str, Any]]:
-    """The rows as the tree draws them (TD-915): depth first from the top entry, each row's children under it
-    in the reading's order (which is breadth first), so a row sits under its own parent; a row whose parent is
-    not on the card keeps its place at the end. Each row gains `rails`, one colour per level down to its own —
-    its ancestors' branches, then its own — so the 2 px rule down a level's left edge runs unbroken past the
-    deeper rows under it."""
+def _seg(r: Mapping[str, Any]) -> dict[str, str]:
+    """A part's segment in its parent's meter: `branch()`'s colour, and its id and state word in its title, so
+    *in review* keeps its word in a grey segment (§4.5 screen 12 *A card*, TD-1131)."""
+    word = {"owner": "yours to do", "decision": "your decision"}.get(str(r.get("needs") or ""), "")
+    return {"b": branch(r), "title": f"{r.get('show') or r.get('qid')}: {word or r.get('state') or 'open'}"}
+
+
+def meter(parts: list[Mapping[str, Any]]) -> dict[str, Any] | None:
+    """A parent's parts meter (§4.5 screen 12 *A card*, TD-1131): one segment per part and *d/n*, `d` the
+    archived; a parent with no part on the card has none."""
+    if not parts:
+        return None
+    return {"segs": [_seg(p) for p in parts], "d": sum(1 for p in parts if p.get("archived")), "n": len(parts)}
+
+
+def _tree(rows: list[dict[str, Any]], top: dict[str, Any]) -> list[dict[str, Any]]:
+    """The rows as the card draws them (§4.4 *Rows*, §4.5 screen 12 *A card*; TD-1131): indented by *part of*
+    alone, each row under its `parent` in the reading's order, which is the drawn order. A part hangs on its
+    parent's **spine**: `rails`, one entry per level down to its own — an ancestor's branch where that ancestor is
+    a part, "" where it is a loose row (no rule) — so the 2 px rule down a level runs unbroken past the deeper
+    rows under it, and a loose row draws none. **Finished parts fold** — an archived part whose own parts are all
+    archived — to one `fold` line first on the parent's spine, *✓ n done*; a parent never folds while a part of it
+    is open (it is a done group head); finished loose rows fold to one line at the card's end. Each parent, and
+    `top` when it is one, gains its `meter`. Returns the lines: `{"row": r}` or `{"fold": [rows], "n", "depth",
+    "rails", "loose"}`; a folded row keeps its `rails` for when the fold opens."""
+    on = {str(r.get("qid") or "") for r in rows} | {str(top.get("qid") or "")}
     kids: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
-        kids.setdefault(str(r.get("parent") or ""), []).append(r)
+        p = str(r.get("parent") or "")
+        kids.setdefault(p if p in on else "", []).append(r)  # a parent not on the card: a loose row
+    top["meter"] = meter(kids.get(str(top.get("qid") or "")) or [])
+
+    def finished(r: Mapping[str, Any], up: frozenset[int] = frozenset()) -> bool:
+        """Archived, and every part of it too; a `parent` cycle reads as not finished, so it is drawn, never lost."""
+        if id(r) in up or not r.get("archived"):
+            return False
+        return all(finished(k, up | {id(r)}) for k in kids.get(str(r.get("qid") or "")) or ())
+
     out: list[dict[str, Any]] = []
     seen: set[int] = set()
 
-    def walk(q: str, up: list[str]) -> None:
-        for r in kids.get(q) or ():
-            if id(r) in seen:
-                continue
-            seen.add(id(r))
-            depth = max(int(r.get("depth") or 1), 1)
-            r["rails"] = [*(up + ["open"] * depth)[: depth - 1], branch(r)]
-            out.append(r)
-            if r.get("qid"):
-                walk(str(r["qid"]), r["rails"])
+    def place(r: dict[str, Any], up: list[str], spine: bool, into: list[dict[str, Any]], depth: int) -> None:
+        """`r` and its parts, into `into`: the row, then its finished parts' fold, then its open parts."""
+        seen.add(id(r))
+        r["depth"] = depth
+        r["rails"] = [*up, branch(r)] if spine else [*up, ""]
+        r["meter"] = meter(kids.get(str(r.get("qid") or "")) or [])
+        into.append({"row": r})
+        if r.get("qid"):  # `kids[""]` is the loose rows, never a row's parts
+            hang(str(r["qid"]), r["rails"], into, depth + 1)
 
-    walk(top, [])
-    for r in rows:
+    def hang(q: str, up: list[str], into: list[dict[str, Any]], depth: int) -> None:
+        ks = [k for k in kids.get(q) or () if id(k) not in seen]
+        done = [k for k in ks if finished(k)]
+        if done:
+            folded: list[dict[str, Any]] = []
+            for k in done:
+                place(k, up, True, folded, depth)
+            rs = [r for ln in folded for r in (ln["fold"] if "fold" in ln else [ln["row"]])]  # all of it is done
+            into.append({"fold": rs, "n": len(rs), "depth": depth, "rails": [*up, "done"], "loose": False})
+        for k in ks:
+            if id(k) not in seen:
+                place(k, up, True, into, depth)
+
+    hang(str(top.get("qid") or ""), [], out, 1)
+    loose = [r for r in kids.get("") or () if id(r) not in seen]
+    ends: list[dict[str, Any]] = []
+    for r in loose:
         if id(r) not in seen:
-            seen.add(id(r))
-            depth = max(int(r.get("depth") or 1), 1)
-            r["rails"] = [*["open"] * (depth - 1), branch(r)]
-            out.append(r)
-            if r.get("qid"):
-                walk(str(r["qid"]), r["rails"])
+            place(r, [], False, ends if finished(r) else out, 1)
+    for r in rows:  # a cycle of `parent` lines no walk reached: loose, never lost
+        if id(r) not in seen:
+            place(r, [], False, out, 1)
+    if ends:
+        rs = [r for ln in ends for r in (ln["fold"] if "fold" in ln else [ln["row"]])]
+        out.append({"fold": rs, "n": len(rs), "depth": 1, "rails": [], "loose": True})
     return out
 
 
@@ -485,7 +529,8 @@ def queue_view(
     shaped: list[dict[str, Any]] = []
     for c in cards:
         top = _row(c["top"], one_repo, mentioned)
-        rows = _tree([_row(r, one_repo, mentioned) for r in c.get("rows") or []], str(top.get("qid") or ""))
+        drawn = _tree([_row(r, one_repo, mentioned) for r in c.get("rows") or []], top)
+        rows = [r for ln in drawn for r in (ln["fold"] if "fold" in ln else [ln["row"]])]
         wants = card_wants(((mail or {}).get("cards") or {}).get(str(c["id"])), str(top.get("qid") or ""), one_repo)
         status = _mail_status(str(c.get("status") or ""), wants)
         shaped.append(
@@ -495,6 +540,7 @@ def queue_view(
                 "edge": card_edge(str(c.get("group") or ""), status, wants),
                 "top": top,
                 "rows": rows,
+                "lines": drawn,
                 "wants": wants,
                 "ids": list(c.get("order") or [c["id"]]),
                 # the number per repo, each with its chip, where the home reads more than one (TD-901)

@@ -925,6 +925,24 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qrail.b-done { background: var(--done); } .qrail.b-waiting { background: var(--waiting); }
 .qrail.b-needs { background: var(--needs); } .qrail.b-open { background: var(--ended); }
 .repopage .bcol .qrail { display: none; }
+/* the parts meter (§4.5 screen 12 *A card*, TD-1131): one small segment per part in its rule's colour — green done,
+   amber the person's alone, teal waiting, grey anything else — and *d/n* beside it */
+.qmeter { display: inline-flex; gap: 2px; align-items: center; }
+.qseg { display: block; width: 9px; height: 9px; border-radius: 2px; border: 1px solid var(--ended); background: var(--line); }
+.qseg.b-done { background: var(--done); border-color: var(--done); }
+.qseg.b-needs { background: var(--needs); border-color: var(--needs); }
+.qseg.b-waiting { background: transparent; border-color: var(--waiting); box-shadow: inset 0 0 0 2px var(--waiting); }
+.qmcount { font-variant-numeric: tabular-nums; margin-left: -4px; }
+/* *after TD-n*: a link on the row, the row it names lit while it is hovered or focused (TD-1131) */
+.qafter .qon { display: inline; margin: 0; border-bottom: 1px dotted currentColor; }
+.qrow.qlit, .qhead.qlit { background: var(--hover); }
+/* finished parts folded to *✓ n done* on their parent's spine; finished loose rows at the card's end (TD-1131) */
+.qfold > summary.qfoldsum { display: flex; cursor: pointer; list-style: none; font-size: var(--t-small); color: var(--muted); }
+.qfold > summary.qfoldsum::-webkit-details-marker { display: none; }
+.qfold > summary.qfoldsum:hover { background: var(--hover); }
+.qfold > summary.qfoldsum::after { content: "▸"; margin-left: 6px; }
+.qfold[open] > summary.qfoldsum::after { content: "▾"; }
+.qtick { color: var(--done); margin-right: 4px; }
 .qcard.dragging { opacity: .45; }
 .qcard.dropbefore { box-shadow: inset 0 3px 0 var(--link); }
 .qcard.dropafter { box-shadow: inset 0 -3px 0 var(--link); }
