@@ -101,6 +101,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1144 | The ledger reading takes either layout: one `load()` road with `fs_io`/`git_io`, the default rule, the v2 history, and a faulted v2 ledger reported, not read | Medium | Open — build, blocked by TD-1130 |
 | TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
 | TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
+| TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first |
 
 ---
 
@@ -2163,3 +2164,28 @@ A design's `Blocked by:` lists its builds, which follow it, and there the edge m
 **Fix:** design §4.4 *Either layout*, §5 *the ledger*. The unset `ledger:` resolves **once, in `repoconfig.load`**, through `ledger.ledger_path`'s rule (which keeps whether the value was set, so the seams' *`ledger:` names <path>, which is gone* warning fires only on a set one), so `cfg.ledger` is the resolved path everywhere it is carried (checked, not edited: `ui/app.py` 646, 2465, 2707, 2944, 3148, `teams.py` 156 and 925, `cli.py` 601, `agent.py` 1564) and wherever it is shown (the Settings page's row says *docs/ledger (directory)* or the file, as found; a session's record carries the resolved path, which TD-1144's readers still put through `layout_at`); a brief's `{ledger}` slot carries the resolved path; **Open ledger** on a v2 directory is the folder form with no line, titled *Open ledger folder* (§4.5a), `ledger_editor` given the resolved path; and `HANDED_ENTRY["{ledger}"]` says *that repo's ledger, a file or a directory of one file per entry*; `look_home.py` takes a `--v2` that writes its fixture as a directory through `lb.split()`.
 
 **Done when** the Settings page and a session's record show the resolved ledger for a v1 and a v2 checkout, `look_home.py --v2` stands up a home whose Queue and Repo page read the directory, and `pdm run test` passes.
+
+## TD-1149: New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first
+**Location:** `src/shiftlead/ui/static/app.js` (`applyTeam` ~4796, `tickTeamManager`, `teamRoles`, `applyRole`); `src/shiftlead/ui/templates/new.html` (the Team picker, 70–79, its `data-` attributes); `src/shiftlead/ui/common.py` (`teams_for_form` 901); `src/shiftlead/ui/app.py` (`new_submit` 2419: the preset resolution through `repoconfig.resolve_role`); design §4.5a *New session* (**the form**, **Team** picker, **Role** pick + **Lane** field), §4.9 *A person in the team* (TD-160) and *Add or remove a member from the team card* (TD-163)
+
+**Why:** Paul, 2026-10-27, after starting a second grinder for dev-cadence from the New session form, to take TD-165 beside the grinder holding TD-090: "It seems like the new session form should fill the rest of itself out after I choose the grinder role." He picked Team *dc-grind* and Role *grinder*. The session started and claimed TD-165, but `ao --json status` shows it is not what dc-grind's member is:
+
+| | `ao-dev-cadence-dc-grinder` (the team's start) | `ao-dev-cadence-dc-grinder2` (the form) |
+|---|---|---|
+| `unattended` / `supervised` | true / true | false / false |
+| `profile` | `grind` | none (the default) |
+| `controllers` | `ao-dev-cadence-dc-manager` | `ao-shiftlead-manager-ao-1`, another repo's manager |
+| brief | the package's `grinder.md`, **`docs/briefs/grinder-dc-1.md`**, the `build` flow's stage | the package's `grinder.md` and the stage, **no repo brief** |
+
+That is the design working as written: a Team pick makes *a person's own session in the team* (§4.9, TD-160; `applyTeam` sets `underMe`), the Role fills from the preset (`resolve_role`), never from the member line in the team's definition (`.shiftlead.yml`'s `role: grinder, name: dc-grinder, lane: free-pick, brief: docs/briefs/grinder-dc-1.md`), and the manager is ticked only while it is live (dc-manager was not), so the preset's own controllers stood. Nor is there another road: **Members… → Add member** (TD-163) is drawn disabled for a team a repo's `.shiftlead.yml` defines (*edit it in the repo; this card only reads it*), as dc-grind is. So the one control that can start another worker for a repo-defined team starts something that misses its repo's brief (dev-cadence's gate commands, *never `--delete-branch` from a worktree*, `files/` as the canonical tree), runs attended — its prompts are the person's — goes unnudged and unrestarted by §6, and answers to a manager that does not run its team.
+
+**Fix (proposed; the design round settles it):** when the Team pick is a team and the Role is one of its member roles, the form fills from **that member line**, as `ao team start` would create it: the name from the team's pattern with the first free number (*dc-grinder-2*, the Members dialog's rule), the line's `profile`, `lane` and `brief` (layered over the preset's, as at a team start), the team's manager as controller (live, or its seat on call, by the record's id), and the mode unattended and supervised, with **run it under me instead** still offered for a person who wants their own session in the team — so §4.9 *A person in the team* becomes that choice, no longer the default. Each field stays editable before Start. The round decides whether such a start is a live **member** of the running team (counted in `ao team status` and its shape, wound down with it) or a one-off beside it, and whether it writes nothing (a repo's definition stays a PR's, TD-163) — Paul's words ask only that the form fill itself.
+
+**Done when** the design says what a Team and member-role pick fills, its build is filed, built and live, and a dev-cadence grinder started from the form carries the member line's brief, profile, lane, controller and mode.
