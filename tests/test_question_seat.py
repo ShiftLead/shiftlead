@@ -317,10 +317,11 @@ async def test_a_closed_seat_is_the_address_and_the_ask_fills_it(agent, tmp_path
             with pytest.raises(RpcError, match=r"dc-grind has no question seat"):
                 await agent._question_seat(team="dc-grind")
             setattr(rec, field, None)
-        rec.supervised = False
-        with pytest.raises(RpcError, match=r"dc-grind has no question seat"):
-            await agent._question_seat(team="dc-grind")
-        rec.supervised = True
+        for field in ("supervised", "unattended"):  # one the person took over is no address either
+            setattr(rec, field, False)
+            with pytest.raises(RpcError, match=r"dc-grind has no question seat"):
+                await agent._question_seat(team="dc-grind")
+            setattr(rec, field, True)
         async with LocalClient(caller=asker) as a:
             got = await a.call("entry_add", repo="dev-cadence", type="debt", text="the address refuses a closed seat")
         assert got["to"] == seat and _ask_in(rec, got["id"]).open

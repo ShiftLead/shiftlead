@@ -21226,3 +21226,39 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Resolved:** 2026-10-27 (grinder-ao-1, #2505) — one test per mutant in `tests/test_ui_entry_host.py`: the create's `repo` is the node's path; a feature on a machine node opens the node flow's design role; a container node's ledger is the shared checkout's; an invalid node `.shiftlead.yml` is the plan's `why`; every name taken on the node is the 409 naming its host; `no_checkout` names the `projects` line, else *register the checkout*. Each of the six mutants (seven, (2) in two halves) now fails the file.
 
 **Related:** TD-1092, TD-1064.
+
+## TD-1141: `_fillable` (#2495) drops its `unattended` test and no test fails: a closed seat that is supervised but not unattended is still taken for an address
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2495)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — 2026-10-27 in #2506 (grinder-ao-2).
+**Location:** `src/sessionorc/agent_mail.py` `_fillable` (`bool(r.supervised and r.unattended)`); `tests/test_question_seat.py::test_a_closed_seat_is_the_address_and_the_ask_fills_it`; design §4.10 *A team or a repo as the address* ("supervised, unattended, neither suspended nor sat out"), `agent_tick.py` `_seat_pass`
+
+**Why:** `_fillable` and the design say rule 3 fills a closed seat only if it is supervised *and* unattended (`_seat_pass`: `not (s.seat and s.supervised and s.unattended)` returns). Probe: in the worktree, change `bool(r.supervised and r.unattended)` to `bool(r.supervised)` and run `tests/test_question_seat.py tests/test_own_sessions_edge.py tests/test_cli.py`: 106 passed. The test's loop over `sit_out`, `closed_for` and `suspended`, and its `rec.supervised = False` case, each fail when their line goes; the `unattended` half has no case. A seat the person took over (`unattended` False) would then be an address an `ask` waits on forever, which the test's own docstring says `_fillable` exists to prevent. (The other mutations of #2495's resolver and `_one_seat` rank — each term of the sit-out/suspended test, `closed` ranked with or below `exited` — fail a test.)
+
+**Fix:** In that test, set `rec.unattended = False` after the `supervised` case and assert the same `no question seat` refusal, then restore it.
+
+**Done when** the mutation above fails the test.
+
+**Resolved:** 2026-10-27 (grinder-ao-2, #2506) — `tests/test_question_seat.py::test_a_closed_seat_is_the_address_and_the_ask_fills_it` sets `unattended = False` beside `supervised = False` and expects the same refusal; with `_fillable` reading `bool(r.supervised)` the test fails.
+
+## TD-1142: `message_edge`'s `own` reply (#2493) drops its `target in chain(…)` test and no test fails: a reply to a person-session's entry could go to any record
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2493)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — 2026-10-27 in #2506 (grinder-ao-2).
+**Location:** `src/sessionorc/mail.py` `message_edge`, the `kind == "reply"` branch of the `own` edge (`target in chain(records, replied.from_, successor)`, ~line 472); `tests/test_own_sessions_edge.py::test_a_member_replies_back_along_the_edge_and_nothing_else_goes_back`
+
+**Why:** The docstring says the reply goes "to that sender or a record its `superseded_by` chain reaches". Probe: replace `and target in chain(records, replied.from_, successor)` with `and True` on that branch alone (line 472, not the question-seat branch at 482) and run `tests/test_question_seat.py tests/test_own_sessions_edge.py tests/test_cli.py`: 106 passed. The test sends the reply to `a` and to its successor `a2`, both of which the chain reaches, and has no case of a reply on an entry from `a` addressed to some other record (`w2`, `mgr`), which the edge must refuse. So the edge can widen from "back to the asker" to "a reply to anyone" unseen.
+
+**Fix:** In that test add a `message_edge`/`message_gate` case: `w` replies on `_entry("m-1", "a")` to an unrelated record (`b`, `mgr`) and passes no own edge.
+
+**Done when** the mutation above fails the test.
+
+**Resolved:** 2026-10-27 (grinder-ao-2, #2506) — `tests/test_own_sessions_edge.py::test_a_member_replies_back_along_the_edge_and_nothing_else_goes_back` has the member's reply on `a`'s entry go to `b` and `u`, which the chain does not reach: no edge, and `message_gate` refuses; with the chain test replaced by `True` the test fails.
