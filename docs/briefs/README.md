@@ -51,6 +51,17 @@ restart ceiling (TD-036) as the mark the tick's restarts leave, and ends in `ao 
 manager's does. guardians' team is defined in its own repo (`guardians-devenv`, its
 `docs/briefs/team-setup.md`); the old `guardians-orchestrator.md` is under `archive/`.
 
+**A direction that must outlive a restart is not mail** (design §4.10 *Where a directive that must
+last goes*, TD-1118). Mail dies with the record it is delivered to, and an unattended member is
+restarted often; send the mail to tell it now, and write the direction where the lanes read:
+
+| The direction | Where it lasts |
+|---|---|
+| a path to keep out of | a line in the team's brief here, by PR (a changed brief restarts its members, design §6 rule 7) |
+| an entry to wait or stop | a hold with `--why` (`ao td hold`), whose holders are told |
+| a condition on an entry | the entry's **Status** or `**Blocked by:**` |
+| a path to cross only after a read | the repo's `held:` paths in `.shiftlead.yml` |
+
 `techlead-context.md` is the techlead's **primer** (design §4.9b): its first read on every fill —
 the team definition's `techlead: {…, context: docs/briefs/techlead-context.md}` names it and the
 preset brief reads it as `{context}` — the project in a few thousand words, an index and never a
