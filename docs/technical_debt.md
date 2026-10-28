@@ -88,7 +88,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1064 | A session gets either the repo's tools or the org's reach, never both: Add entry starts it on the home, away from the repo's container, and `ao` reaches the home only from a host agent's own sessions | Medium | Designed — builds TD-1092, TD-1093 |
 | TD-1066 | A Queue card's board item does not say what it asks: an `act` line reads as a Decide with Answer…, leads with its raw prefix, and stays asked after its close is written; and the person cannot start a session on the item itself | Medium | Open — design; blocked by decision (paul): the layout ask |
 | TD-1092 | Add entry's **Open a session** starts on the team's host: a repo whose team `place:` puts on a node gets its entry session there | Medium | Live check #2475 |
-| TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
@@ -1857,35 +1856,6 @@ It then names the build entries.
 **Done when:** tests show (a) a plan for a repo whose team `place:` puts on a container node names that host, the path `org.checkout` gives (an org-file project path, and a registry path), the line *…on <host>*, and the press creates with `host` set to it; (b) a typed `entry-1` held by a suspended session in the node's main checkout is refused in the name check's words, the routed `name_check` asserted; (c) on a machine node the role, reader and ledger are read through `host_files`, and an existing branch there is refused in the Name row's words; (d) an unreachable node disables the session way with *<host> did not answer*, and a team with no checkout on its host with the start's refusal (a repo's team and an org-file team each), while `entry_add` (the mail way) still answers; (e) a team on this host, and a repo no team services, plan and create as today; (f) a plan on a node with three live entries makes one `host_worktrees` call. `pdm run test` and `pdm run lint` pass. Live: an Add entry session for contractmatch starts on the contractmatch node, where `flutter --version` runs, `ao td add --repo shiftlead` hands an entry and `ao msg` reaches a shiftlead session.
 
 **Related:** TD-1064 (the design), TD-293 (the New session form on another host), TD-998 and TD-1004 (`ao` on a node's `PATH`), TD-299 (contractmatch on its node).
-
-## TD-1118: Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-prompts)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-1116, TD-1117
-**Location:** design §4.10 *An agreement between peers* and §9 invariant 13; `docs/briefs/README.md`; the team briefs' exclusion lines (e.g. `docs/briefs/grinder-ao-1.md`'s *Out of your reach: …*)
-
-**Why:** a Fable review of Paul's 2026-10-27 proposal found that the lasting places already exist:
-- **A team brief's line.** A change to a brief's files restarts an idle member within `BRIEF_SETTLE` (ten minutes) and asks a working one to restart at its next step (§6 rule 7). `grinder-ao-1.md` already carries one: *Out of your reach: TD-003 and TD-008 …*.
-- **A hold with `--why`**, which the hold's holders are told.
-- **The entry's Status or `Blocked by`.**
-- **The repo's `held:` paths**, for a softer "ask the techlead first".
-No document names them, so a session reaches for mail. A "keep out of `<path>`" sent as mail lasts until the receiver's next restart.
-
-**Fix:** one short table, in §4.10 beside invariant 13's sentence and in `docs/briefs/README.md`, of where a lasting directive goes:
-- a path to keep out of → a line in the team's brief (by PR; rule 7 restarts the members);
-- an entry to wait or stop → a hold with `--why` (TD-1117 lets a person's session do it);
-- a condition on an entry → its Status or `Blocked by`;
-- a path to cross only with a read → `held:`.
-Mail tells the member now. The table's entry is what lasts.
-
-**Done when** both places carry the table and the doc-bound tests pass.
-
-**Related:** TD-1116, TD-1117.
 
 ## TD-1119: The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs
 
