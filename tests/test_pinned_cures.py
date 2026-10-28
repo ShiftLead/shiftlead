@@ -111,8 +111,8 @@ def test_an_unpinned_repo_keeps_todays_three_words(tmp_path, roster):
     _settings(root, CADENCE_HOOK_LINES_PAST[0])
     assert seams.reading(root)["hook_pinned"] is False
     assert _said(root) == [
-        f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh {root}`",
-        f"not on dev-cadence's roster: sync-all will not reach it — `<dev-cadence>/sync.sh {root}`",
+        f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh --pin {root}`",
+        f"not on dev-cadence's roster: the copy is retired, so move it to a pin — `<dev-cadence>/sync.sh --pin {root}`",
     ], "a past vintage on the copy is the line"
     (root / ".git" / "hooks" / "pre-push").write_text(OLD_SHIM)
     roster.write_text(f"{root.resolve()}\n")

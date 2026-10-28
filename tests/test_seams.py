@@ -191,7 +191,7 @@ def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path, mo
     hydrate.chmod(0o755)
     assert seams.reading(root)["warnings"] == [], "no .git directory: the shim is not read"
     (root / ".git" / "hooks").mkdir(parents=True)
-    shim = f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh {root}`"
+    shim = f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh --pin {root}`"
     assert seams.reading(root)["warnings"] == [shim]
     (root / ".git" / "hooks" / "pre-push").write_text(f"#!/bin/sh\n# {seams.SHIM_MARKER} — written by x\n")
     assert seams.reading(root)["warnings"] == []
@@ -207,8 +207,9 @@ def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path, mo
 
 @pytest.mark.unit
 def test_a_served_repo_missing_from_dev_cadences_roster_is_warned_of(tmp_path, monkeypatch):
-    """TD-1010, §4.7 `ao repo add`: while a served repo is not on dev-cadence's own roster, sync-all will not
-    reach it; nothing is said where that roster cannot be read, of an unserved repo, or of dev-cadence's source."""
+    """TD-1010, TD-1188, §4.7 `ao repo add`: while a served repo on the copy is not on dev-cadence's own roster,
+    the cure is the move to a pin; nothing is said where that roster cannot be read, of an unserved repo, or of
+    dev-cadence's source."""
     monkeypatch.setattr(seams, "descends", lambda *a: (True, None))
     root = served(tmp_path / "notes")
     (root / workorders.BOARD).write_text("# Board\n")
@@ -220,7 +221,9 @@ def test_a_served_repo_missing_from_dev_cadences_roster_is_warned_of(tmp_path, m
     assert seams.reading(root)["warnings"] == [], "no roster to read: nothing said"
     roster.parent.mkdir(parents=True)
     roster.write_text("# machine roster\n/elsewhere\n")
-    words = f"not on dev-cadence's roster: sync-all will not reach it — `<dev-cadence>/sync.sh {root}`"
+    words = (
+        f"not on dev-cadence's roster: the copy is retired, so move it to a pin — `<dev-cadence>/sync.sh --pin {root}`"
+    )
     assert seams.reading(root)["warnings"] == [words]
     roster.write_text(f"/elsewhere\n{root.resolve()}\n")
     assert seams.reading(root)["warnings"] == []
