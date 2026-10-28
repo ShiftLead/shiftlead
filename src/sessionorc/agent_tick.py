@@ -1932,6 +1932,7 @@ class TickMixin:
             try:
                 rec = teams.get(team) or {}
                 old = rec.get("work_waiting")
+                await self._run_ended_marks(by_team.get(team) or [])
                 on_work = (settings.get(team) or {}).get("on_work", settings_mod.ON_WORK_DEFAULT)
                 # a record never read for news gets its baseline first, and has none on this tick (TD-781)
                 fresh = await self._work_baselines(by_team.get(team) or []) if on_work != "off" else set()
@@ -2034,6 +2035,26 @@ class TickMixin:
             members = _asked(questions, members)
             return {"at": at, "repo": old.get("repo") or repo, "members": members, "questions": questions}
         return _stamped({"at": at, "repo": repo, "members": members}, stopped)
+
+    async def _run_ended_marks(self, records: list[Session], concluded: bool = False) -> None:
+        """A run-only member's run ends with its team's (design §4.9 *A member started from the form*, §6
+        rules 8 and 9, TD-1166): when the team has nobody live — wound down or stopped — or rule 9 concludes
+        it (`concluded`), every dead, current run-only crew record that carries no mark is marked
+        `closed_for: {why: run_ended}`, `closed_at` its close's or, for an exit, the time it exited, as a
+        sit-out's exit is. A Close marks its own (`agent_common.run_ended`); this reaches the exited one no
+        Close did. A record carrying the tick's restart mark is mid-restart, never its run's end."""
+        mine = work_mod.crew(records)
+        if not concluded and (not mine or any(r.state not in work_mod.DEAD for r in mine)):
+            return
+        ended = [
+            r for r in mine if r.run_only and r.state in work_mod.DEAD and not r.superseded_by and r.closed_for is None
+        ]
+        for r in ended:
+            r.closed_for = {"why": "run_ended", "closed_at": r.closed_at or r.since}
+            log.info("%s: run-only, its team's run ended — never replayed", self._address(r))
+            self._save(r)
+        if ended:
+            await self._push_changes()
 
     async def _work_baselines(self, records: list[Session]) -> set[str]:
         """Rule 8's baseline (§6 rule 8 *How the lanes are read*, TD-781): each record `_work_mark` reads whose
@@ -2422,6 +2443,7 @@ class TickMixin:
         left = [m for m in members if m not in closed]
         if closed:
             log.info("rule 9: %s finished — closed %s", team, ", ".join(m.name for m in closed))
+        await self._run_ended_marks(records, concluded=True)  # its closes marked theirs; an exited one too
         if manager is None or manager.state in work_mod.DEAD:
             if left:
                 # one left open with work: the note waits for the tick that finds the last one gone,
