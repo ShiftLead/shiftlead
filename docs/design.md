@@ -8,7 +8,7 @@ is `ao`.*
 Status: **past phase 1.** The host agent, the Claude Code adapter, the Sessions, Focus, Inbox and New
 session pages, the CLI, teams, mail between sessions, a home/node split with one container node, and
 identity on one host are built, each with the parts still open under its ledger entry. §7 lists what each phase still lacks;
-[`technical_debt.md`](technical_debt.md) holds what is deferred;
+[`ledger/`](ledger/README.md) holds what is deferred, one `TD-NNN.md` per entry;
 [`design-history.md`](design-history.md) is the dated record of how the design got here. This
 document is the requirements and architecture as they stand; each open question in §10 is a
 decision that changes what gets built.

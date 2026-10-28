@@ -18,6 +18,6 @@ dev-cadence run check_cadence.py --pr N > gate.txt 2>&1; rc=$?
 
 Run it in the background, after the PR's `headRefOid` matches the pushed head.
 
-**Why:** separate steps leave minutes between green and merge, and the ledger's Summary table moves every few minutes.
+**Why:** separate steps leave minutes between green and merge, and main moves every few minutes (before TD-1195's split, the ledger's Summary table with it).
 
 **How to apply:** fold review evidence and the fact-check in before the precheck, so it runs on the final head. Never run two prechecks at once (TD-1052 fills `/tmp`). A flake in a test the PR does not touch is rerun, and named in the ledger if it is new. See [[gate-a-merge-on-the-checks-exit-code]], [[summary-table-conflicts-resolve-row-wise]].

@@ -25,7 +25,7 @@ This repo pins dev-cadence (`docs/cadence.toml`'s `[dev-cadence]`, TD-129): `doc
 `docs/procedures/*.md` below are the pinned tree's files, which `dev-cadence path cadence.md` (or
 `procedures/<name>.md`) prints; its scripts run as `dev-cadence run <script>`.
 
-The working rules are `docs/cadence.md` — worktrees (§1), the ledger `docs/technical_debt.md`
+The working rules are `docs/cadence.md` — worktrees (§1), the ledger `docs/ledger/` (one `TD-NNN.md` per entry, archived ones under `archive/`; `dev-cadence run ledger.py --summary` prints the table it no longer stores)
 (§2), the attention board `docs/user_attention.md` (§3), and the review and merge loop (§4).
 Three procedures run on top of them, each a doc any agent follows (Claude Code also has each
 as a skill of the same name): `docs/procedures/stranded-work.md` (the periodic sweep, §3.11),
@@ -115,8 +115,8 @@ Work that exists only in a session's conversation is lost when the session close
 full conventions in `docs/cadence.md` (the pinned tree's: `dev-cadence path cadence.md`):
 
 1. **Ledger before idle.** The moment Paul approves a multi-item plan, or a session pauses with
-   steps undone, write the pending steps into [docs/technical_debt.md](docs/technical_debt.md)
-   (new `TD-NNN` entry or a line in the relevant one). Items that need Paul to act or decide go
+   steps undone, write the pending steps into the ledger, [docs/ledger/](docs/ledger/README.md)
+   (a new `TD-NNN.md` entry or a line in the relevant one). Items that need Paul to act or decide go
    on [docs/user_attention.md](docs/user_attention.md) in the board's `Format:` line, each with
    a `Due:` date matched to its urgency; snoozing is editing the date. Due items are printed
    into the context of every session started in a repo that wires the SessionStart hook (this
@@ -184,7 +184,7 @@ Fix them upstream in dev-cadence and bump the pin (`dev-cadence bump`, a reviewe
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | `cadence.md` in the pinned dev-cadence (`dev-cadence path cadence.md`; edit it in dev-cadence, never here) |
 | Which dev-cadence this repo runs | [docs/cadence.toml](docs/cadence.toml) — its `[dev-cadence]` table pins the commit (TD-129); `dev-cadence bump` moves it |
-| Known issues and deferred work | [docs/technical_debt.md](docs/technical_debt.md) |
+| Known issues and deferred work | [docs/ledger/](docs/ledger/README.md), one `TD-NNN.md` per entry |
 | What is waiting on Paul / parked work | [docs/user_attention.md](docs/user_attention.md) |
 | Durable cross-session memory | [docs/claude-memory/MEMORY.md](docs/claude-memory/MEMORY.md) |
 | Resume a past session | `dev-cadence run list_sessions.py` |

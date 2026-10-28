@@ -21,7 +21,7 @@ laptop changes nothing.
 Inbox pages (mail and the sessions' states; due board items are still to come — TD-069), New session and the CLI are built and
 running; phase 2 (a second host over ssh) is not.
 Read [`docs/design.md`](docs/design.md) — §7 has the phase plan, and what is deferred is in
-[`docs/technical_debt.md`](docs/technical_debt.md).
+[`docs/ledger/`](docs/ledger/README.md).
 
 Grew out of [samscrape](https://github.com/eyecantell/samscrape)'s `tdgrind` worker supervisor
 and the [dev-cadence](https://github.com/eyecantell/dev-cadence) working-cadence system, whose
@@ -29,7 +29,7 @@ repo registry it depends on.
 
 ## Start here (handoff, updated 2026-09-06 evening; the next-steps list below is from that
 date — the live lists are [`docs/user_attention.md`](docs/user_attention.md) and
-[`docs/technical_debt.md`](docs/technical_debt.md))
+[`docs/ledger/`](docs/ledger/README.md))
 
 **Phase 1 is built** (PRs #1–#4; each was reviewed by a Sonnet subagent in the build session and
 the findings folded into the PR before merge — see the "review fixes" commits): host agent, Claude Code adapter, Sessions
@@ -40,7 +40,7 @@ and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, i
    the Tailscale route (*Reach it from your phone*, below).
 2. **Decisions waiting on Paul**: see [`docs/user_attention.md`](docs/user_attention.md)
    (dev-cadence PRs #82/#83, GitHub merge settings, the two permission-dialog questions).
-3. **Deferred work** is in [`docs/technical_debt.md`](docs/technical_debt.md) (TD-001 `limited`
+3. **Deferred work** is in [`docs/ledger/`](docs/ledger/README.md) (TD-001 `limited`
    state, TD-002 attachments, TD-003 phone, TD-004 `hosts.yml`, TD-010 adopting hand-started
    sessions), then **phase 2** of [`docs/design.md`](docs/design.md) §7: second host, ssh
    transport, agent install script.

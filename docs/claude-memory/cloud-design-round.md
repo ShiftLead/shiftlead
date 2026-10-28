@@ -39,7 +39,7 @@ the artboards rendered (headless Chromium: `/opt/pw-browsers/chromium --headless
 
 **Numbers move under you.** A TD number can be taken on main while the branch is open, and a
 regex renumber flips pre-existing citations too (an archived TD-145 became TD-146 once). Check
-`docs/technical_debt_archive.md` as well as the open ledger; take the new id from cadence §2.10's
+`docs/ledger/archive/` as well as the open entries; take the new id from cadence §2.10's
 front end (`ao td next`), else `scripts/ledger_next_id.py`, and never renumber by hand.
 
 **Review.** For a plan or a design with decisions in it, run Sonnet rounds (a fresh agent each
