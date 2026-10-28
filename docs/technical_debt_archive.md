@@ -19393,6 +19393,7 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Owner:** grinder
 **Kind:** build
 **Status:** Done
+**Part of:** TD-998
 **Location:** `src/shiftlead/doctor.py` (`nodes`, on a node; `HOME_ONLY`); `src/shiftlead/cli.py` (`cmd_doctor`, its caller); `tests/test_cli_doctor.py`; design §4.7 *`ao doctor`* (the **nodes** line on a node)
 
 **Why:** TD-998: a node member that cannot find `ao` goes silent to the org, and nothing said why.
