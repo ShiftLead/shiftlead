@@ -1615,7 +1615,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   `cadence/precheck` on its head: no workflow runs on a PR there, so step 4's precheck is what makes
   it green, and the *green* test applies after it (TD-1033). Only one that is
   **not cross-repository**, whose **author is the home's own `gh` login** (the account `sync-all.sh`
-  pushes as), in a served repo, or an unserved one whose one lack is a tree older than `OLDEST` (§5 *The seams*: the sync is its cure), goes on to the steps; any other unserved repo's PR is the person's, as an adoption PR is (§4.7 `ao repo add`) — not read, nothing written.
+  pushes as), in a served repo, or an unserved one whose one lack is a tree older than `OLDEST` — or, for a v2 ledger, than `OLDEST_V2`, the ledger's *predates* (§4.4 *Either layout*) — (§5 *The seams*: the sync is its cure), goes on to the steps; any other unserved repo's PR is the person's, as an adoption PR is (§4.7 `ao repo add`) — not read, nothing written.
 
   It waits on *pending*, leaves a `not_run` PR alone with no verdict (§4.4 *CI that never started
   is the person's*: it waits for the person, with no timeout), and leaves red, conflicting and draft

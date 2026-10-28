@@ -327,6 +327,21 @@ async def test_a_repo_unserved_but_by_an_older_tree_has_its_sync_pr_left_and_an_
 
 
 @pytest.mark.integration
+async def test_a_v2_ledgers_predates_is_an_older_tree_the_sync_cures(agent, gh):
+    """§6 *Sync*, TD-1144: a v2 ledger under a dev-cadence older than `OLDEST_V2` (`ledger_age`) is judged as an
+    older tree is; beside another lack it is left."""
+    v2 = {"key": "ledger_age", "words": "unserved: the ledger is a directory and dev-cadence at abc1234 predates"}
+    led = {"key": "ledger", "words": "unserved: no ledger at docs/ledger — x"}
+    _reading(agent, _pr())
+    agent._repos[ROOT]["seams"] = {"serve": {"ok": False, "lacks": [v2, led]}}
+    await agent._sync_pass()
+    assert agent._repos[ROOT].get("sync", {}) == {} and gh["calls"] == []
+    agent._repos[ROOT]["seams"] = {"serve": {"ok": False, "lacks": [v2]}}
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
+
+
+@pytest.mark.integration
 async def test_a_head_moved_before_the_merge_or_a_new_holder_is_not_merged_and_gets_no_verdict(agent, gh, monkeypatch):
     _reading(agent, _pr())
     gh["head"] = ("b" * 40, "open")

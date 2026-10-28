@@ -713,18 +713,39 @@ def layout_at(rel: str, arel: str | None, io: Io) -> tuple[str, str | None]:
     return led, arch
 
 
-def read_pair(rel: str, io: Io) -> tuple[str, str | None, str | None]:
-    """(ledger path, ledger text, archive text) of the ledger named `rel`, through `layout_at`, so a path
-    from before or after a split still reads: a v2 directory through `lb.load()` (its archive "" when it has
-    none), a v1 file with the archive beside it (None when there is none). The text is None when neither
-    layout is there, and the path then `rel` as asked."""
+def v2_faults(led: str, io: Io) -> list[str]:
+    """Why the v2 ledger at `led` may not be read as its files say (§4.4 *A faulted v2 ledger is reported, not
+    read*), or []: `lb.v2_problems()`'s words, and a `README.md` that declares no `Ledgerboard: 2` (a directory
+    is v2 by its shape; `format_major` reads a missing line as 1). [] for a v1 file."""
+    ls, read = io
+    if ls(led) is None:
+        return []
+    out = lb.v2_problems(led, ls, read)
+    if lb.format_major(read(f"{led}/{lb.LEDGER_README}") or "") == 1:
+        out.append(f"{led}/{lb.LEDGER_README} declares no `Ledgerboard: 2` — a directory is a v2 ledger")
+    return out
+
+
+def read_pair(rel: str, io: Io) -> tuple[str, str | None, str | None, list[str]]:
+    """(ledger path, ledger text, archive text, faults) of the ledger named `rel`, through `layout_at`, so a
+    path from before or after a split still reads: a v2 directory through `lb.load()` (its archive "" when it
+    has none), a v1 file with the archive beside it (None when there is none). The text is None when neither
+    layout is there, and the path then `rel` as asked; it is None too for a faulted v2 directory, whose
+    `v2_faults` are the last element (never read, since `load()` would join a file into its neighbour)."""
     ls, read = io
     led, arel = layout_at(rel, archive_path(rel) if rel.endswith(".md") else None, io)
     if ls(led) is not None:
+        if faults := v2_faults(led, io):
+            return led, None, None, faults
         text, archive = lb.load(led, ls, read)
-        return led, text, archive
+        return led, text, archive, []
     text = read(led)
-    return (led, text, read(arel or archive_path(led))) if text is not None else (rel, None, None)
+    return (led, text, read(arel or archive_path(led)), []) if text is not None else (rel, None, None, [])
+
+
+def fault_words(rel: str, faults: list[str]) -> str:
+    """A faulted v2 ledger's error, as an unreadable file's is said: `<path> is faulted: <each fault>`."""
+    return f"{rel} is faulted: {'; '.join(faults)}"
 
 
 def default_ref(root: Path | str, timeout: float = 10.0) -> str | None:
@@ -747,13 +768,14 @@ class Registry:
     `repos()`), as the script's roster does: `<repo>` is a checkout's directory name and `owner/name`
     its origin; that checkout's ledger (`ledger_path`, either layout) and its archive are read at
     `origin/<default>`, or in the working tree where that ref is missing. Each repo is read once, and
-    only when asked; a name two checkouts share, a checkout not listed, a ledger that cannot be read
-    or an id in neither file is `unresolved`, which keeps the block. Each answer is ledgerboard's
-    `(state, why)`, `why` empty unless it is unresolved (TD-585)."""
+    only when asked; a name two checkouts share, a checkout not listed, a ledger that cannot be read or
+    is a faulted v2 directory (`v2_faults`), or an id in neither file is `unresolved`, which keeps the
+    block. Each answer is ledgerboard's `(state, why)`, `why` empty unless it is unresolved (TD-585)."""
 
     def __init__(self, roots: list[str]) -> None:
         self.roots = [Path(r) for r in roots]
         self._read: dict[Path, tuple[set[str], set[str]] | None] = {}
+        self._why: dict[Path, str] = {}  # why a checkout's ledger reads as None: unreadable, or faulted
         self._origins: dict[Path, str] = {}
 
     def _origin(self, root: Path) -> str:
@@ -775,7 +797,9 @@ class Registry:
             ref = default_ref(root)
             rel = ledger_path(root)
             io = fs_io(root) if ref is None else git_io(root, ref, _under(rel), rel=rel)
-            led, arch = read_pair(rel, io)[1:] if io is not None else (None, None)
+            at, led, arch, faults = read_pair(rel, io) if io is not None else (rel, None, None, [])
+            if led is None:
+                self._why[root] = fault_words(at, faults) if faults else f"{rel} cannot be read"
             self._read[root] = None if led is None else (ids_in(led), ids_in(arch))
         return self._read[root]
 
@@ -788,7 +812,7 @@ class Registry:
             return "unresolved", f"no one checkout named {m.group(1)!r} in the home's registry"
         got = self._repo(root)
         if got is None:
-            return "unresolved", f"{root}'s {ledger_path(root)} cannot be read"
+            return "unresolved", f"{root}'s {self._why[root]}"
         tid = _norm(m.group(2))
         if tid in got[1]:
             return "archived", ""
@@ -800,15 +824,21 @@ class Registry:
 def ledger_path(root: Path | str) -> str:
     """The checkout's ledger, relative to it (§4.4 **Either layout**, TD-1144): `.shiftlead.yml`'s `ledger:`
     when it names one (a trailing `/` dropped), else `docs/ledger` where that is a directory, else
-    `docs/technical_debt.md`. An unreadable `.shiftlead.yml` names none, as it does for `shiftlead.repoconfig`."""
+    `docs/technical_debt.md`. An unreadable `.shiftlead.yml` names none, as it does for `shiftlead.repoconfig`.
+    A set path gone from the tree is read through `layout_at` by every reader, as a carried one is."""
+    if (got := ledger_set(root)) is not None:
+        return got
+    return LEDGER_DIR_REL if (Path(root) / LEDGER_DIR_REL).is_dir() else DEFAULT
+
+
+def ledger_set(root: Path | str) -> str | None:
+    """`.shiftlead.yml`'s `ledger:`, a trailing `/` dropped, or None where it names none."""
     try:
         doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
-        doc = None
+        return None
     got = doc.get("ledger") if isinstance(doc, dict) else None
-    if isinstance(got, str) and got.strip().rstrip("/"):
-        return got.strip().rstrip("/")
-    return LEDGER_DIR_REL if (Path(root) / LEDGER_DIR_REL).is_dir() else DEFAULT
+    return got.strip().rstrip("/") if isinstance(got, str) and got.strip().rstrip("/") else None
 
 
 @dataclass
@@ -925,7 +955,9 @@ def entries_before(
         if not (sha := sha.strip()):
             return None, f"no commit of {ref} before {before.isoformat() if before else 'now'}"
         io = git_io(root, sha, _under(rel), timeout=timeout, rel=rel)
-        text, archive = read_pair(rel, io)[1:] if io is not None else (None, None)
+        led, text, archive, faults = read_pair(rel, io) if io is not None else (rel, None, None, [])
+        if faults:
+            return None, f"{fault_words(led, faults)} at {ref} {sha[:8]}"
         if text is None:
             return None, f"no {rel} at {ref} {sha[:8]}"
         return entries(text, archive, resolve, live), f"{ref} at {sha[:8]}"
@@ -964,7 +996,9 @@ def reading(
     `declared_teams` is the `Fields:` line's `Team` vocabulary in its order, and `needs_team` the ids marked so
     (§4.4 *An entry names its team*, TD-730)."""
     io = fs_io(root)
-    rel, text, archive = read_pair(rel or ledger_path(root), io)
+    rel, text, archive, faults = read_pair(rel or ledger_path(root), io)
+    if faults:  # no entry of it is read: the reading's ledger is an error with the words
+        return {"path": rel, "error": fault_words(rel, faults), "at": now.isoformat()}
     if text is None:
         why = "cannot be read" if (Path(root) / rel).exists() else "No such file or directory"
         return {"path": rel, "error": f"{rel}: {why}", "at": now.isoformat()}

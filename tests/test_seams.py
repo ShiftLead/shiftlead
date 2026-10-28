@@ -28,7 +28,14 @@ def make(tmp_path: Path, name: str = "r", ledger: str | None = LEDGER) -> Path:
 def test_a_repo_with_only_a_ledger_has_every_other_seam_absent(tmp_path):
     root = make(tmp_path)
     got = seams.reading(root)
-    assert got["ledger"] == {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 1, "why": None}
+    assert got["ledger"] == {
+        "path": "docs/technical_debt.md",
+        "state": "ok",
+        "major": 1,
+        "entries": 1,
+        "why": None,
+        "directory": False,
+    }
     for key in ("board", "worktree_setup"):
         assert got[key] == {"state": "absent", "value": None}, key
     assert "gate" not in got, "the gate is no seam of the file's (TD-1011)"

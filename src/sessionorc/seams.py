@@ -64,21 +64,40 @@ def ledgerboard(root: Path | str) -> dict[str, Any]:
 
 
 def ledger(root: Path | str) -> dict[str, Any]:
-    """The ledger seam: `{path, state, major, entries, why}` — `state` *ok* (it parses and its major is
-    one `ledgerboard.py` knows; `entries` its count), *absent* (no file at `ledger:`), *unreadable*
-    (the file could not be read as text, or `ledger:` names a path outside the repo) or *newer* (its
-    `Ledgerboard:` major is past the module's), `why` the reader's reason when not *ok*."""
+    """The ledger seam: `{path, state, major, entries, why, directory}` — `state` *ok* (it parses and its major
+    is one `ledgerboard.py` knows; `entries` its count), *absent* (neither a file nor a directory at the
+    ledger's path), *unreadable* (the file could not be read as text, `ledger:` names a path outside the repo,
+    or a v2 directory is faulted: `why` its `ledger.v2_faults` words) or *newer* (its `Ledgerboard:` major —
+    a directory's from its `README.md` — is past the module's), `why` the reader's reason when not *ok*;
+    `reading()` makes an *ok* directory *predates* where dev-cadence's tree cannot read one (§5 *Which
+    dev-cadence*). `path` is the ledger as read, through `layout_at` (§4.4 *Either layout*): a set `ledger:`
+    gone from the tree reads the other layout beside it, and `named` carries the path it names."""
     rel = ledger_mod.ledger_path(root)
-    out: dict[str, Any] = {"path": rel, "state": "ok", "major": None, "entries": None, "why": None}
+    out: dict[str, Any] = {"path": rel, "state": "ok", "major": None, "entries": None, "why": None, "directory": False}
     if not workorders.inside(Path(rel)):
         return {**out, "state": "unreadable", "why": f"ledger: {rel} is not a path inside the repo"}
-    path = Path(root) / rel
+    io = ledger_mod.fs_io(root)
+    led = ledger_mod.layout_at(rel, None, io)[0]
+    if led != rel and (Path(root) / led).exists():
+        out["path"] = led
+        if ledger_mod.ledger_set(root) is not None:
+            out["named"] = rel  # the warning's: `ledger:` names <rel>, which is gone
+    path = Path(root) / out["path"]
+    if path.is_dir():
+        text = lb.load(out["path"], *io)[0]
+        out["major"], out["directory"] = lb.format_major(text), True
+        if (why := lb.version_problem(text)) is not None:
+            return {**out, "state": "newer", "why": why}
+        if faults := ledger_mod.v2_faults(out["path"], io):
+            return {**out, "state": "unreadable", "why": "; ".join(faults)}
+        out["entries"] = len(lb.entries(text))
+        return out
     if not path.is_file():
-        return {**out, "state": "absent", "why": f"no ledger at {rel}"}
+        return {**out, "state": "absent", "why": f"no ledger at {out['path']}"}
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as e:
-        return {**out, "state": "unreadable", "why": f"{rel}: {getattr(e, 'strerror', None) or e}"}
+        return {**out, "state": "unreadable", "why": f"{out['path']}: {getattr(e, 'strerror', None) or e}"}
     out["major"] = lb.format_major(text)
     why = lb.version_problem(text)
     if why is not None:
@@ -86,7 +105,7 @@ def ledger(root: Path | str) -> dict[str, Any]:
     try:
         out["entries"] = len(lb.entries(text))
     except Exception as e:  # noqa: BLE001 — a ledger the module cannot parse is named, never a failed reading
-        return {**out, "state": "unreadable", "why": f"{rel} does not parse: {e}"}
+        return {**out, "state": "unreadable", "why": f"{out['path']} does not parse: {e}"}
     return out
 
 
@@ -122,12 +141,15 @@ def with_adoption(seams: dict[str, Any] | None, root: Path | str, prs: dict[str,
 
 def ledger_lack(led: dict[str, Any] | None, root: Path | str) -> str | None:
     """The ledger seam's lack in §5's words, or None when it parses: *unserved: no ledger at <path> —
-    <cure>*, *ledger is Ledgerboard 3, this build reads 2 (sync)*, or *unserved: the ledger at <path>
-    does not parse — <the reader's reason>*, which no adoption cures."""
+    <cure>*, *ledger is Ledgerboard 3, this build reads 2 (sync)*, *unserved: the ledger is a directory and
+    dev-cadence at <commit> predates its v2 reader (b9236c8) — sync it* (a pinned repo's *— bump the pin*), or
+    *unserved: the ledger at <path> does not parse — <the reader's reason>*, which no adoption cures."""
     led = led or {}
     state, path = led.get("state"), led.get("path") or "the ledger path"
     if state in (None, "ok"):
         return None
+    if state == "predates":
+        return f"unserved: {led.get('why')} — {'bump the pin' if cadence.pinned(root) else 'sync it'}"
     if state == "absent":
         return f"unserved: no ledger at {path} — {cure(root)}"
     if state == "newer":
@@ -168,27 +190,30 @@ def _forge_repo(source: str) -> str | None:
     return rest if host == "github.com" and rest.count("/") == 1 else None
 
 
-def descends(commit: str, roster: Iterable[Path | str], source: str = "") -> tuple[bool | None, str | None]:
-    """Whether `commit` descends from `cadence.OLDEST` (§5 *Which dev-cadence*, TD-1012): `(True|False,
+def descends(
+    commit: str, roster: Iterable[Path | str], source: str = "", oldest: str | None = None
+) -> tuple[bool | None, str | None]:
+    """Whether `commit` descends from `oldest`, `cadence.OLDEST` unless given (§5 *Which dev-cadence*, TD-1012;
+    `cadence.OLDEST_V2` for a v2 ledger, TD-1144): `(True|False,
     None)`, or `(None, why)` when it cannot be read. Read in the roster's dev-cadence checkout (its source,
     as the host's own fetch left it) with `git merge-base --is-ancestor`; with none there, or one that
     does not hold both commits (a fetch not yet made), through the forge's compare of the two commits on
     the lock's `source:`. A `+dirty` tree is read at the commit it was synced from."""
-    commit = commit.removesuffix("+dirty")
+    commit, oldest = commit.removesuffix("+dirty"), oldest or cadence.OLDEST
     checkout = next((Path(r) for r in roster if cadence.is_source(r)), None)
     first = "no dev-cadence checkout in the roster"
     if checkout is not None:
         try:
-            cp = sync._git(checkout, "merge-base", "--is-ancestor", cadence.OLDEST, commit, timeout=AGE_TIMEOUT)
+            cp = sync._git(checkout, "merge-base", "--is-ancestor", oldest, commit, timeout=AGE_TIMEOUT)
         except sync._Error as e:
             return None, str(e)
         if cp.returncode in (0, 1):
             return cp.returncode == 0, None
-        first = f"{checkout} does not hold {commit[:7]} and {cadence.OLDEST[:7]}"
+        first = f"{checkout} does not hold {commit[:7]} and {oldest[:7]}"
     repo = _forge_repo(source)
     if repo is None:
         return None, f"{first}, and its source {source or '(none)'} is not on GitHub"
-    got, why = reports._gh_api(Path.home(), f"repos/{repo}/compare/{cadence.OLDEST}...{commit}", AGE_TIMEOUT)
+    got, why = reports._gh_api(Path.home(), f"repos/{repo}/compare/{oldest}...{commit}", AGE_TIMEOUT)
     if why is not None:
         return None, f"{first}; {why}"
     status = got.get("status") if isinstance(got, dict) else None
@@ -200,21 +225,31 @@ def descends(commit: str, roster: Iterable[Path | str], source: str = "") -> tup
 
 
 def age(
-    root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, Any] | None = None
+    root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, Any] | None = None, v2: bool = False
 ) -> dict[str, Any] | None:
     """The lock's age (§5 *Which dev-cadence*): `{commit, oldest, descends, why}`, `commit` the lock's
     `files_commit` (else `commit`), `descends` whether it is at or after `cadence.OLDEST` (None with `why`
-    when that could not be read); None for dev-cadence's source or a lock that is lacking already. A read
-    `old` made of the same two commits is carried: their ancestry never changes."""
+    when that could not be read); with `v2` (the ledger is a directory, TD-1144) also `{oldest_v2,
+    descends_v2}` against `cadence.OLDEST_V2`, read only once `descends` is True. None for dev-cadence's source
+    or a lock that is lacking already. A read `old` made of the same commits is carried: their ancestry never
+    changes."""
     lock, lack = _lock(Path(root))
     commit = (lock or {}).get("files_commit") or (lock or {}).get("commit")
     if lack or not commit:
         return None
     same = isinstance(old, dict) and (old.get("commit"), old.get("oldest")) == (commit, cadence.OLDEST)
     if same and old.get("descends") is not None:
-        return old
-    got, why = descends(commit, roster, str(lock.get("source") or ""))
-    return {"commit": commit, "oldest": cadence.OLDEST, "descends": got, "why": why}
+        if not v2 or old.get("descends") is False:
+            return old
+        if old.get("oldest_v2") == cadence.OLDEST_V2 and old.get("descends_v2") is not None:
+            return old
+    source = str(lock.get("source") or "")
+    got, why = descends(commit, roster, source)
+    out = {"commit": commit, "oldest": cadence.OLDEST, "descends": got, "why": why}
+    if v2 and got is True:
+        out["oldest_v2"] = cadence.OLDEST_V2
+        out["descends_v2"], out["why"] = descends(commit, roster, source, cadence.OLDEST_V2)
+    return out
 
 
 def serve(root: Path | str, led: dict[str, Any], dc_age: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -243,16 +278,16 @@ def serve(root: Path | str, led: dict[str, Any], dc_age: dict[str, Any] | None =
     elif cadence.gate(root) is None:
         script = cadence.SOURCE_SCRIPT if cadence.is_source(root) else cadence.SCRIPT
         lacks.append({"key": "gate", "words": f"unserved: no gate (no {script}) — {cure(root)}"})
-    if words := ledger_lack(led, root):
-        lacks.append({"key": "ledger", "words": words})
+    if words := ledger_lack(led, root):  # *predates* is an older tree's, which the sync cures (§6 *Sync*)
+        lacks.append({"key": "ledger_age" if led.get("state") == "predates" else "ledger", "words": words})
     return {"ok": not lacks, "lacks": lacks}
 
 
 def unserved(r: Any, but: tuple[str, ...] = ()) -> list[str]:
     """The words of each lack that leaves a repo unserved (§5 *The seams*, TD-1011), from its repo facts
-    (`r["seams"]["serve"]`), passing over the lacks keyed in `but` (the sync pass's `age`, §6 *Sync*); none
-    for a served repo, and none where no `serve` was read yet (an older host agent's reading, or none yet):
-    a repo is never unserved on a guess."""
+    (`r["seams"]["serve"]`), passing over the lacks keyed in `but` (the sync pass's `age` and `ledger_age`, §6
+    *Sync*); none for a served repo, and none where no `serve` was read yet (an older host agent's reading, or
+    none yet): a repo is never unserved on a guess."""
     seams = r.get("seams") if isinstance(r, dict) else None
     serve = seams.get("serve") if isinstance(seams, dict) else None
     if not isinstance(serve, dict) or serve.get("ok") is not False:
@@ -311,14 +346,18 @@ def warnings(
     dc_age: dict[str, Any] | None = None,
     served: bool = False,
     pinned: bool = False,
+    led: dict[str, Any] | None = None,
 ) -> list[str]:
-    """The warnings the host agent can read itself (§5 *The seams*), each one sentence: a missing board,
+    """The warnings the host agent can read itself (§5 *The seams*), each one sentence: a set `ledger:` gone
+    from the tree, which `led` (the ledger seam) reads in the other layout (§4.4 *Either layout*), a missing board,
     no worktree setup, a checkout without dev-cadence's hook shim, dev-cadence's age where it could not
     be read (§5 *Which dev-cadence*), and a `served` repo missing from dev-cadence's own roster (§4.7 `ao
     repo add`, TD-1010) — never dev-cadence's source, which no sync reaches. The two per-clone cures are the
     era's: `sync.sh` on the copy, the launcher in a `pinned` repo (`cadence.hook_pinned`, TD-1024). A repo is
     served whatever they say."""
     out: list[str] = []
+    if (led or {}).get("named"):
+        out.append(f"`ledger:` names {led['named']}, which is gone: reading {led.get('path')}")
     if board.get("state") == "absent" or (board.get("value") and not (Path(root) / board["value"]).is_file()):
         out.append(f"no board at {board.get('value') or workorders.BOARD}")
     if setup.get("state") == "absent":
@@ -353,11 +392,21 @@ def reading(root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, 
         "board": {"state": board_state, "value": board_rel.as_posix() if board_rel is not None else None},
         "worktree_setup": {"state": state, "value": value},
     }
-    out["cadence_age"] = age(root, roster, (old or {}).get("cadence_age"))
+    led = out["ledger"]
+    out["cadence_age"] = got = age(root, roster, (old or {}).get("cadence_age"), v2=bool(led.get("directory")))
+    if led.get("directory") and led["state"] == "ok" and (got or {}).get("descends_v2") is False:
+        why = f"the ledger is a directory and dev-cadence at {got['commit'][:7]} predates its v2 reader"
+        out["ledger"] = {**led, "state": "predates", "why": f"{why} ({cadence.OLDEST_V2[:7]})"}
     out["serve"] = serve(root, out["ledger"], out["cadence_age"])
     out["hook_pinned"] = cadence.hook_pinned(root)
     out["warnings"] = warnings(
-        root, out["board"], out["worktree_setup"], out["cadence_age"], out["serve"]["ok"], out["hook_pinned"]
+        root,
+        out["board"],
+        out["worktree_setup"],
+        out["cadence_age"],
+        out["serve"]["ok"],
+        out["hook_pinned"],
+        out["ledger"],
     )
     out["session_start"] = session_start(root)
     out["ledgerboard"] = ledgerboard(root)

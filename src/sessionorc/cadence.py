@@ -41,6 +41,9 @@ SOURCE_GATE = f"python3 {SOURCE_SCRIPT} --pr {{pr}} --json"
 # board in the ledgerboard format `seams.ledger` reads. Raised only by the PR that needs a newer one, and only
 # once every registered consumer's lock is at or after it (a raise past the roster unserves it).
 OLDEST = "6d92209da67410546a258a467e3ff292fb20166d"
+# The oldest dev-cadence commit that reads a v2 ledger, a directory (§4.4 *Either layout*, §5 *Which dev-cadence*,
+# TD-1144): dev-cadence #405, where `ledger_next_id.py` first reads one and `ledger.py` gains `layout_at`
+OLDEST_V2 = "b9236c8a6be84b52048e0bd6517001fad13f0033"
 LOCK = "docs/cadence-sync.lock"  # the copy's lock, while a repo still has one (`sync.LOCK`)
 PIN = "docs/cadence.toml"  # the pin's file: `[dev-cadence]`'s `source` and `ref` (dev-cadence TD-129)
 # the pin's header as the SessionStart line's grep finds it (TD-1023): the twin of dev-cadence's

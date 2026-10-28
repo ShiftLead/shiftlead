@@ -63,9 +63,11 @@ class SyncMixin:
         prs = [p for p in prs_r.get("open") or [] if isinstance(p, dict)]
         old = reading.get("sync") or {}
         sync = sync_mod.prune(old, prs)
-        if await asyncio.to_thread(cadence.gate, root) is None or seams_mod.unserved(reading, but=("age",)):
-            # unserved by any lack but an older tree, which the sync cures: its PRs are the person's — not read,
-            # nothing written (§6 *Sync*, TD-1018)
+        if await asyncio.to_thread(cadence.gate, root) is None or seams_mod.unserved(
+            reading, but=("age", "ledger_age")
+        ):
+            # unserved by any lack but an older tree (or one too old for a v2 ledger), which the sync cures: its
+            # PRs are the person's — not read, nothing written (§6 *Sync*, TD-1018)
             pass
         elif not auto:
             for pr in prs:
