@@ -62,6 +62,7 @@ def test_a_close_is_the_teams_by_a_claims_ref_its_pr_or_a_restarts_done_and_neve
     assert "Completed (4)" in done and "TD-4" not in done and "TD-5" not in done
     assert '<span class="nopr">no PR</span>' in done and 'data-doing-at="' + closes[0]["closed"] + '"' in done
     assert s["done_pr_w"] == len("no PR")
+    assert 'href="/repo/samscrape?win=day#completed" title="TD-1"' in done  # a closed entry lands on Merged
 
 
 def test_eight_rows_then_more_linking_to_the_merged_column_and_the_empty_windows_words():
@@ -101,12 +102,13 @@ def test_drawn_facets_draws_motion_for_a_stopped_team_with_closes_and_no_claim()
 FACE_PROBE = (
     PROBE[: PROBE.index("console.log(")]
     + """
-const kept = { "motion:grind": "completed" };
+const kept = { "motion:grind": "completed", "motion:stale": "gone" };
 const get = (k, d) => (k in kept ? kept[k] : d);
 console.log(JSON.stringify([
   AO.motionFace("grind", "motion", get),     // a stored pick wins over a claim
   AO.motionFace("other", "completed", get),  // no pick: the server's default
   AO.motionFace("other", "", get),           // no default: in motion
+  AO.motionFace("stale", "completed", get),  // a stored value that is neither: the default
 ]));
 """
 )
@@ -120,7 +122,7 @@ def test_the_pick_is_stored_per_team_and_wins_over_the_default():
     probe.write_text(FACE_PROBE)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
-    assert json.loads(out.stdout) == ["completed", "completed", "motion"]
+    assert json.loads(out.stdout) == ["completed", "completed", "motion", "completed"]
     js = (UI / "static" / "app.js").read_text()
     assert 'else if (pick === "motion") store.set("motion:" + sum.dataset.team, v);' in js
     assert '$$(".mv", sum).forEach((el) => (el.hidden = el.dataset.mv !== st.motion));' in js

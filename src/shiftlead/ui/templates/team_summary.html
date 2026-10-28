@@ -45,7 +45,7 @@
         <div class="mrow">
           <span class="mphase meta mono" data-doing-at="{{ x.closed }}" title="{{ x.closed }}">{{ x.age }}</span>
           <span class="mprio"></span>
-          <a class="mref mono strong" href="{{ m.repo.url if m.repo else '#' }}#{{ x.id }}" title="{{ x.id }}">{{ x.id }}</a>
+          <a class="mref mono strong" href="{{ m.repo.url if m.repo else '' }}?win={{ w }}#completed" title="{{ x.id }}">{{ x.id }}</a>
           <span class="mtitle" title="{{ x.title }}">{{ x.title }}</span>
           <span class="mwho"></span>
           <span class="mpr">{% if x.pr %}{% if x.url %}<a href="{{ x.url }}" target="_blank" rel="noopener">#{{ x.pr }}</a>{% else %}<span>#{{ x.pr }}</span>{% endif %}{% else %}<span class="nopr">no PR</span>{% endif %}</span>

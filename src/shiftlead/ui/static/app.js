@@ -2421,7 +2421,10 @@
   // answers changes, and a new one flips it back to *answer*. TDs in motion's *in motion · completed*
   // is stored per team, as the fold is: a stored pick wins whatever the team then holds, and until one
   // the server's default — *in motion* while the team holds a claim (TD-1189).
-  AO.motionFace = (team, dflt, get) => get("motion:" + team, dflt || "motion");
+  AO.motionFace = (team, dflt, get) => {
+    const v = get("motion:" + team, dflt || "motion");
+    return v === "motion" || v === "completed" ? v : dflt || "motion";  // a stale key never blanks the facet
+  };
   const faceFlip = {};  // team → {key, face}: a flip, held while the pending answers are the same
   const scrollKept = {};  // team → the summary's scrolled boxes, from the swap to the next sync
   function summaryState(sum) {
