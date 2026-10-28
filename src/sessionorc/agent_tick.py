@@ -2212,8 +2212,10 @@ class TickMixin:
         for r in work_mod.crew(records):
             if r.state not in work_mod.DEAD or r.superseded_by or r.suspended or r.restart_ceiling:
                 continue
-            if work_mod.sat_out(r):
-                continue  # it did not end by the team's own ending: its flow sat it out (§4.9c)
+            if work_mod.sat_out(r) or r.run_only:
+                # it did not end by the team's own ending: its flow sat it out (§4.9c); a run-only member is
+                # never replayed, an exited one included, which no Close marks (§4.9, TD-1166)
+                continue
             recent = agent_common._counted(r.restarts, now, fills=False)
             if len(recent) >= RESTART_CEILING:
                 continue

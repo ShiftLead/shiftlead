@@ -36,6 +36,7 @@ from sessionorc.agent_common import (
     launch_params,
     log,
     read_checkout,
+    run_ended,
     stat_dir,
 )
 from sessionorc.gitinfo import WorktreeError, branch_exists, worktree_path
@@ -557,6 +558,8 @@ class RemoteMixin:
             # took the close: a refused or unreachable one leaves a live record with no closer. The
             # node writes the same word from the params it is handed; an older node drops them.
             home_copy.closer = closer_of(caller, params.get("closer"), now_iso())
+            # a run-only member's run ends with it, on the home's copy: `closed_for` is the home's (§4.9, TD-1166)
+            home_copy.closed_for = run_ended(home_copy, caller, params.get("restart"), home_copy.closed_at or now_iso())
             self._save(home_copy)
         if reply.get("record"):
             self._take_records(host, [reply["record"]], whole=False)

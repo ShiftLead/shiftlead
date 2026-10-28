@@ -54,10 +54,11 @@ def closed_finished(record: Any) -> bool:
 
 def sat_out(record: Any) -> bool:
     """Whether a record is a member its team's flow sat out (design §4.9c *Switching*): `closed_for: {why:
-    sit_out}`. Rules 1, 2 and 7 never recreate it, rule 9 and `wound_down` pass over it whatever it
-    declared, and rule 8 watches none of its lanes."""
+    sit_out}`, or a run-only member whose run ended, read the same way (`run_ended`, §4.9 *A member started
+    from the form*, TD-1166). Rules 1, 2 and 7 never recreate it, rule 9 and `wound_down` pass over it
+    whatever it declared, and rule 8 watches none of its lanes."""
     mark = record.get("closed_for") if isinstance(record, Mapping) else getattr(record, "closed_for", None)
-    return isinstance(mark, Mapping) and mark.get("why") == "sit_out"
+    return isinstance(mark, Mapping) and mark.get("why") in ("sit_out", "run_ended")
 
 
 def crew(records: Iterable[Session]) -> list[Session]:
