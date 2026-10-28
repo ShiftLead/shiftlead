@@ -1,15 +1,16 @@
 """The ledger's entry headers, read (design §4.4 *Repo facts*, TD-176 slice 1).
 
-A repo's ledger (`.shiftlead.yml`'s `ledger:`, default `docs/technical_debt.md`) is a file of
-entries, each `## TD-NNN: title` followed by header fields — `**Priority:**`, `**Owner:**`,
-`**Kind:**`, `**Type:**`, `**Blocked by:**`. This module is the one reader of those fields: the
-Org's Repo facet and the Repo page count what it returns, and `tests/test_ledger.py` holds the
-repo's own ledger to its rules through the same reader. Every line shape — a heading, a field, a
-`Blocked by` item, `Answers:` — is ledgerboard's (`sessionorc.ledgerboard`, the vendored release,
-ADR 2026-10-12, TD-585); what a field is *for* is this module's. **Pickable is derived** from `Blocked by:`
-by cadence §2.4's rule (TD-228), the rule dev-cadence's `scripts/ledger.py` applies, and
-`tests/test_ledger_derived.py` holds the two readers equal; a `**Pickable:**` line a ledger still
-writes is not read.
+A repo's ledger (`.shiftlead.yml`'s `ledger:`, else `docs/ledger` where that is a directory, else
+`docs/technical_debt.md`: `ledger_path`) is a v1 file or a v2 directory of one file per entry (dev-cadence
+TD-160), read through ledgerboard's one `load()` with this module's `fs_io` or `git_io` (§4.4 **Either
+layout**, TD-1144) — the same text either way, of entries, each `## TD-NNN: title` followed by header fields —
+`**Priority:**`, `**Owner:**`, `**Kind:**`, `**Type:**`, `**Blocked by:**`. This module is the one reader of
+those fields: the Org's Repo facet and the Repo page count what it returns, and `tests/test_ledger.py` holds
+the repo's own ledger to its rules through the same reader. Every line shape — a heading, a field, a `Blocked by`
+item, `Answers:` — is ledgerboard's (`sessionorc.ledgerboard`, the vendored release, ADR 2026-10-12,
+TD-585); what a field is *for* is this module's. **Pickable is derived** from `Blocked by:` by cadence §2.4's
+rule (TD-228), the rule dev-cadence's `scripts/ledger.py` applies, and `tests/test_ledger_derived.py` holds
+the two readers equal; a `**Pickable:**` line a ledger still writes is not read.
 
 Two reads. `entries` parses one version of the file: an entry counts while its section is in it.
 `history` reads the file's git history in the checkout, so *opened* and *closed* in a window mean
@@ -25,7 +26,7 @@ import subprocess
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -37,6 +38,8 @@ from sessionorc.models import owner_word
 # origin's default branch as last fetched; the two usual names when `origin/HEAD` was never set
 DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 DEFAULT = "docs/technical_debt.md"  # the `ledger:` default, as `shiftlead.repoconfig` has it
+LEDGER_REL, ARCHIVE_REL = DEFAULT, "docs/technical_debt_archive.md"  # dev-cadence's `ledger.py`'s names
+LEDGER_DIR_REL = "docs/ledger"  # a v2 ledger (dev-cadence TD-160): the default where it is a directory
 
 # the fields ShiftLead reads further down the body when the header block lacks them, by any spelling
 # (ledgerboard's `entries` reads Priority, Type and Blocked by there itself)
@@ -601,6 +604,127 @@ def _git(root: Path | str, *args: str, timeout: float = 10.0) -> str | None:
     return cp.stdout if cp.returncode == 0 else None
 
 
+Io = tuple[lb.Ls, lb.Read]  # (ls, read), as `lb.load()` takes them
+
+
+def fs_io(root: Path | str) -> Io:
+    """(ls, read) over the working tree of `root`, paths relative to it: `ls` a directory's file names
+    (None for anything that is not a directory), `read` a file's text (None for anything that is not one)."""
+    base = Path(root)
+
+    def ls(path: str) -> list[str] | None:
+        p = base / path
+        return sorted(x.name for x in p.iterdir() if x.is_file()) if p.is_dir() else None
+
+    def read(path: str) -> str | None:
+        try:
+            return (base / path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+
+    return ls, read
+
+
+def _under(rel: str) -> str:
+    """The common parent of a ledger path and its v1 archive's — the directory `layout_at` looks in."""
+    parent = PurePosixPath(rel).parent.as_posix()
+    return "" if parent == "." else parent
+
+
+def git_io(root: Path | str, ref: str, under: str = "", timeout: float = 10.0) -> Io | None:
+    """(ls, read) over the tree at `ref` in `root`, or None when it cannot be listed: one `git ls-tree` of
+    `under` (empty: the top level, and the v2 directory's name there, never the tree recursively), and a
+    read of a v2 entry file or `README.md` fetches its directory's others with it in one `git cat-file
+    --batch` — only those, never the directory's other files; any other path is fetched alone. dev-cadence's
+    `files/scripts/ledger.py` `git_io` is the worked example (TD-1144)."""
+    if under:
+        listed = _git(root, "ls-tree", "-r", "-z", "--full-tree", ref, "--", under, timeout=timeout)
+    else:
+        top = _git(root, "ls-tree", "-z", "--full-tree", ref, timeout=timeout)
+        sub = _git(root, "ls-tree", "-r", "-z", "--full-tree", ref, "--", PurePosixPath(LEDGER_DIR_REL).name)
+        listed = None if top is None or sub is None else top + sub
+    if listed is None:
+        return None
+    blobs: dict[str, str] = {}
+    for rec in listed.split("\0"):
+        meta, tab, path = rec.partition("\t")
+        if tab and meta.split()[1:2] == ["blob"]:
+            blobs[path] = meta.split()[2]
+    cache: dict[str, str | None] = {}
+
+    def ls(path: str) -> list[str] | None:
+        pre = f"{path.rstrip('/')}/" if path else ""
+        if path in blobs or not any(p.startswith(pre) for p in blobs):
+            return None
+        return sorted(p[len(pre) :] for p in blobs if p.startswith(pre) and "/" not in p[len(pre) :])
+
+    def batched(name: str) -> bool:
+        return name == lb.LEDGER_README or bool(lb.ENTRY_FILE_RE.match(name))
+
+    def read(path: str) -> str | None:
+        if path not in blobs:
+            return None
+        if path not in cache:
+            d, _, name = path.rpartition("/")
+            want = [path]
+            if batched(name):
+                want += [
+                    p
+                    for p in blobs
+                    if p != path and p.rpartition("/")[0] == d and p not in cache and batched(p.rpartition("/")[2])
+                ]
+            try:
+                cp = subprocess.run(
+                    ["git", "-C", str(root), "cat-file", "--batch"], capture_output=True, timeout=timeout,
+                    input="".join(blobs[p] + "\n" for p in want).encode(), check=False,
+                )  # fmt: skip
+                data = cp.stdout if cp.returncode == 0 else b""
+            except (OSError, subprocess.TimeoutExpired):
+                data = b""
+            at = 0
+            for p in want:
+                nl = data.find(b"\n", at)
+                head = data[at:nl].split() if nl >= 0 else []
+                if len(head) != 3 or head[1] != b"blob":
+                    cache[p] = None
+                    break
+                size = int(head[2])
+                body = data[nl + 1 : nl + 1 + size]
+                cache[p] = body.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+                at = nl + 1 + size + 1
+        return cache.get(path)
+
+    return ls, read
+
+
+def layout_at(rel: str, arel: str | None, io: Io) -> tuple[str, str | None]:
+    """(ledger, archive) as the tree `io` reads holds them: `rel` and `arel` when `rel` is there, else the
+    other layout's beside it — a split came between (dev-cadence TD-160): a v1 file's `ledger/` directory
+    (its archive inside it, so None), or a directory's v1 file and archive. dev-cadence's
+    `files/scripts/ledger.py` `layout_at`, copied; `tests/test_ledger_layout.py` holds the two equal."""
+    if io[0](rel) is not None or io[1](rel) is not None:
+        return rel, arel
+    here = PurePosixPath(rel).parent
+    if rel.endswith(".md"):
+        return (here / PurePosixPath(LEDGER_DIR_REL).name).as_posix(), None
+    led, arch = ((here / PurePosixPath(n).name).as_posix() for n in (LEDGER_REL, ARCHIVE_REL))
+    return led, arch
+
+
+def read_pair(rel: str, io: Io) -> tuple[str, str | None, str | None]:
+    """(ledger path, ledger text, archive text) of the ledger named `rel`, through `layout_at`, so a path
+    from before or after a split still reads: a v2 directory through `lb.load()` (its archive "" when it has
+    none), a v1 file with the archive beside it (None when there is none). The text is None when neither
+    layout is there, and the path then `rel` as asked."""
+    ls, read = io
+    led, arel = layout_at(rel, archive_path(rel) if rel.endswith(".md") else None, io)
+    if ls(led) is not None:
+        text, archive = lb.load(led, ls, read)
+        return led, text, archive
+    text = read(led)
+    return (led, text, read(arel or archive_path(led))) if text is not None else (rel, None, None)
+
+
 def default_ref(root: Path | str, timeout: float = 10.0) -> str | None:
     """`origin/<default>` as cadence §9's default-branch rule names it, the script's own: the first
     of `origin/HEAD`'s target, `init.defaultBranch`, `main` and `master` that exists on origin; None
@@ -619,13 +743,11 @@ def default_ref(root: Path | str, timeout: float = 10.0) -> str | None:
 class Registry:
     """Resolves `<repo>#TD-NNN` through the home's registry (§4.4 *Repo facts*: the host's
     `repos()`), as the script's roster does: `<repo>` is a checkout's directory name and `owner/name`
-    its origin; that checkout's `docs/technical_debt.md` and its archive are read at
+    its origin; that checkout's ledger (`ledger_path`, either layout) and its archive are read at
     `origin/<default>`, or in the working tree where that ref is missing. Each repo is read once, and
     only when asked; a name two checkouts share, a checkout not listed, a ledger that cannot be read
     or an id in neither file is `unresolved`, which keeps the block. Each answer is ledgerboard's
     `(state, why)`, `why` empty unless it is unresolved (TD-585)."""
-
-    LEDGER, ARCHIVE = DEFAULT, archive_path(DEFAULT)
 
     def __init__(self, roots: list[str]) -> None:
         self.roots = [Path(r) for r in roots]
@@ -649,17 +771,10 @@ class Registry:
     def _repo(self, root: Path) -> tuple[set[str], set[str]] | None:
         if root not in self._read:
             ref = default_ref(root)
-
-            def read(rel: str) -> str | None:
-                if ref is not None:
-                    return _git(root, "show", f"{ref}:{rel}")
-                try:
-                    return (root / rel).read_text(encoding="utf-8", errors="replace")
-                except OSError:
-                    return None
-
-            led = read(self.LEDGER)
-            self._read[root] = None if led is None else (ids_in(led), ids_in(read(self.ARCHIVE)))
+            rel = ledger_path(root)
+            io = fs_io(root) if ref is None else git_io(root, ref, _under(rel))
+            led, arch = read_pair(rel, io)[1:] if io is not None else (None, None)
+            self._read[root] = None if led is None else (ids_in(led), ids_in(arch))
         return self._read[root]
 
     def __call__(self, item: str) -> tuple[str, str]:
@@ -671,7 +786,7 @@ class Registry:
             return "unresolved", f"no one checkout named {m.group(1)!r} in the home's registry"
         got = self._repo(root)
         if got is None:
-            return "unresolved", f"{root}'s {self.LEDGER} cannot be read"
+            return "unresolved", f"{root}'s {ledger_path(root)} cannot be read"
         tid = _norm(m.group(2))
         if tid in got[1]:
             return "archived", ""
@@ -681,14 +796,17 @@ class Registry:
 
 
 def ledger_path(root: Path | str) -> str:
-    """The checkout's ledger file, relative to it: `.shiftlead.yml`'s `ledger:` when it names one,
-    else the default. An unreadable file is the default, as it is for `shiftlead.repoconfig`."""
+    """The checkout's ledger, relative to it (§4.4 **Either layout**, TD-1144): `.shiftlead.yml`'s `ledger:`
+    when it names one (a trailing `/` dropped), else `docs/ledger` where that is a directory, else
+    `docs/technical_debt.md`. An unreadable `.shiftlead.yml` names none, as it does for `shiftlead.repoconfig`."""
     try:
         doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
-        return DEFAULT
+        doc = None
     got = doc.get("ledger") if isinstance(doc, dict) else None
-    return got.strip() if isinstance(got, str) and got.strip() else DEFAULT
+    if isinstance(got, str) and got.strip().rstrip("/"):
+        return got.strip().rstrip("/")
+    return LEDGER_DIR_REL if (Path(root) / LEDGER_DIR_REL).is_dir() else DEFAULT
 
 
 @dataclass
@@ -804,10 +922,10 @@ def entries_before(
             continue  # no such ref here: the next name
         if not (sha := sha.strip()):
             return None, f"no commit of {ref} before {before.isoformat() if before else 'now'}"
-        text = _git(root, "show", f"{sha}:{rel}", timeout=timeout)
+        io = git_io(root, sha, _under(rel), timeout=timeout)
+        text, archive = read_pair(rel, io)[1:] if io is not None else (None, None)
         if text is None:
             return None, f"no {rel} at {ref} {sha[:8]}"
-        archive = _git(root, "show", f"{sha}:{archive_path(rel)}", timeout=timeout)
         return entries(text, archive, resolve, live), f"{ref} at {sha[:8]}"
     return None, "no origin/<default> here"
 
@@ -843,19 +961,11 @@ def reading(
     `Part of:`.
     `declared_teams` is the `Fields:` line's `Team` vocabulary in its order, and `needs_team` the ids marked so
     (§4.4 *An entry names its team*, TD-730)."""
-    rel = rel or ledger_path(root)
-    try:
-        text = (Path(root) / rel).read_text(encoding="utf-8")
-    except OSError as e:
-        return {"path": rel, "error": f"{rel}: {e.strerror or e}", "at": now.isoformat()}
-    try:
-        archive: str | None = (Path(root) / archive_path(rel)).read_text(encoding="utf-8")
-    except OSError:
-        archive = None
-    try:
-        rank_text: str | None = (Path(root) / lb.rank_path(rel)).read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        rank_text = None  # no rank file: every entry's key is its implicit one
+    io = fs_io(root)
+    rel, text, archive = read_pair(rel or ledger_path(root), io)
+    if text is None:
+        return {"path": rel, "error": f"{rel}: No such file or directory", "at": now.isoformat()}
+    rank_text = io[1](lb.rank_path(rel))  # none: every entry's key is its implicit one
     got = entries(text, archive, resolve, live, rank_text=rank_text, repo=repo_key(root))
     done_parts = parts_of_open(archive, got)
     for e in got:
@@ -873,6 +983,9 @@ def reading(
         "at": now.isoformat(),
     }
     if not with_history:
+        return out
+    if io[0](rel) is not None:
+        out["history_error"] = "a v2 ledger's history is not read yet (TD-1144)"
         return out
     life = history(root, rel, text)
     if life is None:
