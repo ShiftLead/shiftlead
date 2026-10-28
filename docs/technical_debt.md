@@ -99,6 +99,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1181 | The tick's `git status` in every session's directory takes `index.lock`, so a session's own `git add` can fail beside it | Medium | Open — build |
 | TD-1171 | `ledger.stamp`'s test does not pin its `archive/` entry files or its `README.md`: the tick's change test could drop either and `pdm run test` passes | Medium | Open — build |
 | TD-1172 | The Queue's v2 archive cache key (`queue._archive_stat`) has no test for an in-place edit of an archive entry file | Low | Open — build |
+| TD-1174 | The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it | Low | Open |
 
 ---
 
@@ -2079,6 +2080,24 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** run `git_info`'s `git status` with `GIT_OPTIONAL_LOCKS=0` in its environment, and the same for any other read-only `git status` the host agent polls (`changed_files` where it reads the porcelain, `board.py` 547 and 753, `sync.py` 659) — read-only, so nothing is lost.
 
 **Done when** a test pins that `git_info` passes `GIT_OPTIONAL_LOCKS=0` (a `subprocess.run` spy on its `env`), and `tests/test_ui_focus_reaped.py` no longer races the tick.
+
+---
+
+## TD-1174: The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (docs-audit-ao-1, auditing #2529–#2538)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/settings_page.py` (`repo_cards`, the `_row("ledger", …)` call), `docs/design/4.5a-controls.md`, `docs/design/4.5-ui.md` (the Settings page), `docs/design-history.md`
+
+**Why:** #2531 (TD-1146) changed what the Settings page's repo card shows for `ledger`: the resolved value, suffixed ` (directory)` where `root / cfg.ledger` is a directory, and marked default while `cfg.ledger_set` is false (`f"{cfg.ledger} (directory)" if (root / cfg.ledger).is_dir() else cfg.ledger`, `is_default=not cfg.ledger_set`). The PR touched no `docs/design/` file, and `grep -rn "TD-1146" docs/design` finds only §4.4 *Either layout*'s builds list and §4.5a's *Repo page: Open ledger* row; neither names the Settings row. CLAUDE.md: a change in behaviour is a change to the design first, in the same PR, with the dated fact in `docs/design-history.md`. The archived TD-1146 **Resolved:** line does claim "the Settings row says *docs/ledger (directory)* or the file, default while unset", so the code is as the entry says; the design is what lacks it.
+
+**Fix:** write the row in the design's present tense where the Settings page's repo card is described (or §4.4 *Either layout*, if the page has no per-row text), and its dated line in `docs/design-history.md` under the same section.
+
+**Done when** the design says what the `ledger` row shows for a file, a directory and an unset key, and the history has its line.
 
 ---
 
