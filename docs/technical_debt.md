@@ -104,6 +104,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
+| TD-1169 | `test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_level_is_left_alone` fails under a loaded precheck: its sleeps race the supervisor's grace | Low | Open |
 
 ---
 
@@ -2236,3 +2237,20 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
+## TD-1169: `test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_level_is_left_alone` fails under a loaded precheck: its sleeps race the supervisor's grace
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, from #2521's precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_containers.py:948` (the test), `src/sessionorc/containers.py` (`SUPERVISE_GRACE`)
+
+**Why:** #2521's precheck on a30ab6e failed this one test (`assert not [f for f in fakes[before:] if f.execs("pip install")]`, line 971: an install had started inside the 0.5 s it expects to stay quiet within a 1.5 s grace) while 4470 passed; the same test passes three runs of three on the branch alone. #2521 touches nothing under containers. The test times the grace with wall-clock sleeps, so a loaded `-n` run can start the install before the assertion reads.
+
+**Fix:** drive the grace from a clock the test controls (or a wider grace than the quiet window it asserts), so the assertion does not depend on the scheduler.
+
+**Done when** the test reads the grace without wall-clock races and passes under `pdm run test -n 8` repeatedly.
+
+---
