@@ -233,6 +233,9 @@ def settle_key(root: str, remote: str) -> str:
     return origin_key(remote) if remote else str(root)
 
 
+_UNQUOTABLE = re.compile(r'["`$\\]')
+
+
 class IdsMixin:
     async def rpc_td_hold(
         self,
@@ -300,7 +303,7 @@ class IdsMixin:
         readers: list[str] = []
         untold: list[str] = []
         if release:
-            await self._clear_hold(root, entry, presser)
+            await self._clear_hold(root, entry, presser, road=False)
         else:
             key, spans = settle_key(root, remote), settle_mod.spans(root)
             now = datetime.now(UTC)
@@ -336,12 +339,14 @@ class IdsMixin:
         """A hold's presser in words (`mail.presser_words`), read from the one graph now."""
         return mail.presser_words(by, self._graph())
 
-    async def _clear_hold(self, root: str, entry: dict[str, Any], presser: settle_mod.Presser) -> None:
+    async def _clear_hold(
+        self, root: str, entry: dict[str, Any], presser: settle_mod.Presser, *, road: bool = True
+    ) -> None:
         """A hold's end (§4.8 *What a person's session releases*, TD-1117): the store's release
         (`settle.hold`, its protect check by `presser`) and the reading's re-mark, so lanes and the page
-        read the end at once. `td_hold --release` passes its caller's class and is refused on an entry
-        not held; a road passes `person`, the press being the decision, and an entry not held — whatever
-        its reading said — is nothing to do."""
+        read the end at once. `td_hold --release` (`road=False`) passes its caller's class and is refused on
+        an entry not held; a road passes `person`, the press being the decision, and an entry not held —
+        whatever its reading said — is nothing to do."""
         view = self._repos.get(root) or {}
         remote = str(view.get("remote") or "")
         entries = [e for e in ((view.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
@@ -349,7 +354,7 @@ class IdsMixin:
         try:
             await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=PERSON, release=True, presser=presser)
         except settle_mod.NotHeld as e:
-            if presser != "person":
+            if not road:
                 raise RpcError(str(e)) from None
         except settle_mod.Refused as e:
             raise RpcError(str(e)) from None
@@ -406,7 +411,8 @@ class IdsMixin:
 
         who = presser or "the person"
         said = f"{tid} {tell}" if tell else f"{tid} is held by {who}" + (f" (“{why}”)" if why else "")
-        drop = tell.removeprefix("is ") if tell else f"held by {who}"
+        # the notice's words, without what would break or run inside the quoted `--why` (review of #2564)
+        drop = _UNQUOTABLE.sub("", tell.removeprefix("is ")) if tell else f"held by {who}"
         for addr in holders:
             await tell_(
                 addr,

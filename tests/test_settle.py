@@ -645,3 +645,25 @@ async def test_the_claim_refusal_names_a_sessions_hold_by_its_presser(agent, tmp
         del agent.sessions["ao-me"]  # gone: its id stands for it
         with pytest.raises(AgentError, match="TD-003 is held by ao-me since"):
             await person.call("progress", id=g, ref="TD-003", status="claimed")
+
+
+async def test_a_release_of_an_entry_not_held_is_refused_to_every_caller(agent, tmp_path):
+    """Review of #2564: `td_hold --release` on an entry not held is refused to the person, their shell and a
+    person's session alike; only a road's own clear finds nothing to do."""
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    _mine(agent, "ao-me")
+    agent.sessions["ao-sh"] = Session(id="ao-sh", name="sh", kind="interactive", adapter="shell", dir="")
+    for caller in (None, "ao-sh", "ao-me"):
+        with pytest.raises(RpcError, match="TD-003 is not held: there is nothing to release"):
+            await agent.rpc_td_hold(repo=root, id="TD-003", release=True, caller=caller)
+
+
+async def test_a_drop_notices_words_cannot_break_or_run_inside_the_quoted_why(agent, tmp_path):
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True, claim="TD-003")
+    await agent.rpc_td_hold(repo=root, id="TD-003", tell='is fixed "x" $(rm -rf ~) `id` \\n')
+    note = _notes(worker, "TD-003")[0]
+    assert note.startswith('TD-003 is fixed "x" $(rm -rf ~)'), "the words are the note's"
+    assert note.endswith('`ao progress drop TD-003 --why "fixed x (rm -rf ~) id n"`.'), note

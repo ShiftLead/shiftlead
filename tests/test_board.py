@@ -1471,6 +1471,8 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
         {"id": "TD-31", "title": "the person's call", "for_page": "for-you", "blocked_by": ["decision (paul)"]},
         {"id": "TD-32", "title": "held build", "for_page": "pickable"},
         {"id": "TD-33", "title": "another build", "for_page": "pickable"},
+        {"id": "TD-34", "title": "held unseen", "for_page": "pickable"},
+        {"id": "TD-35", "title": "seen held", "for_page": "pickable"},
     ]
     settle.observe(entries, "o/r", {}, datetime.now(UTC))
     agent._repos = {
@@ -1480,7 +1482,7 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
     agent.sessions["ao-me"] = Session(id="ao-me", name="me", kind="interactive", adapter="claude-code", dir="")
     agent.sessions["ao-sh"] = Session(id="ao-sh", name="sh", kind="interactive", adapter="shell", dir="")
     w = Session(id="ao-gw", name="gw", kind="agent", adapter="claude-code", dir="", unattended=True)
-    w.progress += [ProgressEntry(ref="TD-30"), ProgressEntry(ref="TD-32")]
+    w.progress += [ProgressEntry(ref=t) for t in ("TD-30", "TD-31", "TD-32")]
     agent.sessions["ao-gw"] = w
 
     def notes(tid: str) -> list[str]:
@@ -1500,6 +1502,7 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
         await agent.rpc_ledger_decide(repo=root, id="TD-31", words="yes", caller="ao-me")
     got = await agent.rpc_ledger_decide(repo=root, id="TD-31", road="done", caller="ao-sh")
     assert got["message"].endswith("(session n/a)"), "the person's shell is the person"
+    assert notes("TD-31")[0].startswith("TD-31 is closed by the person: stop"), notes("TD-31")
     # a hold the person pressed: the session's Done clears it, the press being the decision
     await agent.rpc_td_hold(repo=root, id="TD-32")
     assert len(notes("TD-32")) == 1
@@ -1510,3 +1513,20 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
     assert notes("TD-32")[1].startswith("TD-32 is closed by the person's session me: stop"), notes("TD-32")
     got = await agent.rpc_ledger_decide(repo=root, id="TD-33", road="design", words="split it", caller="ao-me")
     assert got["decided"] == "back to design — split it" and got["message"].endswith("(session me)")
+    # a reading behind the store: the store's hold is cleared all the same; one ahead of it, nothing to do
+    await agent.rpc_td_hold(repo=root, id="TD-34")
+    entries[4].pop("held")
+    await agent.rpc_ledger_decide(repo=root, id="TD-34", road="done", caller="ao-me")
+    assert "held" not in settle._load()["o/r"]["TD-34"] and "held" not in entries[4]
+    entries[5]["held"] = {"at": "2026-10-28T00:00:00+00:00", "by": "person"}
+    await agent.rpc_ledger_decide(repo=root, id="TD-35", road="done", caller="ao-me")
+    assert "held" not in entries[5], "re-marked from the store"
+    # a person's session on a node, by its id in the home's graph
+    agent.remote = {
+        "laptop": {"ao-me": Session(id="ao-me", name="lap", kind="interactive", adapter="claude-code", dir="")}
+    }
+    await agent.rpc_td_hold(repo=root, id="TD-33", tell="x", caller="ao-me")  # nothing claimed: a no-op notice
+    entries.append({"id": "TD-36", "title": "on a node", "for_page": "pickable"})
+    settle.observe(entries, "o/r", {}, datetime.now(UTC))
+    got = await agent.rpc_ledger_decide(repo=root, id="TD-36", road="done", caller="ao-me@laptop")
+    assert got["message"].endswith("(session lap)")
