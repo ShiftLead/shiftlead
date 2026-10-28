@@ -92,6 +92,7 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
 | TD-1187 | The top bar scrolls away with the page: once scrolled down, the tabs, + New and the counts are out of reach | Medium | Open — design-first |
 | TD-1188 | The per-clone-setup and roster warnings for a lock repo name `sync.sh <checkout>`, which dev-cadence #429 made a refusal; TD-1183's `Resolved` says §5's cures already named the launcher | Medium | Open — build |
+| TD-1190 | The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass | Medium | Open — design-first |
 
 ---
 
@@ -1953,5 +1954,23 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** change both cures to `dev-cadence -C <dev-cadence> adopt <checkout>` (what `adopt.after` now prints) where the dev-cadence checkout has a launcher, keeping `sync.sh` only for an older checkout with none; update §5 and §4.7 in the same PR to match, the doc-bound tests with them, and the history line under §5.
 
 **Done when** the lock-repo warnings name a command dev-cadence accepts, §4.7, §5 and `seams.py` agree, and `pdm run test` passes.
+
+---
+
+## TD-1190: The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-28 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1, m-cc30366b5620)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design-first
+**Location:** `src/shiftlead/ui/static/app.js` (`openEntry` 3557: `plan()` 3591, which blanks `#entryline`, `#entryseat` and `#entrywhen` before it asks; `nameBox.oninput` 3645, a read 250 ms after each pause); `src/shiftlead/ui/templates/base.html` (`#entrydlg` 164, `#entryname` and `#entryline` 195–196); `src/shiftlead/ui/app.py` (`/api/entry/plan` 2969); design §4.5a *Add entry form* rows (**Open a session**, **Name**, **Hand to the techlead**), §4.9 *Add an entry to the ledger*
+
+**Why:** Paul, 2026-10-28: *On the Add Entry form, when you choose to name a session, typing into that textbox causes the help text ("Starts an interactive...") to constantly re-render. Lets drop the session name from that help text so that it can stay consistent. Lets also do a pass on the text presented and run the frontend-design skill on the form to make it more presentable.* Two things make the flicker. (1) §4.5a **Open a session** says *one line under the button says what will start, with the name the box holds* (*an interactive designer session, entry-3, in a new worktree*), so the line changes with every name typed. (2) `nameBox.oninput` re-reads `/api/entry/plan` 250 ms after each pause (§4.5a **Name**: debounced as *New session: name field → holder* is), and `plan()` empties `#entryline`, and the **Hand to the techlead** lines `#entryseat` and `#entrywhen`, before the answer comes back. So all three blank and redraw on each read, even though a typed name changes only the name's verdict.
+
+**Fix:** design it first, then a build. (1) Take the name out of the **Open a session** line in §4.5a (*an interactive designer session in a new worktree*, *… on contractmatch*). The box already shows the name, and a name that is not free keeps its reason in place of the line, as now. (2) Say in the design that a read of the plan made for a typed name leaves the lines standing until its answer. It changes only the line when the verdict changes, and never redraws **Hand to the techlead**'s lines, which no name moves. (3) Do the text pass Paul asked for: the form's notes, button lines and the long *what the session is told besides…* sentence, in the one-sentence rule of the Queue card ADR (`docs/decisions/2026-10-19-queue-card.md`). Then the layout pass with the frontend-design skill. Agree the shape with Paul from mockups or screenshots before any model review round (cadence §4.8, Paul's layer). Then file the build as `Part of: TD-1190`.
+
+**Done when** the design names the Open a session line without the session's name, says a name read redraws nothing that did not change, and holds the form's reworded text and layout as Paul agreed it, and a build entry that implements them is filed as its part.
 
 ---
