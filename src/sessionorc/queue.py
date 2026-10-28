@@ -745,7 +745,7 @@ def _wait(
     q = min(rest, key=by_key)
     while q not in seen:
         seen.append(q)
-        q = min(blockers[q] - own, key=by_key)
+        q = min((blockers[q] | parts[q]) - own, key=by_key)  # an open part waits as an open id does
     loop = sorted(seen[seen.index(q) :], key=by_key)
     names = [show(x) for x in loop]
     said = names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"

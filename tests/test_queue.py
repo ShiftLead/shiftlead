@@ -398,3 +398,28 @@ def test_a_card_whose_parents_are_all_archived_takes_the_rule_from_before(tmp_pa
         ("TD-050", None, 1),
         ("TD-051", "r#TD-050", 2),
     ]
+
+
+def test_part_of_edge_cases_a_cycle_the_tops_archived_parent_and_a_card_of_waiting_parents(tmp_path):
+    """TD-1130 review: a `Part of:` cycle draws every member once, loose; the top entry's own archived parent
+    is a done group head over its open siblings; a card whose open members all wait on open parts is Waiting."""  # noqa: E501
+    root, r = _repo(tmp_path, "r", [
+        _entry(61, "a", Priority="High", Part_of="TD-062"),
+        _entry(62, "b", Priority="High", Part_of="TD-061"),
+    ])  # fmt: skip
+    card = _cards({root: r})["cards"][0]
+    assert sorted([card["top"]["id"], *(x["id"] for x in card["rows"])]) == ["TD-061", "TD-062"]
+    # each waits on the other's open part: Waiting, read as past reach, never *ready*
+    assert card["status"] == "waiting" and card["wait"]["column"] == "blocked"
+    root, r = _repo(tmp_path, "s", [
+        _entry(71, "the top, a parent", Priority="High", Part_of="TD-070"),
+        _entry(72, "its part", Priority="High", Part_of="TD-071"),
+        _entry(73, "its sibling, after its part", Priority="Low", Part_of="TD-070", Blocked_by="TD-072"),
+    ], archive=[_entry(70, "a finished grandparent", Resolved=f"{TODAY} — (PR #70).")])  # fmt: skip
+    card = _cards({root: r})["cards"][0]
+    assert card["top"]["id"] == "TD-071" and card["top"]["state"] == "waiting" and card["status"] == "ready"
+    assert [(x["id"], x["parent"], x["depth"]) for x in card["rows"]] == [
+        ("TD-072", "s#TD-071", 1),
+        ("TD-070", None, 1),
+        ("TD-073", "s#TD-070", 2),
+    ]

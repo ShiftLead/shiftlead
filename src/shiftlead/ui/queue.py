@@ -401,13 +401,13 @@ def card_edge(group: str, status: str, wants: Mapping[str, Any]) -> str:
 def branch(r: Mapping[str, Any]) -> str:
     """A row's colour in the card's tree (§4.5 screen 12 *A card*, TD-915): `done` (green) an archived row,
     `needs` (amber) the person's — *yours to do*, *your decision*, *held (person)* — `waiting` (teal) one that
-    waits — *waits until*, *waits on an event*, *after TD-n*, *settling* — else `open` (grey)."""
+    waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling* — else `open` (grey)."""
     state = str(r.get("state") or "")
     if r.get("archived"):
         return "done"
     if r.get("needs") or state == "held (person)":
         return "needs"
-    if state.startswith(("waits ", "after ")) or state == "settling":
+    if state.startswith("waits ") or state in ("waiting", "settling"):
         return "waiting"
     return "open"
 

@@ -1,6 +1,6 @@
 {# A Queue card's row (design §4.5 screen 12 *A card*, §4.5a *Queue page: card*; TD-770): its id, Priority
-   badge, title, one state word and the holder's pill, two letters in a level; *also after TD-n* where it
-   has two parents. `r.ext` is what the Repo page's row carries beyond the Queue's (§4.5 screen 11 item 2):
+   badge, title, one state word and the holder's pill, two letters in a level; *after TD-n* for each open
+   blocker (its `afters`, TD-1130). `r.ext` is what the Repo page's row carries beyond the Queue's (§4.5 screen 11 item 2):
    its kind, its owner, *needs a team*, the settle mark with Hold / Release, a design's builds — absent on
    the Queue page. No red anywhere: a state is a word with a small mark. #}
 {% macro pbadge(p) %}{% set p = (p or '') | lower %}<span class="qpri qp-{{ p or 'none' }}" title="{{ p | capitalize or 'no priority' }}">{{ (p[:1] or '?') | upper }}</span>{% endmacro %}
