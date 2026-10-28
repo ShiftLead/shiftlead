@@ -1,6 +1,7 @@
 """TD-697, design §4.5 screen 11 *Technical debt* (*Its builds*), §4.5a *Repo page: its builds line*:
 a design entry's row carries its builds and each one's state, a build's row says *builds TD-n*, and
-the ledger reading carries what that is read from — `blocked_ids` and `archived`."""
+the ledger reading carries what that is read from — `parts_open`, `parts_archived` and `archived` (each build
+names its design in `Part of:`, TD-1130; the design's `Blocked by:` names blockers alone since TD-1133)."""
 
 from __future__ import annotations
 
@@ -22,19 +23,21 @@ LEDGER = """# Technical Debt
 **Priority:** Medium
 **Owner:** designer
 **Kind:** design-first
-**Blocked by:** TD-42, TD-101, TD-102, TD-103, TD-104, other#TD-5
+**Blocked by:** other#TD-5
 
 ## TD-101: build one
 
 **Priority:** Medium
 **Owner:** grinder
 **Kind:** build
+**Part of:** TD-100
 
 ## TD-102: build two
 
 **Priority:** Medium
 **Owner:** grinder
 **Kind:** build
+**Part of:** TD-100
 
 ## TD-103: build three
 
@@ -42,12 +45,14 @@ LEDGER = """# Technical Debt
 **Owner:** grinder
 **Kind:** build
 **Blocked by:** TD-102, decision (paul)
+**Part of:** TD-100
 
 ## TD-104: build four
 
 **Priority:** Low
 **Owner:** grinder
 **Kind:** build
+**Part of:** TD-100
 
 ## TD-105: not a design
 
@@ -66,17 +71,23 @@ LEDGER = """# Technical Debt
 **Priority:** Low
 **Owner:** designer
 **Kind:** design-first
-**Blocked by:** TD-42, TD-43
 """
 
 ARCHIVE = """# Archive
 
 ## TD-042: an archived build
 
+**Part of:** TD-100
 **Resolved:** 2026-10-01
 
 ## TD-043: another archived build
 
+**Part of:** TD-107
+**Resolved:** 2026-10-02
+
+## TD-044: a third archived build
+
+**Part of:** TD-107
 **Resolved:** 2026-10-02
 
 ## TD-077: archived, and named by nothing
@@ -101,14 +112,15 @@ def _reading(root: Path) -> dict:
     return ledger.reading(_repo(root), datetime.now(UTC), with_history=False)
 
 
-def test_the_reading_carries_every_blocked_id_and_only_the_archived_ones_named(tmp_path):
+def test_the_reading_carries_each_part_and_only_the_archived_ones_named(tmp_path):
     got = _reading(tmp_path / "r")
     by = {e["id"]: e for e in got["entries"]}
-    # `TD-42` is the archive's `TD-042`; another repo's item and the decision are not ids of this ledger
-    assert by["TD-100"]["blocked_ids"] == ["TD-042", "TD-101", "TD-102", "TD-103", "TD-104"]
-    assert by["TD-100"]["blocked_by"] == ["TD-101", "TD-102", "TD-103", "TD-104", "other#TD-5"]
+    # another repo's item and the decision are not ids of this ledger
+    assert by["TD-100"]["blocked_ids"] == [] and by["TD-100"]["blocked_by"] == ["other#TD-5"]
+    assert by["TD-100"]["parts_open"] == ["TD-101", "TD-102", "TD-103", "TD-104"]
+    assert by["TD-100"]["parts_archived"] == ["TD-042"] and by["TD-107"]["parts_archived"] == ["TD-043", "TD-044"]
     assert by["TD-103"]["blocked_ids"] == ["TD-102"] and by["TD-101"]["blocked_ids"] == []
-    assert got["archived"] == ["TD-042", "TD-043"], "TD-077 is named by nothing, so it does not ride the reading"
+    assert got["archived"] == ["TD-042", "TD-043", "TD-044"], "TD-077 is named by nothing: it does not ride the reading"
 
 
 def test_the_line_lists_each_build_in_order_with_its_state(tmp_path):
@@ -131,7 +143,7 @@ def test_the_line_lists_each_build_in_order_with_its_state(tmp_path):
     assert line["done"] is False
     # the back-link, from the same pass; not on an entry that is no design's build
     assert rows["TD-101"]["builds_of"] == ["TD-100"] and rows["TD-105"]["builds_of"] == []
-    # no line where `Blocked by:` names no build, or the entry is no design
+    # no line where nothing names the entry in `Part of:`
     assert rows["TD-106"]["builds"] is None and rows["TD-105"]["builds"] is None
 
 
@@ -139,13 +151,14 @@ def test_a_design_whose_builds_are_all_archived_still_lists_them(tmp_path):
     r = {"ledger": _reading(tmp_path / "r")}
     rows = {e["id"]: e for x in ledger_lists(r, []) for e in x["rows"]}
     line = rows["TD-107"]["builds"]
-    assert [(b["id"], b["state"]) for b in line["builds"]] == [("TD-042", "archived"), ("TD-043", "archived")]
+    assert [(b["id"], b["state"]) for b in line["builds"]] == [("TD-043", "archived"), ("TD-044", "archived")]
     assert line["done"] is True
 
 
 def test_ids_written_either_way_are_one_entry():
     entries = [
-        {"id": "TD-042", "kind": "design-first", "blocked_ids": ["TD-043", "TD-044"]},
+        # each id is spelled one way in `parts_open` and the other on its row, on purpose
+        {"id": "TD-042", "kind": "design-first", "parts_open": ["TD-043", "TD-44"]},
         {"id": "TD-43", "kind": "build", "blocked_by": ["TD-44", "decision (paul)", "x#TD-1"]},
         {"id": "TD-044", "kind": "build", "blocked_by": []},
     ]
@@ -200,11 +213,11 @@ def test_a_build_in_review_links_its_pr(tmp_path, monkeypatch):
     assert want in line and ">#815</a>" in line
 
 
-def test_its_builds_read_part_of_and_fall_back_for_a_design_not_yet_backfilled():
+def test_its_builds_read_part_of_and_a_blocked_by_never_names_a_build():
     """TD-1130 (§4.5 screen 11 *Its builds*): an entry's builds are the entries naming it in `Part of:`,
-    open and archived, in id order, whatever its Kind; its `Blocked by:` then names blockers, not builds.
-    A `design-first` entry nothing names so lists its `Blocked by:` as before. The back-link is a part's
-    own `Part of:` parent."""
+    open and archived, in id order, whatever its Kind; its `Blocked by:` names blockers, not builds — a
+    `design-first` entry nothing names so has no line (TD-1133 removed the fallback for a design not yet
+    backfilled). The back-link is a part's own `Part of:` parent."""
     entries = [
         {"id": "TD-050", "kind": "build", "blocked_ids": ["TD-060"], "parts_open": ["TD-53", "TD-051"],
          "parts_archived": ["TD-049", "TD-1000"]},
@@ -223,5 +236,5 @@ def test_its_builds_read_part_of_and_fall_back_for_a_design_not_yet_backfilled()
     ]
     assert got["builds"][1]["blocked_by"] == ["TD-053"], "a sibling blocks it; TD-060 is no build of TD-050"
     assert got["done"] is False
-    assert [b["id"] for b in lines["TD-060"]["builds"]] == ["TD-061"], "not yet backfilled"
-    assert back == {"TD-051": ["TD-050"], "TD-53": ["TD-050"], "TD-061": ["TD-060"]}
+    assert "TD-060" not in lines, "its Blocked by names a blocker, never a build"
+    assert back == {"TD-051": ["TD-050"], "TD-53": ["TD-050"]}

@@ -93,11 +93,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1117 | A session the person started cannot hold or decide an entry, so a directive to "hold this design" lasts only as long as the receiver's context | Medium | Open |
 | TD-1118 | Nothing says where a directive that must outlive a session goes, so it is sent as mail and lost at the receiver's next restart | Low | Open — blocked by TD-1116, TD-1117 |
 | TD-1119 | The design, briefs and docs still describe lanes and a manager seat the team no longer runs that way: sweep every doc against what runs | Medium | Open |
-| TD-1129 | A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work | Medium | Designed — builds TD-1130–TD-1133 |
-| TD-1133 | Backfill: every design names none of its builds, each build names its design in `Part of:` | Medium | Open — build, blocked by TD-1130–TD-1132; waits on the promote |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first; part 2: a team's size is a setting, with a run-only member |
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
+| TD-1176 | A precheck test of the home's precheck on main can fail when the precheck has not yet started | Low | Open |
 
 ---
 
@@ -1997,56 +1996,6 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 
 **Related:** the docs-audit seat (`docs/briefs/docs-audit.md`); dev-cadence#TD-129 (the pin, which retired `scripts/` and the sync the docs still name); TD-1116 (the briefs' sentence it adds).
 
-## TD-1129: A Queue card's tree joins `Blocked by:` edges in either direction, so a row's indent can mean *waits on its parent* or *its parent waits on it*, and finished builds read as waiting on unfinished work
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (Paul, through Add entry; drafted by ao-shiftlead-queue-deps)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-27 — [ADR 2026-10-27](decisions/2026-10-27-part-of.md) (agreed with Paul, Fable round 5 and Sonnet round 6 READY) written into design §4.4 *The Queue* (*A card*, *The top entry*, *Rows*, *A row's state*, the within-card order, *Completed cards*), §4.5 screens 11–12, §4.5a *Queue page: card*, §4.9c *A design entry archives with its last build* and the glossary (*part*). The builds are written the old way, listed below, since shiftlead's ledger cannot carry `Part of:` until it vendors ledgerboard v2.1 (TD-1130); TD-1133's backfill converts them with the rest. All wait on dev-cadence#TD-165 (the ledgerboard release and cadence §2.4/§2.12, filed from the ADR).
-**Location:** `src/sessionorc/ledger.py` (pickable, `kind_of`, `archived`), `src/sessionorc/queue.py` (`_card`: the rows breadth first by `adj`, either direction; archived rows one hop under the better-keyed member); `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); `src/shiftlead/ui/repo.py` (`design_builds`); the briefs and flows ADR §4 step 5 lists; design §4.4 *The Queue: cards, and the rank that orders them* (*Rows*, *A row's state*), §4.5 screen 12 *A card*, §4.5a *Queue page: card*
-
-**Why:** Paul, 2026-10-27, on TD-748's card: "it seems some finished items are laid out like they depend on unfinished items. Is that true?" They do not, but the page says they do. §4.4 *Rows* builds the tree "by `Blocked by:` edges taken in either direction", so nesting says only *joined*, and its direction flips from level to level on the same card:
-- TD-772 sits under TD-748, which waits on it (TD-748 *after TD-772*): the child is the prerequisite.
-- TD-916 sits under TD-772 and waits on it (TD-916 *after TD-772*): the child is the dependent.
-- TD-909 sits under TD-916 but waits on it (TD-909 *after TD-916*, an open build it lists).
-- TD-911–TD-914, *done*, sit under TD-909, whose own word is *after TD-916*, so finished builds look as if they wait on unfinished work.
-
-A design's `Blocked by:` lists its builds, which follow it, and there the edge means *built by*, not *waits on*. The *after TD-n* state word also reads as the row's relation to its parent when it names some other row. A reader who takes the indent as order, which is the Queue's whole point ("working what I think matters first, dependencies considered"), reads the effort backwards.
-
-**Fix:** [ADR 2026-10-27](decisions/2026-10-27-part-of.md). A part names its one parent in a new cadence field, `**Part of:** TD-n` (same ledger), and a parent's `Blocked by:` keeps only real blockers. A parent with an open part is not pickable, reads *waiting*, and is picked after its parts. No part is blocked by its parent or an ancestor. On a card, indentation means only *part of*: a parent's parts hang on a spine under it with a parts meter, finished parts fold to *✓ n done*, and a blocker is a word on its row (*after TD-772*) that lights the row it names.
-
-**Done when** the designer's round has written the ADR into the design and filed its builds, and they are done: the reading and the page built, live, and every design backfilled to `Part of:` (ADR §4).
-
-**Related:** TD-748, TD-909, TD-915 (the tree as drawn), dev-cadence#TD-119 (`components()`).
-
----
-
-## TD-1133: Backfill: every design names none of its builds, each build names its design in `Part of:`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-27 (the designer, from TD-1129)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build. The promote holds (read 2026-10-27, grinder-ao-2): live 557f9c0 carries TD-1130 and TD-1132, and `ao doctor` reads the one container node, contractmatch, at the home's build. Step 1, `docs/briefs/`: #2532.
-**Blocked by:** TD-1130, TD-1131, TD-1132
-**Part of:** TD-1129
-**Location:** `docs/briefs/designer-ao-1.md` and every team brief under `docs/briefs/` (held: `docs/briefs/**`); `docs/technical_debt_archive.md` (each converted design's archived builds); `docs/technical_debt.md` (every open `design-first` entry whose `Blocked by:` names an open or archived build, found by reading each one's `Blocked by:` against its builds by hand — the ledger cannot tell a build from a blocker; 18 by the ADR's hand count of 2026-10-27, about 20 naming any local id. The check's *legacy edge* ℹ only flags a pair half converted); the fallbacks TD-1130 writes (`src/sessionorc/ledger.py`, `src/sessionorc/queue.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/inbox.py`)
-
-**Why:** TD-1129: until a design's builds carry `Part of:`, its card still reads it as blocked by them (design §4.4 *Rows*, *A design not yet backfilled*). An older reader reads a backfilled design as pickable, so the backfill waits for the promote.
-
-**Fix:** [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §4 step 6.
-1. **`docs/briefs/` first**, the first PR after the promote: no designer team is started between the promote and its merge. A team's brief is read from the checkout at team start, so it must not tell a designer to stop listing builds before the live reader knows `Part of:`.
-2. **One PR per design**: its parts' `Part of:` lines — its open builds in the ledger and its archived ones in `docs/technical_debt_archive.md`, so the card keeps its finished items (§4.4 *Completed cards*) — and its `Blocked by:` edit land together, each checked with `dev-cadence run ledger.py --pickable` before and after (the design stays not pickable). Each design's `Blocked by:` is read by hand: TD-1029 and TD-857 name only real blockers and keep them; TD-786 stays a part of TD-112 and a blocker of TD-857; whether TD-909 names dev-cadence#TD-121/#TD-122 is judged entry by entry. TD-1129 itself, with TD-1130–TD-1133, is one of them.
-3. **The last PR removes TD-1130's *not yet backfilled* fallbacks** (§4.4 *Rows*), once no design is left to convert.
-4. The *Done when … Blocked by: names them* sentences (TD-748, TD-909, TD-857, TD-1009) are fixed as they are touched.
-
-**Done when** no open `design-first` entry's `Blocked by:` names a local entry that is its build (read by hand), no *legacy edge* ℹ stands on the ledger, every open design's builds name it in `Part of:`, the fallbacks are gone, and the Queue's cards read by *part of* alone.
-
----
-
 ## TD-1149: New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief
 
 **Priority:** Medium
@@ -2117,3 +2066,20 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
+## TD-1176: A precheck test of the home's precheck on main can fail when the precheck has not yet started
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (grinder-ao-2, from #2545's precheck)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_precheck_on_main.py:301` (`test_a_pass_that_read_no_checks_keeps_prechecking_and_runs_no_precheck`)
+
+**Why:** #2545, a ledger-only PR, failed its precheck once (cadence/precheck failure on e2a9077, 2026-10-27 22:37 local) and passed on the rerun at the same tree. The assertion `readings[root.name]["prechecking"] == sha and _ran(fake) == [sha]` read `prechecking` as the sha while `_ran(fake)` was still `[]`: the run is recorded as started before the fake precheck is called, so the test reads the call list too early under load (`-n` workers).
+
+**Fix:** wait for the fake's call in the test (as the suite's other async reads do), or assert `_ran` once the pass has finished, so the test reads no half-started precheck.
+
+**Done when** the test waits for the call and passes repeated runs under `pytest -n auto`.
+
+---

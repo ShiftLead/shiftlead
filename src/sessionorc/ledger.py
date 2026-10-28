@@ -211,19 +211,11 @@ def parts_of_open(archive: str | None, open_: list[dict[str, Any]]) -> dict[str,
     return out
 
 
-def builds_open(entry: dict[str, Any], blocked_open: bool, named_by_open: bool) -> bool:
+def builds_open(entry: dict[str, Any]) -> bool:
     """Whether an open entry has open builds, the guard that keeps **Done…** off its row (§4.5 screen 12,
-    §4.9c, TD-1130): some open entry names it in `Part of:` (`parts_open`). One no entry names in `Part
-    of:` is read as before its backfill (§4.4 *Rows*): a `design-first` entry blocked by an open id
-    (`blocked_open`), or a *design* some open entry's `Blocked by:` names (`named_by_open`). One with
-    archived parts alone (`parts_archived`) is converted: what its `Blocked by:` names is a blocker."""
-    if entry.get("parts_open"):
-        return True
-    if entry.get("parts_archived"):
-        return False
-    return (entry.get("kind") == "design-first" and blocked_open) or (
-        entry.get("for_page") == "design" and named_by_open
-    )
+    §4.9c, TD-1130): some open entry names it in `Part of:` (`parts_open`). What its `Blocked by:` names is
+    a blocker, never a build (TD-1133's backfill)."""
+    return bool(entry.get("parts_open"))
 
 
 # a `<repo>#TD-NNN` item → `(state, why)`, ledgerboard's resolver: `archived`, `open` or `unresolved`
