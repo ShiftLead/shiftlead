@@ -21392,3 +21392,23 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Done when** each text says it, the doc-bound tests pass, and `pdm run test` passes.
 
 **Resolved:** 2026-10-27 (grinder-ao-1, #2525) — `flows/td/build.md` (a parent archives with its last part by §4.9c's rule, one level per PR, and a design not yet backfilled the old way), `flows/td/design.md` and `briefs/designer.md` (each build carries `Part of:`, and the design's `Blocked by:` lists none of them), `briefs/grinder.md` (*and no open entry is `Part of:` it*), `briefs/entry.md` (the `Part of:` header line) and the ledger preamble (`Part of`, the pick rule, the order, the archiving). TD-1129 stays: TD-1131 and TD-1133 are open.
+
+## TD-1131: A Queue card draws parts on a spine: *after TD-n* links, the *✓ n done* fold and the parts meter
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1129)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/queue.py` (`_tree`, `branch`); `src/shiftlead/ui/templates/queue_row.html` (`row`, *also after*); `src/shiftlead/ui/static/app.css`; `src/shiftlead/ui/help.py` (help text bound to §4.5a)
+
+**Why:** TD-1129's page half: the reading of TD-1130 tells a part from a blocker; the card must draw it.
+
+**Fix:** design §4.5 screen 12 *A card* (the spine, the relation words, the fold, the parts meter, amber spent on the person alone), §4.5a *Queue page: card*; the chosen shape in [ADR 2026-10-27](decisions/2026-10-27-part-of.md) §3 and its review page `docs/mockups/reviews/2026-10-27-queue-card-c.html` (§3 governs where the page differs: the meter's colours and the top entry). Parts hang on their parent's spine by `part_of`; each open blocker is *after TD-n*, a link that scrolls to and rings its row, lit on hover or focus; finished parts fold to *✓ n done*, opening in place, finished loose rows to one line at the card's end; the parts meter, one segment per part in `branch()`'s four colours with *d/n*, on every parent row and on the header; *also after* goes. Phone width as screen 12's rows are today.
+
+**Resolved:** 2026-10-27 (grinder-ao-2, #2526) — `ui/queue.py` `_tree` draws the card's `lines` by the reading's `parent` alone: a part on its parent's spine (`rails`, "" for a loose row's level), finished parts folded to one *✓ n done* line first on the spine, finished loose rows to one at the card's end, and `meter` on every parent row and the header; *after TD-n* is an `a.qon` link that rings its row and lights it on hover or focus (`app.js`). Tests: `tests/test_queue_card_spine.py`; shots `docs/mockups/reviews/2026-10-27-td1131-queue-spine.png` and `…-phone.png`.
+
+**Done when** the page tests pin a TD-748-shaped card's spine, words, fold (first on the spine, directly under the parent) and meter, a headless Chromium shot of the live-shaped card at desktop and phone width is in the PR (`docs/mockups/reviews/<date>-td1131-*.png`), and `pdm run test` passes.
+
+---
