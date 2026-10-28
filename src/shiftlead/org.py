@@ -200,6 +200,31 @@ class TeamDef:
         lines = {m.name for m in self.members}
         return [k for k in self.size if k not in lines]
 
+    def line(self, name: str) -> MemberDef:
+        """The member line called `name` (its `name:`, the role where it writes none), or a ValueError
+        naming the lines there are."""
+        for m in self.members:
+            if m.name == name:
+                return m
+        lines = ", ".join(m.name for m in self.members) or "none"
+        raise ValueError(f"team {self.name} has no member line {name!r} (its lines: {lines})")
+
+    def next_free(self, line: str, records: Collection[Mapping[str, Any]], from_: int | None = None) -> str:
+        """The first of `line`'s names at or past position `from_` (from 0; default its size, so the name
+        past its last) that no current record of the team holds (§4.9 *A team's size*, TD-1164): a record
+        resumed as another, or closed `sit_out` or `run_ended`, holds none — the create supersedes it."""
+        m = self.line(line)
+        held = {
+            str(r.get("name"))
+            for r in records
+            if not r.get("superseded_by")
+            and not (isinstance(c := r.get("closed_for"), Mapping) and c.get("why") in ("sit_out", "run_ended"))
+        }
+        i = len(m.names()) if from_ is None else from_
+        while (name := m.names(i + 1)[i]) in held:
+            i += 1
+        return name
+
     def entry_role(self, type_: str) -> str:
         """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
         return self.entries.get(type_, TECHLEAD_ROLE)

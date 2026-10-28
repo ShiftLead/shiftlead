@@ -1871,22 +1871,123 @@ def add_member(
         new = [n for n in new if n not in sits]
         if not new:
             return out
-    lead = next((s for s in up if s.get("name") == plan.manager_id or s.get("id") == plan.manager_id), None)
-    lead_id = str(lead["id"]) if lead else ""
+    lead_id = _lead_id(plan, up)
     for x in [m for m in plan.members if m.name in new]:
-        verdict = call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir))
-        if verdict.get("verdict") in ("live", "suspended"):
+        rec, said = _create_member(call, x, lead_id, caller)
+        if rec is None:
             raise teams.TeamError(
                 f"org.yml: {did}, but {x.name} is held by a live session, so nothing was created — "
                 "the definition names it for the next Start"
             )
-        keeps, said = keep_mail_for(call, {x.name: verdict}, caller, concluded=False)
-        keep = {"keep_mail": True} if keeps else {}
-        out["created"].append(call("create", **x.create_params([lead_id] if lead_id else []), **keep))
+        out["created"].append(rec)
         out["text"] += "".join(f" — {n}" for n in said)
     out["text"] += (
         f" — started {', '.join(str(r.get('name') or r.get('id')) for r in out['created'])} under {lead_id or 'you'}"
     )
+    return out
+
+
+def _lead_id(plan: teams.Plan, up: list[dict[str, Any]]) -> str:
+    """The id of the team's live manager, the one controller a member created into a live team gets."""
+    lead = next((s for s in up if s.get("name") == plan.manager_id or s.get("id") == plan.manager_id), None)
+    return str(lead["id"]) if lead else ""
+
+
+def _create_member(
+    call: Call, x: teams.Launch, lead_id: str, caller: str | None
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """One member created into a live team as `ao team start` creates one, the name check first: the
+    record and what keeping its mail said, or `(None, [])` where a live session holds the name."""
+    verdict = call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir))
+    if verdict.get("verdict") in ("live", "suspended"):
+        return None, []
+    keeps, said = keep_mail_for(call, {x.name: verdict}, caller, concluded=False)
+    keep = {"keep_mail": True} if keeps else {}
+    return call("create", **x.create_params([lead_id] if lead_id else []), **keep), said
+
+
+def _sit_out_member(call: Call, s: dict[str, Any]) -> str:
+    """A member the definition no longer holds, in the sit-out form a removal takes (`relaunch {sit_out,
+    dropped}`, §4.9 *A member renamed or removed*): a live one wound down by the home, never killed, an
+    ended one marked as it stands. Its words, or an AgentError the caller says."""
+    call("relaunch", id=s["id"], sit_out=True, dropped=True)
+    if s.get("state") in DEAD:
+        return f"{s.get('name')} is marked sat out, so a start by the tick never brings it back"
+    return f"{s.get('name')} is wound down by the home (the wrap-up, never a kill); its card stays until Forget"
+
+
+def resize(
+    call: Call, org: orgmod.Org, name: str, line: str, n: int, host: str, caller: str | None = None
+) -> dict[str, Any]:
+    """A member line's size set to `n` (§4.9 *A team's size*, TD-1164) — `ao team size`, and the Members
+    dialog's **− / +**: refused for a line the definition does not name, below 0, below what a listed
+    flow's stages need, and where a step up's next name is another line's, nothing written; then
+    `teams.<team>.size` written through `set_settings` (a person's own, refused to a session), and on
+    a live team the line's sessions created or wound down one at a time to match, walking its sized
+    names — a step up creates the first sized name no current record holds (a line the current flow does
+    not use is counted, not started), a step down winds the highest-numbered kept member down by the
+    sit-out form. A step that fails stops the walk and says what was done; the setting stays written."""
+    team = teams.find(org, name)
+    try:
+        m = team.line(line)
+    except ValueError as e:
+        raise teams.TeamError(str(e)) from None
+    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+        raise teams.TeamError(f"{line}: a size is a whole number of sessions, 0 or more, not {n!r}")
+    old = len(m.names())
+    if m.role and team.flows and n == 0:
+        rest = sum(len(x.names()) for x in team.members if x.role == m.role and x is not m)
+        here = hosts.local_host().name
+        need = teams.flow_needs(org, team, m.role, team.host or host or here, here, files_via(call)) if not rest else ""
+        if need:
+            raise teams.TeamError(f"{need} needs a {m.role}: drop {need} from flows: first")
+    others = {nm for x in team.members if x is not m for nm in x.names()}
+    if taken := [nm for nm in m.names(n)[old:] if nm in others]:
+        raise teams.TeamError(f"{taken[0]} is another line's: rename one of them in the definition")
+    got = call("set_settings", teams={name: {"size": {**team.size, line: n}}})
+    org = orgmod.with_settings(org, got.get("teams"))
+    team = teams.find(org, name)
+    said = f"{line}: {n}" + (f" (file says {m.count})" if n != m.count else "")
+    out: dict[str, Any] = {"team": name, "line": line, "size": n, "count": m.count, "created": [], "wound_down": []}
+    mine = crew(name, call("list"))
+    up = live(mine)
+    if not up:
+        out["text"] = said + (" · from the next Start" if n > old else "")
+        return out
+    if n < old:  # the highest-numbered kept member first, never a run-only one (§4.9 *A team's size*)
+        for gone in reversed(m.names(old)[n:]):
+            s = _current(gone, mine)
+            if s is None or s.get("run_only") or s.get("sit_out") or sat_out(s):
+                continue
+            try:
+                words = _sit_out_member(call, s)
+            except AgentError as e:
+                out["text"] = said + f" — stopped at {gone}: {e}" + "".join(f" — {w}" for w in out["wound_down"])
+                return out
+            out["wound_down"].append(words)
+        out["text"] = said + "".join(f" — {w}" for w in out["wound_down"])
+        return out
+    plan = teams.plan(org, name, host, files=files_via(call))
+    lead_id, said_too = _lead_id(plan, up), []
+    for want in team.line(line).names()[old:]:
+        if want in plan.sit_out:
+            out["text"] = said + f" — {line} sits out under {plan.flow}: counted, not started"
+            return out
+        free = team.next_free(line, mine, from_=team.line(line).names().index(want))
+        if free != want:
+            continue  # a current record holds it already
+        x = next((x for x in plan.members if x.name == want), None)
+        rec, notes = _create_member(call, x, lead_id, caller) if x is not None else (None, [])
+        if rec is None:
+            made = ", ".join(str(r.get("name")) for r in out["created"]) or "nothing"
+            out["text"] = said + f" — stopped at {want}: a live session holds the name; started {made}"
+            return out
+        out["created"].append(rec)
+        mine.append(rec)
+        said_too += notes
+    made = ", ".join(str(r.get("name") or r.get("id")) for r in out["created"])
+    out["text"] = said + "".join(f" — {w}" for w in said_too)
+    out["text"] += f" — started {made} under {lead_id or 'you'}" if made else ""
     return out
 
 
@@ -1922,15 +2023,11 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, h
         return out
     ended = s.get("state") in DEAD
     try:
-        call("relaunch", id=s["id"], sit_out=True, dropped=True)
+        words = _sit_out_member(call, s)
     except AgentError as e:  # the file is edited either way: what the record could not take is said
         out["wound_down"] = {**_entry(s, "member"), "action": f"refused: {e}", "state": s.get("state") or "?"}
         out["text"] += f" — {gone} could not be marked sat out ({e})"
         return out
     out["wound_down"] = {**_entry(s, "member"), "action": "marked" if ended else "wrap-up sent", "state": "?"}
-    out["text"] += (
-        f" — {gone} is marked sat out, so a start by the tick never brings it back"
-        if ended
-        else f" — {gone} is wound down by the home (the wrap-up, never a kill); its card stays until Forget"
-    )
+    out["text"] += f" — {words}"
     return out
