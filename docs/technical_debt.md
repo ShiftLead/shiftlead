@@ -102,6 +102,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1145 | `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names | Medium | Open — build, blocked by TD-1144 |
 | TD-1146 | The surfaces say a ledger may be a directory: the Settings page, `.shiftlead.yml`'s default, the session's `ledger`, and `look_home.py`'s v2 fixture | Low | Open — build, blocked by TD-1144 |
 | TD-1149 | New session's Team and Role picks fill only the package preset, never the team's member line, so a second grinder for a repo-defined team starts as the person's own session: attended, unsupervised, the wrong manager, no repo brief | Medium | Open — design first |
+| TD-1151 | `cmd_status` (#2509) ranks by the shown state and passes the home-read wait, and no test fails with either put back | Low | Open — build |
 
 ---
 
@@ -2189,3 +2190,19 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix (proposed; the design round settles it):** when the Team pick is a team and the Role is one of its member roles, the form fills from **that member line**, as `ao team start` would create it: the name from the team's pattern with the first free number (*dc-grinder-2*, the Members dialog's rule), the line's `profile`, `lane` and `brief` (layered over the preset's, as at a team start), the team's manager as controller (live, or its seat on call, by the record's id), and the mode unattended and supervised, with **run it under me instead** still offered for a person who wants their own session in the team — so §4.9 *A person in the team* becomes that choice, no longer the default. Each field stays editable before Start. The round decides whether such a start is a live **member** of the running team (counted in `ao team status` and its shape, wound down with it) or a one-off beside it, and whether it writes nothing (a repo's definition stays a PR's, TD-163) — Paul's words ask only that the form fill itself.
 
 **Done when** the design says what a Team and member-role pick fills, its build is filed, built and live, and a dev-cadence grinder started from the form carries the member line's brief, profile, lane, controller and mode.
+
+## TD-1151: `cmd_status` (#2509) ranks by the shown state and passes the home-read wait, and no test fails with either put back
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1, auditing #2509)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `src/shiftlead/cli.py` `cmd_status` (the `waits` map, the `sessions.sort(key=… shown_state(s, waits[s["id"]])[0] …)` line, `print(status_line(s, w, waits[s["id"]]))`); `tests/test_cli.py::test_status_says_working_for_an_idle_record_working_on_its_own`; design §4.7 ("ranked with the working … under `-v` a wait the home reads wins, as on the card")
+
+**Why:** The new test calls `cli.status_line` directly, so it pins the line and `shown_state` but never `cmd_status`, where design §4.7 puts the other two claims: the record is *ranked with the working*, and under `-v` a wait the home reads wins. Probes in the worktree, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_cli.py` (91 passed unchanged): (1) change the sort key to `STATE_RANK.get(s["state"], 9)` (the raw state) — 91 passed; (2) change `print(status_line(s, w, waits[s["id"]]))` to `print(status_line(s, w))` — 91 passed. Only removing the `pending` guard in `shown_state` fails the test. So an idle-working record can sort among the idle, and a waiting record print *working* under `-v`, with a green suite.
+
+**Fix:** One test through `cli.main(["status", "-v"])` with `call_sync` faked as the neighbouring status tests do: an idle record with a live shell and a working record (the first must sort with the working, ahead of a plain idle one), and a second idle-with-shell record the faked `waiting_of_home` reads a wait on, which must print `idle`. Run it against both probes above.
+
+**Done when** each probe above fails the test, and `pdm run test` passes.
