@@ -496,6 +496,18 @@
   AO.popName = (id) => `ao-focus-${id}`;
   // `<name> · <state>`, `▲ ` in front while it needs the person: the switcher's one line.
   AO.focusTitle = (v) => `${v.state === "needs-you" ? "▲ " : ""}${v.name} · ${v.state_label || v.state}`;
+  // §4.5 *A tab's icon* (TD-1155): the tab's tile follows the state its title says, from the URLs the
+  // page's icon link carries (`data-icons`, read once); none, or a class with no URL, leaves it as it is
+  let focusIcons;
+  AO.focusIcon = (v) => {
+    const link = document.querySelector("link[rel=icon]");
+    if (!link) return;
+    if (focusIcons === undefined) {
+      try { focusIcons = JSON.parse(link.dataset.icons || "null") || null; } catch (e) { focusIcons = null; }
+    }
+    const url = focusIcons && focusIcons[v.state_class];
+    if (url) link.href = url;
+  };
   // The window's size and position are the person's, remembered per session in this browser; the
   // default fits a 100-column terminal beside the 320px side column (13px mono is ~7.8px a column).
   AO.popFeatures = function (saved) {
@@ -5337,6 +5349,7 @@
         .then((r) => r.json().then((j) => (r.ok && !j.error ? j : Promise.reject(new Error(j.error || j.detail || r.status))))),
     ) : null;
     document.title = AO.focusTitle(s);
+    AO.focusIcon(s);
     // §4.5a **Reports** (TD-150): the heading's **i** mark opens its paragraph in place, as the
     // Inbox's do; it sits in the panel's `<summary>`, so the press must not also fold the panel
     const imark = $("#i-reports"), info = $("#info-reports");
@@ -5792,6 +5805,7 @@
     });
     function render(v) {
       document.title = AO.focusTitle(v);
+      AO.focusIcon(v);
       // the chips go with the composer on a session nothing can be sent to (§4.5a, TD-170)
       const pc = $("#promptchips");
       if (pc) pc.classList.toggle("hidden", ["exited", "closed", "limited", "unreachable"].includes(v.state));
@@ -6263,6 +6277,7 @@
           b.textContent = "This session was forgotten: its record is gone. Close this window when you are done with it.";
           b.classList.remove("hidden");
           document.title = `${s.name} · forgotten`;
+          AO.focusIcon({ state_class: "exited" });
         }
       }
     }, `light=1&focus=${encodeURIComponent(id)}`);
