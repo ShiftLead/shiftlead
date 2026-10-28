@@ -11,6 +11,7 @@ from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from sessionorc import ledger, workorders
 from sessionorc.models import open_prompts, pr_marks, stop_note
@@ -752,7 +753,9 @@ def rollup_rows(items: list[dict[str, Any]], counted: Collection[str]) -> list[d
         if kind == "team":
             team, summary = str(it["team"]), it.get("summary") or {}
             facet = summary.get("repo")
-            row.update(team=team, name=" · ".join(x for x in (row["repo"], team) if x), hash=f"team={team}")
+            row.update(
+                team=team, name=" · ".join(x for x in (row["repo"], team) if x), hash=f"team={quote(team, safe='')}"
+            )
             row["first"] = not row["repo"] or row["repo"] not in seen
             seen.add(row["repo"])
             if facet:
@@ -779,13 +782,19 @@ def rollup_rows(items: list[dict[str, Any]], counted: Collection[str]) -> list[d
             row["acts"] = [*run, *entry, "new-team"] if it.get("stopped") else [*entry, "new-team", *run]
         elif kind == "repo":
             facet = it.get("facet")
-            row.update(name=f"{row['repo']} · no team", hash=f"repo={row['repo']}", repo_url=str(it.get("url") or ""))
+            row.update(
+                name=f"{row['repo']} · no team",
+                hash=f"repo={quote(row['repo'], safe='')}",
+                repo_url=str(it.get("url") or ""),
+            )
             row.update(_rollup_debt(facet))
             row["acts"] = [*(["add-entry"] if row["ledger"] else []), *(["new-here"] if row["root"] else [])]
             row["blocks"], row["working"] = [], 0
         elif kind == "strip":
             n = len(cards)
-            row.update(name=f"no team · {n} session{'' if n == 1 else 's'}", hash=f"strip={row['repo']}")
+            row.update(
+                name=f"no team · {n} session{'' if n == 1 else 's'}", hash=f"strip={quote(row['repo'], safe='')}"
+            )
             row["acts"] = ["new-here"] if row["root"] else []
         else:
             row.update(name="No repo", hash="norepo", repo="")

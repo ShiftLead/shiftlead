@@ -2433,15 +2433,22 @@
     if (rollupHeld !== null) {
       const row = btn.closest("tr").dataset.row, which = btn.dataset.menu, html = rollupHeld;
       rollupHeld = null; AO.swapRollup(html);
-      const again = $$("#rollup tr[data-row]").find((tr) => tr.dataset.row === row);
-      const to = (again && $(`[data-menu="${which}"]`, again)) || $("#rollup .ru-go");
-      if (to) to.focus();
-    } else if (refocus) btn.focus();
+      // focus goes back only on a close from the menu itself (Esc, an item): a press elsewhere keeps its own
+      if (refocus) { const to = rollupButton(row, which) || $("#rollup .ru-go"); if (to) to.focus({ preventScroll: true }); }
+    } else if (refocus) btn.focus({ preventScroll: true });
   }
+  const rollupButton = (row, which) => {
+    const tr = $$("#rollup tr[data-row]").find((el) => el.dataset.row === row);
+    return tr ? $(`[data-menu="${which}"]`, tr) : null;
+  };
   function rollupOpen(btn) {
-    const menu = btn.nextElementSibling;
     if (rollupMenu && rollupMenu.btn === btn) return rollupClose(true);
+    const row = btn.closest("tr").dataset.row, which = btn.dataset.menu;
     rollupClose(false);
+    // the close may have applied a held swap: the button pressed is then the fresh row's, found by its key
+    if (!btn.isConnected) btn = rollupButton(row, which);
+    if (!btn) return;
+    const menu = btn.nextElementSibling;
     menu.hidden = false; btn.setAttribute("aria-expanded", "true"); rollupMenu = { btn, menu };
     const first = $("[role=menuitem]", menu); if (first) first.focus();
   }
@@ -2449,9 +2456,10 @@
     const box = $("#rollup"); if (!box) return;
     if (rollupMenu) { rollupHeld = html; return; }
     box.innerHTML = html;
+    syncSummaries();  // the window's PR words and the copied counts, which the server's markup does not know
   };
   function rollupKeys(e) {
-    if (!rollupMenu || !rollupMenu.menu.contains(e.target)) return;
+    if (!rollupMenu || !(rollupMenu.menu.contains(e.target) || e.target === rollupMenu.btn)) return;
     const items = $$("[role=menuitem]", rollupMenu.menu), i = items.indexOf(document.activeElement);
     // the menu's keys are its own: the page's ring (`j` / `k`, the arrows) never moves past an open menu
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); rollupClose(true); }
@@ -2468,7 +2476,7 @@
     if (btn) { e.preventDefault(); return rollupOpen(btn); }
     const item = e.target.closest("[role=menuitem]");
     if (item) {
-      rollupClose(false);
+      rollupClose(true);
       if (item.dataset.press) {
         const sec = sections().find((s) => s.dataset.key === "team:" + item.dataset.team);
         const b = sec && $$(".ghead [data-team-act]", sec).find((x) => x.dataset.teamAct === item.dataset.press);
@@ -3866,7 +3874,10 @@
     if (rollupBox) {
       rollupBox.addEventListener("click", rollupPress);
       rollupBox.addEventListener("keydown", rollupKeys);
-      document.addEventListener("click", (e) => { if (rollupMenu && !rollupMenu.menu.parentElement.contains(e.target)) rollupClose(false); });
+      // …never for a press whose target a held swap has just replaced: that press opened the menu now open
+      document.addEventListener("click", (e) => {
+        if (rollupMenu && e.target.isConnected && !rollupMenu.menu.parentElement.contains(e.target)) rollupClose(false);
+      });
     }
     layout();
     // a load with a row's hash lands there once the groups are drawn; a hash naming nothing drawn is dropped

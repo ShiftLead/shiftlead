@@ -196,3 +196,12 @@ def test_the_rows_render_as_the_design_draws_them():
     assert design.index('data-press="start"') < design.index("data-addentry") and 'data-press="stop"' not in design
     assert 'href="/new?dir=/r/quiet"' in quiet and "data-addentry" not in quiet
     assert 'data-menu="acts"' not in norepo and 'data-menu="needs"' not in review
+
+
+def test_a_rows_hash_is_url_encoded_as_the_client_reads_it():
+    """The link's `#team=…` / `#repo=…` / `#strip=…` names its item encoded, so the client's `decodeURIComponent`
+    reads back the layout's key whatever the name holds (review of #2623)."""
+    team = {"kind": "team", "key": "team:a b%c", "team": "a b%c", "repo": "", "members": [], "summary": {}}
+    repo = {"kind": "repo", "key": "repo:x y", "repo": "x y", "url": "/repo/x y", "facet": None}
+    rows = ui.rollup_rows([team, repo], set())
+    assert [r["hash"] for r in rows] == ["team=a%20b%25c", "repo=x%20y"]
