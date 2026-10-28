@@ -93,9 +93,8 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1187 | The top bar scrolls away with the page: once scrolled down, the tabs, + New and the counts are out of reach | Medium | Open — design-first |
 | TD-1189 | A team card shows the repo's Technical debt only on the repo's line, and TDs in motion never what the team just finished | Medium | Designed — built by TD-1194 |
 | TD-1190 | The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass | Medium | Open — design-first |
-| TD-1191 | `member_submit`'s *shell (no agent)* pick (`profile == SHELL_PICK`) is set in no test: drop the guard and the suite stays green | Low | Open — build |
-| TD-1193 | The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green | Low | Open — build |
 | TD-1194 | Build TD-1189: the Repo facet first on each team card, the line keeping it only while no card shows it, and TDs in motion's *completed* face | Medium | Open |
+| TD-1195 | shiftlead's ledger is one file every filing edits in the same places, so ledger PRs conflict on its Summary table and each rebase costs a new precheck: split it into `docs/ledger/` (dev-cadence#TD-160's layout) | Medium | Open — waits on Paul's go (trial split run) |
 
 ---
 
@@ -1980,42 +1979,6 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
-## TD-1191: `member_submit`'s *shell (no agent)* pick (`profile == SHELL_PICK`) is set in no test: drop the guard and the suite stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1, from #2591)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/ui/app.py` (`member_submit`, the `profile != SHELL_PICK` clause); `tests/test_ui_member_line.py`
-
-**Why:** `member_submit` carries a Profile picked over the line's into the record (`if profile and profile != SHELL_PICK and profile != x.profile:`), and `/new` itself turns `SHELL_PICK` (*shell (no agent)*, the Profile list's last choice) into the shell adapter before anything else. #2591's `test_a_profile_picked_over_the_lines_is_the_records_with_its_adapter` posts a real profile only. Probe on `origin/main` (2026-10-28): change that line to `if profile and profile != x.profile:` and run `tests/test_ui_member_line.py test_team_size.py test_ui_members_size.py test_cli_teams.py test_ui_teams.py test_flows.py` — 284 passed. So `:shell` posted with a member line reaches `profile_adapter(":shell")` as if it named a profile, and nothing says what a member start does with that pick.
-
-**Fix:** decide what a member start does with *shell (no agent)* (the line's profile stands, or a refusal), say it in §4.5a's *member line* fill, and pin it in a test that fails with the clause deleted.
-
-**Done when** a test posts `profile=:shell` with a member line and asserts the record's profile and adapter are the line's (or the refusal), and it fails with the `SHELL_PICK` clause removed.
-
----
-
-## TD-1193: The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1, from #2590)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/adopt.py` (`_word`); `tests/test_repo_adopt.py` (`test_adopt_opens_the_pr_adds_the_repo_unserved_and_the_merged_adoption_serves_it`, line 134)
-
-**Why:** `_word` names the adopt in the PR body: the launcher's `adopt` where `launcher/dev_cadence.py` exists, else `<dc>/sync.sh`. The launcher arm is pinned (`test_a_dev_cadence_checkout_with_a_launcher_adopts_through_its_adopt_and_names_the_pin`). The older-checkout test asserts the body's *dev-cadence at abc1234* and the after-merge `sync.sh <checkout>` line (which `after` writes, not `_word`), never *written by `<dc>/sync.sh`*. Probe on `origin/main` (2026-10-28): replace `_word`'s body with `return f"dev-cadence -C {dc} adopt"` and run `tests/test_repo_adopt.py` — 11 passed, while a `sync.sh` checkout's PR would then say a launcher wrote it.
-
-**Fix:** assert `written by` plus the `sync.sh` path in the older-checkout test's body check (line 134).
-
-**Done when** that assertion exists and fails with `_word`'s `sync.sh` arm removed.
-
----
-
 ## TD-1194: Build TD-1189: the Repo facet first on each team card, the repo's line keeping it only while no card shows it, and TDs in motion's *completed* face
 
 **Priority:** Medium
@@ -2050,5 +2013,34 @@ That is the design working as written: a Team pick makes *a person's own session
 - **Add entry…** on the card's facet opening the form with the card's repo.
 
 The page is looked at in headless Chromium at 1600 and 1000 px, in both faces, with the shots named in the PR (design §4.9b). `pdm run test` and `pdm run lint` pass.
+
+---
+
+## TD-1195: shiftlead's ledger is one file every filing edits in the same places, so ledger PRs conflict on its Summary table and each rebase costs a new precheck: split it into `docs/ledger/` (dev-cadence#TD-160's layout)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-28 (Paul, in session `queue-deps`; drafted by that session)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — trial split run 2026-10-28 (below). Migrating a real ledger is Paul's call (the plan of dev-cadence#TD-160, archived), hence the decision line
+**Blocked by:** decision (paul) — Paul says go on the split; drop the line then
+**Location:** `docs/technical_debt.md`, `docs/technical_debt_archive.md`, `docs/technical_debt_rank.yml` (become `docs/ledger/`); archived TD-624's **Resolved** line (archive ~10828); `tests/test_ledger.py`, `tests/test_ledger_derived.py`, `tests/test_primer.py`, `tests/test_repo_facts.py`, `tests/test_screen.py` (each opens the v1 files by path); prose naming the v1 paths: `AGENTS.md` (3), `docs/briefs/designer-ao-1.md`, `grinder-ao-1.md`, `techlead-context.md` (the primer, a held path), `docs-audit.md`, `test-audit.md`, design §4.4 (6), §4.5a, §4.7, §5 (2); `docs/claude-memory/` (the Summary-row conflict memories)
+
+**Why:** shiftlead files and archives more entries than any repo on the roster: 78 open before this one, 1,015 archived, a 1,900-line ledger and a 22,000-line archive. Every filing, edit and archive adds or changes a row in the one Summary table and appends near the same lines, so concurrent ledger PRs conflict. On 2026-10-27/28 one session's ledger PRs were refused at merge four times as main moved under them, each needing a hand rebase, a row-wise conflict resolution and a new precheck. dev-cadence split its ledger (#430) and its next two concurrent filings merged clean (#432, #433). Everything shiftlead needs to read a split ledger is in place: its pin carries the v2 scripts (#2593), TD-1143 made the home, the Queue, the rank writes and `ao` read either layout, and `.shiftlead.yml` names no `ledger:`, so the default resolves to `docs/ledger/` once it exists.
+
+**The trial split (2026-10-28, on a scratch copy of main):**
+- `dev-cadence run ledger.py --split` refused once: archived TD-624's Resolved line quotes `` `<!-- Entry template:` `` in a code span, which ledgerboard's `v2_problems()` reads as an unclosed HTML comment. With that one quote reworded, the split ran clean: 79 open, 1,013 archived (main then; the archive has grown since), the rank file moved in, relative links rewritten in 40 files.
+- `ledger.py --check` reported 0 errors, and `--list` and `--pickable` were byte-identical to the v1 ledger's at the same commit.
+- The full suite on the split tree: 4,574 passed, 18 failed and 3 errors from ledger paths, plus 2 Gemini failures that come from the scratch copy (its adapter isn't registered there) and are not the split's. The failures: `test_ledger.py` (10 failed, 3 errors: the Summary-table and per-file checks, which dev-cadence's `ledger.py --check` and `v2_problems()` now cover), `test_ledger_derived.py`, `test_primer.py` (2: the primer names `docs/technical_debt.md`), `test_repo_facts.py` and `test_screen.py` (3).
+
+**Fix:** one PR, landed while no other ledger PR is open (or with each one rebased onto it, its edits moved to the entry's own file):
+1. Reword TD-624's `` `<!--` `` quote so the archive holds no comment opener. Better still, file a ledgerboard entry, since a `<!--` in a Markdown code span is code, not a comment, and `v2_problems()` should not read it.
+2. Run `dev-cadence run ledger.py --split` and commit the result.
+3. Point the five test files at the ledger through `sessionorc.ledger` (`load`/`ledger_path`) instead of the v1 paths. Retire the `test_ledger.py` checks that a v2 ledger has nothing for (the Summary table, an id's order within one file), naming the dev-cadence check that replaces each.
+4. Reword the prose that names the v1 paths: AGENTS.md, the briefs, design §4.4/§4.5a/§4.7/§5. The primer is a held path, so its reader is asked once the PR is green. Retire or rewrite the Summary-row conflict memories.
+5. Tell every running session in one note that the ledger is now `docs/ledger/TD-NNN.md`, one file per entry, archive by `git mv` into `archive/`, and the Summary table generated (`ledger.py --summary`), not edited.
+
+**Done when** shiftlead's ledger is `docs/ledger/` on main; `ledger.py --check`, `pdm run test`, the Queue, the Repo page and `ao td next` all read it; no doc or brief names the v1 paths; and two concurrent shiftlead filings merge with no conflict.
 
 ---

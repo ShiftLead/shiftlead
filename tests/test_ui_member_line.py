@@ -120,6 +120,16 @@ def test_a_profile_picked_over_the_lines_is_the_records_with_its_adapter(world, 
     assert (made["profile"], made["adapter"], made["run_only"]) == ("gem", "gemini", True)
 
 
+def test_shell_no_agent_picked_over_a_member_line_keeps_the_lines_profile(world, client):  # noqa: F811
+    """TD-1191: *shell (no agent)* is no member's: the line's profile stands, and its adapter."""
+    tmp_path, fleet = world
+    _dc_team(tmp_path)
+    _running(fleet, "dc-grinder")
+    assert _post(client, tmp_path, profile=uiapp.SHELL_PICK).status_code == 303
+    (made,) = fleet.creates()
+    assert (made["profile"], made["adapter"], made["run_only"]) == ("paul", "claude-code", True)
+
+
 def test_a_member_start_on_a_team_not_running_is_refused(world, client):  # noqa: F811
     tmp_path, fleet = world
     _dc_team(tmp_path)

@@ -22187,3 +22187,43 @@ Mail tells the member now. The table's entry is what lasts.
 **Resolved:** 2026-10-28 (grinder-ao-1, #2599) — the cure is not the **Fix**'s `adopt`, which refuses a repo carrying synced copies (dev-cadence `launcher/words.py` `w_adopt`). `seams.warnings` names the move to a pin for a repo still on the copy: *dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh --pin <checkout>`* and *not on dev-cadence's roster: the copy is retired, so move it to a pin — `<dev-cadence>/sync.sh --pin <checkout>`*. §5 *The seams* and §4.7 **`ao repo add`** say so in the present tense (after a launcher's adopt the repo is pinned, and its warnings are a pinned repo's), with history lines under each; `tests/test_seams.py` and `tests/test_pinned_cures.py` hold the words.
 
 ---
+
+## TD-1191: `member_submit`'s *shell (no agent)* pick (`profile == SHELL_PICK`) is set in no test: drop the guard and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1, from #2591)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/app.py` (`member_submit`, the `profile != SHELL_PICK` clause); `tests/test_ui_member_line.py`
+
+**Why:** `member_submit` carries a Profile picked over the line's into the record (`if profile and profile != SHELL_PICK and profile != x.profile:`), and `/new` itself turns `SHELL_PICK` (*shell (no agent)*, the Profile list's last choice) into the shell adapter before anything else. #2591's `test_a_profile_picked_over_the_lines_is_the_records_with_its_adapter` posts a real profile only. Probe on `origin/main` (2026-10-28): change that line to `if profile and profile != x.profile:` and run `tests/test_ui_member_line.py test_team_size.py test_ui_members_size.py test_cli_teams.py test_ui_teams.py test_flows.py` — 284 passed. So `:shell` posted with a member line reaches `profile_adapter(":shell")` as if it named a profile, and nothing says what a member start does with that pick.
+
+**Fix:** decide what a member start does with *shell (no agent)* (the line's profile stands, or a refusal), say it in §4.5a's *member line* fill, and pin it in a test that fails with the clause deleted.
+
+**Done when** a test posts `profile=:shell` with a member line and asserts the record's profile and adapter are the line's (or the refusal), and it fails with the `SHELL_PICK` clause removed.
+
+**Resolved:** 2026-10-28 (grinder-ao-2, #2602) — §4.5a *New session: member line fill* says *shell (no agent)* is no member's and the line's profile stands (what #2583 built), with its history line; `test_shell_no_agent_picked_over_a_member_line_keeps_the_lines_profile` posts `:shell` and asserts the line's `paul` / `claude-code`, and fails with the `SHELL_PICK` clause dropped.
+
+---
+
+## TD-1193: The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1, from #2590)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/adopt.py` (`_word`); `tests/test_repo_adopt.py` (`test_adopt_opens_the_pr_adds_the_repo_unserved_and_the_merged_adoption_serves_it`, line 134)
+
+**Why:** `_word` names the adopt in the PR body: the launcher's `adopt` where `launcher/dev_cadence.py` exists, else `<dc>/sync.sh`. The launcher arm is pinned (`test_a_dev_cadence_checkout_with_a_launcher_adopts_through_its_adopt_and_names_the_pin`). The older-checkout test asserts the body's *dev-cadence at abc1234* and the after-merge `sync.sh <checkout>` line (which `after` writes, not `_word`), never *written by `<dc>/sync.sh`*. Probe on `origin/main` (2026-10-28): replace `_word`'s body with `return f"dev-cadence -C {dc} adopt"` and run `tests/test_repo_adopt.py` — 11 passed, while a `sync.sh` checkout's PR would then say a launcher wrote it.
+
+**Fix:** assert `written by` plus the `sync.sh` path in the older-checkout test's body check (line 134).
+
+**Done when** that assertion exists and fails with `_word`'s `sync.sh` arm removed.
+
+**Resolved:** 2026-10-28 (grinder-ao-2, #2603) — the older-checkout adopt test asserts the body's *written by `<dc>/sync.sh` in a scratch clone*; `_word` made to return the launcher's adopt always now fails it.
+
+---
