@@ -93,7 +93,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
-| TD-1185 | `member_submit`'s profile override (a Profile picked over the line's) is set in no test: delete it and the suite stays green | Low | Open — build |
 | TD-1186 | `next_members`' *sits out under <flow>* answer (`/api/team_line`'s `why`, the form's blocked Start) is set in no test: delete it and the suite stays green | Low | Open — build |
 
 ---
@@ -1977,24 +1976,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** as §4.5a's rows say. (1) `teams_for_form` carries each team's member lines (name, role, profile, lane, brief, the next free name, and the current flow's compiled lane, reader and stage brief where a flow is set). (2) Under a Team pick, a Role a member line names (each line by name where a role has two) fills the form from the line: the name, profile, lane and brief, the manager as controller, unattended and supervised; Start makes a run-only member through TD-1166's create; on a team not running the form refuses with *<team> is not running: start it first* and offers the team's **Start**. (3) **keep as a team member**, off by default: ticked, the line's fields are drawn locked with *a kept member is the line's: change the line in the definition*, and Start is TD-1165's **+**, after the same running check (refused on a team not running, Start offered). (4) **run it under me instead** on such a pick starts the person's own session in the team as today, the manager still ticked as its controller, and hides the tick; it needs no running team. *Interactive*, `plain` and a role no line names are unchanged.
 
 **Done when** tests pin: the fill for a repo-defined team's grinder line (dev-cadence's `dc-grinder` shape: brief `docs/briefs/grinder-dc-1.md`, profile, lane, the manager's id, unattended and supervised); a Start making a run-only record with those fields; the refusal on a team not running, with Start offered; the line's fields locked under the tick; a team whose manager is a person (`manager: person`: no controller ticked, running when any crew record is live); two lines of one role offered each by its name; the *a kept member is the line's* note under the tick; the tick writing the size and creating a kept member; *run it under me instead* giving TD-160's record. The form is looked at in headless Chromium (design §4.9b) with a member line picked, ticked and unticked, the shots named in the PR. `pdm run test` and `pdm run lint` pass.
-
----
-
-## TD-1185: `member_submit`'s profile override (a Profile picked over the line's) is set in no test: delete it and the suite stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1, auditing #2583)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/ui/app.py` (`member_submit`, the `fields.update(profile=profile, adapter=profile_adapter(profile))` line); `tests/test_ui_member_line.py`
-
-**Why:** #2583's `member_submit` carries what the person typed over the line's into the record: `name`, `prompt`, `lane` and `profile`. `tests/test_ui_member_line.py::test_what_the_person_typed_over_the_line_is_the_records_for_its_run` types the first three and never a Profile (`_post` posts none but the fill's own `paul` in the unedited test). Probe, 2026-10-28: replace that line with `pass` and run `tests/test_ui_member_line.py test_team_size.py test_ui_members_size.py test_cli_teams.py test_ui_teams.py test_flows.py` — 279 passed; replacing the `refs != list(x.lane)` clause instead fails the `lane` test, so the other three are pinned.
-
-**Fix:** extend that test (or add one) to post a `profile` unlike the line's and assert the created record carries it and its adapter.
-
-**Done when** deleting the `profile` line fails `tests/test_ui_member_line.py`.
 
 ---
 
