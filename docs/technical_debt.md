@@ -93,7 +93,6 @@ Fields: Owner = designer | grinder | paul; Kind = build | design-first | live-ch
 | TD-1187 | The top bar scrolls away with the page: once scrolled down, the tabs, + New and the counts are out of reach | Medium | Open — design-first |
 | TD-1189 | A team card shows the repo's Technical debt only on the repo's line, and TDs in motion never what the team just finished | Medium | Open — design-first, waits on Paul |
 | TD-1190 | The Add entry form's lines under its buttons blank and redraw on every pause in typing a Name, and the Open a session line repeats the name: drop it, and give the form a text and layout pass | Medium | Open — design-first |
-| TD-1191 | `member_submit`'s *shell (no agent)* pick (`profile == SHELL_PICK`) is set in no test: drop the guard and the suite stays green | Low | Open — build |
 | TD-1193 | The adoption PR body's older-checkout wording (*written by `<dc>/sync.sh`*, `adopt._word`'s `sync.sh` arm) is set in no test: drop the arm and the suite stays green | Low | Open — build |
 
 ---
@@ -1977,24 +1976,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** design it first, then a build. (1) Take the name out of the **Open a session** line in §4.5a (*an interactive designer session in a new worktree*, *… on contractmatch*). The box already shows the name, and a name that is not free keeps its reason in place of the line, as now. (2) Say in the design that a read of the plan made for a typed name leaves the lines standing until its answer. It changes only the line when the verdict changes, and never redraws **Hand to the techlead**'s lines, which no name moves. (3) Do the text pass Paul asked for: the form's notes, button lines and the long *what the session is told besides…* sentence, in the one-sentence rule of the Queue card ADR (`docs/decisions/2026-10-19-queue-card.md`). Then the layout pass with the frontend-design skill. Agree the shape with Paul from mockups or screenshots before any model review round (cadence §4.8, Paul's layer). Then file the build as `Part of: TD-1190`.
 
 **Done when** the design names the Open a session line without the session's name, says a name read redraws nothing that did not change, and holds the form's reworded text and layout as Paul agreed it, and a build entry that implements them is filed as its part.
-
----
-
-## TD-1191: `member_submit`'s *shell (no agent)* pick (`profile == SHELL_PICK`) is set in no test: drop the guard and the suite stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1, from #2591)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Location:** `src/shiftlead/ui/app.py` (`member_submit`, the `profile != SHELL_PICK` clause); `tests/test_ui_member_line.py`
-
-**Why:** `member_submit` carries a Profile picked over the line's into the record (`if profile and profile != SHELL_PICK and profile != x.profile:`), and `/new` itself turns `SHELL_PICK` (*shell (no agent)*, the Profile list's last choice) into the shell adapter before anything else. #2591's `test_a_profile_picked_over_the_lines_is_the_records_with_its_adapter` posts a real profile only. Probe on `origin/main` (2026-10-28): change that line to `if profile and profile != x.profile:` and run `tests/test_ui_member_line.py test_team_size.py test_ui_members_size.py test_cli_teams.py test_ui_teams.py test_flows.py` — 284 passed. So `:shell` posted with a member line reaches `profile_adapter(":shell")` as if it named a profile, and nothing says what a member start does with that pick.
-
-**Fix:** decide what a member start does with *shell (no agent)* (the line's profile stands, or a refusal), say it in §4.5a's *member line* fill, and pin it in a test that fails with the clause deleted.
-
-**Done when** a test posts `profile=:shell` with a member line and asserts the record's profile and adapter are the line's (or the refusal), and it fails with the `SHELL_PICK` clause removed.
 
 ---
 
