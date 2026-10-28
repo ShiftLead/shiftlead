@@ -21437,3 +21437,23 @@ Paul turned down copying the team's manager or techlead. Their context is refres
 **Done when** each reader above reads a v2 fixture as it reads its v1 twin (the same entries, archive, history, rank file and seams), a faulted v2 fixture reads as an error naming `v2_problems()`'s words with no entries, and `pdm run test` passes.
 
 ---
+
+## TD-1145: `ao td next` gives ids for a v2 ledger: the script gets the directory, and the fallback road reads file names
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (the designer, from TD-1143)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Resolved:** 2026-10-27 (grinder-ao-1, #2530) — the script road passes a v2 directory as `--ledger <dir>` with no `--archive`, refused in the seams' *predates its v2 reader* words (`seams.predates_v2`) where dev-cadence's tree is older than `OLDEST_V2`; the fallback road reads main through `layout_at` over `git_io` (a directory's and `archive/`'s file names), and an open PR's ids on both layouts' paths (entry files added, or renamed to an id the old path did not carry; the v1 pair's `+## TD-NNN:` lines); `taken_by_line` reads the preamble through `read_pair`.
+**Blocked by:** TD-1144
+**Location:** `src/sessionorc/agent_ids.py` (the script road ~425–440, `_ids_give` ~480–500, `_ids_prs` 505 and `files_jq`); tests
+
+**Why:** TD-1143: the id road passes `--ledger <file> --archive <file>` to dev-cadence's `ledger_next_id.py` and, on the fallback road, reads main's two files and the open PRs' patches on those two paths. A v2 ledger has neither file.
+
+**Fix:** design §4.4 *A ledger entry's id is handed out by the home* (*The run*, *Free*, `taken_by_line`). For a v2 directory: a pinned dev-cadence older than `OLDEST_V2` (§4.4 *Either layout*) refuses the call in §5's *unserved* words, never handing the script a directory; the script gets `--ledger <dir>` and no `--archive` (the pinned script reads `archive/` through `load()`); the fallback road reads `origin/<default>` through `layout_at` against that tree (`git_io`), its ids the file names of one `git ls-tree` of the directory and its `archive/`; an open PR's ids are matched on **both** layouts' paths — the names of the `TD-NNN.md` files it adds under the directory or `archive/` (`status: added`, no patch read; a `renamed` file counts by its new name only when its previous path was not an entry file, since a move into `archive/` files nothing), and the `+## TD-NNN:` lines of the v1 file and archive patches, since a PR opened before a split still edits them — through the paginated listing, cut at `FILES_CAP` as now (a split PR reads as *its listing is cut*); `taken_by_line` reads the `Fields:` line from `load()`'s preamble over `fs_io` (`README.md`'s), and a faulted v2 ledger gives no line. A v1 file is read as today.
+
+**Done when** both roads give ids above a v2 fixture's highest, with an open PR adding a file and another adding one straight into `archive/`, a v1 fixture reads as today, and `pdm run test` passes.
+
+---
