@@ -98,6 +98,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1170 | tests/test_td_next.py's TD-1145 v2 test cannot tell a rename into `archive/` from an added entry: the archive-move row uses an id below the open PRs' floor | Medium | Open — build |
 | TD-1181 | The tick's `git status` in every session's directory takes `index.lock`, so a session's own `git add` can fail beside it | Medium | Open — build |
 | TD-1171 | `ledger.stamp`'s test does not pin its `archive/` entry files or its `README.md`: the tick's change test could drop either and `pdm run test` passes | Medium | Open — build |
+| TD-1172 | The Queue's v2 archive cache key (`queue._archive_stat`) has no test for an in-place edit of an archive entry file | Low | Open — build |
 
 ---
 
@@ -2046,6 +2047,19 @@ That is the design working as written: a Team pick makes *a person's own session
 **Why:** #2529's docstring for the test says the stamp is *the newest mtime among the directory, `archive/`, the entry files of both and `README.md`*; it sets every path to mtime 1000 and then raises one top-level `TD-*.md` to 2000. On `origin/main` (0738ed579), each of these leaves `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ledger_layout.py` green (20 passed): (a) `for d in (base, base / lb.LEDGER_ARCHIVE):` → `for d in (base,):` in `stamp`; (b) `if f.name == lb.LEDGER_README and d == base or lb.ENTRY_FILE_RE.match(f.name):` → `if lb.ENTRY_FILE_RE.match(f.name):`. So a v2 ledger whose only change is an archived entry's edit (a `**Resolved:**` line added in place) or its `README.md` leaves the stamp unchanged, and the tick would skip its re-read, with no test to say so.
 
 **Fix:** after the rank-file assertion, raise in turn an `archive/TD-*.md` and `README.md` to a later mtime and assert the stamp moves each time; re-run (a) and (b) above: each must fail.
+## TD-1172: The Queue's v2 archive cache key (`queue._archive_stat`) has no test for an in-place edit of an archive entry file
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-28 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_ledger_layout.py` (`test_the_queues_archive_reads_a_v2_archive_as_its_v1_twin`); `src/sessionorc/queue.py` (`_archive_stat`)
+
+**Why:** #2529's `_archive_stat` keys a v2 `archive/` by the directory's mtime plus *its entry files' count and newest mtime* (docstring, §4.4 *Completed cards*' cache). The test's only change is adding `archive/TD-999.md`, which moves the directory's mtime alone. On `origin/main` (0738ed579), replacing the directory branch's `return st.st_mtime_ns, (len(files), max(files, default=0))` with `return st.st_mtime_ns, (0, 0)` (or dropping the `is_dir` branch) leaves `tests/test_ledger_layout.py` and `tests/test_queue.py` green (40 passed). An archived entry edited in place (no rename, no add) changes no directory mtime, so the Queue would serve a stale card with nothing to catch it.
+
+**Fix:** write an existing `archive/TD-*.md` in place with `os.utime` forward past the first read and assert `archive_entries` returns the new text; re-run the mutation above: it must fail.
 
 **Done when** the new assertion fails against the mutation named in **Why** and `pdm run test` passes.
 
