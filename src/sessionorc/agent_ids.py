@@ -23,6 +23,7 @@ from typing import Any
 
 from sessionorc import agent_common, cadence, hosts, ledgerboard, mail, paths
 from sessionorc import ledger as ledger_mod
+from sessionorc import seams as seams_mod
 from sessionorc import settle as settle_mod
 from sessionorc.agent_common import RpcError, log
 from sessionorc.models import PERSON, now_iso
@@ -65,11 +66,57 @@ def added_ids(patch: str | None) -> set[int]:
     return {int(n) for n in ADDED.findall(patch or "")}
 
 
-def files_jq(paths_: tuple[str, ...]) -> str:
+def files_jq(paths_: tuple[str, ...], directory: str = "") -> str:
     """One line per file of a PR's listing: the patch of a ledger file as `{f, p}` (`p` null where GitHub
-    left it out), any other file as `0`, so the lines also count the listing."""
+    left it out), a file under the v2 `directory` as `{f, s, o}` (its status and previous name, no patch),
+    any other file as `0`, so the lines also count the listing."""
     names = " or ".join(f".filename == {json.dumps(p)}" for p in paths_)
-    return f".[] | if ({names}) then {{f: .filename, p: .patch}} else 0 end"
+    under = f"elif (.filename | startswith({json.dumps(directory + '/')})) then " if directory else ""
+    under += "{f: .filename, s: .status, o: .previous_filename} " if directory else ""
+    return f".[] | if ({names}) then {{f: .filename, p: .patch}} {under}else 0 end"
+
+
+def both_layouts(rel: str) -> tuple[str, str, str]:
+    """`(v1 file, its archive, v2 directory)` for a ledger path of either layout: the path's own and the other
+    layout's beside it, as `ledger.layout_at` would find it after a split (design §4.4 *Either layout*)."""
+    if rel.endswith(".md"):
+        return rel, ledger_mod.archive_path(rel), ledger_mod.layout_at(rel, None, (_none, _none))[0]
+    led, arch = ledger_mod.layout_at(rel, None, (_none, _none))
+    return led, arch or ledger_mod.archive_path(led), rel
+
+
+def _none(_path: str) -> None:
+    return None
+
+
+def entry_id(path: str, directory: str) -> int | None:
+    """The id of a v2 entry file directly in `directory` or its `archive/`, else None."""
+    d, _, name = path.rpartition("/")
+    if d not in (directory, f"{directory}/{ledgerboard.LEDGER_ARCHIVE}"):
+        return None
+    m = ledgerboard.ENTRY_FILE_RE.match(name)
+    return int(m.group(1)) if m else None
+
+
+def dir_added(f: dict[str, Any], directory: str) -> int | None:
+    """The id a PR's listed file under the v2 `directory` files (§4.4 *Free*, TD-1145): an entry file it adds,
+    or one renamed in from a path that was no entry file — a move into `archive/` files nothing."""
+    tid = entry_id(str(f.get("f") or ""), directory)
+    if tid is None:
+        return None
+    if f.get("s") == "added":
+        return tid
+    if f.get("s") == "renamed" and entry_id(str(f.get("o") or ""), directory) is None:
+        return tid
+    return None
+
+
+def layout(root: str, rel: str) -> tuple[str, str | None, bool]:
+    """`(ledger, archive, directory?)` of the checkout's working tree, through `ledger.layout_at`, so a set
+    `ledger:` gone from the tree reads the other layout beside it (§4.4 *Either layout*)."""
+    io = ledger_mod.fs_io(root)
+    led, arel = ledger_mod.layout_at(rel, ledger_mod.archive_path(rel) if rel.endswith(".md") else None, io)
+    return led, arel, io[0](led) is not None
 
 
 async def _run(
@@ -121,23 +168,21 @@ def ids_script(root: str, timeout: float = cadence.TREE_TIMEOUT) -> Path | None:
     return next((Path(root) / s for s in SCRIPTS if (Path(root) / s).is_file()), None)
 
 
-def taken_by_line(script: Path, ledger: Path, taken_by: str | None) -> str | None:
+def taken_by_line(script: Path, root: str, rel: str, taken_by: str | None) -> str | None:
     """The header line each new entry writes (`**Taken by:** <by>`, cadence §2.10), or None where the repo's
     ledger does not accept the field (design §4.4 *Its answer*, TD-1089): `taken by` is in the `CADENCE_FIELDS`
     of the `ledgerboard.py` beside the script run — read as a literal, never imported — or else the ledger
-    declares no field vocabulary, by the vendored `declared()`. A missing or non-literal sibling, or a ledger
-    that cannot be read, gives None."""
+    declares no field vocabulary, by the vendored `declared()`, of a directory its `README.md`'s preamble as
+    `load()` heads its text (TD-1145). A missing or non-literal sibling, or a ledger that cannot be read (a
+    faulted v2 ledger among them), gives None."""
     if not taken_by:
         return None
     fields = _cadence_fields(script.parent / "ledgerboard.py")
     if fields is None:
         return None
     if "taken by" not in fields:
-        try:
-            text = ledger.read_text(encoding="utf-8")
-        except (OSError, ValueError):
-            return None
-        if ledgerboard.declared(text)[0]:
+        text = ledger_mod.read_pair(rel, ledger_mod.fs_io(root))[1]
+        if text is None or ledgerboard.declared(text)[0]:
             return None
     return f"**Taken by:** {taken_by}"
 
@@ -428,14 +473,18 @@ class IdsMixin:
         the home's last given as its `--floor`, and killed with its group at the call's deadline. It fetches and
         reads what it needs; the home reads no PR here. `branch` goes as one `--branch=<name>` only to a script
         whose source declares `"--branch"` (dev-cadence TD-145); one from before has none, and argparse would
-        refuse the take."""
+        refuse the take. A v2 directory goes as `--ledger <dir>` with no `--archive` (TD-1145), and only to a tree
+        that reads one (`_ids_v2_served`)."""
         rel = await asyncio.to_thread(ledger_mod.ledger_path, root)
+        led, arel, directory = await asyncio.to_thread(layout, root, rel)
+        if directory:
+            await self._ids_v2_served(root, name)
         by = PERSON if caller is None or mail.is_person(caller) else str(caller)
         floor = await asyncio.to_thread(_last, key)
         left = start + BUDGET - time.monotonic()
         args = [
-            "--count", str(count), "--by", by, "--floor", str(floor),
-            "--ledger", rel, "--archive", ledger_mod.archive_path(rel), "--json",
+            "--count", str(count), "--by", by, "--floor", str(floor), "--ledger", led,
+            *([] if directory else ["--archive", arel or ledger_mod.archive_path(led)]), "--json",
         ]  # fmt: skip
         if branch and await asyncio.to_thread(_takes_branch, script):
             args.append(f"--branch={branch}")
@@ -466,7 +515,7 @@ class IdsMixin:
         await asyncio.to_thread(_record_given, key, ids, by)
         refs = [str(r) for r in res.get("unread") or [] if str(r).strip()]
         taken_by = res.get("taken_by") if isinstance(res.get("taken_by"), str) and res["taken_by"] else None
-        line = await asyncio.to_thread(taken_by_line, script, Path(root) / rel, taken_by)
+        line = await asyncio.to_thread(taken_by_line, script, root, led, taken_by)
         return {
             "ids": ids,
             "unread": [f"open PRs not read: {', '.join(refs)}"] if refs else [],
@@ -477,13 +526,26 @@ class IdsMixin:
             "taken_by_line": line,
         }
 
+    async def _ids_v2_served(self, root: str, name: str) -> None:
+        """Refuse a v2 directory where dev-cadence's tree is older than `cadence.OLDEST_V2` (design §4.4 *Either
+        layout*), in the seams' *unserved* words (§5), never handing the script a directory: the age as the
+        repo's last seams reading holds it, read again (carried where its commits are the same) against the
+        home's checkouts. An age that cannot be read refuses nothing: an old script fails on its own."""
+        old = ((self._repos.get(root) or {}).get("seams") or {}).get("cadence_age")
+        roster = [str(r) for r in hosts.local_host().repos()]
+        got = await asyncio.to_thread(seams_mod.age, root, roster, old if isinstance(old, dict) else None, True)
+        if got is not None and False in (got.get("descends"), got.get("descends_v2")):
+            led = {"state": "predates", "why": seams_mod.predates_v2(str(got["commit"]))}
+            raise RpcError(f"{name}'s ids were not given: {seams_mod.ledger_lack(led, root)}")
+
     async def _ids_give(
         self, root: str, key: str, count: int, start: float, caller: Any
     ) -> tuple[list[str], list[str]]:
         rel = await asyncio.to_thread(ledger_mod.ledger_path, root)
-        files = (rel, ledger_mod.archive_path(rel))
-        # 1. the open PRs' added headings, read before the fetch, so a PR merged between the two is in main
-        prs, unread = await self._ids_prs(root, key, files, start + PRS_BY)
+        v1, v1_archive, directory = both_layouts(rel)
+        # 1. the open PRs' added headings and entry files, on both layouts' paths, read before the fetch, so a
+        # PR merged between the two is in main
+        prs, unread = await self._ids_prs(root, key, (v1, v1_archive), start + PRS_BY, directory)
         # 2. the fetch, then 3. main's ledger and archive at the fetched ref
         rc, _, err = await _run(["git", "-C", root, "fetch", "-q", "origin"], None, start + BUDGET - time.monotonic())
         if rc != 0:
@@ -492,18 +554,17 @@ class IdsMixin:
         ref = await asyncio.to_thread(ledger_mod.default_ref, root, max(0.1, start + BUDGET - time.monotonic()))
         if ref is None:
             raise RpcError(f"{Path(root).name} has no origin/<default> after the fetch: main's ids are the floor")
-        main: set[int] = set()
-        for f in files:
-            rc, out, _ = await _run(["git", "-C", root, "show", f"{ref}:{f}"], None, start + BUDGET - time.monotonic())
-            if rc == 0:
-                main |= {int(t[3:]) for t in ledger_mod.ids_in(out)}
+        main = await asyncio.to_thread(_main_ids, root, ref, rel, max(0.1, start + BUDGET - time.monotonic()))
         # 4. the highest of the three and the last given, then 5. the record
         by = PERSON if caller is None or mail.is_person(caller) else str(caller)
         ids = await asyncio.to_thread(_record, key, max([*prs, *main], default=0), count, by)
         return ids, unread
 
-    async def _ids_prs(self, root: str, key: str, files: tuple[str, ...], by: float) -> tuple[set[int], list[str]]:
-        """The ids every open PR adds a heading for in the ledger or its archive, and the unread lines."""
+    async def _ids_prs(
+        self, root: str, key: str, files: tuple[str, ...], by: float, directory: str = ""
+    ) -> tuple[set[int], list[str]]:
+        """The ids every open PR adds a heading for in the v1 ledger or its archive, or an entry file for under
+        the v2 `directory` (`dir_added`), and the unread lines."""
         if not is_github(key):
             return set(), [f"open PRs not read: the origin {key} is not GitHub's"]
         rc, out, err = await _run(
@@ -518,7 +579,7 @@ class IdsMixin:
             return set(), [f"open PRs not read: {_why(err, 'gh pr list failed')}"]
         unread = [f"open PRs not read: the list filled its {PR_LIMIT}"] if len(numbers) >= PR_LIMIT else []
         gate = asyncio.Semaphore(PR_READERS)
-        jq = files_jq(files)
+        jq = files_jq(files, directory)
 
         async def read(n: int) -> set[int] | str:
             async with gate:
@@ -540,6 +601,10 @@ class IdsMixin:
                     return "its listing is not JSON"
                 if not isinstance(f, dict):
                     return "its listing is not a list of files"
+                if "s" in f:  # under the v2 directory: its name, no patch read
+                    if (tid := dir_added(f, directory)) is not None:
+                        got.add(tid)
+                    continue
                 if f.get("p") is None:
                     return f"{f.get('f')} has no patch (too large a diff)"
                 got |= added_ids(f["p"])
@@ -561,6 +626,22 @@ class IdsMixin:
                 ids |= res
         await asyncio.gather(*tasks.values(), return_exceptions=True)
         return ids, unread
+
+
+def _main_ids(root: str, ref: str, rel: str, timeout: float) -> set[int]:
+    """The ids of the ledger and its archive at `ref` (design §4.4 *Free*): the path put through `layout_at`
+    against that tree (`git_io`), so a checkout behind or ahead of a split reads main as main holds it — a v2
+    directory's file names and its `archive/`'s, no content read; a v1 file's and its archive's headings."""
+    io = ledger_mod.git_io(root, ref, ledger_mod.common_parent(rel), timeout, rel)
+    if io is None:
+        return set()
+    ls, read = io
+    led, arel = ledger_mod.layout_at(rel, ledger_mod.archive_path(rel) if rel.endswith(".md") else None, io)
+    if (names := ls(led)) is not None:
+        names += [f"{ledgerboard.LEDGER_ARCHIVE}/{n}" for n in ls(f"{led}/{ledgerboard.LEDGER_ARCHIVE}") or []]
+        return {tid for n in names if (tid := entry_id(f"{led}/{n}", led)) is not None}
+    ids = ledger_mod.ids_in(read(led)) | ledger_mod.ids_in(read(arel or ledger_mod.archive_path(led)))
+    return {int(t[3:]) for t in ids}
 
 
 _STORE = threading.Lock()  # `ids.json` is one file for every origin, and each origin has its own lock

@@ -252,6 +252,12 @@ def age(
     return out
 
 
+def predates_v2(commit: str) -> str:
+    """A v2 ledger's *predates* reason (§5 *Which dev-cadence*): the tree at `commit` is older than
+    `cadence.OLDEST_V2`, so its scripts cannot read a directory."""
+    return f"the ledger is a directory and dev-cadence at {commit[:7]} predates its v2 reader ({cadence.OLDEST_V2[:7]})"
+
+
 def serve(root: Path | str, led: dict[str, Any], dc_age: dict[str, Any] | None = None) -> dict[str, Any]:
     """`{ok, lacks: [{key, words}]}`: `cadence` (dev-cadence's tree: no lock, or one that does not parse),
     `age` (a tree older than `cadence.OLDEST`, as `age()` read it: the one lack a sync cures, §6 *Sync*),
@@ -395,8 +401,7 @@ def reading(root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, 
     led = out["ledger"]
     out["cadence_age"] = got = age(root, roster, (old or {}).get("cadence_age"), v2=bool(led.get("directory")))
     if led.get("directory") and led["state"] == "ok" and (got or {}).get("descends_v2") is False:
-        why = f"the ledger is a directory and dev-cadence at {got['commit'][:7]} predates its v2 reader"
-        out["ledger"] = {**led, "state": "predates", "why": f"{why} ({cadence.OLDEST_V2[:7]})"}
+        out["ledger"] = {**led, "state": "predates", "why": predates_v2(got["commit"])}
     out["serve"] = serve(root, out["ledger"], out["cadence_age"])
     out["hook_pinned"] = cadence.hook_pinned(root)
     out["warnings"] = warnings(
