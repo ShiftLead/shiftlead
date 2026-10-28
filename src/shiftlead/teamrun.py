@@ -17,7 +17,7 @@ import contextlib
 import re
 import time
 from collections.abc import Callable, Collection, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -1927,8 +1927,46 @@ def _create_member(
     return call("create", **x.create_params([lead_id] if lead_id else []), **extra), said
 
 
+def _next_size(team: orgmod.TeamDef, line: str, mine: list[dict[str, Any]]) -> tuple[str, int]:
+    """A member line's next free name (`TeamDef.next_free`) and the size that names it."""
+    m = team.line(line)
+    want = team.next_free(line, mine)
+    i = len(m.names())
+    while m.names(i + 1)[i] != want:
+        i += 1
+    return want, i + 1
+
+
+def next_members(
+    org: orgmod.Org, name: str, host: str, sessions: list[dict[str, Any]], files: teams.Files | None = None
+) -> dict[str, teams.Launch | str]:
+    """Each member line's next member as `start_member` would create it, nothing created (§4.9 *A member
+    started from the form*, TD-1167): by line, its `Launch` — the next free name, the line's profile, lane
+    and brief over the role's, under a flow the current flow's — or why the form cannot start one (the
+    line sits out under the current flow). One plan for the team, every line one past its size."""
+    team = teams.find(org, name)
+    mine = crew(name, sessions)
+    wants, size = {}, dict(team.size)
+    for m in team.members:
+        wants[m.name], size[m.name] = _next_size(team, m.name, mine)
+    plan = teams.plan(orgmod.with_settings(org, {name: {"size": size}}), name, host, files=files)
+    by_name = {x.name: x for x in plan.members}
+    return {
+        line: f"{line} sits out under {plan.flow}" if want in plan.sit_out or want not in by_name else by_name[want]
+        for line, want in wants.items()
+    }
+
+
 def start_member(
-    call: Call, org: orgmod.Org, name: str, line: str, host: str, *, run_only: bool = False, caller: str | None = None
+    call: Call,
+    org: orgmod.Org,
+    name: str,
+    line: str,
+    host: str,
+    *,
+    run_only: bool = False,
+    caller: str | None = None,
+    fields: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """A member line's next member created (§4.9 *One road for every caller*, TD-1164): the line's next free
     name past its size (`TeamDef.next_free`), created as `ao team start` creates a member — under the live
@@ -1936,22 +1974,23 @@ def start_member(
     `run_only` on the create's record and its launch record. The dialog's **Add member**, which edits
     `org.yml`, is `add_member`. Refused for a line the definition does not name, one the current flow
     does not use, and a name a live session holds; a team that is not running is its caller's to refuse
-    (`ao team add`, TD-1166) — with no live manager, the member is created under no one."""
+    (`ao team add`, TD-1166) — with no live manager, the member is created under no one. `fields` is what
+    the New session form's person typed over the line's (TD-1167: `name`, `prompt`, `lane`, `profile`,
+    `adapter`), the record's for its run."""
     team = teams.find(org, name)
+    mine = crew(name, call("list"))
     try:
-        m = team.line(line)
+        want, n = _next_size(team, line, mine)
     except ValueError as e:
         raise teams.TeamError(str(e)) from None
-    mine = crew(name, call("list"))
-    want = team.next_free(line, mine)
-    i = len(m.names())
-    while m.names(i + 1)[i] != want:
-        i += 1
-    sized = orgmod.with_settings(org, {name: {"size": {**team.size, line: i + 1}}})  # the plan names it
+    sized = orgmod.with_settings(org, {name: {"size": {**team.size, line: n}}})  # the plan names it
     plan = teams.plan(sized, name, host, files=files_via(call))
     if want in plan.sit_out:
         raise teams.TeamError(f"{line} sits out under {plan.flow}: nothing started")
     x = next(x for x in plan.members if x.name == want)
+    if fields:
+        x = replace(x, **fields)
+        want = x.name
     rec, said = _create_member(call, x, _lead_id(plan, live(mine)), caller, run_only=run_only)
     if rec is None:
         raise teams.TeamError(f"{want} is held by a live session, so nothing was created")
@@ -1975,16 +2014,25 @@ def not_running(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> str:
 
 
 def add(
-    call: Call, org: orgmod.Org, name: str, line: str, host: str, *, keep: bool = False, caller: str | None = None
+    call: Call,
+    org: orgmod.Org,
+    name: str,
+    line: str,
+    host: str,
+    *,
+    keep: bool = False,
+    caller: str | None = None,
+    fields: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`ao team add <team> <line> [--keep]` (§4.7, §4.9 *A member started from the form*, TD-1166): the line's
     next member started for this run alone (`start_member(run_only=True)`), or with `keep` the line's size one
-    higher (`resize`), its refusals included — each refused on a team that is not running (`not_running`)."""
+    higher (`resize`), its refusals included — each refused on a team that is not running (`not_running`).
+    `fields` is `start_member`'s, for a run-only start alone: a kept member is the line's."""
     team = teams.find(org, name)
     if why := not_running(team, call("list")):
         raise teams.TeamError(why)
     if not keep:
-        return start_member(call, org, name, line, host, run_only=True, caller=caller)
+        return start_member(call, org, name, line, host, run_only=True, caller=caller, fields=fields)
     try:
         n = len(team.line(line).names()) + 1
     except ValueError as e:
