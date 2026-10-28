@@ -1870,7 +1870,6 @@ It then names the build entries.
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed 2026-10-27 (the designer) — §4.8 *A person's session passes two of them* (`td_hold` and `ledger_decide`'s roads pass an own end with no `controllers`; `PERSON_SESSION`; who pressed on the record and in the note; the test's third class), §4.4 *Hold* and *Board write-back*, §4.7 `ao td hold` and `ao td done` / `ao td design`. Build TD-1127.
-**Blocked by:** TD-1127
 **Location:** `src/sessionorc/agent_common.py` (`person_only`), `src/sessionorc/mail.py` (`PERSON_ONLY`), `src/sessionorc/agent_ids.py` (`rpc_td_hold`, its `held.by`), `src/sessionorc/agent_inbox.py` (`rpc_ledger_decide`); design §4.4 *Hold* (TD-905), §4.8 (the person-only list and its list-versus-code test), §4.8a (`as_person`)
 
 **Why:** Paul's 2026-10-27 ask to have a designer hold a design or a grinder leave something alone runs into how mail lasts. Mail lives in the receiver's context, and an unattended member is restarted often. A restart keeps the mail, but as read entries, which `ao inbox --unread` (what a brief runs at start) does not print, and which are pruned 12 hours after reading. Invariant 13 already says what must outlive a session belongs in the ledger, the board or a PR. The lasting act exists: `ao td hold <id> --why` writes the hold on the home's settle clock and tells its holders itself. But it is the person's own act, so a session the person drives is refused it (*a person's own act, refused to every session but the person's own shell*).
@@ -1957,6 +1956,7 @@ The docs-audit seat (`docs-audit-ao-1`, `trigger: {prs: 10}`) audits what recent
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
+**Part of:** TD-1117
 **Location:** `src/sessionorc/mail.py` (`PERSON_SESSION` beside `PERSON_ONLY`; the predicate *an own end with no `controllers`*, inline in `from_role` since TD-1125 (#2493): this build factors it into one `mail` helper that `from_role` and `person_only` both call); `src/sessionorc/agent_common.py` (`person_only`: the RPC's name, the subset, its refusal); `src/sessionorc/agent_ids.py` (`rpc_td_hold`: `held.by`, the holder's note naming the session, `_clear_hold`); `src/sessionorc/settle.py` (`hold`: the protect check under the lock and the reword's `by`; `_marks` carrying `by`; `claim_refusal` taking the presser's words); `src/sessionorc/agent.py` (the claim path passing those words); `src/sessionorc/queue.py` (the mark's `title`); `src/sessionorc/board.py` (`add_decided` and its commit `message` taking `session`, passed to `ledgerboard.subject`'s existing `session=`); `src/sessionorc/agent_inbox.py` (`rpc_ledger_decide`: the roads pass, the road-less answer does not); `src/shiftlead/cli.py` (`ao td done`, `ao td design`); the person-only list test
 
 **Why:** TD-1117's design: a direction the person gives through a session they started (*hold this design*, *leave that alone*) lives only in mail, which outlives neither the sender's context nor the receiver's; a hold is the home's record and outlives both, but its RPC refuses every session.
