@@ -19440,6 +19440,7 @@ The card is not new (TD-283 part 2, built 2026-10-04), but it is drawn only on a
 **Owner:** grinder
 **Kind:** build
 **Status:** Done
+**Part of:** TD-995
 **Location:** `src/shiftlead/cli.py` (`main`, `build_parser`'s `msg` subparser, `cmd_msg`); `tests/test_cli.py`; design §4.7 *Mail*
 
 **Why:** TD-995: `ao msg samscrape --kind note … "text"` failed with argparse's *unrecognized arguments*, the error scrolling off above the echoed text, so the send read as sent (also 2026-10-01; memory *ao msg: options before recipients*).
