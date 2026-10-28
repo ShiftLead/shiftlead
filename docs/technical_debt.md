@@ -616,7 +616,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Fix:** design first, extending TD-636's seat (its rules → director → person order and *What always reaches the person* stand). The round settles: (1) `pass_up` to the director where the org has one, and from it to the person (the thread, `passed_up` once per passer, the recommendation); (2) the preferences files — names, where the person's own lives, the layer order, and the director's first read (the primer's rule: an index, cited at the source); (3) the level — key, where it is set, how an answer shows it; (4) the director's prompt judgement read against the preferences as well as `director.md`; (5) seeding, the interview, *remember this?*, and grooming — who runs each and how each lands; (6) the button. The design names the build entries.
 
-**Done when** the design says what the director answers beyond permission prompts, from which preferences, at which level, and how the preferences grow and are groomed, and the build entries are filed with `Blocked by` lines.
+**Done when** the design says what the director answers beyond permission prompts, from which preferences, at which level, and how the preferences grow and are groomed, and the build entries are filed, each naming this entry in `Part of:`.
 
 **Related:** TD-636 (the seat), TD-641 / TD-642 (its builds; TD-642's brief and trigger are where this lands), `docs/decisions/2026-10-13-agent-product-lessons.md` (lessons 1 and 7).
 
