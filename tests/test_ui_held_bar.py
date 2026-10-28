@@ -23,10 +23,12 @@ const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild:
 const cls = () => { const set = new Set(); return { set, contains: (c) => set.has(c), add: (c) => set.add(c),
   remove: (c) => set.delete(c), toggle: (c, on) => (on ? set.add(c) : set.delete(c)) }; };
 // the bar, + New ▾ and the page: what `holdBar` reads
+// as a browser has it: the leaving element matches :focus-visible all through `focusout`, and not by the next frame
 let focusVisible = false;
+const reads = [];  // what each :focus-visible read saw
 const on = {}, barOn = {}, mqOn = {};
 const bar = { offsetHeight: 107, classList: cls(), addEventListener: (k, f) => { barOn[k] = f; },
-  querySelector: (s) => (s === ":focus-visible" && focusVisible ? {} : null) };
+  querySelector: (s) => (s === ":focus-visible" ? (reads.push(focusVisible), focusVisible ? {} : null) : null) };
 const newmenu = { open: false };
 const props = {};
 const root = { dataset: {}, scrollHeight: 3000, style: { setProperty: (k, v) => { props[k] = v; } } };
@@ -71,7 +73,8 @@ out.bounce = [scroll(ceiling + 60), scroll(ceiling + 10), scroll(ceiling)];
 newmenu.open = true; out.menu_open = scroll(ceiling - 300); newmenu.open = false;
 out.menu_shut_down = [scroll(ceiling - 296), scroll(ceiling - 290)];
 focusVisible = true; barOn.focusin(); out.tab_in = away();
-focusVisible = false; barOn.focusout(); out.focusout_now = away(); frames.forEach((f) => f()); frames = [];
+reads.length = 0; barOn.focusout(); out.focusout_reads = reads.slice(); out.focusout_now = away();
+focusVisible = false; frames.forEach((f) => f()); frames = []; out.frame_reads = reads.slice();
 out.after_tab = [scroll(ceiling - 288), scroll(ceiling - 285)];
 mqOn.change(); out.crossed = away();
 mq.matches = false; out.wide = [scroll(1500), scroll(2000)];
@@ -115,7 +118,9 @@ def test_a_phone_scroll_sends_the_bar_away_and_brings_it_back_by_the_clamped_dis
     assert got["menu_open"] is False, "+ New ▾ open holds the bar"
     assert got["menu_shut_down"] == [False, True], "once shut, the next scroll down of more than 4 px lets it go"
     assert got["tab_in"] is False, "a Tab into a bar that is away brings it back"
-    assert got["focusout_now"] is False, "read a frame after the focus leaves, never during focusout"
+    assert got["focusout_reads"] == [], "nothing reads the bar during focusout, where the leaving focus still holds it"
+    assert got["focusout_now"] is False
+    assert got["frame_reads"] == [False], "read a frame after the focus leaves: it holds the bar no longer"
     assert got["after_tab"] == [False, True], "a Tab out lets it go on the next scroll down of more than 4 px"
     assert got["crossed"] is False, "a window that crosses 720 px shows the bar"
     assert got["wide"] == [False, False], "a wide screen: decide returns at once, the bar stays"
