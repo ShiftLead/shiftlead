@@ -109,7 +109,7 @@ def edit_line(
         raise Refused(str(e)) from None
 
 
-def message(text: str, action: str, due: str | None = None, *, answer: str = "") -> str:
+def message(text: str, action: str, due: str | None = None, *, answer: str = "", session: str = "") -> str:
     """The fixed commit message (design §4.4, cadence §4's carve-out): ledgerboard's
     `subject("shiftlead", …)` — the action, the item's head and the session that raised it, what a
     reviewer greps for; `append` for an add."""
@@ -117,7 +117,7 @@ def message(text: str, action: str, due: str | None = None, *, answer: str = "")
     if len(said) > ANSWER_MAX:  # a *Not right:* carries a sentence; the subject is also the PR's title
         said = said[: ANSWER_MAX - 1].rstrip() + "…"
     try:
-        got = ledgerboard.subject(TOOL, action, text, to=due, answer=said)
+        got = ledgerboard.subject(TOOL, action, text, to=due, answer=said, session=session or None)
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
     # a forge's title holds 256 characters: a session name past that clips, keeping `(session …)` whole
@@ -631,11 +631,13 @@ def decided_line(title: str, ref: str, answers: list[str], default: int | None, 
         raise Refused(str(e)) from None
 
 
-def add_decided(root: str | Path, line: str) -> dict[str, Any]:
+def add_decided(root: str | Path, line: str, session: str = "") -> dict[str, Any]:
     """The third add (design §4.4 *Board write-back*, TD-565): `line` (`decided_line`) at the top of
     the open items of the board on origin's head, by the second add's road, committed by the same
-    `append` (its session *n/a*: the person's). Returns `{commit, message, pr, line}`."""
-    return _insert(Path(root), line, message(ledgerboard.ITEM_RE.match(line.rstrip("\n"))["text"], "append"))
+    `append` — its session *n/a*, the person's, or `session`'s name for a road a person's session
+    pressed (§4.8 *A person's session passes two of them*, TD-1117). Returns `{commit, message, pr, line}`."""
+    text = ledgerboard.ITEM_RE.match(line.rstrip("\n"))["text"]
+    return _insert(Path(root), line, message(text, "append", session=session))
 
 
 def _insert(root: Path, line: str, msg: str) -> dict[str, Any]:

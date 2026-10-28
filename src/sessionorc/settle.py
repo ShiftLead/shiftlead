@@ -13,12 +13,13 @@ import re
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
 from sessionorc import paths
 from sessionorc import settings as settings_mod
+from sessionorc.models import PERSON
 from sessionorc.store import _atomic_write
 
 # The built-in layer under the install's `settle:` and the repo's (§5): a Kind no layer lists settles 0.
@@ -148,7 +149,8 @@ def _marks(entries: list[dict[str, Any]], seen: dict[str, Any], spans: dict[str,
             continue
         if isinstance(rec.get("held"), dict):
             why = str(rec["held"].get("why") or "")
-            e["held"] = {"at": str(rec["held"].get("at") or ""), **({"why": why} if why else {})}
+            by = str(rec["held"].get("by") or PERSON)  # a hold written before `by` is the person's (TD-1117)
+            e["held"] = {"at": str(rec["held"].get("at") or ""), "by": by, **({"why": why} if why else {})}
             continue
         at = _when(rec.get("at"))
         if at is None:
@@ -225,6 +227,15 @@ class Refused(ValueError):
     """A hold or a release the clock will not write, in the words the person reads."""
 
 
+class NotHeld(Refused):
+    """A release of an entry that is not held: a road's clear finds nothing to do (TD-1117)."""
+
+
+# who pressed a hold, by class (§4.8 *What a person's session releases*, TD-1117): the person (the page,
+# no caller), the person's shell (`mail.as_person`), or a person's session
+Presser = Literal["person", "shell", "session"]
+
+
 def hold(
     key: str,
     entry: dict[str, Any],
@@ -234,13 +245,18 @@ def hold(
     by: str,
     release: bool = False,
     why: str = "",
+    presser: Presser = "person",
 ) -> dict[str, Any]:
     """The person's **Hold** or **Release** of one entry of origin `key` (design §4.4 *Hold*, TD-707,
     built by TD-710 slice 2, TD-731): a hold writes `held: {at, by, why}` on the id's record, the home's
     and not a ledger edit, so it holds at once, on any entry the clock holds, settling or settled; `why`
     is the person's optional words (TD-905). Holding a held one changes nothing but its words: new words
-    replace `why`. A release ends the hold and makes the entry pickable at once (its record settled, at
-    the epoch), so a later edit changes nothing. Returns the record as written; raises `Refused`."""
+    replace `why`, and `by` with the new presser's (`at` kept), but that the person's shell keeps a
+    person's hold `person`. A release ends the hold and makes the entry pickable at once (its record
+    settled, at the epoch), so a later edit changes nothing. `presser` is the caller's class (§4.8 *What
+    a person's session releases*, TD-1117): a `session` — a person's session — is refused a release, new
+    words or a re-hold on a hold the person pressed (`by` `person`, or none), checked here under the
+    store's lock on the stored record. Returns the record as written; raises `Refused`."""
     why = " ".join(str(why or "").split())
     i = str(entry.get("id") or "")
     with _STORE:
@@ -250,14 +266,19 @@ def hold(
         if not isinstance(rec, dict):
             raise Refused(f"{i} is not in the home's clock yet: the ledger's next reading records it")
         held = isinstance(rec.get("held"), dict)
+        persons = held and str(rec["held"].get("by") or PERSON) == PERSON
+        if presser == "session" and persons:
+            act = "release" if release else "reword"
+            raise Refused(f"{i}'s hold is the person's own: they {act} it on the Repo page")
         if release:
             if not held:
-                raise Refused(f"{i} is not held: there is nothing to release")
+                raise NotHeld(f"{i} is not held: there is nothing to release")
             rec = {"at": EPOCH, "sig": rec.get("sig") or ""}
         elif held:
             if not why or why == rec["held"].get("why"):
                 return dict(rec)
-            rec = {**rec, "held": {**rec["held"], "why": why}}
+            who = PERSON if presser == "shell" and persons else by
+            rec = {**rec, "held": {**rec["held"], "by": who, "why": why}}
         else:
             rec = {**rec, "held": {"at": now.isoformat(), "by": by, **({"why": why} if why else {})}}
         seen[i] = rec
@@ -281,10 +302,11 @@ def prehold(key: str, ids: list[str], by: str, now: datetime) -> None:
         _atomic_write(paths.ledger_seen_file(), json.dumps(store, indent=1, sort_keys=True))
 
 
-def claim_refusal(entry: dict[str, Any] | None, now: datetime) -> str | None:
+def claim_refusal(entry: dict[str, Any] | None, now: datetime, presser: str = "the person") -> str | None:
     """Why a declared claim on this entry of the home's reading is refused (design §4.8 *A claim is a
     lease*, §4.4 *What settling withholds*), or None: it settles, or the person holds it. `--force`
-    does not pass it — the window is the person's, not another session's lease."""
+    does not pass it — the window is the person's, not another session's lease. `presser` is the
+    hold's presser in words, made by the home from `held.by` (TD-1117: *the person's session w1*)."""
     if not isinstance(entry, dict):
         return None
     i = str(entry.get("id") or "")
@@ -292,7 +314,7 @@ def claim_refusal(entry: dict[str, Any] | None, now: datetime) -> str | None:
     if isinstance(entry.get("held"), dict):
         at = _when(entry["held"].get("at"))
         since = f" since {at.astimezone():%H:%M}" if at else ""
-        return f"{i} is held by the person{since}: no lane takes it until they release it {tail}"
+        return f"{i} is held by {presser}{since}: no lane takes it until they release it {tail}"
     until = _when((entry.get("settling") or {}).get("until")) if isinstance(entry.get("settling"), dict) else None
     if until is not None and until > now:
         return f"{i} settles until {until.astimezone():%H:%M}: the person's window to change or hold it {tail}"

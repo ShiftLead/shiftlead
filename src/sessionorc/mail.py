@@ -164,6 +164,11 @@ PERSON_ONLY = frozenset(
     }
 )
 
+# The two of them a person's session passes too (design §4.8 *A person's session passes two of them*,
+# TD-1117): `td_hold` (a hold, its Release, a drop notice) and `ledger_decide`'s roads, each passing
+# `session_ok` to `agent_common.person_only`; `tests/test_person_only.py` holds the subset to those calls.
+PERSON_SESSION = frozenset({"td_hold", "ledger_decide"})
+
 
 # every control character read as a space, in one C pass rather than a generator per character (TD-739);
 # a pattern, since `str.translate` with a mapping looks each character up in Python's dict (TD-747)
@@ -307,6 +312,28 @@ Controllers = Callable[[Session], list[str]]
 
 def _own(s: Session) -> list[str]:
     return s.controllers
+
+
+def person_session(record: Session | None, controllers: Controllers = _own) -> bool:
+    """A person's session (design §4.8 *A person's session passes two of them*, §4.10 *between the
+    person's own sessions*, TD-1116, TD-1117): an own end (`own_end`) with no `controllers` — started by
+    hand, interactive, holding no seat, carrying no lead's word. Read from the record at each request, so
+    a flip to `unattended`, a controller added or a seat end it on the next call. What `from_role` reads
+    as `person-session` and `agent_common.person_only` passes for `PERSON_SESSION`."""
+    return record is not None and own_end(record) and not controllers(record)
+
+
+def presser_words(by: str, records: Mapping[str, Session]) -> str:
+    """A hold's presser (`held.by`) as the notes, the claim refusal and the mark's `title` say it (§4.8
+    *The record names who pressed*, TD-1117), read from `records` (the one graph) now: *the person* for
+    `person`, none, or the person's shell (`as_person`); *the person's session <name>* for a person's
+    session; the record's name for any other; the id for one gone."""
+    if not by or by == PERSON or as_person(by, records):
+        return "the person"
+    r = records.get(by)
+    if r is None:
+        return by
+    return f"the person's session {r.name}" if person_session(r) else r.name
 
 
 # A record's `superseded_by` as the reader addresses it (§4.4a): its key in the records and the record,
@@ -560,8 +587,7 @@ def from_role(records: Mapping[str, Session], holder: str, sender: str, *, contr
     me = records.get(holder)
     if me is not None and sender in controllers(me):
         return "controller"
-    them = records.get(sender)
-    if them is not None and own_end(them) and not controllers(them):
+    if person_session(records.get(sender), controllers):
         return "person-session"
     return "other"
 

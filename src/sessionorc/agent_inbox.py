@@ -898,8 +898,13 @@ class InboxMixin:
         read from that reading, and refused when it no longer sorts *for you* or an open decided line
         already names it. The ledger itself is never written. The repo's work orders are read again
         once the line lands, so the row leaves on the next poll. `road` is **Done…** (`done`) or **Back to
-        design…** (`design`) on any open row (`_ledger_road`, TD-905)."""
-        agent_common.person_only(caller, "answer a ledger entry", "§4.5", self._graph())
+        design…** (`design`) on any open row (`_ledger_road`, TD-905). A person's session passes for a road
+        alone (`mail.PERSON_SESSION`, §4.8 *A person's session passes two of them*, TD-1117): the answer with
+        no road was put to the person, and stays theirs."""
+        agent_common.person_only(
+            caller, "answer a ledger entry", "§4.5", self._graph(), session_ok=bool(str(road or ""))
+        )
+        road = str(road or "")
         root = next((r for r in self._repos if r == repo or str(Path(r).resolve()) == str(Path(repo).resolve())), None)
         if root is None:
             raise RpcError(f"{repo} is not a repo this home reads (its repos registry)")
@@ -976,6 +981,11 @@ class InboxMixin:
         page = str(e.get("for_page") or "")
         if road == "done" and str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
             raise RpcError(f"{id} is yours to do: its own Done says what was done")
+        graph = self._graph()
+        mine = mail.as_person(caller, graph)
+        if road == "done" and not mine and ledger_mod.decided_by(e, ledger_mod.PERSON_OWNER):
+            # Done here would close the person's question unanswered (§4.8 *A person's session passes two of them*)
+            raise RpcError(f"{id} waits on the person's decision: they answer it on the Inbox or the Queue")
         if road == "design" and not (
             page in ("pickable", "live-check")
             # blocked by an id still open, or with an open part: the page's `blocked_open`, asked again here
@@ -1002,26 +1012,30 @@ class InboxMixin:
             line = board_mod.decided_line(str(e.get("title") or ""), id, [], None, said, today)
         except board_mod.Refused as err:
             raise RpcError(str(err)) from None
+        if not str(view.get("remote") or ""):
+            raise RpcError(f"{name}'s origin is not read yet: its clock is keyed by it, so ask again in a minute")
+        rec = None if mine else graph.get(str(caller))
+        session = "" if mine else rec.name if rec is not None else str(caller)  # the commit's: *n/a* for the person
+        who = "the person" if mine else self._presser_words(str(caller))
         self._board_adding.add(key)
         try:
-            tell = ("is closed by the person" if road == "done" else "goes back to design") + (f" — {w}" if w else "")
-            told = await self.rpc_td_hold(repo=root, id=id, tell=tell, caller=caller)
-            if told.get("untold"):
+            tell = (f"is closed by {who}" if road == "done" else "goes back to design") + (f" — {w}" if w else "")
+            told, readers, untold = await self._hold_notice(id, tell)
+            if untold:
                 raise RpcError(
-                    f"nothing was written: {'; '.join(told['untold'])} — a worker would run on against "
+                    f"nothing was written: {'; '.join(untold)} — a worker would run on against "
                     f"{id} (design §4.4 *Hold*)"
                 )
-            if isinstance(e.get("held"), dict):
-                await self.rpc_td_hold(repo=root, id=id, release=True, caller=caller)
+            await self._clear_hold(root, e, "person")  # any hold, whatever the reading says: the press decides it
             try:
-                done = await asyncio.to_thread(board_mod.add_decided, root, line)
+                done = await asyncio.to_thread(board_mod.add_decided, root, line, session=session)
             except board_mod.Refused as err:
                 raise RpcError(str(err)) from None
             log.info("board %s: %s", root, done["message"])
             await self._reread_board(root)
         finally:
             self._board_adding.discard(key)
-        return {"repo": root, "id": id, "decided": said, "told": told.get("told") or [], **done}
+        return {"repo": root, "id": id, "decided": said, "told": told, "readers": readers, **done}
 
     async def _reread_board(self, root: str | Path) -> None:
         """The repo's board read again at once after a write-back the host agent made (§4.4 *Each

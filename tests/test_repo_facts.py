@@ -766,6 +766,32 @@ def test_ao_td_hold_why_sends_the_holds_words_and_a_release_takes_none(repo, mon
     assert len(sent) == 1 and "a release takes none" in capsys.readouterr().err
 
 
+def test_ao_td_done_and_design_press_the_roads_and_say_whom_they_told(repo, monkeypatch, capsys):
+    """TD-1127 (design §4.7 `ao td done` / `ao td design`): `ledger_decide` with the road, the main checkout by
+    path, the id upper-cased and the words one line, optional; a line per name told, a reader as `ao td hold`
+    words it."""
+    from shiftlead import cli
+
+    sent = []
+    told = {"told": ["grinder-ao-2", "techlead"], "readers": ["techlead"]}
+    monkeypatch.setattr(cli, "_td_repo", lambda r: ("r", str(repo)))
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: sent.append((rpc, kw)) or {"id": kw["id"], **told})
+    assert cli.main(["td", "done", "td-724", " built  it "]) == 0
+    assert cli.main(["td", "design", "TD-724"]) == 0
+    assert sent == [
+        ("ledger_decide", {"repo": str(repo), "id": "TD-724", "road": "done", "words": "built it"}),
+        ("ledger_decide", {"repo": str(repo), "id": "TD-724", "road": "design", "words": ""}),
+    ]
+    assert capsys.readouterr().out.splitlines() == [
+        "TD-724 done: its decided line is on the board",
+        "grinder-ao-2 told to drop it",
+        "techlead reads its PR and is told to leave it unmerged",
+        "TD-724 sent back to design",
+        "grinder-ao-2 told to drop it",
+        "techlead reads its PR and is told to leave it unmerged",
+    ]
+
+
 async def test_one_checkouts_failure_keeps_its_reading_and_costs_the_others_nothing(agent, tmp_path, monkeypatch):
     """Review of PR #595: a read that raises (not a `gh` outage — a surprise) is that checkout's
     error, its last reading kept; the other checkouts are read; and the clock does not advance past

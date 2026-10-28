@@ -96,10 +96,10 @@ def test_a_held_entry_is_withheld_past_its_window_and_an_edit_keeps_the_hold():
     paths.ledger_seen_file().write_text(json.dumps(store))
     much_later = T0 + timedelta(days=2)
     got = _by_id(settle.observe(_ledger(_entry(2)), "o/r", SPANS, much_later))
-    assert got["TD-002"]["held"] == {"at": T0.isoformat()} and "settling" not in got["TD-002"]
+    assert got["TD-002"]["held"] == {"at": T0.isoformat(), "by": "person"} and "settling" not in got["TD-002"]
     assert not ledger.lane_matches(DESIGNER, got["TD-002"])
     got = _by_id(settle.observe(_ledger(_entry(2, body="the person's edit landed")), "o/r", SPANS, much_later))
-    assert got["TD-002"]["held"] == {"at": T0.isoformat()} and "settling" not in got["TD-002"], "TD-731"
+    assert got["TD-002"]["held"] == {"at": T0.isoformat(), "by": "person"} and "settling" not in got["TD-002"], "TD-731"
     rec = json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-002"]
     assert rec["sig"] == got["TD-002"]["sig"] and rec["held"]["at"] == T0.isoformat(), "the new sig, the hold kept"
 
@@ -205,7 +205,9 @@ def test_a_partial_reading_keeps_the_records_it_does_not_hold():
     paths.ledger_seen_file().write_text(json.dumps(store))
     settle.observe(_ledger(_entry(3, "build")), "o/r", SPANS, T0 + timedelta(minutes=1))  # TD-002 missing
     got = _by_id(settle.observe(_ledger(_entry(2)), "o/r", SPANS, T0 + timedelta(days=1)))
-    assert got["TD-002"]["held"] == {"at": T0.isoformat()}, "the hold survived the reading that lacked it"
+    assert got["TD-002"]["held"] == {"at": T0.isoformat(), "by": "person"}, (
+        "the hold survived the reading that lacked it"
+    )
 
 
 # -- slice 2: Hold and the claim (§4.4 *Hold*, §4.8 *A claim is a lease*) ------------------------------------
@@ -263,7 +265,7 @@ def test_a_landed_held_id_is_held_at_its_first_reading_and_never_settles():
     assert rec == {"held": {"at": T0.isoformat(), "by": "ao-i"}}
     t1 = T0 + timedelta(minutes=1)
     got = _by_id(settle.observe(_ledger(_entry(1), _entry(2, "build")), "o/r", SPANS, t1))
-    assert got["TD-002"]["held"] == {"at": T0.isoformat()} and "settling" not in got["TD-002"]
+    assert got["TD-002"]["held"] == {"at": T0.isoformat(), "by": "ao-i"} and "settling" not in got["TD-002"]
     assert not ledger.lane_matches(GRINDER, got["TD-002"])
     rec = json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-002"]
     assert rec["sig"] == got["TD-002"]["sig"] and rec["at"] == t1.isoformat()
@@ -281,7 +283,7 @@ def test_pre_holding_an_id_leaves_a_repos_first_reading_recording_every_other_id
     seen = json.loads(paths.ledger_seen_file().read_text())["o/r"]
     assert seen["TD-001"]["at"] == settle.EPOCH and seen["TD-002"]["at"] == settle.EPOCH, "still a first reading"
     assert "settling" not in got["TD-001"] and "settling" not in got["TD-002"]
-    assert got["TD-009"]["held"] == {"at": T0.isoformat()}
+    assert got["TD-009"]["held"] == {"at": T0.isoformat(), "by": "person"}
     # the next reading is not a first: a new id settles from now
     got = _by_id(settle.observe(_ledger(_entry(1), _entry(3)), "o/r", SPANS, T0 + timedelta(minutes=2)))
     assert "settling" in got["TD-003"]
@@ -482,7 +484,9 @@ async def test_a_holds_words_are_on_the_record_the_reading_and_the_note_and_new_
     root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
     worker = _put(agent, "ao-gw", unattended=True, claim="TD-003")
     got = await agent.rpc_td_hold(repo=root, id="TD-003", why="  wait for   the  vendor ")
-    assert got["held"] == {"at": got["held"]["at"], "why": "wait for the vendor"}, "one line, on the reading"
+    assert got["held"] == {"at": got["held"]["at"], "by": "person", "why": "wait for the vendor"}, (
+        "one line, on the reading"
+    )
     assert json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-003"]["held"]["why"] == "wait for the vendor"
     assert _notes(worker, "TD-003")[0].startswith("TD-003 is held by the person (“wait for the vendor”): stop")
     again = await agent.rpc_td_hold(repo=root, id="TD-003", why="after Friday")
@@ -514,7 +518,7 @@ async def test_a_drop_notice_tells_the_holder_and_the_reader_and_writes_no_hold(
     assert "held" not in _by_id(entries)["TD-003"] and "held" not in (seen.get("o/r") or {}).get("TD-003", {})
     assert _notes(worker, "TD-003") == [
         "TD-003 goes back to design — split it: stop at the step in hand, push, leave its PR open and unmerged, and "
-        'drop the entry: `ao progress drop TD-003 --why "told by the person"`.'
+        'drop the entry: `ao progress drop TD-003 --why "goes back to design — split it"`.'
     ]
     assert _notes(reader, "TD-003") == ["TD-003 goes back to design — split it: leave PR #1840 unmerged."]
     again = await agent.rpc_td_hold(repo=root, id="TD-003", tell="is closed by the person — done")
@@ -538,3 +542,106 @@ async def test_a_holds_words_and_a_drop_notice_are_cut_to_one_line_of_200(agent,
     tell = "t" * 300
     await agent.rpc_td_hold(repo=root, id="TD-003", tell=tell)
     assert _notes(worker, "TD-003")[-1].startswith(f"TD-003 {tell[:200]}: stop")
+
+
+# -- TD-1127: a person's session holds, releases and tells (§4.8 *A person's session passes two of them*) ----
+
+
+def _stored(tid: str) -> dict:
+    return json.loads(paths.ledger_seen_file().read_text())["o/r"][tid]
+
+
+def _mine(agent, sid: str, **over) -> Session:
+    """A session the person started by hand: interactive, no controller, no seat (`mail.person_session`)."""
+    s = Session(**{"id": sid, "name": sid.removeprefix("ao-"), "kind": "interactive", "adapter": "claude-code",
+                   "dir": "", **over})  # fmt: skip
+    agent.sessions[sid] = s
+    return s
+
+
+async def test_a_persons_session_holds_tells_and_releases_its_own_hold_but_never_the_persons(agent, tmp_path):
+    await park_ticks(agent)
+    root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    _mine(agent, "ao-me")
+    worker = _put(agent, "ao-gw", unattended=True, claim="TD-003")
+    got = await agent.rpc_td_hold(repo=root, id="TD-003", caller="ao-me")
+    assert got["held"]["by"] == "ao-me" and got["told"] == ["ao-gw"]
+    assert _stored("TD-003")["held"]["by"] == "ao-me"
+    assert _notes(worker, "TD-003") == [
+        "TD-003 is held by the person's session me: stop at the step in hand, push, leave its PR open and unmerged, "
+        'and drop the entry: `ao progress drop TD-003 --why "held by the person\'s session me"`. A Release makes it '
+        "pickable again."
+    ], "the presser named once"
+    got = await agent.rpc_td_hold(repo=root, id="TD-003", release=True, caller="ao-me")
+    assert got["held"] is None and "held" not in _by_id(entries)["TD-003"]
+    # the person's own hold: no release, no new words, no re-hold from a session
+    await agent.rpc_td_hold(repo=root, id="TD-003", why="mine")
+    for kw, act in (
+        ({"release": True}, "release"),
+        ({"why": "later"}, "reword"),
+        ({}, "reword"),
+        ({"why": "mine"}, "reword"),
+    ):
+        with pytest.raises(RpcError, match=f"TD-003's hold is the person's own: they {act} it on the Repo page"):
+            await agent.rpc_td_hold(repo=root, id="TD-003", caller="ao-me", **kw)
+    assert _stored("TD-003")["held"] == {"at": _stored("TD-003")["held"]["at"], "by": "person", "why": "mine"}
+    # a hold written before `by` reads as the person's
+    store = json.loads(paths.ledger_seen_file().read_text())
+    store["o/r"]["TD-003"]["held"].pop("by")
+    paths.ledger_seen_file().write_text(json.dumps(store))
+    with pytest.raises(RpcError, match="the person's own: they release it"):
+        await agent.rpc_td_hold(repo=root, id="TD-003", release=True, caller="ao-me")
+    # the person's shell rewords and releases the person's hold as the person does, keeping it `person`
+    agent.sessions["ao-sh"] = Session(id="ao-sh", name="sh", kind="interactive", adapter="shell", dir="")
+    await agent.rpc_td_hold(repo=root, id="TD-003", why="still mine", caller="ao-sh")
+    assert _stored("TD-003")["held"]["by"] == "person" and _stored("TD-003")["held"]["why"] == "still mine"
+    await agent.rpc_td_hold(repo=root, id="TD-003", release=True, caller="ao-sh")
+    assert "held" not in _stored("TD-003")
+
+
+async def test_a_sessions_new_words_on_another_sessions_hold_make_it_the_presser(agent, tmp_path):
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    _mine(agent, "ao-a")
+    _mine(agent, "ao-b")
+    await agent.rpc_td_hold(repo=root, id="TD-003", why="a's", caller="ao-a")
+    at = _stored("TD-003")["held"]["at"]
+    await agent.rpc_td_hold(repo=root, id="TD-003", why="a's", caller="ao-b")  # the same words: nothing changes
+    assert _stored("TD-003")["held"] == {"at": at, "by": "ao-a", "why": "a's"}
+    await agent.rpc_td_hold(repo=root, id="TD-003", why="b's", caller="ao-b")
+    assert _stored("TD-003")["held"] == {"at": at, "by": "ao-b", "why": "b's"}, "`at` kept"
+    await agent.rpc_td_hold(repo=root, id="TD-003", release=True, caller="ao-a")  # a session's hold: liftable
+
+
+async def test_a_persons_session_drop_notice_says_who_told_and_a_nodes_session_passes(agent, tmp_path):
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True, claim="TD-003")
+    agent.remote = {
+        "laptop": {"ao-me": Session(id="ao-me", name="me", kind="interactive", adapter="claude-code", dir="")}
+    }
+    got = await agent.rpc_td_hold(repo=root, id="TD-003", tell="is superseded by TD-002", caller="ao-me@laptop")
+    assert got["told"] == ["ao-gw"] and got["held"] is None
+    assert _notes(worker, "TD-003")[0].startswith(
+        "TD-003 is superseded by TD-002 (told by the person's session me): stop at the step in hand"
+    )
+    got = await agent.rpc_td_hold(repo=root, id="TD-003", caller="ao-me@laptop")
+    assert got["held"]["by"] == "ao-me@laptop"
+    agent.remote["laptop"]["ao-me"].controllers = ["ao-lead"]  # a lead's word ends it on the next call
+    with pytest.raises(RpcError, match="ao-me@laptop cannot hold a ledger entry: .*started by hand"):
+        await agent.rpc_td_hold(repo=root, id="TD-003", release=True, caller="ao-me@laptop")
+
+
+async def test_the_claim_refusal_names_a_sessions_hold_by_its_presser(agent, tmp_path):
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    _mine(agent, "ao-me")
+    async with LocalClient() as person:
+        g = (await person.call("create", name="g", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        agent.sessions[g].repo = root
+        await agent.rpc_td_hold(repo=root, id="TD-003", caller="ao-me")
+        with pytest.raises(AgentError, match="TD-003 is held by the person's session me since"):
+            await person.call("progress", id=g, ref="TD-003", status="claimed", force=True)
+        del agent.sessions["ao-me"]  # gone: its id stands for it
+        with pytest.raises(AgentError, match="TD-003 is held by ao-me since"):
+            await person.call("progress", id=g, ref="TD-003", status="claimed")
