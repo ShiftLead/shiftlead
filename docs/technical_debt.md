@@ -93,7 +93,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
-| TD-1182 | `teamrun.start_member`'s two refusals (a line the flow sits out, a name a live session holds) and `resize`'s stop on a failed `keep` are set in no test: each can be deleted with the suite green | Low | Open — build |
 | TD-1183 | `ao repo add`'s adopt runs `sync.sh`, which dev-cadence #429 made a refusal: the offer and `--adopt` fail with sync.sh's own error | Medium | Open — build |
 
 ---
@@ -1977,25 +1976,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** as §4.5a's rows say. (1) `teams_for_form` carries each team's member lines (name, role, profile, lane, brief, the next free name, and the current flow's compiled lane, reader and stage brief where a flow is set). (2) Under a Team pick, a Role a member line names (each line by name where a role has two) fills the form from the line: the name, profile, lane and brief, the manager as controller, unattended and supervised; Start makes a run-only member through TD-1166's create; on a team not running the form refuses with *<team> is not running: start it first* and offers the team's **Start**. (3) **keep as a team member**, off by default: ticked, the line's fields are drawn locked with *a kept member is the line's: change the line in the definition*, and Start is TD-1165's **+**, after the same running check (refused on a team not running, Start offered). (4) **run it under me instead** on such a pick starts the person's own session in the team as today, the manager still ticked as its controller, and hides the tick; it needs no running team. *Interactive*, `plain` and a role no line names are unchanged.
 
 **Done when** tests pin: the fill for a repo-defined team's grinder line (dev-cadence's `dc-grinder` shape: brief `docs/briefs/grinder-dc-1.md`, profile, lane, the manager's id, unattended and supervised); a Start making a run-only record with those fields; the refusal on a team not running, with Start offered; the line's fields locked under the tick; a team whose manager is a person (`manager: person`: no controller ticked, running when any crew record is live); two lines of one role offered each by its name; the *a kept member is the line's* note under the tick; the tick writing the size and creating a kept member; *run it under me instead* giving TD-160's record. The form is looked at in headless Chromium (design §4.9b) with a member line picked, ticked and unticked, the shots named in the PR. `pdm run test` and `pdm run lint` pass.
-
----
-
-## TD-1182: `teamrun.start_member`'s two refusals (a line the flow sits out, a name a live session holds) and `resize`'s stop on a failed `keep` are set in no test: each can be deleted with the suite green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-28 (test-audit-ao-1, from #2571)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — build
-**Part of:** TD-1164
-**Location:** `src/shiftlead/teamrun.py` (`start_member`: `if want in plan.sit_out:` raising *sits out under*, and `if rec is None:` raising *is held by a live session, so nothing was created*; `resize`'s `except AgentError` around `call("keep", ...)`, the *stopped at … started or kept* text); `tests/test_team_size.py` 245–258 (`test_start_member_creates_the_lines_next_name_past_its_size_run_only`)
-
-**Why:** #2571's docstring says `start_member` is "Refused for a line the definition does not name, one the current flow does not use, and a name a live session holds". The test covers only the first (`no member line 'mill'`, which `team.line` raises). Probed on `origin/main` (2026-10-28), each replaced in turn with `if False:` and `tests/test_run_ended.py tests/test_run_only.py tests/test_team_size.py tests/test_cli_teams.py tests/test_finished_tick.py` run: the sit-out guard, the `rec is None` guard, and the line `out["text"] = said + f" — stopped at {want}: {e}; started or kept {made}"` (made `out["text"] = said`) each left 173 passed. `grep -rn "so nothing was created" tests` hits only `add_member`'s test (`tests/test_cli_teams.py` 1999), and `sits out under` is tested for `resize`, not `start_member`. `ao team add` reaches both guards.
-
-**Fix:** tests that call `start_member` for a line the current flow sits out and for a name a `verdicts` entry holds live (both expect a `TeamError` and no `create`), and one that makes `keep` raise inside `resize` and asserts the *stopped at … started or kept* text and that nothing past it is touched.
-
-**Done when** each of the three deletions above fails `tests/test_team_size.py`.
 
 ---
 
