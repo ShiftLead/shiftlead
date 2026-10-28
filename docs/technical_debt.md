@@ -93,7 +93,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1153 | A team's definition and flows are edited only in its file: a per-team page edits them from the UI, and a repo-defined team's edit lands as a PR | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1154 | A team's size is turned by hand: an `auto` size grows a team from its workload and shrinks it back as the queue drains | Medium | Open — design first, waits on Paul (worked interactively) |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Built (#2583) — live check |
-| TD-1174 | The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it | Low | Open |
 
 ---
 
@@ -1976,24 +1975,6 @@ That is the design working as written: a Team pick makes *a person's own session
 **Fix:** as §4.5a's rows say. (1) `teams_for_form` carries each team's member lines (name, role, profile, lane, brief, the next free name, and the current flow's compiled lane, reader and stage brief where a flow is set). (2) Under a Team pick, a Role a member line names (each line by name where a role has two) fills the form from the line: the name, profile, lane and brief, the manager as controller, unattended and supervised; Start makes a run-only member through TD-1166's create; on a team not running the form refuses with *<team> is not running: start it first* and offers the team's **Start**. (3) **keep as a team member**, off by default: ticked, the line's fields are drawn locked with *a kept member is the line's: change the line in the definition*, and Start is TD-1165's **+**, after the same running check (refused on a team not running, Start offered). (4) **run it under me instead** on such a pick starts the person's own session in the team as today, the manager still ticked as its controller, and hides the tick; it needs no running team. *Interactive*, `plain` and a role no line names are unchanged.
 
 **Done when** tests pin: the fill for a repo-defined team's grinder line (dev-cadence's `dc-grinder` shape: brief `docs/briefs/grinder-dc-1.md`, profile, lane, the manager's id, unattended and supervised); a Start making a run-only record with those fields; the refusal on a team not running, with Start offered; the line's fields locked under the tick; a team whose manager is a person (`manager: person`: no controller ticked, running when any crew record is live); two lines of one role offered each by its name; the *a kept member is the line's* note under the tick; the tick writing the size and creating a kept member; *run it under me instead* giving TD-160's record. The form is looked at in headless Chromium (design §4.9b) with a member line picked, ticked and unticked, the shots named in the PR. `pdm run test` and `pdm run lint` pass.
-
----
-
-## TD-1174: The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-27 (docs-audit-ao-1, auditing #2529–#2538)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/settings_page.py` (`repo_cards`, the `_row("ledger", …)` call), `docs/design/4.5a-controls.md`, `docs/design/4.5-ui.md` (the Settings page), `docs/design-history.md`
-
-**Why:** #2531 (TD-1146) changed what the Settings page's repo card shows for `ledger`: the resolved value, suffixed ` (directory)` where `root / cfg.ledger` is a directory, and marked default while `cfg.ledger_set` is false (`f"{cfg.ledger} (directory)" if (root / cfg.ledger).is_dir() else cfg.ledger`, `is_default=not cfg.ledger_set`). The PR touched no `docs/design/` file, and `grep -rn "TD-1146" docs/design` finds only §4.4 *Either layout*'s builds list and §4.5a's *Repo page: Open ledger* row; neither names the Settings row. CLAUDE.md: a change in behaviour is a change to the design first, in the same PR, with the dated fact in `docs/design-history.md`. The archived TD-1146 **Resolved:** line does claim "the Settings row says *docs/ledger (directory)* or the file, default while unset", so the code is as the entry says; the design is what lacks it.
-
-**Fix:** write the row in the design's present tense where the Settings page's repo card is described (or §4.4 *Either layout*, if the page has no per-row text), and its dated line in `docs/design-history.md` under the same section.
-
-**Done when** the design says what the `ledger` row shows for a file, a directory and an unset key, and the history has its line.
 
 ---
 

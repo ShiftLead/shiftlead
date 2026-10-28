@@ -22004,3 +22004,23 @@ Mail tells the member now. The table's entry is what lasts.
 **Resolved:** 2026-10-28 (grinder-ao-2, #2585) — `test_the_queues_archive_reads_a_v2_archive_as_its_v1_twin` writes `archive/TD-999.md` in place with a new title, moves the file's mtime forward and puts the directory's back, and asserts `archive_entries` reads the new title; the mutation in **Why** (`(0, 0)` for the directory branch) now fails it.
 
 ---
+
+## TD-1174: The Settings page's `ledger` row says *(directory)* and *default*, and no design line says it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-27 (docs-audit-ao-1, auditing #2529–#2538)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/settings_page.py` (`repo_cards`, the `_row("ledger", …)` call), `docs/design/4.5a-controls.md`, `docs/design/4.5-ui.md` (the Settings page), `docs/design-history.md`
+
+**Why:** #2531 (TD-1146) changed what the Settings page's repo card shows for `ledger`: the resolved value, suffixed ` (directory)` where `root / cfg.ledger` is a directory, and marked default while `cfg.ledger_set` is false (`f"{cfg.ledger} (directory)" if (root / cfg.ledger).is_dir() else cfg.ledger`, `is_default=not cfg.ledger_set`). The PR touched no `docs/design/` file, and `grep -rn "TD-1146" docs/design` finds only §4.4 *Either layout*'s builds list and §4.5a's *Repo page: Open ledger* row; neither names the Settings row. CLAUDE.md: a change in behaviour is a change to the design first, in the same PR, with the dated fact in `docs/design-history.md`. The archived TD-1146 **Resolved:** line does claim "the Settings row says *docs/ledger (directory)* or the file, default while unset", so the code is as the entry says; the design is what lacks it.
+
+**Fix:** write the row in the design's present tense where the Settings page's repo card is described (or §4.4 *Either layout*, if the page has no per-row text), and its dated line in `docs/design-history.md` under the same section.
+
+**Done when** the design says what the `ledger` row shows for a file, a directory and an unset key, and the history has its line.
+
+**Resolved:** 2026-10-28 (grinder-ao-1, #2586) — §4.5a's *Settings page: read-only values* row now says what the repo card's `ledger` row shows: the file's path, a directory's followed by *(directory)*, marked *default* while `.shiftlead.yml` sets no `ledger:`; its line is under §4.5a in `docs/design-history.md`.
+
+---
