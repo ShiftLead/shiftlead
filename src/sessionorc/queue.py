@@ -259,7 +259,8 @@ def reading(
     Each **card**: `id` (its top entry's `<repo>#TD-n`), `key` and `lined`, `top` and `rows` (each a row:
     `qid`, `repo`, `id`, `title`, `priority`, `state` — the one word of §4.4 *A row's state*, '' for a
     row that waits on the person, whose `needs` says how — `pr`, `holder`, `parent`, `depth`,
-    `also_after`, `archived`, `key`), `done` and `of` (*d/m done*), `status` (the ledger's part), `group`
+    `after` (its open blockers, *after TD-n*, TD-1130), `archived`, `key`), `done` and `of` (*d/m done*),
+    `status` (the ledger's part), `group`
     (`in_progress`, `waiting` or `up_next`), `wait` (a Waiting card's `{column, phrase, id}`, else None;
     §4.4 *Waiting*, TD-918), `place` (Up next numbered from 1) and `places` (one `{repo, n}` per repo of its
     open members, numbered among that repo's Up next cards, TD-901), `would_be` (a Waiting card's `{repo, n}`
@@ -292,9 +293,12 @@ def reading(
         name = rs.resolve(m.group(1)) if m else None
         return qid(name, m.group(2)) if m and name else None
 
-    # the edges: an open member's `Blocked by:` ids, local and `<repo>#`, in both directions
+    # the edges: an open member's `Blocked by:` ids, local and `<repo>#`, and its `Part of:` parent, in both
+    # directions (TD-1130)
     adj: dict[str, set[str]] = {q: set() for q in open_}
     blockers: dict[str, set[str]] = {q: set() for q in open_}  # the open members each one is blocked by
+    parts: dict[str, set[str]] = {q: set() for q in open_}  # the open members naming each one in `Part of:`
+    up: dict[str, str] = {}  # an entry, open or archived → its `Part of:` parent, open or archived
     touch: dict[str, set[str]] = {q: set() for q in open_}  # the archived entries one hop from each
     for q, e in open_.items():
         named = [qid(e["repo"], b) for b in e.get("blocked_ids") or []]
@@ -306,7 +310,16 @@ def reading(
                 blockers[q].add(n)
             elif n in archived:
                 touch[q].add(n)
-    names_open: dict[str, set[str]] = {}  # an archived entry → the open members its `Blocked by:` names
+        if e.get("part_of") and (n := qid(e["repo"], str(e["part_of"]))) != q:
+            if n in open_:
+                adj[q].add(n)
+                adj[n].add(q)
+                parts[n].add(q)
+                up[q] = n
+            elif n in archived:  # an archived parent: a done group head over its open parts
+                touch[q].add(n)
+                up[q] = n
+    names_open: dict[str, set[str]] = {}  # an archived entry → the open members its `Blocked by:` or `Part of:` names
     for a_q, a in archived.items():
         ids, _, _ = lb.parse_blocked(a.get("blocked_raw") or "") if a.get("blocked_raw") else ([], [], [])
         for b in ids:
@@ -314,6 +327,10 @@ def reading(
             if n in open_:
                 names_open.setdefault(a_q, set()).add(n)
                 touch[n].add(a_q)
+        if (par := lb.parse_part_of(a.get("part_of_raw"))[0]) and (n := qid(a["repo"], par)) in open_:
+            names_open.setdefault(a_q, set()).add(n)  # an archived part of an open parent: its done row
+            touch[n].add(a_q)
+            up[a_q] = n
 
     # an open member blocked past the org's reach (§4.4 *Blocked*): a decision neither the person's nor
     # the designer's, an id in no reading (an unknown id keeps its block), a `<repo>#TD-n` no reading
@@ -396,6 +413,8 @@ def reading(
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
                 "page": str(e.get("for_page") or ""),
+                # what it waits on, apart from its state word: each open blocker, *after TD-n* (TD-1130)
+                "after": sorted(blockers.get(q) or (), key=lambda b: _key_sort(str(open_[b].get("key") or ""), b)),
                 "blocked_open": bool(blockers.get(q)) or bool(e.get("parts_open")),  # an open part counts (TD-1130)
                 "builds_open": ledger_mod.builds_open(e, bool(blockers.get(q)), any(q in b for b in blockers.values())),
                 "key": e.get("key") or "",
@@ -416,6 +435,7 @@ def reading(
             "holder": None,
             "held": None,
             "page": "",
+            "after": [],
             "blocked_open": False,
             "builds_open": False,
             "key": "",
@@ -428,7 +448,7 @@ def reading(
 
     cards: list[dict[str, Any]] = []
     for members in comps.values():
-        cards.append(_card(members, open_, blockers, adj, touch, row))
+        cards.append(_card(members, open_, blockers, parts, up, touch, row))
     for c in cards:
         if any(q in held or q in prs for q in c["members"]):
             c["group"], c["wait"] = "in_progress", None  # In progress whatever `waits` says (§4.4 *Waiting*)
@@ -488,8 +508,8 @@ def _state(
     if isinstance(w, Mapping):
         return (f"waits until {w.get('until')}" if w.get("on") == "until" else "waits on an event"), None
     opened = [b for b in e.get("blocked_by") or [] if re.fullmatch(r"(?:[\w./-]+#)?TD-\d+", b)]
-    if opened:
-        return f"after {opened[0]}", None
+    if opened or e.get("parts_open"):  # an open blocker or an open part; the row's `after` names the blockers
+        return "waiting", None
     return "ready", None
 
 
@@ -497,12 +517,15 @@ def _card(
     members: list[str],
     open_: Mapping[str, Mapping[str, Any]],
     blockers: Mapping[str, set[str]],
-    adj: Mapping[str, set[str]],
+    parts: Mapping[str, set[str]],
+    up: Mapping[str, str],
     touch: Mapping[str, set[str]],
     row: Any,
 ) -> dict[str, Any]:
     """One card from its open members: the top entry, the rows' tree, its archived rows, its key, its
-    pick order and the ledger's part of its status."""
+    pick order and the ledger's part of its status. The tree is `Part of:` alone (§4.4 *Rows*, TD-1130):
+    a row's `parent` is its `Part of:` parent where that is on the card, open or archived, else None (a
+    loose row); a blocker is the row's `after`, never an edge."""
     inside = set(members)
     keyed = {q: str(open_[q].get("key") or "") for q in members}
     lined = [q for q in members if open_[q].get("lined")]
@@ -511,44 +534,67 @@ def _card(
     def best(qs: Iterable[str]) -> str:
         return min(qs, key=lambda q: _key_sort(keyed[q], q))
 
+    # the top entry: the open root parent with the best key — an open member with an open part on the card
+    # that names no open parent on it — else the rule from before (§4.4 *The top entry*)
+    roots = [q for q in members if parts[q] & inside and up.get(q) not in inside]
     designs = [q for q in members if open_[q].get("kind") == "design-first"]
-    tops = [q for q in designs if not any(b in inside and b in designs for b in blockers[q])]
+    tops = roots or [q for q in designs if not any(b in inside and b in designs for b in blockers[q])]
     tops = tops or [q for q in members if not blockers[q] & inside]
     top = best(tops or members)
-    # the rows: breadth first from the top entry by edges in either direction; a row with two parents
-    # at the level above is drawn under the better-keyed one and noted under the other
-    depth = {top: 0}
-    level, order = [top], [top]
-    while level:
-        nxt: list[str] = []
-        for q in level:
-            for n in adj[q]:
-                if n in inside and n not in depth:
-                    depth[n] = depth[q] + 1
-                    nxt.append(n)
-        nxt = sorted(set(nxt), key=lambda q: _key_sort(keyed[q], q))
-        order += nxt
-        level = nxt
-    rows: list[dict[str, Any]] = []
-    for q in order[1:]:
-        parents = sorted((p for p in adj[q] if depth.get(p) == depth[q] - 1), key=lambda p: _key_sort(keyed[p], p))
-        rows.append({**row(q), "parent": parents[0], "depth": depth[q], "also_after": parents[1:]})
-    # archived rows: one hop from an open member, drawn under the better-keyed of them, done
-    done_rows: dict[str, list[str]] = {}
-    for q in members:
-        for a in touch[q]:
-            done_rows.setdefault(a, []).append(q)
-    for a, under in sorted(done_rows.items(), key=lambda kv: kv[0]):
-        under.sort(key=lambda p: _key_sort(keyed[p], p))
-        rows.append({**row(a), "parent": under[0], "depth": depth[under[0]] + 1, "also_after": under[1:]})
-    # the pick order within the card: after every member it is blocked by, else by key (`_card_order`'s)
+    # the pick order within the card: after every member it is blocked by and every open part, else by key
     left, picked = set(members), []
     while left:
-        ready = [q for q in left if not blockers[q] & left] or list(left)
+        ready = [q for q in left if not (blockers[q] | parts[q]) & left] or list(left)
         q = best(ready)
         picked.append(q)
         left.discard(q)
-    top_row = {**row(top), "parent": None, "depth": 0, "also_after": []}
+    # archived rows: one hop from an open member, by either field
+    done_rows = sorted({a for q in members for a in touch[q]})
+    on_card = inside | set(done_rows)
+    pi = {q: n for n, q in enumerate(picked)}
+
+    def parent_of(q: str) -> str | None:
+        p = up.get(q)
+        return p if p in on_card and p != q and q != top else None
+
+    kids: dict[str | None, list[str]] = {}
+    for q in [*members, *done_rows]:
+        if q != top:
+            kids.setdefault(parent_of(q), []).append(q)
+
+    def first(q: str, seen: frozenset[str] = frozenset()) -> float:
+        """The pick place of a group's first open member: the order its group is drawn in."""
+        if q in seen:
+            return float("inf")
+        own = pi.get(q, float("inf"))
+        return min([own, *(first(k, seen | {q}) for k in kids.get(q) or ())])
+
+    def place(q: str) -> tuple[float, str]:
+        return (pi[q], q) if q in pi else (float("inf"), q)  # open parts in pick order, then archived by id
+
+    rows: list[dict[str, Any]] = []
+    drawn: set[str] = {top}
+
+    def walk(q: str, depth: int) -> None:
+        for k in sorted(kids.get(q) or (), key=place):
+            if k in drawn:
+                continue
+            drawn.add(k)
+            p = parent_of(k)
+            rows.append({**row(k), "parent": p, "depth": depth})
+            walk(k, depth + 1)
+
+    walk(top, 1)
+    for q in sorted(kids.get(None) or (), key=lambda q: (first(q), q)):
+        if q not in drawn:
+            drawn.add(q)
+            rows.append({**row(q), "parent": None, "depth": 1})
+            walk(q, 2)
+    for q in [*members, *done_rows]:  # a cycle of `Part of:` lines no walk reached: loose, never lost
+        if q not in drawn:
+            drawn.add(q)
+            rows.append({**row(q), "parent": None, "depth": 1})
+    top_row = {**row(top), "parent": None, "depth": 0}
     open_rows = [top_row, *(r for r in rows if not r["archived"])]
     return {
         "id": top,
@@ -559,7 +605,7 @@ def _card(
         "done": len(done_rows),
         "of": len(members) + len(done_rows),
         "status": _status(open_rows, [open_[q] for q in members]),
-        "wait": _wait(members, open_, blockers, keyed, top),
+        "wait": _wait(members, open_, blockers, parts, keyed, top),
         "start": _start(members, open_, keyed, top),
         "order": picked,
         "repos": sorted({open_[q]["repo"] for q in members}),
@@ -606,7 +652,8 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
             return True
         # blocked only by open ids: a designer's decision beside one is the designer's lane, not a wait
         ids = [b for b in e.get("blocked_by") or [] if b.lower() != f"decision ({DESIGNER})"]
-        return bool(ids) and all(not b.startswith("decision (") for b in ids)
+        # an open part counts as an open id its parent is blocked by (TD-1130)
+        return bool(ids or e.get("parts_open")) and all(not b.startswith("decision (") for b in ids)
 
     if any(e.get("held") for e in ents) and all(waits(e) for e in ents if not e.get("held")):
         return "held (person)"
@@ -626,13 +673,14 @@ def _wait(
     members: list[str],
     open_: Mapping[str, Mapping[str, Any]],
     blockers: Mapping[str, set[str]],
+    parts: Mapping[str, set[str]],
     keyed: Mapping[str, str],
     top: str,
 ) -> dict[str, str] | None:
     """A card's `waits` and what it waits for (§4.4 *Waiting*, TD-918): None when it does not wait, else
     `{column, phrase, id}` read from a leaf. `waits` holds when every open member that is not the person's
     own waits — a `Waits:` line in force, a live check whose build is not live, settling, blocked by open
-    ids once the person's own are set aside, blocked past the org's reach, or no lane takes it — and at
+    ids or open parts once the person's own are set aside, blocked past the org's reach, or no lane takes it — and at
     least one is not the person's own. The leaf is a member that waits for a reason of its own, the first
     that applies: the top entry with a `Waits:` line, the earliest `Waits:` date, an event, settling, a
     live check not live, past reach — ties by key; a cycle of open ids with none is read as past reach."""
@@ -652,7 +700,7 @@ def _wait(
         e = open_[q]
         return bool(e.get("waiting") or e.get("settling")) or not_live(e) or far(e)
 
-    if not rest or not all(of_its_own(q) or blockers[q] - own for q in rest):
+    if not rest or not all(of_its_own(q) or (blockers[q] | parts[q]) - own for q in rest):
         return None
     home = top.partition("#")[0]
 
@@ -767,6 +815,8 @@ def _completed(
     for e in open_.values():
         named_by_open.update(qid(e["repo"], b) for b in e.get("blocked_ids") or [])
         named_by_open.update(x for x in map(xref, e.get("xrepo_ids") or []) if x)
+        if e.get("part_of"):  # an archived parent of an open part: that card's done group head (TD-1130)
+            named_by_open.add(qid(e["repo"], str(e["part_of"])))
     parent = {q: q for q in archived}
 
     def find(q: str) -> str:
@@ -781,6 +831,8 @@ def _completed(
             n = xref(b) if "#" in b else qid(a["repo"], b)
             if n in archived and n != q:
                 parent[find(n)] = find(q)
+        if (par := lb.parse_part_of(a.get("part_of_raw"))[0]) and (n := qid(a["repo"], par)) in archived and n != q:
+            parent[find(n)] = find(q)  # an archived part joins its archived parent's component (TD-1130)
     comps: dict[str, list[str]] = {}
     for q in archived:
         comps.setdefault(find(q), []).append(q)

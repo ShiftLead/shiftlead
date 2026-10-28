@@ -37,7 +37,7 @@ def row(repo: str, tid: str, title: str, **kw) -> dict:
 def card(top: dict, rows=(), group="up_next", place=None, status="ready", **kw) -> dict:
     members = [top["qid"], *(r["qid"] for r in rows if not r["archived"])]
     done = sum(1 for r in rows if r["archived"])
-    return {"id": top["qid"], "key": "0i", "lined": True, "top": {**top, "parent": None, "depth": 0, "also_after": []},
+    return {"id": top["qid"], "key": "0i", "lined": True, "top": {**top, "parent": None, "depth": 0, "after": []},
             "rows": list(rows), "done": done, "of": len(members) + done, "status": status, "group": group, "place": place,
             "order": members, "repos": sorted({top["repo"], *(r["repo"] for r in rows)}), "passed_over": [], **kw}  # fmt: skip
 
@@ -51,7 +51,7 @@ def queue() -> dict:
             card(row("samscrape", "TD-10", "recover stuck notices", state="held by grinder-1", holder={"id": "g1", "name": "grinder-1", "state": "working"}), group="in_progress"),
             card(
                 row("samscrape", "TD-20", "the queue's design", priority="High"),
-                [row("samscrape", "TD-21", "build the queue", depth=1, parent="samscrape#TD-20", also_after=["samscrape#TD-30"]),
+                [row("samscrape", "TD-21", "build the queue", depth=1, parent="samscrape#TD-20", after=["samscrape#TD-30"]),
                  row("samscrape", "TD-19", "an old step", state="done #77", pr=77, archived=True, depth=1, parent="samscrape#TD-20")],
                 place=1,
             ),
@@ -155,7 +155,7 @@ def test_a_card_in_two_columns_draws_its_rows_with_the_queue_cards_row(tmp_path,
     # the row is the Queue card's row partial: its id (the `#TD-20` link's target), badge, title (TD-903)
     assert '<div class="qrow" style="--qd: 1" id="TD-20"' in design and "qpri qp-high" in design
     assert "the queue&#39;s design" in design and 'id="TD-21"' not in design
-    assert 'id="TD-21"' in build and "also after TD-30" in build and 'id="TD-20"' not in build
+    assert 'id="TD-21"' in build and "after TD-30" in build and 'id="TD-20"' not in build
     assert 'id="TD-19"' not in html  # an archived member is the Queue's, not the board's
 
 

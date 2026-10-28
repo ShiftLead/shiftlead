@@ -84,7 +84,9 @@ def test_the_top_entry_a_design_naming_its_builds_no_design_and_a_tie(tmp_path):
     assert "TD-032" in tops  # the one entry nothing in its card blocks
 
 
-def test_a_two_parent_row_is_drawn_under_the_better_keyed_one(tmp_path):
+def test_a_blocker_is_a_word_on_its_row_never_an_edge_of_the_tree(tmp_path):
+    """TD-1130 (§4.4 *Rows*): with no `Part of:` line every row is loose, at the card's left edge, in the
+    pick order of the card, and what it waits on is its `after`, its open blockers by key."""
     root, r = _repo(tmp_path, "r", [
         _entry(1, "top", Priority="High"),
         _entry(2, "left", Priority="Low", Blocked_by="TD-001"),
@@ -94,8 +96,9 @@ def test_a_two_parent_row_is_drawn_under_the_better_keyed_one(tmp_path):
     card = _cards({root: r})["cards"][0]
     rows = {x["id"]: x for x in card["rows"]}
     assert card["top"]["id"] == "TD-001" and [x["id"] for x in card["rows"]] == ["TD-003", "TD-002", "TD-004"]
-    assert rows["TD-004"]["parent"] == "r#TD-003" and rows["TD-004"]["also_after"] == ["r#TD-002"]
-    assert rows["TD-004"]["depth"] == 2
+    assert {(x["parent"], x["depth"]) for x in card["rows"]} == {(None, 1)}
+    assert rows["TD-004"]["after"] == ["r#TD-003", "r#TD-002"] and rows["TD-002"]["after"] == ["r#TD-001"]
+    assert rows["TD-004"]["state"] == "waiting" and card["top"]["after"] == []
     # the pick order within a card: after every member it is blocked by, then by key
     assert card["order"] == ["r#TD-001", "r#TD-003", "r#TD-002", "r#TD-004"]
 
@@ -168,7 +171,7 @@ def test_each_row_state_word(tmp_path):
         "TD-005": ("settling", None),
         "TD-006": ("waits until 2026-10-21", None),
         "TD-007": ("waits on an event", None),
-        "TD-008": ("after TD-009", None),
+        "TD-008": ("waiting", None),  # its blocker is its `after`, not its word (TD-1130)
         "TD-009": ("ready", None),
         "TD-010": ("", "owner"),
         "TD-011": ("", "decision"),
@@ -339,3 +342,59 @@ def test_a_completed_cards_entries_are_ordered_by_instant_a_bare_date_its_days_e
     r["completed"] = [{"id": "TD-001", "closed": f"{TODAY}T09:30:00-06:00", "pr": 5}]
     (done,) = _cards({root: r})["completed"]
     assert [e["id"] for e in done["entries"]] == ["TD-002", "TD-001"] and done["at"] == TODAY
+
+
+def test_a_td748_shaped_card_hangs_parts_under_their_parent_and_never_tops_an_archived_one(tmp_path):
+    """TD-1130's Done when (§4.4 *The top entry*, *Rows*, *A row's state*, the within-card order): a design, its
+    parts, a trial, a part blocked from another group, a cross-repo blocker, an archived part and an archived
+    parent with an open part. Indentation is `Part of:` alone; a blocker is the row's `after`; an open part
+    makes its parent *waiting*; the top entry is the open root parent, never the archived one."""
+    _, other = _repo(tmp_path, "db", [_entry(7, "another repo's", Priority="Medium")])
+    root, r = _repo(tmp_path, "r", [
+        _entry(40, "the design", Priority="Medium", Kind="design-first"),
+        _entry(41, "part one", Priority="High", Part_of="TD-040"),
+        _entry(42, "part two, after part one", Priority="High", Part_of="TD-040", Blocked_by="TD-041"),
+        _entry(43, "a trial, after the design", Priority="Low", Blocked_by="TD-040"),
+        _entry(44, "a part of the trial, after part two", Priority="Medium", Part_of="TD-043",
+               Blocked_by="TD-042, db#TD-7"),
+        _entry(45, "an open part of a finished parent", Priority="Low", Part_of="TD-030"),
+    ], archive=[
+        _entry(39, "a done part", Part_of="TD-040", Resolved=f"{TODAY} — done (PR #39)."),
+        _entry(30, "a finished parent", Kind="design-first", Resolved=f"{TODAY} — (PR #30)."),
+    ])  # fmt: skip
+    q = _cards({root: r, str(tmp_path / "db"): other})
+    card = next(c for c in q["cards"] if c["top"]["id"] == "TD-040")
+    assert card["top"]["state"] == "waiting" and card["top"]["parent"] is None, "it waits on its open parts"
+    got = [(x["id"], x["parent"], x["depth"], x["state"], x["after"]) for x in card["rows"]]
+    # the top entry's group first (open parts in pick order, then its done part), then each loose group in
+    # the pick order of its first open member: the other repo's blocker, then the trial with its part
+    assert got == [
+        ("TD-041", "r#TD-040", 1, "ready", []),
+        ("TD-042", "r#TD-040", 1, "waiting", ["r#TD-041"]),
+        ("TD-039", "r#TD-040", 1, "done #39", []),
+        ("TD-007", None, 1, "ready", []),
+        ("TD-043", None, 1, "waiting", ["r#TD-040"]),
+        ("TD-044", "r#TD-043", 2, "waiting", ["r#TD-042", "db#TD-007"]),
+    ]
+    assert card["done"] == 1 and card["of"] == 7
+    # picked after its blockers and its parts: a parent after its parts, a part after its blocker
+    order = card["order"]
+    assert order.index("r#TD-041") < order.index("r#TD-042") < order.index("r#TD-044") < order.index("r#TD-043")
+    assert order.index("r#TD-042") < order.index("r#TD-040") < order.index("r#TD-043")
+    # an archived parent with an open part: a done group head over it on that part's card, never Completed
+    lone = next(c for c in q["cards"] if c["top"]["id"] == "TD-045")
+    assert [(x["id"], x["parent"], x["state"]) for x in lone["rows"]] == [("TD-030", None, "done #30")]
+    assert not [c for c in q["completed"] if any(e.get("qid") == "r#TD-030" for e in c.get("entries") or ())]
+
+
+def test_a_card_whose_parents_are_all_archived_takes_the_rule_from_before(tmp_path):
+    root, r = _repo(tmp_path, "r", [
+        _entry(51, "an open part", Priority="High", Part_of="TD-050"),
+        _entry(52, "a design after it", Priority="Low", Kind="design-first", Blocked_by="TD-051"),
+    ], archive=[_entry(50, "the finished parent", Resolved=f"{TODAY} — (PR #50).")])  # fmt: skip
+    card = _cards({root: r})["cards"][0]
+    assert card["top"]["id"] == "TD-052", "the design-first entry, as before; an archived parent never tops"
+    assert [(x["id"], x["parent"], x["depth"]) for x in card["rows"]] == [
+        ("TD-050", None, 1),
+        ("TD-051", "r#TD-050", 2),
+    ]

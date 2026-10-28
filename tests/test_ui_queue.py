@@ -39,7 +39,7 @@ def row(repo: str, tid: str, title: str, **kw) -> dict:
 def card(top: dict, rows=(), group="up_next", place=None, status="ready", **kw) -> dict:
     members = [top["qid"], *(r["qid"] for r in rows if not r["archived"])]
     done = sum(1 for r in rows if r["archived"])
-    return {"id": top["qid"], "key": "0i", "lined": True, "top": {**top, "parent": None, "depth": 0, "also_after": []},
+    return {"id": top["qid"], "key": "0i", "lined": True, "top": {**top, "parent": None, "depth": 0, "after": []},
             "rows": list(rows), "done": done, "of": len(members) + done, "status": status, "group": group, "place": place,
             "order": members, "repos": sorted({top["repo"], *(r["repo"] for r in rows)}), "passed_over": [], **kw}  # fmt: skip
 
