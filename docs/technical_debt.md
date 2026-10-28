@@ -95,6 +95,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-1165 | The Members dialog's − / + on each member line, on every team a repo's included, and Add member no longer bumps a count | Medium | Open — build |
 | TD-1167 | The New session form fills from a team's member line, starts a run-only member, and keeps one on its tick | Medium | Open — build, blocked by TD-1165 |
 | TD-1168 | `AO.focusIcon`'s three call sites in `app.js` (#2520) are pinned by no test: delete any one and the Focus tab icon stops following the state with a green suite | Low | Open — build |
+| TD-1170 | tests/test_td_next.py's TD-1145 v2 test cannot tell a rename into `archive/` from an added entry: the archive-move row uses an id below the open PRs' floor | Medium | Open — build |
 
 ---
 
@@ -2017,3 +2018,20 @@ That is the design working as written: a Team pick makes *a person's own session
 
 ---
 
+## TD-1170: tests/test_td_next.py's TD-1145 v2 test cannot tell a rename into `archive/` from an added entry: the archive-move row uses an id below the open PRs' floor
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-27 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — build
+**Location:** `tests/test_td_next.py` (`test_a_v2_ledgers_ids_are_its_file_names_and_an_open_prs_added_files_on_both_layouts`, the `gh["prs"][9]` row); `src/sessionorc/agent_ids.py` (`dir_added`)
+
+**Why:** #2530 (TD-1145) says a rename counts as an add only where it changes the id, so *a move into `archive/` files nothing*, and the test's PR 9 row (`archive/TD-002.md` renamed from `TD-002.md`) is its pin. Probe on `origin/main` (0738ed579): change `dir_added`'s `if f.get("s") == "renamed" and entry_id(str(f.get("o") or ""), directory) != tid:` to `if f.get("s") == "renamed":` and `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_td_next.py` gives 65 passed. TD-002 is far below the floor that PRs 7 and 8 (`TD-040`, `TD-041`) already set, so counting it changes no id; the bug the rule exists for (an open PR that archives the ledger's highest entry raising the next id above it, or the reverse, hiding that id as taken) is not in the fixture.
+
+**Fix:** put the archive move on an id above every other row's (a PR whose only listed file is `archive/TD-070.md` renamed from `TD-070.md`), assert the next id does not rise to `TD-071`, and re-run the probe above: it must fail.
+
+**Done when** the new assertion fails against the mutation named in **Why** and `pdm run test` passes.
+
+---
