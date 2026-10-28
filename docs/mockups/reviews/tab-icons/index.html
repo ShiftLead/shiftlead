@@ -1,0 +1,184 @@
+<title>ShiftLead Tab Icons</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one column of option sections, each a row of rendered tabs, then a size ladder, then the glyph sheet.
+   Colours are shiftlead's own app.css tokens (state colours and the top bar), so the icons read as the app does. */
+:root {
+  --bg: #f4f5f7; --fg: #1c2128; --muted: #6b7280; --line: #dfe3e8; --card: #fff;
+  --tabbar: #dee1e6; --tab: #f1f3f4; --tab-on: #fff; --tabfg: #1f2328;
+  --mark: #1c2128; --markfg: #e6e9ee;
+  --f-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --line: #2a313a; --card: #171b21;
+  --tabbar: #1f2125; --tab: #2a2c30; --tab-on: #35363a; --tabfg: #e8eaed; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --line: #2a313a; --card: #171b21;
+  --tabbar: #1f2125; --tab: #2a2c30; --tab-on: #35363a; --tabfg: #e8eaed; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 48px; }
+main { max-width: 1080px; margin: 0 auto; display: grid; gap: 36px; }
+h1 { font-size: 22px; margin: 0; text-wrap: balance; }
+h2 { font-size: 17px; margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+h2 .tag { font: 600 11px/1 var(--f-body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+p { margin: 0; max-width: 68ch; }
+.lede { color: var(--muted); }
+section { display: grid; gap: 12px; min-width: 0; }
+.strip { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+.chrome { display: flex; gap: 1px; padding: 6px 6px 0; background: var(--tabbar); width: max-content; }
+.chrome.light { --tabbar: #dee1e6; --tab: #eceef0; --tab-on: #fff; --tabfg: #1f2328; }
+.chrome.dark { --tabbar: #1f2125; --tab: #2a2c30; --tab-on: #35363a; --tabfg: #e8eaed; }
+.tab { display: flex; align-items: center; gap: 8px; width: 168px; padding: 7px 10px; background: var(--tab); color: var(--tabfg);
+  border-radius: 8px 8px 0 0; font-size: 12px; white-space: nowrap; overflow: hidden; }
+.tab.on { background: var(--tab-on); }
+.tab img { width: 16px; height: 16px; flex: none; }
+.tab span { overflow: hidden; text-overflow: ellipsis; }
+.ladder { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; }
+.cell { display: grid; justify-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
+.cell .sizes { display: flex; gap: 8px; align-items: end; }
+.cell img.s16 { width: 16px; } .cell img.s32 { width: 32px; } .cell img.s64 { width: 64px; }
+.notes { display: grid; gap: 4px; font-size: 14px; }
+.notes b { font-weight: 600; }
+code { font: 13px var(--f-mono); }
+</style>
+
+<main>
+  <header style="display:grid;gap:6px">
+    <h1>ShiftLead tab icons: three directions</h1>
+    <p class="lede">Each direction is drawn twice, in a light and a dark browser tab strip. A Focus tab's icon shows its session's state, using the colours and glyphs the state pills already use. Every other page gets an icon of its own from the same family. The tab titles are what the pages set today.</p>
+  </header>
+  <div id="root" style="display:grid;gap:36px"></div>
+</main>
+
+<script>
+// State colours are app.css's light tokens (--needs, --working, --idle, ...). The glyphs are the pills'
+// ::before glyphs (app.css 154-159) redrawn as 16px paths, so no font is needed in a favicon.
+const S = {
+  needs:   { c: "#f59e0b", ink: "#1c2128", g: "tri",    t: "▲ grinder-ao-2 · needs you" },
+  working: { c: "#16a34a", ink: "#fff",    g: "wave",   t: "designer-ao-1 · working" },
+  idle:    { c: "#2563eb", ink: "#fff",    g: "prompt", t: "techlead · idle" },
+  waiting: { c: "#0d9488", ink: "#fff",    g: "dots",   t: "grinder-ao-1 · waiting" },
+  stalled: { c: "#dc2626", ink: "#fff",    g: "q",      t: "reviewer · stalled?" },
+  limited: { c: "#7c3aed", ink: "#fff",    g: "pie",    t: "grinder-ao-3 · limited" },
+  scheduled:{ c: "#64748b", ink: "#fff",   g: "clock",  t: "night-grind · scheduled" },
+  exited:  { c: "#9ca3af", ink: "#1c2128", g: "ring",   t: "shell-2 · exited" },
+  closed:  { c: "#9ca3af", ink: "#1c2128", g: "check",  t: "grinder-ao-4 · closed" },
+};
+const P = {
+  sessions: { g: "grid",   t: "Sessions · ShiftLead" },
+  inbox:    { g: "tray",   t: "Inbox · ShiftLead" },
+  queue:    { g: "bars",   t: "Queue · ShiftLead" },
+  repo:     { g: "branch", t: "shiftlead · ShiftLead" },
+  settings: { g: "sliders",t: "Settings · ShiftLead" },
+  help:     { g: "i",      t: "Help · ShiftLead" },
+  spend:    { g: "coin",   t: "Spend · ShiftLead" },
+  new:      { g: "plus",   t: "New session · ShiftLead" },
+  transcript:{ g: "lines", t: "techlead · transcript" },
+};
+const MARK = "#1c2128", MARKFG = "#e6e9ee";
+
+// Each glyph is drawn in a 16-unit box; `k` is its ink colour.
+function glyph(name, k, scale = 1, cx = 8, cy = 8) {
+  const sw = (w = 1.8) => `fill="none" stroke="${k}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"`;
+  const st = sw();
+  const G = {
+    tri: `<path d="M8 3.2 13.2 12.4H2.8Z" fill="${k}"/>`,
+    wave: `<path d="M2.8 8.6c1.3-3.6 3.9-3.6 5.2 0s3.9 3.6 5.2 0" ${st}/>`,
+    prompt: `<path d="M3.4 5 6.4 8 3.4 11M8.4 11.6h4.4" ${st}/>`,
+    dots: `<circle cx="4" cy="8" r="1.6" fill="${k}"/><circle cx="8" cy="8" r="1.6" fill="${k}"/><circle cx="12" cy="8" r="1.6" fill="${k}"/>`,
+    q: `<path d="M5.6 6a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5" ${st}/><circle cx="8" cy="12.6" r="1.1" fill="${k}"/>`,
+    pie: `<circle cx="8" cy="8" r="4.8" ${sw(1.5)}/><path d="M8 8V3.2A4.8 4.8 0 0 1 12.8 8Z" fill="${k}"/>`,
+    clock: `<circle cx="8" cy="8" r="4.8" ${sw(1.5)}/><path d="M8 5.3V8h2.4" ${sw(1.5)}/>`,
+    ring: `<circle cx="8" cy="8" r="4.6" ${sw(1.6)} stroke-dasharray="2.2 1.8"/>`,
+    check: `<path d="M3.8 8.4 6.8 11.4 12.4 4.8" ${sw(2)}/>`,
+    grid: `<rect x="3" y="3" width="4.2" height="4.2" rx="1" fill="${k}"/><rect x="8.8" y="3" width="4.2" height="4.2" rx="1" fill="${k}"/><rect x="3" y="8.8" width="4.2" height="4.2" rx="1" fill="${k}"/><rect x="8.8" y="8.8" width="4.2" height="4.2" rx="1" fill="${k}" opacity=".55"/>`,
+    tray: `<path d="M2.8 9h3l1.2 1.8h2L10.2 9h3M2.8 9l1.8-5h6.8l1.8 5v3.8H2.8Z" ${sw(1.5)}/>`,
+    bars: `<rect x="3" y="3.4" width="10" height="2.2" rx="1" fill="${k}"/><rect x="3" y="6.9" width="7.2" height="2.2" rx="1" fill="${k}"/><rect x="3" y="10.4" width="4.4" height="2.2" rx="1" fill="${k}"/>`,
+    branch: `<circle cx="5" cy="4" r="1.6" fill="${k}"/><circle cx="5" cy="12" r="1.6" fill="${k}"/><circle cx="11" cy="5.5" r="1.6" fill="${k}"/><path d="M5 5v6M11 7c0 3-6 2-6 4" ${sw(1.5)}/>`,
+    sliders: `<path d="M3 5h10M3 11h10" ${sw(1.5)}/><circle cx="10" cy="5" r="1.9" fill="${k}"/><circle cx="6" cy="11" r="1.9" fill="${k}"/>`,
+    i: `<circle cx="8" cy="4.2" r="1.3" fill="${k}"/><path d="M8 7.2v5.4" ${sw(2.2)}/>`,
+    coin: `<ellipse cx="8" cy="5" rx="4.6" ry="1.9" ${sw(1.4)}/><path d="M3.4 5v3.2c0 1 2 1.9 4.6 1.9s4.6-.9 4.6-1.9V5M3.4 8.2v3c0 1 2 1.9 4.6 1.9s4.6-.9 4.6-1.9v-3" ${sw(1.4)}/>`,
+    plus: `<path d="M8 3.5v9M3.5 8h9" ${sw(2.2)}/>`,
+    lines: `<path d="M3.5 4.5h9M3.5 8h9M3.5 11.5h5.5" ${sw(1.6)}/>`,
+    shift: `<path d="M8 2.4 13.6 8.4H10.6V13.4H5.4V8.4H2.4Z" fill="none" stroke="${k}" stroke-width="1.5" stroke-linejoin="round"/>`,
+    shiftfill: `<path d="M8 2.4 13.6 8.4H10.6V13.4H5.4V8.4H2.4Z" fill="${k}"/>`,
+  };
+  const s = G[name];
+  if (scale === 1) return s;
+  return `<g transform="translate(${cx} ${cy}) scale(${scale}) translate(-8 -8)">${s}</g>`;
+}
+const uri = (body) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">${body}</svg>`);
+
+// A — Tile: the same rounded square everywhere. Pages are the top bar's dark with a light glyph;
+// a Focus tab is filled with its state's colour and carries the pill's glyph.
+const A = {
+  page: (p) => uri(`<rect width="16" height="16" rx="3.5" fill="${MARK}"/>${glyph(p.g, MARKFG, .82)}`),
+  state: (s) => uri(`<rect width="16" height="16" rx="3.5" fill="${s.c}"/>${glyph(s.g, s.ink, .82)}`),
+};
+// B — Mark and badge: every tab carries the ShiftLead mark (a Shift-key arrow on the dark tile);
+// a page adds nothing, and a Focus tab adds a state badge in the corner, shaped as well as coloured.
+const B = {
+  page: (p) => uri(`<rect width="16" height="16" rx="3.5" fill="${MARK}"/>${glyph("shift", MARKFG, .9)}`),
+  pageG: (p) => uri(`<rect width="16" height="16" rx="3.5" fill="${MARK}"/>${glyph("shift", MARKFG, .62, 6, 6.4)}<circle cx="11.6" cy="11.6" r="4.4" fill="${MARK}"/>${glyph(p.g, MARKFG, .44, 11.6, 11.6)}`),
+  state: (s) => {
+    const badge = s.g === "tri"
+      ? `<path d="M11.8 6.2 16.4 15.2H7.2Z" fill="${s.c}" stroke="${MARK}" stroke-width="1.2" stroke-linejoin="round"/>`
+      : `<circle cx="11.8" cy="11.8" r="4.2" fill="${s.c}" stroke="${MARK}" stroke-width="1.2"/>${glyph(s.g, s.ink, .42, 11.8, 11.8)}`;
+    return uri(`<rect width="16" height="16" rx="3.5" fill="${MARK}"/>${glyph("shift", MARKFG, .62, 6, 6.4)}${badge}`);
+  },
+};
+// C — Shift key: the mark itself is the icon, no tile. Pages draw it outlined in the top bar's dark
+// with the page glyph inside its stem; a Focus tab fills it with the state colour.
+const C = {
+  page: (p) => uri(`<path d="M8 .8 15.4 8.6H11.4V15.2H4.6V8.6H.6Z" fill="${MARK}" stroke="${MARKFG}" stroke-width=".8" stroke-linejoin="round"/>${glyph(p.g, MARKFG, .48, 8, 10.4)}`),
+  state: (s) => uri(`<path d="M8 .8 15.4 8.6H11.4V15.2H4.6V8.6H.6Z" fill="${s.c}" stroke="${MARK}" stroke-width=".8" stroke-linejoin="round"/>${glyph(s.g, s.ink, .48, 8, 10.4)}`),
+};
+
+const OPTS = [
+  { key: "A", name: "Tile", fam: A, pageFn: A.page,
+    notes: [
+      "<b>Same family:</b> one rounded square on every tab. Dark means a page, colour means a live session.",
+      "<b>Reads at 16px:</b> the whole icon is the state colour, so the state can be seen across a row of tabs.",
+      "<b>Cost:</b> no ShiftLead mark of its own; the family is recognised by the shape and the glyphs.",
+    ] },
+  { key: "B", name: "Mark and badge", fam: B, pageFn: B.pageG,
+    notes: [
+      "<b>Same family:</b> the Shift-key mark is on every tab, so each one is plainly a ShiftLead tab.",
+      "<b>Reads at 16px:</b> the badge is about a third of the icon. Colour shows; the glyph inside only shows at 32px and up (needs-you uses a triangle badge, so its shape still shows).",
+      "<b>Pages:</b> drawn here with a small page glyph in the badge spot. They could also all share the bare mark (shown last in the ladder).",
+    ] },
+  { key: "C", name: "Shift key", fam: C, pageFn: C.page,
+    notes: [
+      "<b>Same family:</b> the icon is the mark itself, so it is the most clearly branded of the three.",
+      "<b>Reads at 16px:</b> the colour fills less of the icon than in A, and the glyph sits in the narrow stem, so small glyphs get lost.",
+      "<b>Cost:</b> the arrow could be taken for an upload or a scroll-to-top button.",
+    ] },
+];
+
+const root = document.getElementById("root");
+const focusMix = ["needs", "working", "idle", "waiting", "stalled"];
+const pageMix = ["sessions", "inbox", "queue", "repo"];
+function strip(opt, theme) {
+  const tabs = [
+    ...pageMix.map((k, i) => `<div class="tab${i === 0 ? " on" : ""}"><img alt="" src="${opt.pageFn(P[k])}"><span>${P[k].t}</span></div>`),
+    ...focusMix.map((k) => `<div class="tab"><img alt="" src="${opt.fam.state(S[k])}"><span>${S[k].t}</span></div>`),
+  ];
+  return `<div class="strip"><div class="chrome ${theme}">${tabs.join("")}</div></div>`;
+}
+function ladder(opt) {
+  const cell = (src, label) => `<div class="cell"><div class="sizes"><img class="s16" alt="" src="${src}"><img class="s32" alt="" src="${src}"><img class="s64" alt="" src="${src}"></div>${label}</div>`;
+  const states = Object.entries(S).map(([k, s]) => cell(opt.fam.state(s), k));
+  const pages = Object.entries(P).map(([k, p]) => cell(opt.pageFn(p), k));
+  if (opt.key === "B") pages.push(cell(B.page(), "bare mark"));
+  return `<div class="ladder">${states.join("")}</div><div class="ladder">${pages.join("")}</div>`;
+}
+root.innerHTML = OPTS.map((o) => `
+  <section>
+    <h2><span class="tag">Option ${o.key}</span>${o.name}</h2>
+    ${strip(o, "light")}
+    ${strip(o, "dark")}
+    ${ladder(o)}
+    <div class="notes">${o.notes.map((n) => `<p>${n}</p>`).join("")}</div>
+  </section>`).join("");
+</script>
