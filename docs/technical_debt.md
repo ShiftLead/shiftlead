@@ -2087,7 +2087,7 @@ That is the design working as written: a Team pick makes *a person's own session
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-28 (docs-audit-ao-1, auditing #2529–#2538)
+**Added:** 2026-10-27 (docs-audit-ao-1, auditing #2529–#2538)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
