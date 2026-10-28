@@ -195,16 +195,32 @@ def ids_in(text: str | None) -> set[str]:
     return {f"TD-{n:03d}" for n in lb.heading_nums(text)}
 
 
-def parts_of_open(archive: str | None, open_: list[dict[str, Any]]) -> set[str]:
-    """The archived ids whose `Part of:` names an open entry (ADR 2026-10-27 §3, TD-1130): an archived
-    part of an open parent, each written `TD-NNN`, its line parsed as an open entry's is."""
+def parts_of_open(archive: str | None, open_: list[dict[str, Any]]) -> dict[str, list[str]]:
+    """The archived parts of each open parent (ADR 2026-10-27 §3, TD-1130): by the parent's id written
+    `TD-NNN`, the archived ids whose `Part of:` names it, in archive order, its line parsed as an open
+    entry's is."""
     live = {_norm(e["id"]) for e in open_}
-    out: set[str] = set()
+    out: dict[str, list[str]] = {}
     for e in lb.entries(archive or ""):
         par = lb.parse_part_of(e.get("part_of_raw"))[0]
-        if par and _norm(par) in live:
-            out.add(_norm(e["id"]))
+        if par and _norm(par) in live and (tid := _norm(e["id"])) not in out.get(_norm(par), []):
+            out.setdefault(_norm(par), []).append(tid)
     return out
+
+
+def builds_open(entry: dict[str, Any], blocked_open: bool, named_by_open: bool) -> bool:
+    """Whether an open entry has open builds, the guard that keeps **Done…** off its row (§4.5 screen 12,
+    §4.9c, TD-1130): some open entry names it in `Part of:` (`parts_open`). One no entry names in `Part
+    of:` is read as before its backfill (§4.4 *Rows*): a `design-first` entry blocked by an open id
+    (`blocked_open`), or a *design* some open entry's `Blocked by:` names (`named_by_open`). One with
+    archived parts alone (`parts_archived`) is converted: what its `Blocked by:` names is a blocker."""
+    if entry.get("parts_open"):
+        return True
+    if entry.get("parts_archived"):
+        return False
+    return (entry.get("kind") == "design-first" and blocked_open) or (
+        entry.get("for_page") == "design" and named_by_open
+    )
 
 
 # a `<repo>#TD-NNN` item → `(state, why)`, ledgerboard's resolver: `archived`, `open` or `unresolved`
@@ -823,7 +839,8 @@ def reading(
     the history and `recent` the entries opened or closed in the longest window, newest first — both absent when the
     history was not read, and marked `history_error` when git could not be asked. `archived` is the archived ids
     some entry's `blocked_ids` names, or whose `Part of:` names an open entry (TD-1130), never the whole archive
-    (§4.5 screen 11 *Its builds*, TD-693).
+    (§4.5 screen 11 *Its builds*, TD-693); each entry carries `parts_archived`, the archived ids naming it in
+    `Part of:`.
     `declared_teams` is the `Fields:` line's `Team` vocabulary in its order, and `needs_team` the ids marked so
     (§4.4 *An entry names its team*, TD-730)."""
     rel = rel or ledger_path(root)
@@ -840,12 +857,17 @@ def reading(
     except OSError:
         rank_text = None  # no rank file: every entry's key is its implicit one
     got = entries(text, archive, resolve, live, rank_text=rank_text, repo=repo_key(root))
+    done_parts = parts_of_open(archive, got)
+    for e in got:
+        e["parts_archived"] = list(done_parts.get(_norm(e["id"]), []))
     out: dict[str, Any] = {
         "path": rel,
         "entries": got,
         "by_priority": {p: sum(1 for e in got if e["priority"] == p) for p in PRIORITIES},
         "by_kind": {k: sum(1 for e in got if e["for_page"] == k) for k in KINDS},
-        "archived": sorted(ids_in(archive) & {b for e in got for b in e["blocked_ids"]} | parts_of_open(archive, got)),
+        "archived": sorted(
+            ids_in(archive) & {b for e in got for b in e["blocked_ids"]} | {a for e in got for a in e["parts_archived"]}
+        ),
         "declared_teams": list(declared_teams(text)),
         "needs_team": [e["id"] for e in got if e.get("needs_team")],
         "at": now.isoformat(),

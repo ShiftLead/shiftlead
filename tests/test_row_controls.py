@@ -221,3 +221,39 @@ def test_the_inbox_ledger_row_carries_the_keys_and_draws_the_controls_from_them(
     held = str(Markup(row(rows["TD-001"], "later")))
     assert "(after Friday)" in held and 'data-road="done"' not in held, "a design with open builds"
     assert 'data-road="done"' not in str(row(rows["TD-004"], "later")), "yours to do"
+
+
+def test_a_parents_open_parts_keep_done_off_and_back_to_design_on(tmp_path):
+    """TD-1130 (§4.5 screen 12, §4.9c): an entry some open entry names in `Part of:` has open builds and,
+    blocked by its open parts, a way back to design; one with archived parts alone is converted, so an open
+    id its `Blocked by:` names is a blocker, never a build; a design not yet backfilled reads as before."""
+    from test_queue import NOW, _entry, _repo
+
+    from sessionorc import queue
+
+    root, r = _repo(
+        tmp_path,
+        "r",
+        [
+            _entry(1, "a design", Priority="Medium", Kind="design-first"),
+            _entry(2, "its part", Priority="Medium", Part_of="TD-001"),
+            _entry(3, "a converted design", Priority="Medium", Kind="design-first", Blocked_by="TD-005"),
+            _entry(4, "an old design", Priority="Medium", Kind="design-first", Blocked_by="TD-005"),
+            _entry(5, "free", Priority="Medium"),
+        ],
+        [_entry(9, "a done part", Part_of="TD-003")],
+    )
+    q = queue.reading({root: r}, [], NOW)
+    rows = {x["id"]: x for c in q["cards"] for x in (c["top"], *c["rows"])}
+    keys = {i: (x["page"], x["blocked_open"], x["builds_open"]) for i, x in rows.items()}
+    assert keys["TD-001"] == ("blocked", True, True)
+    assert keys["TD-002"] == ("pickable", False, False)
+    assert keys["TD-003"] == ("blocked", True, False), "converted: TD-005 is a blocker"
+    assert keys["TD-004"] == ("blocked", True, True), "not yet backfilled: its Blocked by names its builds"
+    drawn = _controls(**rows["TD-001"])
+    assert 'data-road="done"' not in drawn and 'data-road="design"' in drawn
+    assert 'data-road="done"' in _controls(**rows["TD-003"])
+    by = {e["id"]: e for e in r["ledger"]["entries"]}
+    by["TD-001"]["held"] = {"at": NOW.isoformat(), "why": "x"}
+    inbox = {x["id"]: x for x in ui.ledger_for_you({root: r}, [], {}, NOW)["groups"][0]["rows"]}
+    assert (inbox["TD-001"]["blocked_open"], inbox["TD-001"]["builds_open"]) == (True, True)
