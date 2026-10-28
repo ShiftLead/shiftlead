@@ -265,7 +265,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   *Either layout*), *unserved:
   dev-cadence at <commit> is older than this build reads (<oldest>) — sync it*, *unserved: the ledger is a
   directory and dev-cadence at <commit> predates its v2 reader (b9236c8) — sync it* (a pinned repo's: *— bump
-  the pin*; the seams' ledger state `predates`, and `ao td next` refuses in the same words) (`sync.sh`; for a pinned
+  the pin*; the seams' ledger state `predates`, and `ao td reserve` refuses in the same words) (`sync.sh`; for a pinned
   repo, whose pin's `ref` is the commit, *— bump the pin*, a bump PR); where an adoption PR is open (the repo's PR reading's open PR whose
   head is `cadence-adopt`, §4.4), its cure reads *adoption PR #n open* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
   the PRs that show an adoption PR) and **the two passes that make it served**:
