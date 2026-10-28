@@ -346,6 +346,8 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     PHASES,  # noqa: F401
     PRIORITY_BARS,  # noqa: F401
     REF_WIDTH,  # noqa: F401
+    ROLLUP_CLS,  # noqa: F401
+    ROLLUP_ROWS,  # noqa: F401
     ROLLUP_STATES,  # noqa: F401
     SHAPE_KEYS,
     WINDOWS,  # noqa: F401
@@ -355,6 +357,8 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     _https,  # noqa: F401
     _own_stop,  # noqa: F401
     _pr_states,  # noqa: F401
+    _rollup_block,  # noqa: F401
+    _rollup_debt,  # noqa: F401
     answer_blocks,  # noqa: F401
     answer_members,  # noqa: F401
     ask_blocks,  # noqa: F401
@@ -374,6 +378,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     repo_named,  # noqa: F401
     rollup,  # noqa: F401
     rollup_counted,  # noqa: F401
+    rollup_rows,  # noqa: F401
     team_lanes,  # noqa: F401
     team_named,  # noqa: F401
     team_repo,  # noqa: F401
@@ -441,6 +446,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     repo_items,
     repo_line,  # noqa: F401
     repo_window,
+    seat_names,  # noqa: F401
     send_folds,
     settle_mark,  # noqa: F401
     strip_group,  # noqa: F401
