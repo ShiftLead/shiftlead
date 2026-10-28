@@ -2476,6 +2476,39 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return await asyncio.to_thread(team_reader, team, dir, cfg)
         return await asyncio.to_thread(team_reader, team, dir)
 
+    @app.get("/api/team_line")
+    async def api_team_line(team: str = "", line: str = ""):
+        """New session's **member line** fill (design §4.5a, §4.9 *A member started from the form*, TD-1167):
+        the line's next member as `ao team add` would create it — its name, profile, lane and brief, under a
+        flow the current flow's — or `why` it cannot be started (a line the definition does not name, one
+        that sits out, a team that is not running, a definition that does not resolve)."""
+        org, _notes = org_here()
+        sessions = await call("list")
+        try:
+            t_ = teams.find(org, team)
+            got = await asyncio.to_thread(
+                teamrun.next_members, org, team, host_name(), sessions, teamrun.files_via(rpc)
+            )
+        except (teams.TeamError, ValueError, OSError) as e:
+            return {"team": team, "line": line, "why": str(e)}
+        x = got.get(line)
+        if x is None:
+            return {"team": team, "line": line, "why": f"team {team} has no member line {line!r}"}
+        if isinstance(x, str):
+            return {"team": team, "line": line, "why": x}
+        return {
+            "team": team,
+            "line": line,
+            "name": x.name,
+            "dir": str(x.dir),
+            "profile": x.profile,
+            "lane": list(x.lane),
+            "prompt": x.prompt or "",
+            "grants": list(x.grants),
+            "not_running": teamrun.not_running(t_, sessions),
+            "why": "",
+        }
+
     @app.get("/api/roles")
     async def api_roles(dir: str = "", host: str = ""):
         return await roles_view(dir, host)
@@ -2501,7 +2534,13 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
         grant: Annotated[list[str], Form()] = NO_GRANTS,
         host: str = Form(""),
+        line: str = Form(""),
+        keep: str = Form(""),
     ):
+        if team.strip() and line.strip() and unattended == "on":
+            # a Role a member line names under a Team pick starts **a member** (§4.5a New session
+            # **member line** fill, §4.9 *A member started from the form*, TD-1167): `ao team add`'s road
+            return await member_submit(team.strip(), line.strip(), keep == "on", name, prompt, lane, profile)
         # the Host pick (TD-284 slice 3): sent only when it names another host — the home routes the
         # create there (§4.4a) — so a form on one host posts exactly what it always did (§4.4 skew rule)
         elsewhere = {"host": host.strip()} if host.strip() and host.strip() != host_name() else {}
@@ -2604,6 +2643,44 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
         # a scheduled record has no terminal yet: the Org shows its card with the *starts* note (§4.5a At)
         return RedirectResponse("/" if s.get("state") == "scheduled" else f"/focus/{s['id']}", status_code=303)
+
+    async def member_submit(
+        team: str, line: str, keep: bool, name: str, prompt: str, lane: str, profile: str
+    ) -> RedirectResponse:
+        """The form's member start (TD-1167): `teamrun.add` — run-only, what the person typed over the line's
+        the record's for its run; or ticked *keep as a team member*, the line's size one higher and the
+        member the line's alone. Refused on a team that is not running, as `ao team add` is."""
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
+        org, _notes = org_here()
+        fields: dict[str, Any] = {}
+        if not keep:
+            try:
+                x = (
+                    await asyncio.to_thread(
+                        teamrun.next_members, org, team, host_name(), await call("list"), teamrun.files_via(rpc)
+                    )
+                ).get(line)
+            except (teams.TeamError, ValueError, OSError) as e:
+                raise _team_http(e) from None
+            if isinstance(x, teams.Launch):
+                refs = [r.strip() for r in lane.split(",") if r.strip()]
+                if name.strip() and name.strip() != x.name:
+                    fields["name"] = name.strip()
+                if prompt.strip() and prompt.strip() != (x.prompt or "").strip():
+                    fields.update(prompt=prompt.strip(), prompt_from=None)
+                if refs and refs != list(x.lane):
+                    fields["lane"] = refs
+                if profile and profile != SHELL_PICK and profile != x.profile:
+                    fields.update(profile=profile, adapter=profile_adapter(profile))
+        try:
+            got = await asyncio.to_thread(teamrun.add, rpc, org, team, line, host_name(), keep=keep, fields=fields)
+        except (teams.TeamError, ValueError, AgentError, AgentUnavailable) as e:
+            raise _team_http(e) from None
+        made = got.get("created")
+        made = [made] if isinstance(made, dict) else list(made or []) + list(got.get("adopted") or [])
+        sid = next((r.get("id") for r in made if isinstance(r, dict) and r.get("id")), None)
+        return RedirectResponse(f"/focus/{sid}" if sid else "/", status_code=303)
 
     @app.post("/shell")
     async def shell(dir: str = Form(...), name: str = Form("")):  # unnamed: the agent names it (TD-030)
@@ -3518,6 +3595,20 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return [view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]
 
 
+def _team_http(e: Exception) -> HTTPException:
+    """One mapping for every way a start or a stop can fail, so the strip reports the agent's
+    own message the way every other control does — a toast (design §4.5 "Errors"); New session's member
+    start (TD-1167) answers its refusal so."""
+    if isinstance(e, AgentUnavailable):
+        return HTTPException(503, f"host agent unreachable: {e}")
+    if isinstance(e, teamrun.PartialStart):
+        # The created sessions are running on the brief, so a stale-brief warning belongs on
+        # this path most of all (review of PR #139). `detail` is what the toast renders.
+        warnings = " · ".join([*e.plan.warnings, *e.plan.notes])
+        return HTTPException(409, f"{e}{' — ' + warnings if warnings else ''}")
+    return HTTPException(400, str(e).strip('"'))
+
+
 def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """Teams: the list, Start, and Stop / Wind down (design §4.9, §4.9a)."""
     call = h.call
@@ -3553,18 +3644,6 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             stop_errors[team] = f"{lead} did not stop: {str(err).strip(chr(34))}"
 
         return done
-
-    def _team_http(e: Exception) -> HTTPException:
-        """One mapping for every way a start or a stop can fail, so the strip reports the agent's
-        own message the way every other control does — a toast (design §4.5 "Errors")."""
-        if isinstance(e, AgentUnavailable):
-            return HTTPException(503, f"host agent unreachable: {e}")
-        if isinstance(e, teamrun.PartialStart):
-            # The created sessions are running on the brief, so a stale-brief warning belongs on
-            # this path most of all (review of PR #139). `detail` is what the toast renders.
-            warnings = " · ".join([*e.plan.warnings, *e.plan.notes])
-            return HTTPException(409, f"{e}{' — ' + warnings if warnings else ''}")
-        return HTTPException(400, str(e).strip('"'))
 
     @app.get("/api/teams")
     async def api_teams():

@@ -903,8 +903,10 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     TD-173): every definition `org_here` reads — `ao team list`'s set — with the host it runs on,
     its repo's checkout there (the Directory list it narrows to), its member roles (Role is
     filtered to them plus `plain`) and its manager's id when that session is live or a seat on call
-    (the Controllers tick, TD-269). A definition that cannot be read leaves the picker at *none*, as
-    the strip notes it."""
+    (the Controllers tick, TD-269), its member lines by name and role, and why a member cannot be
+    started from the form now — "" when the team is running (§4.9 *A member started from the form*,
+    TD-1167; `/api/team_line` fills the form from one line). A definition that cannot be read leaves
+    the picker at *none*, as the strip notes it."""
     org, _notes = org_here()
     here = host_name()
     out = []
@@ -919,6 +921,8 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "dirs": dirs,
                 "roles": sorted({m.role for m in t.members if m.role}),
                 "manager": mid if mid and teamrun.can_control(sessions, mid) else "",
+                "lines": [{"line": m.name, "role": m.role} for m in t.members if m.role],
+                "not_running": teamrun.not_running(t, sessions),
             }
         )
     return out

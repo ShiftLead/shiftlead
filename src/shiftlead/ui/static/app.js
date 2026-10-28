@@ -4507,13 +4507,13 @@
     const hq = () => (away() ? `&host=${encodeURIComponent(hostSel.value)}` : "");
     // Start is refused by either check: a live holder of the name, or an occupied directory that is
     // not a git repo; each sets its own flag and the button follows both
-    let nameBlocked = false, dirBlocked = false, missingDir = false;
+    let nameBlocked = false, dirBlocked = false, missingDir = false, memberBlocked = false;
     // **Where** follows the Repo and the Profile until the person picks it, or the form came filled in
     let whereTouched = !!document.querySelector("form[data-prefilled]");
     // …or a host it cannot reach: a record's host with no live link stays picked and refuses Start
     const hostBlocked = () => !!hostSel && !!hostSel.selectedOptions[0] && hostSel.selectedOptions[0].disabled;
     const gate = () => {
-      start.disabled = nameBlocked || dirBlocked || missingDir || hostBlocked();
+      start.disabled = nameBlocked || dirBlocked || missingDir || hostBlocked() || memberBlocked;
       const hb = $("#hostblock");
       if (hb) hb.innerHTML = hostBlocked() ? `⚠ <b>${esc(hostSel.value)}</b>: ${esc(hostSel.selectedOptions[0].title || "not reachable")} — pick another host to start` : "";
     };
@@ -4735,21 +4735,100 @@
       const o = role.selectedOptions[0], interactive = !o || !o.value, shell = isShell(), outside = other();
       const un = !interactive && !shell && !outside && !underMe;
       unIn.value = un ? "on" : "";
+      applyMember();
       // hidden, At and Until post nothing: a time typed before the pick moved is not a refusal (review of #952)
       if (when) { when.hidden = !un; for (const i of when.querySelectorAll("input")) i.disabled = !un; }
       if (!rmode) return;
       if (shell) rmode.textContent = "";
       else if (interactive) rmode.textContent = "yours: never paused, sent to, or killed by a policy";
       else if (outside) rmode.textContent = "runs under you: a directory outside a registered repo has no unattended mode";
+      else if (memberLines().length && !underMe) rmode.innerHTML = `a member of ${esc(teamSel.value)}: runs unattended, policies apply — <a href="#" data-mode="me">run it under me instead</a>`;
       else rmode.innerHTML = underMe
         ? `runs under you — <a href="#" data-mode="un">make it unattended</a>`
         : `runs unattended: policies apply — <a href="#" data-mode="me">run it under me instead</a>`;
     }
+    // New session's **member line** fill + **keep as a team member** (design §4.5a, §4.9 *A member started
+    // from the form*, TD-1167): under a Team pick, a Role one of its member lines names fills the form from
+    // that line as `ao team start` creates its next member (`/api/team_line`), and Start posts `line`, which
+    // the server starts through `ao team add`'s road — a run-only member, or ticked, the line's **+**. A role
+    // with two lines offers each by its name; a team not running refuses Start and offers the team's Start.
+    const memberField = $("#memberfield"), linePick = $("#linepick"), lineIn = $("[name=line]");
+    const keepIn = $("#keep"), mnote = $("#membernote");
+    const laneIn = $("[name=lane]"), promptIn = $("[name=prompt]");
+    let lineKey = "", lineGot = null, lseq = 0;
+    function memberLines() {
+      const o = teamSel && teamSel.selectedOptions[0];
+      if (!o || !o.value || !role.value || isShell()) return [];
+      let ls = [];
+      try { ls = JSON.parse(o.dataset.lines || "[]"); } catch (e) { ls = []; }
+      return ls.filter((l) => l.role === role.value);
+    }
+    function lockLine(on) {
+      // a kept member is the line's (§4.9): named and filled from it alone, so its fields are drawn locked
+      for (const el of [nm, laneIn, promptIn]) if (el) el.readOnly = on;
+      if (profSel) profSel.disabled = on;
+    }
+    function memberNote() {
+      if (!mnote) return;
+      const team = teamSel.value, why = lineGot ? (lineGot.why || lineGot.not_running) : "";
+      memberBlocked = !!why;
+      if (why) mnote.innerHTML = `⚠ <b>${esc(why)}</b>` + (lineGot.not_running && !lineGot.why ? ` <button type="button" class="btn sm" id="memberteamstart">Start ${esc(team)}</button>` : "");
+      else if (keepIn && keepIn.checked) mnote.textContent = "a kept member is the line's: change the line in the definition";
+      else if (lineGot) mnote.textContent = `the line's next member, for this run: it ends with ${team}'s run and is never replayed`;
+      else mnote.textContent = "";
+      gate();
+    }
+    async function loadLine(team, line) {
+      const my = ++lseq;
+      lineGot = null; memberNote();
+      let got = { why: `${team} did not answer` };
+      try { got = await (await fetch(`/api/team_line?team=${encodeURIComponent(team)}&line=${encodeURIComponent(line)}`)).json(); } catch (e) { /* said below */ }
+      if (my !== lseq) return;
+      lineGot = got;
+      if (!got.why) {
+        nm.value = got.name || nm.value;
+        if (profSel) profSel.value = [...profSel.options].some((x) => x.value === got.profile) ? got.profile : "";
+        if (laneIn) laneIn.value = (got.lane || []).join(", ");
+        if (promptIn) promptIn.value = got.prompt || "";
+        tickGrants(got.grants || []);
+        nm.dispatchEvent(new Event("change"));
+      }
+      memberNote();
+    }
+    function applyMember() {
+      if (!memberField) return;
+      const ls = underMe ? [] : memberLines();
+      memberField.hidden = !ls.length;
+      if (!ls.length) {
+        lineIn.value = ""; lineKey = ""; lineGot = null; lseq++;
+        lockLine(false); memberBlocked = false; gate();
+        return;
+      }
+      const keep = [...linePick.options].map((x) => x.value).join(",") === ls.map((l) => l.line).join(",") ? linePick.value : ls[0].line;
+      linePick.innerHTML = ls.map((l) => `<option value="${esc(l.line)}">${esc(l.role)} · ${esc(l.line)}</option>`).join("");
+      linePick.value = keep; linePick.hidden = ls.length < 2;
+      lineIn.value = linePick.value;
+      lockLine(!!(keepIn && keepIn.checked));
+      const key = `${teamSel.value}|${lineIn.value}`;
+      if (key !== lineKey) { lineKey = key; loadLine(teamSel.value, lineIn.value); } else memberNote();
+    }
+    if (linePick) linePick.addEventListener("change", applyMember);
+    if (keepIn) keepIn.addEventListener("change", applyMember);
+    if (mnote) mnote.addEventListener("click", async (e) => {
+      const b = e.target.closest("#memberteamstart"); if (!b) return;
+      const team = teamSel.value; b.disabled = true;
+      try {
+        const r = await fetch(`/api/teams/${encodeURIComponent(team)}/start`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+        let o = {}; try { o = await r.json(); } catch (x) { o = {}; }
+        if (!r.ok) { mnote.innerHTML = `⚠ <b>${esc(o.detail || r.statusText)}</b>`; return; }
+        lineKey = ""; applyMember();  // the line read again: the team's run now holds the member
+      } catch (x) { b.disabled = false; }
+    });
     if (rmode) rmode.addEventListener("click", (e) => {
       const a = e.target.closest("[data-mode]"); if (!a) return;
       e.preventDefault(); underMe = a.dataset.mode === "me"; applyMode();
     });
-    role.addEventListener("change", applyMode);
+    role.addEventListener("change", () => { if (teamSel && teamSel.value) underMe = !memberLines().length; applyMode(); });
     dir.addEventListener("change", loadRoles);
     dir.addEventListener("input", () => { clearTimeout(dir._r); dir._r = setTimeout(loadRoles, 400); });
 
@@ -4863,7 +4942,8 @@
         if (hostSel && o.dataset.host && [...hostSel.options].some((x) => x.value === o.dataset.host && !x.disabled)) {
           if (hostSel.value !== o.dataset.host) { hostSel.value = o.dataset.host; gate(); loadRepos(); }
         }
-        underMe = true; applyMode();  // a person's own session in the team (§4.9): a role runs under you
+        // a role a member line names starts a member (TD-1167); any other a person's own session in the team (§4.9)
+        underMe = !memberLines().length; applyMode();
       } else { underMe = false; options(allDirs); narrowRepos(); applyMode(); }  // *none*: a role is presumed unattended again
       teamRoles();
       teamLine();

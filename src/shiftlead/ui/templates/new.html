@@ -58,6 +58,16 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         <option value="" data-interactive="1"{% if not picked %} selected{% endif %}>Interactive</option>{% for r in roles %}<option value="{{ r.name }}"{% if r.name == picked %} selected{% endif %} data-prompts='{{ (r.prompts or []) | tojson }}' data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}" title="{{ r.source }}{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}">{{ r.name }} · unattended</option>{% endfor %}</select>
         <input type="hidden" name="unattended" value="{{ 'on' if prefill.unattended else '' }}" data-under="{{ '1' if prefill.role and not prefill.unattended else '' }}">
         <span class="note" id="rolemode"></span>
+        {#- design §4.5a New session **member line** fill + **keep as a team member** (§4.9 *A member started
+            from the form*, TD-1167): under a Team pick, a Role a member line names fills the form from that
+            line (`/api/team_line`) and starts a run-only member; a role with two lines offers each by its
+            name; the tick makes it the Members dialog's **+**. *run it under me instead* hides it all. -#}
+        <div class="col" id="memberfield" style="gap: 5px;" hidden>
+          <input type="hidden" name="line" value="">
+          <select class="input" id="linepick" hidden></select>
+          <label class="row gap" id="keepfield"><input type="checkbox" name="keep" id="keep"> keep as a team member</label>
+          <span class="note" id="membernote"></span>
+        </div>
         <span class="note" id="rolenote">a role fills the brief, lane, grants and profile it names; each can be edited before Start</span>
       </div>
       {#- design §4.5a New session **the form** (TD-284 slice 2): **Profile is the one place
@@ -75,7 +85,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
       <div class="field"><label>Team</label>
         <select class="input" name="team" id="team">
           <option value="">none</option>
-          {% for t in form_teams %}<option value="{{ t.name }}"{% if t.name == prefill.team %} selected{% endif %} data-dirs='{{ t.dirs | tojson }}' data-roles="{{ t.roles | join(',') }}" data-manager="{{ t.manager }}" data-host="{{ t.host }}">{{ t.name }}{% if t.host != host %} · on {{ t.host }}{% endif %}</option>{% endfor %}
+          {% for t in form_teams %}<option value="{{ t.name }}"{% if t.name == prefill.team %} selected{% endif %} data-dirs='{{ t.dirs | tojson }}' data-roles="{{ t.roles | join(',') }}" data-manager="{{ t.manager }}" data-host="{{ t.host }}" data-lines='{{ (t.lines or []) | tojson }}' data-notrunning="{{ t.not_running }}">{{ t.name }}{% if t.host != host %} · on {{ t.host }}{% endif %}</option>{% endfor %}
         </select>
         <span class="note" id="teamnote">optional: its badge and group, its manager as a controller, the team's techlead for its held PRs</span>
       </div>
