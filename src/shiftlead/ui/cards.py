@@ -1325,8 +1325,13 @@ def ready_to_close(
         checks.append(("members unknown — the host agent did not list the sessions; reload", False))
     elif members:
         up = [m["name"] for m in members if m.get("state") not in DEAD]
-        label = f"no live members ({', '.join(up)} — stop the team first)" if up else "no live members"
-        checks.append((label, not up))
+        # §4.2 *No live member* (TD-1226): a manager on call (`seat.trigger` `team`) is closed between
+        # its fills over working members — the tick runs them (§6 rule 3), so the item passes for it
+        if up and (s.get("seat") or {}).get("trigger") == "team":
+            checks.append((f"live members ({', '.join(up)}) — the tick runs them for a manager on call", True))
+        else:
+            label = f"no live members ({', '.join(up)} — stop the team first)" if up else "no live members"
+            checks.append((label, not up))
     return checks
 
 
