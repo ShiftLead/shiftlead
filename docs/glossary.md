@@ -151,6 +151,10 @@ not mix:
   board's `Swept:` stamp is old, closing only what it verified done and bringing the rest to the
   person. The Settings page's **Sweep** switch gives every served repo one. — *proposed* 2026-10-26
   (design §4.9b *The sweep*, TD-1061).
+- **fact-checker** — a role for a seat with the `asks` trigger: reads a doc-only PR it is asked
+  about by refs and replies with a `cadence-review:` line and its findings, editing and posting
+  nothing. Its first seat runs on a Gemini profile, beside the author's own check, as a trial. —
+  *proposed* 2026-10-29 (design §4.9b *The fact-check*, TD-857).
 - **grinder** — a role: resolves each lane item to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.
