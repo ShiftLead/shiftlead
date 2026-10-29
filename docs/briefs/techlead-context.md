@@ -98,9 +98,9 @@ person is `docs/user_attention.md`.
 - **Org, team, project** (§4.9): `~/.shiftlead/org.yml` defines projects (where checkouts are) and
   teams (a `manager:` — a seat on call, filled by the tick for a reading no policy makes, unless it
   says `on_call: false` (§6 rule 3) — or `manager: {role: person}`, the bare string being refused —
-  plus members, each a role with a brief; a member's lane is its own `lane:`, else its flow stage's lane
-  words, shared by every member that carries them, §4.8 *Choosing in a free-pick lane*). `ao team start` launches them; briefs are read
-  from the checkout at that moment (`docs/briefs/` here; presets under `src/shiftlead/briefs/`).
+  plus members, each a role with a brief; a member's lane is its own `lane:`, else its flow
+  stage's lane words, shared by every member that carries them, §4.8 *Choosing in a free-pick
+  lane*). `ao team start` launches them; briefs are read from the checkout at that moment (`docs/briefs/` here; presets under `src/shiftlead/briefs/`).
 - **One agent per directory** (§9 invariant 2): every unattended session works in its own
   worktree under `.claude/worktrees/<name>`; the first session in the checkout is the **anchor**
   and only the anchor promotes the live install.

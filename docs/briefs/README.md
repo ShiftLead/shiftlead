@@ -24,7 +24,7 @@ ao-grind's manager is a **seat on call** (design §6 rule 3 and *What is left is
 holds it*; `on_call`, §4.9): `ao team start` writes it closed, with no pane, and the home's tick fills it
 on the package's `manager_on_call.md` template for one reading no policy makes — an `ask` to it, a
 permission, a `stalled?` member, one *idle · open work* after the nudge — and it ends once it has acted.
-Starting, restarting and nudging the members, and the cadence check on what they call done, are the
+Restarting and nudging the members, and the cadence check on what they call done, are the
 tick's (§6 rules 1, 2, 4 and 10). A standing manager with a round of its own is what a definition asks for
 with `on_call: false`, on the package's `manager.md` template; this repo runs none.
 
