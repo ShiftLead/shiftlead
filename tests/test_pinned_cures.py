@@ -266,6 +266,13 @@ def test_a_pin_after_agent_cadences_seed_descends_on_either_history(tmp_path, mo
     )
     assert seams.descends(after, [], "https://github.com/ShiftLead/agent-cadence") == (True, None)
     assert asked == [f"repos/shiftlead/agent-cadence/compare/{p}...{after}" for p in (cadence.OLDEST, seed)]
+    # TD-1215: a forge repo holding both histories answers *diverged* for `OLDEST`, and the seed still decides
+    status[cadence.OLDEST] = ({"status": "diverged"}, None)
+    assert seams.descends(after, [], "https://github.com/ShiftLead/agent-cadence") == (True, None)
+    status[seed] = ({"status": "behind"}, None)
+    assert seams.descends(after, [], "https://github.com/ShiftLead/agent-cadence") == (False, None)
+    status[seed] = (None, "HTTP 404: Not Found")
+    assert seams.descends(after, [], "https://github.com/ShiftLead/agent-cadence") == (False, None)
     # the age keys on the seed: one read against another seed is read again, one against this one carried
     root = tmp_path / "notes"
     (root / "docs").mkdir(parents=True)

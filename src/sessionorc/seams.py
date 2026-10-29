@@ -230,8 +230,9 @@ def descends(
     if repo is None:
         return None, f"{first}, and its source {source or '(none)'} is not on GitHub"
     got, why = _compare(repo, oldest, commit)
-    if got is None:
-        got = _compare(repo, cadence.SEED, commit)[0]
+    if got is not True:
+        seed = _compare(repo, cadence.SEED, commit)[0]
+        got = seed if got is None or seed is True else got
     if got is None:
         return None, f"{first}; {why}"
     return got, None
