@@ -250,7 +250,9 @@ def test_the_seed_is_a_full_sha_apart_from_both_oldest_points():
 @pytest.mark.skipif(not (AGENT_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no agent-cadence checkout")
 def test_the_seed_is_agent_cadences_first_commit():
     """TD-1220: `SEED` is the one parentless commit agent-cadence's history descends from (`183de9c`, the value
-    #2646 replaced, is not)."""
+    #2646 replaced, is not); a shallow clone's root is its boundary, not the history's."""
+    if _git(AGENT_CADENCE, "rev-parse", "--is-shallow-repository") == "true":
+        pytest.skip("a shallow agent-cadence checkout")
     assert _git(AGENT_CADENCE, "rev-list", "--max-parents=0", "HEAD").split() == [cadence.SEED]
 
 
