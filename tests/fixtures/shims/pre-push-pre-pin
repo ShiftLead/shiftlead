@@ -1,0 +1,8 @@
+#!/bin/sh
+# agent-cadence hook shim (TD-055) — written by scripts/install_git_hooks.sh; rerun that, never edit.
+# Runs the MAIN checkout's copy of this hook, whatever branch this worktree is on.
+d=$(git rev-parse --git-common-dir 2>/dev/null) && d=$(cd "$d" && pwd -P) || d=
+hook="${d%/*}/scripts/git-hooks/${0##*/}"
+[ -n "$d" ] && [ -x "$hook" ] && exec "$hook" "$@"
+echo "git hook shim: $hook is missing or not executable — the ${0##*/} hook did not run (TD-055)" >&2
+exit 0

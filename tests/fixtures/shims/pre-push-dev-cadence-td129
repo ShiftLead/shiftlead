@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# dev-cadence hook shim (TD-055) — written by scripts/install_git_hooks.sh; rerun that, never edit.
+# Runs this hook from the dev-cadence the MAIN checkout pins, else the MAIN checkout's copy,
+# whatever branch this worktree is on.
+d=$(git rev-parse --git-common-dir 2>/dev/null) && d=$(cd "$d" && pwd -P) || d=
+input=$(cat)
+default_branch() {
+    local repo="$1" b
+    b="$(git -C "$repo" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)"
+    for b in "${b#origin/}" "$(git -C "$repo" config init.defaultBranch 2>/dev/null)" main master; do
+        if [[ -n "$b" ]] && git -C "$repo" rev-parse --verify -q "refs/remotes/origin/$b" >/dev/null; then
+            echo "$b"; return 0
+        fi
+    done
+    echo main
+}
+DEFAULT="$(default_branch .)"
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+    if { [ "$remote_ref" = "refs/heads/main" ] || [ "$remote_ref" = "refs/heads/$DEFAULT" ]; } \
+        && [ "${ALLOW_MAIN_PUSH:-0}" != "1" ]; then
+        echo "pre-push: BLOCKED — direct push to ${remote_ref#refs/heads/} (the default branch; docs/cadence.md §4: use a PR)." >&2
+        echo "pre-push: deliberate override: ALLOW_MAIN_PUSH=1 git push ..." >&2
+        exit 1
+    fi
+done <<< "$input"
+if [ -n "$d" ] && grep -qsE '^[[:space:]]*\[dev-cadence\][[:space:]]*(#.*)?$' "${d%/*}/docs/cadence.toml"; then
+    if command -v dev-cadence >/dev/null 2>&1; then
+        dev-cadence hook "${0##*/}" "$@" <<< "$input"
+        rc=$?
+        [ "$rc" -ne 2 ] && exit "$rc"
+        echo "git hook shim: the dev-cadence launcher could not run this repo's pin (above) — the ${0##*/} hook did not run (TD-129)" >&2
+    else
+        echo "git hook shim: this repo pins dev-cadence (docs/cadence.toml) but no dev-cadence launcher is on PATH — the ${0##*/} hook did not run; install the dev-cadence launcher once per machine: clone dev-cadence at its latest tag, then run: install -m 755 launcher/dev_cadence.py ~/.local/bin/dev-cadence" >&2
+    fi
+    exit 0
+fi
+hook="${d%/*}/scripts/git-hooks/${0##*/}"
+[ -n "$d" ] && [ -x "$hook" ] && exec "$hook" "$@" <<< "$input"
+echo "git hook shim: $hook is missing or not executable — the ${0##*/} hook did not run (TD-055)" >&2
+exit 0
