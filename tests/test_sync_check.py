@@ -109,7 +109,7 @@ def test_a_bump_of_the_pin_alone_that_descends_is_mechanical(pinned):
     head = pinned.pr({sync.PIN: pinned.pin(ref).replace(f'"{ref}"', f'"{ref}"   # v1.2')})
     got = pinned.check(head)
     assert (got["verdict"], got["why"], got["kind"]) == ("mechanical", "", "bump")
-    assert (got["commit"], got["old"], got["files"], got["post_sync"]) == (ref, pinned.ref0, [sync.PIN], False)
+    assert (got["commit"], got["old"], got["files"]) == (ref, pinned.ref0, [sync.PIN]) and "post_sync" not in got
 
 
 @pytest.mark.parametrize(

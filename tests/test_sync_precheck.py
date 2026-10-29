@@ -147,12 +147,12 @@ def test_a_killed_runs_tree_is_dropped_by_its_own_prefix(monkeypatch, tmp_path):
 async def test_the_pass_runs_the_precheck_before_the_gate_and_the_pr_waits_then_its_status_is_gated(agent, gh, pre):  # noqa: F811
     _reading(agent, _none())
     await agent._sync_pass()
-    assert _names(gh) == ["login", "check", "comment"], "steps 1 to 3, then the precheck in place of the gate"
+    assert _names(gh) == ["login", "check"], "steps 1 to 3, then the precheck in place of the gate"
     assert _ran(pre, 1) == ["--pr 1097"]
     f = promote.precheck_pr_run(REPO)
     assert (f["pr"], f["sha"], f["pid"] is not None) == (1097, HEAD, True)
     e = _entry(agent)
-    assert (e["verdict"], e["tries"], e["posted"], e["why"]) == ("", 0, True, f"prechecking {HEAD[:7]}")
+    assert (e["verdict"], e["tries"], e["why"]) == ("", 0, f"prechecking {HEAD[:7]}")
     assert await _orders(agent) == [], "a PR waiting on its precheck is no order"
     # the run going: the next pass waits, uncounted, without the check
     gh["calls"] = []
@@ -166,7 +166,7 @@ async def test_the_pass_runs_the_precheck_before_the_gate_and_the_pr_waits_then_
     gh["calls"] = []
     await agent._sync_pass()
     assert promote.precheck_pr_run(REPO) is None
-    assert _names(gh) == ["check", "gate", "head", "merge"], "posted once per head: no second SHIP comment"
+    assert _names(gh) == ["check", "gate", "head", "merge"], "no comment of the home's own (TD-1206)"
     assert _entry(agent)["verdict"] == "merged"
 
 
@@ -277,7 +277,7 @@ async def test_a_day_waiting_at_one_head_is_refused_and_the_teams_order(agent, g
     pre["checkout"] = "the checkout has 1 uncommitted change"
     _reading(agent, _none())
     day_ago = (datetime.now(UTC) - timedelta(seconds=sync.SYNC_PRECHECK_WAIT + 60)).isoformat()
-    agent._repos[ROOT]["sync"] = {"1097": {"head": HEAD, "verdict": "", "why": "x", "tries": 0, "posted": False,
+    agent._repos[ROOT]["sync"] = {"1097": {"head": HEAD, "verdict": "", "why": "x", "tries": 0,
                                            "waiting_since": day_ago}}  # fmt: skip
     await agent._sync_pass()
     e = _entry(agent)
@@ -310,7 +310,7 @@ async def test_an_unread_precheck_setting_keeps_the_clock_covers_nothing_and_the
 ):
     _reading(agent, _none())
     since = now_iso()
-    e = {"head": HEAD, "verdict": "", "why": "x", "tries": 0, "posted": False, "waiting_since": since}
+    e = {"head": HEAD, "verdict": "", "why": "x", "tries": 0, "waiting_since": since}
     agent._repos[ROOT]["sync"] = {"1097": e}
     monkeypatch.setattr(cadence, "precheck_command", lambda root, rev: (None, "docs/cadence.toml does not parse"))
     agent._sync_ran[ROOT] = datetime.now(UTC) - timedelta(minutes=20)  # an older cover, which this pass must not renew

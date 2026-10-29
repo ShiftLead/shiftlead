@@ -1673,8 +1673,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the team's to give. A bump with no such review after `SYNC_PRECHECK_WAIT` (a day) at one head is
      *refused*, *review waited a day: …*. Comments that cannot be read are no reading, counted as
      step 4's are. Once reviewed, the bump goes on to step 4. A bump is the only mechanical PR since the
-     lock's road left; the pass still carries the SHIP comment it posted for a lock's sync (`review_body`,
-     the entry's `posted`), which no check now reaches, until TD-1206 removes it.
+     lock's road left, so the home posts no SHIP comment of its own on any PR: `sync-check` signs only the
+     gate's BLOCK (step 4).
   4. **The gate** is rule 10's: `scripts/check_cadence.py --pr <n>`. It is run in the
      registry checkout, as rule 10 runs it: the default branch's copy of the script. In a repo whose tree is older than
      `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
