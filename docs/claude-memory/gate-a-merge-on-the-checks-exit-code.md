@@ -6,6 +6,6 @@ metadata:
 ---
 
 The cadence procedure's step 5 (`docs/procedures/cadence.md`): merge only on exit 0. The lesson the
-procedure does not state: capture that exit code from `scripts/check_cadence.py` itself
+procedure does not state: capture that exit code from `agent-cadence run check_cadence.py` itself
 (`… > out; ec=$?`), never through a pipe — `| head` gave #398 a 0 on a FAIL (2026-09-21).
 Related: [[read-inbox-before-merging]].

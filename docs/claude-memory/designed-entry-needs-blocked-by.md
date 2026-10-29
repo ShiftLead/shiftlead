@@ -7,5 +7,5 @@ metadata:
 
 Cadence §2.4: pickable is derived, never written; a designed entry is kept out of the lanes by its
 open builds, each carrying `**Part of:** TD-n` (the design's id), while its `**Blocked by:**` names only
-what must land first (TD-1129; the team brief since TD-1133 step 1, 2026-10-27), and `python3 scripts/ledger.py --check --since origin/main`
+what must land first (TD-1129; the team brief since TD-1133 step 1, 2026-10-27), and `agent-cadence run ledger.py --check --since origin/main`
 runs before every ledger push. See [[shiftlead-td-grind-mechanics]].
