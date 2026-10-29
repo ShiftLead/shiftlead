@@ -35,6 +35,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
         "techlead",
         "auditor",
         "sweeper",
+        "fact-checker",
         "designer",
         "plain",
     ]
@@ -95,6 +96,7 @@ commands:
         "techlead",
         "auditor",
         "sweeper",
+        "fact-checker",
         "designer",
         "plain",
         "reviewer",
@@ -429,6 +431,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
         "techlead": "Tech Lead",
         "auditor": "Auditor",
         "sweeper": "Sweeper",
+        "fact-checker": "Fact-check",
         "designer": "Designer",
         "plain": "Plain",
     }
@@ -464,6 +467,7 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
         "techlead": "book",
         "auditor": "eye",
         "sweeper": "shield",
+        "fact-checker": "eye",
         "designer": None,
         "plain": None,
     }
@@ -538,6 +542,7 @@ def test_a_role_says_when_to_message_it(tmp_path):
         "hunter": "an area to look at; it files, never fixes",
         "auditor": "what its trigger counts: the last n PRs, the period",
         "sweeper": "the board's open items: one it should verify, close or ledger",
+        "fact-checker": "a doc-only PR to fact-check at its head — an ask fills the seat",
     }
     for name, line in want.items():
         assert repoconfig.resolve_role(cfg, name).message == line

@@ -370,6 +370,18 @@ PRESETS: dict[str, dict[str, Any]] = {
         "context": WORKER_CONTEXT,
         "message": "the board's open items: one it should verify, close or ledger",
     },
+    # The fact-check (design §4.9b *The fact-check*, TD-1212): a seat filled by an ask that reads a doc-only
+    # PR's head by refs and replies with a `cadence-review:` line and its findings; it writes nothing.
+    "fact-checker": {
+        "kind": "seat",
+        "brief": "fact-checker.md",
+        "lane": [],
+        "grants": [],
+        "icon": "eye",
+        "label": "Fact-check",
+        "context": WORKER_CONTEXT,
+        "message": "a doc-only PR to fact-check at its head — an ask fills the seat",
+    },
     # The design stage's role (design §4.9c *The designer gets a template*, TD-309): no icon and no
     # label, so no designer card's badge changes at the build.
     "designer": {
