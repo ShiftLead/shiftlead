@@ -59,6 +59,26 @@
    "file": "captured/panes/6-a-doorbell.txt",
    "state": "limited",
    "composer": null
+  },
+  {
+   "file": "captured/panes/6-a-doorbell-needs-you.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/7-a-doorbell.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/8-a-resume.txt",
+   "state": null,
+   "composer": ""
+  },
+  {
+   "file": "captured/panes/9-the-transcript.txt",
+   "state": null,
+   "composer": ""
   }
  ],
  "titles": [
@@ -101,6 +121,22 @@
     },
     {
      "state": "working"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "needs-you",
+     "pending": "permission"
+    },
+    {
+     "state": "working"
+    },
+    {
+     "state": "idle"
+    },
+    {
+     "state": "idle"
     }
    ]
   }

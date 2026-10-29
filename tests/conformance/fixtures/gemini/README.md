@@ -12,12 +12,15 @@ person's session is in them. `manifest.json` names each fixture with what the ad
   `working-queued` (that prompt submitted mid-turn: the tool queues it in faint *Queued* lines above an
   empty composer). Their `state` is `null`: the adapter's state is its title's, never the tail's.
 - `captured/`: what the live walk's `--capture` recorded (`pdm run conformance gemini --profile
-  gemini-conformance --capture`, 0.64.0, 2026-10-21, TD-785 slice 5), unshortened: `hooks.jsonl`, each hook
-  payload the tool handed `shiftlead-hook --adapter gemini` (the state mapping and `pending`);
-  `titles.json`, the pane titles on the walk's tmux server at its end (`title`); and `panes/<n>-<step>.txt`,
-  each step's pane (`capture-pane -e`, the title on its first line). The walk held four of its seven steps:
-  at the doorbell the free tier's daily quota ran out (*Usage limit reached for gemini-3.8-flash*, the
-  tool's own dialog in `6-a-doorbell.txt`), so its resume and transcript steps were not reached.
+  gemini-conformance --capture`, 0.65.0, 2026-10-29, TD-786, on the tool's default model), unshortened:
+  `hooks.jsonl`, each hook payload the tool handed `shiftlead-hook --adapter gemini` (the state mapping and
+  `pending`), the permission and the doorbell's `ao inbox` each a `ToolPermission` notification and the
+  resume a second `SessionStart`; `titles.json`, the pane titles on the walk's tmux server at its end
+  (`title`); and `panes/<n>-<step>.txt`, each step's pane (`capture-pane -e`, the title on its first line).
+  The walk held all seven steps. `6-a-doorbell-needs-you.txt` was taken as the hook landed, before the
+  confirmation painted, so its composer reads empty. `6-a-doorbell.txt` is the earlier walk's (0.64.0,
+  2026-10-21, TD-785 slice 5), kept for the tool's own *Usage limit reached for gemini-3.8-flash* dialog,
+  read as `limited`.
 
 - `transcripts/`: two chats the live walks wrote on the `gemini-conformance` home (0.64.0, TD-786 slice 1),
   copied unchanged from its `.gemini/tmp/<slug>/chats/` (`read_transcript`, `context`, `links`, `spend`):
