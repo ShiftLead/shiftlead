@@ -2947,7 +2947,7 @@ def _link_state(row: dict[str, Any], walked: dict[str, Any]) -> str:
 
 
 def cmd_progress(args: argparse.Namespace) -> int:
-    """`ao progress claim|done|drop <ref>` (design §4.8): declare a lane item claimed before the
+    """`ao progress claim|done|drop <ref>` (design §4.8): declare a reference claimed before the
     first edit and its result before moving on. Ungated, and lands on this session's own record.
     `ao progress none --why "…"` (§4.9a) takes no reference: this session searched and found
     nothing it may pick, which tells its lead an exit is an ending rather than a crash. And
@@ -4677,7 +4677,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--lane",
         type=_refs,
         default=[],
-        help="the references this session was handed, comma-separated (`TD-027,TD-019`) or `free-pick` (design §4.8)",
+        help="lane words: `free-pick` or `design-first`, narrowed by `owner:<word>`; a list of references "
+        "(`TD-027,TD-019`) is kept as written but matched by no lane (design §4.7, §4.8)",
     )
     p.add_argument(
         "--role",

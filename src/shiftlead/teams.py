@@ -354,7 +354,7 @@ def seat_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
 
 def manager_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
     """The id the team's manager will take (`{manager}`, TD-113 (a)), which every member's brief
-    names as the one its `done` lines go to. "" when a person leads the team."""
+    names as its manager. "" when a person leads the team."""
     if team.manager.role == orgmod.PERSON:
         return ""
     return _session_id(org, team, team.manager.name, host, here)

@@ -4863,7 +4863,7 @@
       tickControllers(own.length ? own : (picker.dataset.default || "").split(",").filter(Boolean));
       tickTeamManager();  // a picked team's manager stays ticked through the role's ticks (TD-296 #8)
       tickGrants((o.dataset.grants || "").split(",").filter(Boolean));
-      $("[name=lane]").placeholder = o.dataset.lane || "TD-027, TD-019 · or free-pick";
+      $("[name=lane]").placeholder = o.dataset.lane || "free-pick or design-first · owner:<word>";
       // §4.5a *New session* **prompt chips** (TD-170): the role's saved prompts, as text
       const chips = $("#newchips");
       if (chips) {
