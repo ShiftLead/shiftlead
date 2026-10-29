@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 import subprocess
 import tarfile
 from pathlib import Path
@@ -238,6 +239,19 @@ def test_descends_reads_the_first_roster_source_that_holds_both_commits(tmp_path
     got, why = seams.descends(shas[2], [orphan], "github.com/ShiftLead/dev-cadence")
     assert got is None and "agent-cadence does not hold" in why and "no forge here" in why
     assert [x[1].rsplit("/", 1)[1].split("...")[0] for x in asked] == [shas[1], cadence.SEED], "OLDEST, then the seed"
+
+
+def test_the_seed_is_a_full_sha_apart_from_both_oldest_points():
+    """TD-1220: every other test patches `SEED` or reads it back, so its value is held here and below."""
+    assert re.fullmatch(r"[0-9a-f]{40}", cadence.SEED)
+    assert cadence.SEED not in (cadence.OLDEST, cadence.OLDEST_V2)
+
+
+@pytest.mark.skipif(not (AGENT_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no agent-cadence checkout")
+def test_the_seed_is_agent_cadences_first_commit():
+    """TD-1220: `SEED` is the one parentless commit agent-cadence's history descends from (`183de9c`, the value
+    #2646 replaced, is not)."""
+    assert _git(AGENT_CADENCE, "rev-list", "--max-parents=0", "HEAD").split() == [cadence.SEED]
 
 
 def test_a_pin_after_agent_cadences_seed_descends_on_either_history(tmp_path, monkeypatch):
