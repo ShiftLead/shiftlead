@@ -194,33 +194,54 @@ def descends(
     commit: str, roster: Iterable[Path | str], source: str = "", oldest: str | None = None
 ) -> tuple[bool | None, str | None]:
     """Whether `commit` descends from `oldest`, `cadence.OLDEST` unless given (§5 *Which dev-cadence*, TD-1012;
-    `cadence.OLDEST_V2` for a v2 ledger, TD-1144): `(True|False,
-    None)`, or `(None, why)` when it cannot be read. Read in each of the roster's dev-cadence checkouts in
-    turn (each a source, as the host's own fetch left it; TD-1208: an orphan history such as agent-cadence's
-    holds neither commit) with `git merge-base --is-ancestor`, the first that holds both answering; with none
-    there, or none that holds both (a fetch not yet made), through the forge's compare of the two commits on
-    the lock's `source:`. A `+dirty` tree is read at the commit it was synced from."""
+    `cadence.OLDEST_V2` for a v2 ledger, TD-1144), or from `cadence.SEED`, agent-cadence's first commit, which
+    is newer than both on a history that holds neither (TD-1208): `(True|False, None)`, or `(None, why)` when it
+    cannot be read. Read in each of the roster's dev-cadence checkouts in turn (each a source, as the host's
+    own fetch left it) with `git merge-base --is-ancestor`, the first that holds both commits of a pair
+    answering: a checkout that holds `commit` and either oldest point decides, since one that holds a commit
+    after the seed holds the seed too. With none, through the forge's compare of each pair in turn on the
+    pin's own `source`. A `+dirty` tree is read at the commit it was synced from; `why` is the read
+    against `oldest`."""
     commit, oldest = commit.removesuffix("+dirty"), oldest or cadence.OLDEST
     checkouts = [Path(r) for r in roster if cadence.is_source(r)]
     first = "no dev-cadence checkout in the roster"
     misses = []
-    for checkout in checkouts:
-        try:
-            cp = sync._git(checkout, "merge-base", "--is-ancestor", oldest, commit, timeout=AGE_TIMEOUT)
-        except sync._Error as e:
-            misses.append(str(e))
-            continue
-        if cp.returncode in (0, 1):
-            return cp.returncode == 0, None
-        misses.append(f"{checkout} does not hold {commit[:7]} and {oldest[:7]}")
+    answers = []
+    for point in (oldest, cadence.SEED):
+        for checkout in checkouts:
+            try:
+                cp = sync._git(checkout, "merge-base", "--is-ancestor", point, commit, timeout=AGE_TIMEOUT)
+            except sync._Error as e:
+                if point == oldest:
+                    misses.append(str(e))
+                continue
+            if cp.returncode in (0, 1):
+                answers.append(cp.returncode == 0)
+                break
+            if point == oldest:
+                misses.append(f"{checkout} does not hold {commit[:7]} and {oldest[:7]}")
+        if True in answers:
+            return True, None
+    if answers:
+        return False, None
     if misses:
         first = "; ".join(misses)
     repo = _forge_repo(source)
     if repo is None:
         return None, f"{first}, and its source {source or '(none)'} is not on GitHub"
+    got, why = _compare(repo, oldest, commit)
+    if got is None:
+        got = _compare(repo, cadence.SEED, commit)[0]
+    if got is None:
+        return None, f"{first}; {why}"
+    return got, None
+
+
+def _compare(repo: str, oldest: str, commit: str) -> tuple[bool | None, str | None]:
+    """The forge's compare of `oldest...commit` on `repo` (`descends`): `(True|False, None)`, or `(None, why)`."""
     got, why = reports._gh_api(Path.home(), f"repos/{repo}/compare/{oldest}...{commit}", AGE_TIMEOUT)
     if why is not None:
-        return None, f"{first}; {why}"
+        return None, why
     status = got.get("status") if isinstance(got, dict) else None
     if status in ("ahead", "identical"):
         return True, None
@@ -232,17 +253,21 @@ def descends(
 def age(
     root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, Any] | None = None, v2: bool = False
 ) -> dict[str, Any] | None:
-    """The lock's age (§5 *Which dev-cadence*): `{commit, oldest, descends, why}`, `commit` the lock's
-    `files_commit` (else `commit`), `descends` whether it is at or after `cadence.OLDEST` (None with `why`
-    when that could not be read); with `v2` (the ledger is a directory, TD-1144) also `{oldest_v2,
-    descends_v2}` against `cadence.OLDEST_V2`, read only once `descends` is True. None for dev-cadence's source
-    or a lock that is lacking already. A read `old` made of the same commits is carried: their ancestry never
-    changes."""
+    """The lock's age (§5 *Which dev-cadence*): `{commit, oldest, seed, descends, why}`, `commit` the lock's
+    `files_commit` (else `commit`), `descends` whether it is at or after `cadence.OLDEST` or `cadence.SEED`
+    (None with `why` when that could not be read); with `v2` (the ledger is a directory, TD-1144) also
+    `{oldest_v2, descends_v2}` against `cadence.OLDEST_V2`, read only once `descends` is True. None for
+    dev-cadence's source or a lock that is lacking already. A read `old` made of the same commits is carried:
+    their ancestry never changes."""
     lock, lack = _lock(Path(root))
     commit = (lock or {}).get("files_commit") or (lock or {}).get("commit")
     if lack or not commit:
         return None
-    same = isinstance(old, dict) and (old.get("commit"), old.get("oldest")) == (commit, cadence.OLDEST)
+    same = isinstance(old, dict) and (old.get("commit"), old.get("oldest"), old.get("seed")) == (
+        commit,
+        cadence.OLDEST,
+        cadence.SEED,
+    )
     if same and old.get("descends") is not None:
         if not v2 or old.get("descends") is False:
             return old
@@ -250,7 +275,7 @@ def age(
             return old
     source = str(lock.get("source") or "")
     got, why = descends(commit, roster, source)
-    out = {"commit": commit, "oldest": cadence.OLDEST, "descends": got, "why": why}
+    out = {"commit": commit, "oldest": cadence.OLDEST, "seed": cadence.SEED, "descends": got, "why": why}
     if v2 and got is True:
         out["oldest_v2"] = cadence.OLDEST_V2
         out["descends_v2"], out["why"] = descends(commit, roster, source, cadence.OLDEST_V2)

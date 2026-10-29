@@ -44,6 +44,10 @@ OLDEST = "6d92209da67410546a258a467e3ff292fb20166d"
 # The oldest dev-cadence commit that reads a v2 ledger, a directory (§4.4 *Either layout*, §5 *Which dev-cadence*,
 # TD-1144): dev-cadence #405, where `ledger_next_id.py` first reads one and `ledger.py` gains `layout_at`
 OLDEST_V2 = "b9236c8a6be84b52048e0bd6517001fad13f0033"
+# agent-cadence's seed (TD-1208, dev-cadence TD-191's cutover): `ShiftLead/agent-cadence`'s first commit, a
+# snapshot of dev-cadence at 0ad7b2f with no parents, so a tree newer than OLDEST and OLDEST_V2 on a history that
+# holds neither; a commit that descends from it is at or after both
+SEED = "183de9cfa899e0def9e4420eb4af1e2fd0faa935"
 LOCK = "docs/cadence-sync.lock"  # the copy's lock, while a repo still has one (`sync.LOCK`)
 PIN = "docs/cadence.toml"  # the pin's file: `[dev-cadence]`'s `source` and `ref` (dev-cadence TD-129)
 # the pin's header as the SessionStart line's grep finds it (TD-1023): the twin of dev-cadence's

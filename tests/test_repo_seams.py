@@ -217,7 +217,13 @@ def test_a_lock_older_than_the_builds_oldest_is_unserved_by_name(tmp_path, monke
     monkeypatch.setattr(cadence, "OLDEST", first)
     got = seams.reading(root, roster)
     assert got["serve"] == {"ok": True, "lacks": []}
-    assert got["cadence_age"] == {"commit": middle, "oldest": first, "descends": True, "why": None}
+    assert got["cadence_age"] == {
+        "commit": middle,
+        "oldest": first,
+        "seed": cadence.SEED,
+        "descends": True,
+        "why": None,
+    }
     assert not [w for w in got["warnings"] if "age" in w]
     monkeypatch.setattr(cadence, "OLDEST", third)
     got = seams.reading(root, roster)
@@ -285,7 +291,7 @@ def test_the_tick_reads_the_age_against_the_registry_and_carries_it(tmp_path, mo
     r = str(root)
     got = TickMixin._read_repos([r], {}, set(), registry=[r, str(src)])
     age = got[r]["seams"]["cadence_age"]
-    assert age == {"commit": middle, "oldest": third, "descends": False, "why": None}
+    assert age == {"commit": middle, "oldest": third, "seed": cadence.SEED, "descends": False, "why": None}
     assert got[r]["seams"]["serve"]["lacks"][0]["key"] == "age"
     # the five-minute read, the registry without dev-cadence: the age is carried, the forge never asked
     again = TickMixin._read_repos([r], got, {r}, registry=[r])
