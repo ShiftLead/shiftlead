@@ -56,7 +56,7 @@ PIN_HEADER_RE = re.compile(r"^[^\S\n]*\[agent-cadence\][^\S\n]*(#.*)?$", re.M)
 # agent-cadence's launcher, vendored frozen from its `launcher/agent_cadence.py` at LAUNCHER_COMMIT (TD-1014); a
 # pinned tree names the lowest launcher interface it runs under, so a newer one is a ShiftLead release
 LAUNCHER = Path(__file__).with_name("agent_cadence.py")
-LAUNCHER_COMMIT = "cca4fb5ea7931bd9aba5bf6f236bf00ec2ce9973"
+LAUNCHER_COMMIT = "29210e6c17c473cdeee50ba65e7bb1696819dfc3"
 TREE_TIMEOUT = 330.0  # one resolve: the launcher's first clone or fetch of a source is bounded at 300 s
 GATE_SCRIPT = "check_cadence.py"  # the gate, as the pinned tree's `files/scripts/` holds it
 # the copy's paths, while a repo still has a lock (a brief's layout slots, §5 *The seams*); agent-cadence's own

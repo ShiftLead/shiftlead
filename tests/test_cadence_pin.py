@@ -118,7 +118,7 @@ def test_the_vendored_launcher_is_agent_cadences_at_the_named_commit():
     """The launcher is frozen: a change to it is a new vendoring, with `LAUNCHER_COMMIT` moved and this hash."""
     digest = hashlib.sha256(cadence.LAUNCHER.read_bytes()).hexdigest()
     assert digest == "dfd6c00f4a93574f656b180c6b3c6acccf37c55130fd2ec1888fb62fc8e2dda7"
-    assert cadence.LAUNCHER_COMMIT == "cca4fb5ea7931bd9aba5bf6f236bf00ec2ce9973"
+    assert cadence.LAUNCHER_COMMIT == "29210e6c17c473cdeee50ba65e7bb1696819dfc3"
 
 
 def test_a_pinned_repo_with_no_lock_reads_served_and_its_gate_runs_through_the_resolver(tmp_path, monkeypatch):
