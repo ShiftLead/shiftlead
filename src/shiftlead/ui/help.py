@@ -27,11 +27,11 @@ HELP: tuple[Help, ...] = (
         "Start",
         "team card",
         (
-            "Runs the team again from its definition: every check first, then the concluded sessions closed "
-            "under the wrap-up's own safety check, then the manager and the members created with their "
-            "briefs. Press it to run the team again — after a wind-down, or when a run has concluded and you "
-            "want the next. It is not a message: a running session is mailed with Message…, and a session "
-            "holding uncommitted or unpushed work refuses the start instead of being closed."
+            "Runs the team again from its definition: every check first, then the concluded sessions closed under the "
+            "wrap-up's own safety check, then the members, each started on its brief, and the manager written closed "
+            "when it is on call or started when it stands. Press it to run the team again — after a wind-down, or when "
+            "a run has concluded and you want the next. It is not a message: a running session is mailed with Message…,"
+            " and a session holding uncommitted or unpushed work refuses the start instead of being closed."
         ),
     ),
     Help(
@@ -384,10 +384,11 @@ HELP: tuple[Help, ...] = (
         "Inbox row: team start",
         (
             "Starts this team from its definition, exactly as the Start on its card does: every check first, then the "
-            "manager and the members with their briefs. When the team is running and the row names members that "
-            "finished, it starts those members alone, each on its brief. Press it when the entries the row names are "
-            "work you want the team to take now. It is refused, in words, where the card's Start would be or where a "
-            "bound holds the members back, and it picks nothing for the team: the manager decides who runs."
+            "members with their briefs, and the manager written closed when it is on call or started when it stands. "
+            "When the team is running and the row names members that finished, it starts those members alone, each on "
+            "its brief. Press it when the entries the row names are work you want the team to take now. It is refused, "
+            "in words, where the card's Start would be or where a bound holds the members back, and it hands no entry "
+            "to anyone: each member takes from its lane's shared list."
         ),
     ),
     Help(

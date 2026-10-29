@@ -121,8 +121,8 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         </div>
       </div>
       <div class="field" id="lanefield"><label>Lane</label>
-        <input class="input mono" name="lane" value="{{ prefill.lane }}" placeholder="TD-027, TD-019 · or free-pick">
-        <span class="note">the references this session is handed, in order; empty: the role's default</span>
+        <input class="input mono" name="lane" value="{{ prefill.lane }}" placeholder="free-pick or design-first · owner:&lt;word&gt;">
+        <span class="note">the lane's words, shared by its members; empty: the role's default</span>
       </div>
     </div>
     {#- **At** and **Until** are drawn for an unattended pick only (TD-284 slice 5) -#}

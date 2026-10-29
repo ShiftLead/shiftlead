@@ -1146,9 +1146,9 @@ class Session:
     # agent restart, where the in-memory `_last_hook` is seeded at load. Written once by the pane's host,
     # kept across saves, and carried by nothing a replay copies. None: no hook has reached it.
     hook_seen_at: str | None = None
-    # Report channels (design §4.8). `lane` is the ordered list of references the session was handed
-    # (or `["free-pick"]`), so a display can say *1 of 2* without parsing the brief; the other two
-    # are what the session says it did.
+    # Report channels (design §4.8). `lane` is the session's lane words (`["free-pick"]`, or narrowed by
+    # `owner:<word>`); a list of references is kept as written and matched by no lane (§4.7 `--lane`).
+    # The other two are what the session says it did.
     lane: list[str] = field(default_factory=list)
     progress: list[ProgressEntry] = field(default_factory=list)
     findings: list[FindingEntry] = field(default_factory=list)
