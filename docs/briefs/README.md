@@ -19,36 +19,34 @@ agent's now — the usage gate pauses and resumes unattended sessions against th
 `settings.yml` (design §6, `ao gate`), and a hand-launched worker gets a stop time with
 `ao new --until <time>` (TD-026; a clock time or `+8h`). samscrape runs its own team on its own briefs, in that repo.
 
-`manager-ao-1.md` is the team's manager (design §4.8): a session holding the
-`control` grant that keeps the unattended workers going and runs the cadence check
-(`agent-cadence run check_cadence.py`, cadence §4) on what they call done. **By hand** — which is what this
-file is about — launch it **after** the workers and attach it to them in the same step; see
-Membership below, which is the part that is easy to forget and looks like a broken lead when it
-is. (`ao team start` does both for you, in the right order, and is the ordinary way in.)
+`manager-ao-1.md` is this repo's part of the team's manager brief, and it is never launched by hand.
+ao-grind's manager is a **seat on call** (design §6 rule 3 and *What is left is judgement, and a seat
+holds it*; `on_call`, §4.9): `ao team start` writes it closed, with no pane, and the home's tick fills it
+on the package's `manager_on_call.md` template for one reading no policy makes — an `ask` to it, a
+permission, a `stalled?` member, one *idle · open work* after the nudge — and it ends once it has acted.
+Restarting and nudging the members, and the cadence check on what they call done, are the
+tick's (§6 rules 1, 2, 4 and 10). A standing manager with a round of its own is what a definition asks for
+with `on_call: false`, on the package's `manager.md` template; this repo runs none.
 
-```
-pdm run ao new -d ~/shiftlead -w manager-ao-1 --unattended -p grind --grant control --prompt "$(cat docs/briefs/manager-ao-1.md)" manager-ao-1
-```
-
-**Membership (design §4.8, TD-036).** The grant lets a lead act on other sessions; it
+**Membership (design §4.8, TD-036).** The `control` grant lets a session act on other sessions; it
 does not say which. Each worker's record carries the `controllers` that may act on *it*, and an
 empty list means nobody may. A person's `ao new` sets no controller — there is no caller — so
 **every worker launched by hand needs attaching**, in the same step as the grant:
 
 ```
-ao control manager-ao-1 add grinder-ao-1 grinder-ao-2
-ao status -v            # each worker's `under:`, and the lead's `members:`
+ao control <controller> add grinder-ao-1 grinder-ao-2
+ao status -v            # each worker's `under:`, and the controller's `members:`
 ```
 
-Skip it and the lead holds the grant with no members, which looks exactly like a broken
-lead: every send it makes is refused, and its own log is the only place that says why.
-The one case that needs nothing is a worker the **lead itself** started — a session lists
-its creator from birth (§4.8), which is what the brief's restart rule relies on.
+Skip it and the controller holds the grant with no members, which looks exactly like a broken
+controller: every send it makes is refused, and its own log is the only place that says why.
+The one case that needs nothing is a worker the **controller itself** started — a session lists
+its creator from birth (§4.8).
 
 One brief is written but **not launchable yet**, so that its rules are decided before the day it
 is needed: `director.md` (needs two managers before it is worth running). Its round reads the
 restart ceiling (TD-036) as the mark the tick's restarts leave, and ends in `ao wait`, as a
-manager's does. guardians' team is defined in its own repo (`guardians-devenv`, its
+standing manager's does (`src/shiftlead/briefs/manager.md`). guardians' team is defined in its own repo (`guardians-devenv`, its
 `docs/briefs/team-setup.md`); the old `guardians-orchestrator.md` is under `archive/`.
 
 **A direction that must outlive a restart is not mail** (design §4.10 *Where a directive that must
