@@ -1417,6 +1417,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-03 (TD-292 slice 2, grinder-ao-1): `ao msg --shot` built. A path to a file in the sender's checkout is sent repo-relative (`$PWD/docs/mockups/reviews/x.png` and the repo-relative form send the same), since the page reads the file on origin's default; any other path goes as typed and the host agent refuses its shape.
 
 ## 4.8 Capabilities, report channels, and role presets
+- 2026-10-29 (TD-1119's review, round 9, Fable, 0 findings): the loop closes — Sonnet READY in round 8, Fable with no finding on rounds 7–8.
 - 2026-10-29 (TD-1119's review, round 8, Sonnet, READY, 1 finding, adopted): TD-1226 keys on the record's `seat.trigger`, not a top-level `trigger`.
 - 2026-10-29 (TD-1119's review, round 7, Fable, 3 findings, all adopted — 1 new, 2 follow-ons): §4.2 *No live member* passes for a manager on call, filled or not, since its close orphans nobody; the card's check has no seat exemption and reads ✗ *stop the team first*, so TD-1226 builds it. §4.9a's opening names rule 9 for its *other*; TD-1223's grep catches §4.5a's wrapped copy.
 - 2026-10-29 (TD-1119's review, round 6, Sonnet, NOT READY, 3 findings, all adopted, each on TD-1223 and none on the design text): the placeholder string is TD-1223's own (round 5's, superseding round 4's), and its kept grep hits add §4.5a's inert-list example and `manager.md`'s *lane items* (an open reference on the record, accurate for the standing template).
