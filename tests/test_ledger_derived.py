@@ -1,5 +1,5 @@
 """TD-228 slice 1, design §4.4 *Repo facts*: pickable is derived from `**Blocked by:**`, never
-written, by cadence §2.4's rule — the rule dev-cadence's `scripts/ledger.py` applies — so the home
+written, by cadence §2.4's rule — the rule agent-cadence's `scripts/ledger.py` applies — so the home
 and the repo's own tool give one answer. These tests hold the two readers equal."""
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ ROOT = Path(__file__).parents[1]
 
 def _script(cwd: Path, reg_dir: Path, *args: str) -> dict:
     """The synced script's `--list --json`, its roster pointed at `reg_dir` alone."""
-    env = {**os.environ, "DEV_CADENCE_REG_DIR": str(reg_dir)}
+    env = {**os.environ, "AGENT_CADENCE_REG_DIR": str(reg_dir)}
     cp = subprocess.run(
         [sys.executable, str(pinned_script("ledger.py")), "--list", "--json", *args],
         cwd=cwd, env=env, capture_output=True, text=True, timeout=60, check=True,

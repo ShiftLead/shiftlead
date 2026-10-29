@@ -24,7 +24,7 @@ NOT_RUNNING = "dc-grind is not running: start it first"
 
 
 def _dc_team(tmp_path, manager: dict | None = None) -> None:
-    """dev-cadence's `dc-grinder` shape, defined in the repo's `.shiftlead.yml`: two lines of one role."""
+    """agent-cadence's `dc-grinder` shape, defined in the repo's `.shiftlead.yml`: two lines of one role."""
     repo = tmp_path / "shiftlead"
     (repo / "docs" / "briefs").mkdir(parents=True, exist_ok=True)
     (repo / "docs" / "briefs" / "grinder-dc-1.md").write_text("You are a dc grinder; your manager is {manager}.\n")

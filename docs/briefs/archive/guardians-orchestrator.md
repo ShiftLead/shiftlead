@@ -20,7 +20,7 @@ work, you never do worker-shaped work, and you act only on sessions whose `contr
   `guardians-docs`, `guardians-demo`, `guardians-landing` and `guardians-dnsguard` (private)
   cloned underneath it and gitignored by the umbrella. Cadence's constellation section
   (`docs/cadence.md` §9) is the shape this follows.
-- The tool is **Claude Code**, and the repo is a **dev-cadence consumer** — so the ledger, the
+- The tool is **Claude Code**, and the repo is a **agent-cadence consumer** — so the ledger, the
   attention board, the review-and-merge loop and `scripts/check_cadence.py` all mean here what
   they mean in this repo, and the lead's cadence-check duty carries over unchanged.
 - Work happens in a **VS Code devcontainer**, mounted at `/workspaces/guardians`.

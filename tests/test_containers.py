@@ -138,10 +138,10 @@ def test_the_dockerfile_links_ao_onto_path_after_tmux_and_before_the_images_user
     assert tmux < at < lines.index("USER developer") and lines.index("USER root") < at
     # the target is the venv's, whatever INSIDE_VENV names
     assert f"ln -s {containers.INSIDE_VENV}/bin/ao " in link
-    # dev-cadence's launcher by the same guarded rule, right after it (TD-1014)
+    # agent-cadence's launcher by the same guarded rule, right after it (TD-1014)
     dc = (
-        "RUN [ -e /usr/local/bin/dev-cadence ] || [ -L /usr/local/bin/dev-cadence ] || { install -d -o root -g root"
-        " -m 0755 /usr/local/bin && ln -s /shiftlead/venv/bin/dev-cadence /usr/local/bin/dev-cadence; }"
+        "RUN [ -e /usr/local/bin/agent-cadence ] || [ -L /usr/local/bin/agent-cadence ] || { install -d -o root -g root"
+        " -m 0755 /usr/local/bin && ln -s /shiftlead/venv/bin/agent-cadence /usr/local/bin/agent-cadence; }"
     )
     assert lines.count(dc) == 1 and lines.index(dc) == at + 1
 
@@ -343,10 +343,10 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
 
 
 def _pinned_node(monkeypatch, tmp_path, *, resolves=True):
-    """The node's checkout pins dev-cadence at `ref`, whose tree the home's launcher cache holds (or not)."""
+    """The node's checkout pins agent-cadence at `ref`, whose tree the home's launcher cache holds (or not)."""
     ref = "c" * 40
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    tree = tmp_path / "cache" / "dev-cadence" / "trees" / ref
+    tree = tmp_path / "cache" / "agent-cadence" / "trees" / ref
     if resolves:
         (tree / "files" / "scripts").mkdir(parents=True)
         (tree / "files" / "scripts" / "check_cadence.py").write_text("x = 1\n")
@@ -358,13 +358,13 @@ def _pinned_node(monkeypatch, tmp_path, *, resolves=True):
     from sessionorc import cadence
 
     monkeypatch.setattr(cadence, "pinned", lambda root: True)
-    monkeypatch.setattr(cadence, "pin", lambda root: ("git@example.com:o/dev-cadence.git", ref))
+    monkeypatch.setattr(cadence, "pin", lambda root: ("git@example.com:o/agent-cadence.git", ref))
     got = (tree / "files", None) if resolves else (None, "commit cccc is not in the source")
     monkeypatch.setattr(cadence, "tree", lambda root, timeout=0: got)
     return ref
 
 
-def test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache(home, tmp_path, monkeypatch):
+def test_host_up_ships_the_pinned_agent_cadence_tree_into_the_containers_cache(home, tmp_path, monkeypatch):
     """§4.4a, TD-1014 (5): the home copies the tree the node's checkout pins to the node's volume, then
     into the container's launcher cache, where the launcher takes it as made and fetches nothing."""
     ref = _pinned_node(monkeypatch, tmp_path)
@@ -388,7 +388,7 @@ def test_host_up_ships_the_pinned_dev_cadence_tree_into_the_containers_cache(hom
     again.log = said.append
     containers.host_up("contractmatch", again)  # shipped once: a second run copies nothing new (TD-1058)
     assert sorted(p.name for p in shipped.parent.iterdir()) == [ref]
-    assert not [line for line in said if "shipping dev-cadence" in line or "could not be shipped" in line], said
+    assert not [line for line in said if "shipping agent-cadence" in line or "could not be shipped" in line], said
     assert len(again.execs(containers.CADENCE_INTO_CACHE)) == 1
     assert containers.ship_cadence(n, Fake(), "abc123def456", "developer") == ref
     os.chmod(shipped / "files", 0o555)  # as the launcher leaves its trees
@@ -407,7 +407,7 @@ def test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once(tmp_pat
     os.chmod(src / "files" / "a.txt", 0o444)
     os.chmod(src / "files", 0o555)
     env = {"PATH": os.environ["PATH"], "HOME": str(tmp_path / "home")}
-    trees = tmp_path / "home" / ".cache" / "dev-cadence" / "trees"
+    trees = tmp_path / "home" / ".cache" / "agent-cadence" / "trees"
     stale = trees / f".ship-{ref}"  # an interrupted run's copy, read-only as `cp -a` left it (TD-1059)
     stale.mkdir(parents=True)
     (stale / "stray.txt").write_text("stray\n")

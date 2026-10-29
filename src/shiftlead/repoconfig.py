@@ -171,7 +171,7 @@ HANDED_ENTRY = {
 
 # The layout slots (design §5 *The seams*, TD-588, TD-1011): what a built-in brief names of a repo's layout,
 # never a literal of one repo's. The cadence's four (`{gate}`, `{board}`, `{ledger_check}`, `{cadence_rules}`)
-# and `{ledger}` fill with dev-cadence's values and have no sentence, since an unserved repo composes no brief;
+# and `{ledger}` fill with agent-cadence's values and have no sentence, since an unserved repo composes no brief;
 # the repo's own three fill with its own or with the seam's fixed sentence, never empty text. `{pr}` inside
 # `{gate}` is filled after them. Recorded as text slots, so a replay fills them as the launch did (§6 rule 7).
 LAYOUT_SLOTS = (
@@ -187,8 +187,8 @@ LAYOUT_SLOTS = (
 PR_PLACEHOLDER = "{pr}"
 PR_IN_BRIEF = "<n>"
 DESIGN_DIR = "docs/design/"
-PIN_HEADER = "[dev-cadence]"  # a pinned repo's `docs/cadence.toml` table (dev-cadence TD-129)
-SOURCE_PREFIX = "files/"  # dev-cadence's own source holds every dev-cadence path under it (§5 *The seams*)
+PIN_HEADER = "[agent-cadence]"  # a pinned repo's `docs/cadence.toml` table (dev-cadence TD-129)
+SOURCE_PREFIX = "files/"  # agent-cadence's own source holds every agent-cadence path under it (§5 *The seams*)
 NO_TEST = "no test command: run what the repo's README says"
 NO_LINT = "no lint command: keep to the style of the code around the change"
 NO_DESIGN_DIR = "no design directory: the README and the code say what is true"
@@ -201,8 +201,9 @@ THERE_REFUSALS = (": not a regular file", " bytes, which is not a repo config or
 
 def layout(cfg: RepoConfig) -> dict[str, str]:
     """Each of `LAYOUT_SLOTS` for `cfg`'s repo (design §5 *The seams*, TD-1011): the cadence's slots
-    dev-cadence's paths — under `files/` in dev-cadence's own source (`cadence.is_source`'s test, read with `there`),
-    read the way the file was, `cfg.read`; in a pinned repo (`[dev-cadence]` in its `docs/cadence.toml`, no lock)
+    agent-cadence's paths — under `files/` in agent-cadence's own source (`cadence.is_source`'s test, read with
+    `there`),
+    read the way the file was, `cfg.read`; in a pinned repo (`[agent-cadence]` in its `docs/cadence.toml`, no lock)
     the resolver's command as a session types it, `cadence.typed` (TD-1014), under `cfg.venv` where set —
     and `board:` and `ledger:` where the file sets them; `{test}` and `{lint}` `commands:`'s, `{design_dir}`
     the directory where the checkout holds it, each else its seam's sentence. `{gate}` still holds `{pr}`: the
@@ -227,7 +228,7 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
             raise
 
     def pinned() -> bool:
-        # `[dev-cadence]` in the pin's file as the launcher reads it (TOML), and no lock, which keeps the copy read;
+        # `[agent-cadence]` in the pin's file as the launcher reads it (TOML), and no lock, which keeps the copy read;
         # a pin it would refuse is pinned still, as `cadence.pinned` says — that repo is unserved and briefs no one
         if cfg.root is None or there(cadence.LOCK):
             return False
@@ -243,7 +244,7 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
         if text is None:
             return False
         try:
-            return "dev-cadence" in tomllib.loads(text)
+            return "agent-cadence" in tomllib.loads(text)
         except tomllib.TOMLDecodeError:
             return PIN_HEADER in (line.strip() for line in text.splitlines())
 
@@ -817,7 +818,7 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
     elif key == "promote":
         cfg.promote = _promote(value, where)
     elif key == "gate":
-        cfg.gone.append(key)  # the gate is dev-cadence's script, no key (§5 *The seams*, TD-1011)
+        cfg.gone.append(key)  # the gate is agent-cadence's script, no key (§5 *The seams*, TD-1011)
     elif key == "board":
         if not isinstance(value, str) or not value.strip() or not workorders.inside(Path(value.strip())):
             raise ValueError(

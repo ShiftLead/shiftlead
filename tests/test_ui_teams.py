@@ -281,18 +281,18 @@ def test_a_wound_down_note_says_who_closed_it_how_soon_and_why(world, client):
     t0, t1 = "2026-10-01T10:00:00Z", "2026-10-01T10:00:40Z"
 
     def closed(name, by, **kw):
-        oow = {"at": t1, "why": "nothing pickable on dev-cadence's ledger\nand the rest"}
+        oow = {"at": t1, "why": "nothing pickable on agent-cadence's ledger\nand the rest"}
         rec = {**badged(name, "ao-grind", state="closed"), "tail": [], "created": t0, "closed_at": t1}
         return {**rec, "out_of_work": oow, "closer": {"by": by, "at": t1}, **kw}
 
     fleet.sessions = [closed("orc-ao", "orc-ao"), closed("grind-1", "orc-ao")]
     row = next(r for r in uiapp.teams_view(fleet.sessions)["teams"] if r["name"] == "ao-grind")
     assert (row["closed_by"], row["run_seconds"], row["after"]) == ("orc-ao", 40, "40 s")
-    assert row["manager_why"] == "nothing pickable on dev-cadence's ledger"
-    assert teamrun.wound_down_words(row) == " · after 40 s · by orc-ao — nothing pickable on dev-cadence's ledger"
+    assert row["manager_why"] == "nothing pickable on agent-cadence's ledger"
+    assert teamrun.wound_down_words(row) == " · after 40 s · by orc-ao — nothing pickable on agent-cadence's ledger"
     html = client.get("/").text
     head = html[html.index('<section class="tgroup" data-team="ao-grind"') :].split('<div class="grid">', 1)[0]
-    assert "· after 40 s</span> · by orc-ao<span" in head and "— nothing pickable on dev-cadence&#39;s ledger" in head
+    assert "· after 40 s</span> · by orc-ao<span" in head and "— nothing pickable on agent-cadence&#39;s ledger" in head
     # a person's close, a run of an hour: no *after*, *by you*; a manager that gave no reason, no why
     late = "2026-10-01T11:00:00Z"
     fleet.sessions = [

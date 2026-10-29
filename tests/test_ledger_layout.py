@@ -143,7 +143,7 @@ print(json.dumps({"consts": [m.LEDGER_REL, m.ARCHIVE_REL, m.LEDGER_DIR_REL],
 """
 
 
-def test_layout_at_is_dev_cadences_rule():
+def test_layout_at_is_agent_cadences_rule():
     """`sessionorc.ledger.layout_at` is a copy of the pinned tree's, as `test_ledger_derived.py` holds
     `pickable` equal: its constants and its answer on each shape of path, with either layout present."""
     script = pinned_script("ledger.py")
@@ -251,7 +251,7 @@ def test_a_set_ledger_gone_from_the_tree_reads_the_other_layout_and_is_warned_of
 
 @pytest.mark.parametrize("pinned", [False, True])
 def test_a_v2_ledger_under_a_tree_that_predates_its_reader_is_unserved(tmp_path, monkeypatch, pinned):
-    """§5 *Which dev-cadence*: a directory under a dev-cadence older than `OLDEST_V2` lacks *predates*,
+    """§5 *Which agent-cadence*: a directory under an agent-cadence older than `OLDEST_V2` lacks *predates*,
     which the sync cures (its key passed over by the sync pass); a v1 file under the same tree does not."""
     from sessionorc import cadence, seams
 
@@ -270,7 +270,9 @@ def test_a_v2_ledger_under_a_tree_that_predates_its_reader_is_unserved(tmp_path,
     got = seams.reading(two)
     assert got["ledger"]["state"] == "predates"
     cure = "bump the pin" if pinned else "sync it"
-    words = f"unserved: the ledger is a directory and dev-cadence at abc1234 predates its v2 reader (b9236c8) — {cure}"
+    words = (
+        f"unserved: the ledger is a directory and agent-cadence at abc1234 predates its v2 reader (b9236c8) — {cure}"
+    )
     assert {"key": "ledger_age", "words": words} in got["serve"]["lacks"]
     assert words not in seams.unserved({"seams": got}, but=("age", "ledger_age"))
     asked.clear()

@@ -1,28 +1,28 @@
 #!/usr/bin/env python3
-"""dev-cadence — the launcher: resolve a repo's pinned dev-cadence and exec it (TD-129).
+"""agent-cadence — the launcher: resolve a repo's pinned agent-cadence and exec it (TD-129).
 
-    dev-cadence [-C <dir>] <word> [args…]    run <word> from the dev-cadence the repo pins
+    agent-cadence [-C <dir>] <word> [args…]    run <word> from the agent-cadence the repo pins
                                              (-C as git's: resolve and run in <dir>)
-    dev-cadence --interface                  print this launcher's interface number
+    agent-cadence --interface                  print this launcher's interface number
 
 Installed once per machine, never per repo (docs/plans/2026-10-25-pinned-not-synced.md,
 *Decision* 3):
 
-    git clone <dev-cadence source> && git -C dev-cadence checkout <tag>
-    install -m 755 dev-cadence/launcher/dev_cadence.py ~/.local/bin/dev-cadence
+    git clone <agent-cadence source> && git -C agent-cadence checkout <tag>
+    install -m 755 agent-cadence/launcher/agent_cadence.py ~/.local/bin/agent-cadence
 
 THIS FILE IS KEPT SMALL AND FROZEN. Every repo on the machine runs through it, and it is the one
-piece of dev-cadence that is not pinned, so its only job is *resolve and exec*:
+piece of agent-cadence that is not pinned, so its only job is *resolve and exec*:
 
   1. the root — the main checkout's for the word `hook` (every worktree's hooks behave alike, and
      a branch that bumps the pin does not run its new pin in hooks before it merges), otherwise
      the checkout the command runs in (`git rev-parse --show-toplevel`), so a bump branch tests
      its own pin;
-  2. the pin — `[dev-cadence]` in the root's docs/cadence.toml: `source` (a git URL) and `ref`
+  2. the pin — `[agent-cadence]` in the root's docs/cadence.toml: `source` (a git URL) and `ref`
      (a full 40-hex commit, never a tag or branch: a moved tag would change what a repo runs
-     without a PR). No pin and no dev-cadence tree at the root: not a cadence repo. dev-cadence's
+     without a PR). No pin and no agent-cadence tree at the root: not a cadence repo. agent-cadence's
      own repo has no pin and runs from its own tree;
-  3. the tree — ${XDG_CACHE_HOME:-~/.cache}/dev-cadence/: one bare clone per source
+  3. the tree — ${XDG_CACHE_HOME:-~/.cache}/agent-cadence/: one bare clone per source
      (sources/<sha256(source)[:16]>.git) and one read-only tree per commit (trees/<commit>/),
      made on first use under one cache-wide lock, checked out from the object database into a
      temp directory and renamed into place, so a tree that exists is whole. A tree is never
@@ -49,8 +49,8 @@ import tempfile
 import time
 
 INTERFACE = 1
-INSTALL = ("install a newer launcher: clone dev-cadence at its latest tag and "
-           "`install -m 755 launcher/dev_cadence.py ~/.local/bin/dev-cadence`")
+INSTALL = ("install a newer launcher: clone agent-cadence at its latest tag and "
+           "`install -m 755 launcher/agent_cadence.py ~/.local/bin/agent-cadence`")
 COMMIT_RE = re.compile(r"[0-9a-f]{40}")
 # a git URL (scheme://…), scp-like (host:path) or an absolute path — never a relative one, which
 # would resolve against wherever the launcher happens to run
@@ -97,7 +97,7 @@ def find_root(word, start):
 
 
 def read_pin(root):
-    """(source, ref) from [dev-cadence] in docs/cadence.toml, or None when there is no pin."""
+    """(source, ref) from [agent-cadence] in docs/cadence.toml, or None when there is no pin."""
     path = os.path.join(root, "docs", "cadence.toml")
     if not os.path.isfile(path):
         return None
@@ -107,25 +107,25 @@ def read_pin(root):
         raise Refusal("reading docs/cadence.toml needs Python >= 3.11 (tomllib)") from None
     try:
         with open(path, "rb") as f:
-            table = tomllib.load(f).get("dev-cadence")
+            table = tomllib.load(f).get("agent-cadence")
     except (OSError, ValueError) as e:
         raise Refusal(f"{path}: {e}") from None
     if table is None:
         return None
     if not isinstance(table, dict):
-        raise Refusal(f"{path}: dev-cadence must be a table ([dev-cadence]), not {table!r}")
+        raise Refusal(f"{path}: agent-cadence must be a table ([agent-cadence]), not {table!r}")
     source, ref = table.get("source"), table.get("ref")
     if not isinstance(source, str) or not SOURCE_RE.fullmatch(source.strip()):
-        raise Refusal(f"{path}: [dev-cadence] source must be a git URL or an absolute path, not {source!r}")
+        raise Refusal(f"{path}: [agent-cadence] source must be a git URL or an absolute path, not {source!r}")
     if not isinstance(ref, str) or not COMMIT_RE.fullmatch(ref):
-        raise Refusal(f"{path}: [dev-cadence] ref must be a full 40-hex commit (never a tag or "
+        raise Refusal(f"{path}: [agent-cadence] ref must be a full 40-hex commit (never a tag or "
                       f"branch), not {ref!r}")
     return source.strip(), ref
 
 
 def cache_dir():
     base = os.environ.get("XDG_CACHE_HOME") or os.path.join(os.path.expanduser("~"), ".cache")
-    return os.path.join(base, "dev-cadence")
+    return os.path.join(base, "agent-cadence")
 
 
 def _writable(path):
@@ -209,13 +209,13 @@ def ensure_tree(source, ref):
 
 
 def resolve(word, start):
-    """(root, tree): the root whose pin is read and the dev-cadence tree that runs."""
+    """(root, tree): the root whose pin is read and the agent-cadence tree that runs."""
     root = find_root(word, start)
     pin = read_pin(root)
     if pin is None:
         if os.path.isfile(os.path.join(root, "launcher", "INTERFACE")):
-            return root, root   # dev-cadence's own repo: no pin, it runs from its own tree
-        raise Refusal(f"{root} is not a cadence repo: docs/cadence.toml has no [dev-cadence] pin "
+            return root, root   # agent-cadence's own repo: no pin, it runs from its own tree
+        raise Refusal(f"{root} is not a cadence repo: docs/cadence.toml has no [agent-cadence] pin "
                       "(source and ref)")
     return root, ensure_tree(*pin)
 
@@ -250,7 +250,7 @@ def main(argv):
         print(__doc__)
         return 0
     if not argv or argv[0].startswith("-"):
-        print("usage: dev-cadence [-C <dir>] <word> [args…]  (`dev-cadence words` lists them)", file=sys.stderr)
+        print("usage: agent-cadence [-C <dir>] <word> [args…]  (`agent-cadence words` lists them)", file=sys.stderr)
         return 2
     root, tree = resolve(argv[0], start)
     check_interface(tree)
@@ -264,8 +264,8 @@ if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv[1:]))
     except Refusal as e:
-        print(f"dev-cadence: {e}", file=sys.stderr)
+        print(f"agent-cadence: {e}", file=sys.stderr)
         sys.exit(2)
     except OSError as e:   # a full disk, a cache it cannot write: still a refusal, never a traceback
-        print(f"dev-cadence: {e}", file=sys.stderr)
+        print(f"agent-cadence: {e}", file=sys.stderr)
         sys.exit(2)

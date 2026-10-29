@@ -4,13 +4,13 @@ status per row — so the home runs it on every `done` a supervised member repor
 what it read on the record's `checks`, and tells the member in fixed words. Nothing here is typed
 by a session, and the words name the script's `rule` field, never its `detail`.
 
-The gate is dev-cadence's script (§5 *The seams*, TD-1011): there is no `gate:` key, and in
-dev-cadence's own source it is the script under `files/`. A checkout without it has no gate and is
+The gate is agent-cadence's script (§5 *The seams*, TD-1011): there is no `gate:` key, and in
+agent-cadence's own source it is the script under `files/`. A checkout without it has no gate and is
 unserved (§5): the home runs nothing there and writes nothing on the record.
 
-A repo that pins dev-cadence (`docs/cadence.toml`'s `[dev-cadence]`, dev-cadence TD-129) carries no copy:
+A repo that pins agent-cadence (`docs/cadence.toml`'s `[agent-cadence]`, dev-cadence TD-129) carries no copy:
 its gate is the pinned tree's script, run through **the resolver** (`command`, §5 *How the readers find
-dev-cadence*, TD-1014), which calls the launcher this build vendors (`sessionorc/dev_cadence.py`) with the
+agent-cadence*, TD-1014), which calls the launcher this build vendors (`sessionorc/agent_cadence.py`) with the
 host agent's own Python. While a repo still has the lock, its copy's paths are read.
 
 The reads (`head`, `check`, `tree`) shell out and are called in a thread; the rest is pure."""
@@ -36,35 +36,35 @@ VERDICTS = ("pass", "fail", "unknown")
 SOURCE_SCRIPT = f"files/{SCRIPT}"
 DEFAULT_GATE = f"python3 {SCRIPT} --pr {{pr}} --json"
 SOURCE_GATE = f"python3 {SOURCE_SCRIPT} --pr {{pr}} --json"
-# The oldest dev-cadence commit whose files this build reads (§5 *Which dev-cadence*, TD-1012): dev-cadence
+# The oldest agent-cadence commit whose files this build reads (§5 *Which agent-cadence*, TD-1012): agent-cadence
 # TD-106 (#241), the vendoring of ledgerboard v1.0, from which its scripts read and write the ledger and the
 # board in the ledgerboard format `seams.ledger` reads. Raised only by the PR that needs a newer one, and only
 # once every registered consumer's lock is at or after it (a raise past the roster unserves it).
 OLDEST = "6d92209da67410546a258a467e3ff292fb20166d"
-# The oldest dev-cadence commit that reads a v2 ledger, a directory (§4.4 *Either layout*, §5 *Which dev-cadence*,
+# The oldest agent-cadence commit that reads a v2 ledger, a directory (§4.4 *Either layout*, §5 *Which agent-cadence*,
 # TD-1144): dev-cadence #405, where `ledger_next_id.py` first reads one and `ledger.py` gains `layout_at`
 OLDEST_V2 = "b9236c8a6be84b52048e0bd6517001fad13f0033"
-# agent-cadence's seed (TD-1208, dev-cadence TD-191's cutover): `ShiftLead/agent-cadence`'s first commit, a
-# snapshot of dev-cadence at 0ad7b2f with no parents, so a tree newer than OLDEST and OLDEST_V2 on a history that
+# agent-cadence's seed (TD-1208, agent-cadence TD-191's cutover): `ShiftLead/agent-cadence`'s first commit, a
+# snapshot of agent-cadence at 0ad7b2f with no parents, so a tree newer than OLDEST and OLDEST_V2 on a history that
 # holds neither; a commit that descends from it is at or after both
 SEED = "35b4b4a1e9ad9c76b69727415e8553a5778a4be7"
 LOCK = "docs/cadence-sync.lock"  # the copy's lock, while a repo still has one (`sync.LOCK`)
-PIN = "docs/cadence.toml"  # the pin's file: `[dev-cadence]`'s `source` and `ref` (dev-cadence TD-129)
-# the pin's header as the SessionStart line's grep finds it (TD-1023): the twin of dev-cadence's
+PIN = "docs/cadence.toml"  # the pin's file: `[agent-cadence]`'s `source` and `ref` (dev-cadence TD-129)
+# the pin's header as the SessionStart line's grep finds it (TD-1023): the twin of agent-cadence's
 # `launcher/words.py` PIN_HEADER_RE, `[^\S\n]` standing for the shell's `[[:space:]]` within a line
-PIN_HEADER_RE = re.compile(r"^[^\S\n]*\[dev-cadence\][^\S\n]*(#.*)?$", re.M)
-# dev-cadence's launcher, vendored frozen from its `launcher/dev_cadence.py` at LAUNCHER_COMMIT (TD-1014); a
+PIN_HEADER_RE = re.compile(r"^[^\S\n]*\[agent-cadence\][^\S\n]*(#.*)?$", re.M)
+# agent-cadence's launcher, vendored frozen from its `launcher/agent_cadence.py` at LAUNCHER_COMMIT (TD-1014); a
 # pinned tree names the lowest launcher interface it runs under, so a newer one is a ShiftLead release
-LAUNCHER = Path(__file__).with_name("dev_cadence.py")
-LAUNCHER_COMMIT = "8008a10e50e9b70cd571984bb2810d79d59c94c7"
+LAUNCHER = Path(__file__).with_name("agent_cadence.py")
+LAUNCHER_COMMIT = "29210e6c17c473cdeee50ba65e7bb1696819dfc3"
 TREE_TIMEOUT = 330.0  # one resolve: the launcher's first clone or fetch of a source is bounded at 300 s
 GATE_SCRIPT = "check_cadence.py"  # the gate, as the pinned tree's `files/scripts/` holds it
-# the copy's paths, while a repo still has a lock (a brief's layout slots, §5 *The seams*); dev-cadence's own
+# the copy's paths, while a repo still has a lock (a brief's layout slots, §5 *The seams*); agent-cadence's own
 # source holds each under `files/`, and a pinned tree's `files/` holds each by the same relative path
 COPY_GATE = SCRIPT
 COPY_LEDGER = "scripts/ledger.py"
 COPY_RULES = "docs/cadence.md"
-PINNED_GATE = f"dev-cadence run {GATE_SCRIPT} --pr {{pr}} --json"
+PINNED_GATE = f"agent-cadence run {GATE_SCRIPT} --pr {{pr}} --json"
 TREE_FOR = 60.0  # one resolve answers every reader of one reading: a launcher that cannot fetch is asked once
 _trees: dict[tuple[str, tuple[str, str] | None], tuple[float, tuple[Path | None, str | None]]] = {}
 
@@ -73,21 +73,21 @@ SOURCE_MARKS = ("sync.sh", "launcher/INTERFACE")  # either, beside `files/`: `sy
 
 
 def is_source(root: Path | str) -> bool:
-    """Whether `root` is dev-cadence's own source (§5 *The seams*): a root holding `files/` and `sync.sh` or,
-    once that retires, `launcher/INTERFACE`, which carries no lock and whose every dev-cadence path is under
+    """Whether `root` is agent-cadence's own source (§5 *The seams*): a root holding `files/` and `sync.sh` or,
+    once that retires, `launcher/INTERFACE`, which carries no lock and whose every agent-cadence path is under
     `files/`."""
     root = Path(root)
     return (root / "files").is_dir() and any((root / mark).is_file() for mark in SOURCE_MARKS)
 
 
 class PinError(ValueError):
-    """A `docs/cadence.toml` whose `[dev-cadence]` the launcher would refuse, in its words."""
+    """A `docs/cadence.toml` whose `[agent-cadence]` the launcher would refuse, in its words."""
 
 
 def pin(root: Path | str) -> tuple[str, str] | None:
-    """`(source, ref)` from the root's `docs/cadence.toml` `[dev-cadence]`, as the launcher reads it, or
+    """`(source, ref)` from the root's `docs/cadence.toml` `[agent-cadence]`, as the launcher reads it, or
     None where there is no pin; one it would refuse raises `PinError`."""
-    from sessionorc import dev_cadence as launcher
+    from sessionorc import agent_cadence as launcher
 
     try:
         return launcher.read_pin(str(root))
@@ -96,9 +96,9 @@ def pin(root: Path | str) -> tuple[str, str] | None:
 
 
 def pinned(root: Path | str) -> bool:
-    """Whether the repo runs dev-cadence through its pin (§5 *How the readers find dev-cadence*): a
-    `[dev-cadence]` table in its `docs/cadence.toml` and no lock — while it still has the lock, its copy
-    is read — and never dev-cadence's source, which runs from its own tree."""
+    """Whether the repo runs agent-cadence through its pin (§5 *How the readers find agent-cadence*): a
+    `[agent-cadence]` table in its `docs/cadence.toml` and no lock — while it still has the lock, its copy
+    is read — and never agent-cadence's source, which runs from its own tree."""
     root = Path(root)
     if is_source(root) or (root / LOCK).is_file() or not (root / PIN).is_file():
         return False
@@ -111,7 +111,7 @@ def pinned(root: Path | str) -> bool:
 def hook_pinned(root: Path | str) -> bool:
     """Whether the SessionStart line runs in its pinned mode for `root` (design §4.2, TD-1023): the main
     checkout's `docs/cadence.toml` — the first entry of `git worktree list`, else `root` itself, as the
-    line's `${r:-…}` falls back — has a `[dev-cadence]` header (`PIN_HEADER_RE`, matched as the line's grep
+    line's `${r:-…}` falls back — has a `[agent-cadence]` header (`PIN_HEADER_RE`, matched as the line's grep
     and the launcher match it). The hooks' view, not `pinned`: a repo pinned with its lock still there is
     hook-pinned. False where the file is missing or unreadable."""
     root = Path(root)
@@ -134,13 +134,13 @@ def hook_pinned(root: Path | str) -> bool:
 
 
 def holds(root: Path | str) -> bool:
-    """Whether the checkout holds dev-cadence (design §4.7 **`ao repo add`**): its lock, its pin, or dev-cadence's
+    """Whether the checkout holds agent-cadence (design §4.7 **`ao repo add`**): its lock, its pin, or agent-cadence's
     own source. A pin the launcher would refuse is held still: the reading says it is unserved, and why."""
     return (Path(root) / LOCK).is_file() or is_source(root) or pinned(root)
 
 
 def command(repo: Path | str, word: str, *args: str) -> tuple[list[str], dict[str, str]]:
-    """The command to run dev-cadence's `word` for `repo` (§5 *How the readers find dev-cadence*): the
+    """The command to run agent-cadence's `word` for `repo` (§5 *How the readers find agent-cadence*): the
     argv and environment, `CADENCE_REPO_ROOT` included. The vendored launcher runs under this process's
     own Python (the host agent's venv), never one found on a login `PATH`."""
     argv = [sys.executable, str(LAUNCHER), "-C", str(repo), word, *args]
@@ -152,16 +152,16 @@ def typed(word: str, *args: str, venv: str | None = None) -> str:
     vendored launcher under this install's Python, with no `-C`, so it resolves the checkout the session
     runs in — a worktree's own ledger, a bump branch's own pin — and sets `CADENCE_REPO_ROOT` itself. For a
     session on a container node, `venv` is the node's own (`containers.INSIDE_VENV`), where the home's paths
-    are not there: its `bin/dev-cadence`, the console script over the same launcher under the node's Python."""
+    are not there: its `bin/agent-cadence`, the console script over the same launcher under the node's Python."""
     if venv is not None:
-        return shlex.join([f"{venv}/bin/dev-cadence", word, *args])
+        return shlex.join([f"{venv}/bin/agent-cadence", word, *args])
     return shlex.join([sys.executable, str(LAUNCHER), word, *args])
 
 
 def _launcher_words(text: str) -> str:
-    """The launcher's refusal, its `dev-cadence: ` prefix dropped; an interface this build's launcher is
+    """The launcher's refusal, its `agent-cadence: ` prefix dropped; an interface this build's launcher is
     too old for is said as what cures it, a newer ShiftLead."""
-    why = (text.strip().splitlines() or ["no reason given"])[-1].removeprefix("dev-cadence: ").strip()
+    why = (text.strip().splitlines() or ["no reason given"])[-1].removeprefix("agent-cadence: ").strip()
     if m := re.match(r"this pin needs launcher interface (\d+); this launcher is (\d+)", why):
         return f"it needs launcher interface {m[1]}, this build carries {m[2]} — a newer ShiftLead"
     return why
@@ -201,7 +201,7 @@ def _tree(root: Path | str, timeout: float) -> tuple[Path | None, str | None]:
 
 def has_script(root: Path | str) -> bool:
     """Whether `root` is a checkout the home can see that carries the script (under `files/` in
-    dev-cadence's source, in the pinned tree for a pinned repo): a repo not on dev-cadence, or a path
+    agent-cadence's source, in the pinned tree for a pinned repo): a repo not on agent-cadence, or a path
     that is not a directory here, gives no reading."""
     if pinned(root):
         payload, _ = tree(root)
@@ -210,7 +210,7 @@ def has_script(root: Path | str) -> bool:
 
 
 def gate(root: Path | str) -> str | None:
-    """The checkout's merge gate (§5 *The seams*, TD-1011): dev-cadence's script, `SOURCE_GATE` in
+    """The checkout's merge gate (§5 *The seams*, TD-1011): agent-cadence's script, `SOURCE_GATE` in
     its source, `PINNED_GATE` (through the resolver) in a pinned repo and `DEFAULT_GATE` elsewhere, when
     the checkout holds it; None otherwise — the repo is then unserved. No key is read."""
     if not has_script(root):
@@ -220,7 +220,7 @@ def gate(root: Path | str) -> str | None:
     return PINNED_GATE if pinned(root) else DEFAULT_GATE
 
 
-PRECHECK_SCRIPT = "precheck.py"  # dev-cadence's local precheck (dev-cadence §4.12), in each layout's `scripts/`
+PRECHECK_SCRIPT = "precheck.py"  # agent-cadence's local precheck (agent-cadence §4.12), in each layout's `scripts/`
 PRECHECK_READ = 20.0
 
 
@@ -253,8 +253,8 @@ def precheck_command(root: Path | str, rev: str) -> tuple[str | None, str | None
 
 
 def precheck_script(root: Path | str) -> tuple[tuple[list[str], dict[str, str] | None] | None, str | None]:
-    """How to start dev-cadence's `precheck.py` for `root` (design §6 *What runs*, TD-1037): `((argv, env), None)`
-    in the gate's three layouts — dev-cadence's own `files/scripts/`, the resolver's `dev-cadence run` in a
+    """How to start agent-cadence's `precheck.py` for `root` (design §6 *What runs*, TD-1037): `((argv, env), None)`
+    in the gate's three layouts — agent-cadence's own `files/scripts/`, the resolver's `agent-cadence run` in a
     pinned repo (its env `command`'s, as the pinned gate runs), the checkout's `scripts/` — env None but in the
     pinned one; `(None, why)` where the script is absent, as in a pinned tree older than it."""
     absent = f"no {PRECHECK_SCRIPT} here"

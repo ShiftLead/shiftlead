@@ -1,7 +1,7 @@
 """TD-1024 (design §5 *The seams*, §4.2 the line's two modes): the repo reading carries `hook_pinned`, and
 the Repo page's words follow it — a pinned repo's per-clone cures name the launcher, not `sync.sh`; its
-SessionStart line of a past vintage *predates the pin*; a line no vintage matches but naming dev-cadence's
-runner or launcher is *not one this build knows*; and dev-cadence's source still reads as its source once
+SessionStart line of a past vintage *predates the pin*; a line no vintage matches but naming agent-cadence's
+runner or launcher is *not one this build knows*; and agent-cadence's source still reads as its source once
 `sync.sh` retires (`launcher/INTERFACE`)."""
 
 from __future__ import annotations
@@ -22,12 +22,12 @@ from shiftlead.adapters.claude_code import CADENCE_HOOK_LINE, CADENCE_HOOK_LINES
 pytestmark = pytest.mark.unit
 
 LEDGER = "# Technical debt\n\n## TD-001: One thing\n\n**Priority:** Low\n**Status:** Open.\n\n---\n"
-PIN = f'[dev-cadence]\nsource = "https://example.invalid/dev-cadence.git"\nref = "{"a" * 40}"\n'
-DEV_CADENCE = Path(os.environ.get("DEV_CADENCE_SOURCE", "~/dev-cadence")).expanduser()
+PIN = f'[agent-cadence]\nsource = "https://example.invalid/agent-cadence.git"\nref = "{"a" * 40}"\n'
+AGENT_CADENCE = Path(os.environ.get("AGENT_CADENCE_SOURCE", "~/agent-cadence")).expanduser()
 OLD_SHIM = f'#!/bin/sh\n# {seams.SHIM_MARKER} — written by scripts/install_git_hooks.sh\nexec "$hook"\n'
 NEW_SHIM = (
     f"#!/usr/bin/env bash\n# {seams.SHIM_MARKER} — written by scripts/install_git_hooks.sh\n"
-    'if grep -qsE \'^\\[dev-cadence\\]\' x; then dev-cadence hook "${0##*/}" "$@"; fi\n'
+    'if grep -qsE \'^\\[agent-cadence\\]\' x; then agent-cadence hook "${0##*/}" "$@"; fi\n'
 )
 UNKNOWN = doctor.UNKNOWN_SESSION_START
 NO_LINE = doctor.NO_SESSION_START
@@ -35,7 +35,7 @@ NO_LINE = doctor.NO_SESSION_START
 
 def _repo(tmp_path: Path, pinned: bool, name: str = "notes") -> Path:
     """A served checkout with a board and a worktree setup, so only the per-clone and SessionStart words
-    are said: pinned (`docs/cadence.toml`'s `[dev-cadence]`, the gate stood for by a resolved reading) or
+    are said: pinned (`docs/cadence.toml`'s `[agent-cadence]`, the gate stood for by a resolved reading) or
     on the copy (the lock)."""
     root = tmp_path / name
     (root / "docs").mkdir(parents=True)
@@ -62,10 +62,10 @@ def _settings(root: Path, *commands: str) -> None:
 
 @pytest.fixture
 def roster(tmp_path, monkeypatch):
-    path = tmp_path / "config" / "dev-cadence" / "repos.txt"
+    path = tmp_path / "config" / "agent-cadence" / "repos.txt"
     path.parent.mkdir(parents=True)
     path.write_text("/elsewhere\n")
-    monkeypatch.setattr(seams.hosts, "DEV_CADENCE_ROSTER", str(path))
+    monkeypatch.setattr(seams.hosts, "AGENT_CADENCE_ROSTER", str(path))
     monkeypatch.setattr(seams, "descends", lambda *a: (True, None))
     # a pinned repo is served by its resolved tree; these tests read the words, not the resolver
     monkeypatch.setattr(seams, "serve", lambda *a, **k: {"ok": True, "lacks": []})
@@ -90,17 +90,18 @@ def test_a_pinned_repo_with_the_current_line_the_td129_shim_and_a_roster_line_wa
 
 def test_a_pinned_repos_pre_pin_line_shim_and_missing_roster_line_each_get_the_launchers_cure(tmp_path, roster):
     root = _repo(tmp_path, pinned=True)
-    _settings(root, CADENCE_HOOK_LINES_PAST[0])
+    _settings(root, CADENCE_HOOK_LINES_PAST[1])
     (root / ".git" / "hooks" / "pre-push").write_text(OLD_SHIM)
     assert _said(root) == [
-        f"dev-cadence's per-clone setup not run in this checkout — `dev-cadence -C {root} run install_git_hooks.sh`",
-        f"not on dev-cadence's roster: its gc may remove the tree this repo pins — "
-        f"`dev-cadence -C <dev-cadence> adopt {root}`",
+        "agent-cadence's per-clone setup not run in this checkout — "
+        f"`agent-cadence -C {root} run install_git_hooks.sh`",
+        f"not on agent-cadence's roster: its gc may remove the tree this repo pins — "
+        f"`agent-cadence -C <agent-cadence> adopt {root}`",
         "SessionStart line predates the pin: a session started outside ShiftLead runs no cadence hook"
-        f" — copy the line from `dev-cadence -C {root} path .claude/settings.json`",
+        f" — copy the line from `agent-cadence -C {root} path .claude/settings.json`",
     ]
     # the 2026-09-25 line beside the current one is the line: nothing predates the pin
-    _settings(root, CADENCE_HOOK_LINES_PAST[0], CADENCE_HOOK_LINE)
+    _settings(root, CADENCE_HOOK_LINES_PAST[1], CADENCE_HOOK_LINE)
     assert not [w for w in _said(root) if "predates the pin" in w]
     # no `.git` to read: the shim is not said, as on the copy
     assert seams.shimmed(tmp_path / "nowhere", pinned=True) is None
@@ -108,11 +109,12 @@ def test_a_pinned_repos_pre_pin_line_shim_and_missing_roster_line_each_get_the_l
 
 def test_an_unpinned_repo_keeps_todays_three_words(tmp_path, roster):
     root = _repo(tmp_path, pinned=False)
-    _settings(root, CADENCE_HOOK_LINES_PAST[0])
+    _settings(root, CADENCE_HOOK_LINES_PAST[1])
     assert seams.reading(root)["hook_pinned"] is False
     assert _said(root) == [
-        f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh --pin {root}`",
-        f"not on dev-cadence's roster: the copy is retired, so move it to a pin — `<dev-cadence>/sync.sh --pin {root}`",
+        f"agent-cadence's per-clone setup not run in this checkout — `<agent-cadence>/sync.sh --pin {root}`",
+        "not on agent-cadence's roster: the copy is retired, so move it to a pin — "
+        f"`<agent-cadence>/sync.sh --pin {root}`",
     ], "a past vintage on the copy is the line"
     (root / ".git" / "hooks" / "pre-push").write_text(OLD_SHIM)
     roster.write_text(f"{root.resolve()}\n")
@@ -126,7 +128,7 @@ def test_a_line_one_byte_off_is_not_one_this_build_knows_and_beside_the_current_
     assert off != CADENCE_HOOK_LINE
     assert doctor.missing_seams({**base, "session_start": [off]}) == [UNKNOWN]
     assert doctor.missing_seams({**base, "session_start": [off, CADENCE_HOOK_LINE]}) == []
-    assert doctor.missing_seams({**base, "session_start": ["(cd x && dev-cadence hook session-start)"]}) == [UNKNOWN]
+    assert doctor.missing_seams({**base, "session_start": ["(cd x && agent-cadence hook session-start)"]}) == [UNKNOWN]
     assert doctor.missing_seams({**base, "session_start": ["echo hi"]}) == [NO_LINE]
     assert doctor.missing_seams({**base, "session_start": []}) == [NO_LINE]
     # pinned, the same: a line it does not know is not also *predates the pin*
@@ -135,7 +137,7 @@ def test_a_line_one_byte_off_is_not_one_this_build_knows_and_beside_the_current_
 
 def test_a_reading_without_hook_pinned_reads_unpinned():
     """An older host agent's reading carries no `hook_pinned`: today's words, never *predates the pin*."""
-    older = {"warnings": [], "source": False, "session_start": [CADENCE_HOOK_LINES_PAST[0]]}
+    older = {"warnings": [], "source": False, "session_start": [CADENCE_HOOK_LINES_PAST[1]]}
     assert doctor.missing_seams(older) == []
     assert doctor.missing_seams({**older, "hook_pinned": True}) == [
         doctor.PRE_PIN_SESSION_START.format(root="<checkout>")
@@ -143,12 +145,12 @@ def test_a_reading_without_hook_pinned_reads_unpinned():
 
 
 def _shim_at(tmp_path: Path, ref: str) -> str:
-    """The pre-push shim dev-cadence's `install_git_hooks.sh` at `ref` writes into a fresh clone."""
+    """The pre-push shim agent-cadence's `install_git_hooks.sh` at `ref` writes into a fresh clone."""
     done = subprocess.run(
-        ["git", "-C", str(DEV_CADENCE), "archive", ref, "files/scripts"], capture_output=True, timeout=60
+        ["git", "-C", str(AGENT_CADENCE), "archive", ref, "files/scripts"], capture_output=True, timeout=60
     )
     if done.returncode != 0:
-        pytest.skip(f"no {ref} in the dev-cadence checkout")
+        pytest.skip(f"no {ref} in the agent-cadence checkout")
     repo = tmp_path / f"at-{ref}"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
@@ -165,10 +167,12 @@ def _shim_at(tmp_path: Path, ref: str) -> str:
     return (repo / ".git" / "hooks" / "pre-push").read_text()
 
 
-@pytest.mark.skipif(not (DEV_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no dev-cadence checkout")
-def test_dev_cadences_pre_pin_shim_warns_in_a_pinned_repo_and_its_td129_shim_does_not(tmp_path, roster):
+@pytest.mark.skipif(not (AGENT_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no agent-cadence checkout")
+def test_agent_cadences_pre_pin_shim_warns_in_a_pinned_repo_and_its_td129_shim_does_not(tmp_path, roster):
     root = _repo(tmp_path, pinned=True)
-    words = f"dev-cadence's per-clone setup not run in this checkout — `dev-cadence -C {root} run install_git_hooks.sh`"
+    words = (
+        f"agent-cadence's per-clone setup not run in this checkout — `agent-cadence -C {root} run install_git_hooks.sh`"
+    )
     for ref, warned in (("2cc2b88", True), ("ddd2f99", False)):
         shim = _shim_at(tmp_path, ref)
         assert seams.SHIM_MARKER in shim
@@ -180,10 +184,10 @@ def _git(root: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True).stdout.strip()
 
 
-def test_dev_cadences_source_with_launcher_interface_and_no_sync_sh_is_its_source(tmp_path, monkeypatch):
+def test_agent_cadences_source_with_launcher_interface_and_no_sync_sh_is_its_source(tmp_path, monkeypatch):
     """§5 *The seams*: `files/` beside `sync.sh` or, once that retires, `launcher/INTERFACE` — and the roster's
-    dev-cadence checkout `seams.descends` reads the age in is found by the same test."""
-    src = tmp_path / "dev-cadence"
+    agent-cadence checkout `seams.descends` reads the age in is found by the same test."""
+    src = tmp_path / "agent-cadence"
     (src / "files").mkdir(parents=True)
     (src / "launcher").mkdir()
     assert cadence.is_source(src) is False
@@ -283,11 +287,11 @@ def test_a_pin_after_agent_cadences_seed_descends_on_either_history(tmp_path, mo
     assert seams.age(root, [old, new], {**got, "seed": "f" * 40, "descends": False}) == got, "read again"
 
 
-def test_a_brief_in_dev_cadences_source_after_sync_sh_names_files_paths(tmp_path):
+def test_a_brief_in_agent_cadences_source_after_sync_sh_names_files_paths(tmp_path):
     """`repoconfig.layout`'s `{gate}` prefix takes `is_source`'s two-way test, read with `there`."""
     from shiftlead import repoconfig
 
-    src = tmp_path / "dev-cadence"
+    src = tmp_path / "agent-cadence"
     (src / "files").mkdir(parents=True)
     (src / "launcher").mkdir()
     (src / "launcher" / "INTERFACE").write_text("1\n")

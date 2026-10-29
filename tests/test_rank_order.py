@@ -122,7 +122,7 @@ def test_ao_repos_order_is_ledger_py_pickables_from_the_rank_file_alone(tmp_path
     (tmp_path / "docs" / "technical_debt_rank.yml").write_text(rank, encoding="utf-8")
     cp = subprocess.run(
         [sys.executable, str(pinned_script("ledger.py")), "--pickable", "--json"],
-        cwd=tmp_path, env={"DEV_CADENCE_REG_DIR": str(tmp_path / "no-roster"), "PATH": "/usr/bin:/bin"},
+        cwd=tmp_path, env={"AGENT_CADENCE_REG_DIR": str(tmp_path / "no-roster"), "PATH": "/usr/bin:/bin"},
         capture_output=True, text=True, timeout=60, check=True,
     )  # fmt: skip
     script = [e["id"] for e in json.loads(cp.stdout)["pickable"]]

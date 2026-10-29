@@ -9,7 +9,7 @@ laptop browser ──https──▶ shiftlead UI (one process on the home, `shif
                           ├─ state dir  ~/.shiftlead/sessions/<id>.json  ◀── adapter hooks write here
                           ├─ run logs   ~/.shiftlead/runs/<session>.log  ◀── tmux pipe-pane, continuous
                           ├─ policies   (§6: the tick — stop time, usage gate, seats, restarts, promote)
-                          └─ repos from ~/.shiftlead/repos.txt (+ dev-cadence's repos.txt, imported; §5)
+                          └─ repos from ~/.shiftlead/repos.txt (+ agent-cadence's repos.txt, imported; §5)
                               ▲ the node→home link (ssh, or a per-node socket)
               ┌───────────────┴───────────────┐
         node host agent                  node host agent

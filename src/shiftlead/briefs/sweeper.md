@@ -9,7 +9,7 @@ What follows is the repo's own part of this brief — its first reads, its gate,
 {repo}
 
 ## The sweep
-- **The procedure is the repo's, from where dev-cadence keeps it.** In a repo that pins dev-cadence, `dev-cadence path procedures/stranded-work.md` prints the file: read that one. In a repo that syncs dev-cadence's files instead, read its synced `docs/procedures/stranded-work.md`. Follow it as written: this brief copies none of its steps, and where the two seem to differ on how to sweep, the procedure wins.
+- **The procedure is the repo's, from where agent-cadence keeps it.** In a repo that pins agent-cadence, `agent-cadence path procedures/stranded-work.md` prints the file: read that one. In a repo that syncs agent-cadence's files instead, read its synced `docs/procedures/stranded-work.md`. Follow it as written: this brief copies none of its steps, and where the two seem to differ on how to sweep, the procedure wins.
 - **Quick or deep.** Read the board ({board}) on `origin/<default>`: run the **deep** mode when its `Swept-deep:` line is older than the cadence's `deep-sweep-every`, or absent; otherwise the **quick** mode, as the procedure says.
 - **Your worktree and your branch.** You work in your own worktree, as every team session does. A PR you open is on a branch `sweep/<date>` (today's date, from `date`) off a fresh `origin/<default>`, made with `gh`. A ledger entry's id comes from `ao td reserve`, never by hand.
 

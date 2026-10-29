@@ -276,7 +276,7 @@ def test_repo_wires_cadence_and_layer_choice(tmp_path, monkeypatch):
         ],
     )
     assert repo_wires_cadence(legacy) is True
-    other = tmp_path / "other"  # SessionStart hooks of its own, none of them dev-cadence's
+    other = tmp_path / "other"  # SessionStart hooks of its own, none of them agent-cadence's
     _settings(other, ["echo hi"])
     assert repo_wires_cadence(other) is False
     broken = tmp_path / "broken"

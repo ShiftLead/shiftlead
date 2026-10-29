@@ -1,7 +1,7 @@
 """The ledger's entry headers, read (design §4.4 *Repo facts*, TD-176 slice 1).
 
 A repo's ledger (`.shiftlead.yml`'s `ledger:`, else `docs/ledger` where that is a directory, else
-`docs/technical_debt.md`: `ledger_path`) is a v1 file or a v2 directory of one file per entry (dev-cadence
+`docs/technical_debt.md`: `ledger_path`) is a v1 file or a v2 directory of one file per entry (agent-cadence
 TD-160), read through ledgerboard's one `load()` with this module's `fs_io` or `git_io` (§4.4 **Either
 layout**, TD-1144) — the same text either way, of entries, each `## TD-NNN: title` followed by header fields —
 `**Priority:**`, `**Owner:**`, `**Kind:**`, `**Type:**`, `**Blocked by:**`. This module is the one reader of
@@ -9,7 +9,7 @@ those fields: the Org's Repo facet and the Repo page count what it returns, and 
 the repo's own ledger to its rules through the same reader. Every line shape — a heading, a field, a `Blocked by`
 item, `Answers:` — is ledgerboard's (`sessionorc.ledgerboard`, the vendored release, ADR 2026-10-12,
 TD-585); what a field is *for* is this module's. **Pickable is derived** from `Blocked by:` by cadence §2.4's
-rule (TD-228), the rule dev-cadence's `scripts/ledger.py` applies, and `tests/test_ledger_derived.py` holds
+rule (TD-228), the rule agent-cadence's `scripts/ledger.py` applies, and `tests/test_ledger_derived.py` holds
 the two readers equal; a `**Pickable:**` line a ledger still writes is not read.
 
 Two reads. `entries` parses one version of the file: an entry counts while its section is in it.
@@ -38,7 +38,7 @@ from sessionorc.models import owner_word
 # origin's default branch as last fetched; the two usual names when `origin/HEAD` was never set
 DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 DEFAULT = "docs/technical_debt.md"  # the `ledger:` default, as `shiftlead.repoconfig` has it
-LEDGER_REL, ARCHIVE_REL = DEFAULT, "docs/technical_debt_archive.md"  # dev-cadence's `ledger.py`'s names
+LEDGER_REL, ARCHIVE_REL = DEFAULT, "docs/technical_debt_archive.md"  # agent-cadence's `ledger.py`'s names
 LEDGER_DIR_REL = "docs/ledger"  # a v2 ledger (dev-cadence TD-160): the default where it is a directory
 
 # the fields ShiftLead reads further down the body when the header block lacks them, by any spelling
@@ -56,7 +56,7 @@ TYPES = lb.TYPES  # cadence §2.11: pick order within a Priority; the first is t
 WINDOWS = {"day": timedelta(days=1), "week": timedelta(days=7), "month": timedelta(days=30)}
 # A *for you* entry's reading for its Inbox row (§4.5 screen 6 *The ledger's entries that wait on you*,
 # TD-565): its `**Answers:**` in cadence §3.5's form, and its Why and Fix clipped as a board item's
-# detail block is (dev-cadence's `MAX_DETAIL_LINES`).
+# detail block is (agent-cadence's `MAX_DETAIL_LINES`).
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 DETAIL_FIELDS = ("Why", "Fix")
 MAX_DETAIL_LINES = 20
@@ -628,7 +628,7 @@ def git_io(root: Path | str, ref: str, under: str = "", timeout: float = 10.0, r
     `under` (empty: the top level, and there `ledger/` and `rel` — the ledger asked for, where it is a
     directory — never the tree recursively), and a
     read of a v2 entry file or `README.md` fetches its directory's others with it in one `git cat-file
-    --batch` — only those, never the directory's other files; any other path is fetched alone. dev-cadence's
+    --batch` — only those, never the directory's other files; any other path is fetched alone. agent-cadence's
     `files/scripts/ledger.py` `git_io` is the worked example (TD-1144)."""
     if under:
         listed = _git(root, "ls-tree", "-r", "-z", "--full-tree", ref, "--", under, timeout=timeout)
@@ -694,7 +694,7 @@ def git_io(root: Path | str, ref: str, under: str = "", timeout: float = 10.0, r
 def layout_at(rel: str, arel: str | None, io: Io) -> tuple[str, str | None]:
     """(ledger, archive) as the tree `io` reads holds them: `rel` and `arel` when `rel` is there, else the
     other layout's beside it — a split came between (dev-cadence TD-160): a v1 file's `ledger/` directory
-    (its archive inside it, so None), or a directory's v1 file and archive. dev-cadence's
+    (its archive inside it, so None), or a directory's v1 file and archive. agent-cadence's
     `files/scripts/ledger.py` `layout_at`, copied; `tests/test_ledger_layout.py` holds the two equal."""
     if io[0](rel) is not None or io[1](rel) is not None:
         return rel, arel
@@ -964,7 +964,7 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
     if not (Path(root) / rel).is_dir():
         out = _log(root, timeout, fmt, "-p", "--unified=0", "--", rel)
         return None if out is None else _parse_log(out, skip)
-    # the v1 file beside the directory, by dev-cadence's names (`layout_at`): a custom-named v1 file is not read
+    # the v1 file beside the directory, by agent-cadence's names (`layout_at`): a custom-named v1 file is not read
     v1 = layout_at(rel, None, (lambda p: None, lambda p: None))[0]
     one = _log(root, timeout, fmt, "-p", "--unified=0", "--", v1)
     two = _log(root, timeout, fmt, "--name-status", "--", rel)

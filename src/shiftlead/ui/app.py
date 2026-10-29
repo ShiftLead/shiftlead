@@ -2354,7 +2354,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         press: str = "",  # `start`: the landing is **Start session**'s, and the warning says so
     ):
         profs, default = profiles_mod.load()
-        # registered repos (design §5 *Repos*: the home's roster and dev-cadence's, or `repos_registry`) first,
+        # registered repos (design §5 *Repos*: the home's roster and agent-cadence's, or `repos_registry`) first,
         # then recent directories; phase 1 reads the local host's file directly
         repos = hosts.local_host().repos()
         recent = repos + [d for d in await call("recent_dirs") if d not in repos]

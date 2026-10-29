@@ -1,6 +1,6 @@
 """§4.4 *Repo facts* **The seams** (§5 *The seams*; TD-584, built by TD-591 slice 1): the host agent's
 reading of what a repo has — its ledger parsing through ledgerboard and its major, `board:` and
-`worktree_setup:` each set, defaulted or absent, whether it is served (TD-1011: dev-cadence's tree, the
+`worktree_setup:` each set, defaulted or absent, whether it is served (TD-1011: agent-cadence's tree, the
 gate and the ledger) and its warnings — on the repo reading as `seams`."""
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def test_a_repo_with_only_a_ledger_has_every_other_seam_absent(tmp_path):
 
 
 @pytest.mark.unit
-def test_dev_cadences_files_are_the_defaults_and_shiftlead_yml_sets_each(tmp_path):
+def test_agent_cadences_files_are_the_defaults_and_shiftlead_yml_sets_each(tmp_path):
     root = make(tmp_path)
     (root / workorders.BOARD).write_text("# Board\n")
     (root / "scripts").mkdir()
@@ -112,7 +112,7 @@ def test_a_repo_read_that_fails_keeps_the_last_seams(tmp_path, monkeypatch):
 
 
 def served(tmp_path: Path, name: str = "r") -> Path:
-    """A repo holding all three: dev-cadence's lock, the gate and a ledger."""
+    """A repo holding all three: agent-cadence's lock, the gate and a ledger."""
     root = make(tmp_path, name)
     (root / "scripts").mkdir()
     (root / cadence.SCRIPT).write_text("")
@@ -122,7 +122,7 @@ def served(tmp_path: Path, name: str = "r") -> Path:
 
 @pytest.mark.unit
 def test_a_repo_lacking_each_of_the_three_is_unserved_in_its_words(tmp_path):
-    """TD-1011, §5 *The seams*: dev-cadence's tree, the gate and the ledger, each lack in its fixed words
+    """TD-1011, §5 *The seams*: agent-cadence's tree, the gate and the ledger, each lack in its fixed words
     with its cure; with all three the repo is served."""
     root = served(tmp_path)
     assert seams.reading(root)["serve"] == {"ok": True, "lacks": []}
@@ -133,16 +133,18 @@ def test_a_repo_lacking_each_of_the_three_is_unserved_in_its_words(tmp_path):
         "lacks": [
             {
                 "key": "cadence",
-                "words": f"unserved: no dev-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — {cure}",
+                "words": (
+                    f"unserved: no agent-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — {cure}"
+                ),
             }
         ],
     }
     (root / "docs" / "cadence-sync.lock").write_text("source: x\n")
     words = seams.reading(root)["serve"]["lacks"][0]["words"]
-    assert words == f"unserved: dev-cadence's lock does not parse — it has no files_commit line — {cure}"
+    assert words == f"unserved: agent-cadence's lock does not parse — it has no files_commit line — {cure}"
     (root / "docs" / "cadence-sync.lock").write_bytes(b"\xff\xfe")
     assert seams.reading(root)["serve"]["lacks"][0]["words"].startswith(
-        "unserved: dev-cadence's lock does not parse — "
+        "unserved: agent-cadence's lock does not parse — "
     )
     (root / "docs" / "cadence-sync.lock").write_text("files_commit: abc123\n")
     (root / cadence.SCRIPT).unlink()
@@ -163,8 +165,8 @@ def test_a_repo_lacking_each_of_the_three_is_unserved_in_its_words(tmp_path):
 
 
 @pytest.mark.unit
-def test_dev_cadences_source_is_served_with_no_lock_and_its_gate_under_files(tmp_path):
-    root = make(tmp_path, "dev-cadence")
+def test_agent_cadences_source_is_served_with_no_lock_and_its_gate_under_files(tmp_path):
+    root = make(tmp_path, "agent-cadence")
     (root / "sync.sh").write_text("#!/bin/sh\n")
     (root / "files" / "scripts").mkdir(parents=True)
     got = seams.reading(root)
@@ -179,7 +181,7 @@ def test_dev_cadences_source_is_served_with_no_lock_and_its_gate_under_files(tmp
 
 @pytest.mark.unit
 def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path, monkeypatch):
-    monkeypatch.setattr(seams, "descends", lambda *a: (True, None))  # dev-cadence's age: tests/test_repo_seams.py
+    monkeypatch.setattr(seams, "descends", lambda *a: (True, None))  # agent-cadence's age: tests/test_repo_seams.py
     root = served(tmp_path)
     assert seams.reading(root)["warnings"] == ["no board at docs/user_attention.md", "no worktree setup"]
     (root / ".shiftlead.yml").write_text("board: notes/board.md\n")
@@ -191,7 +193,7 @@ def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path, mo
     hydrate.chmod(0o755)
     assert seams.reading(root)["warnings"] == [], "no .git directory: the shim is not read"
     (root / ".git" / "hooks").mkdir(parents=True)
-    shim = f"dev-cadence's per-clone setup not run in this checkout — `<dev-cadence>/sync.sh --pin {root}`"
+    shim = f"agent-cadence's per-clone setup not run in this checkout — `<agent-cadence>/sync.sh --pin {root}`"
     assert seams.reading(root)["warnings"] == [shim]
     (root / ".git" / "hooks" / "pre-push").write_text(f"#!/bin/sh\n# {seams.SHIM_MARKER} — written by x\n")
     assert seams.reading(root)["warnings"] == []
@@ -206,23 +208,24 @@ def test_the_three_warnings_and_the_session_start_commands_are_read(tmp_path, mo
 
 
 @pytest.mark.unit
-def test_a_served_repo_missing_from_dev_cadences_roster_is_warned_of(tmp_path, monkeypatch):
-    """TD-1010, TD-1188, §4.7 `ao repo add`: while a served repo on the copy is not on dev-cadence's own roster,
+def test_a_served_repo_missing_from_agent_cadences_roster_is_warned_of(tmp_path, monkeypatch):
+    """TD-1010, TD-1188, §4.7 `ao repo add`: while a served repo on the copy is not on agent-cadence's own roster,
     the cure is the move to a pin; nothing is said where that roster cannot be read, of an unserved repo, or of
-    dev-cadence's source."""
+    agent-cadence's source."""
     monkeypatch.setattr(seams, "descends", lambda *a: (True, None))
     root = served(tmp_path / "notes")
     (root / workorders.BOARD).write_text("# Board\n")
     hydrate = root / gitinfo.HYDRATE
     hydrate.write_text("#!/bin/sh\n")
     hydrate.chmod(0o755)
-    roster = tmp_path / "config" / "dev-cadence" / "repos.txt"
-    monkeypatch.setattr(seams.hosts, "DEV_CADENCE_ROSTER", str(roster))
+    roster = tmp_path / "config" / "agent-cadence" / "repos.txt"
+    monkeypatch.setattr(seams.hosts, "AGENT_CADENCE_ROSTER", str(roster))
     assert seams.reading(root)["warnings"] == [], "no roster to read: nothing said"
     roster.parent.mkdir(parents=True)
     roster.write_text("# machine roster\n/elsewhere\n")
     words = (
-        f"not on dev-cadence's roster: the copy is retired, so move it to a pin — `<dev-cadence>/sync.sh --pin {root}`"
+        "not on agent-cadence's roster: the copy is retired, so move it to a pin — "
+        f"`<agent-cadence>/sync.sh --pin {root}`"
     )
     assert seams.reading(root)["warnings"] == [words]
     roster.write_text(f"/elsewhere\n{root.resolve()}\n")
@@ -230,7 +233,7 @@ def test_a_served_repo_missing_from_dev_cadences_roster_is_warned_of(tmp_path, m
     roster.write_text("/elsewhere\n")
     (root / "scripts" / "check_cadence.py").unlink()  # unserved: its lack says what to do, not this
     assert seams.reading(root)["warnings"] == []
-    source = tmp_path / "dev-cadence"
+    source = tmp_path / "agent-cadence"
     (source / "files" / "scripts").mkdir(parents=True)
     (source / "sync.sh").write_text("#!/bin/sh\n")
     assert seams.warnings(source, {"state": "set", "value": None}, {"state": "set"}, None, True) == []
@@ -239,7 +242,7 @@ def test_a_served_repo_missing_from_dev_cadences_roster_is_warned_of(tmp_path, m
 def test_unserved_names_each_lack_and_nothing_on_a_guess():
     """TD-1011: the passes read `seams.unserved` — each lack's words for an unserved repo; none for a
     served one, a reading with no `serve` (an older host agent's), or no reading at all."""
-    lacks = [{"key": "cadence", "words": "unserved: no dev-cadence"}, {"key": "gate"}]
-    assert seams.unserved({"seams": {"serve": {"ok": False, "lacks": lacks}}}) == ["unserved: no dev-cadence", "gate"]
+    lacks = [{"key": "cadence", "words": "unserved: no agent-cadence"}, {"key": "gate"}]
+    assert seams.unserved({"seams": {"serve": {"ok": False, "lacks": lacks}}}) == ["unserved: no agent-cadence", "gate"]
     for r in ({"seams": {"serve": {"ok": True, "lacks": []}}}, {"seams": {"ledger": {}}}, {}, None, {"seams": None}):
         assert seams.unserved(r) == []

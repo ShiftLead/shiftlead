@@ -62,8 +62,8 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       `ssh -tt host tmux attach -t <name>`, bridged to xterm.js with `asyncio` + `os.openpty`;
       resize is `TIOCSWINSZ` on the local pty. The host agent stays the only per-host process.
       ttyd remains the fallback if the bridge proves flaky on slow links (§4.5b).
-- [x] `.agentorc.yml` vs. a section in dev-cadence's per-repo config (2026-09-04): its own
-      file; dev-cadence stays the cadence system, ShiftLead reads its registry and, via the host
+- [x] `.agentorc.yml` vs. a section in agent-cadence's per-repo config (2026-09-04): its own
+      file; agent-cadence stays the cadence system, ShiftLead reads its registry and, via the host
       agent only, edits and commits board items (§4.7).
 - [x] Repo layout (2026-09-04): **one repo, two packages**, `sessionorc` below the adapter
       contract and `shiftlead` above it; `sessionorc` imports nothing from `shiftlead`; split into

@@ -112,7 +112,7 @@ GLOSS = {
     "5": "the settings file, the repo's `.shiftlead.yml`, and where each setting lives.",
     "6": "the tick's policies: usage gates, run windows, restarts, promote, balance.",
     "7": "the phase plan, re-baselined against what runs, and what each phase still lacks.",
-    "8": "lessons carried in from dev-cadence and tdgrind.",
+    "8": "lessons carried in from agent-cadence and tdgrind.",
     "9": "the rules that hold whatever else changes.",
     "10": "the dated log of questions, each a decision that changes what gets built.",
     "11": "files, repos and documents the design cites.",

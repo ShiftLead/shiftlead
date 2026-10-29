@@ -1435,9 +1435,9 @@ class HostAgent(
                 # server may predate this agent and carry a different environment; a hook script
                 # inside the session must find *this* agent's socket (found the hard way, 2026-09-06).
                 # AGENT_NAME is the name the Org shows, for whatever in the session signs its work —
-                # dev-cadence's commit hook writes it as a co-author (TD-185). Tool-neutral: every
+                # agent-cadence's commit hook writes it as a co-author (TD-185). Tool-neutral: every
                 # adapter's session gets it, and a blank name was given its automatic one above.
-                # CADENCE_ATTENTION_SCOPE tells dev-cadence's start hook whose board to nudge from —
+                # CADENCE_ATTENTION_SCOPE tells agent-cadence's start hook whose board to nudge from —
                 # its own for an unattended session, the machine's for one a person drives — so the
                 # synced script never asks `ao status` (design §4.3, §8, TD-425). AGENT_MODEL and
                 # AGENT_MODEL_FILE name the model for its `Agent-Model:` trailer (§4.2, TD-638).

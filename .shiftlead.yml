@@ -24,7 +24,7 @@ held: ["src/sessionorc/**", "docs/briefs/**"]
 commands: {test: pdm run test, lint: pdm run lint}
 
 # How a new worktree is set up (design §5 *The seams* `worktree_setup:`, TD-589): unset, so the home runs
-# the pinned dev-cadence tree's hydrate_worktree.sh (`gitinfo.hydrate_command`, TD-1044).
+# the pinned agent-cadence tree's hydrate_worktree.sh (`gitinfo.hydrate_command`, TD-1044).
 
 # How long a new ledger entry waits, holdable, before a lane may take it (design §4.4 *A new entry
 # settles before it is pickable*, §5 `settle:`; TD-707, TD-710): a `design-first` entry ten minutes,

@@ -24,7 +24,7 @@ Read [`docs/design.md`](docs/design.md) — §7 has the phase plan, and what is 
 [`docs/ledger/`](docs/ledger/README.md).
 
 Grew out of [samscrape](https://github.com/eyecantell/samscrape)'s `tdgrind` worker supervisor
-and the [dev-cadence](https://github.com/eyecantell/dev-cadence) working-cadence system, whose
+and the [agent-cadence](https://github.com/eyecantell/agent-cadence) working-cadence system, whose
 repo registry it depends on.
 
 ## Start here (handoff, updated 2026-09-06 evening; the next-steps list below is from that
@@ -39,7 +39,7 @@ and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, i
    From the laptop, reach the UI with `ssh -L 8765:127.0.0.1:8765 kmaster`; from the phone, set up
    the Tailscale route (*Reach it from your phone*, below).
 2. **Decisions waiting on Paul**: see [`docs/user_attention.md`](docs/user_attention.md)
-   (dev-cadence PRs #82/#83, GitHub merge settings, the two permission-dialog questions).
+   (agent-cadence PRs #82/#83, GitHub merge settings, the two permission-dialog questions).
 3. **Deferred work** is in [`docs/ledger/`](docs/ledger/README.md) (TD-001 `limited`
    state, TD-002 attachments, TD-003 phone, TD-004 `hosts.yml`, TD-010 adopting hand-started
    sessions), then **phase 2** of [`docs/design.md`](docs/design.md) §7: second host, ssh
@@ -165,8 +165,8 @@ carries it, so hooks inside find the right agent). Profiles: `~/.shiftlead/profi
 `local: true` when the UI runs on the machine you sit at (`vscode://file/…` links). Without the
 file the machine's hostname is used, which is rarely what VS Code can resolve. The same entry
 takes `volatile: true` (a laptop: an unreachable agent is asleep, not an alert), `repos_registry`
-(one file in place of the default: `~/.shiftlead/repos.txt`, then dev-cadence's
-`~/.config/dev-cadence/repos.txt` when it exists; their repos head the New session directory list) and
+(one file in place of the default: `~/.shiftlead/repos.txt`, then agent-cadence's
+`~/.config/agent-cadence/repos.txt` when it exists; their repos head the New session directory list) and
 `runs_keep_days` (default 30; run logs of exited/closed sessions older than that are deleted on
 the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`. A top-level `home: <host>` makes this
 host agent a *node* of that home (design §4.4a); leave it out on a single machine.

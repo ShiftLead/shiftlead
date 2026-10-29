@@ -52,20 +52,20 @@ START_CONTEXT_ENV = "SHIFTLEAD_START_CONTEXT_FILE"
 # `1` when the launch read a layer under which a background command's end wakes the session (design §4.3
 # *A wait the guard refuses*): the tool reads its settings once, at launch, so the hook reads this, never the file
 WAKES_ENV = "SHIFTLEAD_GEMINI_WAKES"
-# dev-cadence's runner (design §4.3 *A repo's start hooks are every adapter's to run*), the main checkout's
+# agent-cadence's runner (design §4.3 *A repo's start hooks are every adapter's to run*), the main checkout's
 START_HOOKS = ("scripts", "cadence_hooks.sh")
 START_HOOKS_TIMEOUT = 150  # seconds: the runner's own bound, > 5 children × its 25 s child timeout
-# a pinned repo's (design §4.2, TD-1023): the launcher's word, from PATH, and the two sentences dev-cadence's
+# a pinned repo's (design §4.2, TD-1023): the launcher's word, from PATH, and the two sentences agent-cadence's
 # seed line prints when it cannot run the pin (exit 2) or there is none, copied from the seed (a parity test)
-PINNED_HOOK = ("dev-cadence", "hook", "session-start")
+PINNED_HOOK = ("agent-cadence", "hook", "session-start")
 PIN_FAILED = (
-    "dev-cadence: the launcher could not run the pin in docs/cadence.toml (it said why above), "
+    "agent-cadence: the launcher could not run the pin in docs/cadence.toml (it said why above), "
     "so the cadence session-start hooks did not run (TD-129)"
 )
 NO_LAUNCHER = (
-    "dev-cadence: this repo pins dev-cadence in docs/cadence.toml but no dev-cadence launcher is on PATH, "
-    "so the cadence session-start hooks did not run; install it once per machine: clone dev-cadence at its "
-    "latest tag, then run: install -m 755 launcher/dev_cadence.py ~/.local/bin/dev-cadence"
+    "agent-cadence: this repo pins agent-cadence in docs/cadence.toml but no agent-cadence launcher is on PATH, "
+    "so the cadence session-start hooks did not run; install it once per machine: clone agent-cadence at its "
+    "latest tag, then run: install -m 755 launcher/agent_cadence.py ~/.local/bin/agent-cadence"
 )
 
 
@@ -140,7 +140,7 @@ def start_context(payload: dict[str, Any]) -> str:
 
 def start_hooks(payload: dict[str, Any]) -> str:
     """Run the repo's start hooks, as Claude Code's layer line does (`CADENCE_HOOK_LINE`). In a pinned repo
-    (`cadence.hook_pinned`), `dev-cadence hook session-start` from PATH in `cwd`, the payload on its stdin:
+    (`cadence.hook_pinned`), `agent-cadence hook session-start` from PATH in `cwd`, the payload on its stdin:
     its stdout whatever its exit, then `PIN_FAILED` after an exit 2; `PIN_FAILED` alone on a timeout, and
     `NO_LAUNCHER` with none on PATH — never "" (design §4.2, TD-1023). Otherwise the main checkout's
     runner — the first entry of `git worktree list` — else the project's own copy, only where it is

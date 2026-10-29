@@ -311,14 +311,15 @@ def test_a_new_worktree_is_set_up_by_the_repos_worktree_setup(tmp_path):
 
 
 def _pinned_repo(tmp_path, ref: str):
-    """A repo pinned to dev-cadence (`docs/cadence.toml`'s `[dev-cadence]`, no lock), with no
+    """A repo pinned to agent-cadence (`docs/cadence.toml`'s `[agent-cadence]`, no lock), with no
     `scripts/hydrate_worktree.sh` of its own — the pin removed it (dev-cadence TD-129)."""
     repo = tmp_path / "pinned"
     (repo / "docs").mkdir(parents=True)
     run("git", "init", "-q", "-b", "main", cwd=repo)
     run("git", "config", "user.email", "t@t", cwd=repo)
     run("git", "config", "user.name", "t", cwd=repo)
-    (repo / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/nowhere/dev-cadence.git"\nref = "{ref}"\n')
+    pin = f'[agent-cadence]\nsource = "/nowhere/agent-cadence.git"\nref = "{ref}"\n'
+    (repo / "docs" / "cadence.toml").write_text(pin)
     run("git", "add", "docs", cwd=repo)
     run("git", "commit", "-q", "-m", "one", cwd=repo)
     return repo

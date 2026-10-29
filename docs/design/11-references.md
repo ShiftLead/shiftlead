@@ -2,7 +2,7 @@
 
 - samscrape `scripts/tdgrind.sh` (supervisor being generalized), `scripts/list_sessions.py`,
   `scripts/reap_worktrees.sh`, `docs/cadence.md`
-- eyecantell/dev-cadence — registry `~/.config/dev-cadence/repos.txt`, `/attention`;
+- eyecantell/agent-cadence — registry `~/.config/agent-cadence/repos.txt`, `/attention`;
   adoption and the two upstream PRs: [ADR 2026-09-06](../decisions/2026-09-06-adopt-dev-cadence.md)
 - eyecantell/textual-cmdorc — command specs for the buttons
 - Claude Code hooks: https://code.claude.com/docs/en/hooks

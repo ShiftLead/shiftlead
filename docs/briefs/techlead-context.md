@@ -125,19 +125,19 @@ agreement binds once written in the shared entry, the PR or the design (§4.10).
 
 ## 6. How work lands here
 
-The cadence rules: `dev-cadence path cadence.md` prints the pinned file (this repo pins dev-cadence
+The cadence rules: `agent-cadence path cadence.md` prints the pinned file (this repo pins agent-cadence
 in `docs/cadence.toml`). Every change goes branch → PR → squash merge; the pre-push hook blocks `main`.
 Every PR gets an **independent cheaper-model review** (code) or **fact-check** (docs), recorded
 as a PR comment whose first line is `cadence-review: SHIP|FIXED|BLOCK · <model> · <code|docs> ·
-<n> findings` and which is never edited; merge only when `dev-cadence run check_cadence.py --pr
+<n> findings` and which is never edited; merge only when `agent-cadence run check_cadence.py --pr
 N` exits 0. **A PR touching `src/sessionorc/` or `docs/briefs/` waits for this seat's read**
 (TD-093, design §4.9b *The reader*): the grinder role carries `review: {reader: techlead,
 held: [...]}` in `org.yml`, the PR reaches you as an `ask` carrying `pr`, and your brief's
 *A held PR* says how you read it and, for an unattended asker, merge it. **A change to a page is verified by its builder** on a scratch home (`scripts/look_home.py`, design §4.9b): what a browser cannot settle reaches you as an `ask` naming screenshots and a design section, and your brief's *A screenshot ask* says how it is answered — never passed up. `org.yml` is not in
 the repo; a change to it is Paul's. A ledger entry's Status changes in the PR that changes the
 thing; a PR number is written only after the PR exists; bare dates are the machine's local date.
-dev-cadence's scripts and docs are not in this repo: `docs/cadence.toml` pins the commit, and
-`dev-cadence run <script>` / `dev-cadence path <name>` reach them; they are changed in dev-cadence.
+agent-cadence's scripts and docs are not in this repo: `docs/cadence.toml` pins the commit, and
+`agent-cadence run <script>` / `agent-cadence path <name>` reach them; they are changed in agent-cadence.
 The live system is **promoted, not
 edited** (CLAUDE.md): nothing a worker does touches `~/.shiftlead`, the live venv, systemd, or a
 session it does not control. Tests run on private tmux sockets and a temporary home

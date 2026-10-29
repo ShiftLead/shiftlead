@@ -6,7 +6,7 @@ of a team servicing the repo, and counted by rule 8, until a session closes the 
 
 The board is read in-process through the vendored `ledgerboard.py` (design §8 *Which side a thing
 lives on*, ADR 2026-10-12, TD-585): its `parse_board`, `item_record`, `item_key` and line shapes,
-never a second parser here and no dev-cadence script, so a repo with a board needs no dev-cadence.
+never a second parser here and no agent-cadence script, so a repo with a board needs no agent-cadence.
 Origin's side is this module's own fetch (`_against_origin`, §4.5 screen 6 *Boards are read against
 origin*): a board merely behind origin is read from origin. A `fyi` line and a closed line are never
 work orders; a line whose `Decided:` is gone leaves on the next reading.
@@ -46,7 +46,7 @@ NO_LINE = "no line {ref} on the board — reworded or closed"
 # origin has no board · matches · behind — only origin moved, its copy is read · local — only this
 # checkout moved · both — both moved, or no common history to tell
 FETCH_CASES = ("skipped", "none", "matches", "behind", "local", "both")
-# The board's sweep stamps (cadence §3.10), the cadence reader's own (dev-cadence `nudge_user_attention.py`
+# The board's sweep stamps (cadence §3.10), the cadence reader's own (agent-cadence `nudge_user_attention.py`
 # `SWEEP_RE` and `SWEEP_DEEP_RE`), ported verbatim so the sweep seat and `/attention` never disagree on
 # whether a board is swept (design §4.9b *The sweep*, TD-1090)
 SWEEP_RE = re.compile(r"^Swept:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*(?:\((?P<meta>[^)]*)\))?", re.MULTILINE)
@@ -139,7 +139,7 @@ def _git(root: Path, args: list[str], timeout: float) -> subprocess.CompletedPro
 
 def default_branch(root: Path) -> str:
     """The repo's default branch: the first of origin/HEAD's target, `init.defaultBranch`, `main`
-    and `master` that origin has, else `main` (dev-cadence's rule, cadence §9)."""
+    and `master` that origin has, else `main` (agent-cadence's rule, cadence §9)."""
     got = _git(root, ["symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"], READ_TIMEOUT)
     named = got.stdout.decode().strip().removeprefix("origin/") if got.returncode == 0 else ""
     cfg = _git(root, ["config", "init.defaultBranch"], READ_TIMEOUT)

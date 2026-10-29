@@ -387,7 +387,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      does next is its own, and a member still idle another `IDLE_NUDGE` later reads *idle · open
      work* in the slot for a person or its manager to judge.
   **What is left is judgement, and a seat holds it.** Four of the manager's round's jobs read
-  fields and scripts and no screen — the cadence check (dev-cadence's gate, §5 *The seams*;
+  fields and scripts and no screen — the cadence check (agent-cadence's gate, §5 *The seams*;
   `check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files against `held:`, the reader's reply in a
   mailbox the home holds), the relay of `docs/cadence-changes.md` (a file as merged, a list of
   headings) and the chase of an owed outcome (the record's `owed()`) — and they are rules 10, 11
@@ -978,7 +978,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the reports' five-minute cadence, detached as `seat_count`'s read is: the script run `--json`
      in the registry root the record's `repo` names, at the home (a node's member's checkout is at
      the same absolute path, §4.4a; a path the home cannot see, or a root without the script — a
-     repo not on dev-cadence — gives no reading), one PR per run; its exit of 2 (no such PR) ends
+     repo not on agent-cadence — gives no reading), one PR per run; its exit of 2 (no such PR) ends
      the reading, and an `unknown` verdict is kept and read again on the next cadence, nothing
      told. The entry keeps the head it was read at, so a PR whose head moved is read again: the
      head and the PR's state are read from the repo's PR reading (§4.4 *Repo facts*: its open PRs
@@ -1011,9 +1011,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      status -v` prints the record's last check per PR; a member on a node is checked as any (the
      script runs at the home) and told by the clause alone, as rule 5 tells it. **Not this
      rule's**: a PR from a session with no `progress` entry naming it (a person's anchor — the
-     cadence is theirs to run). **The gate is dev-cadence's `check_cadence.py`** (§5 *The seams*; [ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md), *Decision* 2; TD-1011): `scripts/check_cadence.py --pr <n> --json`, run by the shell in
+     cadence is theirs to run). **The gate is agent-cadence's `check_cadence.py`** (§5 *The seams*; [ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md), *Decision* 2; TD-1011): `scripts/check_cadence.py --pr <n> --json`, run by the shell in
      the checkout (under dev-cadence TD-129, the resolver's command, §5 *How the readers find
-     dev-cadence*), its rows kept as above, and a run that does not end in the script's time is no
+     agent-cadence*), its rows kept as above, and a run that does not end in the script's time is no
      reading. There is no `gate:` key and no repo without a gate: a repo that lacks the script is
      unserved (§5), so the home runs no gate there and its review stage never merges; the Repo page
      and `ao doctor` say *unserved: no gate*, and nothing is written on the record.
@@ -1067,10 +1067,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      again next cadence, never a crossing by default. A node's member is read as rule 10 reads
      one.
   12. **Conventions relayed** (`sessionorc.conventions`, the tick's `_conventions_pass`).
-     dev-cadence's SessionStart hook prints the new entries of `docs/cadence-changes.md` to a
+     agent-cadence's SessionStart hook prints the new entries of `docs/cadence-changes.md` to a
      session that starts, so only a session that outlives a change needs telling, and the tick
      tells it as rule 6 tells lane news. For each registry root at the home whose checkout holds
-     `scripts/cadence_changes.py` (in dev-cadence's source `files/scripts/cadence_changes.py`, §5 *The seams*; in a pinned repo the pinned tree's, run through the resolver, §5 *How the readers find dev-cadence*, which reads dev-cadence's own changes, *In a pinned repo* below) — every served repo's — the home runs it `--json` on the reports' cadence — it reads
+     `scripts/cadence_changes.py` (in agent-cadence's source `files/scripts/cadence_changes.py`, §5 *The seams*; in a pinned repo the pinned tree's, run through the resolver, §5 *How the readers find agent-cadence*, which reads agent-cadence's own changes, *In a pinned repo* below) — every served repo's — the home runs it `--json` on the reports' cadence — it reads
      the file as merged, `origin/<default>`, as rule 7 reads a brief's file — taking each entry's
      `heading` and `landed`; a root without the script, or whose origin has no default branch
      (exit 2), gives no reading. On each supervised member record of that root, not a seat (every
@@ -1090,16 +1090,16 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      any mail reaches it. A member restarted by any rule starts with no `conventions_seen`, is
      written afresh at its create, and the hook has told it. **The manager's `relayed.json` is
      gone**: nothing reads it, and neither the preset nor this repo's supplement names the step.
-     **In a pinned repo** (TD-1025) the changes are dev-cadence's own and arrive by a bump: the
+     **In a pinned repo** (TD-1025) the changes are agent-cadence's own and arrive by a bump: the
      repo carries no `docs/cadence-changes.md` once migrated, and the bump PR's body lists the entries
-     between the two pins for its reviewer alone (dev-cadence's plan, *Decision* 7). **The script reads
+     between the two pins for its reviewer alone (dev-cadence's private plan *2026-10-25-pinned-not-synced*, *Decision* 7). **The script reads
      them, not the home**, and the home's call is the same: the resolver runs the script from the tree
      of the *checkout's* pin (§5), and the script reads the pin on **`origin/<default>`**
      (`docs/cadence.toml` there, as rule 7 reads a brief's file) and the `cadence-changes.md` of the
-     dev-cadence commit it names, from the launcher's bare clone of the source, never the repo — reached
+     agent-cadence commit it names, from the launcher's bare clone of the source, never the repo — reached
      through the pinned tree's own cache code under the cache's lock (a function beside
      `_source_clone` in the tree's `launcher/words.py`, which the script imports when it runs from a
-     tree — `launcher/words.py` at its `../../`, as dev-cadence's own checkout has it too; in a tree
+     tree — `launcher/words.py` at its `../../`, as agent-cadence's own checkout has it too; in a tree
      with no pin on origin it reads as today, the repo's own file; the launcher itself is frozen — outside a tree, a synced copy, the pin on origin is
      not read: origin's file is the repo's own path as today, so once migrated it gives none, never exit
      2, in `--json` and `--hook` alike, with no *behind* line; that copy runs only while the main
@@ -1108,7 +1108,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      older line nothing runs, or the worktree's own copy, which says nothing (dev-cadence TD-149) — and
      the wordings below for it stand), the lock taken only to clone or fetch (origin's pin commit absent, or no clone),
      non-blocking with a 20-second deadline, a miss exit 2 — the walk's object reads take none, as
-     `--hook`'s do; `source` and `ref` both come from origin's `[dev-cadence]` table, parsed with `tomllib` and
+     `--hook`'s do; `source` and `ref` both come from origin's `[agent-cadence]` table, parsed with `tomllib` and
      checked by the launcher's own patterns, a table that fails either read as no pin; the clone is origin's source's,
      and a walk commit naming another source is skipped as one the clone lacks,
      never a path computed beside it. In `--json`, when origin's pin commit is not in the clone, or there is no
@@ -1130,7 +1130,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      entries listed are the headings of the file at origin's current pin — each heading given the commit where it last
      came in — the first of its latest run of presence in the walk — so an entry withdrawn by a
      rollback and brought back lands again at the rebump, and a member created inside the rollback is
-     told it, while one that already holds it in `conventions_seen` is not told twice. A commit in the walk that has no `[dev-cadence]` table, a ref that does
+     told it, while one that already holds it in `conventions_seen` is not told twice. A commit in the walk that has no `[agent-cadence]` table, a ref that does
      not parse, a pinned commit the clone cannot give (a force-pushed source), or one lacking
      `files/docs/cadence-changes.md` is skipped, and a skipped commit neither starts nor ends a run: runs are over the readable commits, so a
      heading first present at a skipped commit lands at the next readable one — later than it came, a
@@ -1159,8 +1159,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      worktree is not printed the history; no *behind* line prints while origin holds no pin), so a migration tells only what it brought and a bump what it brought, with no walk of
      every pin commit, only the bump lookup above; a
      worktree whose own file cannot be read is told only what is dated within the 14 days.
-     Its *behind* line is the worktree's pin against origin's (*this worktree pins `<old7>`, `origin/main` pins `<new7>` — rebase; `dev-cadence path cadence.md` prints the path of the rules it runs now*, before the migration *this worktree carries its own copy; `origin/main` pins `<new7>` — rebase*, and
-     before an adopt *this worktree runs no dev-cadence; `origin/main` pins `<new7>` — rebase*),
+     Its *behind* line is the worktree's pin against origin's (*this worktree pins `<old7>`, `origin/main` pins `<new7>` — rebase; `agent-cadence path cadence.md` prints the path of the rules it runs now*, before the migration *this worktree carries its own copy; `origin/main` pins `<new7>` — rebase*, and
+     before an adopt *this worktree runs no agent-cadence; `origin/main` pins `<new7>` — rebase*),
      printed when the two pins differ unless the clone proves origin's pin an ancestor of the worktree's
      (a clone lacking either commit proves nothing, so the line prints), entries or none, once per worktree per origin pin
      (the pin joins the marker, printed or not). It fetches no source (the repo's own fetch,
@@ -1168,17 +1168,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      objects needs none), so a commit the clone lacks says nothing there: a session starting while the
      clone lacks origin's pin is told nothing but its *behind* line, and the home's
      first reading, after its `created`, records those headings untold — accepted, as the checkout's lag is — while a member that predates
-     the bump is told by the home; the heading's format stays dev-cadence's (its parity row), never parsed a
-     second time here. That reading is dev-cadence's change, filed in its ledger; ShiftLead's half is
+     the bump is told by the home; the heading's format stays agent-cadence's (its parity row), never parsed a
+     second time here. That reading is agent-cadence's change, filed in its ledger; ShiftLead's half is
      the note (TD-1046). Since the repo holds no file, and a member's worktree branched before the bump
-     resolves the old pin, **a pinned repo's note carries each told entry's `body`** (dev-cadence holds
+     resolves the old pin, **a pinned repo's note carries each told entry's `body`** (agent-cadence holds
      an entry to three lines; the note names three at most, each body's lines joined by a space, a body over 300 characters cut to its first 300 and *…*), and names the file by the resolver's typed command (§5 *The seams*,
-     as the brief slots name the gate): *dev-cadence's cadence-changes.md gained 1 entry since you
+     as the brief slots name the gate): *agent-cadence's cadence-changes.md gained 1 entry since you
      started: "2026-10-27 — …": <its body> — after rebasing onto `origin/main`, `<python> <launcher>
      path cadence-changes.md` prints its path; go on* — for a member on a node (`host` not the
-     home's), whose container has neither path, the command is `dev-cadence path cadence-changes.md`,
+     home's), whose container has neither path, the command is `agent-cadence path cadence-changes.md`,
      the link `ao host up` puts on its `PATH`. **The checkout's pin selects the script**, and
-     the home never moves the checkout: while it is pinned before dev-cadence's change, or has not yet pulled the migration (unpinned, its copy reads a file origin no longer has),
+     the home never moves the checkout: while it is pinned before agent-cadence's change, or has not yet pulled the migration (unpinned, its copy reads a file origin no longer has),
      or holds a pin beside a `docs/cadence-sync.lock` (`cadence.pinned` false while the lock stands, so
      its copy is read, though the hooks, by `cadence.hook_pinned`, run the tree), the old script
      runs, gives no entries, and nobody is told — nor is a member created in that window told later of
@@ -1207,21 +1207,21 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   commit nothing has looked at is not a green one; failing runs that all never started, *CI never
   ran: <reason>*, kept per sha with **`checks_not_run: {reason, kind, runs}`** beside it, a real
   failure beside them still *failed*, §4.4 *CI that never started is the person's*). **Where the
-  repo sets `precheck`** (dev-cadence §4.12; read as *The precheck on main* says, on the same pass), main's head is green
+  repo sets `precheck`** (agent-cadence §4.12; read as *The precheck on main* says, on the same pass), main's head is green
   only when it also carries a `cadence/precheck` status that succeeded, the rest folding as above
-  (a hand-run workflow that failed beside a green precheck is still *failed*, as dev-cadence's `ci`
+  (a hand-run workflow that failed beside a green precheck is still *failed*, as agent-cadence's `ci`
   row folds it), except that runs that **never started** are outranked by a green precheck — they
   checked nothing, and with `precheck` set the precheck is the check — so a repo whose push workflow
   can no longer start reads green on its precheck, and its reading carries no `checks_not_run`, so
   the *CI not starting* row does not name main (the cure for the never-started runs is removing the
-  trigger, as TD-1035 does here). The outrank is the home's own rule: dev-cadence's `ci` row reads a
+  trigger, as TD-1035 does here). The outrank is the home's own rule: agent-cadence's `ci` row reads a
   never-started run as *unknown* whatever else passed. The reading keeps what the status read found
   as a field of its own, **`precheck`**: `absent`, `success`, `failure`, `pending` or `unread` (the
   read failed), and null where the repo sets no `precheck` or its `docs/cadence.toml` does not parse (the
   reading then `unknown` with that why, as §4.8's *checks unknown*) — the rules below key on it, never on the
   `why` text. The rule is main's head's alone: a rollback's commit (`read_checks`' `keep=False`) is
   read as before, since an old commit never carries one. With none it reads `unknown`, *no cadence/precheck on <sha7>*, or `pending`, *prechecking <sha7>*, while
-  the home's own run on it is going (*The precheck on main*, below), as dev-cadence's `ci` row reads
+  the home's own run on it is going (*The precheck on main*, below), as agent-cadence's `ci` row reads
   an open PR's head. *When main moved*
   is its head's committer time (a squash merge stamps it), so the settle and the row's age survive a
   restart of the home; the readings are held in memory and re-read at start, and what must survive
@@ -1502,7 +1502,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       judges, and the log says *browser half skipped: run scripts/smoke.py --setup*.
   **The precheck on main** (TD-1033). A repo that gates its PRs on `precheck` runs no CI on `main`,
   and a squash merge's commit carries no status of its own: its tree is its PR's head's only when
-  that PR was current with main, which the cadence does not ask (dev-cadence's `base` row reads the
+  that PR was current with main, which the cadence does not ask (agent-cadence's `base` row reads the
   base branch, not how far behind it the head is). So the home checks main's head itself, as CI on a
   push to main did, and since PRs are prechecked on heads behind main, this run is the one check of
   what main actually holds.
@@ -1520,10 +1520,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     while the sync pass's run goes, main's reading stays `unknown`, *no cadence/precheck on <sha7>*, and
     the row says nothing of a precheck, until main's own run starts. Main moving during a run leaves it
     running on its commit, and the new head is checked on the pass after it ends.
-  - **What runs.** `python3 scripts/precheck.py --commit <sha>` (dev-cadence's, the commit form of its
-    `--pr`; asked of dev-cadence by TD-1038), located by `sessionorc.cadence.precheck_script(root)` →
+  - **What runs.** `python3 scripts/precheck.py --commit <sha>` (agent-cadence's, the commit form of its
+    `--pr`; asked of agent-cadence by TD-1038), located by `sessionorc.cadence.precheck_script(root)` →
     `((argv, env) | None, why | None)`: the three layouts the gate has (the checkout's `scripts/`,
-    dev-cadence's own `files/scripts/`, the resolver's `dev-cadence run` in a pinned repo, whose `env`
+    agent-cadence's own `files/scripts/`, the resolver's `agent-cadence run` in a pinned repo, whose `env`
     is `cadence.command`'s, as the pinned gate is run with it; None in the other two), or None with a
     why when the script is absent, as in a pinned tree older than it; then nothing starts and main's reading is
     `unknown`, *no precheck.py here*, as step 4 waits uncounted — started from that argv with `--commit <sha>` appended (no shell), in the checkout, stdin closed, in a session of its
@@ -1619,7 +1619,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch by slice 3; step 4's precheck by TD-1039; Paul,
   2026-10-14: *each team should pick up those PRs and run them to ground, but if it's mechanical and
   post_sync would handle it that's even better*). A sync PR (§4.4 *A sync PR is the team's at once*:
-  head branch `cadence-sync-*`, the pin's `docs/cadence.toml` or a lock in its diff) changes only what dev-cadence owns, and a
+  head branch `cadence-sync-*`, the pin's `docs/cadence.toml` or a lock in its diff) changes only what agent-cadence owns, and a
   mechanical synced-file change needs no repo's judgement (Paul, 2026-09-12), so one the check below
   finds mechanical needs no session. The policy runs **at the home** (§4.4a), in the promote's pass
   and on its cadence (five minutes, detached as the `gh` reads are), over every checkout in the
@@ -1641,31 +1641,31 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - another login's: *author <login> is not the home's*;
 
   **A bump of a pin** (TD-1015; ADR 2026-10-25 *Decision* 5, which replaces TD-681's steps 1 and 2, and
-  dev-cadence's plan *Decision* 7). Every served repo pins dev-cadence in `docs/cadence.toml`'s
-  `[dev-cadence]` table, so there is no lock and no copied file to replay. The lock's road — its files hashed
-  against dev-cadence's, then replayed with the repo's `post_sync` in a tree of the home's own — left
+  dev-cadence's private plan *2026-10-25-pinned-not-synced*, *Decision* 7). Every served repo pins agent-cadence in `docs/cadence.toml`'s
+  `[agent-cadence]` table, so there is no lock and no copied file to replay. The lock's road — its files hashed
+  against agent-cadence's, then replayed with the repo's `post_sync` in a tree of the home's own — left
   `sync.check` once no served repo held a lock (TD-1015). A merge base with no pin is *refused*, *no
-  [dev-cadence] pin at the merge base: docs/cadence.toml holds none*, and the PR is the team's.
+  [agent-cadence] pin at the merge base: docs/cadence.toml holds none*, and the PR is the team's.
 
   Each head is checked once. Steps 1 and 2 are one check, and the PR is a **routine bump** only when all
   of these hold:
   - it changes `docs/cadence.toml` alone, and there only the pin's `ref` line, with its tag comment
     (*not a routine bump: <path> changed*, *not a routine bump: docs/cadence.toml changed beyond the
-    pin's ref*, *not a routine bump: docs/cadence.toml holds no [dev-cadence] pin*, *not a routine bump:
+    pin's ref*, *not a routine bump: docs/cadence.toml holds no [agent-cadence] pin*, *not a routine bump:
     the pin's ref did not move*);
   - its `source` is the merge base's (*the pin's source changed*);
   - the new `ref` is a full commit on the default branch of the clone the registry holds of that
-    source, fetched once a pass (*no dev-cadence clone to check the pin against*, *ref <sha> is not a
-    full commit on dev-cadence's <default>*);
+    source, fetched once a pass (*no agent-cadence clone to check the pin against*, *ref <sha> is not a
+    full commit on agent-cadence's <default>*);
   - the new `ref` descends from the old one: a rollback is a bump the person makes by hand (*ref <sha>
     does not descend from <old>*);
   - `docs/cadence.toml` is not a held path (*docs/cadence.toml is a held path*).
 
   A bump refused for any of these is the team's order, as any refused sync PR is, and merging it is
-  the person's. The check proves the PR moves the pin and nothing else. Whether the dev-cadence it moves
-  to is right is the review of its compare (step 3) and dev-cadence's own review, at its merge.
+  the person's. The check proves the PR moves the pin and nothing else. Whether the agent-cadence it moves
+  to is right is the review of its compare (step 3) and agent-cadence's own review, at its merge.
   3. **The review evidence.** **For a bump the home posts none.** A bump is reviewed on its compare,
-     never merged unread (dev-cadence's plan *Decision* 7). It waits, uncounted, until the PR carries a
+     never merged unread (dev-cadence's private plan *2026-10-25-pinned-not-synced*, *Decision* 7). It waits, uncounted, until the PR carries a
      review of the compare: a `cadence-review: SHIP` or `FIXED` comment whose reviewer, as its line
      names it (the gate's own self-attested reading, never the comment's author), is not `sync-check`, whose body names the head (seven hex characters or more), and which no later BLOCK
      follows. While it waits, its entry keeps `waits: review` and `waiting_since`. It is no longer the
@@ -1678,7 +1678,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   4. **The gate** is rule 10's: `scripts/check_cadence.py --pr <n>`. It is run in the
      registry checkout, as rule 10 runs it: the default branch's copy of the script. In a repo whose tree is older than
      `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
-     its rows are kept only when they parse. **Where the repo sets `precheck`** (dev-cadence §4.12)
+     its rows are kept only when they parse. **Where the repo sets `precheck`** (agent-cadence §4.12)
      and the head carries no `cadence/precheck` status, step 4 first starts `precheck.py
      --pr <n>`, located by `precheck_script` (absent, the pass waits uncounted), as main's run is started (TD-1033, *The precheck on main* above):
      detached, in the registry checkout, under `PRECHECK_BOUND`, its own intent file below. The head's bytes are the ones step 1 proved, so
@@ -1720,7 +1720,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      it, and comes back only once the claim ends. The merge is then `gh pr merge <n> --squash
      --match-head-commit <head>`, with no body (cadence §4.2). The forge's head match is the one
      atomic guard, and a push it refuses is the moved head again. A merge is followed by a `system`
-     note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — bump of the dev-cadence pin
+     note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — bump of the agent-cadence pin
      to <sha>*.
 
   The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, at,
@@ -1740,7 +1740,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   only when no entry has a verdict and the PR reading holds no open sync PR. An open one still
   waiting for its checks or its retries, or a PR reading that failed, says nothing. **What it is not**: it never pushes
   a commit to a PR (a sync that needs a step is the team's), never merges a PR that is not a sync,
-  runs nothing from the PR's head except bytes step 1 proved are dev-cadence's, and never moves a
+  runs nothing from the PR's head except bytes step 1 proved are agent-cadence's, and never moves a
   checkout. The pull (above) follows the
   merge on its next pass, and the promote follows main as it always does.
 - **Schedule: a team start at the reset** (not built; TD-133 builds it, unscheduled until the person

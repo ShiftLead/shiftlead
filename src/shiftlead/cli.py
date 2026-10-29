@@ -1535,10 +1535,10 @@ def _main_checkout(start: str) -> str | None:
 
 def cmd_repo_add(args: argparse.Namespace) -> int:
     """`ao repo add <path> [--adopt]` (design §4.7 **`ao repo add`**, TD-1010): register a checkout with the
-    home — the person's own, on the home machine, since the path, the roster and the dev-cadence checkout
-    are the home's. A checkout holding dev-cadence, or one already in the roster without `--adopt`, goes to
+    home — the person's own, on the home machine, since the path, the roster and the agent-cadence checkout
+    are the home's. A checkout holding agent-cadence, or one already in the roster without `--adopt`, goes to
     the home's `add_repo` RPC, which writes the roster line and refuses what is not its to add. One without
-    dev-cadence is offered its adoption (`shiftlead.adopt`, run here): the files it would write, nothing
+    agent-cadence is offered its adoption (`shiftlead.adopt`, run here): the files it would write, nothing
     added; `--adopt` opens them as a PR and adds the repo, unserved until it merges — or, on a registered
     unserved repo, opens the PR alone."""
     from sessionorc import cadence as cadence_mod
@@ -1559,9 +1559,9 @@ def cmd_repo_add(args: argparse.Namespace) -> int:
     holds = cadence_mod.holds(root)
     if not args.adopt or holds and not registered:
         if not (holds or registered):  # the offer: what the adoption would write, nothing added
-            dc = adopt_mod.dev_cadence(roster, root)
+            dc = adopt_mod.agent_cadence(roster, root)
             if dc is None:
-                raise AgentError(NO_DEV_CADENCE)
+                raise AgentError(NO_AGENT_CADENCE)
             try:
                 got = adopt_mod.offer(root, dc)
             except adopt_mod.AdoptError as e:
@@ -1572,18 +1572,18 @@ def cmd_repo_add(args: argparse.Namespace) -> int:
                 got,
                 lambda: print(
                     "\n".join(got["paths"])
-                    + f"\ndev-cadence is not adopted in {root.name}: `ao repo add {root} --adopt` opens these"
+                    + f"\nagent-cadence is not adopted in {root.name}: `ao repo add {root} --adopt` opens these"
                     f" {n} files as a PR"
                 ),
             )
         got = call_sync("add_repo", path=str(path))
         return emit(args, got, lambda: print(f"added {got['name']} — the home reads it on its next tick"))
-    # --adopt, on a checkout without dev-cadence or a registered one
+    # --adopt, on a checkout without agent-cadence or a registered one
     if registered and seams_mod.reading(root, roster)["serve"]["ok"]:
         raise AgentError(f"{root} is in the roster already, and served: there is nothing to adopt")
-    dc = adopt_mod.dev_cadence(roster, root)
+    dc = adopt_mod.agent_cadence(roster, root)
     if dc is None:
-        raise AgentError(NO_DEV_CADENCE)
+        raise AgentError(NO_AGENT_CADENCE)
     try:
         got = adopt_mod.adopt(root, dc)
     except adopt_mod.AdoptError as e:
@@ -1597,16 +1597,17 @@ def cmd_repo_add(args: argparse.Namespace) -> int:
         if got.get("open"):  # a re-run: the PR stands, nothing pushed
             print(f"adoption PR {pr} is open already: {got['url']}")
         else:
-            print(f"adoption PR {pr} open: {got['url']} — dev-cadence {got['commit']}, {n} file{'s' if n != 1 else ''}")
+            files = f"{n} file{'s' if n != 1 else ''}"
+            print(f"adoption PR {pr} open: {got['url']} — agent-cadence {got['commit']}, {files}")
         print(
             f"{root.name} is unserved until it merges" if registered else f"added {root.name}, unserved until it merges"
         )
-        print(f"once it merges, run `{adopt_mod.after(dc, root)}`: dev-cadence's hook shims, and its roster")
+        print(f"once it merges, run `{adopt_mod.after(dc, root)}`: agent-cadence's hook shims, and its roster")
 
     return emit(args, got, prose)
 
 
-NO_DEV_CADENCE = "no dev-cadence checkout in the roster: clone ShiftLead/dev-cadence and add it first"
+NO_AGENT_CADENCE = "no agent-cadence checkout in the roster: clone ShiftLead/agent-cadence and add it first"
 
 
 def _repo_line(r: dict[str, Any]) -> str:
@@ -4933,7 +4934,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--adopt",
         action="store_true",
-        help="with `add`: open dev-cadence's adoption as a PR (branch cadence-adopt) for a checkout without it",
+        help="with `add`: open agent-cadence's adoption as a PR (branch cadence-adopt) for a checkout without it",
     )
     p.add_argument("--all", action="store_true", help="every registered repo, one line each")
     p.set_defaults(fn=cmd_repo)

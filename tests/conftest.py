@@ -66,14 +66,14 @@ def _identity_off(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _no_real_repos_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """A host with no `repos_registry:` of its own imports dev-cadence's machine roster in the
+    """A host with no `repos_registry:` of its own imports agent-cadence's machine roster in the
     person's home only on the default home (TD-298, TD-590: every home reads its own `repos.txt`, which
     `hosts.default_repos_registry()` names) — and from TD-069 step 3 the Inbox runs the board reader
     over every repo on it. A test never reads the person's roster, even one that points
     `SHIFTLEAD_HOME` at the default: it gets an empty one unless it writes its own."""
     from sessionorc import hosts
 
-    monkeypatch.setattr(hosts, "DEV_CADENCE_ROSTER", str(tmp_path / "no-roster" / "repos.txt"))
+    monkeypatch.setattr(hosts, "AGENT_CADENCE_ROSTER", str(tmp_path / "no-roster" / "repos.txt"))
 
 
 CHILD = HERE / "_agent_child.py"
@@ -398,6 +398,7 @@ async def agent(tmp_path, monkeypatch):
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))
+
     # the tick loop too (TD-1087): `serve` binds the socket a loop step before it makes `_ticker`, so a
     # test that parked the ticks in that step found none to park, and the loop started under it
     def up() -> bool:
@@ -545,12 +546,12 @@ def with_origin(root: Path) -> Path:
 
 
 def served(root) -> None:
-    """dev-cadence's tree, its gate and a ledger in `root`, so the home reads it served (§5 *The seams*,
+    """agent-cadence's tree, its gate and a ledger in `root`, so the home reads it served (§5 *The seams*,
     TD-1011): a registered test repo without them is unserved, and the home writes nothing there."""
     root = Path(root)
     (root / "docs").mkdir(parents=True, exist_ok=True)
     (root / "scripts").mkdir(exist_ok=True)
-    (root / "docs" / "cadence-sync.lock").write_text("source: dev-cadence\ncommit: abc1234\nfiles_commit: abc1234\n")
+    (root / "docs" / "cadence-sync.lock").write_text("source: agent-cadence\ncommit: abc1234\nfiles_commit: abc1234\n")
     (root / "scripts" / "check_cadence.py").write_text("x = 1\n")
     if not (root / "docs" / "technical_debt.md").exists():
         (root / "docs" / "technical_debt.md").write_text("# Technical debt\n")
@@ -575,9 +576,9 @@ def repo_ledger() -> tuple[str, str]:
 
 
 def pinned_script(name: str) -> Path:
-    """dev-cadence's `scripts/<name>` in the tree this checkout pins (`docs/cadence.toml`'s `[dev-cadence]`,
+    """agent-cadence's `scripts/<name>` in the tree this checkout pins (`docs/cadence.toml`'s `[agent-cadence]`,
     dev-cadence TD-129): ShiftLead carries no synced copies, so a test that runs or loads one of
-    dev-cadence's scripts — a parity test of the home's reader, a reader as a fixture — takes it from the
+    agent-cadence's scripts — a parity test of the home's reader, a reader as a fixture — takes it from the
     pinned tree, through the same resolver the home uses (`cadence.tree`). Where the tree cannot be
     reached (no network, or no token for a private source, as on CI) the test skips, naming why; a pin
     the resolver refuses fails it, so a broken pin never turns these checks into silent skips."""
@@ -585,14 +586,14 @@ def pinned_script(name: str) -> Path:
 
     root = Path(__file__).resolve().parents[1]
     try:
-        assert cadence.pin(root) is not None, "this checkout has no [dev-cadence] pin in docs/cadence.toml"
+        assert cadence.pin(root) is not None, "this checkout has no [agent-cadence] pin in docs/cadence.toml"
     except cadence.PinError as e:
-        pytest.fail(f"this checkout's dev-cadence pin is malformed: {e}")
+        pytest.fail(f"this checkout's agent-cadence pin is malformed: {e}")
     payload, why = cadence.tree(root)
     if payload is None:
         if why and why.startswith(_UNREACHABLE):
-            pytest.skip(f"dev-cadence's pinned tree could not be reached: {why}")
-        pytest.fail(f"dev-cadence's pin does not resolve: {why}")
+            pytest.skip(f"agent-cadence's pinned tree could not be reached: {why}")
+        pytest.fail(f"agent-cadence's pin does not resolve: {why}")
     script = payload / "scripts" / name
-    assert script.is_file(), f"the pinned dev-cadence tree has no scripts/{name}"
+    assert script.is_file(), f"the pinned agent-cadence tree has no scripts/{name}"
     return script

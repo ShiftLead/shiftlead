@@ -1,6 +1,6 @@
 """TD-1023 (design §4.2, §4.3 *A repo's start hooks are every adapter's to run*): the layer's SessionStart
-line is dev-cadence's pinned seed, byte for byte, with two modes — in a repo whose main checkout's
-`docs/cadence.toml` has a `[dev-cadence]` header it runs `dev-cadence hook session-start` from `PATH`, else
+line is agent-cadence's pinned seed, byte for byte, with two modes — in a repo whose main checkout's
+`docs/cadence.toml` has a `[agent-cadence]` header it runs `agent-cadence hook session-start` from `PATH`, else
 the copied runner — and Gemini's start hooks follow it; a pinned repo carrying a pre-pin line gets the
 layer's line beside its own, and either past vintage still counts as the repo's line."""
 
@@ -24,8 +24,10 @@ from shiftlead.adapters.claude_code import (
 )
 from shiftlead.adapters.gemini import hook
 
-DEV_CADENCE = Path(os.environ.get("DEV_CADENCE_SOURCE", "~/dev-cadence")).expanduser()
-PIN = '[dev-cadence]  # the pin\nsource = "https://example.invalid/dev-cadence.git"\nref = "abc"\n'
+AGENT_CADENCE = Path(os.environ.get("AGENT_CADENCE_SOURCE", "~/agent-cadence")).expanduser()
+# the agent-cadence commit the parity pairs read: its default branch, or a branch head named before it merges
+AGENT_CADENCE_REF = os.environ.get("AGENT_CADENCE_REF", "origin/HEAD")
+PIN = '[agent-cadence]  # the pin\nsource = "https://example.invalid/agent-cadence.git"\nref = "abc"\n'
 # the stub launcher: records its argv, cwd and stdin, prints a line, and exits with the code in `rc`
 STUB = """#!/bin/sh
 here=$(dirname "$0")
@@ -48,8 +50,8 @@ def _pinned(d: Path) -> Path:
 def _stub(tmp_path: Path, rc: int = 0) -> Path:
     bin_ = tmp_path / "bin"
     bin_.mkdir(exist_ok=True)
-    (bin_ / "dev-cadence").write_text(STUB)
-    (bin_ / "dev-cadence").chmod(0o755)
+    (bin_ / "agent-cadence").write_text(STUB)
+    (bin_ / "agent-cadence").chmod(0o755)
     (bin_ / "rc").write_text(str(rc))
     return bin_
 
@@ -70,9 +72,9 @@ def test_hook_pinned_reads_the_header_as_the_lines_grep_does(tmp_path):
     plain.mkdir()
     assert cadence.hook_pinned(plain) is False  # no file
     assert cadence.hook_pinned(_pinned(plain)) is True
-    (plain / "docs" / "cadence.toml").write_text("[other]\nx = 1\n[dev-cadence.extra]\n# [dev-cadence]\n")
+    (plain / "docs" / "cadence.toml").write_text("[other]\nx = 1\n[agent-cadence.extra]\n# [agent-cadence]\n")
     assert cadence.hook_pinned(plain) is False  # another table, a sub-table, a comment
-    (plain / "docs" / "cadence.toml").write_text("x = 1\n \t[dev-cadence]\t# pinned\n")
+    (plain / "docs" / "cadence.toml").write_text("x = 1\n \t[agent-cadence]\t# pinned\n")
     assert cadence.hook_pinned(plain) is True
     (plain / "docs" / "cadence.toml").unlink()
     (plain / "docs" / "cadence.toml").mkdir()  # unreadable as a file
@@ -157,12 +159,12 @@ def test_geminis_sentences_are_the_lines():
 
 def test_a_pinned_repo_carrying_a_pre_pin_line_gets_the_layers_line_beside_it(tmp_path):
     repo = _pinned(tmp_path / "repo")
-    _settings(repo, [CADENCE_HOOK_LINES_PAST[0]])
+    _settings(repo, [CADENCE_HOOK_LINES_PAST[1]])
     assert repo_wires_cadence(repo) is False
     _settings(repo, [CADENCE_HOOK_LINE])
     assert repo_wires_cadence(repo) is True
     unpinned = tmp_path / "unpinned"
-    _settings(unpinned, [CADENCE_HOOK_LINES_PAST[0]])
+    _settings(unpinned, [CADENCE_HOOK_LINES_PAST[1]])
     assert repo_wires_cadence(unpinned) is True  # a copied repo's line of either vintage still runs its runner
 
 
@@ -177,29 +179,47 @@ def test_either_past_vintage_is_the_repos_line():
 
 def _seed(ref: str, path: str = "files/.claude/settings.json") -> dict:
     done = subprocess.run(
-        ["git", "-C", str(DEV_CADENCE), "show", f"{ref}:{path}"], capture_output=True, text=True, timeout=30
+        ["git", "-C", str(AGENT_CADENCE), "show", f"{ref}:{path}"], capture_output=True, text=True, timeout=30
     )
     if done.returncode != 0:
-        pytest.skip(f"no {ref}:{path} in the dev-cadence checkout ({done.stderr.strip()[:80]})")
+        pytest.skip(f"no {ref}:{path} in the agent-cadence checkout ({done.stderr.strip()[:80]})")
     return json.loads(done.stdout)["hooks"]["SessionStart"][0]["hooks"][0]
 
 
-@pytest.mark.skipif(not (DEV_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no dev-cadence checkout")
-def test_the_line_is_dev_cadences_seed_at_origin_head():
-    seed = _seed("origin/HEAD")
+@pytest.mark.skipif(not (AGENT_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no agent-cadence checkout")
+def test_the_line_is_agent_cadences_seed_at_origin_head():
+    seed = _seed(AGENT_CADENCE_REF)
     assert seed["command"] == CADENCE_HOOK_LINE and seed["timeout"] == CADENCE_HOOK_TIMEOUT
     assert hook.PIN_FAILED in seed["command"] and hook.NO_LAUNCHER in seed["command"]
-    # dev-cadence's own settings run its runner under `files/`, as `doctor._hook_lines` makes the line
-    own = _seed("origin/HEAD", ".claude/settings.json")["command"]
+    # agent-cadence's own settings run its runner under `files/`, as `doctor._hook_lines` makes the line
+    own = _seed(AGENT_CADENCE_REF, ".claude/settings.json")["command"]
     assert own == CADENCE_HOOK_LINE.replace("/scripts/cadence_hooks.sh", "/files/scripts/cadence_hooks.sh")
     # `hook_pinned`'s header is the launcher's
     words = subprocess.run(
-        ["git", "-C", str(DEV_CADENCE), "show", "origin/HEAD:launcher/words.py"], capture_output=True, text=True
+        ["git", "-C", str(AGENT_CADENCE), "show", f"{AGENT_CADENCE_REF}:launcher/words.py"],
+        capture_output=True,
+        text=True,
     ).stdout
     theirs = re.search(r'^PIN_HEADER_RE = re\.compile\(r"(.*)", re\.M\)', words, re.M)
     assert theirs and theirs.group(1) == cadence.PIN_HEADER_RE.pattern
 
 
-@pytest.mark.skipif(not (DEV_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no dev-cadence checkout")
-def test_the_past_vintages_are_dev_cadences_earlier_seeds():
-    assert tuple(_seed(ref)["command"] for ref in ("4316bd4", "267cae5")) == CADENCE_HOOK_LINES_PAST
+@pytest.mark.skipif(not (AGENT_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no agent-cadence checkout")
+def test_the_past_vintages_are_agent_cadences_earlier_seeds():
+    assert tuple(_seed(ref)["command"] for ref in ("4316bd4", "267cae5")) == CADENCE_HOOK_LINES_PAST[1:]
+
+
+@pytest.mark.unit
+def test_the_line_before_the_rename_is_a_past_vintage(tmp_path):
+    old = CADENCE_HOOK_LINES_PAST[0]
+    # the seed at the private repo's cut-over point C (0ad7b2f), under the tool's old name
+    assert "\\[dev-cadence\\]" in old and "dev-cadence hook session-start" in old
+    assert "agent" not in old and old != CADENCE_HOOK_LINE
+    base = {"serve": {"ok": True, "lacks": []}, "warnings": [], "source": False}
+    assert doctor.session_start_warning({**base, "session_start": [old], "hook_pinned": True}, "R") == (
+        doctor.PRE_PIN_SESSION_START.format(root="R")
+    )
+    # in a repo pinned under the new table it runs nothing, so the layer's line goes beside it
+    repo = _pinned(tmp_path / "repo")
+    _settings(repo, [old])
+    assert repo_wires_cadence(repo) is False

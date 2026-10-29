@@ -1,6 +1,6 @@
 # AGENTS.md
 
-<!-- Seeded by dev-cadence's sync.sh (TD-092): created once if missing, never overwritten — this
+<!-- Seeded by agent-cadence's sync.sh (TD-092): created once if missing, never overwritten — this
      file is the repo's own. Codex and most agent tools read AGENTS.md; Claude Code reads CLAUDE.md,
      so a repo keeps its map here and makes CLAUDE.md the one line `@AGENTS.md` (cadence.md §7.6).
      Keep the first section first: it is how a session in any tool gets the cadence's wake-up. -->
@@ -10,7 +10,7 @@
 Run this from the repo's root before anything else, and act on what it prints:
 
 ```bash
-dev-cadence hook session-start
+agent-cadence hook session-start
 ```
 
 It names what is due on this machine's attention boards, this repo's pull requests that have
@@ -21,11 +21,11 @@ session-start hook runs it itself. It always exits 0.
 
 ## How this repo works
 
-This repo pins dev-cadence (`docs/cadence.toml`'s `[dev-cadence]`, TD-129): `docs/cadence.md` and
-`docs/procedures/*.md` below are the pinned tree's files, which `dev-cadence path cadence.md` (or
-`procedures/<name>.md`) prints; its scripts run as `dev-cadence run <script>`.
+This repo pins agent-cadence (`docs/cadence.toml`'s `[agent-cadence]`, TD-129): `docs/cadence.md` and
+`docs/procedures/*.md` below are the pinned tree's files, which `agent-cadence path cadence.md` (or
+`procedures/<name>.md`) prints; its scripts run as `agent-cadence run <script>`.
 
-The working rules are `docs/cadence.md` — worktrees (§1), the ledger `docs/ledger/` (one `TD-NNN.md` per entry, archived ones under `archive/`; `dev-cadence run ledger.py --summary` prints the table it no longer stores)
+The working rules are `docs/cadence.md` — worktrees (§1), the ledger `docs/ledger/` (one `TD-NNN.md` per entry, archived ones under `archive/`; `agent-cadence run ledger.py --summary` prints the table it no longer stores)
 (§2), the attention board `docs/user_attention.md` (§3), and the review and merge loop (§4).
 Three procedures run on top of them, each a doc any agent follows (Claude Code also has each
 as a skill of the same name): `docs/procedures/stranded-work.md` (the periodic sweep, §3.11),
@@ -112,7 +112,7 @@ $V/pip install --upgrade "$T[ui]" && $V/ao service install
 ## Session Hygiene — Never Strand Work
 
 Work that exists only in a session's conversation is lost when the session closes. Two rules,
-full conventions in `docs/cadence.md` (the pinned tree's: `dev-cadence path cadence.md`):
+full conventions in `docs/cadence.md` (the pinned tree's: `agent-cadence path cadence.md`):
 
 1. **Ledger before idle.** The moment Paul approves a multi-item plan, or a session pauses with
    steps undone, write the pending steps into the ledger, [docs/ledger/](docs/ledger/README.md)
@@ -127,9 +127,9 @@ full conventions in `docs/cadence.md` (the pinned tree's: `dev-cadence path cade
 Every change goes branch → PR → squash merge; the pre-push hook blocks main
 (`ALLOW_MAIN_PUSH=1` is the deliberate override; cadence §4 lists the carve-outs). Every other
 concurrent session in this repo works in a worktree (`claude --worktree <name>` or
-`dev-cadence run open_worktree.sh <topic>`); the first session in the checkout is the anchor.
+`agent-cadence run open_worktree.sh <topic>`); the first session in the checkout is the anchor.
 A PR's gate is its `cadence/precheck` status, not GitHub Actions (which run only by hand, `ci.yml`):
-`dev-cadence run precheck.py --pr <n>` runs `docs/cadence.toml`'s `precheck` on its head and records it
+`agent-cadence run precheck.py --pr <n>` runs `docs/cadence.toml`'s `precheck` on its head and records it
 (cadence §4.12, TD-1035). Self-authored PRs get an independent cheaper-model review before merge; doc-only PRs get a
 fact-check against the repo. A PR that `ao pr held <n>` says is held waits for its reader only once
 the author asks: when it is green, post its review, then send `ao msg --kind ask --pr <n> <reader> "…"`
@@ -152,9 +152,9 @@ can act on you ([ADR 2026-09-24](docs/decisions/2026-09-24-cloud-sessions.md)). 
   merge it was meant to cause. Ledger lines are fine: they land at merge, which is when they are
   read. Findings on your work come back as PR comments, nowhere else.
 
-dev-cadence's scripts and docs are not copied into this repo: the pin in `docs/cadence.toml`
-names the commit, `dev-cadence run <script>` runs one and `dev-cadence path <name>` finds a doc.
-Fix them upstream in dev-cadence and bump the pin (`dev-cadence bump`, a reviewed PR).
+agent-cadence's scripts and docs are not copied into this repo: the pin in `docs/cadence.toml`
+names the commit, `agent-cadence run <script>` runs one and `agent-cadence path <name>` finds a doc.
+Fix them upstream in agent-cadence and bump the pin (`agent-cadence bump`, a reviewed PR).
 
 ## Documentation map
 
@@ -163,7 +163,7 @@ Fix them upstream in dev-cadence and bump the pin (`dev-cadence bump`, a reviewe
 | What ShiftLead is and how it works | [docs/design.md](docs/design.md) |
 | How the design got here: dated decisions, reversals and review rounds, by section | [docs/design-history.md](docs/design-history.md) |
 | What a word means (lead, director, worker, host agent, …) | [docs/glossary.md](docs/glossary.md) |
-| Why dev-cadence was adopted, what it changed in the design | [docs/decisions/2026-09-06-adopt-dev-cadence.md](docs/decisions/2026-09-06-adopt-dev-cadence.md) |
+| Why agent-cadence was adopted, what it changed in the design | [docs/decisions/2026-09-06-adopt-dev-cadence.md](docs/decisions/2026-09-06-adopt-dev-cadence.md) |
 | Why herdr is prior art and not the session substrate | [docs/decisions/2026-09-10-herdr-spike.md](docs/decisions/2026-09-10-herdr-spike.md) |
 | Why OpenAI's Agents API is not the substrate, and the four lessons taken from it | [docs/decisions/2026-09-13-openai-agents-api.md](docs/decisions/2026-09-13-openai-agents-api.md) |
 | What Org, Team, Project and Role mean, and why the name stays agentorc for now | [docs/decisions/2026-09-13-org-teams-projects.md](docs/decisions/2026-09-13-org-teams-projects.md) |
@@ -179,12 +179,12 @@ Fix them upstream in dev-cadence and bump the pin (`dev-cadence bump`, a reviewe
 | How shiftlead could make money without standing in the person's path, and the questions that decide it (for discussion) | [docs/decisions/2026-10-13-monetisation.md](docs/decisions/2026-10-13-monetisation.md) |
 | Why the person's view becomes a Queue of ranked effort cards beside a smaller Inbox, and how the rank is stored and read | [docs/decisions/2026-10-15-queue.md](docs/decisions/2026-10-15-queue.md) |
 | How a Queue card asks for the person's attention (Decide, Do, Read), what they do about it (Answer, Start session, ⋯), the Waiting group, and the one-sentence writing rule | [docs/decisions/2026-10-19-queue-card.md](docs/decisions/2026-10-19-queue-card.md) |
-| Whether ShiftLead should require dev-cadence, and where the person's own briefs, start prompts and preferences live | [docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md](docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md) |
-| Why a part names its parent in `Part of:`, how a Queue card draws parts and blockers, and the order the ledgerboard, dev-cadence and shiftlead changes land in | [docs/decisions/2026-10-27-part-of.md](docs/decisions/2026-10-27-part-of.md) |
+| Whether ShiftLead should require agent-cadence, and where the person's own briefs, start prompts and preferences live | [docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md](docs/decisions/2026-10-25-shiftlead-requires-dev-cadence.md) |
+| Why a part names its parent in `Part of:`, how a Queue card draws parts and blockers, and the order the ledgerboard, agent-cadence and shiftlead changes land in | [docs/decisions/2026-10-27-part-of.md](docs/decisions/2026-10-27-part-of.md) |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
-| Working cadence (sessions, reviews, TD flow) | `cadence.md` in the pinned dev-cadence (`dev-cadence path cadence.md`; edit it in dev-cadence, never here) |
-| Which dev-cadence this repo runs | [docs/cadence.toml](docs/cadence.toml) — its `[dev-cadence]` table pins the commit (TD-129); `dev-cadence bump` moves it |
+| Working cadence (sessions, reviews, TD flow) | `cadence.md` in the pinned agent-cadence (`agent-cadence path cadence.md`; edit it in agent-cadence, never here) |
+| Which agent-cadence this repo runs | [docs/cadence.toml](docs/cadence.toml) — its `[agent-cadence]` table pins the commit (TD-129); `agent-cadence bump` moves it |
 | Known issues and deferred work | [docs/ledger/](docs/ledger/README.md), one `TD-NNN.md` per entry |
 | What is waiting on Paul / parked work | [docs/user_attention.md](docs/user_attention.md) |
 | Durable cross-session memory | [docs/claude-memory/MEMORY.md](docs/claude-memory/MEMORY.md) |
-| Resume a past session | `dev-cadence run list_sessions.py` |
+| Resume a past session | `agent-cadence run list_sessions.py` |

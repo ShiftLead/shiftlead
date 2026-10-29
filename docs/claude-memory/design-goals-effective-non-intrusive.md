@@ -5,6 +5,6 @@ metadata:
   type: feedback
 ---
 
-Paul judges ShiftLead / dev-cadence designs by *effective and non-intrusive* (2026-09-12); a change in
+Paul judges ShiftLead / agent-cadence designs by *effective and non-intrusive* (2026-09-12); a change in
 another repo beyond a sync PR is made by that repo's own sessions — cadence §3.7 — and tool-specific
 wiring stays in ShiftLead's adapters. See [[unattended-workers-run-inside-shiftlead]].

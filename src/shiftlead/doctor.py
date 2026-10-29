@@ -374,28 +374,28 @@ def org(
 
 NO_SESSION_START = "no SessionStart line: a session started outside ShiftLead misses the cadence's nudge"
 UNKNOWN_SESSION_START = (
-    "SessionStart line is not one this build knows: dev-cadence's seed may be newer than ShiftLead's copy"
-    " — or copy the line from dev-cadence's files/.claude/settings.json"
+    "SessionStart line is not one this build knows: agent-cadence's seed may be newer than ShiftLead's copy"
+    " — or copy the line from agent-cadence's files/.claude/settings.json"
 )
 PRE_PIN_SESSION_START = (
     "SessionStart line predates the pin: a session started outside ShiftLead runs no cadence hook"
-    " — copy the line from `dev-cadence -C {root} path .claude/settings.json`"
+    " — copy the line from `agent-cadence -C {root} path .claude/settings.json`"
 )
-# what names dev-cadence's runner or launcher in a SessionStart command, so a line no vintage matches is
+# what names agent-cadence's runner or launcher in a SessionStart command, so a line no vintage matches is
 # one this build does not know rather than no line at all (§5 *The seams*, TD-1024)
-CADENCE_HOOK_NAMES = ("cadence_hooks.sh", "dev-cadence hook")
+CADENCE_HOOK_NAMES = ("cadence_hooks.sh", "agent-cadence hook")
 
 
 def _hook_lines(source: bool) -> set[str]:
-    """Each adapter's SessionStart line for dev-cadence (`cadence_hook_line`) and its earlier vintages
-    (`cadence_hook_lines_past`, TD-1023), its runner under `files/` in dev-cadence's own source (§5 *The seams*)."""
+    """Each adapter's SessionStart line for agent-cadence (`cadence_hook_line`) and its earlier vintages
+    (`cadence_hook_lines_past`, TD-1023), its runner under `files/` in agent-cadence's own source (§5 *The seams*)."""
     current, past = _hook_vintages(source)
     return current | past
 
 
 def _hook_vintages(source: bool) -> tuple[set[str], set[str]]:
     """`(current, past)`: each adapter's `cadence_hook_line`, and its `cadence_hook_lines_past` (TD-1023,
-    TD-1024), each with its runner under `files/` in dev-cadence's own source (§5 *The seams*)."""
+    TD-1024), each with its runner under `files/` in agent-cadence's own source (§5 *The seams*)."""
     now: set[object] = set()
     before: set[object] = set()
     for n in adapters.names():
@@ -439,7 +439,7 @@ def missing_seams(seams: dict[str, Any] | None, root: Any = "<checkout>") -> lis
 def session_start_warning(seams: dict[str, Any], root: Any = "<checkout>") -> str | None:
     """The checkout's SessionStart commands against each adapter's vintages (§5 *The seams*, TD-1024): one
     that is a vintage is the line, and a hand-written command beside it says nothing; with none, a command
-    naming dev-cadence's runner or launcher is *not one this build knows*, and no such command *no
+    naming agent-cadence's runner or launcher is *not one this build knows*, and no such command *no
     SessionStart line*; in a pinned repo (the reading's `hook_pinned`; a reading without it, from an older
     host agent, is unpinned) a past vintage with no command the current line *predates the pin*."""
     current, past = _hook_vintages(bool(seams.get("source")))

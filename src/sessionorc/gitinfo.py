@@ -105,11 +105,11 @@ def branch_exists(directory: Path | str, name: str, timeout: float = 5.0) -> boo
 
 
 HYDRATE = "scripts/hydrate_worktree.sh"
-PINNED_HYDRATE = "dev-cadence run hydrate_worktree.sh"  # the default in a pinned repo, as the Repo page says it
+PINNED_HYDRATE = "agent-cadence run hydrate_worktree.sh"  # the default in a pinned repo, as the Repo page says it
 
 
 def hydrate_command(repo: Path | str) -> tuple[list[str], dict[str, str] | None] | None:
-    """The argv prefix and environment that run dev-cadence's `hydrate_worktree.sh` for the main checkout
+    """The argv prefix and environment that run agent-cadence's `hydrate_worktree.sh` for the main checkout
     `repo` (§5 *The seams*, TD-1044): in a pinned repo the pinned tree's, through the resolver
     (`cadence.command`), whose refusal of a pin it cannot resolve is the script's failure; otherwise the
     checkout's own `scripts/hydrate_worktree.sh` when it is there and executable; else None."""
@@ -122,7 +122,7 @@ def hydrate_command(repo: Path | str) -> tuple[list[str], dict[str, str] | None]
 def worktree_setup(repo: Path | str) -> tuple[str, str | None]:
     """The checkout's worktree setup (§5 *The seams*, TD-589): `("set", command)` for its
     `.shiftlead.yml` `worktree_setup:`, `("defaulted", HYDRATE)` when the key is unset and the checkout
-    holds an executable `scripts/hydrate_worktree.sh` (dev-cadence's), `("defaulted", PINNED_HYDRATE)` when
+    holds an executable `scripts/hydrate_worktree.sh` (agent-cadence's), `("defaulted", PINNED_HYDRATE)` when
     it is unset in a pinned repo (TD-1044), `("absent", None)` otherwise. A file that cannot be read, or a
     key that is not a non-empty string, is the key unset: the clients (`shiftlead.repoconfig`) refuse such a
     file by name."""
@@ -148,7 +148,7 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0, *, resume: boo
     contain it, so a Resume of a reaped record takes up its pushed work (design §4.1 *Started again*). Reused
     when it already exists. A new one is
     then set up by the repo's `worktree_setup` (§5 *The seams*, TD-589): a configured command, run by
-    the shell in the new worktree with its path as `$1`, or by default dev-cadence's `hydrate_worktree.sh` — the
+    the shell in the new worktree with its path as `$1`, or by default agent-cadence's `hydrate_worktree.sh` — the
     repo's own when present, the pinned tree's in a pinned repo (`hydrate_command`) — so the worktree gets the
     untracked pieces git leaves out. `created` is whether this call made it, which the record keeps as
     `worktree_made` (design §4.1 *A close reaps the worktree it made*)."""
@@ -524,7 +524,7 @@ def _not_in_upstream(directory: Path | str, upstream: str, ahead: int, timeout: 
 
 
 # -- a close's reap of the worktree it made (design §4.1 *A close reaps the worktree it made*, TD-979) ----------
-# The tests are dev-cadence's `reap_worktrees.sh`'s *clean*, *unlocked* and *nested*, ported here because that
+# The tests are agent-cadence's `reap_worktrees.sh`'s *clean*, *unlocked* and *nested*, ported here because that
 # script is synced and has no one-worktree mode; *idle* reads ShiftLead's own records, so the caller gives it.
 
 REAP_WITHIN = 60.0  # the deadline the reap reads between steps: no step starts past it

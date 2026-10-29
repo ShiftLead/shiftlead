@@ -60,7 +60,7 @@ class Adapter(Protocol):
     #                                                      under `permission_prompts: all` (§4.2a, TD-823);
     #                                                      unset, nothing is added
     #   cadence_hook_line: str                            the SessionStart command the adapter's launch carries
-    #                                                      for dev-cadence (design §5 *The seams*): a repo whose
+    #                                                      for agent-cadence (design §5 *The seams*): a repo whose
     #                                                      `.claude/settings.json` lacks it is warned on the Repo
     #                                                      page and in `ao doctor`; unset, the adapter has none
     #   cadence_hook_lines_past: tuple[str, ...]          the earlier vintages of that line a repo may still carry,

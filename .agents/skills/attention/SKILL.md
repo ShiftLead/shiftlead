@@ -5,5 +5,5 @@ description: What needs my attention? — this repo's user-attention board in fu
 
 # Attention — machine-wide board report
 
-Read [`docs/procedures/attention.md`](../../../docs/procedures/attention.md) — in a repo that pins dev-cadence, the file `dev-cadence path procedures/attention.md` prints — and follow it; the whole procedure lives there,
+Read [`docs/procedures/attention.md`](../../../docs/procedures/attention.md) — in a repo that pins agent-cadence, the file `agent-cadence path procedures/attention.md` prints — and follow it; the whole procedure lives there,
 where an agent in any tool can run it (TD-093); this file holds no rule of its own. An argument of `all` or a repo's name picks which repos are shown in full, `fetch` or `remote` that form of the report, and they combine; none means this repo, plain.

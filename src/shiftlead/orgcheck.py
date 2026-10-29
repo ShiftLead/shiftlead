@@ -20,7 +20,7 @@ from shiftlead import org as orgmod
 GIT_TIMEOUT = 5.0
 OLD_REPO_FILE = ".agentorc.yml"  # a repo's file before the rename (TD-060): read by nothing, named by the check
 # a `.shiftlead.yml` key accepted and read by nothing (`repoconfig.RepoConfig.gone`), and what the check says
-GONE = {"gate": "gate: is gone — a repo's extra check is dev-cadence's precheck"}
+GONE = {"gate": "gate: is gone — a repo's extra check is agent-cadence's precheck"}
 
 
 def where(org: orgmod.Org, team: orgmod.TeamDef, here: str) -> tuple[str, str]:

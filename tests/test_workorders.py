@@ -26,7 +26,7 @@ FYI = "- [ ] fyi 2026-10-01 (session n/a) — **The mirror moved.** Due: 2026-10
 
 def _repo(tmp_path: Path, *lines: str) -> Path:
     root = tmp_path / "repo"
-    (root / "docs").mkdir(parents=True)  # no `scripts/`: a repo with a board needs no dev-cadence
+    (root / "docs").mkdir(parents=True)  # no `scripts/`: a repo with a board needs no agent-cadence
     board = ["# User Attention Board", "", FORMAT, "", "## Needs the user", "", *lines, ""]
     (root / "docs" / "user_attention.md").write_text("\n".join(board), encoding="utf-8")
     return root
@@ -155,7 +155,7 @@ def test_the_repo_reading_lists_them_on_a_full_read_and_keeps_them_between(tmp_p
 @pytest.mark.unit
 def test_a_plain_read_runs_nothing_and_writes_nothing_into_the_checkout(tmp_path, monkeypatch):
     """TD-585: the board is parsed in-process by the vendored ledgerboard — a plain read starts no
-    process (no dev-cadence script, no git) and leaves the checkout as it was (TD-386's gate)."""
+    process (no agent-cadence script, no git) and leaves the checkout as it was (TD-386's gate)."""
     root = _repo(tmp_path, DECIDED)
     before = sorted(p.relative_to(root) for p in root.rglob("*"))
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: pytest.fail(f"a process was started: {a}"))
@@ -340,7 +340,7 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     assert cli.main(["board", "show", key, "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["line"] == 7
     assert cli.main(["board", "show", "TD-607"]) == 2
-    assert not (root / "scripts").exists()  # the line is found with no dev-cadence script in the repo
+    assert not (root / "scripts").exists()  # the line is found with no agent-cadence script in the repo
 
 
 # -- a red PR nobody holds (design §4.4, TD-613) ---------------------------------------------------
@@ -354,7 +354,7 @@ T0 = datetime(2026, 10, 12, 12, 0, tzinfo=UTC)
 
 
 def _red(n=1573, since=T0, **kw):
-    pr = {"number": n, "title": "sync dev-cadence", "url": f"https://github.com/o/r/pull/{n}", "branch": f"b{n}"}
+    pr = {"number": n, "title": "sync agent-cadence", "url": f"https://github.com/o/r/pull/{n}", "branch": f"b{n}"}
     return {**pr, "author": "a", "checks": "red", "failing": ["test (3.13)"], "red_since": since.isoformat(), **kw}
 
 
@@ -375,7 +375,7 @@ def test_an_unheld_red_pr_is_an_order_after_orphan_after_and_not_before():
         True,
         True,
     )
-    assert o["title"] == "sync dev-cadence"
+    assert o["title"] == "sync agent-cadence"
     assert o["context"] == "https://github.com/o/r/pull/1573 · test (3.13)"
     assert (told, notes) == ({}, [])
     assert workorders.is_pr_order("pr:1573") and not workorders.is_pr_order("pr:x")

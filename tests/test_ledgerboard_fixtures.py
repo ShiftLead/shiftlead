@@ -1,6 +1,6 @@
 """The vendored ledgerboard (ADR 2026-10-12 *How ledgerboard is consumed*, design §8, TD-585): the
 wheel's `src/sessionorc/ledgerboard.py` is an intact release — the one `tests/ledgerboard/MANIFEST`
-names — byte-equal to `scripts/ledgerboard.py` in the dev-cadence tree this repo pins (dev-cadence TD-129;
+names — byte-equal to `scripts/ledgerboard.py` in the agent-cadence tree this repo pins (dev-cadence TD-129;
 before the pin, the synced copy), every vendored file is as `scripts/vendor_ledgerboard.sh` wrote it, and
 the release's own fixtures pass against it."""
 
@@ -38,7 +38,7 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def test_the_wheels_copy_is_byte_equal_to_the_pinned_one():
-    """One release in the repo: a dev-cadence bump that brings a new `scripts/ledgerboard.py` runs
+    """One release in the repo: an agent-cadence bump that brings a new `scripts/ledgerboard.py` runs
     `vendor_ledgerboard.sh` in the same PR, or this fails — never two versions (TD-1014: a pinned repo's
     ledgerboard release is its pinned tree's)."""
     pinned = pinned_script("ledgerboard.py")

@@ -305,7 +305,7 @@ async def test_a_closed_seat_is_the_address_and_the_ask_fills_it(agent, tmp_path
         )  # fmt: skip
         grinder = await mk("dc-grinder", team="dc-grind", project="D")
         asker = await mk("cm-session", team="cm-grind", project="C")
-        agent.sessions[seat].repo, agent.sessions[grinder].repo = "/src/dev-cadence", "/src/dev-cadence"
+        agent.sessions[seat].repo, agent.sessions[grinder].repo = "/src/agent-cadence", "/src/agent-cadence"
         agent.sessions[asker].repo = "/src/contractmatch"
         await person.call("close", id=seat)  # rule 3's close between questions
         rec = agent.sessions[seat]
@@ -323,12 +323,12 @@ async def test_a_closed_seat_is_the_address_and_the_ask_fills_it(agent, tmp_path
                 await agent._question_seat(team="dc-grind")
             setattr(rec, field, True)
         async with LocalClient(caller=asker) as a:
-            got = await a.call("entry_add", repo="dev-cadence", type="debt", text="the address refuses a closed seat")
+            got = await a.call("entry_add", repo="agent-cadence", type="debt", text="the address refuses a closed seat")
         assert got["to"] == seat and _ask_in(rec, got["id"]).open
         # nobody of the team live (stopped): the address still resolves, and the ask still fills it
         await person.call("kill", id=grinder)
         agent.sessions[grinder].state = "closed"
-        assert (await agent._question_seat(repo="dev-cadence")) is rec
+        assert (await agent._question_seat(repo="agent-cadence")) is rec
         await agent._keep_running(datetime.now(UTC))
         new = agent.sessions[seat]
         assert new is not rec and [r["why"] for r in new.restarts][-1:] == ["fill"], "the ask filled the seat"

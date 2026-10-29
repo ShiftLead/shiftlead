@@ -1,8 +1,8 @@
 """A repo's seams as the host agent keeps them (design §4.4 *Repo facts*, *The seams*; §5 *The seams*;
 TD-584, built by TD-591; TD-1011): whether its ledger at `ledger:` parses through `ledgerboard.py` and
 its `Ledgerboard:` major; for each of `board:` and `worktree_setup:` whether it is *set*, *defaulted*
-(the dev-cadence file the checkout holds) or *absent*; whether the repo is **served** — it holds
-dev-cadence's tree, the gate and the ledger, or `serve` names each lack in §5's words with its cure —
+(the agent-cadence file the checkout holds) or *absent*; whether the repo is **served** — it holds
+agent-cadence's tree, the gate and the ledger, or `serve` names each lack in §5's words with its cure —
 and the warnings, one sentence each. The Repo page's missing-seam lines (§4.5a) and `ao doctor`'s
 **repos** check (§4.7) draw this reading and read nothing themselves; the SessionStart commands are
 carried as text, for the clients to compare with the adapter's own line. It also carries the release
@@ -25,7 +25,7 @@ from sessionorc import ledgerboard as lb
 AGE_TIMEOUT = 20.0  # the bound of one ancestry read, git's or the forge's
 # a vendored copy's first line: the tagged release it came from and the hash of every byte after it
 RELEASE_HEADER = re.compile(r"^# ledgerboard v(\S+) sha256:([0-9a-f]{64})$")
-# where a repo keeps its copy: a consumer's, then dev-cadence's own source
+# where a repo keeps its copy: a consumer's, then agent-cadence's own source
 LEDGERBOARD_COPIES = ("scripts/ledgerboard.py", "files/scripts/ledgerboard.py")
 
 
@@ -69,8 +69,8 @@ def ledger(root: Path | str) -> dict[str, Any]:
     ledger's path), *unreadable* (the file could not be read as text, `ledger:` names a path outside the repo,
     or a v2 directory is faulted: `why` its `ledger.v2_faults` words) or *newer* (its `Ledgerboard:` major —
     a directory's from its `README.md` — is past the module's), `why` the reader's reason when not *ok*;
-    `reading()` makes an *ok* directory *predates* where dev-cadence's tree cannot read one (§5 *Which
-    dev-cadence*). `path` is the ledger as read, through `layout_at` (§4.4 *Either layout*): a set `ledger:`
+    `reading()` makes an *ok* directory *predates* where agent-cadence's tree cannot read one (§5 *Which
+    agent-cadence*). `path` is the ledger as read, through `layout_at` (§4.4 *Either layout*): a set `ledger:`
     gone from the tree reads the other layout beside it, and `named` carries the path it names."""
     rel = ledger_mod.ledger_path(root)
     out: dict[str, Any] = {"path": rel, "state": "ok", "major": None, "entries": None, "why": None, "directory": False}
@@ -109,18 +109,18 @@ def ledger(root: Path | str) -> dict[str, Any]:
     return out
 
 
-# dev-cadence's shim in a checkout's common hooks (dev-cadence TD-055): its per-clone setup was run
-SHIM_MARKER = "dev-cadence hook shim (TD-055)"
-# the launcher call only dev-cadence TD-129's shim makes (`dev-cadence hook "${0##*/}"`): the bare
-# `dev-cadence hook` is in every shim's SHIM_MARKER, so it tells no era (TD-1024)
-PINNED_SHIM = 'dev-cadence hook "'
+# agent-cadence's shim in a checkout's common hooks (dev-cadence TD-055): its per-clone setup was run
+SHIM_MARKER = "agent-cadence hook shim (TD-055)"
+# the launcher call only dev-cadence TD-129's shim makes (`agent-cadence hook "${0##*/}"`): the bare
+# `agent-cadence hook` is in every shim's SHIM_MARKER, so it tells no era (TD-1024)
+PINNED_SHIM = 'agent-cadence hook "'
 
 
 ADOPT_BRANCH = "cadence-adopt"  # the head `ao repo add --adopt` opens its PR from (§4.7 `ao repo add`)
 
 
 def cure(root: Path | str) -> str:
-    """The cure of a lack dev-cadence's adoption supplies (§5 *The seams*, TD-1010)."""
+    """The cure of a lack agent-cadence's adoption supplies (§5 *The seams*, TD-1010)."""
     return f"`ao repo add {root} --adopt`"
 
 
@@ -142,7 +142,7 @@ def with_adoption(seams: dict[str, Any] | None, root: Path | str, prs: dict[str,
 def ledger_lack(led: dict[str, Any] | None, root: Path | str) -> str | None:
     """The ledger seam's lack in §5's words, or None when it parses: *unserved: no ledger at <path> —
     <cure>*, *ledger is Ledgerboard 3, this build reads 2 (sync)*, *unserved: the ledger is a directory and
-    dev-cadence at <commit> predates its v2 reader (b9236c8) — sync it* (a pinned repo's *— bump the pin*), or
+    agent-cadence at <commit> predates its v2 reader (b9236c8) — sync it* (a pinned repo's *— bump the pin*), or
     *unserved: the ledger at <path> does not parse — <the reader's reason>*, which no adoption cures."""
     led = led or {}
     state, path = led.get("state"), led.get("path") or "the ledger path"
@@ -159,8 +159,8 @@ def ledger_lack(led: dict[str, Any] | None, root: Path | str) -> str | None:
 
 def _lock(root: Path) -> tuple[dict[str, Any] | None, str | None]:
     """The checkout's lock and the tree's lack (§5 *The seams*): no lock, or one that does not parse;
-    `(None, None)` for dev-cadence's own source, which carries none. A pinned repo's pin stands in for the
-    lock (`{source, files_commit, pin}`, its `ref` the commit, §5 *How the readers find dev-cadence*,
+    `(None, None)` for agent-cadence's own source, which carries none. A pinned repo's pin stands in for the
+    lock (`{source, files_commit, pin}`, its `ref` the commit, §5 *How the readers find agent-cadence*,
     TD-1014): one the launcher would refuse, or cannot resolve, is the tree's lack."""
     if cadence.is_source(root):
         return None, None
@@ -168,19 +168,20 @@ def _lock(root: Path) -> tuple[dict[str, Any] | None, str | None]:
         try:
             source, ref = cadence.pin(root) or ("", "")
         except cadence.PinError as e:
-            return None, f"unserved: dev-cadence's pin does not parse — {e} — {cure(root)}"
+            return None, f"unserved: agent-cadence's pin does not parse — {e} — {cure(root)}"
         if (why := cadence.tree(root)[1]) is not None:
-            return None, f"unserved: dev-cadence's pin does not resolve — {why}"
+            return None, f"unserved: agent-cadence's pin does not resolve — {why}"
         return {"source": source, "commit": ref, "files_commit": ref, "pin": True}, None
     path = root / sync.LOCK
     if not path.is_file():
-        return None, f"unserved: no dev-cadence (no pin in {cadence.PIN}, no {sync.LOCK}) — {cure(root)}"
+        return None, f"unserved: no agent-cadence (no pin in {cadence.PIN}, no {sync.LOCK}) — {cure(root)}"
     try:
         lock = sync.parse_lock(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError) as e:
-        return None, f"unserved: dev-cadence's lock does not parse — {getattr(e, 'strerror', None) or e} — {cure(root)}"
+        why = getattr(e, "strerror", None) or e
+        return None, f"unserved: agent-cadence's lock does not parse — {why} — {cure(root)}"
     if not (lock or {}).get("files_commit"):
-        return None, f"unserved: dev-cadence's lock does not parse — it has no files_commit line — {cure(root)}"
+        return None, f"unserved: agent-cadence's lock does not parse — it has no files_commit line — {cure(root)}"
     return lock, None
 
 
@@ -193,10 +194,10 @@ def _forge_repo(source: str) -> str | None:
 def descends(
     commit: str, roster: Iterable[Path | str], source: str = "", oldest: str | None = None
 ) -> tuple[bool | None, str | None]:
-    """Whether `commit` descends from `oldest`, `cadence.OLDEST` unless given (§5 *Which dev-cadence*, TD-1012;
+    """Whether `commit` descends from `oldest`, `cadence.OLDEST` unless given (§5 *Which agent-cadence*, TD-1012;
     `cadence.OLDEST_V2` for a v2 ledger, TD-1144), or from `cadence.SEED`, agent-cadence's first commit, which
     is newer than both on a history that holds neither (TD-1208): `(True|False, None)`, or `(None, why)` when it
-    cannot be read. Read in each of the roster's dev-cadence checkouts in turn (each a source, as the host's
+    cannot be read. Read in each of the roster's agent-cadence checkouts in turn (each a source, as the host's
     own fetch left it) with `git merge-base --is-ancestor`, the first that holds both commits of a pair
     answering: a checkout that holds `commit` and either oldest point decides, since one that holds a commit
     after the seed holds the seed too. With none, through the forge's compare of each pair in turn on the
@@ -204,7 +205,7 @@ def descends(
     against `oldest`."""
     commit, oldest = commit.removesuffix("+dirty"), oldest or cadence.OLDEST
     checkouts = [Path(r) for r in roster if cadence.is_source(r)]
-    first = "no dev-cadence checkout in the roster"
+    first = "no agent-cadence checkout in the roster"
     misses = []
     answers = []
     for point in (oldest, cadence.SEED):
@@ -254,11 +255,11 @@ def _compare(repo: str, oldest: str, commit: str) -> tuple[bool | None, str | No
 def age(
     root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, Any] | None = None, v2: bool = False
 ) -> dict[str, Any] | None:
-    """The lock's age (§5 *Which dev-cadence*): `{commit, oldest, seed, descends, why}`, `commit` the lock's
+    """The lock's age (§5 *Which agent-cadence*): `{commit, oldest, seed, descends, why}`, `commit` the lock's
     `files_commit` (else `commit`), `descends` whether it is at or after `cadence.OLDEST` or `cadence.SEED`
     (None with `why` when that could not be read); with `v2` (the ledger is a directory, TD-1144) also
     `{oldest_v2, descends_v2}` against `cadence.OLDEST_V2`, read only once `descends` is True. None for
-    dev-cadence's source or a lock that is lacking already. A read `old` made of the same commits is carried:
+    agent-cadence's source or a lock that is lacking already. A read `old` made of the same commits is carried:
     their ancestry never changes."""
     lock, lack = _lock(Path(root))
     commit = (lock or {}).get("files_commit") or (lock or {}).get("commit")
@@ -284,13 +285,15 @@ def age(
 
 
 def predates_v2(commit: str) -> str:
-    """A v2 ledger's *predates* reason (§5 *Which dev-cadence*): the tree at `commit` is older than
+    """A v2 ledger's *predates* reason (§5 *Which agent-cadence*): the tree at `commit` is older than
     `cadence.OLDEST_V2`, so its scripts cannot read a directory."""
-    return f"the ledger is a directory and dev-cadence at {commit[:7]} predates its v2 reader ({cadence.OLDEST_V2[:7]})"
+    return (
+        f"the ledger is a directory and agent-cadence at {commit[:7]} predates its v2 reader ({cadence.OLDEST_V2[:7]})"
+    )
 
 
 def serve(root: Path | str, led: dict[str, Any], dc_age: dict[str, Any] | None = None) -> dict[str, Any]:
-    """`{ok, lacks: [{key, words}]}`: `cadence` (dev-cadence's tree: no lock, or one that does not parse),
+    """`{ok, lacks: [{key, words}]}`: `cadence` (agent-cadence's tree: no lock, or one that does not parse),
     `age` (a tree older than `cadence.OLDEST`, as `age()` read it: the one lack a sync cures, §6 *Sync*),
     `gate` (its script) and `ledger`, each lack in §5's fixed words with its cure; `ok` when there is none."""
     root = Path(root)
@@ -300,7 +303,7 @@ def serve(root: Path | str, led: dict[str, Any], dc_age: dict[str, Any] | None =
     if words:
         lacks.append({"key": "cadence", "words": words})
     elif dc_age and dc_age.get("descends") is False:
-        words = f"unserved: dev-cadence at {dc_age['commit'][:7]} is older than this build reads"
+        words = f"unserved: agent-cadence at {dc_age['commit'][:7]} is older than this build reads"
         lacks.append(
             {"key": "age", "words": f"{words} ({dc_age['oldest'][:7]}) — {'bump the pin' if pinned else 'sync it'}"}
         )
@@ -334,7 +337,7 @@ def unserved(r: Any, but: tuple[str, ...] = ()) -> list[str]:
 
 
 def shimmed(root: Path | str, pinned: bool = False) -> bool | None:
-    """Whether the checkout's common `.git/hooks/pre-push` carries dev-cadence's shim marker — in a `pinned`
+    """Whether the checkout's common `.git/hooks/pre-push` carries agent-cadence's shim marker — in a `pinned`
     repo (`cadence.hook_pinned`) the TD-129 shim's launcher call too, since an older shim runs a copied hook
     that is gone (TD-1024); None where the checkout has no `.git` directory to read (a worktree, or no
     checkout here)."""
@@ -365,11 +368,11 @@ def session_start(root: Path | str) -> list[str]:
 
 
 def on_cadence_roster(root: Path | str) -> bool | None:
-    """Whether the checkout is on dev-cadence's own roster (`hosts.DEV_CADENCE_ROSTER`), which its
+    """Whether the checkout is on agent-cadence's own roster (`hosts.AGENT_CADENCE_ROSTER`), which its
     `adopt` and `gc` read and ShiftLead never writes (§4.7 `ao repo add`); None where that roster could not
     be read, so nothing is said of it."""
     try:
-        lines = Path(hosts.DEV_CADENCE_ROSTER).expanduser().read_text(encoding="utf-8").splitlines()
+        lines = Path(hosts.AGENT_CADENCE_ROSTER).expanduser().read_text(encoding="utf-8").splitlines()
     except (OSError, UnicodeDecodeError):
         return None
     here = Path(root).resolve()
@@ -387,9 +390,9 @@ def warnings(
 ) -> list[str]:
     """The warnings the host agent can read itself (§5 *The seams*), each one sentence: a set `ledger:` gone
     from the tree, which `led` (the ledger seam) reads in the other layout (§4.4 *Either layout*), a missing board,
-    no worktree setup, a checkout without dev-cadence's hook shim, dev-cadence's age where it could not
-    be read (§5 *Which dev-cadence*), and a `served` repo missing from dev-cadence's own roster (§4.7 `ao
-    repo add`, TD-1010) — never dev-cadence's source, which no sync reaches. The two per-clone cures are the
+    no worktree setup, a checkout without agent-cadence's hook shim, agent-cadence's age where it could not
+    be read (§5 *Which agent-cadence*), and a `served` repo missing from agent-cadence's own roster (§4.7 `ao
+    repo add`, TD-1010) — never agent-cadence's source, which no sync reaches. The two per-clone cures are the
     era's: a repo still on the copy is moved to a pin, `sync.sh --pin` (the copy is retired, TD-1188), the
     launcher in a `pinned` repo (`cadence.hook_pinned`, TD-1024). A repo is served whatever they say."""
     out: list[str] = []
@@ -400,16 +403,18 @@ def warnings(
     if setup.get("state") == "absent":
         out.append("no worktree setup")
     if shimmed(root, pinned) is False:
-        cure = f"dev-cadence -C {root} run install_git_hooks.sh" if pinned else f"<dev-cadence>/sync.sh --pin {root}"
-        out.append(f"dev-cadence's per-clone setup not run in this checkout — `{cure}`")
+        cure = (
+            f"agent-cadence -C {root} run install_git_hooks.sh" if pinned else f"<agent-cadence>/sync.sh --pin {root}"
+        )
+        out.append(f"agent-cadence's per-clone setup not run in this checkout — `{cure}`")
     if dc_age and dc_age.get("why"):
-        out.append(f"dev-cadence's age not read: {dc_age['why']}")
+        out.append(f"agent-cadence's age not read: {dc_age['why']}")
     if served and not cadence.is_source(root) and on_cadence_roster(root) is False:
         if pinned:
-            cure = f"its gc may remove the tree this repo pins — `dev-cadence -C <dev-cadence> adopt {root}`"
+            cure = f"its gc may remove the tree this repo pins — `agent-cadence -C <agent-cadence> adopt {root}`"
         else:
-            cure = f"the copy is retired, so move it to a pin — `<dev-cadence>/sync.sh --pin {root}`"
-        out.append(f"not on dev-cadence's roster: {cure}")
+            cure = f"the copy is retired, so move it to a pin — `<agent-cadence>/sync.sh --pin {root}`"
+        out.append(f"not on agent-cadence's roster: {cure}")
     return out
 
 
@@ -420,8 +425,8 @@ def reading(root: Path | str, roster: Iterable[Path | str] = (), old: dict[str, 
     `age()` reads it against the `roster` (the home's checkouts; `old` the last reading, whose age it
     carries), `serve` as `serve()` gives it, `hook_pinned` as `cadence.hook_pinned` (the SessionStart line's
     mode, §4.2, which picks the per-clone cures and the clients' *predates the pin*, TD-1024),
-    `ledgerboard` as `ledgerboard()` does, `source` whether the root is dev-cadence's own source (its every
-    dev-cadence path under `files/`)."""
+    `ledgerboard` as `ledgerboard()` does, `source` whether the root is agent-cadence's own source (its every
+    agent-cadence path under `files/`)."""
     board_state, board_rel = workorders.board_path(root)
     state, value = gitinfo.worktree_setup(root)
     out: dict[str, Any] = {

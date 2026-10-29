@@ -44,7 +44,7 @@ grep the directory, read a section by its file.
 - **§5** [Configuration](design/5-configuration.md) — the settings file, the repo's `.shiftlead.yml`, and where each setting lives.
 - **§6** [Policies (the tdgrind supervisor, generalized)](design/6-policies.md) — the tick's policies: usage gates, run windows, restarts, promote, balance.
 - **§7** [Phases](design/7-phases.md) — the phase plan, re-baselined against what runs, and what each phase still lacks.
-- **§8** [Lessons carried in (dev-cadence + tdgrind)](design/8-lessons.md) — lessons carried in from dev-cadence and tdgrind.
+- **§8** [Lessons carried in (agent-cadence + tdgrind)](design/8-lessons.md) — lessons carried in from agent-cadence and tdgrind.
 - **§9** [Invariants](design/9-invariants.md) — the rules that hold whatever else changes.
 - **§10** [Open questions](design/10-open-questions.md) — the dated log of questions, each a decision that changes what gets built.
 - **§11** [References](design/11-references.md) — files, repos and documents the design cites.

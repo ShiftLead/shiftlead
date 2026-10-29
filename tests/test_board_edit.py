@@ -22,7 +22,7 @@ def git(root: Path, *args: str) -> str:
 
 
 def make_repo(tmp_path: Path, rel: str = "docs/user_attention.md", branch: str = "td1-work") -> Path:
-    """A checkout with no scripts/ — a repo without dev-cadence — on a work branch."""
+    """A checkout with no scripts/ — a repo without agent-cadence — on a work branch."""
     root = tmp_path / "repo"
     (root / rel).parent.mkdir(parents=True)
     (root / rel).write_text(BOARD_TEXT, encoding="utf-8")

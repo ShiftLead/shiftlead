@@ -25,7 +25,7 @@ def _roster() -> list[str]:
     return reg.read_text(encoding="utf-8").splitlines() if reg.exists() else []
 
 
-async def test_a_checkout_holding_dev_cadence_is_added_once_and_read_whole_on_the_next_tick(agent, tmp_path):
+async def test_a_checkout_holding_agent_cadence_is_added_once_and_read_whole_on_the_next_tick(agent, tmp_path):
     await park_ticks(agent)
     root = _repo(tmp_path / "samscrape")
     served(root)
@@ -55,9 +55,9 @@ async def test_a_worktree_adds_its_main_checkout_and_a_line_lands_after_a_hand_a
     assert _roster() == ["# mine", "/elsewhere", str(root.resolve())]
 
 
-async def test_dev_cadences_source_is_added_and_a_checkout_without_dev_cadence_is_refused(agent, tmp_path):
+async def test_agent_cadences_source_is_added_and_a_checkout_without_agent_cadence_is_refused(agent, tmp_path):
     await park_ticks(agent)
-    source = _repo(tmp_path / "dev-cadence")
+    source = _repo(tmp_path / "agent-cadence")
     (source / "sync.sh").write_text("#!/bin/sh\n")
     (source / "files" / "scripts").mkdir(parents=True)
     (source / "files" / "scripts" / "check_cadence.py").write_text("x = 1\n")  # its gate
@@ -66,7 +66,7 @@ async def test_dev_cadences_source_is_added_and_a_checkout_without_dev_cadence_i
     bare = _repo(tmp_path / "notes")
     async with LocalClient() as person:
         assert (await person.call("add_repo", path=str(source)))["served"] is True
-        with pytest.raises(AgentError, match="holds no dev-cadence .*its adoption comes first"):
+        with pytest.raises(AgentError, match="holds no agent-cadence .*its adoption comes first"):
             await person.call("add_repo", path=str(bare))
         assert _roster() == [str(source.resolve())]
         # its adoption PR open, it is added unserved until that merges (§5 *The seams*)
@@ -114,7 +114,7 @@ def test_the_word_calls_the_rpc_with_the_resolved_path_and_is_refused_on_a_node(
     monkeypatch.setattr(cli, "call_sync", call)
     monkeypatch.setattr(hosts, "is_node", lambda: False)
     monkeypatch.chdir(tmp_path)
-    served(_repo(tmp_path / "notes"))  # it holds dev-cadence: the RPC's to add
+    served(_repo(tmp_path / "notes"))  # it holds agent-cadence: the RPC's to add
     assert cli.main(["repo", "add", "notes"]) == 0
     assert calls == [("add_repo", {"path": str((tmp_path / "notes").resolve())})]
     assert capsys.readouterr().out.startswith("added notes")

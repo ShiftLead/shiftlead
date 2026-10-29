@@ -1,8 +1,8 @@
-"""dev-cadence's adoption as `ao repo add` offers it and opens it (design §4.7 **`ao repo add`**, §5 *The
-seams*; TD-1010): run in the person's own shell on the home, never by the host agent. dev-cadence's adopt
+"""agent-cadence's adoption as `ao repo add` offers it and opens it (design §4.7 **`ao repo add`**, §5 *The
+seams*; TD-1010): run in the person's own shell on the home, never by the host agent. agent-cadence's adopt
 (its launcher's `adopt`, dev-cadence TD-129; an older checkout's `sync.sh`, TD-1183) runs in a **scratch clone**
 of the repo under `$TMPDIR` — never a worktree, whose common directory is the person's checkout, where the adopt
-writes per-clone settings — and a temp root, so it registers nothing on dev-cadence's own roster
+writes per-clone settings — and a temp root, so it registers nothing on agent-cadence's own roster
 (dev-cadence TD-068). The offer lists what it wrote; the adopt commits it on `cadence-adopt`, pushes that
 branch and opens it as a PR, never touching the default branch. The clone is removed either way."""
 
@@ -24,7 +24,7 @@ from sessionorc import cadence, reports, sync, workorders
 from sessionorc.seams import ADOPT_BRANCH
 
 GIT_TIMEOUT = 120.0  # a clone or a fetch of the person's repo
-SYNC_TIMEOUT = 300.0  # dev-cadence's adopt, bounded at birth
+SYNC_TIMEOUT = 300.0  # agent-cadence's adopt, bounded at birth
 PR_URL = re.compile(r"https://\S+/pull/(\d+)")
 
 
@@ -32,8 +32,8 @@ class AdoptError(Exception):
     """The adopt could not run or was refused, in words for the person."""
 
 
-def dev_cadence(roster: list[str], root: Path) -> Path | None:
-    """The roster's dev-cadence checkout — the first whose root holds `files/` and `sync.sh` or
+def agent_cadence(roster: list[str], root: Path) -> Path | None:
+    """The roster's agent-cadence checkout — the first whose root holds `files/` and `sync.sh` or
     `launcher/INTERFACE` (`cadence.is_source`) — or None; never `root` itself."""
     for line in roster:
         here = Path(line).expanduser().resolve()
@@ -62,7 +62,7 @@ def origin(root: Path) -> str:
         # as configured, not as an `insteadOf` rewrites it: the clone's `origin` keeps the rewrite
         if url := _run(["git", "-C", str(root), "config", "--get", "remote.origin.url"], None).strip():
             return url
-    raise AdoptError(f"{root} has no origin: ao repo add adopts dev-cadence on origin's default branch")
+    raise AdoptError(f"{root} has no origin: ao repo add adopts agent-cadence on origin's default branch")
 
 
 def temp_root() -> str | None:
@@ -76,7 +76,7 @@ def scratch_clone(root: Path) -> Iterator[tuple[Path, str]]:
     """A `--shared` clone of `root` under `$TMPDIR`, its `origin` the checkout's own, fetched and
     detached at `origin/<default>`; yields `(clone, default)` and removes it after, whatever happened."""
     url, default = origin(root), workorders.default_branch(root)
-    tmp = Path(tempfile.mkdtemp(prefix="ao-adopt-", dir=temp_root()))  # a dev-cadence temp root (its TD-068)
+    tmp = Path(tempfile.mkdtemp(prefix="ao-adopt-", dir=temp_root()))  # an agent-cadence temp root (its TD-068)
     try:
         clone = tmp / root.name
         _run(["git", "clone", "-q", "--shared", "--no-checkout", str(root), str(clone)], None)
@@ -89,36 +89,36 @@ def scratch_clone(root: Path) -> Iterator[tuple[Path, str]]:
 
 
 def _launcher(dc: Path) -> Path:
-    return dc / "launcher" / "dev_cadence.py"
+    return dc / "launcher" / "agent_cadence.py"
 
 
 def _adopter(dc: Path) -> list[str]:
-    """dev-cadence's adopt, the clone's path to follow: the checkout's launcher's `adopt` (dev-cadence TD-129, whose
+    """agent-cadence's adopt, the clone's path to follow: the checkout's launcher's `adopt` (dev-cadence TD-129, whose
     `sync.sh` no longer copies since its #429, TD-1183), else an older checkout's `sync.sh`; AdoptError for one with
     neither, before any clone is made."""
     if _launcher(dc).is_file():
         return [sys.executable, str(_launcher(dc)), "-C", str(dc), "adopt"]
     if (dc / "sync.sh").is_file():
         return [str(dc / "sync.sh")]
-    raise AdoptError(f"dev-cadence at {dc} has no launcher or sync.sh: pull it, then run this again")
+    raise AdoptError(f"agent-cadence at {dc} has no launcher or sync.sh: pull it, then run this again")
 
 
 def after(dc: Path, root: Path) -> str:
-    """The person's own run in the checkout once the adoption merges: the hook shims and dev-cadence's roster."""
+    """The person's own run in the checkout once the adoption merges: the hook shims and agent-cadence's roster."""
     if _launcher(dc).is_file():
-        return f"dev-cadence -C {dc} adopt {root}"
+        return f"agent-cadence -C {dc} adopt {root}"
     return f"{dc}/sync.sh {root}"
 
 
 def _unpinned(clone: Path, root: Path, default: str) -> None:
-    """Refuses a clone whose `origin/<default>` pins dev-cadence already, before the adopt writes beside the pin
+    """Refuses a clone whose `origin/<default>` pins agent-cadence already, before the adopt writes beside the pin
     (TD-1014): the checkout is behind its origin."""
     if cadence.pinned(clone):
-        raise AdoptError(f"origin/{default} of {root} pins dev-cadence already ({cadence.PIN}): pull the checkout")
+        raise AdoptError(f"origin/{default} of {root} pins agent-cadence already ({cadence.PIN}): pull the checkout")
 
 
 def _sync(dc: Path, clone: Path) -> list[str]:
-    """dev-cadence's adopt in the clone; the paths it wrote, as `git status --porcelain -z` names them (a
+    """agent-cadence's adopt in the clone; the paths it wrote, as `git status --porcelain -z` names them (a
     rename's new path alone)."""
     _run([*_adopter(dc), str(clone)], clone, SYNC_TIMEOUT)
     records = iter(_run(["git", "status", "--porcelain", "-z", "--untracked-files=all"], clone).split("\0"))
@@ -153,7 +153,7 @@ def open_pr(clone: Path, gh: str) -> dict[str, Any] | None:
 
 
 def offer(root: Path, dc: Path) -> dict[str, Any]:
-    """`ao repo add <path>` on a checkout without dev-cadence: what its adoption would write, `{root, name,
+    """`ao repo add <path>` on a checkout without agent-cadence: what its adoption would write, `{root, name,
     paths}`; nothing is committed, pushed or added."""
     _adopter(dc)
     with scratch_clone(root) as (clone, default):
@@ -164,17 +164,17 @@ def offer(root: Path, dc: Path) -> dict[str, Any]:
 
 def _word(dc: Path) -> str:
     """The adopt as the PR body names it."""
-    return f"dev-cadence -C {dc} adopt" if _launcher(dc).is_file() else f"{dc}/sync.sh"
+    return f"agent-cadence -C {dc} adopt" if _launcher(dc).is_file() else f"{dc}/sync.sh"
 
 
 def body(commit: str, dc: Path, root: Path) -> str:
-    """The adoption PR's body: dev-cadence's commit, and the person's own run once it merges."""
+    """The adoption PR's body: agent-cadence's commit, and the person's own run once it merges."""
     return (
-        f"Adopts dev-cadence at {commit}, written by `{_word(dc)}` in a scratch clone (`ao repo add --adopt`,"
+        f"Adopts agent-cadence at {commit}, written by `{_word(dc)}` in a scratch clone (`ao repo add --adopt`,"
         " ShiftLead design §4.7).\n\n"
         "ShiftLead serves this repo once this PR is merged and the checkout is pulled; it never merges it.\n\n"
-        f"After the merge, run `{after(dc, root)}` in the checkout: it sets up dev-cadence's hook shims there and"
-        " puts the checkout on dev-cadence's roster.\n"
+        f"After the merge, run `{after(dc, root)}` in the checkout: it sets up agent-cadence's hook shims there and"
+        " puts the checkout on agent-cadence's roster.\n"
     )
 
 
@@ -184,7 +184,7 @@ def adopt(root: Path, dc: Path, gh: str = "gh") -> dict[str, Any]:
     refused, as is a default branch that already holds what the adopt writes. Where origin holds
     `cadence-adopt` already, its open PR is the answer, `open` true and nothing pushed (a re-run, or one
     whose `add_repo` failed after the PR was opened); a `cadence-adopt` with no open PR is refused, and so
-    is a dev-cadence checkout with no launcher or `sync.sh`, before any clone."""
+    is an agent-cadence checkout with no launcher or `sync.sh`, before any clone."""
     _adopter(dc)
     url = origin(root)
     if not reports.GITHUB_ORIGIN.search(url):
@@ -201,7 +201,7 @@ def adopt(root: Path, dc: Path, gh: str = "gh") -> dict[str, Any]:
         _unpinned(clone, root, default)
         paths = _sync(dc, clone)
         if not paths:
-            raise AdoptError(f"origin/{default} of {root} holds dev-cadence already: pull the checkout")
+            raise AdoptError(f"origin/{default} of {root} holds agent-cadence already: pull the checkout")
         # the pin's `ref` (the launcher's adopt), else the lock's commit (an older checkout's `sync.sh`)
         lock = (
             sync.parse_lock((clone / sync.LOCK).read_text(encoding="utf-8")) if (clone / sync.LOCK).is_file() else None
@@ -212,11 +212,11 @@ def adopt(root: Path, dc: Path, gh: str = "gh") -> dict[str, Any]:
         commit = (pinned[1][:7] if pinned else None) or (lock or {}).get("commit") or "?"
         _run(["git", "switch", "-q", "-c", ADOPT_BRANCH], clone)
         _run(["git", "add", "-A"], clone)
-        _run(["git", *_identity(root), "commit", "-q", "-m", f"adopt dev-cadence {commit}"], clone)
+        _run(["git", *_identity(root), "commit", "-q", "-m", f"adopt agent-cadence {commit}"], clone)
         _run(["git", "push", "-q", "-u", "origin", ADOPT_BRANCH], clone)
         note = clone.parent / "pr-body.md"
         note.write_text(body(commit, dc, root), encoding="utf-8")
-        title = f"Adopt dev-cadence {commit}"
+        title = f"Adopt agent-cadence {commit}"
         out = _run(
             [gh, "pr", "create", "--head", ADOPT_BRANCH, "--base", default, "--title", title, "--body-file", str(note)],
             clone,

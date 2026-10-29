@@ -6,7 +6,7 @@ metadata:
 ---
 
 Since TD-1195 (2026-10-28) shiftlead's ledger is `docs/ledger/`: one `TD-NNN.md` per entry, archived ones under
-`archive/` (`git mv`), and no stored Summary table (`dev-cadence run ledger.py --summary` prints it). Two
+`archive/` (`git mv`), and no stored Summary table (`agent-cadence run ledger.py --summary` prints it). Two
 filings never conflict. Two edits to the same entry conflict in that one file, and resolve there.
 
 In a repo still on a v1 ledger (cadence §2.5, dev-cadence TD-137), a summary-table conflict is resolved row by

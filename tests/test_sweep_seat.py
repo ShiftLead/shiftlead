@@ -58,7 +58,7 @@ def test_the_sweeper_preset_is_a_seat_whose_brief_holds_every_rule_of_what_it_ma
     assert p["icon"] in repoconfig.ICONS and p["context"] == repoconfig.WORKER_CONTEXT
     text, _ = role.compose()
     # the procedure by both roads, never its steps
-    assert "`dev-cadence path procedures/stranded-work.md`" in text and "`docs/procedures/stranded-work.md`" in text
+    assert "`agent-cadence path procedures/stranded-work.md`" in text and "`docs/procedures/stranded-work.md`" in text
     assert "`Swept-deep:`" in text and "`deep-sweep-every`" in text  # deep or quick
     for rule in (
         "only once you have verified it done",  # a close is verified, and says how

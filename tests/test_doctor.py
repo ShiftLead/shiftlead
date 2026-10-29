@@ -227,9 +227,10 @@ def test_claude_codes_profiles_read_their_layers_credentials_and_key(tmp_path, m
     assert g["layers"][1]["commands"] == [
         {"command": str(hook), "resolves": True},
         {"command": f"{hook} --statusline", "resolves": True},
-    ], "dev-cadence's own line is not ours to read"
+    ], "agent-cadence's own line is not ours to read"
     assert {c["resolves"] for c in g["layers"][0]["commands"]} == {False}
-    # a layer written before dev-cadence's runner line changed carries the older line: not ours to read either (TD-507)
+    # a layer written before agent-cadence's runner line changed carries the older line: not ours to read
+    # either (TD-507)
     old_line = 'f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi'
     nudge = "python3 scripts/nudge_user_attention.py --session-start"
     hooks = {"SessionStart": [{"hooks": [{"command": str(hook)}, {"command": old_line}, {"command": nudge}]}]}
