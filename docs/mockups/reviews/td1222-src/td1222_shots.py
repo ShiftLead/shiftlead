@@ -33,7 +33,7 @@ CASES = [
      ("working", "s-working", "interactive · working · 1 shell: timeout 1500 gh pr checks 2658 --watch · 4m", True)),
     ("A grinder with an ask out and its own shell running",
      ("waiting", "s-waiting", "Grinder · waiting on you: TD-959", False),
-     ("working", "s-working", "Grinder · working · 1 shell: timeout 1500 gh pr checks 2658 --watch · 4m · waiting on you: TD-959", False)),
+     ("working", "s-working", "Grinder · waiting on you: TD-959 · working · 1 shell", False)),
     ("A grinder with an ask out and nothing running",
      ("waiting", "s-waiting", "Grinder · waiting on you: TD-959", False),
      ("waiting", "s-waiting", "Grinder · waiting on you: TD-959", False)),
