@@ -1720,11 +1720,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      it, and comes back only once the claim ends. The merge is then `gh pr merge <n> --squash
      --match-head-commit <head>`, with no body (cadence §4.2). The forge's head match is the one
      atomic guard, and a push it refuses is the moved head again. A merge is followed by a `system`
-     note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — sync of dev-cadence
-     <commit>, n files*, or for a bump *merged `<repo>` #<n> — bump of the dev-cadence pin to <sha>*.
+     note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — bump of the dev-cadence pin
+     to <sha>*.
 
-  The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, posted,
-  at, waiting_since}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, the reason from step 1
+  The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, at,
+  waiting_since}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, the reason from step 1
   or 2, or `SYNC_PRECHECK_WAIT` run out in step 4), *gate* (the gate's line), *error* (no reading after `SYNC_TRIES`) or *off*, and it is empty
   while a retry is counted. A PR's entry is dropped once it leaves the open list, except the newest
   *merged* one, which the Repos card names (§4.5a) and which neither the pass nor the order reads. So a head with a

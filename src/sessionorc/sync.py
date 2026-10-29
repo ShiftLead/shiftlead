@@ -381,10 +381,9 @@ def judge(
     """Steps 1 to 4 on one candidate, blocking (called off the loop): the entry to keep, `ready` set on
     one the gate passed — the merge is the caller's, after it reads the holders again — or None for a
     head that moved (nothing written). The home posts no evidence of its own: a mechanical PR is a bump,
-    which waits on a review of its compare (TD-1015, TD-1206); no reading counts `tries`, and at `SYNC_TRIES`
-    the verdict is *error*. With `precheck` (a PR
-    awaiting its precheck) the gate is not run: a mechanical one comes back with `prestart` set, and the
-    start is the caller's, under the promote lock."""
+    which waits on a review of its compare (TD-1015, TD-1206); no reading counts `tries`, and at
+    `SYNC_TRIES` the verdict is *error*. With `precheck` (a PR awaiting its precheck) the gate is not run:
+    a mechanical one comes back with `prestart` set, and the start is the caller's, under the promote lock."""
     number, head = int(pr["number"]), str(pr["head"])
     e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0}
     e.pop("ready", None)
