@@ -242,6 +242,27 @@ def test_the_starts_note_is_the_stops_formatter_on_a_scheduled_record_only():
     assert start_note({"state": "scheduled", "start_at": far.astimezone(UTC).isoformat()}) == f"starts {far:%a %H:%M}"
 
 
+def test_the_starts_note_reads_the_offset_of_its_own_day_across_a_dst_change(monkeypatch):
+    """TD-1217: three days after Fri 08:35 MDT is Mon 07:35 MST (US DST ended Sun 2030-11-03), the clock
+    the zone keeps that day, never today's offset carried forward."""
+    import time
+
+    from sessionorc.models import start_note
+
+    monkeypatch.setenv("TZ", "America/Denver")
+    time.tzset()
+    try:
+        soon = datetime(2030, 11, 1, 8, 35).astimezone()
+        far = soon + timedelta(days=3)
+        assert f"{far:%a %H:%M}" == "Mon 08:35", "today's offset carried forward: the old expectation"
+        at = far.astimezone(UTC).isoformat()
+        assert start_note({"state": "scheduled", "start_at": at}) == f"starts {far.astimezone():%a %H:%M}"
+        assert start_note({"state": "scheduled", "start_at": at}) == "starts Mon 07:35"
+    finally:
+        monkeypatch.undo()
+        time.tzset()
+
+
 async def test_ao_new_at_and_ao_at_drive_the_start(agent, tmp_path, capsys, monkeypatch):
     from shiftlead import cli
 
