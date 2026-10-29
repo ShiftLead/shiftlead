@@ -1673,8 +1673,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the team's to give. A bump with no such review after `SYNC_PRECHECK_WAIT` (a day) at one head is
      *refused*, *review waited a day: …*. Comments that cannot be read are no reading, counted as
      step 4's are. Once reviewed, the bump goes on to step 4. A bump is the only mechanical PR since the
-     lock's road left; the pass still carries the SHIP comment it posted for a lock's sync (`review_body`,
-     the entry's `posted`), which no check now reaches, until TD-1206 removes it.
+     lock's road left, so the home posts no SHIP comment of its own on any PR: `sync-check` signs only the
+     gate's BLOCK (step 4).
   4. **The gate** is rule 10's: `scripts/check_cadence.py --pr <n>`. It is run in the
      registry checkout, as rule 10 runs it: the default branch's copy of the script. In a repo whose tree is older than
      `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
@@ -1720,11 +1720,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      it, and comes back only once the claim ends. The merge is then `gh pr merge <n> --squash
      --match-head-commit <head>`, with no body (cadence §4.2). The forge's head match is the one
      atomic guard, and a push it refuses is the moved head again. A merge is followed by a `system`
-     note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — sync of dev-cadence
-     <commit>, n files*, or for a bump *merged `<repo>` #<n> — bump of the dev-cadence pin to <sha>*.
+     note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — bump of the dev-cadence pin
+     to <sha>*.
 
-  The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, posted,
-  at, waiting_since}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, the reason from step 1
+  The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, at,
+  waiting_since}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, the reason from step 1
   or 2, or `SYNC_PRECHECK_WAIT` run out in step 4), *gate* (the gate's line), *error* (no reading after `SYNC_TRIES`) or *off*, and it is empty
   while a retry is counted. A PR's entry is dropped once it leaves the open list, except the newest
   *merged* one, which the Repos card names (§4.5a) and which neither the pass nor the order reads. So a head with a

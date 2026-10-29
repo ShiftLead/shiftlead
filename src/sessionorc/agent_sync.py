@@ -76,7 +76,7 @@ class SyncMixin:
                 if e.get("verdict") == "off" and e.get("head") == head:
                     continue  # already *off* at this head: nothing rewritten, nothing pushed
                 if pr.get("sync") is True and head and not sync_mod.settled(sync.get(n), head):
-                    sync[n] = {"head": head, "verdict": "off", "why": "sync is off", "tries": 0, "posted": False,
+                    sync[n] = {"head": head, "verdict": "off", "why": "sync is off", "tries": 0,
                                "at": now_iso()}  # fmt: skip
         else:
             covered, repo = True, Path(root).name
@@ -103,7 +103,7 @@ class SyncMixin:
                         covered = False
                         break  # no reading: no verdict on anyone
                 if why := sync_mod.decline(pr, self._sync_login):
-                    sync[n] = {"head": head, "verdict": "refused", "why": why, "tries": 0, "posted": False,
+                    sync[n] = {"head": head, "verdict": "refused", "why": why, "tries": 0,
                                "at": now_iso()}  # fmt: skip
                     continue
                 if prechecks and sync_mod.unprechecked(pr):
@@ -172,10 +172,7 @@ class SyncMixin:
                 return None  # the head moved under the merge: the forge's match refused it, and nothing is written
             return sync_mod._no_reading(e, f"the merge was refused: {why}", now_iso())
         repo = Path(root).name
-        if e.get("kind") == "bump":
-            text = f"merged {repo} #{n} — bump of the dev-cadence pin to {(e.get('commit') or '?')[:7]}"
-        else:
-            text = f"merged {repo} #{n} — sync of dev-cadence {e.get('commit') or '?'}, {e.get('files', 0)} files"
+        text = f"merged {repo} #{n} — bump of the dev-cadence pin to {(e.get('commit') or '?')[:7]}"
         self._system_note(PERSON, text)
         log.info("sync: %s", text)
         return {**e, "verdict": "merged", "why": "", "at": now_iso()}

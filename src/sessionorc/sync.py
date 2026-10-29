@@ -217,7 +217,7 @@ def _check_bump(
         return f"ref {ref[:7]} does not descend from {old[1][:7]}"
     if any(held_mod.matches(PIN, g) for g in held):
         return f"{PIN} is a held path"
-    out.update(kind="bump", commit=ref, old=old[1], files=[PIN], post_sync=False)
+    out.update(kind="bump", commit=ref, old=old[1], files=[PIN])
     return None
 
 
@@ -283,24 +283,6 @@ def decline(pr: dict[str, Any], login: str | None) -> str | None:
     if not login or author.lower() != login.lower():
         return f"author {author or '(unknown)'} is not the home's"
     return None
-
-
-def review_body(got: dict[str, Any]) -> str:
-    """The SHIP comment for a mechanical PR (§6 step 3): the first line the cadence check reads, then
-    the lock's `commit:`, the files checked, the replay and the head."""
-    files = got.get("files") or []
-    return "\n".join(
-        [
-            f"cadence-review: SHIP · {REVIEWER} · code · 0 findings",
-            "",
-            f"A sync of dev-cadence {got.get('commit') or '(no commit:)'}, checked by the home (design §6 *Sync*).",
-            "",
-            f"- {len(files)} file(s) checked against dev-cadence's `files/` at the lock's `files_commit`"
-            + (": " + ", ".join(f"`{p}`" for p in files) if files else ""),
-            "- post_sync replayed" if got.get("post_sync") else "- no post_sync",
-            f"- head {got.get('head')}",
-        ]
-    )
 
 
 def block_body(line: str) -> str:
@@ -398,12 +380,12 @@ def judge(
 ) -> dict[str, Any] | None:  # fmt: skip
     """Steps 1 to 4 on one candidate, blocking (called off the loop): the entry to keep, `ready` set on
     one the gate passed — the merge is the caller's, after it reads the holders again — or None for a
-    head that moved (nothing written). A retry keeps `posted`, so the SHIP comment is posted once per
-    head; no reading counts `tries`, and at `SYNC_TRIES` the verdict is *error*. With `precheck` (a PR
-    awaiting its precheck) the gate is not run: a mechanical one comes back with `prestart` set, and the
-    start is the caller's, under the promote lock."""
+    head that moved (nothing written). The home posts no evidence of its own: a mechanical PR is a bump,
+    which waits on a review of its compare (TD-1015, TD-1206); no reading counts `tries`, and at
+    `SYNC_TRIES` the verdict is *error*. With `precheck` (a PR awaiting its precheck) the gate is not run:
+    a mechanical one comes back with `prestart` set, and the start is the caller's, under the promote lock."""
     number, head = int(pr["number"]), str(pr["head"])
-    e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0, "posted": False}
+    e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0}
     e.pop("ready", None)
     e.pop("prestart", None)
     held = held_globs(root)
@@ -416,19 +398,13 @@ def judge(
         return _no_reading(e, got["why"], at)
     if got["verdict"] == "refused":
         return {**e, "verdict": "refused", "why": got["why"], "at": at}
-    bump = got.get("kind") == "bump"
-    if bump:  # the home posts no evidence of its own for a bump: it waits on a review of the compare (TD-1015)
-        why, read = compare_review(root, number, head)
-        if why:
-            return _no_reading(e, f"the PR's comments could not be read: {why}", at)
-        if not read:
-            return {**wait_entry(e, head, f"no review of the compare at {head[:7]}", at, "review"), "waits": "review"}
-        if e.pop("waits", None):
-            e.pop("waiting_since", None)
-    elif not e.get("posted"):
-        if why := comment(root, number, review_body(got)):
-            return _no_reading(e, f"the review comment was not posted: {why}", at)
-        e["posted"] = True
+    why, read = compare_review(root, number, head)
+    if why:
+        return _no_reading(e, f"the PR's comments could not be read: {why}", at)
+    if not read:
+        return {**wait_entry(e, head, f"no review of the compare at {head[:7]}", at, "review"), "waits": "review"}
+    if e.pop("waits", None):
+        e.pop("waiting_since", None)
     if precheck:
         return {**e, "at": at, "prestart": True}
     g = (gate or cadence.check)(root, number, GATE_TIMEOUT)
@@ -439,7 +415,7 @@ def judge(
         if why := comment(root, number, block_body(line)):
             return _no_reading(e, f"the BLOCK comment was not posted: {why}", at)
         return {**e, "verdict": "gate", "why": line, "at": at}
-    return {**e, "verdict": "", "why": "", "at": at, "ready": True, "kind": got.get("kind") or "sync",
+    return {**e, "verdict": "", "why": "", "at": at, "ready": True, "kind": "bump",
             "commit": got.get("commit") or "", "files": len(got.get("files") or [])}  # fmt: skip
 
 
@@ -537,7 +513,7 @@ def tend_precheck(root: Path | str, repo: str, prs: list[dict[str, Any]], sync: 
         return None
     if f.get("counted") or settled(sync.get(n), sha):
         return None
-    e = sync.get(n) if (sync.get(n) or {}).get("head") == sha else {"head": sha, "tries": 0, "posted": False}
+    e = sync.get(n) if (sync.get(n) or {}).get("head") == sha else {"head": sha, "tries": 0}
     why = f"precheck on {sha[:7]} ended and recorded nothing" + (f" ({f['why']})" if f.get("why") else "")
     sync[n] = {**_no_reading(dict(e), why, at), "waiting_since": e.get("waiting_since") or at}
     promote._write(promote.repo_dir(repo) / "precheck-pr.json", {**f, "counted": True})
@@ -549,7 +525,7 @@ def wait_entry(entry: dict[str, Any] | None, head: str, why: str, at: str, what:
     the entry at `head` with `waiting_since` (set on the first waiting pass, reset by a new head) and the
     wait's reason; at `SYNC_PRECHECK_WAIT` the verdict is *refused*, *<what> waited a day: <the reason>*, and
     the PR the team's."""
-    e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0, "posted": False}
+    e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0}
     e.pop("prestart", None)
     since = e.get("waiting_since") or at
     e.update(waiting_since=since, why=why, at=at, verdict=e.get("verdict") or "")

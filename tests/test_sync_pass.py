@@ -1,5 +1,5 @@
 """The home merges a mechanical sync PR (design §6 *Sync*, steps 3 to 5; TD-685 slice 2): who the pass
-takes up and declines, the SHIP and BLOCK comments, the gate's three outcomes, the pinned merge and its
+takes up and declines, the BLOCK comment, the gate's three outcomes, the pinned merge and its
 note, the switch, and TD-684's order read through `sync.mark`. The check (slice 1, tested with fixture
 repos in `test_sync_check.py`), the gate and every `gh` call are stubbed: no test reaches GitHub."""
 
@@ -34,15 +34,15 @@ def _pr(n: int = 1097, **over) -> dict:
     return {**pr, **over}
 
 
-MECHANICAL = {"verdict": "mechanical", "why": "", "head": HEAD, "commit": "d" * 40, "files": ["scripts/x.sh"],
-              "post_sync": False}  # fmt: skip
+BUMP = {"verdict": "mechanical", "why": "", "head": HEAD, "kind": "bump", "commit": "e" * 40, "old": "d" * 40,
+        "files": ["docs/cadence.toml"]}  # fmt: skip
 
 
 @pytest.fixture
 def gh(monkeypatch):
     """Every outward call of the pass, recorded and answered from `state`."""
     state = {
-        "check": dict(MECHANICAL),
+        "check": dict(BUMP),
         "gate": {"verdict": "pass", "failed": []},
         "comment": None,
         "merge": None,
@@ -67,6 +67,7 @@ def gh(monkeypatch):
     monkeypatch.setattr(sync, "gh_login", record("login", "login"))
     monkeypatch.setattr(cadence, "gate", lambda root: state["gated"])
     monkeypatch.setattr(sync, "held_globs", lambda root: [])
+    monkeypatch.setattr(sync, "compare_review", lambda root, n, head: (None, True))  # reviewed, unless a test says
     return state
 
 
@@ -146,25 +147,21 @@ def test_mark_the_homes_prs_are_no_order_and_a_verdicts_why_is_the_context():
     assert sync.mark(prs, offs, True)[0]["sync_home"] and not sync.mark(prs, offs, True)[0].get("sync_why")
 
 
-def test_the_ship_comment_is_the_cadence_line_and_what_was_checked():
-    body = sync.review_body(MECHANICAL)
-    assert body.splitlines()[0] == "cadence-review: SHIP · sync-check · code · 0 findings"
-    assert "d" * 40 in body and "`scripts/x.sh`" in body and "no post_sync" in body and HEAD in body
+def test_the_block_comment_is_the_cadence_line():
     assert sync.block_body("ci: not green").splitlines()[0] == "cadence-review: BLOCK · sync-check · code · 1 findings"
 
 
 # -- judge ------------------------------------------------------------------------------------------------
 
 
-def test_judge_mechanical_and_gated_is_ready_and_posts_once(gh):
+def test_judge_mechanical_and_gated_is_ready_and_posts_nothing(gh):
     e = sync.judge(ROOT, _pr(), None, [], "T0")
-    assert e["ready"] and e["posted"] and e["commit"] == "d" * 40 and e["files"] == 1
-    assert _names(gh) == ["check", "comment", "gate"]
-    assert gh["calls"][1][1][2].startswith("cadence-review: SHIP")
-    # no reading from the gate: tried again, not posted again, and *error* at the third
+    assert e["ready"] and e["kind"] == "bump" and e["commit"] == "e" * 40 and e["files"] == 1
+    assert _names(gh) == ["check", "gate"] and "posted" not in e, "no SHIP of the home's own (TD-1206)"
+    # no reading from the gate: tried again, and *error* at the third
     gh["gate"], gh["calls"] = None, []
     e = sync.judge(ROOT, _pr(), {k: v for k, v in e.items() if k != "ready"}, [], "T1")
-    assert (e["verdict"], e["tries"], e["posted"]) == ("", 1, True) and "comment" not in _names(gh)
+    assert (e["verdict"], e["tries"]) == ("", 1) and "comment" not in _names(gh)
     gh["gate"] = {"verdict": "unknown", "failed": []}  # the script's exit 3
     e = sync.judge(ROOT, _pr(), e, [], "T2")
     e = sync.judge(ROOT, _pr(), e, [], "T3")
@@ -176,7 +173,6 @@ def test_judge_a_failed_gate_blocks_and_a_refusal_posts_nothing(gh):
     e = sync.judge(ROOT, _pr(), None, [], "T0")
     assert (e["verdict"], e["why"]) == ("gate", "ci; review")
     assert [c[1][2].splitlines()[0] for c in gh["calls"] if c[0] == "comment"] == [
-        "cadence-review: SHIP · sync-check · code · 0 findings",
         "cadence-review: BLOCK · sync-check · code · 1 findings",
     ]
     gh["calls"], gh["check"] = [], {"verdict": "refused", "why": "scripts/y.sh is not in the lock", "head": HEAD}
@@ -188,17 +184,13 @@ def test_judge_a_failed_gate_blocks_and_a_refusal_posts_nothing(gh):
     assert sync.judge(ROOT, _pr(), None, [], "T0")["tries"] == 1
 
 
-BUMP = {"verdict": "mechanical", "why": "", "head": HEAD, "kind": "bump", "commit": "e" * 40, "old": "d" * 40,
-        "files": ["docs/cadence.toml"], "post_sync": False}  # fmt: skip
-
-
 def test_judge_a_bump_posts_nothing_and_waits_on_a_review_of_its_compare(gh, monkeypatch):
     """TD-1015, §6 *Sync* step 3 for a bump: the home posts no evidence of its own; the bump waits, uncounted,
     for a review of its compare at the head, then gates as any; a day with none is *refused*."""
-    gh["check"], review = dict(BUMP), [None, False]
+    review = [None, False]
     monkeypatch.setattr(sync, "compare_review", lambda root, n, head: tuple(review))
     e = sync.judge(ROOT, _pr(), None, [], "2026-10-26T00:00:00+00:00")
-    assert (e["verdict"], e["waits"], e["tries"], e["posted"]) == ("", "review", 0, False)
+    assert (e["verdict"], e["waits"], e["tries"]) == ("", "review", 0) and "posted" not in e
     assert e["why"] == f"no review of the compare at {HEAD[:7]}" and e["waiting_since"] == "2026-10-26T00:00:00+00:00"
     assert _names(gh) == ["check"]
     # unreadable comments are no reading, counted
@@ -258,16 +250,16 @@ async def _orders(agent) -> list[dict]:
 
 
 @pytest.mark.integration
-async def test_a_mechanical_sync_pr_is_merged_with_the_note_and_is_no_order(agent, gh):
+async def test_a_reviewed_bump_is_merged_with_its_note_and_is_no_order(agent, gh):
     _reading(agent, _pr())
     assert len(await _orders(agent)) == 1, "no pass has covered the repo yet: the team's"
     await agent._sync_pass()
     entry = agent._repos[ROOT]["sync"]["1097"]
-    assert (entry["verdict"], entry["head"], entry["posted"]) == ("merged", HEAD, True)
-    assert _names(gh) == ["login", "check", "comment", "gate", "head", "merge"]
+    assert (entry["verdict"], entry["head"]) == ("merged", HEAD) and "posted" not in entry
+    assert _names(gh) == ["login", "check", "gate", "head", "merge"]
     assert gh["calls"][-1][1] == (ROOT, 1097, HEAD)
     notes = [e.text for e in agent.person_inbox if e.from_ == "system"]
-    assert f"merged samscrape #1097 — sync of dev-cadence {'d' * 40}, 1 files" in notes
+    assert "merged samscrape #1097 — bump of the dev-cadence pin to eeeeeee" in notes
     assert await _orders(agent) == []
     # judged at its head: never checked again
     gh["calls"] = []
@@ -275,18 +267,6 @@ async def test_a_mechanical_sync_pr_is_merged_with_the_note_and_is_no_order(agen
     assert gh["calls"] == []
     # the reading's re-read keeps the pass's outcomes
     assert agent.repos_store.load()[ROOT]["sync"]["1097"]["verdict"] == "merged"
-
-
-@pytest.mark.integration
-async def test_a_reviewed_bump_is_merged_with_its_own_note(agent, gh, monkeypatch):
-    gh["check"] = dict(BUMP)
-    monkeypatch.setattr(sync, "compare_review", lambda root, n, head: (None, True))
-    _reading(agent, _pr())
-    await agent._sync_pass()
-    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
-    assert _names(gh) == ["login", "check", "gate", "head", "merge"]
-    notes = [e.text for e in agent.person_inbox if e.from_ == "system"]
-    assert "merged samscrape #1097 — bump of the dev-cadence pin to eeeeeee" in notes
 
 
 @pytest.mark.integration
@@ -352,7 +332,7 @@ async def test_a_head_moved_before_the_merge_or_a_new_holder_is_not_merged_and_g
     monkeypatch.setattr(agent, "_sync_held_by", lambda root, pr: next(seen))
     await agent._sync_pass()
     entry = agent._repos[ROOT]["sync"]["1097"]
-    assert "merge" not in _names(gh) and entry["verdict"] == "" and entry["posted"]
+    assert "merge" not in _names(gh) and entry["verdict"] == "" and entry["kind"] == "bump"
 
 
 @pytest.mark.integration
