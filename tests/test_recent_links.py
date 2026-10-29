@@ -12,7 +12,7 @@ import shutil
 import subprocess
 
 import pytest
-from conftest import scratch_dir
+from conftest import park_ticks, scratch_dir
 
 from sessionorc import adapters
 from sessionorc.adapters import Link
@@ -168,6 +168,7 @@ async def test_the_tick_merges_newest_first_a_url_once_and_keeps_twenty(agent, t
         return batches.pop(0) if batches else ([], cursor)
 
     monkeypatch.setattr(adapters.get("shell"), "links", links, raising=False)
+    await park_ticks(agent)  # the test owns the clock: a loop tick mid-read would mark the record checked (TD-1235)
     async with LocalClient() as person:
         sid = (await person.call("create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))[
             "id"
