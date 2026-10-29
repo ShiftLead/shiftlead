@@ -43,7 +43,7 @@ open(os.path.join(t, "docs", "cadence.toml"), "w").write('[dev-cadence]\\nsource
 """
 GH = """#!/bin/sh
 if [ "$2" = list ]; then cat "$GH_OPEN" 2>/dev/null || echo '[]'; exit 0; fi
-printf '%s\\n' "$@" > "$GH_LOG"
+line=$(printf '%s\\t' "$@"); echo "$line" >> "$GH_LOG"
 while [ $# -gt 0 ]; do [ "$1" = --body-file ] && cp "$2" "$GH_LOG.body"; shift; done
 echo https://github.com/t/notes/pull/7
 """
@@ -96,6 +96,18 @@ def world(tmp_path, monkeypatch):
     return {"origin": bare, "seed": seed, "checkout": checkout, "dc": dc, "tmp": scratch, "log": tmp_path / "gh.log"}
 
 
+def _calls(world) -> list[list[str]]:
+    """Every `gh` call but `pr list`, one argv a line: appended, since a call the test did not make (likeliest a
+    read of the agent's still running in a thread when `world` put the fake on PATH) lands in the same log (TD-1211)."""
+    log = world["log"]
+    return [line.removesuffix("\t").split("\t") for line in log.read_text().splitlines()] if log.exists() else []
+
+
+def _prs(world) -> list[list[str]]:
+    """The `gh pr create` calls: what an adoption opens, and the only call these tests assert on."""
+    return [c for c in _calls(world) if c[:2] == ["pr", "create"]]
+
+
 def _roster() -> list[str]:
     return hosts.default_repos_registry().read_text().splitlines()
 
@@ -114,7 +126,7 @@ async def test_a_checkout_without_dev_cadence_is_offered_its_adoption_and_nothin
     assert _roster() == [str(world["dc"])]  # nothing added
     assert list(world["tmp"].iterdir()) == []  # no clone left
     assert _per_clone(checkout) == before  # the clone's settings never reached the person's checkout
-    assert not world["log"].exists()  # no PR
+    assert not _prs(world), _calls(world)  # no PR
     assert "cadence-adopt" not in git(world["origin"], "branch")
 
 
@@ -128,7 +140,7 @@ async def test_adopt_opens_the_pr_adds_the_repo_unserved_and_the_merged_adoption
     origin = world["origin"]
     assert git(origin, "log", "-1", "--format=%s", "cadence-adopt").strip() == "adopt dev-cadence abc1234"
     assert git(origin, "log", "-1", "--format=%s", "main").strip() == "the ledger"  # never the default branch
-    argv = world["log"].read_text().splitlines()
+    (argv,) = _prs(world)
     assert argv[:6] == ["pr", "create", "--head", "cadence-adopt", "--base", "main"]
     body = Path(f"{world['log']}.body").read_text()
     assert "dev-cadence at abc1234" in body and f"`{world['dc']}/sync.sh {checkout}`" in body
@@ -190,7 +202,7 @@ async def test_adopt_refuses_a_served_repo_no_dev_cadence_checkout_and_an_origin
     hosts.default_repos_registry().write_text(f"{world['dc']}\n{checkout}\n")
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
     assert "in the roster already, and served" in capsys.readouterr().err
-    assert not world["log"].exists()
+    assert not _prs(world), _calls(world)
     assert cli.main(["repo", "notes", "--adopt"]) != 0
     assert "--adopt goes with `ao repo add <path>`" in capsys.readouterr().err
 
@@ -213,7 +225,8 @@ async def test_a_dev_cadence_checkout_without_a_launcher_or_sync_sh_is_picked_an
         assert await asyncio.to_thread(cli.main, argv) != 0
         assert words in capsys.readouterr().err
         assert list(world["tmp"].iterdir()) == [], "no scratch clone"
-    assert not world["log"].exists() and "cadence-adopt" not in git(world["origin"], "branch")
+    assert not _prs(world), _calls(world)
+    assert "cadence-adopt" not in git(world["origin"], "branch")
     assert _roster() == [str(dc)], "nothing added"
 
 
@@ -233,12 +246,12 @@ async def test_a_rerun_finds_the_open_adoption_pr_and_adds_the_repo_and_a_stale_
     assert "not answering" in capsys.readouterr().err
     assert _roster() == [str(world["dc"])]
     first = git(world["origin"], "rev-parse", "cadence-adopt")
-    world["log"].unlink()
+    world["log"].unlink(missing_ok=True)
     (tmp_path / "gh-open.json").write_text('[{"number": 7, "url": "https://github.com/t/notes/pull/7"}]')
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("adoption PR #7 is open already: https://github.com/t/notes/pull/7\nadded notes")
-    assert git(world["origin"], "rev-parse", "cadence-adopt") == first and not world["log"].exists()
+    assert git(world["origin"], "rev-parse", "cadence-adopt") == first and not _prs(world), _calls(world)
     assert _roster() == [str(world["dc"]), str(checkout)]
     (tmp_path / "gh-open.json").write_text("[]")  # the PR closed, the branch left behind
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
@@ -384,4 +397,4 @@ async def test_a_pinned_checkout_is_added_and_an_adopt_over_a_pinned_origin_is_r
     assert _roster() == [str(world["dc"]), str(checkout)]
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
     assert "pins dev-cadence already" in capsys.readouterr().err
-    assert not world["log"].exists()  # no PR
+    assert not _prs(world), _calls(world)  # no PR
