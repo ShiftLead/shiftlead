@@ -43,6 +43,8 @@ settle: {design-first: 10m}
 teams:
   ao-grind:
     flows: [td, build-review]
+    # on call (the `manager` role's default, design §6 rule 3): a Start writes it closed, and the tick fills it
+    # only for a reading no policy makes — a question to it, a permission, a stalled or idle-with-work member
     manager: {role: manager, name: manager-ao-1, brief: docs/briefs/manager-ao-1.md}
     techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}
     # seats with a trigger (design §4.9b, TD-098): auditors that file what the last PRs left in the
@@ -52,7 +54,7 @@ teams:
       - {name: test-audit-ao-1, role: auditor, brief: docs/briefs/test-audit.md, trigger: {prs: 10}}
     members:
       - {role: grinder, name: grinder-ao-1, brief: docs/briefs/grinder-ao-1.md}
-      # the page and git lane, apart from the host agent: the split is by file and lives in its brief
+      # the second grinder: both share the build stage's one lane and pick the top-ranked entry nobody holds (TD-749)
       - {role: grinder, name: grinder-ao-2, brief: docs/briefs/grinder-ao-2.md}
       # the design stage's member; what the person sees of a design is its own call (design §4.8)
       - {role: designer, name: designer-ao-1, unattended: true}

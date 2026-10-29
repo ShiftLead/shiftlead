@@ -45,9 +45,10 @@ not mix:
 - **worker** — an agent on a team that coordinates nobody: its record names a manager in its
   `controllers`, and no session names it. Started from a role such as `grinder` or `hunter`.
   — **decided** 2026-09-16 (Paul).
-- **manager** — the session that runs one team's lifecycle: it starts its members, nudges
-  them, checks their merges against the cadence, wraps them up. Its members are the sessions
-  whose `controllers` name it. Started from the `manager` role; shown as *Manager*. A person may
+- **manager** — one team's seat for the readings no policy makes: a Start writes it, closed
+  with no pane, and the home's tick fills it only when a member needs one (below); starting,
+  restarting, nudging and winding down the members are the tick's (design §6). Its members are
+  the sessions whose `controllers` name it. Started from the `manager` role; shown as *Manager*. A person may
   manage a team instead (`manager: person`), in which case no manager session exists. Called
   **lead** from 2026-09-16 to 2026-09-20 and `orchestrator` before that; neither old role name
   resolves any more (TD-107). *Not:* lead, orchestrator, orc, supervisor.
@@ -155,13 +156,13 @@ not mix:
   about by refs and replies with a `cadence-review:` line and its findings, editing and posting
   nothing. Its first seat runs on a Gemini profile, beside the author's own check, as a trial. —
   *proposed* 2026-10-29 (design §4.9b *The fact-check*, TD-857).
-- **grinder** — a role: resolves each lane item to a merged PR. — *proposed*.
+- **grinder** — a role: resolves each entry it picks from its lane to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.
 - **brief** — the job description a session is started with, written from its role's template. The template holds shiftlead's mechanics and ships with the package; a repo's brief is a **supplement** filled into the template's `{repo}` slot (design §4.8, TD-114), never a replacement.
   Describes the job, not the run (TD-042). — *proposed*.
 - **start context** — text a session holds from its start that is not a prompt: no turn runs for it, nothing is typed, and the composer does not hold it (design §4.3 `start_context`, TD-283 part 2, built 2026-10-04). Carried by the adapter, kept on the record and the launch record, read on Focus in the Session card's **told at start** row (TD-993). *Not:* a brief, which is sent as the opening prompt of an unattended run; nor the person's words, which stay in the composer.
-- **lane** — the list of references a worker was handed, or `free-pick`. — *proposed*. A lane word matches a ledger entry by its header (design §6 rule 6); an `owner:<word>` in the lane narrows it to entries whose `Owner:` is that word or absent (TD-214). A `design-first` lane also takes an entry of any kind blocked by `decision (designer)`, the decision's holder standing as its owner (TD-367).
+- **lane** — what a member may pick: the lane words of its flow stage (else its role's, or its own `lane:`), `free-pick` or `design-first`, read against each entry's header, and shared by every member that carries the same words; nothing splits it between them or hands an entry to one (design §4.8 *Choosing in a free-pick lane*, TD-749). A lane written as a list of ledger ids matches nothing in the team's lanes. — *proposed*. A lane word matches a ledger entry by its header (design §6 rule 6); an `owner:<word>` in the lane narrows it to entries whose `Owner:` is that word or absent (TD-214). A `design-first` lane also takes an entry of any kind blocked by `decision (designer)`, the decision's holder standing as its owner (TD-367).
 - **pickable** — of a ledger entry: not blocked, which is derived and never written (design §4.4 *Repo facts*, cadence §2.4, TD-223): no `Blocked by:`, or every entry it names archived and no decision named, and no open entry names it in `Part of:` (TD-1129). Whether a given worker may take it is its lane's kind and owner words. *Not:* the `**Pickable:**` header line, retired. — *proposed* 2026-09-28.
 - **Sessions page** — the home page, `/`: the card grid of every session, grouped project → repo → team (design §4.5 screen 1); Not: *the Org page*, its name until 2026-10-18 (TD-900) — in older text that is this page.
 - **Queue** — the person's page of **cards**, one per effort, ranked by the person (design §4.5 screen 12, §4.4 *The Queue*, TD-748): where a TD is, and whether the org works what the person thinks matters first. *Not:* the Inbox, which keeps what names no TD; nor a message queue.
