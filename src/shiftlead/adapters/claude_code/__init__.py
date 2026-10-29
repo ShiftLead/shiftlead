@@ -198,9 +198,17 @@ CADENCE_HOOK_LINE = (
     f"echo '{CADENCE_PIN_FAILED}'; else echo '{CADENCE_NO_LAUNCHER}'; fi; "
     'elif [ -x "$f" ]; then "$f" --session-start; fi'
 )
-# The earlier seeds, newest first, which a repo may still carry (design §5 *The seams*): agent-cadence
-# 4316bd4 (2026-09-25, the main checkout's runner) and 267cae5 (2026-09-11, the directory's own runner).
+# The line before the rename (agent-cadence TD-193): this one under the tool's old name, which every repo
+# carried until its rename PR and a worktree branched before it still does. It greps the old table, so in a
+# repo pinned under the new one it runs nothing, and doctor reads it as a past vintage.
+CADENCE_HOOK_LINE_PRE_RENAME = CADENCE_HOOK_LINE.replace("agent-cadence", "dev" + "-cadence").replace(
+    "agent_cadence", "dev" + "_cadence"
+)
+# The earlier seeds, newest first, which a repo may still carry (design §5 *The seams*): the line before the
+# rename, then the private dev-cadence repo's 4316bd4 (2026-09-25, the main checkout's runner) and 267cae5
+# (2026-09-11, the directory's own runner).
 CADENCE_HOOK_LINES_PAST = (
+    CADENCE_HOOK_LINE_PRE_RENAME,
     "r=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p'); "
     'f="${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi',
     'f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi',

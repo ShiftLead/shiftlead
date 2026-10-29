@@ -159,12 +159,12 @@ def test_geminis_sentences_are_the_lines():
 
 def test_a_pinned_repo_carrying_a_pre_pin_line_gets_the_layers_line_beside_it(tmp_path):
     repo = _pinned(tmp_path / "repo")
-    _settings(repo, [CADENCE_HOOK_LINES_PAST[0]])
+    _settings(repo, [CADENCE_HOOK_LINES_PAST[1]])
     assert repo_wires_cadence(repo) is False
     _settings(repo, [CADENCE_HOOK_LINE])
     assert repo_wires_cadence(repo) is True
     unpinned = tmp_path / "unpinned"
-    _settings(unpinned, [CADENCE_HOOK_LINES_PAST[0]])
+    _settings(unpinned, [CADENCE_HOOK_LINES_PAST[1]])
     assert repo_wires_cadence(unpinned) is True  # a copied repo's line of either vintage still runs its runner
 
 
@@ -206,4 +206,20 @@ def test_the_line_is_agent_cadences_seed_at_origin_head():
 
 @pytest.mark.skipif(not (AGENT_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no agent-cadence checkout")
 def test_the_past_vintages_are_agent_cadences_earlier_seeds():
-    assert tuple(_seed(ref)["command"] for ref in ("4316bd4", "267cae5")) == CADENCE_HOOK_LINES_PAST
+    assert tuple(_seed(ref)["command"] for ref in ("4316bd4", "267cae5")) == CADENCE_HOOK_LINES_PAST[1:]
+
+
+@pytest.mark.unit
+def test_the_line_before_the_rename_is_a_past_vintage(tmp_path):
+    old = CADENCE_HOOK_LINES_PAST[0]
+    # the seed at the private repo's cut-over point C (0ad7b2f), under the tool's old name
+    assert "\\[dev-cadence\\]" in old and "dev-cadence hook session-start" in old
+    assert "agent" not in old and old != CADENCE_HOOK_LINE
+    base = {"serve": {"ok": True, "lacks": []}, "warnings": [], "source": False}
+    assert doctor.session_start_warning({**base, "session_start": [old], "hook_pinned": True}, "R") == (
+        doctor.PRE_PIN_SESSION_START.format(root="R")
+    )
+    # in a repo pinned under the new table it runs nothing, so the layer's line goes beside it
+    repo = _pinned(tmp_path / "repo")
+    _settings(repo, [old])
+    assert repo_wires_cadence(repo) is False

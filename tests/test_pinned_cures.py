@@ -90,7 +90,7 @@ def test_a_pinned_repo_with_the_current_line_the_td129_shim_and_a_roster_line_wa
 
 def test_a_pinned_repos_pre_pin_line_shim_and_missing_roster_line_each_get_the_launchers_cure(tmp_path, roster):
     root = _repo(tmp_path, pinned=True)
-    _settings(root, CADENCE_HOOK_LINES_PAST[0])
+    _settings(root, CADENCE_HOOK_LINES_PAST[1])
     (root / ".git" / "hooks" / "pre-push").write_text(OLD_SHIM)
     assert _said(root) == [
         "agent-cadence's per-clone setup not run in this checkout — "
@@ -101,7 +101,7 @@ def test_a_pinned_repos_pre_pin_line_shim_and_missing_roster_line_each_get_the_l
         f" — copy the line from `agent-cadence -C {root} path .claude/settings.json`",
     ]
     # the 2026-09-25 line beside the current one is the line: nothing predates the pin
-    _settings(root, CADENCE_HOOK_LINES_PAST[0], CADENCE_HOOK_LINE)
+    _settings(root, CADENCE_HOOK_LINES_PAST[1], CADENCE_HOOK_LINE)
     assert not [w for w in _said(root) if "predates the pin" in w]
     # no `.git` to read: the shim is not said, as on the copy
     assert seams.shimmed(tmp_path / "nowhere", pinned=True) is None
@@ -109,7 +109,7 @@ def test_a_pinned_repos_pre_pin_line_shim_and_missing_roster_line_each_get_the_l
 
 def test_an_unpinned_repo_keeps_todays_three_words(tmp_path, roster):
     root = _repo(tmp_path, pinned=False)
-    _settings(root, CADENCE_HOOK_LINES_PAST[0])
+    _settings(root, CADENCE_HOOK_LINES_PAST[1])
     assert seams.reading(root)["hook_pinned"] is False
     assert _said(root) == [
         f"agent-cadence's per-clone setup not run in this checkout — `<agent-cadence>/sync.sh --pin {root}`",
@@ -137,7 +137,7 @@ def test_a_line_one_byte_off_is_not_one_this_build_knows_and_beside_the_current_
 
 def test_a_reading_without_hook_pinned_reads_unpinned():
     """An older host agent's reading carries no `hook_pinned`: today's words, never *predates the pin*."""
-    older = {"warnings": [], "source": False, "session_start": [CADENCE_HOOK_LINES_PAST[0]]}
+    older = {"warnings": [], "source": False, "session_start": [CADENCE_HOOK_LINES_PAST[1]]}
     assert doctor.missing_seams(older) == []
     assert doctor.missing_seams({**older, "hook_pinned": True}) == [
         doctor.PRE_PIN_SESSION_START.format(root="<checkout>")
