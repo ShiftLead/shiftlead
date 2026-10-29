@@ -959,8 +959,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      and not counted (§9 invariant 5). Not while a member is gated: a paused member has declared
      nothing, so the team is not finished, and nothing here reads the gate. A node's member is
      closed as rule 2 closes one, routed over the link, and waits for the link. **What this leaves
-     the manager**: a manager on call is not filled for a finished team (*Keeping a team running*,
-     above), so the wind-down is the tick's alone; a standing manager's round still ends the team
+     the manager**: a manager on call has no cause in a finished team but a question to it,
+     which fills it as any seat's does, so the wind-down is the tick's alone; a standing manager's round still ends the team
      when it sees the same reading first — the
      sequence is one code path — and its brief says the reading is the records' each round
      (`ao team status --json`, §4.9) and never an earlier round's; what it may not do is keep a
