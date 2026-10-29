@@ -386,9 +386,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      host agent's own clock, like a lapse). After the nudge the policy is done: what the member
      does next is its own, and a member still idle another `IDLE_NUDGE` later reads *idle · open
      work* in the slot for a person or its manager to judge.
-  **What is left is judgement, and a seat holds it.** Four of the manager's round's jobs read
+  **What is left is judgement, and a seat holds it.** Four jobs a standing manager's round once held read
   fields and scripts and no screen — the cadence check (agent-cadence's gate, §5 *The seams*;
-  `check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files against `held:`, the reader's reply in a
+  `agent-cadence run check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files against `held:`, the reader's reply in a
   mailbox the home holds), the relay of `docs/cadence-changes.md` (a file as merged, a list of
   headings) and the chase of an owed outcome (the record's `owed()`) — and they are rules 10, 11
   and 12 below and rule 4's owed clause: each fixed text and a mark, an Inbox row where a second

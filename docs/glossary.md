@@ -239,7 +239,7 @@ not mix:
   turns. — *proposed* (TD-047).
 - **send** — the act of pasting text into a session and pressing Enter. To an idle session it
   **starts a turn**; to a working one it **steers** the turn in flight. — *proposed* (TD-047).
-- **round** — one iteration of a manager's or director's loop: read status, act, end in `ao wait`.
+- **round** — one iteration of a standing manager's or a director's loop: read status, act, end in `ao wait`.
   "A round every 10 minutes." *Not:* tick. — **decided** 2026-09-16 (Paul).
 - *nudge* — **retired** 2026-09-16 (Paul): a controller's send is a **send**. §4.10 splits send
   (control) from message (mail), and a third verb blurred it.
@@ -366,7 +366,7 @@ not mix:
 
 1. **run** — keep *run log* and *run window*; *command session* for the noun; *run N* retired, a
    start is named by its time.
-2. **tick** — the host agent's loop; a manager's or director's loop is a **round**.
+2. **tick** — the host agent's loop; a standing manager's or director's loop is a **round**, and a manager on call's fill is neither.
 3. **`orchestrate` grant** — renamed **`control`**; `orchestrate` was an alias until TD-107 removed it.
 4. **nudge** — retired; it is a **send**. *supervisor* (→ manager, or policies) and *fleet* (→ org)
    retired with it, in prose and UI only.
