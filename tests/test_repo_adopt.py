@@ -43,7 +43,7 @@ open(os.path.join(t, "docs", "cadence.toml"), "w").write('[dev-cadence]\\nsource
 """
 GH = """#!/bin/sh
 if [ "$2" = list ]; then cat "$GH_OPEN" 2>/dev/null || echo '[]'; exit 0; fi
-printf '%s\\t' "$@" >> "$GH_LOG"; echo >> "$GH_LOG"
+line=$(printf '%s\\t' "$@"); echo "$line" >> "$GH_LOG"
 while [ $# -gt 0 ]; do [ "$1" = --body-file ] && cp "$2" "$GH_LOG.body"; shift; done
 echo https://github.com/t/notes/pull/7
 """
@@ -97,8 +97,8 @@ def world(tmp_path, monkeypatch):
 
 
 def _calls(world) -> list[list[str]]:
-    """Every `gh` call but `pr list`, one argv a line: appended, since a call the test did not make (a read of
-    the agent's still running in a thread when `world` put the fake on PATH) lands in the same log (TD-1211)."""
+    """Every `gh` call but `pr list`, one argv a line: appended, since a call the test did not make (likeliest a
+    read of the agent's still running in a thread when `world` put the fake on PATH) lands in the same log (TD-1211)."""
     log = world["log"]
     return [line.removesuffix("\t").split("\t") for line in log.read_text().splitlines()] if log.exists() else []
 
@@ -225,7 +225,8 @@ async def test_a_dev_cadence_checkout_without_a_launcher_or_sync_sh_is_picked_an
         assert await asyncio.to_thread(cli.main, argv) != 0
         assert words in capsys.readouterr().err
         assert list(world["tmp"].iterdir()) == [], "no scratch clone"
-    assert not _prs(world) and "cadence-adopt" not in git(world["origin"], "branch")
+    assert not _prs(world), _calls(world)
+    assert "cadence-adopt" not in git(world["origin"], "branch")
     assert _roster() == [str(dc)], "nothing added"
 
 
@@ -250,7 +251,7 @@ async def test_a_rerun_finds_the_open_adoption_pr_and_adds_the_repo_and_a_stale_
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) == 0
     out = capsys.readouterr().out
     assert out.startswith("adoption PR #7 is open already: https://github.com/t/notes/pull/7\nadded notes")
-    assert git(world["origin"], "rev-parse", "cadence-adopt") == first and not _prs(world)
+    assert git(world["origin"], "rev-parse", "cadence-adopt") == first and not _prs(world), _calls(world)
     assert _roster() == [str(world["dc"]), str(checkout)]
     (tmp_path / "gh-open.json").write_text("[]")  # the PR closed, the branch left behind
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
