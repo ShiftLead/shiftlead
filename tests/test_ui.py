@@ -1923,12 +1923,14 @@ def test_a_team_winding_down_keeps_its_cards_compact_and_draws_no_empty_summary(
     assert " compact" in client.get("/").text.split(f'id="card-{made[1]}"')[0].rsplit("<div", 1)[-1]
     with client.websocket_connect("/events") as ws:
         call_sync("kill", id=made[0])
+        heads = None  # the newest groups: a session event carries them only when they changed (TD-1207)
         for _ in range(80):
             ev = json.loads(ws.receive_text())
+            heads = ev.get("groups", heads)
             if ev.get("event") == "session" and ev["id"] == made[0] and ev["state"] == "exited":
                 break
         assert " compact" in ev["html"].split(">", 1)[0]
-        (g,) = [g for g in ev["groups"] if g["team"] == "wind"]
+        (g,) = [g for g in heads if g["team"] == "wind"]
         assert g["live"] == 0 and g["summary"] == ""
     page = client.get("/").text
     for sid in made:
