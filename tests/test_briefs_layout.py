@@ -29,6 +29,7 @@ NAMED = {
     "techlead": {"{board}", "{design_dir}", "{gate}", "{ledger}"},
     "auditor": {"{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{test}"},
     "sweeper": {"{board}", "{cadence_rules}", "{gate}", "{test}"},
+    "fact-checker": set(),
     "designer": {"{board}", "{cadence_rules}"},
 }
 ROLES = tuple(NAMED)

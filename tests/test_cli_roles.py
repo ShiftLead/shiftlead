@@ -178,8 +178,13 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     assert cli.main(["roles"]) == 0
     out = capsys.readouterr().out
     assert out.splitlines()[0] == f"roles from {root / '.shiftlead.yml'}"
-    assert "grinder   [built-in + repo]  lane: free-pick  grants: none  profile: grind  controllers: orc" in out
-    assert "brief: docs/briefs/g.md" in out and "reviewer  [repo role + repo]  lane: ui" in out
+    # the name column is as wide as the longest role's name
+    assert re.search(
+        r"^grinder +\[built-in \+ repo\]  lane: free-pick  grants: none  profile: grind  controllers: orc", out, re.M
+    )
+    assert "brief: docs/briefs/g.md" in out and re.search(r"^reviewer +\[repo role \+ repo\]  lane: ui", out, re.M)
+    # the fact-check seat (design §4.9b *The fact-check*, TD-1212): a built-in seat with its label
+    assert re.search(r"^fact-checker +\[built-in\]  lane: -  grants: none", out, re.M) and "label: Fact-check" in out
     assert "label: Grinder" in out and "label: Reviewer" in out  # what the page shows (design §4.8 *The names*)
     # when to message it (design §4.8, TD-171): its own line under the role's, where a role has one
     assert "  message: its own card only: the entry it holds, a finding on its PR" in out

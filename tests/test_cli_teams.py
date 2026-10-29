@@ -1824,6 +1824,52 @@ def test_a_sweeper_seat_starts_with_the_built_in_brief_and_its_swept_trigger(wor
     assert teamrun.seat_ids(org, gone) == {"s": "sweeps when unswept 7 d"}
 
 
+def test_a_fact_checker_seat_starts_on_the_built_in_brief_filled_by_an_ask(world, capsys):
+    """TD-1212, design §4.9b *The fact-check*: one `seats:` line `{role: fact-checker, profile, trigger: asks}`
+    starts a seat on the built-in `fact-checker.md`, no lane and no grants, its brief saying what the seat does:
+    reads the head by refs, re-derives each claim, writes nothing, replies with the cadence's line naming its
+    model, answers only open asks, and declares nothing."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["seats"] = [
+        {"name": "fact-check-ao-1", "role": "fact-checker", "profile": "org-grind", "trigger": "asks"}
+    ]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    capsys.readouterr()
+    org = cli._org_here()
+    (seat,) = org.teams["ao-grind"].seats
+    assert (seat.role, seat.trigger, seat.brief) == ("fact-checker", "asks", None)
+    (made,) = [p for p in creates(state) if p["name"] == "fact-check-ao-1"]
+    assert made["role"] == "fact-checker" and made["capabilities"] == [] and made["lane"] == []
+    assert made["profile"] == "org-grind" and made["seat"] == {"trigger": "asks"}
+    gone = [{"id": "f", "name": "fact-check-ao-1", "team": "ao-grind", "state": "exited"}]
+    assert teamrun.seat_ids(org, gone) == {"f": "comes on the next question"}
+    prompt = made["prompt"]
+    assert prompt.startswith("You are a **fact-checker**")
+    for rule in (
+        "`ao inbox --unread --json`",
+        "**Answer only an open ask.**",
+        "closed (`expired`)",
+        "`git show <sha>:<path>` and `git diff origin/<default>...<sha>`",
+        "never read the author's worktree",
+        "the verdict is `BLOCK`, with that as its one finding",
+        "**Re-derive each claim**",
+        "post nothing on the PR",
+        "run no `ao` command but `ao inbox` and `ao msg`",
+        '`ao msg --reply-to <the ask\'s id> "…"`',
+        "`cadence-review: SHIP|BLOCK · <adapter>/<model> · docs · <n> findings`",
+        "`$AGENT_MODEL_FILE`",
+        "else `$AGENT_MODEL`, used unchanged",
+        "else `<adapter>/default`",
+        "the claim, where it bites (file:line), and what the repo says",
+        "**You declare nothing**",
+    ):
+        assert rule in prompt, rule
+    for slot in ("{repo}", "{flow}", "{stage}", "{techlead}", "{lane}"):
+        assert slot not in prompt, slot
+
+
 def test_the_sweep_switch_gives_a_started_team_its_sweeper_seat(world, capsys):
     """TD-1091, design §4.9b *The switch*: while the Settings switch is on, `ao team start` adds a seat
     `sweep-<team>`, role `sweeper`, the built-in brief and the switch's profile, its mark `{trigger: swept,
