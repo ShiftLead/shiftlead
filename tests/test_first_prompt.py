@@ -151,6 +151,14 @@ async def _marked(rec) -> bool:
     return bool(rec.first_prompt_error)
 
 
+def _unmarked(agent, rec) -> str:
+    """What the tick saw, so a miss at the bound names its cause (TD-1218: seen once under the full suite)."""
+    return (
+        f"never marked at the bound: in flight {rec.id in agent._prompting}, state {rec.state}, hook_seen_at "
+        f"{rec.hook_seen_at}, tries {rec.first_prompt_tries}, created {rec.created}, sent {rec.first_prompt_sent_at}"
+    )
+
+
 async def test_a_launch_with_no_brief_types_and_marks_nothing(agent, briefstubs, tmp_path):
     async with LocalClient() as c:
         w = await _start(agent, c, tmp_path, "w", "brief0")
@@ -205,7 +213,7 @@ async def test_a_composer_that_never_reads_empty_is_marked_at_the_bound(agent, b
         agent.tmux.send_literal(w, "half a thought")
         rec = agent.sessions[w]
         rec.set_state("idle", confidence="scraped")
-        assert await wait_for(lambda: _marked(rec), timeout=10), "never marked at the bound"
+        assert await wait_for(lambda: _marked(rec), timeout=10), _unmarked(agent, rec)
         assert rec.first_prompt_error == agent_common.FIRST_PROMPT_NO_HOOK and rec.first_prompt_tries == 0
         assert await _submitted(agent, w) == [] and rec.first_prompt == BRIEF
         slot = cards.view(await c.call("get", id=w))["slot"]
@@ -312,6 +320,6 @@ async def test_no_hook_since_launch_survives_an_agent_restart(agent, briefstubs,
         monkeypatch.setattr(agent_common, "FIRST_PROMPT_BOUND", 3.0)
         assert await wait_for(lambda: _first(agent, empty, "SUBMITTED " + TYPED), timeout=8), "never sent"
         rec = agent.sessions[words]
-        assert await wait_for(lambda: _marked(rec), timeout=10), "never marked at the bound"
+        assert await wait_for(lambda: _marked(rec), timeout=10), _unmarked(agent, rec)
         assert rec.first_prompt_error == agent_common.FIRST_PROMPT_NO_HOOK and await _submitted(agent, words) == []
         assert agent.sessions[fed].first_prompt_error is None, "a record a hook reached is never marked"
