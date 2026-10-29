@@ -386,9 +386,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      host agent's own clock, like a lapse). After the nudge the policy is done: what the member
      does next is its own, and a member still idle another `IDLE_NUDGE` later reads *idle · open
      work* in the slot for a person or its manager to judge.
-  **What is left is judgement, and a seat holds it.** Four of the manager's round's jobs read
+  **What is left is judgement, and a seat holds it.** Four jobs a standing manager's round once held read
   fields and scripts and no screen — the cadence check (agent-cadence's gate, §5 *The seams*;
-  `check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files against `held:`, the reader's reply in a
+  `agent-cadence run check_cadence.py --json` gives a verdict per row), the held-path check (a merged PR's files against `held:`, the reader's reply in a
   mailbox the home holds), the relay of `docs/cadence-changes.md` (a file as merged, a list of
   headings) and the chase of an owed outcome (the record's `owed()`) — and they are rules 10, 11
   and 12 below and rule 4's owed clause: each fixed text and a mark, an Inbox row where a second
@@ -430,8 +430,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   started before a change keeps the old words until its next start — and the restart ceiling, the
   fill ceiling and the twenty minutes are these constants, never numbers in `manager.md`. The
   built-in manager preset reads the marks and performs no restart, fill or nudge — except the
-  nudge to a member on a node, which rule 4 does not reach yet — and its round ends in `ao wait
-  --timeout 3540`, run in the background because a tool call is capped at ten minutes.
+  nudge to a member on a node, which rule 4 does not reach yet; a fill on call reads its one
+  cause and ends, and a standing manager's round ends in `ao wait --timeout 3540`, run in the
+  background because a tool call is capped at ten minutes.
   5. **Context bound.** A supervised member whose **context reading** (§4.3 `context`, on the
      record as `context: {tokens, at, window}` — the window kept beside the tokens, since the
      model may change mid-run) is over its role's **bound** (§4.8 `context: {bound}`; 300k for
@@ -672,9 +673,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        still one start, removes the mark, and is counted *n of m* from the records), the records
        other ones name as a controller first so the lead is up before its members, and every
        record's mail kept, as a fill's and a Restart's is (§4.10 *The name coming back adopts it*).
-       It starts **the whole team**, a member whose lane gained nothing included: the manager decides
-       who runs, and a member with nothing to pick declares `none` again at the cost of one short
-       run. Five bounds, each
+       It starts **the whole team**, a member whose lane gained nothing included: each member picks
+       from its own lane, nobody hands it an entry, and a member with nothing to pick declares `none`
+       again at the cost of one short run. Five bounds, each
        read before the first replay and each leaving the row of `ask` in its place, saying which: a
        profile of any member **over its usage line** (§6 *Usage gate*); the team's **stop time**
        passed and not cleared; **`WORK_STARTS_DAY`** (three) starts of that team by this rule in the
@@ -908,8 +909,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      2's. **What the tick does with it.** When the reading has held for **`FINISHED_SETTLE`** (ten
      minutes, a clock the home keeps in memory per team from the tick the reading first held,
      dropped the tick it stops holding, so a restart of the home starts it again as rule 8's
-     `WORK_SETTLE` does: a finished member may claim again on rule 6's news, and a manager whose
-     round has the wind-down in hand makes it) the home **winds the team down itself** — and it
+     `WORK_SETTLE` does: a finished member may claim again on rule 6's news, and a standing manager
+     whose round has the wind-down in hand makes it) the home **winds the team down itself** — and it
      **holds no wind-down for an entry a declared member has not been told of**: rule 6 tells on
      the tick an entry matches, inside this rule's settle, and the cases it does not tell in —
      gated, wrapping up, past its stop, suspended, over its balance line — are each a reason the
@@ -958,7 +959,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      and not counted (§9 invariant 5). Not while a member is gated: a paused member has declared
      nothing, so the team is not finished, and nothing here reads the gate. A node's member is
      closed as rule 2 closes one, routed over the link, and waits for the link. **What this leaves
-     the manager**: its round still ends the team when it sees the same reading first — the
+     the manager**: a manager on call has no cause in a finished team but a question to it,
+     which fills it as any seat's does, so the wind-down is the tick's alone; a standing manager's round still ends the team
+     when it sees the same reading first — the
      sequence is one code path — and its brief says the reading is the records' each round
      (`ao team status --json`, §4.9) and never an earlier round's; what it may not do is keep a
      finished team live by not saying so.
@@ -1967,9 +1970,10 @@ teams:
   **Who is told**, once per crossing and once when it clears — a mark that comes and goes
   inside ten minutes tells once, not each time: a crossing within ten minutes of the last note
   of either kind is told only once it has stood until those ten minutes are up — by `system`
-  note: the team's **manager** (the controller its members share), which logs the line in its
-  round — *14:02 over the line: 9 open PRs, line 8; no new claims until it clears* — and does
-  nothing else, since its members are neither crashed nor finished; and the **person**, FYI and
+  note: the team's **manager** (the controller its members share) — a standing one logs the line
+  in its round — *14:02 over the line: 9 open PRs, line 8; no new claims until it clears* — and
+  does nothing else, since its members are neither crashed nor finished, and a manager on call is
+  not filled for it, a `note` being none of rule 3's causes; and the **person**, FYI and
   uncounted. **The techlead is asked by what already asks it**: every pull request in the reader's
   queue is an `ask` on the seat, which the tick fills for a seat whose trigger is `asks` (rule 3),
   so a crossing of `review` needs no second message, and a crossing of `prs` or `oldest` with
@@ -2000,6 +2004,6 @@ teams:
   claimed unchecked. **The presets say it**: `grinder` says what a refusal *over its line* means —
   nothing new, finish what is held, end the turn, never `none`, and no branch cut for a new entry
   as a way round; `hunter`, which claims nothing, says the same of its `none`; `auditor` is a
-  seat, never refused, and says nothing; and `manager` says such a team is neither crashed nor
+  seat, never refused, and says nothing; and `manager`'s standing brief says such a team is neither crashed nor
   finished, that its part is one log line, and that an idle member on another host is told of the
   clearing with one send.
