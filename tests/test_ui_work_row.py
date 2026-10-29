@@ -395,11 +395,11 @@ def test_a_team_with_no_record_is_a_later_row_of_what_its_lanes_hold():
     entry: TD-119*, under Later, uncounted, under `ask` and `start` and never `off`; drawn only while no
     unattended record carries the badge (a person's own session does not take it away), and only for a
     reading that holds an entry — an unread ledger is *unknown*, never a row."""
-    teams = [{"name": "dc-grind", "repo": "/home/k/dev-cadence"}, {"name": "ao-grind", "repo": "agentorc"}]
+    teams = [{"name": "dc-grind", "repo": "/home/k/agent-cadence"}, {"name": "ao-grind", "repo": "agentorc"}]
     readings = {"dc-grind": lanes("TD-119"), "ao-grind": lanes(*(f"TD-{i}" for i in range(1, 8)))}
     rows = lanes_rows(teams, readings, on_work=lambda t: "ask")
     dc, ao = sorted(rows, key=lambda r: r["team"], reverse=True)
-    assert dc["row"] == "lanes" and dc["sid"] == "lanes:dc-grind" and dc["later"] and dc["repo"] == "dev-cadence"
+    assert dc["row"] == "lanes" and dc["sid"] == "lanes:dc-grind" and dc["later"] and dc["repo"] == "agent-cadence"
     assert dc["text"] == "dc-grind · stopped · its lanes hold 1 entry: TD-119" and dc["ids"] == ["TD-119"]
     assert ao["n"] == 7 and ao["ids"] == ["TD-1", "TD-2", "TD-3", "TD-4", "TD-5"] and ao["more"] == 2
     assert ao["text"].endswith("TD-4, TD-5 and 2 more")

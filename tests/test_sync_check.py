@@ -1,5 +1,5 @@
 """Design §6 *Sync: a mechanical sync PR is merged at the home*: `sync.check` — steps 1 and 2 as one check of
-a bump of the pin (TD-1015) — against a fixture dev-cadence and a fixture repo, each a bare origin and a
+a bump of the pin (TD-1015) — against a fixture agent-cadence and a fixture repo, each a bare origin and a
 checkout. The lock's replay (TD-685 slice 1) left once no served repo held a lock: a merge base with no pin is
 refused."""
 
@@ -55,15 +55,15 @@ def sha(text: str) -> str:
 
 
 def lock(source: str, fc: str, files: dict[str, str], mode: str = "644") -> str:
-    lines = ["# Written by dev-cadence sync.sh", f"source: {source}", f"commit: {fc[:7]}", f"files_commit: {fc}"]
+    lines = ["# Written by agent-cadence sync.sh", f"source: {source}", f"commit: {fc[:7]}", f"files_commit: {fc}"]
     return "\n".join(lines + [f"file: {p} {sha(t)} {mode}" for p, t in files.items()]) + "\n"
 
 
-PINNED = '# the repo\'s settings\nreview-model = "sonnet"\n\n[dev-cadence]\nsource = "{source}"\nref = "{ref}"\n'
+PINNED = '# the repo\'s settings\nreview-model = "sonnet"\n\n[agent-cadence]\nsource = "{source}"\nref = "{ref}"\n'
 
 
 class PinWorld:
-    """`World`, but the repo's main pins dev-cadence's first commit in `docs/cadence.toml` and holds no lock."""
+    """`World`, but the repo's main pins agent-cadence's first commit in `docs/cadence.toml` and holds no lock."""
 
     def __init__(self, tmp: Path):
         self.tmp = tmp
@@ -119,7 +119,7 @@ def test_a_bump_of_the_pin_alone_that_descends_is_mechanical(pinned):
         ("file", "not a routine bump: src/x.py changed"),
         ("line", "not a routine bump: docs/cadence.toml changed beyond the pin's ref"),
         ("same", "not a routine bump: the pin's ref did not move"),
-        ("gone", "not a routine bump: docs/cadence.toml holds no [dev-cadence] pin"),
+        ("gone", "not a routine bump: docs/cadence.toml holds no [agent-cadence] pin"),
     ],
 )
 def test_a_bump_that_changes_more_than_the_ref_is_refused_by_name(pinned, change, why):
@@ -140,30 +140,30 @@ def test_a_ref_that_does_not_descend_or_is_not_on_the_default_branch_is_refused(
     g(pinned.repo, "checkout", "-q", "main")
     commit(pinned.repo, {sync.PIN: pinned.pin(ref1)})
     g(pinned.repo, "push", "-q", "origin", "main")
-    # back to the first commit: on dev-cadence's main, but an ancestor of the pin, not a descendant
+    # back to the first commit: on agent-cadence's main, but an ancestor of the pin, not a descendant
     assert pinned.check(pinned.pr({sync.PIN: pinned.pin(pinned.ref0)}))["why"] == (
         f"ref {pinned.ref0[:7]} does not descend from {ref1[:7]}"
     )
-    # a commit dev-cadence never put on main: pushed to a side branch only
+    # a commit agent-cadence never put on main: pushed to a side branch only
     g(pinned.dc, "checkout", "-q", "-b", "side")
     side = commit(pinned.dc, {"files/x": "x\n"})
     g(pinned.dc, "push", "-q", "origin", "side")
     g(pinned.dc, "checkout", "-q", "main")
     assert pinned.check(pinned.pr({sync.PIN: pinned.pin(side)}))["why"] == (
-        f"ref {side[:7]} is not a full commit on dev-cadence's main"
+        f"ref {side[:7]} is not a full commit on agent-cadence's main"
     )
     # a short ref is no full commit, though it names one; nor is a full one padded with a space
     head = pinned.pr({sync.PIN: pinned.pin(side[:12])})
-    assert pinned.check(head)["why"] == f"ref {side[:7]} is not a full commit on dev-cadence's main"
+    assert pinned.check(head)["why"] == f"ref {side[:7]} is not a full commit on agent-cadence's main"
     ref2 = pinned.dc_commit({DOC: "three\n"})
     head = pinned.pr({sync.PIN: pinned.pin(f" {ref2}")})
-    assert pinned.check(head)["why"] == f"ref  {ref2[:6]} is not a full commit on dev-cadence's main"
+    assert pinned.check(head)["why"] == f"ref  {ref2[:6]} is not a full commit on agent-cadence's main"
 
 
 def test_a_bump_with_no_clone_or_on_a_held_path_is_refused(pinned):
     head = pinned.pr({sync.PIN: pinned.pin(pinned.dc_commit({DOC: "two\n"}))})
     assert sync.check(pinned.repo, 7, head, "cadence-sync-1", clones=[])["why"] == (
-        "no dev-cadence clone to check the pin against"
+        "no agent-cadence clone to check the pin against"
     )
     assert pinned.check(head, held=["docs/**"])["why"] == "docs/cadence.toml is a held path"
 
@@ -186,17 +186,17 @@ def test_a_merge_base_with_a_lock_and_no_pin_is_refused(pinned):
     assert pinned.check(head) == {
         "head": head,
         "verdict": "refused",
-        "why": "no [dev-cadence] pin at the merge base: docs/cadence.toml holds none",
+        "why": "no [agent-cadence] pin at the merge base: docs/cadence.toml holds none",
     }
 
 
-@pytest.mark.parametrize("toml", ['# settings alone\nreview-model = "sonnet"\n', '[dev-cadence\nref = "x"\n'])
+@pytest.mark.parametrize("toml", ['# settings alone\nreview-model = "sonnet"\n', '[agent-cadence\nref = "x"\n'])
 def test_a_merge_base_whose_toml_holds_no_pin_or_does_not_parse_is_refused(pinned, toml):
     g(pinned.repo, "checkout", "-q", "main")
     commit(pinned.repo, {sync.PIN: toml})
     g(pinned.repo, "push", "-q", "origin", "main")
     head = pinned.pr({sync.PIN: pinned.pin(pinned.dc_commit({DOC: "two\n"}))})
-    assert pinned.check(head)["why"] == "no [dev-cadence] pin at the merge base: docs/cadence.toml holds none"
+    assert pinned.check(head)["why"] == "no [agent-cadence] pin at the merge base: docs/cadence.toml holds none"
 
 
 def test_a_head_that_moved_is_not_checked(pinned):
@@ -206,8 +206,8 @@ def test_a_head_that_moved_is_not_checked(pinned):
     assert pinned.check(head)["verdict"] == "mechanical"
 
 
-LAST_OWN_LOCK = """# Written by ShiftLead/dev-cadence sync.sh — do not edit by hand.
-source: https://github.com/ShiftLead/dev-cadence
+LAST_OWN_LOCK = """# Written by ShiftLead/agent-cadence sync.sh — do not edit by hand.
+source: https://github.com/ShiftLead/agent-cadence
 commit: 232f2ad
 files_commit: 232f2ad364384929f57011ff2e76b9ba324ab8d7
 synced: 2026-10-23T01:54:48Z
@@ -218,11 +218,11 @@ file: docs/cadence-rationale.md f06aecd78c767a0eac466bb0c5e4637b364fc3582cfd6da5
 
 def test_parse_lock_reads_a_lock_as_sync_sh_writes_it():
     got = sync.parse_lock(LAST_OWN_LOCK)
-    assert got["source"] == "https://github.com/ShiftLead/dev-cadence" and got["files"]["docs/cadence.md"][1] == "644"
+    assert got["source"] == "https://github.com/ShiftLead/agent-cadence" and got["files"]["docs/cadence.md"][1] == "644"
     assert sync.parse_lock(None) is None
 
 
 def test_origins_compare_as_one_repository():
     n = sync._norm_url
-    assert n("git@github.com:ShiftLead/dev-cadence.git") == n("https://github.com/shiftlead/dev-cadence/")
+    assert n("git@github.com:ShiftLead/agent-cadence.git") == n("https://github.com/shiftlead/agent-cadence/")
     assert n("/tmp/x/dc.git") == n("/tmp/x/dc")

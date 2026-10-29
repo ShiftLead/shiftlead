@@ -78,7 +78,7 @@ not mix:
   day), orc-of-orcs, orchestrator of orchestrators, top orc. — **decided** 2026-09-16 (Paul).
 - **preferences** — what the person has written of what they would say, in layers the director reads
   in order, the most specific winning: the package's defaults, the person's own
-  (`shiftlead/preferences.md` in their dev-cadence layer repo, private; TD-1009), a repo's (`.shiftlead/preferences.md`, checked in), and the
+  (`shiftlead/preferences.md` in their agent-cadence layer repo, private; TD-1009), a repo's (`.shiftlead/preferences.md`, checked in), and the
   person's section for that repo (design §4.9b *The director answers what is passed up to it*,
   TD-657). Groomed into general sentiments by the director's **groom pass**, every change landing as a
   *proposal* the person accepts. *Not:* memory (a session's own facts, cadence §7), a brief (what a
@@ -199,10 +199,10 @@ not mix:
   full; never shortened to *agent*. Command and module names are unchanged. — **decided**
   2026-09-16 (Paul).
 - **UI host** — the machine running `shiftlead[ui]`. — *proposed*.
-- **unserved** — a registered repo that lacks what ShiftLead requires of it — dev-cadence's tree (at or
+- **unserved** — a registered repo that lacks what ShiftLead requires of it — agent-cadence's tree (at or
   after the oldest commit the build reads), its gate, or a ledger that parses — so the home runs nothing
   of it but its readings, *Pull* and, for an older tree, *Sync*, and its Repo page names the lack and
-  the cure, `ao repo add <path> --adopt` or, for an older tree, the sync (design §5 *The seams*). *Not:* a repo without dev-cadence served by fallbacks, which no longer exists. — *proposed*
+  the cure, `ao repo add <path> --adopt` or, for an older tree, the sync (design §5 *The seams*). *Not:* a repo without agent-cadence served by fallbacks, which no longer exists. — *proposed*
   2026-10-25 (TD-1009).
 - **home** (host agent) — the one host agent that holds the org's session graph and mail; kmaster
   on Paul's machines. *Not:* hub, master, server. — **decided** 2026-09-16 (Paul, design §4.4a).

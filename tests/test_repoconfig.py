@@ -176,7 +176,7 @@ def test_a_repo_brief_is_read_relative_to_the_repo(tmp_path):
 
 def test_a_brief_names_the_repos_layout_through_its_slots(tmp_path):
     """TD-588, TD-1011, design §5 *The seams*: a supplement's (or a template's) layout slots fill — the
-    cadence's with dev-cadence's paths and no sentence (an unserved repo composes no brief), `board:` and
+    cadence's with agent-cadence's paths and no sentence (an unserved repo composes no brief), `board:` and
     `ledger:` where the file sets them; `{test}`, `{lint}` and `{design_dir}` the repo's own, else the
     seam's sentence, never empty — `{pr}` inside `{gate}` after them, each recorded as a text slot."""
     (tmp_path / "briefs").mkdir()
@@ -195,7 +195,7 @@ def test_a_brief_names_the_repos_layout_through_its_slots(tmp_path):
     (tmp_path / "docs" / "design").mkdir(parents=True)
     designed = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
     assert f"{cadence}docs/design/ | read docs/cadence.md §1–§4\n" in designed[0]
-    # dev-cadence's own source: every dev-cadence path under `files/`
+    # agent-cadence's own source: every agent-cadence path under `files/`
     (tmp_path / "sync.sh").write_text("x\n")
     (tmp_path / "files").mkdir()
     source = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
@@ -226,12 +226,12 @@ def test_a_brief_names_the_repos_layout_through_its_slots(tmp_path):
 
 
 def test_a_pinned_repos_layout_names_the_resolvers_command(tmp_path):
-    """TD-1014, design §5 *The seams*: a repo whose `docs/cadence.toml` holds `[dev-cadence]` and no lock has
+    """TD-1014, design §5 *The seams*: a repo whose `docs/cadence.toml` holds `[agent-cadence]` and no lock has
     its cadence slots from the resolver — the vendored launcher under this Python, no `-C`, so the session's
     own checkout resolves; a lock beside the pin keeps the copy's paths; read across the link as any seam."""
     (tmp_path / "docs").mkdir()
     (tmp_path / "docs" / "cadence.toml").write_text(
-        f'[dev-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n', encoding="utf-8"
+        f'[agent-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n', encoding="utf-8"
     )
     launcher = f"{shlex.quote(sys.executable)} {shlex.quote(str(cadence.LAUNCHER))}"
     got = repoconfig.layout(repoconfig.load_text(None, tmp_path))
@@ -245,19 +245,19 @@ def test_a_pinned_repos_layout_names_the_resolvers_command(tmp_path):
     cfg.read = lambda path: seen.append(path) or (path.read_text(encoding="utf-8") if path.is_file() else None)
     assert repoconfig.layout(cfg)["{gate}"] == got["{gate}"] and tmp_path / "docs" / "cadence.toml" in seen
     # the table as TOML reads it, whatever its spacing or comment
-    (tmp_path / "docs" / "cadence.toml").write_text(f'[ dev-cadence ]  # v1\nsource = "/src"\nref = "{"a" * 40}"\n')
+    (tmp_path / "docs" / "cadence.toml").write_text(f'[ agent-cadence ]  # v1\nsource = "/src"\nref = "{"a" * 40}"\n')
     assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{gate}"] == got["{gate}"]
     # composed, the `{pr}` is the brief's `<n>`
     (tmp_path / "b.md").write_text("gate: {gate}\n")
     (tmp_path / ".shiftlead.yml").write_text("roles: {plain: {brief: b.md}}\n")
     text, _ = repoconfig.resolve_role(repoconfig.load(tmp_path), "plain").compose()
     assert f"gate: {launcher} run check_cadence.py --pr <n>" in text
-    # dev-cadence's own source keeps its `files/` paths, pin or not
+    # agent-cadence's own source keeps its `files/` paths, pin or not
     (tmp_path / "sync.sh").write_text("x\n")
     (tmp_path / "files").mkdir()
     assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{gate}"].startswith("python3 files/scripts/")
     (tmp_path / "sync.sh").unlink()
-    # a lock keeps the copy read; a toml with no `[dev-cadence]` is no pin
+    # a lock keeps the copy read; a toml with no `[agent-cadence]` is no pin
     (tmp_path / "docs" / "cadence-sync.lock").write_text("files_commit=x\n")
     assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{gate}"].startswith("python3 scripts/")
     (tmp_path / "docs" / "cadence-sync.lock").unlink()
@@ -268,14 +268,14 @@ def test_a_pinned_repos_layout_names_the_resolvers_command(tmp_path):
 
 
 def test_a_pin_the_launcher_would_refuse_or_a_refused_read_of_it_is_pinned_still(tmp_path):
-    """TD-1027: a pin that is not TOML is pinned while it holds a `[dev-cadence]` line, else it is no pin;
+    """TD-1027: a pin that is not TOML is pinned while it holds a `[agent-cadence]` line, else it is no pin;
     across the link the pin's file refused by name is there and pinned, and any other failure goes up."""
     (tmp_path / "docs").mkdir()
     pin = tmp_path / "docs" / "cadence.toml"
     resolver = f"{shlex.quote(sys.executable)} {shlex.quote(str(cadence.LAUNCHER))} run ledger.py --check"
-    pin.write_text('[dev-cadence]\nsource = \nref = "half-edited\n', encoding="utf-8")
+    pin.write_text('[agent-cadence]\nsource = \nref = "half-edited\n', encoding="utf-8")
     assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{ledger_check}"] == resolver
-    pin.write_text("source = \n[other]\n# [dev-cadence] in a comment\n", encoding="utf-8")
+    pin.write_text("source = \n[other]\n# [agent-cadence] in a comment\n", encoding="utf-8")
     assert repoconfig.layout(repoconfig.load_text(None, tmp_path))["{ledger_check}"] == (
         "python3 scripts/ledger.py --check"
     )
@@ -596,7 +596,7 @@ def test_a_role_has_saved_prompts_replaced_whole_per_layer(tmp_path):
 
 
 def test_a_gate_key_is_accepted_and_read_by_nothing(tmp_path):
-    """TD-1011, §5 *The seams*: the gate is dev-cadence's script, no key — a `gate:` left in the file
+    """TD-1011, §5 *The seams*: the gate is agent-cadence's script, no key — a `gate:` left in the file
     loads, whatever it holds, and is kept only as gone, for `ao org check` to name."""
     for text in ("gate: make gate PR={pr}\n", "gate: ''\n", "gate: [a]\n"):
         assert repoconfig.load_text(text, tmp_path).gone == ["gate"]

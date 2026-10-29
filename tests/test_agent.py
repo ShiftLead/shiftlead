@@ -36,7 +36,7 @@ async def test_shell_lifecycle(agent, tmp_path):
         # the session's environment names this agent's home, so hooks inside it reach this socket
         env = await c.call("tail", id=sid, lines=1)  # warm-up; the real check is below
         assert env is not None
-        # and the name the Org shows, for dev-cadence's co-author hook (TD-185)
+        # and the name the Org shows, for agent-cadence's co-author hook (TD-185)
         await c.call("send", id=sid, text='echo HOME=$SHIFTLEAD_HOME SESSION=$SHIFTLEAD_SESSION NAME="$AGENT_NAME".')
         for _ in range(30):
             tail = await c.call("tail", id=sid, lines=6)
@@ -2372,7 +2372,7 @@ async def test_a_tool_event_that_wakes_an_idle_session_is_logged(agent, tmp_path
 
 async def test_a_launch_tells_the_start_hook_whose_board_to_nudge_from(agent, tmp_path):
     """TD-425 (design §4.3, §8): every launch sets `CADENCE_ATTENTION_SCOPE` from the record's mode —
-    `own` for an unattended session, `machine` for an interactive one — so dev-cadence's start hook
+    `own` for an unattended session, `machine` for an interactive one — so agent-cadence's start hook
     scopes its nudge without asking `ao status` itself."""
     async with LocalClient() as c:
         for unattended, want in ((True, "own"), (False, "machine")):
@@ -2450,7 +2450,7 @@ async def test_the_model_rides_the_env_and_its_file_follows_the_model_in_use(age
 
 async def test_a_session_started_without_a_name_exports_the_one_it_was_given(agent, tmp_path):
     """TD-185: `AGENT_NAME` is the name the Org shows — for a blank name, the automatic one — so
-    dev-cadence's commit hook signs with what a person sees on the card, whatever the adapter."""
+    agent-cadence's commit hook signs with what a person sees on the card, whatever the adapter."""
     out = tmp_path / "name.txt"
     async with LocalClient() as c:
         s = await c.call(

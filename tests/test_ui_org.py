@@ -1058,10 +1058,10 @@ def test_a_closed_card_says_who_closed_it_and_keeps_the_declaration_after_the_en
     full = view(_card(state="closed", pane=False, closed_at=at, closer={"by": "person", "at": at}))["slot"]["full"]
     assert full == f"closed by you at {at} · forgotten by itself a day after the close"
     # the declaration after the ending, its reason's first line; the hover holds both in full
-    oow = {"at": at, "why": "nothing pickable on dev-cadence's ledger\nTD-1 is design-first"}
+    oow = {"at": at, "why": "nothing pickable on agent-cadence's ledger\nTD-1 is design-first"}
     slot = view(_card(state="closed", pane=False, closed_at=at, closer={"by": "ao-r-manager-dc-1", "at": at},
                       out_of_work=oow), [mgr])["slot"]  # fmt: skip
-    assert slot["text"] == "closed by manager-dc-1 — out of work — nothing pickable on dev-cadence's ledger"
+    assert slot["text"] == "closed by manager-dc-1 — out of work — nothing pickable on agent-cadence's ledger"
     assert slot["full"].startswith(f"closed by manager-dc-1 at {at} · ")
     assert slot["full"].endswith("TD-1 is design-first")
     ex = view(_card(state="exited", exit_code=0, restart_wanted={"at": at, "why": "context bound"}))["slot"]

@@ -118,10 +118,10 @@ def _git(root, *args):
 
 
 def _served(root) -> None:
-    """dev-cadence's tree and its gate in `root`, which with a ledger serve it (§5 *The seams*, TD-1011)."""
+    """agent-cadence's tree and its gate in `root`, which with a ledger serve it (§5 *The seams*, TD-1011)."""
     (root / "docs").mkdir(parents=True, exist_ok=True)
     (root / "scripts").mkdir(exist_ok=True)
-    (root / "docs" / "cadence-sync.lock").write_text("source: dev-cadence\ncommit: abc1234\nfiles_commit: abc1234\n")
+    (root / "docs" / "cadence-sync.lock").write_text("source: agent-cadence\ncommit: abc1234\nfiles_commit: abc1234\n")
     (root / "scripts" / "check_cadence.py").write_text("x = 1\n")
 
 

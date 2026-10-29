@@ -136,7 +136,7 @@ def test_the_open_file_holds_open_work_only():
 
 
 def _script():
-    """dev-cadence's `scripts/ledger.py`, loaded from the pinned tree: the reader of the preamble's `Fields:` line."""
+    """agent-cadence's `scripts/ledger.py`, loaded from the pinned tree: the reader of the preamble's `Fields:` line."""
     spec = importlib.util.spec_from_file_location("cadence_ledger", pinned_script("ledger.py"))
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod  # its dataclasses look their module up by name
@@ -145,7 +145,7 @@ def _script():
 
 
 # TD-248: one list of words, not two. The ledger's preamble declares them (cadence §2.12) and
-# dev-cadence's script reads them, so the test and the script cannot disagree about what an Owner is.
+# agent-cadence's script reads them, so the test and the script cannot disagree about what an Owner is.
 # A fixture, not a module constant: where the pinned tree does not resolve, its tests skip, not the file.
 class Declared(NamedTuple):
     words: dict

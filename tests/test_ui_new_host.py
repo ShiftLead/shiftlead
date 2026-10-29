@@ -167,15 +167,15 @@ def test_start_on_another_host_carries_that_hosts_brief_and_ledger(form):
 @pytest.mark.unit
 def test_start_on_a_container_node_names_the_nodes_own_launcher(form, monkeypatch):
     """TD-1014 (5), design §5 *The layout slots*: a pinned repo's `{gate}` in a brief started from the form
-    on a container node names the node venv's `bin/dev-cadence`, not the home's Python and launcher; on a
+    on a container node names the node venv's `bin/agent-cadence`, not the home's Python and launcher; on a
     machine node the home's command stands, as before."""
     from sessionorc import cadence, containers
 
     c, calls = form
-    monkeypatch.setitem(NODE_FILES, "docs/cadence.toml", '[dev-cadence]\nsource = "x"\nref = "y"\n')
+    monkeypatch.setitem(NODE_FILES, "docs/cadence.toml", '[agent-cadence]\nsource = "x"\nref = "y"\n')
     monkeypatch.setitem(NODE_FILES, "docs/scout.md", "Gate: {gate}.\n")
     monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": object()})
-    node = f"{containers.INSIDE_VENV}/bin/dev-cadence run check_cadence.py --pr <n>"
+    node = f"{containers.INSIDE_VENV}/bin/agent-cadence run check_cadence.py --pr <n>"
     for host, words in (("cm", node), ("node1", f"{cadence.typed('run', 'check_cadence.py')} --pr <n>")):
         calls.clear()
         r = c.post(

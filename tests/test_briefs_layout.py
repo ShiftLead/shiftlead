@@ -1,7 +1,7 @@
 """TD-588 slice 2 (design §5 *The seams*, [ADR 2026-10-12] *Briefs and flows name no repo's layout*): the
 built-in briefs, the five flows' stage texts and `team_skill.md` hold the layout slots, never one repo's
 literals — a bare repo's composed briefs name no layout, and this repo's read its own through its
-`.shiftlead.yml` and dev-cadence's files."""
+`.shiftlead.yml` and agent-cadence's files."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ def test_the_built_ins_name_no_repos_layout():
 @pytest.mark.parametrize("role", ROLES)
 def test_a_bare_repos_brief_says_each_seam_in_its_own_words(tmp_path, role):
     text, made = repoconfig.resolve_role(repoconfig.load(tmp_path), role).compose()
-    # the cadence's slots and `{ledger}` are dev-cadence's paths in any repo (an unserved one composes no
+    # the cadence's slots and `{ledger}` are agent-cadence's paths in any repo (an unserved one composes no
     # brief, TD-1011); outside the slots the text names no layout
     rest = text
     for slot in ("{gate}", "{board}", "{ledger}", "{ledger_check}", "{cadence_rules}"):
@@ -73,7 +73,7 @@ def test_a_bare_repos_brief_says_each_seam_in_its_own_words(tmp_path, role):
 
 @pytest.mark.parametrize("role", ROLES)
 def test_this_repos_brief_reads_its_own_layout(role):
-    # this repo pins dev-cadence (dev-cadence TD-129): its cadence slots are the resolver's commands, typed
+    # this repo pins agent-cadence (dev-cadence TD-129): its cadence slots are the resolver's commands, typed
     assert cadence.pinned(REPO)
     text, made = repoconfig.resolve_role(repoconfig.load(REPO), role).compose()
     given = {s: made["slots"][s]["text"] for s in repoconfig.LAYOUT_SLOTS if s in made["slots"]}

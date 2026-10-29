@@ -1,4 +1,4 @@
-## 8. Lessons carried in (dev-cadence + tdgrind)
+## 8. Lessons carried in (agent-cadence + tdgrind)
 
 - **One anchor per checkout** — enforced at creation, not warned about later.
 - **Ledger before idle** — the stranded-work flag makes the audit continuous.
@@ -13,16 +13,16 @@
 the formats' placement superseded by [ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), TD-584).
 Three layers. **ledgerboard** (`ShiftLead/ledgerboard`) owns the ledger and board formats as text —
 `SPEC.md`, one stdlib module `ledgerboard.py`, and the conformance fixtures — and nothing that touches
-the outside. **dev-cadence** owns how a repo works for any session or a person with no shiftlead on the
+the outside. **agent-cadence** owns how a repo works for any session or a person with no shiftlead on the
 machine: cadence.md's rules, the seeds, the git hooks, the gate (`check_cadence.py`), sweeps, the
 session-start nudge, worktree and anchor rules, `sync.sh`, the machine roster. **shiftlead** owns how
 many sessions are run: the host agent, session state, teams, lanes, claims, policies, the Inbox and
 every UI, what a field is *for* (`Owner`, `Kind`, lanes), its own roster, and the board write-back's
-fetch, commit, push and locking — and it **requires dev-cadence** in every repo it serves, while
-dev-cadence stays usable with no shiftlead on the machine: the dependency runs one way, dev-cadence never
+fetch, commit, push and locking — and it **requires agent-cadence** in every repo it serves, while
+agent-cadence stays usable with no shiftlead on the machine: the dependency runs one way, agent-cadence never
 calls `ao` and never reads a layer's `shiftlead/` directory (§5 *The seams*; [ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md),
-superseding [ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md)'s *never owns a requirement that dev-cadence be installed*). The person's
-own texts — brief, entry and work additions, the director's preferences — live in their dev-cadence
+superseding [ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md)'s *never owns a requirement that agent-cadence be installed*). The person's
+own texts — brief, entry and work additions, the director's preferences — live in their agent-cadence
 layer repo, the one personal home (§4.8 *The person's own additions*).
 - **No second parser.** Every reader and writer of a ledger or board, in any repo, calls
   `ledgerboard.py`; a regex that recognises a ledger or board line shape outside it is a finding, and
@@ -37,6 +37,6 @@ layer repo, the one personal home (§4.8 *The person's own additions*).
   first: the hook reads it, and every launch sets it, `own` unattended and `machine` interactive
   (§4.3, TD-425). `AGENT_MODEL` and `AGENT_MODEL_FILE` are the next (§4.2, TD-638): the commit hook
   reads the file, which the host agent rewrites when the model in use changes, so a variable set once
-  at launch is not the only source and no hook asks `ao`. The hook's `ao status` branch is the one known exception until dev-cadence
+  at launch is not the only source and no hook asks `ao`. The hook's `ao status` branch is the one known exception until agent-cadence
   drops it, which waits on TD-425's live check telling it the variable reaches the hook.
 

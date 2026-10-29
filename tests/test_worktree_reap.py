@@ -216,7 +216,7 @@ def test_a_pinned_repos_reap_runs_the_pinned_trees_hydrate(repo, monkeypatch):
 
     wt, _ = ensure_worktree(repo, "ao-w")
     (repo / "docs").mkdir()
-    (repo / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/nowhere"\nref = "{"a" * 40}"\n')
+    (repo / "docs" / "cadence.toml").write_text(f'[agent-cadence]\nsource = "/nowhere"\nref = "{"a" * 40}"\n')
     stub = repo.parent / "launcher.sh"
     # each call runs in the resolver's environment, its pin's variables with it (TD-1075)
     stub.write_text(f'#!/bin/sh\nshift 2\necho "$@ $CADENCE_REPO_ROOT" >> "{repo}/hydrate.log"\n')

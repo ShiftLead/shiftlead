@@ -964,14 +964,14 @@ def test_the_grinder_template_says_the_pick_order_and_names_the_tool():
 
 
 def _oct6():
-    """The ledger of 2026-10-06 (TD-357): 24 pickable, 20 the anchor's and 4 dev-cadence's, one
+    """The ledger of 2026-10-06 (TD-357): 24 pickable, 20 the anchor's and 4 agent-cadence's, one
     design entry a designer's lane takes and a designed one waiting on its build, *blocked* (TD-418)."""
 
     def e(i, page, owner, kind="build"):
         return {"id": i, "title": i, "for_page": page, "owner": owner, "kind": kind, "pickable": "yes"}
 
     entries = [e(f"TD-{100 + i}", "pickable", "anchor") for i in range(20)]
-    entries += [e(f"TD-{200 + i}", "pickable", "dev-cadence") for i in range(4)]
+    entries += [e(f"TD-{200 + i}", "pickable", "agent-cadence") for i in range(4)]
     entries += [e("TD-300", "design", "designer", "design-first")]
     entries += [{**e("TD-301", "blocked", "designer", "design-first"), "pickable": "no", "blocked_by": ["TD-999"]}]
     entries += [e("TD-400", "for-you", "paul", "decision")]
@@ -996,7 +996,7 @@ def test_in_lanes_splits_the_repos_count_by_the_teams_lanes():
     entries, records = _oct6()
     got = ledger.in_lanes(entries, records)
     assert got["pickable"] == [] and got["design"] == ["TD-300"] and got["live_check"] == []
-    assert [(r["owner"], r["n"]) for r in got["rest"]] == [("anchor", 20), ("dev-cadence", 4)]
+    assert [(r["owner"], r["n"]) for r in got["rest"]] == [("anchor", 20), ("agent-cadence", 4)]
     # TD-301 waits on its build: *blocked*, in no lane's count, and *design* keeps no rest (TD-418)
     assert "design_first_rest" not in got and got["out_of_work"] == []
     grinders = {"title": "g", "for_page": "pickable", "owner": "grinder", "kind": "build", "pickable": "yes"}
@@ -1115,7 +1115,7 @@ def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_o
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     first = out.splitlines()[0]
-    assert "28 open entries: 25 pickable (ao-grind 1 · anchor 20, dev-cadence 4), 1 design (ao-grind 1)," in first
+    assert "28 open entries: 25 pickable (ao-grind 1 · anchor 20, agent-cadence 4), 1 design (ao-grind 1)," in first
     assert "  grinder-ao-1 is out of work with 1 in its lane: TD-355" in out
     assert "  grinder-ao-2 is out of work with 1 in its lane: TD-355" in out
     fleet[0]["progress"] = [{"ref": "TD-355", "status": "claimed"}]
@@ -1289,7 +1289,7 @@ def test_red_since_is_the_first_reading_that_saw_it_red_kept_while_it_stays_so(t
 
 
 def test_a_bump_of_the_pin_on_a_sync_branch_is_a_sync_pr(tmp_path, monkeypatch):
-    """TD-1015: in a repo that pins dev-cadence there is no lock, so a `cadence-sync-*` branch whose files
+    """TD-1015: in a repo that pins agent-cadence there is no lock, so a `cadence-sync-*` branch whose files
     include the pin's `docs/cadence.toml` is `sync` as well."""
     t0 = datetime.now(UTC)
     bump = _pr(8, "open", t0, headRefName="cadence-sync-pin", headRefOid="h8")

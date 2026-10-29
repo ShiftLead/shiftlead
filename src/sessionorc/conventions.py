@@ -1,14 +1,14 @@
 """Design §6 *Keeping a team running*, rule 12 (TD-247, TD-258): conventions relayed by the tick.
-dev-cadence's SessionStart hook prints the new entries of `docs/cadence-changes.md` to a session
+agent-cadence's SessionStart hook prints the new entries of `docs/cadence-changes.md` to a session
 that starts, so only a member that outlives a change needs telling: the home runs
 `scripts/cadence_changes.py --json` in each registry root that carries it, keeps on each member's
 record the headings it has seen, and sends one `note` from `system` for those that landed after
 the record was created. Nothing here is typed by a session, and the words are the script's `date`
 and `title` fields — in a pinned repo, each entry's `body` as well.
 
-A pinned repo (§5 *How the readers find dev-cadence*, TD-1014) carries no copy: the script is the pinned
-tree's, run through the resolver, `cadence.command`, and the changes are dev-cadence's own (TD-1025), so
-its note carries each entry's body and names the file by the resolver's command (TD-1046). dev-cadence's
+A pinned repo (§5 *How the readers find agent-cadence*, TD-1014) carries no copy: the script is the pinned
+tree's, run through the resolver, `cadence.command`, and the changes are agent-cadence's own (TD-1025), so
+its note carries each entry's body and names the file by the resolver's command (TD-1046). agent-cadence's
 source runs its own, under `files/`.
 
 The reads (`has_script`, which may resolve a pinned tree, and `read`) shell out and are called in a thread;
@@ -26,7 +26,7 @@ from sessionorc import cadence
 
 SCRIPT = "scripts/cadence_changes.py"
 PINNED_SCRIPT = "cadence_changes.py"  # as the pinned tree's `files/scripts/` holds it
-SOURCE_SCRIPT = f"files/{SCRIPT}"  # in dev-cadence's own source (`cadence.is_source`)
+SOURCE_SCRIPT = f"files/{SCRIPT}"  # in agent-cadence's own source (`cadence.is_source`)
 NAMED = 3  # the entries one note names; the rest are *and n more*
 BODY = 300  # a pinned note's body, at most, before its `…`
 TIMEOUT = 180.0  # an unpinned root's run; a pinned one's is `cadence.TREE_TIMEOUT`
@@ -34,7 +34,7 @@ TIMEOUT = 180.0  # an unpinned root's run; a pinned one's is `cadence.TREE_TIMEO
 
 def has_script(root: Path | str) -> bool:
     """Whether `root` is a checkout the home can see that carries the script — in the pinned tree, for a
-    pinned repo, and under `files/` in dev-cadence's source."""
+    pinned repo, and under `files/` in agent-cadence's source."""
     if cadence.pinned(root):
         payload, _ = cadence.tree(root)
         return payload is not None and (payload / "scripts" / PINNED_SCRIPT).is_file()
@@ -46,7 +46,7 @@ def read(root: Path | str, timeout: float | None = None) -> tuple[dict[str, Any]
     for **no reading** — no script, an origin with no default branch (exit 2, whose last stderr line says
     so), a run that could not be made or did not end, or output that is not the script's. Unpinned, the
     script asks git once per entry for its `landed`, hence the long bound; in a pinned repo its walk reads
-    each pin once, and the run may fetch or clone dev-cadence's source under the launcher's 300 s, so it is
+    each pin once, and the run may fetch or clone agent-cadence's source under the launcher's 300 s, so it is
     bounded at `cadence.TREE_TIMEOUT` — `has_script`'s resolve is bounded on its own."""
     if not has_script(root):
         return None, "no script"
@@ -143,14 +143,14 @@ def _body(e: dict[str, Any]) -> str:
 
 def note(told: list[dict[str, Any]], ref: str, path: str | None = None) -> str:
     """The `system` note's fixed words, three entries named at most. With `path`, the resolver's command
-    that prints the file (a pinned repo, which holds no copy): dev-cadence's file, each named entry with its
+    that prints the file (a pinned repo, which holds no copy): agent-cadence's file, each named entry with its
     body, since a worktree branched before the bump resolves the old pin."""
     count = f"{len(told)} entr{'y' if len(told) == 1 else 'ies'}"
     more = f" and {len(told) - NAMED} more" if len(told) > NAMED else ""
     if path is not None:
         named = ", ".join(_name(e) + (f": {b}" if (b := _body(e)) else "") for e in told[:NAMED])
         return (
-            f"dev-cadence's cadence-changes.md gained {count} since you started: {named}{more} — "
+            f"agent-cadence's cadence-changes.md gained {count} since you started: {named}{more} — "
             f"after rebasing onto `{ref}`, `{path}` prints its path; go on"
         )
     named = ", ".join(_name(e) for e in told[:NAMED])

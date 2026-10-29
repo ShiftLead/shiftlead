@@ -639,7 +639,7 @@ async def test_an_unserved_repos_lane_reads_empty_and_a_turn_to_unserved_is_told
     await park_ticks(agent)
     now = datetime.now(UTC)
     lack = (
-        "unserved: no dev-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — `ao repo add /r --adopt`"
+        "unserved: no agent-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — `ao repo add /r --adopt`"
     )
     unserved = {"serve": {"ok": False, "lacks": [{"key": "cadence", "words": lack}]}}
     async with LocalClient() as person:

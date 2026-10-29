@@ -10,8 +10,8 @@ local:
   local: false             # true → vscode://file/… links (the UI runs on the machine you sit at)
   volatile: false          # true → a laptop: an unreachable agent is expected (asleep), not an alert
   repos_registry: ~/my-repos.txt   # one main-checkout path per line, `#` comments, in place of both rosters;
-                                   # unset: `repos.txt` under the home, then dev-cadence's
-                                   # ~/.config/dev-cadence/repos.txt imported on the default home (§5)
+                                   # unset: `repos.txt` under the home, then agent-cadence's
+                                   # ~/.config/agent-cadence/repos.txt imported on the default home (§5)
   runs_keep_days: 30       # run logs of exited/closed sessions older than this are deleted; 0 keeps all
 ```
 
@@ -47,7 +47,7 @@ import yaml
 
 from sessionorc import paths
 
-DEV_CADENCE_ROSTER = "~/.config/dev-cadence/repos.txt"
+AGENT_CADENCE_ROSTER = "~/.config/agent-cadence/repos.txt"
 DEFAULT_RUNS_KEEP_DAYS = 30
 
 
@@ -59,10 +59,10 @@ def default_repos_registry() -> Path:
 
 def default_repos_import() -> Path | None:
     """The roster imported after the home's own when no `repos_registry:` is set (design §5 *Repos*,
-    TD-590): dev-cadence's machine roster, on the default home only — any other home (a look, a
+    TD-590): agent-cadence's machine roster, on the default home only — any other home (a look, a
     test) never reads, pulls or promotes this machine's real checkouts by default (TD-298)."""
     if paths.home().resolve() == paths.DEFAULT_HOME.expanduser().resolve():  # a symlink to it is the default
-        return Path(DEV_CADENCE_ROSTER).expanduser()
+        return Path(AGENT_CADENCE_ROSTER).expanduser()
     return None
 
 

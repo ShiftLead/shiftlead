@@ -26,7 +26,7 @@ shiftlead-agent = "sessionorc.agent:main"
 shiftlead-hook = "shiftlead.hook_entry:main"
 shiftlead-ui = "shiftlead.ui.app:main"
 shiftlead-watch = "shiftlead.watch:main"
-dev-cadence = "sessionorc.dev_cadence_entry:main"
+agent-cadence = "sessionorc.agent_cadence_entry:main"
 
 [project.entry-points."shiftlead.adapters"]
 claude-code = "shiftlead.adapters.claude_code:ClaudeCodeAdapter"
@@ -101,10 +101,10 @@ filterwarnings = [
 line-length = 120
 target-version = "py312"
 # the vendored ledgerboard and its fixtures are read, never formatted: its release header hashes its
-# body and a test holds it byte-equal to the pinned dev-cadence tree's scripts/ledgerboard.py (ADR
-# 2026-10-12, TD-585); dev-cadence's launcher is vendored frozen, its hash held by a test (§5 *How the
-# readers find dev-cadence*, TD-1014)
-extend-exclude = ["scripts", "docs", "src/sessionorc/ledgerboard.py", "src/sessionorc/dev_cadence.py", "tests/ledgerboard"]
+# body and a test holds it byte-equal to the pinned agent-cadence tree's scripts/ledgerboard.py (ADR
+# 2026-10-12, TD-585); agent-cadence's launcher is vendored frozen, its hash held by a test (§5 *How the
+# readers find agent-cadence*, TD-1014)
+extend-exclude = ["scripts", "docs", "src/sessionorc/ledgerboard.py", "src/sessionorc/agent_cadence.py", "tests/ledgerboard"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

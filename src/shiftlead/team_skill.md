@@ -43,10 +43,10 @@ that gets exit 3 stops there and says so: **it never starts one** (`ao --skill`)
 ao doctor repos
 ```
 
-One line per registered repo: whether it is served — dev-cadence's tree, its gate and its ledger,
-each lack named with its cure — and the warnings (a missing board, no worktree setup, dev-cadence's
+One line per registered repo: whether it is served — agent-cadence's tree, its gate and its ledger,
+each lack named with its cure — and the warnings (a missing board, no worktree setup, agent-cadence's
 per-clone setup not run). An unserved repo gets no team (`ao team start` refuses it); its ledger and
-gate come from dev-cadence's adoption, which is the person's to run, not yours (design §5 *The seams*).
+gate come from agent-cadence's adoption, which is the person's to run, not yours (design §5 *The seams*).
 A repo the doctor does not list is not registered on this host; that is the person's to fix, not yours.
 
 **What the repo needs before a team can pick anything.** A worker picks by an entry's header lines,
@@ -58,10 +58,10 @@ never its prose (design §6 rule 6), so the ledger's entries carry them first:
 - **`**Kind:**`** — `build`, or none, is a `free-pick` lane's (and a `live-check` once its build is
   live); `design-first` is a designer's.
 - **`**Owner:**`** — the word a lane's `owner:` matches (*What a lane takes*, step 3). `paul` is the
-  person's owner word (`PERSON_OWNER` in `sessionorc/ledger.py`, as dev-cadence's seeded ledger's
+  person's owner word (`PERSON_OWNER` in `sessionorc/ledger.py`, as agent-cadence's seeded ledger's
   `Fields:` line declares it), and keeps an entry from every lane that carries an `owner:` word. **To keep an
   entry from every worker, whatever its lanes**, block it: `**Blocked by:** decision (paul)`.
-- **The rules a PR lands by**, written down — dev-cadence's review and merge rules (its §4) where the repo
+- **The rules a PR lands by**, written down — agent-cadence's review and merge rules (its §4) where the repo
   uses them (branch → PR → independent review → the gate → merge), else in the briefs (step 4). A team
   merges its own PRs by what is written, never by a person's habit.
 
@@ -206,10 +206,10 @@ profile and session names.
 
 `.shiftlead.yml` takes these keys and refuses any other: `ledger`, `roles`, `controllers`,
 `teams` and `promote` (read by the home's promote, design §6), `gate` (the merge gate's command,
-`{pr}` filled; unset, dev-cadence's `check_cadence.py` where the checkout holds it, design §5 *The seams*),
-`worktree_setup` (a command run in each new worktree; unset, dev-cadence's `hydrate_worktree.sh` where
+`{pr}` filled; unset, agent-cadence's `check_cadence.py` where the checkout holds it, design §5 *The seams*),
+`worktree_setup` (a command run in each new worktree; unset, agent-cadence's `hydrate_worktree.sh` where
 the checkout holds it, or the pinned tree's in a pinned repo, design §5 *The seams*), `board` (the person's board, from the repo's root; unset,
-dev-cadence's `user_attention.md` where the checkout holds it, design §5 *The seams*), `settle` (how long a new
+agent-cadence's `user_attention.md` where the checkout holds it, design §5 *The seams*), `settle` (how long a new
 ledger entry of each Kind waits, holdable, before a lane may take it, `{design-first: 10m}`, design §4.4), `held` (the paths a flow's review stage waits for, design §4.9c),
 `commands` (a mapping, `test: …` and `lint: …` filling the briefs' `{test}` and `{lint}`, design §5 *The seams*), and
 `unattended` and `ready_when`, which nothing reads yet — **never `projects`**, which is the org's (design §5).
@@ -269,7 +269,7 @@ One function reads the lane words against each entry's header lines (`lane_match
 A team is on **one repo**, and every reading of a PR is that repo's: `ao progress done --pr <n>` is
 read with `gh` in the team's checkout, `held:` globs match that repo's paths, and the red-PR and
 sync-PR work orders and the PR and Doing facets read that repo alone. An umbrella whose work lands
-in sibling repos with their own remotes (dev-cadence's `docs/nested-repos.txt`) gives each member
+in sibling repos with their own remotes (agent-cadence's `docs/nested-repos.txt`) gives each member
 its own worktree or link of each sibling, as `hydrate_worktree.sh` sets them up — and **none of
 the siblings' PRs is seen**: a sibling's PR number given to `--pr` is read as the umbrella's PR of
 that number. Until ShiftLead reads them (TD-943), such a team lands a sibling change as **paired
@@ -300,7 +300,7 @@ roles:
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}
   manager: {brief: docs/briefs/manager.md, grants: [control]}
 controllers: [manager-cm]
-ledger: notes/ledger.md          # unset: dev-cadence's ledger path
+ledger: notes/ledger.md          # unset: agent-cadence's ledger path
 commands: {test: make test, lint: make lint}
 ```
 
@@ -343,7 +343,7 @@ cadence review and merge, asking and outcomes, the declarations a run ends with,
 pause, the never-list of `ao` verbs — and move with the package on every promote. They name no
 repo's layout: where a brief needs one it holds a slot — `{gate}`, `{board}`, `{ledger}`,
 `{ledger_check}`, `{test}`, `{lint}`, `{design_dir}`, `{cadence_rules}` — filled at the start: the cadence's
-(`{gate}`, `{board}`, `{ledger}`, `{ledger_check}`, `{cadence_rules}`) with dev-cadence's paths and the
+(`{gate}`, `{board}`, `{ledger}`, `{ledger_check}`, `{cadence_rules}`) with agent-cadence's paths and the
 repo's `.shiftlead.yml` `board` and `ledger`, the repo's own (`{test}`, `{lint}`, `{design_dir}`) from its
 `commands` or its checkout, else the seam's own sentence (*no test command: run what the repo's README
 says*), never empty (design §5 *The seams*). **A repo whose standing rules, scratch tools or reviewers differ says so in its own
@@ -360,7 +360,7 @@ A skeleton — one short section each, and nothing the template already says:
 - **First reads** — the files to read before anything, beyond `CLAUDE.md` and the cadence rules.
 - **Where it works** — the branch naming, the default branch, anything about worktrees the repo
   does differently.
-- **The gate** — what a PR needs beyond `commands:` and dev-cadence's gate: who reviews and who merges which
+- **The gate** — what a PR needs beyond `commands:` and agent-cadence's gate: who reviews and who merges which
   PRs (e.g. *anything under `src/core/` waits for the techlead*).
 - **Standing rules** — what is never done here: deploys, destructive data operations, files with
   their own line endings, what waits on the person, whole areas the team leaves alone.

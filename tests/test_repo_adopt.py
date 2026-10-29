@@ -1,7 +1,7 @@
-"""`ao repo add <path> [--adopt]` on a checkout without dev-cadence (design §4.7 **`ao repo add`**, §5 *The
+"""`ao repo add <path> [--adopt]` on a checkout without agent-cadence (design §4.7 **`ao repo add`**, §5 *The
 seams*, TD-1010): the adoption is offered from a scratch clone and nothing is added; `--adopt` opens it as a
 PR on `cadence-adopt` and adds the repo, unserved until the PR merges. A temp origin stands for GitHub
-through `url.<path>.insteadOf`, a stub `sync.sh` (or launcher) for dev-cadence's adopt and a stub `gh` for the PR."""
+through `url.<path>.insteadOf`, a stub `sync.sh` (or launcher) for agent-cadence's adopt and a stub `gh` for the PR."""
 
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ from sessionorc import hosts, seams
 from shiftlead import adopt, cli
 
 URL = "https://github.com/t/notes.git"
-LOCK = "source: dev-cadence\ncommit: abc1234\nfiles_commit: abc1234\n"
-# dev-cadence's adopt as far as these tests need it: the lock and the gate, and per-clone settings in the
+LOCK = "source: agent-cadence\ncommit: abc1234\nfiles_commit: abc1234\n"
+# agent-cadence's adopt as far as these tests need it: the lock and the gate, and per-clone settings in the
 # target's own `.git`, which must never reach the person's checkout
 SYNC = f"""#!/bin/sh
 set -e
@@ -29,7 +29,7 @@ t="$1"
 mkdir -p "$t/docs" "$t/scripts"
 printf '{LOCK.replace(chr(10), "\\n")}' > "$t/docs/cadence-sync.lock"
 echo 'x = 1' > "$t/scripts/check_cadence.py"
-git -C "$t" config dev-cadence.shim on
+git -C "$t" config agent-cadence.shim on
 echo '.cadence-scratch' >> "$t/.git/info/exclude"
 """
 REF = "4197a277978b1652459ecdf65db0dc033016cb5a"
@@ -39,7 +39,7 @@ open(os.environ["ADOPT_LOG"], "w").write("\\n".join([os.getcwd(), *sys.argv[1:]]
 t = sys.argv[-1]
 os.makedirs(os.path.join(t, "docs"), exist_ok=True)
 open(os.path.join(t, "AGENTS.md"), "w").write("seeded\\n")
-open(os.path.join(t, "docs", "cadence.toml"), "w").write('[dev-cadence]\\nsource = "/src"\\nref = "{REF}"\\n')
+open(os.path.join(t, "docs", "cadence.toml"), "w").write('[agent-cadence]\\nsource = "/src"\\nref = "{REF}"\\n')
 """
 GH = """#!/bin/sh
 if [ "$2" = list ]; then cat "$GH_OPEN" 2>/dev/null || echo '[]'; exit 0; fi
@@ -62,7 +62,7 @@ def _exe(path: Path, text: str) -> Path:
 
 @pytest.fixture
 def world(tmp_path, monkeypatch):
-    """A GitHub-looking origin with a ledger on `main`, the person's checkout of it, a stub dev-cadence
+    """A GitHub-looking origin with a ledger on `main`, the person's checkout of it, a stub agent-cadence
     checkout on the home's roster, a stub `gh` on PATH, and `$TMPDIR` a directory of the test's own."""
     bare = tmp_path / "origin.git"
     cfg = tmp_path / "gitconfig"
@@ -79,7 +79,7 @@ def world(tmp_path, monkeypatch):
     git(seed, "push", "-q", "origin", "HEAD:main")
     checkout = tmp_path / "notes"
     subprocess.run(["git", "clone", "-q", URL, str(checkout)], check=True, capture_output=True)
-    dc = tmp_path / "dev-cadence"
+    dc = tmp_path / "agent-cadence"
     _exe(dc / "sync.sh", SYNC)
     (dc / "files").mkdir()
     reg = hosts.default_repos_registry()
@@ -116,7 +116,7 @@ def _per_clone(checkout: Path) -> tuple[str, str]:
     return (checkout / ".git" / "config").read_text(), (checkout / ".git" / "info" / "exclude").read_text()
 
 
-async def test_a_checkout_without_dev_cadence_is_offered_its_adoption_and_nothing_is_added(agent, world, capsys):
+async def test_a_checkout_without_agent_cadence_is_offered_its_adoption_and_nothing_is_added(agent, world, capsys):
     await park_ticks(agent)
     checkout, before = world["checkout"], _per_clone(world["checkout"])
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout)]) == 0
@@ -135,15 +135,15 @@ async def test_adopt_opens_the_pr_adds_the_repo_unserved_and_the_merged_adoption
     checkout, before = world["checkout"].resolve(), _per_clone(world["checkout"])
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("adoption PR #7 open: https://github.com/t/notes/pull/7 — dev-cadence abc1234, 2 files")
+    assert out.startswith("adoption PR #7 open: https://github.com/t/notes/pull/7 — agent-cadence abc1234, 2 files")
     assert f"added notes, unserved until it merges\nonce it merges, run `{world['dc']}/sync.sh {checkout}`" in out
     origin = world["origin"]
-    assert git(origin, "log", "-1", "--format=%s", "cadence-adopt").strip() == "adopt dev-cadence abc1234"
+    assert git(origin, "log", "-1", "--format=%s", "cadence-adopt").strip() == "adopt agent-cadence abc1234"
     assert git(origin, "log", "-1", "--format=%s", "main").strip() == "the ledger"  # never the default branch
     (argv,) = _prs(world)
     assert argv[:6] == ["pr", "create", "--head", "cadence-adopt", "--base", "main"]
     body = Path(f"{world['log']}.body").read_text()
-    assert "dev-cadence at abc1234" in body and f"`{world['dc']}/sync.sh {checkout}`" in body
+    assert "agent-cadence at abc1234" in body and f"`{world['dc']}/sync.sh {checkout}`" in body
     assert f"written by `{world['dc']}/sync.sh` in a scratch clone" in body  # no launcher: sync.sh wrote it
     assert _roster() == [str(world["dc"]), str(checkout)]
     assert list(world["tmp"].iterdir()) == []
@@ -180,20 +180,20 @@ async def test_adopt_on_a_registered_repo_lacking_its_gate_opens_the_pr_and_adds
     assert "is in the roster already" in capsys.readouterr().err
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) == 0
     out = capsys.readouterr().out
-    assert "dev-cadence abc1234, 1 file\nnotes is unserved until it merges\n" in out
+    assert "agent-cadence abc1234, 1 file\nnotes is unserved until it merges\n" in out
     assert git(world["origin"], "show", "--name-only", "--format=", "cadence-adopt").split() == [
         "scripts/check_cadence.py"
     ]
     assert _roster() == [str(world["dc"]), str(checkout)]  # not added twice
 
 
-async def test_adopt_refuses_a_served_repo_no_dev_cadence_checkout_and_an_origin_off_github(agent, world, capsys):
+async def test_adopt_refuses_a_served_repo_no_agent_cadence_checkout_and_an_origin_off_github(agent, world, capsys):
     await park_ticks(agent)
     checkout = world["checkout"].resolve()
-    hosts.default_repos_registry().write_text("")  # no dev-cadence checkout in the roster
+    hosts.default_repos_registry().write_text("")  # no agent-cadence checkout in the roster
     for argv in (["repo", "add", str(checkout)], ["repo", "add", str(checkout), "--adopt"]):
         assert await asyncio.to_thread(cli.main, argv) != 0
-        assert cli.NO_DEV_CADENCE in capsys.readouterr().err
+        assert cli.NO_AGENT_CADENCE in capsys.readouterr().err
     hosts.default_repos_registry().write_text(f"{world['dc']}\n")
     git(checkout, "remote", "set-url", "origin", str(world["origin"]))
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
@@ -207,10 +207,10 @@ async def test_adopt_refuses_a_served_repo_no_dev_cadence_checkout_and_an_origin
     assert "--adopt goes with `ao repo add <path>`" in capsys.readouterr().err
 
 
-async def test_a_dev_cadence_checkout_without_a_launcher_or_sync_sh_is_picked_and_refused_before_any_clone(
+async def test_a_agent_cadence_checkout_without_a_launcher_or_sync_sh_is_picked_and_refused_before_any_clone(
     agent, world, capsys
 ):
-    """TD-1024, §4.7 `ao repo add`: once `sync.sh` retires, a dev-cadence checkout with `launcher/INTERFACE`
+    """TD-1024, §4.7 `ao repo add`: once `sync.sh` retires, an agent-cadence checkout with `launcher/INTERFACE`
     is still the roster's pick, and the adopt — which runs `sync.sh` — refuses it by name, offer and
     `--adopt` alike, with no scratch clone made and nothing pushed."""
     await park_ticks(agent)
@@ -219,8 +219,8 @@ async def test_a_dev_cadence_checkout_without_a_launcher_or_sync_sh_is_picked_an
     (dc / "sync.sh").unlink()
     (dc / "launcher").mkdir()
     (dc / "launcher" / "INTERFACE").write_text("1\n")
-    assert adopt.dev_cadence(_roster(), checkout) == dc.resolve()
-    words = f"dev-cadence at {dc.resolve()} has no launcher or sync.sh: pull it, then run this again"
+    assert adopt.agent_cadence(_roster(), checkout) == dc.resolve()
+    words = f"agent-cadence at {dc.resolve()} has no launcher or sync.sh: pull it, then run this again"
     for argv in (["repo", "add", str(checkout)], ["repo", "add", str(checkout), "--adopt"]):
         assert await asyncio.to_thread(cli.main, argv) != 0
         assert words in capsys.readouterr().err
@@ -288,18 +288,18 @@ def test_an_open_adoption_pr_is_the_cure_its_lacks_name():
     assert seams.with_adoption(None, "/r", {"open": [{"number": 9, "branch": "cadence-adopt"}]}) is None
 
 
-async def test_a_dev_cadence_checkout_with_a_launcher_adopts_through_its_adopt_and_names_the_pin(
+async def test_a_agent_cadence_checkout_with_a_launcher_adopts_through_its_adopt_and_names_the_pin(
     agent, world, capsys, monkeypatch
 ):
-    """TD-1183 (design §4.7 **`ao repo add`**): a dev-cadence checkout with a launcher adopts through its `adopt`,
-    `<dc>/launcher/dev_cadence.py -C <dc> adopt <clone>`, never its `sync.sh` (which no longer copies since
+    """TD-1183 (design §4.7 **`ao repo add`**): an agent-cadence checkout with a launcher adopts through its `adopt`,
+    `<dc>/launcher/agent_cadence.py -C <dc> adopt <clone>`, never its `sync.sh` (which no longer copies since
     dev-cadence #429); the PR names the pin's `ref`, and the reply and the body name that `adopt` as the
     person's run after the merge."""
     await park_ticks(agent)
     checkout, dc = world["checkout"].resolve(), world["dc"]
     (dc / "sync.sh").write_text("#!/bin/sh\necho 'sync.sh no longer copies into a repo' >&2\nexit 1\n")
     (dc / "launcher").mkdir()
-    (dc / "launcher" / "dev_cadence.py").write_text(LAUNCHER)
+    (dc / "launcher" / "agent_cadence.py").write_text(LAUNCHER)
     log = world["tmp"].parent / "adopt.log"
     monkeypatch.setenv("ADOPT_LOG", str(log))
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout)]) == 0
@@ -310,22 +310,22 @@ async def test_a_dev_cadence_checkout_with_a_launcher_adopts_through_its_adopt_a
     assert cwd == argv[3]
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith(f"adoption PR #7 open: https://github.com/t/notes/pull/7 — dev-cadence {REF[:7]}, 2 files")
-    assert f"once it merges, run `dev-cadence -C {dc} adopt {checkout}`" in out
-    assert git(world["origin"], "log", "-1", "--format=%s", "cadence-adopt").strip() == f"adopt dev-cadence {REF[:7]}"
+    assert out.startswith(f"adoption PR #7 open: https://github.com/t/notes/pull/7 — agent-cadence {REF[:7]}, 2 files")
+    assert f"once it merges, run `agent-cadence -C {dc} adopt {checkout}`" in out
+    assert git(world["origin"], "log", "-1", "--format=%s", "cadence-adopt").strip() == f"adopt agent-cadence {REF[:7]}"
     body = Path(f"{world['log']}.body").read_text()
-    assert f"written by `dev-cadence -C {dc} adopt`" in body and f"`dev-cadence -C {dc} adopt {checkout}`" in body
+    assert f"written by `agent-cadence -C {dc} adopt`" in body and f"`agent-cadence -C {dc} adopt {checkout}`" in body
     assert list(world["tmp"].iterdir()) == []
 
 
-DEV_CADENCE = Path(os.environ.get("DEV_CADENCE_SOURCE", "~/dev-cadence")).expanduser()
+AGENT_CADENCE = Path(os.environ.get("AGENT_CADENCE_SOURCE", "~/agent-cadence")).expanduser()
 
 
 def _adoptable(dc: Path) -> str | None:
-    """Why the machine's dev-cadence cannot run this test's adopt, or None: no launcher (TD-1183), or one its
+    """Why the machine's agent-cadence cannot run this test's adopt, or None: no launcher (TD-1183), or one its
     `adopt` refuses to run from — a dirty clone, or a HEAD off origin's default branch (dev-cadence TD-129)."""
-    if not (dc / "launcher" / "dev_cadence.py").is_file():
-        return "no dev-cadence checkout with a launcher on this machine"
+    if not (dc / "launcher" / "agent_cadence.py").is_file():
+        return "no agent-cadence checkout with a launcher on this machine"
     run = lambda *a: subprocess.run(["git", "-C", str(dc), *a], capture_output=True, text=True)  # noqa: E731
     if run("status", "--porcelain", "--untracked-files=no").stdout.strip():
         return f"{dc} has uncommitted changes: its adopt refuses"
@@ -335,28 +335,28 @@ def _adoptable(dc: Path) -> str | None:
     return None
 
 
-@pytest.mark.skipif(bool(_adoptable(DEV_CADENCE)), reason=_adoptable(DEV_CADENCE) or "")
-def test_the_offer_leaves_dev_cadences_roster_as_it_was_and_the_temp_root_is_the_reason(world, tmp_path, monkeypatch):
+@pytest.mark.skipif(bool(_adoptable(AGENT_CADENCE)), reason=_adoptable(AGENT_CADENCE) or "")
+def test_the_offer_leaves_agent_cadences_roster_as_it_was_and_the_temp_root_is_the_reason(world, tmp_path, monkeypatch):
     """dev-cadence TD-068: its adopt registers a target outside every temp root, so the scratch clone is made
     under `$TMPDIR`. The roster lives outside the temp roots (`CADENCE_TEMP_ROOTS` names the test's
     `$TMPDIR` alone); the offer's real run, the launcher's `adopt` (TD-1183), leaves it byte-identical, and the
     same run on a clone outside the temp roots registers that clone."""
     config = tmp_path / "config"
-    roster = config / "dev-cadence" / "repos.txt"
+    roster = config / "agent-cadence" / "repos.txt"
     roster.parent.mkdir(parents=True)
     roster.write_text("/somewhere/else\n")
     monkeypatch.setenv("XDG_CONFIG_HOME", str(config))
-    monkeypatch.delenv("DEV_CADENCE_REG_DIR", raising=False)
+    monkeypatch.delenv("AGENT_CADENCE_REG_DIR", raising=False)
     monkeypatch.setenv("CADENCE_TEMP_ROOTS", str(world["tmp"]))
     root = world["checkout"].resolve()
-    got = adopt.offer(root, DEV_CADENCE)
+    got = adopt.offer(root, AGENT_CADENCE)
     assert "docs/cadence.toml" in got["paths"]
     assert roster.read_text() == "/somewhere/else\n"
     outside = tmp_path / "outside"
     subprocess.run(["git", "clone", "-q", str(root), str(outside)], check=True, capture_output=True)
-    launcher = DEV_CADENCE / "launcher" / "dev_cadence.py"
+    launcher = AGENT_CADENCE / "launcher" / "agent_cadence.py"
     subprocess.run(
-        [sys.executable, str(launcher), "-C", str(DEV_CADENCE), "adopt", str(outside)],
+        [sys.executable, str(launcher), "-C", str(AGENT_CADENCE), "adopt", str(outside)],
         check=True,
         capture_output=True,
         timeout=300,
@@ -368,15 +368,15 @@ def test_the_offer_leaves_dev_cadences_roster_as_it_was_and_the_temp_root_is_the
 async def test_a_pinned_checkout_is_added_and_an_adopt_over_a_pinned_origin_is_refused(
     agent, world, capsys, monkeypatch
 ):
-    """TD-1014 (design §4.7 **`ao repo add`**): a checkout holding dev-cadence by its pin (`docs/cadence.toml`'s
-    `[dev-cadence]`, no lock) is added as one holding the lock is, served or not as the reading finds it; an
-    adopt run where origin's default branch pins dev-cadence is refused before `sync.sh` writes a copy."""
+    """TD-1014 (design §4.7 **`ao repo add`**): a checkout holding agent-cadence by its pin (`docs/cadence.toml`'s
+    `[agent-cadence]`, no lock) is added as one holding the lock is, served or not as the reading finds it; an
+    adopt run where origin's default branch pins agent-cadence is refused before `sync.sh` writes a copy."""
     from sessionorc import cadence
 
     await park_ticks(agent)
     monkeypatch.setattr(cadence, "tree", lambda root, timeout=0: (None, "no tree in this test"))
     seed, checkout = world["seed"], world["checkout"].resolve()
-    (seed / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n')
+    (seed / "docs" / "cadence.toml").write_text(f'[agent-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n')
     git(seed, "add", "-A")
     git(seed, "commit", "-qm", "the pin")
     git(seed, "push", "-q", "origin", "HEAD:main")
@@ -388,7 +388,7 @@ async def test_a_pinned_checkout_is_added_and_an_adopt_over_a_pinned_origin_is_r
     lock.unlink()
     with pytest.raises(
         adopt.AdoptError,
-        match=rf"origin/main of {checkout} pins dev-cadence already \(docs/cadence.toml\): pull the checkout",
+        match=rf"origin/main of {checkout} pins agent-cadence already \(docs/cadence.toml\): pull the checkout",
     ):
         await asyncio.to_thread(adopt.offer, checkout, world["dc"])
     assert list(world["tmp"].iterdir()) == []
@@ -396,5 +396,5 @@ async def test_a_pinned_checkout_is_added_and_an_adopt_over_a_pinned_origin_is_r
     capsys.readouterr()
     assert _roster() == [str(world["dc"]), str(checkout)]
     assert await asyncio.to_thread(cli.main, ["repo", "add", str(checkout), "--adopt"]) != 0
-    assert "pins dev-cadence already" in capsys.readouterr().err
+    assert "pins agent-cadence already" in capsys.readouterr().err
     assert not _prs(world), _calls(world)  # no PR

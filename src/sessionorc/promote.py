@@ -629,7 +629,7 @@ def _going(f: dict[str, Any] | None) -> bool:
 
 
 def start_precheck(root: str | Path, repo: str, sha: str) -> tuple[dict[str, Any] | None, str | None]:
-    """Start dev-cadence's `precheck.py --commit <sha>` in the checkout, located by
+    """Start agent-cadence's `precheck.py --commit <sha>` in the checkout, located by
     `cadence.precheck_script` — `(file, None)`, or `(None, why)` with nothing started where the script is
     absent. Stdin closed, in a session of its own (`pdm run test` is a grandchild, and the bound kills
     the group), output to `precheck-<sha7>.log`; `precheck.json` is written **before** the start, so a

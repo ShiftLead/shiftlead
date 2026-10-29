@@ -56,13 +56,13 @@ INSIDE = "/shiftlead"  # the node's volume, inside
 INSIDE_HOME = f"{INSIDE}/home"
 INSIDE_VENV = f"{INSIDE}/venv"
 PATH_AO = "/usr/local/bin/ao"  # the link to the venv's `ao` the node's Dockerfile makes
-PATH_DEV_CADENCE = "/usr/local/bin/dev-cadence"  # and to its `dev-cadence`, the vendored launcher (TD-1014)
+PATH_AGENT_CADENCE = "/usr/local/bin/agent-cadence"  # and to its `agent-cadence`, the vendored launcher (TD-1014)
 log = logging.getLogger("sessionorc.containers")
 INSIDE_LINK = f"{INSIDE}/link"
 INSIDE_WHEELS = f"{INSIDE}/wheels"
 INSIDE_PROFILES = f"{INSIDE}/profiles"
 INSIDE_ENV = f"{INSIDE}/env"
-INSIDE_CADENCE = f"{INSIDE}/cadence"  # the pinned dev-cadence trees the home ships (§4.4a, TD-1014)
+INSIDE_CADENCE = f"{INSIDE}/cadence"  # the pinned agent-cadence trees the home ships (§4.4a, TD-1014)
 ID_LABEL = "dev.shiftlead.node"  # the id label `devcontainer up` keys the container on: ours, never VS Code's
 PIDFILE = f"{INSIDE_HOME}/agent.pid"
 AGENT_LOG = f"{INSIDE_HOME}/agent.log"
@@ -302,9 +302,9 @@ def dockerfile_text(base_image: str, image_user: str, layers: list[tuple[str, st
             f" && install -o root -g root -m 0644 {tmp} {dest} && rm -f {tmp}",
         ]
     # `ao` on every shell's PATH, a login shell's included; a base image's own `ao` (a dangling link
-    # too) is kept, and `ao doctor` on the node says so (design §4.4a, TD-998); `dev-cadence` by the same
-    # rule, for dev-cadence's SessionStart line and git hook shims in a pinned repo (TD-1014)
-    for link, name in ((PATH_AO, "ao"), (PATH_DEV_CADENCE, "dev-cadence")):
+    # too) is kept, and `ao doctor` on the node says so (design §4.4a, TD-998); `agent-cadence` by the same
+    # rule, for agent-cadence's SessionStart line and git hook shims in a pinned repo (TD-1014)
+    for link, name in ((PATH_AO, "ao"), (PATH_AGENT_CADENCE, "agent-cadence")):
         lines.append(
             f"RUN [ -e {link} ] || [ -L {link} ] || {{ install -d -o root -g root -m 0755"
             f" {os.path.dirname(link)} && ln -s {INSIDE_VENV}/bin/{name} {link}; }}"
@@ -639,7 +639,7 @@ def provision(n: ContainerNode, r: Runner, cid: str, user: str) -> Path:
 # into the launcher's cache inside, as the container's user: `$1` the shipped tree, `$2` its commit.
 # The launcher takes a tree under `trees/<commit>` as made and never fetches it (§4.4a, TD-1014).
 CADENCE_INTO_CACHE = """set -e
-d="${XDG_CACHE_HOME:-$HOME/.cache}/dev-cadence/trees"
+d="${XDG_CACHE_HOME:-$HOME/.cache}/agent-cadence/trees"
 [ -d "$d/$2" ] && exit 0
 mkdir -p "$d"
 if [ -e "$d/.ship-$2" ]; then chmod -R u+w "$d/.ship-$2"; rm -rf "$d/.ship-$2"; fi
@@ -649,8 +649,8 @@ mv "$d/.ship-$2" "$d/$2"
 
 
 def ship_cadence(n: ContainerNode, r: Runner, cid: str, user: str) -> str | None:
-    """The pinned dev-cadence tree of the node's checkout, shipped beside the wheel (§4.4a, TD-1014): a
-    container has no network path to a private dev-cadence and no lasting cache, so the home resolves the
+    """The pinned agent-cadence tree of the node's checkout, shipped beside the wheel (§4.4a, TD-1014): a
+    container has no network path to a private agent-cadence and no lasting cache, so the home resolves the
     pin, copies the tree to `~/.shiftlead/nodes/<name>/cadence/<commit>/` and from there into the
     container's own launcher cache. The commit shipped, or None: a checkout that pins nothing ships
     nothing, and a pin the home cannot resolve is said by name and leaves the repo unserved on the node."""
@@ -661,16 +661,16 @@ def ship_cadence(n: ContainerNode, r: Runner, cid: str, user: str) -> str | None
         ref = (cadence.pin(n.devcontainer) or ("", ""))[1]
     except cadence.PinError as e:
         ref, why = "", str(e)
-    from sessionorc import dev_cadence as launcher
+    from sessionorc import agent_cadence as launcher
 
     src = Path(launcher.cache_dir()) / "trees" / ref
     if payload is None or not ref or not src.is_dir():
-        r.log(f"dev-cadence's pin in {n.devcontainer} does not resolve here — {why or f'no tree at {src}'}; "
+        r.log(f"agent-cadence's pin in {n.devcontainer} does not resolve here — {why or f'no tree at {src}'}; "
               f"{n.name} reads it unserved until it does")  # fmt: skip
         return None
     dest = n.node_dir / "cadence" / ref
     if not dest.is_dir():
-        r.log(f"shipping dev-cadence {ref[:7]} to {n.name} …")
+        r.log(f"shipping agent-cadence {ref[:7]} to {n.name} …")
         dest.parent.mkdir(parents=True, exist_ok=True)
         tmp = dest.with_name(f".ship-{ref}-{os.getpid()}")
         try:
@@ -678,18 +678,18 @@ def ship_cadence(n: ContainerNode, r: Runner, cid: str, user: str) -> str | None
             tmp.rename(dest)
         except OSError as e:  # a full disk: nothing half-copied left, and the repo is said unserved
             _remove_tree(tmp)
-            r.log(f"dev-cadence {ref[:7]} could not be shipped to {n.name} — {e}; {n.name} reads it unserved")
+            r.log(f"agent-cadence {ref[:7]} could not be shipped to {n.name} — {e}; {n.name} reads it unserved")
             return None
     # the agent's own environment (its env file), so the cache written is the one its launcher reads
     cmd = exec_cmd(cid, user, "sh", "-c", CADENCE_INTO_CACHE, "sh", f"{INSIDE_CADENCE}/{ref}", ref, env_file=n.env_file)
     if r.run(cmd, check=False).returncode != 0:
-        r.log(f"dev-cadence {ref[:7]} could not be put in {n.name}'s cache; {n.name} reads it unserved")
+        r.log(f"agent-cadence {ref[:7]} could not be put in {n.name}'s cache; {n.name} reads it unserved")
         return None
     return ref
 
 
 def _remove_tree(path: Path) -> None:
-    """`path` removed though it holds a dev-cadence tree, whose directories are read-only (`0555`, as the
+    """`path` removed though it holds an agent-cadence tree, whose directories are read-only (`0555`, as the
     launcher leaves them): each made writable first, as the launcher's own `_remove` does."""
     if not path.exists():
         return

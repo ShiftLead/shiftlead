@@ -296,7 +296,7 @@ def _when(v: Any) -> datetime | None:
 
 
 PR_FIELDS = "number,title,url,state,createdAt,closedAt,mergedAt,headRefName,headRefOid,author,isDraft"
-PRECHECK_CONTEXT = "cadence/precheck"  # the commit status dev-cadence's `precheck.py` records (§4.12, TD-1033)
+PRECHECK_CONTEXT = "cadence/precheck"  # the commit status agent-cadence's `precheck.py` records (§4.12, TD-1033)
 
 
 def prechecked(rollup: Any) -> bool:
@@ -307,7 +307,7 @@ def prechecked(rollup: Any) -> bool:
 OPEN_PR_FIELDS = (
     f"{PR_FIELDS},statusCheckRollup,mergeStateStatus,baseRefName,isCrossRepository"  # the open read alone (TD-613)
 )
-# a sync PR (design §4.4 *A sync PR is the team's at once*, TD-684): its head branch as dev-cadence's
+# a sync PR (design §4.4 *A sync PR is the team's at once*, TD-684): its head branch as agent-cadence's
 # `sync-all.sh` names it, and the lock among its changed files — or, a bump of a pin, the pin's file (TD-1015)
 SYNC_BRANCH = "cadence-sync-"
 SYNC_LOCK = cadence.LOCK

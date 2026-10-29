@@ -191,7 +191,7 @@ class SettingsMixin:
         """`ao repo add <path>` (design §4.7 **`ao repo add`**, §5 *Repos*, TD-1010): append the main
         checkout `path` is in to the home's roster, `repos.txt` (`repos_registry` where `hosts.yml` names
         one) — **a person's own**, refused to a session as `set_settings` is, and at the home alone. A
-        checkout holding dev-cadence's lock, or dev-cadence's source, is added; one without is refused
+        checkout holding agent-cadence's lock, or agent-cadence's source, is added; one without is refused
         here, since its adoption is offered by the client, unless `adopted` (its adoption PR is open: the
         repo is unserved until it merges, §5 *The seams*). A path already in the roster is refused. The
         next tick reads a checkout new to the roster whole, at once (`_refresh_repos`). Returns `{root,
@@ -214,8 +214,8 @@ class SettingsMixin:
             raise RpcError(f"{root} is in the roster already (design §5 Repos)")
         if not (await asyncio.to_thread(cadence_mod.holds, here) or adopted):
             raise RpcError(
-                f"{root} holds no dev-cadence (no pin in {cadence_mod.PIN}, no {cadence_mod.LOCK}): its adoption comes"
-                " first (design §4.7)"
+                f"{root} holds no agent-cadence (no pin in {cadence_mod.PIN}, no {cadence_mod.LOCK}): "
+                "its adoption comes first (design §4.7)"
             )
         reg = host.repos_registry
         try:
@@ -227,7 +227,7 @@ class SettingsMixin:
         except OSError as e:
             raise RpcError(f"could not write the roster {reg}: {e}") from None
         log.info("add_repo: %s added to %s by %s", root, reg, caller)
-        roster = [*host.repos(), root]  # the age lack reads dev-cadence's checkout among them (TD-1012)
+        roster = [*host.repos(), root]  # the age lack reads agent-cadence's checkout among them (TD-1012)
         served = (await asyncio.to_thread(seams_mod.reading, here, roster))["serve"]["ok"]
         return {"root": root, "name": here.name, "served": served}
 

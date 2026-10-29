@@ -7107,7 +7107,7 @@
       const card = box.closest(".setcard");
       try {
         await post("repos", { repo: card.dataset.repo, sync: box.checked });
-        box.parentElement.querySelector(".note").textContent = box.checked ? "on: the home merges a mechanical dev-cadence sync PR" : "off: every sync PR is the team's";
+        box.parentElement.querySelector(".note").textContent = box.checked ? "on: the home merges a mechanical agent-cadence sync PR" : "off: every sync PR is the team's";
         const read = box.parentElement.querySelector(".setsyncread");  // drawn on every card, hidden when empty
         if (read) { read.textContent = box.checked ? "" : "off"; read.hidden = box.checked; }
         AO.toast(`${card.dataset.repo}: sync ${box.checked ? "on" : "off"} · applies on the next pass`, true);

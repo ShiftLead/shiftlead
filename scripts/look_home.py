@@ -41,7 +41,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 LIVE_HOME = Path("~/.shiftlead").expanduser()
 # what this process takes on itself once the agent is up, to start the fixture sessions through it
-SCRATCH_ENV = ("SHIFTLEAD_HOME", "SHIFTLEAD_TMUX_SOCKET", "CLAUDE_CONFIG_DIR", "DEV_CADENCE_REG_DIR")
+SCRATCH_ENV = ("SHIFTLEAD_HOME", "SHIFTLEAD_TMUX_SOCKET", "CLAUDE_CONFIG_DIR", "AGENT_CADENCE_REG_DIR")
 FIXTURE_SESSIONS = ("look-shell-1", "look-shell-2", "look-shell-3")
 _LINE = "- [ ] {kind} {{today}} (session `look` on look) — **{head}** {rest}Context: TD-001. Due: {due}."
 BOARD = "\n".join(
@@ -130,7 +130,7 @@ def child_env(home: Path, sock: str) -> dict[str, str]:
         SHIFTLEAD_HOME=str(home),
         SHIFTLEAD_TMUX_SOCKET=sock,
         CLAUDE_CONFIG_DIR=str(home / "claude"),  # never this machine's live Claude registry
-        DEV_CADENCE_REG_DIR=str(home),  # the board reader's roster is the home's `repos.txt`, never the person's
+        AGENT_CADENCE_REG_DIR=str(home),  # the board reader's roster is the home's `repos.txt`, never the person's
         PYTHONPATH=os.pathsep.join([str(SRC), *filter(None, [env.get("PYTHONPATH")])]),
     )
     return env
@@ -153,12 +153,12 @@ def write_fixtures(home: Path, v2: bool = False) -> Path:
             (repo / "docs" / "ledger" / rel).write_text(text, encoding="utf-8")
     else:
         (repo / "docs" / "technical_debt.md").write_text(LEDGER, encoding="utf-8")
-    # the Inbox runs the board reader a registered repo carries. This checkout pins dev-cadence (TD-129) and
+    # the Inbox runs the board reader a registered repo carries. This checkout pins agent-cadence (TD-129) and
     # carries no copies, so the fixture repo is a synced one made from the pinned tree's files
 
     tree, why = cadence.tree(ROOT)
     if tree is None:
-        raise SystemExit(f"look_home: dev-cadence's pinned tree did not resolve: {why}")
+        raise SystemExit(f"look_home: agent-cadence's pinned tree did not resolve: {why}")
     source, ref = cadence.pin(ROOT)
     (repo / "scripts").mkdir()
     shutil.copy2(tree / "scripts" / "nudge_user_attention.py", repo / "scripts" / "nudge_user_attention.py")

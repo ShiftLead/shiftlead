@@ -1,10 +1,10 @@
 """The home's sync check (design §6 *Sync: a mechanical sync PR is merged at the home*, TD-681,
 TD-685, TD-1015): whether a sync PR (§4.4 *A sync PR is the team's at once*) is a routine bump of the repo's
-dev-cadence pin — its pin lines alone moved, to a commit of the same source's default branch that descends
+agent-cadence pin — its pin lines alone moved, to a commit of the same source's default branch that descends
 from the old one. A repo that still held a `cadence-sync.lock` was checked by replaying the lock's files; that
 road left once no served repo held a lock (TD-1015), and a merge base with no pin is refused.
 
-`check` reads git only — the repo's checkout and the dev-cadence clone the pin names — and is called off the
+`check` reads git only — the repo's checkout and the agent-cadence clone the pin names — and is called off the
 loop by the pass (TD-685 slice 2), which posts the review evidence, runs the gate and merges. It answers
 `{verdict, why, …}`: *mechanical*; *refused* with the first reason that held, worded as §6 words
 it; *moved* — the head on origin is not the one asked about, so nothing was checked; or *error* —
@@ -29,14 +29,14 @@ from sessionorc import held as held_mod
 from sessionorc.workorders import _git as _git_bytes
 from sessionorc.workorders import default_branch
 
-LOCK = "docs/cadence-sync.lock"  # dev-cadence's old lock (`sync.sh`), read by the seams and `ao repo add`
+LOCK = "docs/cadence-sync.lock"  # agent-cadence's old lock (`sync.sh`), read by the seams and `ao repo add`
 GIT_TIMEOUT = 60.0
 FETCH_TIMEOUT = 120.0
 FILE_LINE = re.compile(r"^file:\s+(\S+)\s+([0-9a-f]{64})\s+([0-7]{3,6})\s*$")
-PIN = cadence.PIN  # a pinned repo's `[dev-cadence]` table, the one file a routine bump changes (TD-1015)
-PIN_TABLES = ("[dev-cadence]", '["dev-cadence"]')
+PIN = cadence.PIN  # a pinned repo's `[agent-cadence]` table, the one file a routine bump changes (TD-1015)
+PIN_TABLES = ("[agent-cadence]", '["agent-cadence"]')
 TABLE_LINE = re.compile(r"^\s*\[")
-# the pin's `ref` line, its value whatever it holds and its tag comment, as `dev-cadence bump` writes it
+# the pin's `ref` line, its value whatever it holds and its tag comment, as `agent-cadence bump` writes it
 REF_LINE = re.compile(r'^\s*ref\s*=\s*"[^"]*"\s*(#.*)?$')
 
 
@@ -153,16 +153,16 @@ def _check(
     _out(root, "fetch", "-q", "origin", want, timeout=FETCH_TIMEOUT)
     base = _out(root, "merge-base", head, f"origin/{want}").strip()
     if (old_pin := pin_at(root, base)) is None:
-        return f"no [dev-cadence] pin at the merge base: {PIN} holds none"
+        return f"no [agent-cadence] pin at the merge base: {PIN} holds none"
     return _check_bump(root, base, head, old_pin, clones, held, out)
 
 
 def pin_at(root: Path | str, rev: str) -> tuple[str, str] | None:
-    """`(source, ref)` of the `[dev-cadence]` table in `docs/cadence.toml` at `rev`, or None where there is
+    """`(source, ref)` of the `[agent-cadence]` table in `docs/cadence.toml` at `rev`, or None where there is
     none or it does not parse. The `ref` is kept as written, so a padded one is no full commit."""
     text = _text(root, rev, PIN)
     try:
-        got = tomllib.loads(text).get("dev-cadence") if text is not None else None
+        got = tomllib.loads(text).get("agent-cadence") if text is not None else None
     except tomllib.TOMLDecodeError:
         return None
     if not isinstance(got, dict) or not isinstance(got.get("source"), str) or not isinstance(got.get("ref"), str):
@@ -171,7 +171,7 @@ def pin_at(root: Path | str, rev: str) -> tuple[str, str] | None:
 
 
 def only_ref_moved(before: str, after: str) -> bool:
-    """Whether `after` differs from `before` in the `[dev-cadence]` table's `ref` line alone, its tag comment
+    """Whether `after` differs from `before` in the `[agent-cadence]` table's `ref` line alone, its tag comment
     with it (TD-1015): every other line, in number and in bytes, the same."""
     a, b = before.splitlines(), after.splitlines()
     if len(a) != len(b):
@@ -189,7 +189,7 @@ def _check_bump(
     root: Path, base: str, head: str, old: tuple[str, str], clones: list[Path | str], held: list[str],
     out: dict[str, Any],
 ) -> str | None:  # fmt: skip
-    """§6 *Sync* in a repo that pins dev-cadence (TD-1015): the PR is a routine bump — it changes
+    """§6 *Sync* in a repo that pins agent-cadence (TD-1015): the PR is a routine bump — it changes
     `docs/cadence.toml` alone, there the pin's `ref` line alone, under the same `source`, to a full commit on
     that source's default branch that descends from the old `ref`. None when it is, else the first reason."""
     for _, path in _changes(root, base, head):
@@ -197,7 +197,7 @@ def _check_bump(
             return f"not a routine bump: {path} changed"
     new = pin_at(root, head)
     if new is None:
-        return f"not a routine bump: {PIN} holds no [dev-cadence] pin"
+        return f"not a routine bump: {PIN} holds no [agent-cadence] pin"
     if new[0] != old[0]:
         return "the pin's source changed"
     if not only_ref_moved(_text(root, base, PIN) or "", _text(root, head, PIN) or ""):
@@ -206,13 +206,13 @@ def _check_bump(
         return "not a routine bump: the pin's ref did not move"
     clone = find_clone(new[0], clones)
     if clone is None:
-        return "no dev-cadence clone to check the pin against"
+        return "no agent-cadence clone to check the pin against"
     dc = default_branch(clone)
     _out(clone, "fetch", "-q", "origin", dc, timeout=FETCH_TIMEOUT)
     ref = new[1]
     full = re.fullmatch(r"[0-9a-f]{40}", ref) and _git(clone, "cat-file", "-e", f"{ref}^{{commit}}").returncode == 0
     if not full or _git(clone, "merge-base", "--is-ancestor", ref, f"origin/{dc}").returncode != 0:
-        return f"ref {ref[:7] or '(none)'} is not a full commit on dev-cadence's {dc}"
+        return f"ref {ref[:7] or '(none)'} is not a full commit on agent-cadence's {dc}"
     if _git(clone, "merge-base", "--is-ancestor", old[1], ref).returncode != 0:
         return f"ref {ref[:7]} does not descend from {old[1][:7]}"
     if any(held_mod.matches(PIN, g) for g in held):

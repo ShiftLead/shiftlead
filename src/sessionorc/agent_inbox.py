@@ -303,7 +303,7 @@ class InboxMixin:
         the one line edited on origin's head in the host agent's own tree, committed with the fixed
         message and landed by its own PR (`board.write_back`); the checkout is never written.
         `board` must be the board of a checkout this host's repos registry names;
-        `line` and `text` are what dev-cadence's reader gave the Inbox, and the edit is refused
+        `line` and `text` are what agent-cadence's reader gave the Inbox, and the edit is refused
         unless the line still holds that text. `key` is the line's id (`board:<key>`, §4.4 *A board
         line's id*, TD-603): the open line whose id it is is found first, wherever it now sits and
         whatever a snooze or a reply has added to it, and refused in its own words when none is.

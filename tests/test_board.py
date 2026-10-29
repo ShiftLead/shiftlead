@@ -731,7 +731,7 @@ def test_a_decide_writes_the_field_at_the_lines_end_and_its_message():
 
 
 def read_back(tmp_path: Path, line: str) -> dict:
-    """What dev-cadence's own reader makes of `line`: the fields the Inbox draws."""
+    """What agent-cadence's own reader makes of `line`: the fields the Inbox draws."""
     import json
     import sys
 

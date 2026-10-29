@@ -1,5 +1,5 @@
 """Board items in the Inbox (design §4.5 screen 6, §4.4; TD-069 step 3): the due items of each
-repo's `docs/user_attention.md`, read by dev-cadence's own reader, as counted **Needs you** rows."""
+repo's `docs/user_attention.md`, read by agent-cadence's own reader, as counted **Needs you** rows."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from test_ui_inbox import PERMISSION, entry, needs_line, rec, state_rows_of
 
 
 def reader_script() -> pathlib.Path:
-    """dev-cadence's board reader, from the tree this checkout pins (dev-cadence TD-129)."""
+    """agent-cadence's board reader, from the tree this checkout pins (dev-cadence TD-129)."""
     return pinned_script("nudge_user_attention.py")
 
 
@@ -1297,7 +1297,7 @@ def test_a_press_hands_the_answer_and_the_readers_list_to_the_write_back(tmp_pat
 
 @pytest.mark.integration
 def test_the_page_draws_what_the_reader_reads_and_a_press_is_written_and_read_back(tmp_path, monkeypatch):
-    """End to end with dev-cadence's own reader and the real write-back: the reader's `answers` and
+    """End to end with agent-cadence's own reader and the real write-back: the reader's `answers` and
     `default` draw the buttons; the answer the page would send is written as `Decided:`; and the
     reader's next read gives `decided`, which the row prints in place of the buttons."""
     import json

@@ -217,7 +217,7 @@ PATH = "py launcher path cadence-changes.md"
 def test_the_pinned_words_carry_each_entrys_body():
     one = {**NEW, "body": "Do: put the verdict first.\n  Why: a reader skims.\n"}
     assert conventions.note([one], "origin/main", PATH) == (
-        "dev-cadence's cadence-changes.md gained 1 entry since you started: "
+        "agent-cadence's cadence-changes.md gained 1 entry since you started: "
         '"2026-09-29 — a review comment\'s first line carries the verdict": Do: put the verdict first. '
         f"Why: a reader skims. — after rebasing onto `origin/main`, `{PATH}` prints its path; go on"
     )
@@ -285,10 +285,10 @@ async def test_a_pinned_member_is_told_with_bodies_and_the_resolvers_command(age
     assert _notes(home) == [conventions.note([_view(NEW)], "origin/main", typed)]
     told = sent[agent._address(node)]
     assert told == [conventions.note([_view(NEW)], "origin/main", agent_tick.NODE_CHANGES)]
-    assert "`dev-cadence path cadence-changes.md` prints its path" in told[0] and ": Do: it." in told[0]
+    assert "`agent-cadence path cadence-changes.md` prints its path" in told[0] and ": Do: it." in told[0]
     assert typed in sent[agent._address(home)][0]
     assert home.conventions_seen["headings"] == [NEW["heading"], OLD["heading"]]
-    assert sum("told of 1 new in dev-cadence's changes" in m for m in caplog.messages) == 2
+    assert sum("told of 1 new in agent-cadence's changes" in m for m in caplog.messages) == 2
 
 
 async def test_the_migration_is_one_note_naming_three(agent, tmp_path, monkeypatch):
@@ -319,7 +319,7 @@ async def test_an_empty_reading_sends_nothing_and_is_logged_once(agent, tmp_path
     (locked / "docs").mkdir(parents=True)
     (locked / "scripts").mkdir()
     (locked / "docs" / "cadence.toml").write_text(
-        '[dev-cadence]\nsource = "https://x/dev-cadence"\nref = "' + "a" * 40 + '"\n'
+        '[agent-cadence]\nsource = "https://x/agent-cadence"\nref = "' + "a" * 40 + '"\n'
     )
     (locked / "docs" / "cadence-sync.lock").write_text("files_commit=x\n")
     (locked / conventions.SCRIPT).write_text(_says([]))
@@ -332,7 +332,7 @@ async def test_an_empty_reading_sends_nothing_and_is_logged_once(agent, tmp_path
         await agent._conventions_pass(members)
         await agent._conventions_pass(members)
     assert all(_notes(m) == [] for m in members)
-    assert _lines(caplog, p.root) == [f"{p.root}: no entries — the checkout's pin may predate dev-cadence's change"]
+    assert _lines(caplog, p.root) == [f"{p.root}: no entries — the checkout's pin may predate agent-cadence's change"]
     for root in (unpinned, locked):
         words = (
             "no entries — the checkout may predate the migration, or still hold docs/cadence-sync.lock beside its pin"
@@ -392,7 +392,7 @@ async def test_a_pinned_root_with_no_tree_is_logged_once_while_it_lasts(agent, t
     assert _notes(s) == []
 
 
-def test_dev_cadences_source_reads_its_own_script(tmp_path):
+def test_agent_cadences_source_reads_its_own_script(tmp_path):
     (tmp_path / "files" / "scripts").mkdir(parents=True)
     (tmp_path / "sync.sh").write_text("")
     assert cadence.is_source(tmp_path) and not conventions.has_script(tmp_path)

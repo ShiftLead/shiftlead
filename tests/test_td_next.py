@@ -627,7 +627,7 @@ async def test_a_script_past_the_budget_refuses_and_dies_with_its_group(home, gh
 
 
 @pytest.mark.integration
-async def test_dev_cadences_own_checkout_runs_files_scripts(home, gh, tmp_path):
+async def test_agent_cadences_own_checkout_runs_files_scripts(home, gh, tmp_path):
     root = _one(tmp_path, gh)
     log = _stub(root, where="files/scripts", ids=("TD-003",))
     assert (await home.rpc_td_next(repo="shiftlead"))["ids"] == ["TD-003"] and log.exists()
@@ -642,7 +642,7 @@ LAUNCHER = r"""
 import os, sys
 here = os.path.dirname(os.path.abspath(__file__))
 if os.path.exists(os.path.join(here, "refuse")):
-    print("dev-cadence: " + open(os.path.join(here, "refuse")).read(), file=sys.stderr)
+    print("agent-cadence: " + open(os.path.join(here, "refuse")).read(), file=sys.stderr)
     sys.exit(2)
 os.chdir(sys.argv[2])
 payload = open(os.path.join(here, "payload")).read()
@@ -654,16 +654,16 @@ elif sys.argv[3] == "run":
 
 
 def _pin(root: Path, tmp_path: Path, monkeypatch) -> Path:
-    """`root` pinned to a stub launcher whose tree's `files/` is returned: no lock, a `[dev-cadence]` pin."""
+    """`root` pinned to a stub launcher whose tree's `files/` is returned: no lock, a `[agent-cadence]` pin."""
     (root / "docs").mkdir(exist_ok=True)
-    (root / "docs" / "cadence.toml").write_text(f'[dev-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n')
+    (root / "docs" / "cadence.toml").write_text(f'[agent-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n')
     payload = tmp_path / "tree" / "files"
     payload.mkdir(parents=True)
     stub = tmp_path / "launcher"
     stub.mkdir()
-    (stub / "dev_cadence.py").write_text(LAUNCHER)
+    (stub / "agent_cadence.py").write_text(LAUNCHER)
     (stub / "payload").write_text(str(payload))
-    monkeypatch.setattr(cadence, "LAUNCHER", stub / "dev_cadence.py")
+    monkeypatch.setattr(cadence, "LAUNCHER", stub / "agent_cadence.py")
     cadence._trees.clear()
     return payload
 
@@ -706,11 +706,11 @@ async def test_a_pin_that_does_not_resolve_refuses_in_the_launchers_words(home, 
     root = _one(tmp_path, gh)
     _pin(root, tmp_path, monkeypatch)
     (tmp_path / "launcher" / "refuse").write_text("git fetch of /src failed")
-    with pytest.raises(RpcError, match=r"shiftlead's dev-cadence pin did not resolve \(git fetch of /src failed\)"):
+    with pytest.raises(RpcError, match=r"shiftlead's agent-cadence pin did not resolve \(git fetch of /src failed\)"):
         await home.rpc_td_next(repo="shiftlead")
     (tmp_path / "launcher" / "refuse").unlink()
     cadence._trees.clear()
-    with pytest.raises(RpcError, match=r"shiftlead's pinned dev-cadence has no ledger_next_id.py: bump the pin"):
+    with pytest.raises(RpcError, match=r"shiftlead's pinned agent-cadence has no ledger_next_id.py: bump the pin"):
         await home.rpc_td_next(repo="shiftlead")  # a tree with no id script: never the home's own road
     assert not paths.ids_file().exists()
 
@@ -978,7 +978,7 @@ async def test_a_tree_older_than_its_v2_reader_is_refused_in_the_seams_words(hom
     with pytest.raises(RpcError) as e:
         await home.rpc_td_next(repo="shiftlead")
     assert str(e.value) == (
-        "shiftlead's ids were not given: unserved: the ledger is a directory and dev-cadence at abc1234 predates "
+        "shiftlead's ids were not given: unserved: the ledger is a directory and agent-cadence at abc1234 predates "
         "its v2 reader (b9236c8) — sync it"
     )
     assert not log.exists(), "the script is never handed a directory"

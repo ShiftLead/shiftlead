@@ -91,16 +91,16 @@ def test_no_script_is_no_reading(tmp_path):
     assert not cadence.has_script(tmp_path / "not-here")
 
 
-def test_the_gate_is_the_script_and_no_key_and_under_files_in_dev_cadences_source(tmp_path):
-    """TD-1011, §5 *The seams*: the gate is dev-cadence's script where the checkout holds it, None
-    otherwise; a `gate:` key is read by nothing; dev-cadence's own source runs the one under `files/`."""
+def test_the_gate_is_the_script_and_no_key_and_under_files_in_agent_cadences_source(tmp_path):
+    """TD-1011, §5 *The seams*: the gate is agent-cadence's script where the checkout holds it, None
+    otherwise; a `gate:` key is read by nothing; agent-cadence's own source runs the one under `files/`."""
     assert cadence.gate(tmp_path) is None and cadence.gate(tmp_path / "not-here") is None
     (tmp_path / ".shiftlead.yml").write_text("gate: 'true'\n")
     assert cadence.gate(tmp_path) is None and cadence.check(tmp_path, 1) is None, "a gate: key is no gate"
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts" / "check_cadence.py").write_text("# here\n")
     assert cadence.gate(tmp_path) == "python3 scripts/check_cadence.py --pr {pr} --json"
-    src = tmp_path / "dev-cadence"
+    src = tmp_path / "agent-cadence"
     (src / "files" / "scripts").mkdir(parents=True)
     (src / "sync.sh").write_text("#!/bin/sh\n")
     (src / "scripts").mkdir()

@@ -6,4 +6,4 @@ metadata:
 ---
 
 Cadence §1.1 (dev-cadence TD-139): `open_worktree.sh` leaves a VS Code window on Paul's desktop, so a
-session's own worktree is made with `git worktree add` (and `dev-cadence run hydrate_worktree.sh` in it).
+session's own worktree is made with `git worktree add` (and `agent-cadence run hydrate_worktree.sh` in it).

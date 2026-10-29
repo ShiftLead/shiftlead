@@ -507,7 +507,7 @@ def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
     assert cli.main(["team", "start", "ao-grind"]) == 0
     asked = [p for m, p in state["calls"] if m == "host_files"]
     assert asked and all(p["host"] == "devenv" and p["dir"] == there for p in asked)
-    # the repo's file and brief, then what the layout slots look for: whether it is dev-cadence's source
+    # the repo's file and brief, then what the layout slots look for: whether it is agent-cadence's source
     # (`sync.sh`, then `files/`, TD-1011), whether it is pinned (the lock, then the pin, TD-1014) and its
     # design directory (TD-588); and, the file naming no `ledger:`, whether its ledger is a v2 directory (TD-1146)
     layout = {"sync.sh", "launcher/INTERFACE", "docs/cadence-sync.lock", "docs/cadence.toml", "docs/design"}
@@ -535,14 +535,14 @@ def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
 def test_a_container_nodes_member_is_told_the_nodes_own_launcher(world, monkeypatch):
     """TD-1014 (5), design §5 *The layout slots*: a container node shares the checkout's path, so its
     briefs are read here, but the home's Python and launcher are not in the node — a pinned repo's
-    `{gate}`, `{ledger_check}` and `{cadence_rules}` name the node venv's `bin/dev-cadence` there, and the
+    `{gate}`, `{ledger_check}` and `{cadence_rules}` name the node venv's `bin/agent-cadence` there, and the
     home's own member keeps the home's command."""
     from sessionorc import cadence, containers
 
     tmp_path, state = world
     checkout = tmp_path / "shiftlead"
     (checkout / "docs").mkdir()
-    (checkout / "docs" / "cadence.toml").write_text('[dev-cadence]\nsource = "x"\nref = "y"\n')
+    (checkout / "docs" / "cadence.toml").write_text('[agent-cadence]\nsource = "x"\nref = "y"\n')
     (checkout / "docs" / "grind.md").write_text("gate {gate}; check {ledger_check}; {cadence_rules}\n")
     (checkout / ".shiftlead.yml").write_text(yaml.safe_dump({"roles": {"grinder": {"brief": "docs/grind.md"}}}))
     doc = org_doc(tmp_path)
@@ -553,7 +553,7 @@ def test_a_container_nodes_member_is_told_the_nodes_own_launcher(world, monkeypa
     state["elsewhere"] = {str(checkout)}
     assert cli.main(["team", "start", "ao-grind"]) == 0
     prompt = {p["name"]: p for p in creates(state)}["grind-1"]["prompt"]
-    node = f"{containers.INSIDE_VENV}/bin/dev-cadence"
+    node = f"{containers.INSIDE_VENV}/bin/agent-cadence"
     assert f"gate {node} run check_cadence.py --pr <n>;" in prompt
     assert f"check {node} run ledger.py --check;" in prompt and f"`{node} path cadence.md` prints" in prompt
     assert cadence.typed("run", "check_cadence.py") not in prompt
@@ -1817,7 +1817,7 @@ def test_a_sweeper_seat_starts_with_the_built_in_brief_and_its_swept_trigger(wor
     assert sweep["seat"] == {"trigger": "swept", "after": "7d"}
     assert sweep["role"] == "sweeper" and sweep["capabilities"] == [] and sweep["lane"] == []
     assert sweep["prompt"].startswith("You are a **sweeper**")
-    assert "`dev-cadence path procedures/stranded-work.md`" in sweep["prompt"]
+    assert "`agent-cadence path procedures/stranded-work.md`" in sweep["prompt"]
     capsys.readouterr()
     org = cli._org_here()
     gone = [{"id": "s", "name": "sweep-ao-1", "team": "ao-grind", "state": "exited"}]
@@ -2731,7 +2731,7 @@ def test_a_declared_team_or_a_repo_with_no_reading_starts(world, declared):
 UNSERVED = {
     "ok": False,
     "lacks": [
-        {"key": "cadence", "words": "unserved: no dev-cadence (no docs/cadence-sync.lock) — sync it"},
+        {"key": "cadence", "words": "unserved: no agent-cadence (no docs/cadence-sync.lock) — sync it"},
         {"key": "gate", "words": "unserved: no gate (no scripts/check_cadence.py) — sync it"},
     ],
 }
@@ -2744,15 +2744,15 @@ def test_a_start_is_refused_for_a_team_of_an_unserved_repo_naming_each_lack(worl
     state["repos"] = {str(tmp_path / "shiftlead"): reading}
     assert cli.main(["team", "start", "ao-grind"]) != 0
     err = capsys.readouterr().err
-    assert "ao-grind: shiftlead is unserved: no dev-cadence (no docs/cadence-sync.lock) — sync it; " in err
+    assert "ao-grind: shiftlead is unserved: no agent-cadence (no docs/cadence-sync.lock) — sync it; " in err
     assert "unserved: no gate (no scripts/check_cadence.py) — sync it" in err
     assert creates(state) == [], "refused before anything is created"
     # its lanes read empty, as the team card's Start reads them before the start (§4.5a)
     assert cli.main(["team", "start", "ao-grind", "--anyway"]) != 0, "--anyway does not pass it"
-    assert "shiftlead is unserved: no dev-cadence" in capsys.readouterr().err
+    assert "shiftlead is unserved: no agent-cadence" in capsys.readouterr().err
     picks = teamrun.lanes(cli.call_sync, cli._org_here(), "ao-grind", HOST)
     assert picks["roles"]["grinder"]["n"] == 0 and picks["empty"] is True
-    assert picks["unserved"].startswith("ao-grind: shiftlead is unserved: no dev-cadence")
+    assert picks["unserved"].startswith("ao-grind: shiftlead is unserved: no agent-cadence")
     # the start itself refuses it too, as the team card's Start calls it (§4.5a)
     plan = teams.plan(cli._org_here(), "ao-grind", HOST)
     assert teamrun.unserved(cli.call_sync, plan) == picks["unserved"]

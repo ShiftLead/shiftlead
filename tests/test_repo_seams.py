@@ -21,7 +21,7 @@ CURE = "`ao repo add /r/notes --adopt`"
 
 
 def seam_reading(ledger=None, lacks=(), warnings=(), **over) -> dict:
-    """dev-cadence's shape: a parsing ledger of 412 entries, every seam defaulted, served, nothing warned,
+    """agent-cadence's shape: a parsing ledger of 412 entries, every seam defaulted, served, nothing warned,
     and the adapter's SessionStart line in the checkout's settings."""
     r = {
         "ledger": ledger or {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 412, "why": None},
@@ -72,7 +72,7 @@ def test_a_served_repo_is_ok_a_warning_warns_and_each_lack_unserves_it():
 
 def test_a_checkout_without_the_adapters_session_start_line_is_warned():
     """§5 *The seams*: the reading carries the commands as text, the client compares them with the
-    adapter's `cadence_hook_line` — under `files/` in dev-cadence's source."""
+    adapter's `cadence_hook_line` — under `files/` in agent-cadence's source."""
     words = "no SessionStart line: a session started outside ShiftLead misses the cadence's nudge"
     assert doctor.missing_seams(seam_reading(session_start=["something else"])) == [words]
     assert doctor.missing_seams(seam_reading(session_start=[])) == [words]
@@ -105,7 +105,7 @@ def test_the_repo_page_says_each_warning_and_each_lack_with_its_cure_as_code():
 
 
 def test_init_is_read_as_a_repo_name(monkeypatch, capsys):
-    """TD-1011, design §4.7: `ao repo` has no `init` word — a repo's ledger comes from dev-cadence's seeds —
+    """TD-1011, design §4.7: `ao repo` has no `init` word — a repo's ledger comes from agent-cadence's seeds —
     so `init` is a repo's name like any word but `add`, and `--repo` is no option of `ao repo`."""
     got = {"/r/init": {"name": "init", "root": "/r/init", "prs": {}, "ledger": {}}}
     monkeypatch.setattr(cli, "call_sync", lambda method, **kw: got if method == "repos" else [])
@@ -142,7 +142,7 @@ def test_the_wheels_ledgerboard_names_its_release_and_a_vendored_copy_is_read_by
     (bare / "scripts").mkdir(parents=True)
     (bare / "scripts/ledgerboard.py").write_text("# SYNCED FILE\nx = 1\n")
     none.mkdir()
-    (source / "files/scripts").mkdir(parents=True)  # dev-cadence's own source
+    (source / "files/scripts").mkdir(parents=True)  # agent-cadence's own source
     (source / "files/scripts/ledgerboard.py").write_text(first + "\n")
     assert seams.ledgerboard(older) == {"release": "1.2", "wheel": wheel}
     assert seams.ledgerboard(bare) == {"release": None, "wheel": wheel}
@@ -179,9 +179,9 @@ def _git(root: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True).stdout.strip()
 
 
-def _dev_cadence(tmp_path: Path) -> tuple[Path, list[str]]:
-    """dev-cadence's source (a root holding `sync.sh` and `files/`) with three commits, oldest first."""
-    src = tmp_path / "dev-cadence"
+def _agent_cadence(tmp_path: Path) -> tuple[Path, list[str]]:
+    """agent-cadence's source (a root holding `sync.sh` and `files/`) with three commits, oldest first."""
+    src = tmp_path / "agent-cadence"
     (src / "files").mkdir(parents=True)
     (src / "sync.sh").write_text("#!/bin/sh\n")
     _git(tmp_path, "init", "-q", "-b", "main", str(src))
@@ -201,17 +201,18 @@ def _consumer(tmp_path: Path, files_commit: str) -> Path:
     (root / "scripts" / "check_cadence.py").write_text("x = 1\n")
     (root / "docs" / "technical_debt.md").write_text("# Technical debt\n")
     lock = (
-        f"source: https://github.com/ShiftLead/dev-cadence\ncommit: {files_commit[:7]}\nfiles_commit: {files_commit}\n"
+        "source: https://github.com/ShiftLead/agent-cadence\n"
+        f"commit: {files_commit[:7]}\nfiles_commit: {files_commit}\n"
     )
     (root / "docs" / "cadence-sync.lock").write_text(lock)
     return root
 
 
 def test_a_lock_older_than_the_builds_oldest_is_unserved_by_name(tmp_path, monkeypatch):
-    """TD-1012, §5 *Which dev-cadence*: a lock at the middle of three commits is served with `OLDEST` at
+    """TD-1012, §5 *Which agent-cadence*: a lock at the middle of three commits is served with `OLDEST` at
     the first, and unserved in the fixed words with it at the third; ancestry read in the roster's
-    dev-cadence checkout."""
-    src, (first, middle, third) = _dev_cadence(tmp_path)
+    agent-cadence checkout."""
+    src, (first, middle, third) = _agent_cadence(tmp_path)
     root = _consumer(tmp_path, middle)
     roster = [root, src]
     monkeypatch.setattr(cadence, "OLDEST", first)
@@ -227,11 +228,11 @@ def test_a_lock_older_than_the_builds_oldest_is_unserved_by_name(tmp_path, monke
     assert not [w for w in got["warnings"] if "age" in w]
     monkeypatch.setattr(cadence, "OLDEST", third)
     got = seams.reading(root, roster)
-    words = f"unserved: dev-cadence at {middle[:7]} is older than this build reads ({third[:7]}) — sync it"
+    words = f"unserved: agent-cadence at {middle[:7]} is older than this build reads ({third[:7]}) — sync it"
     assert got["serve"] == {"ok": False, "lacks": [{"key": "age", "words": words}]}
     assert seams.unserved({"seams": got}) == [words]
     assert missing_seams(repo("notes", got))["unserved"] == [[(words, False)]]
-    assert seams.reading(src, roster)["cadence_age"] is None, "dev-cadence's source carries no lock to age"
+    assert seams.reading(src, roster)["cadence_age"] is None, "agent-cadence's source carries no lock to age"
     # a +dirty tree is read at the commit it was synced from
     (root / "docs" / "cadence-sync.lock").write_text(f"files_commit: {middle}+dirty\n")
     assert seams.reading(root, roster)["serve"]["lacks"][0]["key"] == "age"
@@ -240,12 +241,12 @@ def test_a_lock_older_than_the_builds_oldest_is_unserved_by_name(tmp_path, monke
     got = seams.reading(root, roster)
     assert got["serve"]["ok"] is True
     why = f"{src} does not hold fffffff and {third[:7]}, and its source (none) is not on GitHub"
-    assert f"dev-cadence's age not read: {why}" in got["warnings"]
+    assert f"agent-cadence's age not read: {why}" in got["warnings"]
 
 
-def test_with_no_dev_cadence_checkout_the_forge_compares_and_a_failure_is_a_warning(tmp_path, monkeypatch):
-    """TD-1012: no dev-cadence checkout in the roster reads the forge's compare on the lock's source; a
-    `gh` that fails is *dev-cadence's age not read: <why>*, never a lack; a read age is carried."""
+def test_with_no_agent_cadence_checkout_the_forge_compares_and_a_failure_is_a_warning(tmp_path, monkeypatch):
+    """TD-1012: no agent-cadence checkout in the roster reads the forge's compare on the lock's source; a
+    `gh` that fails is *agent-cadence's age not read: <why>*, never a lack; a read age is carried."""
     root = _consumer(tmp_path, "a" * 40)
     bin_ = tmp_path / "bin"
     bin_.mkdir()
@@ -256,11 +257,11 @@ def test_with_no_dev_cadence_checkout_the_forge_compares_and_a_failure_is_a_warn
     got = seams.reading(root, [root])
     assert got["serve"] == {"ok": True, "lacks": []}
     assert (
-        "dev-cadence's age not read: no dev-cadence checkout in the roster; gh: HTTP 503: unavailable"
+        "agent-cadence's age not read: no agent-cadence checkout in the roster; gh: HTTP 503: unavailable"
         in got["warnings"]
     )
     calls = (bin_ / "gh.calls").read_text()
-    assert f"api repos/shiftlead/dev-cadence/compare/{cadence.OLDEST}...{'a' * 40}" in calls
+    assert f"api repos/shiftlead/agent-cadence/compare/{cadence.OLDEST}...{'a' * 40}" in calls
     gh.write_text('#!/bin/sh\necho \'{"status": "ahead"}\'\n')
     assert seams.reading(root, [root])["serve"]["ok"] is True
     gh.write_text('#!/bin/sh\necho "$@" >> "$0.calls"\necho \'{"status": "diverged"}\'\n')
@@ -274,11 +275,11 @@ def test_with_no_dev_cadence_checkout_the_forge_compares_and_a_failure_is_a_warn
 
 def test_the_tick_reads_the_age_against_the_registry_and_carries_it(tmp_path, monkeypatch):
     """TD-1020: the home's own repo read (`TickMixin._read_repos`) passes the registry to the seams as their
-    roster, so a lock older than `OLDEST` is read in the registry's dev-cadence checkout with no `gh`, and
+    roster, so a lock older than `OLDEST` is read in the registry's agent-cadence checkout with no `gh`, and
     the next read carries that age without the checkout and without the forge."""
     from sessionorc.agent_tick import TickMixin
 
-    src, (first, middle, third) = _dev_cadence(tmp_path)
+    src, (first, middle, third) = _agent_cadence(tmp_path)
     root = _consumer(tmp_path, middle)
     _git(tmp_path, "init", "-q", "-b", "main", str(root))
     monkeypatch.setattr(cadence, "OLDEST", third)
@@ -293,7 +294,7 @@ def test_the_tick_reads_the_age_against_the_registry_and_carries_it(tmp_path, mo
     age = got[r]["seams"]["cadence_age"]
     assert age == {"commit": middle, "oldest": third, "seed": cadence.SEED, "descends": False, "why": None}
     assert got[r]["seams"]["serve"]["lacks"][0]["key"] == "age"
-    # the five-minute read, the registry without dev-cadence: the age is carried, the forge never asked
+    # the five-minute read, the registry without agent-cadence: the age is carried, the forge never asked
     again = TickMixin._read_repos([r], got, {r}, registry=[r])
     assert again[r]["seams"]["cadence_age"] == age
     calls = (bin_ / "gh.calls").read_text() if (bin_ / "gh.calls").exists() else ""

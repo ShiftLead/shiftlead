@@ -184,7 +184,7 @@ def _orders(r: dict[str, Any] | None) -> list[Any]:
     return [*((r.get("work_orders") or {}).get("orders") or []), *((r.get("pr_orders") or {}).get("orders") or [])]
 
 
-NODE_CHANGES = "dev-cadence path cadence-changes.md"  # rule 12's command on a node: `ao host up`'s link (TD-1046)
+NODE_CHANGES = "agent-cadence path cadence-changes.md"  # rule 12's command on a node: `ao host up`'s link (TD-1046)
 SETUP_EVERY = 3600.0  # seconds between the setup notes' reads with `profiles.yml` unchanged (TD-875)
 
 
@@ -1437,7 +1437,7 @@ class TickMixin:
         """Rule 10's read (design §6, TD-258), detached on the reports' cadence: for each supervised
         member, not a seat, each `progress` entry `done` with a `pr` — declared or derived — whose
         `checks` entry is missing, `unknown`, older than the `done`, or read at another head, the
-        repo's gate (§5 *The seams*, TD-1011: dev-cadence's script) is run in the registry root the
+        repo's gate (§5 *The seams*, TD-1011: agent-cadence's script) is run in the registry root the
         record's `repo` names, **one PR per run**, the one longest unread first. A root with no gate is
         unserved: nothing is run there and nothing written. A root the home holds no reading of, a head
         `gh` cannot give and a run with no reading write nothing."""
@@ -1581,7 +1581,7 @@ class TickMixin:
                 if not got["entries"]:
                     self._conventions_once(
                         root,
-                        "no entries — the checkout's pin may predate dev-cadence's change"
+                        "no entries — the checkout's pin may predate agent-cadence's change"
                         if pinned
                         else "no entries — the checkout may predate the migration, "
                         "or still hold docs/cadence-sync.lock beside its pin",
@@ -1607,7 +1607,7 @@ class TickMixin:
                             on_home = s.host == self.host
                             path = cadence_mod.typed("path", "cadence-changes.md") if on_home else NODE_CHANGES
                         self._system_note(self._address(s), conventions_mod.note(told, got["ref"], path))
-                        where = "dev-cadence's changes" if pinned else "docs/cadence-changes.md"
+                        where = "agent-cadence's changes" if pinned else "docs/cadence-changes.md"
                         log.info("%s: told of %d new in %s", self._address(s), len(told), where)
                     self._save(s)
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next pass tries again
@@ -3638,7 +3638,7 @@ class TickMixin:
         """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
         pass, so two checkouts of one remote are one `gh` read. `ledger` False keeps the last
         ledger as it stands (a pass for the board alone); `boards` is the board's clock (`_read_boards`);
-        `roster` the registry's checkouts, where the seams find dev-cadence's (§5 *Which dev-cadence*)."""
+        `roster` the registry's checkouts, where the seams find agent-cadence's (§5 *Which agent-cadence*)."""
         stamp = now.isoformat()
         remote = reports._git(root, "remote", "get-url", "origin") if due else None
         remote = (remote or "").strip() if due else str(old.get("remote") or "")

@@ -5,14 +5,14 @@ metadata:
   type: feedback
 ---
 
-Since TD-1035, PRs are gated on `cadence/precheck`, which the session records with `dev-cadence run precheck.py --pr N`. It is the whole suite on one core, ~12 minutes (TD-1068 parallelises it). On 2026-10-26 a ledger-only PR (#2408) was prechecked six times:
+Since TD-1035, PRs are gated on `cadence/precheck`, which the session records with `agent-cadence run precheck.py --pr N`. It is the whole suite on one core, ~12 minutes (TD-1068 parallelises it). On 2026-10-26 a ledger-only PR (#2408) was prechecked six times:
 - two flaky failures of TD-1050's container test, and one of `test_a_restart_is_written_afresh`, which passes alone;
 - two green runs, after each of which main had moved the ledger, so the PR conflicted and every rebase needed a new precheck.
 The sixth merged because precheck, gate and merge ran in one command:
 
 ```bash
-dev-cadence run precheck.py --pr N > pre.txt 2>&1; echo "precheck $?"
-dev-cadence run check_cadence.py --pr N > gate.txt 2>&1; rc=$?
+agent-cadence run precheck.py --pr N > pre.txt 2>&1; echo "precheck $?"
+agent-cadence run check_cadence.py --pr N > gate.txt 2>&1; rc=$?
 [ $rc = 0 ] && gh pr merge N --squash && gh pr view N --json state -q .state
 ```
 

@@ -39,7 +39,7 @@ GIVEN_KEEP = 200
 COUNT_MAX = 10
 WHY_CHARS = 200  # a hold's words and a drop notice's, one line (TD-905)
 ADDED = re.compile(r"^\+## TD-(\d+):", re.M)
-SCRIPTS = ("scripts/ledger_next_id.py", "files/scripts/ledger_next_id.py")  # a syncing repo's; dev-cadence's own
+SCRIPTS = ("scripts/ledger_next_id.py", "files/scripts/ledger_next_id.py")  # a syncing repo's; agent-cadence's own
 IDS_SCRIPT = "ledger_next_id.py"  # as a pinned tree's `files/scripts/` holds it
 SCRIPT_SLACK = 5.0  # the script's race ends this far before the call's deadline
 TID = re.compile(r"TD-\d+")
@@ -160,14 +160,14 @@ def _why(err: str, fallback: str) -> str:
 
 def ids_script(root: str, timeout: float = cadence.TREE_TIMEOUT) -> Path | None:
     """The `ledger_next_id.py` the checkout serving a `td_next` has: in a pinned repo the pinned tree's (§5 *How
-    the readers find dev-cadence*, TD-1014) — a pin that does not resolve, or a tree with no id script, refused,
+    the readers find agent-cadence*, TD-1014) — a pin that does not resolve, or a tree with no id script, refused,
     never the home's own road, which reads no counter; else the first of `SCRIPTS` found."""
     if cadence.pinned(root):
         payload, why = cadence.tree(root, timeout)
         if payload is None:
-            raise RpcError(f"{Path(root).name}'s dev-cadence pin did not resolve ({why}): no id script to run")
+            raise RpcError(f"{Path(root).name}'s agent-cadence pin did not resolve ({why}): no id script to run")
         if not (script := payload / "scripts" / IDS_SCRIPT).is_file():
-            raise RpcError(f"{Path(root).name}'s pinned dev-cadence has no {IDS_SCRIPT}: bump the pin")
+            raise RpcError(f"{Path(root).name}'s pinned agent-cadence has no {IDS_SCRIPT}: bump the pin")
         return script
     return next((Path(root) / s for s in SCRIPTS if (Path(root) / s).is_file()), None)
 
@@ -587,7 +587,7 @@ class IdsMixin:
         }
 
     async def _ids_v2_served(self, root: str, name: str) -> None:
-        """Refuse a v2 directory where dev-cadence's tree is older than `cadence.OLDEST_V2` (design §4.4 *Either
+        """Refuse a v2 directory where agent-cadence's tree is older than `cadence.OLDEST_V2` (design §4.4 *Either
         layout*), in the seams' *unserved* words (§5), never handing the script a directory: the age as the
         repo's last seams reading holds it, read again (carried where its commits are the same) against the
         home's checkouts. An age that cannot be read refuses nothing: an old script fails on its own."""

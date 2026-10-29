@@ -128,14 +128,14 @@ def test_mark_the_homes_prs_are_no_order_and_a_verdicts_why_is_the_context():
     prs = [_pr(1), _pr(2), _pr(3), _pr(4, checks="red", failing=["test"]), _pr(5, sync=False, checks="red")]
     kept = {
         "1": {"head": HEAD, "verdict": "merged"},
-        "2": {"head": HEAD, "verdict": "refused", "why": "lock not dev-cadence's: scripts/x.sh"},
+        "2": {"head": HEAD, "verdict": "refused", "why": "lock not agent-cadence's: scripts/x.sh"},
         "3": {"head": HEAD, "verdict": "", "tries": 1},  # a retry: still the home's
     }
     got = {p["number"]: p for p in sync.mark(prs, kept, True)}
     assert got[1]["sync_home"] and got[3]["sync_home"]
-    assert got[2]["sync_why"] == "lock not dev-cadence's: scripts/x.sh" and not got[2].get("sync_home")
+    assert got[2]["sync_why"] == "lock not agent-cadence's: scripts/x.sh" and not got[2].get("sync_home")
     assert not got[4].get("sync_home") and got[5] is prs[4]
-    assert workorders.sync_reason(got[2]) == "lock not dev-cadence's: scripts/x.sh"
+    assert workorders.sync_reason(got[2]) == "lock not agent-cadence's: scripts/x.sh"
     assert not workorders.is_sync_order(got[1]) and not workorders.is_sync_order(got[3])
     assert workorders.is_sync_order(got[2]) and workorders.is_sync_order(got[4])
     off = {p["number"]: p for p in sync.mark(prs, {}, False)}
@@ -259,7 +259,7 @@ async def test_a_reviewed_bump_is_merged_with_its_note_and_is_no_order(agent, gh
     assert _names(gh) == ["login", "check", "gate", "head", "merge"]
     assert gh["calls"][-1][1] == (ROOT, 1097, HEAD)
     notes = [e.text for e in agent.person_inbox if e.from_ == "system"]
-    assert "merged samscrape #1097 — bump of the dev-cadence pin to eeeeeee" in notes
+    assert "merged samscrape #1097 — bump of the agent-cadence pin to eeeeeee" in notes
     assert await _orders(agent) == []
     # judged at its head: never checked again
     gh["calls"] = []
@@ -296,7 +296,10 @@ async def test_a_repo_unserved_but_by_an_older_tree_has_its_sync_pr_left_and_an_
     """§6 *Sync*, TD-1018: a repo with the gate but no ledger is unserved, its sync PR not read and nothing
     written; one whose only lack is an older tree (TD-1012's `age`) is judged, since the sync cures it."""
     led = {"key": "ledger", "words": "unserved: no ledger at docs/technical_debt.md — x"}
-    age = {"key": "age", "words": "unserved: dev-cadence at abc1234 is older than this build reads (6d92209) — sync it"}
+    age = {
+        "key": "age",
+        "words": "unserved: agent-cadence at abc1234 is older than this build reads (6d92209) — sync it",
+    }
     _reading(agent, _pr())
     agent._repos[ROOT]["seams"] = {"serve": {"ok": False, "lacks": [led, age]}}
     await agent._sync_pass()
@@ -308,9 +311,9 @@ async def test_a_repo_unserved_but_by_an_older_tree_has_its_sync_pr_left_and_an_
 
 @pytest.mark.integration
 async def test_a_v2_ledgers_predates_is_an_older_tree_the_sync_cures(agent, gh):
-    """§6 *Sync*, TD-1144: a v2 ledger under a dev-cadence older than `OLDEST_V2` (`ledger_age`) is judged as an
+    """§6 *Sync*, TD-1144: a v2 ledger under an agent-cadence older than `OLDEST_V2` (`ledger_age`) is judged as an
     older tree is; beside another lack it is left."""
-    v2 = {"key": "ledger_age", "words": "unserved: the ledger is a directory and dev-cadence at abc1234 predates"}
+    v2 = {"key": "ledger_age", "words": "unserved: the ledger is a directory and agent-cadence at abc1234 predates"}
     led = {"key": "ledger", "words": "unserved: no ledger at docs/ledger — x"}
     _reading(agent, _pr())
     agent._repos[ROOT]["seams"] = {"serve": {"ok": False, "lacks": [v2, led]}}

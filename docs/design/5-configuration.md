@@ -3,7 +3,7 @@
 - Hosts: `~/.shiftlead/hosts.yml` on every host — the UI host's copy lists the hosts; each host
   agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a). The `local` entry's
   fields: `name`, `vscode_host`, `local: true|false` (`vscode://file` links, for a UI on the machine
-  you sit at), `volatile: true|false`, `repos_registry` path (unset: the home's own roster, `repos.txt` under the home, into which dev-cadence's `~/.config/dev-cadence/repos.txt` is imported when it exists — *Repos*, below; TD-584), `runs_keep_days`, `identity` (§4.8a)
+  you sit at), `volatile: true|false`, `repos_registry` path (unset: the home's own roster, `repos.txt` under the home, into which agent-cadence's `~/.config/agent-cadence/repos.txt` is imported when it exists — *Repos*, below; TD-584), `runs_keep_days`, `identity` (§4.8a)
   and `person` (§4.4a); the top-level keys are `home:`, `nodes:` and `link:` (§4.4a). There are
   no per-host `transport:` or `ssh` target entries: the hub-and-spoke ssh transport they were for
   was replaced by the home and node split (§4.4a, §7 phase 2), where a node dials the home with its
@@ -141,11 +141,11 @@ reach:                                        # §4.5b *The setting*: the person
   text the person wrote, escaped. Nothing under `person:` reaches a policy: the gate and the tick
   read the file by key and never this one.
 - Repos: **ShiftLead's own roster**, `repos.txt` under the home (one main-checkout path per line, `#`
-  comments), read first; **dev-cadence's `~/.config/dev-cadence/repos.txt` is imported** into the
+  comments), read first; **agent-cadence's `~/.config/agent-cadence/repos.txt` is imported** into the
   reading when it exists, so a host that runs the cadence lists both and one without it lists what
   ShiftLead was given; `hosts.yml`'s `repos_registry` names one file in place of the home's
   ([ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), *Its own roster*; TD-584, built by TD-590). A repo is
-  registered with `ao repo add` (§4.7, TD-1010), which offers dev-cadence's adoption as a PR for a repo
+  registered with `ao repo add` (§4.7, TD-1010), which offers agent-cadence's adoption as a PR for a repo
   without it, and a registered repo that lacks what *The seams*, below, require is unserved until it has
   it ([ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md), TD-1009). Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
@@ -172,7 +172,7 @@ roles:                                # §4.8 presets; every key optional, built
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 # ledger:                             # unset: docs/ledger where that is a directory, else docs/technical_debt.md (§4.4 *Either layout*) — what a TD-NNN reference resolves to: a ledger in ledgerboard format (*The seams*)
-board: docs/user_attention.md         # the person's board, dev-cadence's seed (*The seams*); missing: a warning, the Inbox the channel
+board: docs/user_attention.md         # the person's board, agent-cadence's seed (*The seams*); missing: a warning, the Inbox the channel
 worktree_setup: scripts/hydrate_worktree.sh   # run in every new worktree (*The seams*)
 held: ["src/sessionorc/**"]           # §4.9c: the paths a review stage holds (the `build` flow holds nothing)
 
@@ -206,7 +206,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   systemd, skaffold or wrangler: this repo's `run` is the pip pair of CLAUDE.md and its `check`
   prints the installed build's commit (`sessionorc.build.info()`); samscrape's would be its
   skaffold run and the deployed image's tag; contractmatch's a wrangler deploy and the deployment's
-  commit; dev-cadence's its sync. Both are commands run **at the home** (§6
+  commit; agent-cadence's its sync. Both are commands run **at the home** (§6
   *Promote* says when), `check` in the checkout and `run` in the tree it is to make live: the
   checkout, on main's head, for a promote, and a detached worktree at the commit for a rollback
   (§6 *A rollback*). So **`run` makes live the tree it is started in**, names no path to
@@ -227,25 +227,25 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   `ledger:` travels on the record as well, because it is a session's.
 
   **The seams** ([ADR 2026-10-25](../decisions/2026-10-25-shiftlead-requires-dev-cadence.md), *Decision* 2–6, superseding [ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md)'s *What ShiftLead requires of a repo, and what it only uses*; TD-584, TD-1009).
-  ShiftLead **requires dev-cadence** in every repo it serves, and dev-cadence stays usable alone: the
+  ShiftLead **requires agent-cadence** in every repo it serves, and agent-cadence stays usable alone: the
   dependency runs one way. Of a repo it requires the three things it cannot supply itself, each read
-  through dev-cadence:
-  - **dev-cadence's tree** — today the synced files and their lock, `docs/cadence-sync.lock`, whose
-    `files_commit` is at or after the oldest dev-cadence commit this build reads (*Which dev-cadence*,
+  through agent-cadence:
+  - **agent-cadence's tree** — today the synced files and their lock, `docs/cadence-sync.lock`, whose
+    `files_commit` is at or after the oldest agent-cadence commit this build reads (*Which agent-cadence*,
     below); under dev-cadence TD-129, the pin in `docs/cadence.toml`, resolved (*How the readers find
-    dev-cadence*, below);
-  - **the gate**, dev-cadence's `check_cadence.py` (§6 rule 10);
+    agent-cadence*, below);
+  - **the gate**, agent-cadence's `check_cadence.py` (§6 rule 10);
   - **the ledger**, in ledgerboard format at `ledger:` — a file, or a v2 directory of one file per entry
     (§4.4 *Either layout*; default `docs/ledger` where that is a directory, else `docs/technical_debt.md`) — the format
     `ShiftLead/ledgerboard`'s `SPEC.md` defines and its `ledgerboard.py` reads — the one parser,
     vendored as `src/sessionorc/ledgerboard.py` and held byte-equal to the synced
     `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
 
-  **dev-cadence's own repo is its source**, not a consumer: a checkout whose root holds `files/` and `sync.sh` or, once
+  **agent-cadence's own repo is its source**, not a consumer: a checkout whose root holds `files/` and `sync.sh` or, once
   `sync.sh` retires, `launcher/INTERFACE` (TD-1024) carries no lock and is at its own head, so its tree is itself (no lock, no `OLDEST` check)
   and its gate is its own `files/scripts/check_cadence.py --pr {pr} --json`; every rule below that
-  counts registered repos' locks (*Which dev-cadence*'s raise, TD-1016's) passes over it. **In the
-  source every dev-cadence path a reader names is under `files/`** — `files/docs/cadence.md`,
+  counts registered repos' locks (*Which agent-cadence*'s raise, TD-1016's) passes over it. **In the
+  source every agent-cadence path a reader names is under `files/`** — `files/docs/cadence.md`,
   `files/scripts/check_cadence.py`, `ledger.py`, `cadence_changes.py`, `ledgerboard.py`,
   `cadence_layer.py` — and every copy-era reader (the slots, rule 12's relay, the ledgerboard header,
   the layer listing) and the resolver prefix it there, as §4.4's id counter reads
@@ -253,18 +253,18 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
 
   A registered repo that lacks any of the three is **unserved** (TD-1011): the Repo page and `ao doctor`
   say which, each in its fixed words with its cure, the page and `ao doctor` sharing them:
-  *unserved: no dev-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — `ao repo add <path>
-  --adopt`*, *unserved: dev-cadence's lock does not parse — <the reader's reason> — `ao repo add <path>
-  --adopt`*, *unserved: dev-cadence's pin does not parse — <the launcher's reason> — `ao repo add <path>
-  --adopt`*, *unserved: dev-cadence's pin does not resolve — <the launcher's reason>* (a pin needing a newer
+  *unserved: no agent-cadence (no pin in docs/cadence.toml, no docs/cadence-sync.lock) — `ao repo add <path>
+  --adopt`*, *unserved: agent-cadence's lock does not parse — <the reader's reason> — `ao repo add <path>
+  --adopt`*, *unserved: agent-cadence's pin does not parse — <the launcher's reason> — `ao repo add <path>
+  --adopt`*, *unserved: agent-cadence's pin does not resolve — <the launcher's reason>* (a pin needing a newer
   launcher interface reads *it needs launcher interface <n>, this build carries <m> — a newer ShiftLead*),
   *unserved: no gate (no scripts/check_cadence.py) — `ao repo add <path> --adopt`*, *unserved: no gate (no
   check_cadence.py in the pinned tree) — bump the pin*, *unserved: no ledger at
   <ledger> — `ao repo add <path> --adopt`*, *unserved: the ledger at
   <ledger> does not parse — <the reader's reason>* (no adopt cures it; `<ledger>` the resolved path, §4.4
   *Either layout*), *unserved:
-  dev-cadence at <commit> is older than this build reads (<oldest>) — sync it*, *unserved: the ledger is a
-  directory and dev-cadence at <commit> predates its v2 reader (b9236c8) — sync it* (a pinned repo's: *— bump
+  agent-cadence at <commit> is older than this build reads (<oldest>) — sync it*, *unserved: the ledger is a
+  directory and agent-cadence at <commit> predates its v2 reader (b9236c8) — sync it* (a pinned repo's: *— bump
   the pin*; the seams' ledger state `predates`, and `ao td reserve` refuses in the same words) (`sync.sh`; for a pinned
   repo, whose pin's `ref` is the commit, *— bump the pin*, a bump PR); where an adoption PR is open (the repo's PR reading's open PR whose
   head is `cadence-adopt`, §4.4), its cure reads *adoption PR #n open* — and the home runs nothing of it but its readings (the repo facts, §4.4: the seams that name the lack,
@@ -278,21 +278,21 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   work as on any empty lane, and the person gets one `system` note when a served repo turns unserved,
   *<repo> is unserved: <the lack> — team <t> has no lane until it is cured*. A plain session in its directory starts
   as in any directory (New session takes a path). No reader degrades silently and no slot has a
-  sentence for dev-cadence's absence. An external tracker is mapped *into* the ledger by an importer,
+  sentence for agent-cadence's absence. An external tracker is mapped *into* the ledger by an importer,
   never read in its place. The rest are keys of this file, each with a default:
-  - **`board:`** — the person's board, default `docs/user_attention.md`, dev-cadence's seed.
+  - **`board:`** — the person's board, default `docs/user_attention.md`, agent-cadence's seed.
     The Inbox reads it in-process through `ledgerboard.py` — the checkout's file and
     `origin/<default>`'s after the host's own fetch, the origin note derived from the two (§4.5 screen 6
-    *Boards are read against origin*) — and runs no dev-cadence script. A board missing at its path is
+    *Boards are read against origin*) — and runs no agent-cadence script. A board missing at its path is
     a warning, never a lack (*no board at docs/user_attention.md*, on the Repo page and in `ao doctor`),
     and the Inbox is then that repo's one channel to the person (`workorders.board_path`, built by
     TD-587). A session's own edit of a line is `ao board edit` on its branch (§4.7); the person's
     presses are the write-back (§4.4).
   - **The gate is no key** (TD-1011): it is `python3 scripts/check_cadence.py --pr {pr} --json`, run in
     the checkout and judged by its exit code, its rows kept on the record's checks entry (§6 rule 10).
-    A repo's own extra check is dev-cadence's precheck (cadence §4.12), which the gate reads. A `gate:`
+    A repo's own extra check is agent-cadence's precheck (cadence §4.12), which the gate reads. A `gate:`
     left in a `.shiftlead.yml` is read by nothing, and `ao org check` names it (*gate: is gone — a
-    repo's extra check is dev-cadence's precheck*).
+    repo's extra check is agent-cadence's precheck*).
   - **`commands:`** — a mapping; `test` and `lint` fill `{test}` and `{lint}` in the built-in briefs and
     flows (§4.8 *A repo's brief*), each unset one filling with its seam's sentence (*no test command:
     run what the repo's README says*): they are the repo's commands, not the cadence's. This repo's own
@@ -303,12 +303,12 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     (`sessionorc.gitinfo.ensure_worktree`; a worktree reused is not set up again), default
     `scripts/hydrate_worktree.sh` when present and executable, given the worktree's path — in a pinned
     repo the pinned tree's, run through the resolver (`cadence.command(repo, "run", "hydrate_worktree.sh",
-    <path>)`, said *dev-cadence run hydrate_worktree.sh*), as the reaper's `--check` and `--dehydrate` are
+    <path>)`, said *agent-cadence run hydrate_worktree.sh*), as the reaper's `--check` and `--dehydrate` are
     (TD-1044), and a pin the launcher refuses fails the create in its words; unset and
     absent, nothing runs and the Repo page says *no worktree setup* (TD-589). A setup that fails
     leaves the worktree and fails the create with its own words.
   - **`ledger:`** carries, beside the ledger, the `{ledger_check}` the briefs name: `python3
-    scripts/ledger.py --check`, dev-cadence's, which every tree at or after `OLDEST` ships.
+    scripts/ledger.py --check`, agent-cadence's, which every tree at or after `OLDEST` ships.
   **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (the gate,
   `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as `<n>` after the rest), `{board}`
   (the board's path, whether or not the file is there: a missing board is the Repo page's warning,
@@ -324,8 +324,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   resolves — a worktree's ledger is the one checked, a bump branch runs its own pin — as
   `<python> <launcher> run check_cadence.py --pr {pr}`, `… run ledger.py --check` and *read the file
   `… path cadence.md` prints, §1–§4*. A session started on a container node, a team's member or the New
-  session form's, is told the node's own launcher instead, `/shiftlead/venv/bin/dev-cadence` (the console script over the same launcher in the
-  node's venv, §4.4a), since the home's paths are not the node's; a lock beside the pin keeps the copy's paths, and dev-cadence's own source its `files/` ones. They are read only when the brief
+  session form's, is told the node's own launcher instead, `/shiftlead/venv/bin/agent-cadence` (the console script over the same launcher in the
+  node's venv, §4.4a), since the home's paths are not the node's; a lock beside the pin keeps the copy's paths, and agent-cadence's own source its `files/` ones. They are read only when the brief
   being composed names one — a node's files are asked across the link, where a directory or a file
   past the cap is refused by name and is there, and any other failure stops the start rather than tell
   the brief a seam is absent — after every other slot, and fill a supplement's text as they fill the
@@ -334,38 +334,38 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   ShiftLead's launch for every session it starts (`CADENCE_HOOK_LINE`), so a repo whose own
   `.claude/settings.json` lacks it gets a warning on the Repo page, *no SessionStart line: a session
   started outside ShiftLead misses the cadence's nudge*, and nothing more. The line has **vintages**, each
-  dev-cadence's seed of its day: the adapter knows the current one (`CADENCE_HOOK_LINE`) and the ones before it
+  agent-cadence's seed of its day: the adapter knows the current one (`CADENCE_HOOK_LINE`) and the ones before it
   that a repo may still carry (`CADENCE_HOOK_LINES_PAST`: the 2026-09-25 main-checkout line, then the 2026-09-11
-  `$CLAUDE_PROJECT_DIR` line — dev-cadence's seed since it became one line), and any of them reads as present — a repo not yet synced is not warned for an older seed. Two more words read the line
-  (TD-1024): where no SessionStart command is a vintage this build knows but one names dev-cadence's runner or
-  launcher (`cadence_hooks.sh`, `dev-cadence hook`), it warns *SessionStart line is not one this build knows:
-  dev-cadence's seed may be newer than ShiftLead's copy — or copy the line from dev-cadence's
+  `$CLAUDE_PROJECT_DIR` line — agent-cadence's seed since it became one line), and any of them reads as present — a repo not yet synced is not warned for an older seed. Two more words read the line
+  (TD-1024): where no SessionStart command is a vintage this build knows but one names agent-cadence's runner or
+  launcher (`cadence_hooks.sh`, `agent-cadence hook`), it warns *SessionStart line is not one this build knows:
+  agent-cadence's seed may be newer than ShiftLead's copy — or copy the line from agent-cadence's
   files/.claude/settings.json* (a hand-written line beside a known vintage warns nothing, and a line warned so is not also warned *no SessionStart
-  line*, which stays the word for a repo with no dev-cadence line at all) — the drift TD-1022 found, said where it shows — and in a
-  **pinned** repo (§4.2: the main checkout's `docs/cadence.toml` has the `[dev-cadence]` header, the hooks' view; the reading's
+  line*, which stays the word for a repo with no agent-cadence line at all) — the drift TD-1022 found, said where it shows — and in a
+  **pinned** repo (§4.2: the main checkout's `docs/cadence.toml` has the `[agent-cadence]` header, the hooks' view; the reading's
   `hook_pinned`; a reading from an older host agent, without the key, reads unpinned) a line of a pre-pin vintage, with no command the current line, warns
   *SessionStart line predates the pin: a session started outside ShiftLead runs no cadence hook — copy the line from
-  `dev-cadence -C <checkout> path .claude/settings.json`* (the pinned tree's seed; dev-cadence seeds only a missing
+  `agent-cadence -C <checkout> path .claude/settings.json`* (the pinned tree's seed; agent-cadence seeds only a missing
   file and never rewrites this one, `adopt` included, so the copy is the person's; a hand-written pin older than
-  dev-cadence ddd2f99, the seed's pinned mode, holds a pre-pin seed and is bumped first, `dev-cadence bump`). Two more
-  warnings come from dev-cadence's per-clone setup: a checkout without its hook shim and one missing from
-  dev-cadence's own roster. Their cure is the era's (§4.7 `ao repo add`): a repo still on the copy (a
-  lock, no pin) is one dev-cadence no longer syncs — its #429 (2026-10-28) retired the copy and `sync-all.sh`, and
+  dev-cadence ddd2f99, the seed's pinned mode, holds a pre-pin seed and is bumped first, `agent-cadence bump`). Two more
+  warnings come from agent-cadence's per-clone setup: a checkout without its hook shim and one missing from
+  agent-cadence's own roster. Their cure is the era's (§4.7 `ao repo add`): a repo still on the copy (a
+  lock, no pin) is one agent-cadence no longer syncs — its #429 (2026-10-28) retired the copy and `sync-all.sh`, and
   `sync.sh` with a target alone refuses — and `adopt` refuses a repo that carries synced copies, so the cure of both
-  is the move to a pin, the person's `<dev-cadence>/sync.sh --pin <checkout>` (dev-cadence's migration: it writes
+  is the move to a pin, the person's `<agent-cadence>/sync.sh --pin <checkout>` (agent-cadence's migration: it writes
   the pin, removes the copies still matching the lock and the lock, installs the shims and registers the checkout,
-  and commits nothing, so what it wrote is the person's PR), words *dev-cadence's per-clone setup not run in this
-  checkout — `<dev-cadence>/sync.sh --pin <checkout>`* and *not on dev-cadence's roster: the copy is retired, so
-  move it to a pin — `<dev-cadence>/sync.sh --pin <checkout>`* (TD-1188); in a pinned repo the shim warning reads *dev-cadence's
-  per-clone setup not run in this checkout — `dev-cadence -C <checkout> run install_git_hooks.sh`* (the pinned
-  tree's own installer), and also fires for a shim that predates the pin (its text has no `dev-cadence hook "`, the launcher call only the TD-129 shim
-  makes — the bare `dev-cadence hook` is in every shim's TD-055 marker, so it runs a copied hook that is gone); the roster warning stays, since dev-cadence's `adopt` and `gc` still read the
-  roster (`~/.config/dev-cadence/repos.txt`), and reads *not on dev-cadence's roster: its gc may remove the tree
-  this repo pins — `dev-cadence -C <dev-cadence> adopt <checkout>`* (`adopt` on a pinned repo keeps its pin and
-  every file it would seed that is already there, installs the shims and registers it, so it cures both; a repo moved by dev-cadence's migration, `sync.sh --pin`, has no lock
+  and commits nothing, so what it wrote is the person's PR), words *agent-cadence's per-clone setup not run in this
+  checkout — `<agent-cadence>/sync.sh --pin <checkout>`* and *not on agent-cadence's roster: the copy is retired, so
+  move it to a pin — `<agent-cadence>/sync.sh --pin <checkout>`* (TD-1188); in a pinned repo the shim warning reads *agent-cadence's
+  per-clone setup not run in this checkout — `agent-cadence -C <checkout> run install_git_hooks.sh`* (the pinned
+  tree's own installer), and also fires for a shim that predates the pin (its text has no `agent-cadence hook "`, the launcher call only the TD-129 shim
+  makes — the bare `agent-cadence hook` is in every shim's TD-055 marker, so it runs a copied hook that is gone); the roster warning stays, since agent-cadence's `adopt` and `gc` still read the
+  roster (`~/.config/agent-cadence/repos.txt`), and reads *not on agent-cadence's roster: its gc may remove the tree
+  this repo pins — `agent-cadence -C <agent-cadence> adopt <checkout>`* (`adopt` on a pinned repo keeps its pin and
+  every file it would seed that is already there, installs the shims and registers it, so it cures both; a repo moved by agent-cadence's migration, `sync.sh --pin`, has no lock
   left and `adopt` warns past an edited copy it kept and registers it (dev-cadence #341, merged 2026-10-26); for a
   repo pinned by hand with its lock still there `adopt` refuses, and the roster line is the person's to append by
-  hand; `adopt` also refuses from a dirty dev-cadence clone or one whose HEAD is not on origin's default branch, and says so). The roster's loss is small — a tree `gc` removed is fetched again on the next run — but a node or an
+  hand; `adopt` also refuses from a dirty agent-cadence clone or one whose HEAD is not on origin's default branch, and says so). The roster's loss is small — a tree `gc` removed is fetched again on the next run — but a node or an
   offline machine cannot fetch it, so it is said. The host agent reads the
   file's SessionStart commands into the repo facts as text (§4.4), and `hook_pinned` beside them, so a client on another machine sees
   them, and the clients (`shiftlead.doctor`, the Repo page) compare them with each adapter's own
@@ -377,35 +377,35 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   the board's path) and a worktree's creation — and the clients (`repoconfig.py`) read every key for
   the briefs and `ao board edit`; `commands:` and the rest of the file are the clients' alone.
 
-  **How the readers find dev-cadence** (*Decision* 3, TD-1014). While the copy stands, each reader
+  **How the readers find agent-cadence** (*Decision* 3, TD-1014). While the copy stands, each reader
   reads its path in the checkout (`scripts/check_cadence.py`, `docs/cadence.md`, the lock). Under
   dev-cadence TD-129 every reader asks **one resolver**, `sessionorc.cadence.command(repo, word,
   *args)`, for **the command to run** — its argv and environment, `CADENCE_REPO_ROOT` included — so no
-  reader sets that up itself. The resolver calls dev-cadence's launcher, a dependency of ShiftLead's
-  install: the wheel vendors it frozen (`sessionorc/dev_cadence.py`, from dev-cadence's
-  `launcher/dev_cadence.py` at the commit `cadence.LAUNCHER_COMMIT` names) and the host agent runs it under
+  reader sets that up itself. The resolver calls agent-cadence's launcher, a dependency of ShiftLead's
+  install: the wheel vendors it frozen (`sessionorc/agent_cadence.py`, from agent-cadence's
+  `launcher/agent_cadence.py` at the commit `cadence.LAUNCHER_COMMIT` names) and the host agent runs it under
   its own venv's Python, never one on a login `PATH`, so a rollback of the live copy covers it. A repo is
-  **pinned** when its `docs/cadence.toml` holds `[dev-cadence]` and it has no lock; while it still has the
-  lock, its copy is read. A pinned repo holds dev-cadence by its pin (read as the launcher reads it), its
-  gate is the pinned tree's `check_cadence.py` run as `dev-cadence run check_cadence.py --pr <n> --json`,
+  **pinned** when its `docs/cadence.toml` holds `[agent-cadence]` and it has no lock; while it still has the
+  lock, its copy is read. A pinned repo holds agent-cadence by its pin (read as the launcher reads it), its
+  gate is the pinned tree's `check_cadence.py` run as `agent-cadence run check_cadence.py --pr <n> --json`,
   and its ledgerboard release is the pinned tree's, so a pin with no copy is warned of for no absent file.
-  The tree is the launcher's `path` (its cache, local after the first fetch), asked once a minute at most. A container node has no network path to a private dev-cadence
+  The tree is the launcher's `path` (its cache, local after the first fetch), asked once a minute at most. A container node has no network path to a private agent-cadence
   and no lasting cache, so the home ships the pinned trees a node needs with the wheel (`ao host up`,
   §4.4a). A pin that cannot be resolved — one that needs a newer launcher interface than this build's
   included, which a ShiftLead release cures — makes the repo unserved by name, never skipped.
-  **Which dev-cadence** (*Decision* 4, TD-1012): the build names the oldest dev-cadence commit it reads
+  **Which agent-cadence** (*Decision* 4, TD-1012): the build names the oldest agent-cadence commit it reads
   (`sessionorc.cadence.OLDEST`) and, under TD-129, the launcher interface it needs; a lock's
   `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. A v2 ledger (§4.4 *Either layout*, TD-1143) asks
   more: one that does not descend from `OLDEST_V2` (`b9236c8`, dev-cadence #405, where its `ledger_next_id.py` first reads a
-  directory and `ledger.py` gains `layout_at`; `ledger.py` has read one since `d92d663`, #403) is the lack *the ledger is a directory and dev-cadence at <commit> predates its v2 reader*. A commit that descends from agent-cadence's seed
-  (`SEED`, `35b4b4a`, the first commit of `ShiftLead/agent-cadence`: a snapshot of dev-cadence at `0ad7b2f` with no
+  directory and `ledger.py` gains `layout_at`; `ledger.py` has read one since `d92d663`, #403) is the lack *the ledger is a directory and agent-cadence at <commit> predates its v2 reader*. A commit that descends from agent-cadence's seed
+  (`SEED`, `35b4b4a`, the first commit of `ShiftLead/agent-cadence`: a snapshot of agent-cadence at `0ad7b2f` with no
   parents, so newer than both on a history that holds neither, TD-1208) is at or after `OLDEST` and `OLDEST_V2`
   alike. Ancestry is read in
-  each of the roster's dev-cadence checkouts after its fetch (`git merge-base --is-ancestor`), the first that
+  each of the roster's agent-cadence checkouts after its fetch (`git merge-base --is-ancestor`), the first that
   holds both commits of a pair answering, against the oldest point and then the seed, else through the
-  forge's compare of each pair in turn on the pin's own `source`; an age that cannot be read is a warning, *dev-cadence's age not
+  forge's compare of each pair in turn on the pin's own `source`; an age that cannot be read is a warning, *agent-cadence's age not
   read: <why>*, never a lack, so a missing clone unserves nothing. The newer side is
-  dev-cadence's promise: the `--json` shapes and fields ShiftLead reads, which cadence §7's parity
+  agent-cadence's promise: the `--json` shapes and fields ShiftLead reads, which cadence §7's parity
   table names, change only additively, and a breaking change waits for a ShiftLead release that reads
   it. **ledgerboard by its header** (*Decision* 6, TD-1013): each vendored `ledgerboard.py` opens with
   `# ledgerboard v<release> sha256:<hash>`, the tagged release it was vendored from; the Repo page and

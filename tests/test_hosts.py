@@ -36,11 +36,11 @@ def test_local_host_from_file(tmp_path, monkeypatch):
 
 def test_scratch_home_never_reads_the_machine_roster(tmp_path, monkeypatch):
     """TD-298: a home other than the default, with no `repos_registry:` of its own, reads its own
-    `repos.txt` — never dev-cadence's machine roster, whose real checkouts it would pull."""
+    `repos.txt` — never agent-cadence's machine roster, whose real checkouts it would pull."""
     roster = tmp_path / "machine" / "repos.txt"
     roster.parent.mkdir()
     roster.write_text("/home/p/real\n")
-    monkeypatch.setattr(hosts, "DEV_CADENCE_ROSTER", str(roster))
+    monkeypatch.setattr(hosts, "AGENT_CADENCE_ROSTER", str(roster))
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     monkeypatch.setenv("SHIFTLEAD_HOME", str(scratch))
@@ -61,26 +61,26 @@ def test_scratch_home_never_reads_the_machine_roster(tmp_path, monkeypatch):
     assert hosts.default_repos_import() == roster
 
 
-def test_the_home_has_its_own_roster_and_imports_dev_cadences(tmp_path, monkeypatch):
+def test_the_home_has_its_own_roster_and_imports_agent_cadences(tmp_path, monkeypatch):
     """TD-590 (design §5 *Repos*): the default home reads `repos.txt` under itself first, then
-    dev-cadence's roster when it exists — so a host without dev-cadence lists what ShiftLead was
+    agent-cadence's roster when it exists — so a host without agent-cadence lists what ShiftLead was
     given, one with it lists both, each repo once; `repos_registry:` names one file in place of both."""
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("SHIFTLEAD_HOME", "~/.shiftlead")
     home = tmp_path / ".shiftlead"
     home.mkdir()
-    cadence = tmp_path / ".config" / "dev-cadence" / "repos.txt"
-    monkeypatch.setattr(hosts, "DEV_CADENCE_ROSTER", str(cadence))
+    cadence = tmp_path / ".config" / "agent-cadence" / "repos.txt"
+    monkeypatch.setattr(hosts, "AGENT_CADENCE_ROSTER", str(cadence))
     assert hosts.local_host().repos() == []  # neither roster: nothing, never a crash
     (home / "repos.txt").write_text("# given to ShiftLead\n/home/p/mine\n/home/p/both\n")
     h = hosts.local_host()
     assert h.repos_registry == home / "repos.txt" and h.repos_import == cadence
-    assert h.repos() == ["/home/p/mine", "/home/p/both"]  # no dev-cadence roster: what ShiftLead was given
+    assert h.repos() == ["/home/p/mine", "/home/p/both"]  # no agent-cadence roster: what ShiftLead was given
     cadence.parent.mkdir(parents=True)
     cadence.write_text("/home/p/both\n/home/p/cadence\n")
     assert hosts.local_host().repos() == ["/home/p/mine", "/home/p/both", "/home/p/cadence"]  # both, the home's first
     (home / "repos.txt").unlink()
-    assert hosts.local_host().repos() == ["/home/p/both", "/home/p/cadence"]  # dev-cadence's alone, as before
+    assert hosts.local_host().repos() == ["/home/p/both", "/home/p/cadence"]  # agent-cadence's alone, as before
     other = tmp_path / "other.txt"
     other.write_text("/home/p/other\n")
     (home / "hosts.yml").write_text(f"local:\n  repos_registry: {other}\n")

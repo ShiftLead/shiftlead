@@ -2,9 +2,9 @@
 # once and never overwrites it. People write it; tools only read it and never rewrite it, so a
 # comment saying why a value was chosen is safe here (cadence.md §9.18).
 #
-# Every tool reads a value through `dev-cadence run cadence_config.py get <key>` (Python >= 3.11).
+# Every tool reads a value through `agent-cadence run cadence_config.py get <key>` (Python >= 3.11).
 # The first that has it wins: env CADENCE_<KEY> (CADENCE_REVIEW_MODEL), this file, the machine's
-# ${XDG_CONFIG_HOME:-~/.config}/dev-cadence/cadence.toml, the default. `cadence_config.py`
+# ${XDG_CONFIG_HOME:-~/.config}/agent-cadence/cadence.toml, the default. `cadence_config.py`
 # prints every key with its value and source; `--check` names a key nothing reads.
 # To change a value, uncomment its line and edit the value (each is shown at its default).
 
@@ -21,13 +21,13 @@
 # checks that guard Claude Code's auto-memory (TD-095).
 # agents = "claude"
 
-# Where `dev-cadence run open_worktree.sh` puts worktrees, relative to the clone root (§1, TD-101). The
+# Where `agent-cadence run open_worktree.sh` puts worktrees, relative to the clone root (§1, TD-101). The
 # anchor guard, the hydrate scan and the workspace generator follow it. The default is where
 # `claude --worktree` puts them; worktrees already elsewhere are not moved.
 # worktree-root = ".claude/worktrees"
 
 # The repo's own checks, as one command (§4.12, TD-1035). GitHub Actions stopped on the shared
-# account (TD-1033), so a PR is gated on this: `dev-cadence run precheck.py --pr N` runs it on the PR's head
+# account (TD-1033), so a PR is gated on this: `agent-cadence run precheck.py --pr N` runs it on the PR's head
 # in a clean worktree and records a cadence/precheck status, and the home runs it on main's head
 # (design §6 *The precheck on main*). The worktree has nothing installed, so it installs first. The
 # interpreter is pinned to the machine's python3 (3.13 on kmaster, the live copy's), since pdm
@@ -55,8 +55,8 @@ precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pd
 # "docs/claude-memory/MEMORY.md" = "docs/decisions/0001-….md"
 #     that SEED file is never created (one that exists is left alone — it is yours).
 
-# The dev-cadence this repo runs (TD-129): `source` is never moved by a bump, and `ref` is a
-# full commit, moved by `dev-cadence bump` in a reviewed PR. Written by `sync.sh --pin`.
-[dev-cadence]
-source = "https://github.com/ShiftLead/dev-cadence"
-ref = "0ad7b2fc21653b09cb3db1fbfd762e842d0b5e9b"
+# The agent-cadence this repo runs (TD-129): `source` is never moved by a bump, and `ref` is a
+# full commit, moved by `agent-cadence bump` in a reviewed PR. Written by `sync.sh --pin`.
+[agent-cadence]
+source = "https://github.com/ShiftLead/agent-cadence"
+ref = "cca4fb5ea7931bd9aba5bf6f236bf00ec2ce9973"
