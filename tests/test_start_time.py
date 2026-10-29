@@ -238,7 +238,7 @@ def test_the_starts_note_is_the_stops_formatter_on_a_scheduled_record_only():
     assert start_note({"state": "scheduled", "start_at": at}) == f"starts {soon:%H:%M}"
     assert start_note({"state": "working", "start_at": at}) == ""
     assert start_note({"state": "scheduled", "start_at": "garbage"}) == ""
-    far = soon + timedelta(days=3)
+    far = (soon + timedelta(days=3)).astimezone()  # local again: a DST change in those days moves the hour
     assert start_note({"state": "scheduled", "start_at": far.astimezone(UTC).isoformat()}) == f"starts {far:%a %H:%M}"
 
 
