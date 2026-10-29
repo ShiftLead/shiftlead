@@ -47,7 +47,7 @@ OLDEST_V2 = "b9236c8a6be84b52048e0bd6517001fad13f0033"
 # agent-cadence's seed (TD-1208, dev-cadence TD-191's cutover): `ShiftLead/agent-cadence`'s first commit, a
 # snapshot of dev-cadence at 0ad7b2f with no parents, so a tree newer than OLDEST and OLDEST_V2 on a history that
 # holds neither; a commit that descends from it is at or after both
-SEED = "183de9cfa899e0def9e4420eb4af1e2fd0faa935"
+SEED = "35b4b4a1e9ad9c76b69727415e8553a5778a4be7"
 LOCK = "docs/cadence-sync.lock"  # the copy's lock, while a repo still has one (`sync.LOCK`)
 PIN = "docs/cadence.toml"  # the pin's file: `[dev-cadence]`'s `source` and `ref` (dev-cadence TD-129)
 # the pin's header as the SessionStart line's grep finds it (TD-1023): the twin of dev-cadence's

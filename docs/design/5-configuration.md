@@ -398,7 +398,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. A v2 ledger (§4.4 *Either layout*, TD-1143) asks
   more: one that does not descend from `OLDEST_V2` (`b9236c8`, dev-cadence #405, where its `ledger_next_id.py` first reads a
   directory and `ledger.py` gains `layout_at`; `ledger.py` has read one since `d92d663`, #403) is the lack *the ledger is a directory and dev-cadence at <commit> predates its v2 reader*. A commit that descends from agent-cadence's seed
-  (`SEED`, `183de9c`, the first commit of `ShiftLead/agent-cadence`: a snapshot of dev-cadence at `0ad7b2f` with no
+  (`SEED`, `35b4b4a`, the first commit of `ShiftLead/agent-cadence`: a snapshot of dev-cadence at `0ad7b2f` with no
   parents, so newer than both on a history that holds neither, TD-1208) is at or after `OLDEST` and `OLDEST_V2`
   alike. Ancestry is read in
   each of the roster's dev-cadence checkouts after its fetch (`git merge-base --is-ancestor`), the first that
