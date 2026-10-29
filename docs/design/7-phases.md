@@ -34,7 +34,7 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    source on the tick, the card's report line and the Focus Reports panel, and last the
    presets — with a manager run as a session for a few evenings before its mechanical rules
    become policies here.
-   **Built:** the stop time (`ao until`); the usage gate is in build. The manager's mechanical
+   **Built:** the stop time (`ao until`) and the usage gate (§6 *Usage gate*, TD-100). The manager's mechanical
    rules are the home's tick (§6 *Keeping a team running*), and the manager is a seat on call,
    filled only for a reading no policy makes (§6 rule 3 `team`). The samscrape team is
    defined, its briefs ported from tdgrind. **Not built:** the run window, stall,
