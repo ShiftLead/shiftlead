@@ -233,7 +233,47 @@ def test_descends_reads_the_first_roster_source_that_holds_both_commits(tmp_path
     assert asked == []
     got, why = seams.descends(shas[2], [orphan], "github.com/ShiftLead/dev-cadence")
     assert got is None and "agent-cadence does not hold" in why and "no forge here" in why
-    assert len(asked) == 1
+    assert [x[1].rsplit("/", 1)[1].split("...")[0] for x in asked] == [shas[1], cadence.SEED], "OLDEST, then the seed"
+
+
+def test_a_pin_after_agent_cadences_seed_descends_on_either_history(tmp_path, monkeypatch):
+    """TD-1208 slice 2, §5 *Which dev-cadence*: agent-cadence's seed is a second oldest point, so a pin on
+    the orphan history at or after the seed descends, in either roster order and for `OLDEST_V2` too; a pin
+    on neither history does not; with no checkout, the forge's compare of the seed answers once `OLDEST`'s
+    cannot be read; and an age read against another seed is read again."""
+    old, shas = _source(tmp_path, "dev-cadence", 2)
+    new, (seed, after) = _source(tmp_path, "agent-cadence", 2)
+    _git(new, "checkout", "-q", "--orphan", "other")
+    _git(new, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "neither")
+    neither = _git(new, "rev-parse", "HEAD")
+    monkeypatch.setattr(cadence, "OLDEST", shas[1])
+    monkeypatch.setattr(cadence, "OLDEST_V2", shas[1])
+    monkeypatch.setattr(cadence, "SEED", seed)
+    monkeypatch.setattr(seams.reports, "_gh_api", lambda *a: pytest.fail(f"the forge was asked: {a}"))
+    for roster in ([old, new], [new, old]):
+        assert seams.descends(after, roster) == (True, None), roster
+        assert seams.descends(seed, roster) == (True, None), roster
+        assert seams.descends(after, roster, oldest=cadence.OLDEST_V2) == (True, None), roster
+        assert seams.descends(shas[1], roster) == (True, None), roster
+        assert seams.descends(shas[0], roster) == (False, None), roster
+        assert seams.descends(neither, roster) == (False, None), roster
+    status = {cadence.OLDEST: (None, "HTTP 404: Not Found"), seed: ({"status": "ahead"}, None)}
+    asked = []
+    monkeypatch.setattr(
+        seams.reports,
+        "_gh_api",
+        lambda home, path, t: asked.append(path) or status[path.split("/")[-1].split("...")[0]],
+    )
+    assert seams.descends(after, [], "https://github.com/ShiftLead/agent-cadence") == (True, None)
+    assert asked == [f"repos/shiftlead/agent-cadence/compare/{p}...{after}" for p in (cadence.OLDEST, seed)]
+    # the age keys on the seed: one read against another seed is read again, one against this one carried
+    root = tmp_path / "notes"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "cadence-sync.lock").write_text(f"source: {new}\nfiles_commit: {after}\n")
+    got = seams.age(root, [old, new])
+    assert got == {"commit": after, "oldest": shas[1], "seed": seed, "descends": True, "why": None}
+    assert seams.age(root, [], {**got, "descends": False}) == {**got, "descends": False}, "carried"
+    assert seams.age(root, [old, new], {**got, "seed": "f" * 40, "descends": False}) == got, "read again"
 
 
 def test_a_brief_in_dev_cadences_source_after_sync_sh_names_files_paths(tmp_path):

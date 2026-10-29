@@ -397,10 +397,13 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   (`sessionorc.cadence.OLDEST`) and, under TD-129, the launcher interface it needs; a lock's
   `files_commit` (or a pin) that does not descend from `OLDEST` is the lack above. A v2 ledger (§4.4 *Either layout*, TD-1143) asks
   more: one that does not descend from `OLDEST_V2` (`b9236c8`, dev-cadence #405, where its `ledger_next_id.py` first reads a
-  directory and `ledger.py` gains `layout_at`; `ledger.py` has read one since `d92d663`, #403) is the lack *the ledger is a directory and dev-cadence at <commit> predates its v2 reader*. Ancestry is read in
+  directory and `ledger.py` gains `layout_at`; `ledger.py` has read one since `d92d663`, #403) is the lack *the ledger is a directory and dev-cadence at <commit> predates its v2 reader*. A commit that descends from agent-cadence's seed
+  (`SEED`, `183de9c`, the first commit of `ShiftLead/agent-cadence`: a snapshot of dev-cadence at `0ad7b2f` with no
+  parents, so newer than both on a history that holds neither, TD-1208) is at or after `OLDEST` and `OLDEST_V2`
+  alike. Ancestry is read in
   each of the roster's dev-cadence checkouts after its fetch (`git merge-base --is-ancestor`), the first that
-  holds both commits answering (an orphan history, agent-cadence's, holds neither, TD-1208), else through the
-  forge's compare of the two commits on the pin's own `source`; an age that cannot be read is a warning, *dev-cadence's age not
+  holds both commits of a pair answering, against the oldest point and then the seed, else through the
+  forge's compare of each pair in turn on the pin's own `source`; an age that cannot be read is a warning, *dev-cadence's age not
   read: <why>*, never a lack, so a missing clone unserves nothing. The newer side is
   dev-cadence's promise: the `--json` shapes and fields ShiftLead reads, which cadence §7's parity
   table names, change only additively, and a breaking change waits for a ShiftLead release that reads

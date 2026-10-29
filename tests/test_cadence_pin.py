@@ -129,7 +129,13 @@ def test_a_pinned_repo_with_no_lock_reads_served_and_its_gate_runs_through_the_r
     assert cadence.pinned(root) and cadence.pin(root) == ("https://github.com/ShiftLead/dev-cadence", second)
     got = seams.reading(root, [root, src])
     assert got["serve"] == {"ok": True, "lacks": []}, got["serve"]
-    assert got["cadence_age"] == {"commit": second, "oldest": first, "descends": True, "why": None}
+    assert got["cadence_age"] == {
+        "commit": second,
+        "oldest": first,
+        "seed": cadence.SEED,
+        "descends": True,
+        "why": None,
+    }
     assert got["ledgerboard"] == {"release": seams.wheel_release(), "wheel": seams.wheel_release(), "pinned": True}
     assert doctor.ledgerboard_warning(got["ledgerboard"]) is None
     assert cadence.gate(root) == cadence.PINNED_GATE
