@@ -1866,6 +1866,7 @@ def test_a_fact_checker_seat_starts_on_the_built_in_brief_filled_by_an_ask(world
         "**You declare nothing**",
     ):
         assert rule in prompt, rule
+    assert "ao --skill" not in prompt and "ao doing" not in prompt  # its `ao` is `inbox` and `msg` alone
     for slot in ("{repo}", "{flow}", "{stage}", "{techlead}", "{lane}"):
         assert slot not in prompt, slot
 
