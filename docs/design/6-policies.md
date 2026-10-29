@@ -1562,7 +1562,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     the home that started it saw them (a restarted home cannot read a detached process's exit), and
     is not run again on that commit; the next head runs afresh.
   - **Where `precheck` is read.** One helper, `sessionorc.cadence.precheck_command(root, rev)` →
-    `(command | None, why | None)` (built by TD-1037), as `sync.post_sync_command` reads `post_sync`:
+    `(command | None, why | None)` (built by TD-1037):
     `tomllib` on `docs/cadence.toml` at `origin/<default>` in the registry checkout, no script, so a pinned repo
     (which carries no `scripts/cadence_config.py`) reads it the same way, and every reader of the
     key at the home — this rule, the checks reading, §4.8's `done` — reads the one copy the gate on
@@ -1615,11 +1615,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   agent's own, §6 *A rollback*). *The tree is a person's* (§6 *Promote*) stands: the pull is the one
   move the host agent makes in a person's checkout, and only ever a fast-forward.
 - **Sync: a mechanical sync PR is merged at the home** (TD-681; steps 1 and 2 built as `sessionorc.sync.check`
-  by TD-685 slice 1; the pass, the evidence, the gate, the merge and the setting by slice 2, as
+  by TD-685 slice 1, and replaced by the bump's check, TD-1015; the pass, the evidence, the gate, the merge and the setting by slice 2, as
   `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch by slice 3; step 4's precheck by TD-1039; Paul,
   2026-10-14: *each team should pick up those PRs and run them to ground, but if it's mechanical and
   post_sync would handle it that's even better*). A sync PR (§4.4 *A sync PR is the team's at once*:
-  head branch `cadence-sync-*`, the lock in its diff) changes only what dev-cadence owns, and a
+  head branch `cadence-sync-*`, the pin's `docs/cadence.toml` or a lock in its diff) changes only what dev-cadence owns, and a
   mechanical synced-file change needs no repo's judgement (Paul, 2026-09-12), so one the check below
   finds mechanical needs no session. The policy runs **at the home** (§4.4a), in the promote's pass
   and on its cadence (five minutes, detached as the `gh` reads are), over every checkout in the
@@ -1640,10 +1640,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - a forked PR: *forked*;
   - another login's: *author <login> is not the home's*;
 
-  **A bump of a pin** (TD-1015; ADR 2026-10-25 *Decision* 5, which replaces TD-681's steps 1 and 2 for a
-  pinned repo, and dev-cadence's plan *Decision* 7). Where the merge base holds a `[dev-cadence]` pin in
-  `docs/cadence.toml` and no lock, there is no copied file to replay. Steps 1 and 2 become one check, and
-  the PR is a **routine bump** only when all of these hold:
+  **A bump of a pin** (TD-1015; ADR 2026-10-25 *Decision* 5, which replaces TD-681's steps 1 and 2, and
+  dev-cadence's plan *Decision* 7). Every served repo pins dev-cadence in `docs/cadence.toml`'s
+  `[dev-cadence]` table, so there is no lock and no copied file to replay. The lock's road — its files hashed
+  against dev-cadence's, then replayed with the repo's `post_sync` in a tree of the home's own — left
+  `sync.check` once no served repo held a lock (TD-1015). A merge base with no pin is *refused*, *no
+  [dev-cadence] pin at the merge base: docs/cadence.toml holds none*, and the PR is the team's.
+
+  Each head is checked once. Steps 1 and 2 are one check, and the PR is a **routine bump** only when all
+  of these hold:
   - it changes `docs/cadence.toml` alone, and there only the pin's `ref` line, with its tag comment
     (*not a routine bump: <path> changed*, *not a routine bump: docs/cadence.toml changed beyond the
     pin's ref*, *not a routine bump: docs/cadence.toml holds no [dev-cadence] pin*, *not a routine bump:
@@ -1657,58 +1662,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - `docs/cadence.toml` is not a held path (*docs/cadence.toml is a held path*).
 
   A bump refused for any of these is the team's order, as any refused sync PR is, and merging it is
-  the person's. Step 3 differs for a bump, below; steps 4 and 5 stand. A repo that still holds a lock
-  is checked by steps 1 and 2 as written until it migrates. The lock road leaves `sync.check` once no
-  served repo has a lock.
-
-  Each head is checked once:
-  1. **The files are dev-cadence's.** The head lock's `source:` must equal the merge base's lock's,
-     so the PR does not choose its judge. The home finds that repo's clone in its registry: the
-     checkout whose origin is `source:`, fetched once a pass. The lock's `files_commit` must be a
-     commit, not a `+dirty` mark (`sync.sh`'s word for a sync from an unclean clone), and it must be
-     on that clone's `origin/<default>`. Two checks follow:
-     - For every path the PR changes that the head's lock lists, the head's blob hashes, with its
-       mode, to its `file: <path> <sha256> <mode>` line. A path the head's lock lists that the PR
-       deletes has no blob: *<path> deleted but still in the lock*.
-     - Every lock line that differs from the base lock's, for a changed file or not, hashes as the
-       blob at `files/<path>` at `files_commit` does, and a line the head's lock drops names no file
-       there: dev-cadence retired it too.
-
-     So both the lock and the bytes are dev-cadence's. A lock the PR wrote for itself, or a file
-     edited beside an honest lock, is refused, with one of these reasons:
-     - *<path> differs from its lock line*
-     - *lock not dev-cadence's: <path>*
-     - *the lock's source changed*
-     - *files_commit is +dirty*
-     - *files_commit <sha> is not on dev-cadence's <default>*
-     - *no dev-cadence clone to check the lock against*
-  2. **The replay.** The home keeps a detached worktree of its own per repo,
-     `~/.shiftlead/sync/<repo>/tree` (made as the board's tree is, §4.4 *Board write-back*). It is
-     set to the merge base of the PR's head and `origin/<default>`. From the head it takes the lock
-     and every path the PR changes that the head's lock lists. It deletes every path the PR deletes
-     that the base's lock lists and the head's does not. The PR's paths come from `git diff
-     --name-status <merge base> <head>` in that tree, never from a capped list. Then it runs the
-     repo's **`post_sync`**, where the repo has one. That key belongs to dev-cadence's
-     `docs/cadence.toml` (dev-cadence#TD-113): a string, one shell command run with the tree's root as
-     its working directory, read from the merge base's copy of the file. Until TD-113 lands no repo
-     has the key, and the replay runs nothing. It runs under `SYNC_BOUND` (five minutes), its process
-     killed at the bound, with an environment holding `PATH`, `HOME` and `LANG` alone: no `GH_TOKEN`,
-     no Doppler and no `SHIFTLEAD_*`. It runs only the base's own scripts and the bytes step 1 proved
-     are dev-cadence's. That is the same trust the gate's run already has.
-
-     **Mechanical** means three things. The tree then equals the PR's head (`git add -A`, then `git
-     diff --cached --quiet <head>`). The PR changes no file the lock does not list, other than what
-     `post_sync` wrote. And no path the PR changes matches the repo's held globs (the `held:` of the
-     flow that serves the repo, as `ao pr held` reads it, §4.9b: the list, or the union of its named
-     sets, §4.9c). Otherwise the reason is the first
-     that held: *<path> is not in the lock*, *<path> deleted but not in the base lock* (a file
-     dev-cadence retired that the lock never listed is the team's), *post_sync left <path> unlike the
-     PR*, *post_sync exited <n>*, *post_sync did not end in 5 min*, *<path> is a held path*. The lock's membership is checked
-     before the replay is compared, so a non-lock file the PR changes always reads *not in the
-     lock*. A held path goes to the team,
-     whose member's PR the reader reads as any (rule 11). The check proves the PR is what dev-cadence
-     and the repo's own step wrote. Whether the sync itself was right is dev-cadence's review, at its
-     own merge.
+  the person's. The check proves the PR moves the pin and nothing else. Whether the dev-cadence it moves
+  to is right is the review of its compare (step 3) and dev-cadence's own review, at its merge.
   3. **The review evidence.** **For a bump the home posts none.** A bump is reviewed on its compare,
      never merged unread (dev-cadence's plan *Decision* 7). It waits, uncounted, until the PR carries a
      review of the compare: a `cadence-review: SHIP` or `FIXED` comment whose reviewer, as its line
@@ -1717,14 +1672,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      home's to hold: the team's order carries it with *no review of the compare at <sha>*, since the review is
      the team's to give. A bump with no such review after `SYNC_PRECHECK_WAIT` (a day) at one head is
      *refused*, *review waited a day: …*. Comments that cannot be read are no reading, counted as
-     step 4's are. Once reviewed, the bump goes on to step 4. For any other mechanical PR the home posts one comment, through
-     `--body-file`, once per head: the entry keeps `posted`, so a retry (step 4) never posts again. Its first line is `cadence-review: SHIP · sync-check · code · 0 findings`. Its
-     body is the lock's `commit:`, the files checked against dev-cadence, *post_sync replayed* or
-     *no post_sync*, and the head it checked. The reviewer is named for what it is, never a model,
-     just as rule 10 never says *verified*.
+     step 4's are. Once reviewed, the bump goes on to step 4. A bump is the only mechanical PR since the
+     lock's road left; the pass still carries the SHIP comment it posted for a lock's sync (`review_body`,
+     the entry's `posted`), which no check now reaches, until TD-1206 removes it.
   4. **The gate** is rule 10's: `scripts/check_cadence.py --pr <n>`. It is run in the
-     registry checkout, as rule 10 runs it: the default branch's copy of the script,
-     never the replay tree, which proves content and never judges. In a repo whose tree is older than
+     registry checkout, as rule 10 runs it: the default branch's copy of the script. In a repo whose tree is older than
      `OLDEST` the script is older than the shapes this build reads, so its exit code alone judges and
      its rows are kept only when they parse. **Where the repo sets `precheck`** (dev-cadence §4.12)
      and the head carries no `cadence/precheck` status, step 4 first starts `precheck.py

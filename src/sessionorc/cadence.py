@@ -223,8 +223,8 @@ PRECHECK_READ = 20.0
 def precheck_command(root: Path | str, rev: str) -> tuple[str | None, str | None]:
     """The repo's `precheck` from `docs/cadence.toml` at `rev` (design §6 *Where `precheck` is read*, TD-1037):
     `(command, None)`, `(None, None)` where it sets none — no file at `rev`, or a value that is not a
-    non-empty string — or `(None, why)` where `rev` is not there, or the file cannot be read or does not parse. As
-    `sync.post_sync_command` reads `post_sync`: `tomllib` on the blob, no script, so a pinned repo reads it too."""
+    non-empty string — or `(None, why)` where `rev` is not there, or the file cannot be read or does not parse:
+    `tomllib` on the blob, no script, so a pinned repo reads it too."""
     try:
         cp = subprocess.run(
             ["git", "-C", str(root), "cat-file", "blob", f"{rev}:{PIN}"],
