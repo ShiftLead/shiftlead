@@ -362,6 +362,11 @@ def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph
     # design §4.2, §4.9a (TD-141): mail nobody read — the fact `ao progress none` is refused on
     unread = view({**worker, "unread": 3}, fleet)["ready"]
     assert unread[-1] == ("mail read (3 unread — `ao inbox`)", False)
+    # design §4.2 *No live member* (TD-1226): a filled manager on call over working members passes —
+    # the tick runs them; a standing manager (no `seat`) still reads ✗ above
+    seat = view({**lead, "seat": {"trigger": "team"}}, fleet)["ready"]
+    assert seat[-1] == ("live members (g1) — the tick runs them for a manager on call", True)
+    assert view({**lead, "seat": {"trigger": "asks"}}, fleet)["ready"][-1][1] is False
     # the member gone: the item passes, and the card says so
     worker["state"] = "closed"
     v = view(lead, fleet)
