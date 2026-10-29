@@ -6,12 +6,10 @@ runner or launcher is *not one this build knows*; and agent-cadence's source sti
 
 from __future__ import annotations
 
-import io
 import json
 import os
 import re
 import subprocess
-import tarfile
 from pathlib import Path
 
 import pytest
@@ -145,40 +143,23 @@ def test_a_reading_without_hook_pinned_reads_unpinned():
     ]
 
 
-def _shim_at(tmp_path: Path, ref: str) -> str:
-    """The pre-push shim agent-cadence's `install_git_hooks.sh` at `ref` writes into a fresh clone."""
-    done = subprocess.run(
-        ["git", "-C", str(AGENT_CADENCE), "archive", ref, "files/scripts"], capture_output=True, timeout=60
-    )
-    if done.returncode != 0:
-        pytest.skip(f"no {ref} in the agent-cadence checkout")
-    repo = tmp_path / f"at-{ref}"
-    repo.mkdir()
-    subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
-    with tarfile.open(fileobj=io.BytesIO(done.stdout)) as tar:
-        tar.extractall(repo, filter="data")
-    (repo / "files" / "scripts").rename(repo / "scripts")
-    subprocess.run(
-        ["bash", str(repo / "scripts" / "install_git_hooks.sh"), str(repo)],
-        check=True,
-        capture_output=True,
-        timeout=60,
-        env={**os.environ, "GIT_CONFIG_NOSYSTEM": "1"},
-    )
-    return (repo / ".git" / "hooks" / "pre-push").read_text()
+# The pre-push shims agent-cadence's `install_git_hooks.sh` writes into a fresh clone, kept as text so the
+# test needs no checkout (TD-1221): `pre-push-pre-pin` is dev-cadence 2cc2b88's (it runs a copied hook) under
+# agent-cadence's names, `pre-push-td129` is agent-cadence 29210e6's (the launcher call), and
+# `pre-push-dev-cadence-td129` is dev-cadence ddd2f99's verbatim, a shim written before the rename.
+SHIMS = Path(__file__).parent / "fixtures" / "shims"
 
 
-@pytest.mark.skipif(not (AGENT_CADENCE / "launcher" / "INTERFACE").is_file(), reason="no agent-cadence checkout")
 def test_agent_cadences_pre_pin_shim_warns_in_a_pinned_repo_and_its_td129_shim_does_not(tmp_path, roster):
     root = _repo(tmp_path, pinned=True)
     words = (
         f"agent-cadence's per-clone setup not run in this checkout — `agent-cadence -C {root} run install_git_hooks.sh`"
     )
-    for ref, warned in (("2cc2b88", True), ("ddd2f99", False)):
-        shim = _shim_at(tmp_path, ref)
-        assert seams.SHIM_MARKER in shim
+    for name, warned in (("pre-push-pre-pin", True), ("pre-push-td129", False), ("pre-push-dev-cadence-td129", True)):
+        shim = (SHIMS / name).read_text()
+        assert (seams.SHIM_MARKER in shim) is (name != "pre-push-dev-cadence-td129"), name
         (root / ".git" / "hooks" / "pre-push").write_text(shim)
-        assert (words in seams.reading(root)["warnings"]) is warned, ref
+        assert (words in seams.reading(root)["warnings"]) is warned, name
 
 
 def _git(root: Path, *args: str) -> str:
