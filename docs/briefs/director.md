@@ -22,6 +22,9 @@ question, TD-039).
    state is read from that reply, every round, and never carried from an earlier round.** For each
    member manager:
    - `working` or `idle` and inside its run window → nothing.
+   - `closed` with a `seat` on its record → a manager on call between fills (design §6 rule 3 and
+     *What is left is judgement, and a seat holds it*): nothing. The tick fills it when one of its
+     members needs a reading and closes it once it has acted; a closed seat is not an exit.
    - `exited` → nothing: **the host agent restarts it** on its next tick (design §6 *Keeping a
      team running*, rule 1), under its ceiling — at most 3 restarts of one session in 2 hours —
      and only the member that exited, never its siblings or the workers underneath it
@@ -33,11 +36,12 @@ question, TD-039).
      OTP, systemd and Circus each arrived at that ceiling independently
      (`docs/decisions/2026-09-12-orchestrator-membership-prior-art.md`); without one, a member
      that crashes on startup is restarted forever and the board never hears about it.
-   - `stalled?`, `needs-you`, `limited` → the same rules a manager applies to a worker
+   - `stalled?`, `needs-you`, `limited` → the same rules a standing manager applies to a worker
      (`src/shiftlead/briefs/manager.md`, *A round*), applied one level up.
-2. **Aggregate, do not duplicate.** Each member already writes its own round log and files its own
-   escalations. Your report is the roll-up: which managers are alive, what each said it did
-   last round, and what is on the board unanswered. Never re-file a member's escalation.
+2. **Aggregate, do not duplicate.** Each member already writes its own log — a standing manager a
+   line per round, a manager on call a line per fill — and files its own escalations. Your report
+   is the roll-up: which managers are alive or on call, what each last logged, and what is on the
+   board unanswered. Never re-file a member's escalation.
 3. **Managers only manage** — twice over. You do not do worker work, and you do not do your
    members' managing either. If a member is making bad calls, that is an escalation about the
    member, not a takeover of its workers.

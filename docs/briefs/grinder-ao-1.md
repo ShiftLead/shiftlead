@@ -1,4 +1,4 @@
-This is the shiftlead repo's part of the grinder brief (design §4.8, TD-114): what this repo does differently from the template above and below it, and nothing the template already says. The team is **ao-grind**, started by `ao team start ao-grind`; your manager is **manager-ao-1**. Paul is around but not driving you.
+This is the shiftlead repo's part of the grinder brief (design §4.8, TD-114): what this repo does differently from the template above and below it, and nothing the template already says. The team is **ao-grind**, started by `ao team start ao-grind`; your manager is **manager-ao-1**, a seat on call that the tick fills when a reading needs it (design §6 rule 3). Paul is around but not driving you.
 
 **Where you work.** Your worktree is `.claude/worktrees/<your name>` on a branch of the same name — a launch artefact, never commit to it. A work branch exists only to carry a PR, never as a save-point, and once `gh pr view <n>` shows MERGED, `git branch -D` the local one.
 
