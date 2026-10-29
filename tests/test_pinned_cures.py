@@ -203,6 +203,39 @@ def test_dev_cadences_source_with_launcher_interface_and_no_sync_sh_is_its_sourc
     assert cadence.is_source(src) is False, "`files/` is still the mark"
 
 
+def _source(tmp_path: Path, name: str, commits: int) -> tuple[Path, list[str]]:
+    src = tmp_path / name
+    (src / "launcher").mkdir(parents=True)
+    (src / "launcher" / "INTERFACE").write_text("1\n")
+    _git(tmp_path, "init", "-q", "-b", "main", str(src))
+    shas = []
+    for n in range(commits):
+        (src / "files").mkdir(exist_ok=True)
+        (src / "files" / "n").write_text(f"{name} {n}\n")
+        _git(src, "add", "-A")
+        _git(src, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", f"c{n}")
+        shas.append(_git(src, "rev-parse", "HEAD"))
+    return src, shas
+
+
+def test_descends_reads_the_first_roster_source_that_holds_both_commits(tmp_path, monkeypatch):
+    """TD-1208: with two dev-cadence sources on the roster — the old history and an orphan one (agent-cadence's
+    snapshot) — a pin's age is read in whichever holds both commits, in either order, and the forge is asked
+    only when none does."""
+    old, shas = _source(tmp_path, "dev-cadence", 3)
+    orphan, _ = _source(tmp_path, "agent-cadence", 1)
+    monkeypatch.setattr(cadence, "OLDEST", shas[1])
+    asked = []
+    monkeypatch.setattr(seams.reports, "_gh_api", lambda *a: asked.append(a) or (None, "no forge here"))
+    for roster in ([old, orphan], [orphan, old]):
+        assert seams.descends(shas[2], roster) == (True, None), roster
+        assert seams.descends(shas[0], roster) == (False, None), roster
+    assert asked == []
+    got, why = seams.descends(shas[2], [orphan], "github.com/ShiftLead/dev-cadence")
+    assert got is None and "agent-cadence does not hold" in why and "no forge here" in why
+    assert len(asked) == 1
+
+
 def test_a_brief_in_dev_cadences_source_after_sync_sh_names_files_paths(tmp_path):
     """`repoconfig.layout`'s `{gate}` prefix takes `is_source`'s two-way test, read with `there`."""
     from shiftlead import repoconfig

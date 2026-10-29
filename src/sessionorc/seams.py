@@ -195,21 +195,26 @@ def descends(
 ) -> tuple[bool | None, str | None]:
     """Whether `commit` descends from `oldest`, `cadence.OLDEST` unless given (§5 *Which dev-cadence*, TD-1012;
     `cadence.OLDEST_V2` for a v2 ledger, TD-1144): `(True|False,
-    None)`, or `(None, why)` when it cannot be read. Read in the roster's dev-cadence checkout (its source,
-    as the host's own fetch left it) with `git merge-base --is-ancestor`; with none there, or one that
-    does not hold both commits (a fetch not yet made), through the forge's compare of the two commits on
+    None)`, or `(None, why)` when it cannot be read. Read in each of the roster's dev-cadence checkouts in
+    turn (each a source, as the host's own fetch left it; TD-1208: an orphan history such as agent-cadence's
+    holds neither commit) with `git merge-base --is-ancestor`, the first that holds both answering; with none
+    there, or none that holds both (a fetch not yet made), through the forge's compare of the two commits on
     the lock's `source:`. A `+dirty` tree is read at the commit it was synced from."""
     commit, oldest = commit.removesuffix("+dirty"), oldest or cadence.OLDEST
-    checkout = next((Path(r) for r in roster if cadence.is_source(r)), None)
+    checkouts = [Path(r) for r in roster if cadence.is_source(r)]
     first = "no dev-cadence checkout in the roster"
-    if checkout is not None:
+    misses = []
+    for checkout in checkouts:
         try:
             cp = sync._git(checkout, "merge-base", "--is-ancestor", oldest, commit, timeout=AGE_TIMEOUT)
         except sync._Error as e:
-            return None, str(e)
+            misses.append(str(e))
+            continue
         if cp.returncode in (0, 1):
             return cp.returncode == 0, None
-        first = f"{checkout} does not hold {commit[:7]} and {oldest[:7]}"
+        misses.append(f"{checkout} does not hold {commit[:7]} and {oldest[:7]}")
+    if misses:
+        first = "; ".join(misses)
     repo = _forge_repo(source)
     if repo is None:
         return None, f"{first}, and its source {source or '(none)'} is not on GitHub"

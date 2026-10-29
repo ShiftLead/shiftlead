@@ -2001,6 +2001,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-04 (TD-308, grinder-ao-1; met on a TD-297 press): the trail writes *pushed*, *answered in the terminal* and *the limit reset* from the record still standing (`_ended_by`), as the `how` list says. Until then each fell back to *resolved*, and an `unpushed` row that ended by a push read *resolved: resolved*.
 
 ## 5. Configuration
+- 2026-10-28 (TD-1208 slice 1, grinder-ao-2): *Which dev-cadence* — ancestry is read in each of the roster's dev-cadence checkouts in turn, the first holding both commits answering, so agent-cadence's orphan history listed first no longer sends every pin's age to the forge (dev-cadence#TD-191's cutover, step 6.3).
 - 2026-10-28 (TD-1188, grinder-ao-1): *The seams* — a repo still on the copy (a lock, no pin) is cured of both per-clone warnings by the move to a pin, `<dev-cadence>/sync.sh --pin <checkout>`, since dev-cadence #429 made `sync.sh <checkout>` a refusal and retired `sync-all.sh`, and `adopt` refuses a repo carrying synced copies; dev-cadence #341 is merged.
 - 2026-10-27 (TD-1143's review, round 6): *unserved* names the resolved ledger, and a v2 ledger whose dev-cadence predates `b9236c8` is unserved — sync it, or bump the pin; the example `ledger:` is commented with the default rule.
 - 2026-10-27 (TD-1143, the designer): *the ledger* may be a v2 directory, `ledger:` naming either and defaulting to `docs/ledger` where that is a directory, else `docs/technical_debt.md`. Built by TD-1144 and TD-1146.
