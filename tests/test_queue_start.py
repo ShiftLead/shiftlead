@@ -15,7 +15,7 @@ from test_ui_queue import card, client, fake, queue, row
 
 from sessionorc.queue import card_entries
 from shiftlead import repoconfig
-from shiftlead.ui.queue import card_session, item_ref, queue_view, waits_on_me
+from shiftlead.ui.queue import attach, card_session, item_ref, item_start, queue_view, waits_on_me
 
 
 def _read(tmp: Path, entries: list[str], **marks: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -329,3 +329,132 @@ def test_the_roads_record_is_the_persons_own_end_with_the_manager_its_controller
     (kw,) = created
     assert kw["unattended"] is False and kw["controllers"] == [MANAGER["id"]]
     assert not kw.get("supervised") and not kw.get("seat") and "by_person" not in kw
+
+
+# -- the page: Start session on every Decide and Do item (TD-1246 slice 3) --------------------------------
+
+
+def test_an_items_start_reads_the_entry_it_starts_on():
+    c = _card()  # start s#TD-009 (the person's Do); TD-020 its top, no need
+    go = {"repo": "s", "card": "s#TD-020", "own": ""}
+    # a board line or a mail item starts on the card's `start`; a ledger item on its own Decide or Do entry
+    assert item_start(c, "board:bb", []) == {"item": "board:bb", "ref": "TD-009", **go}
+    assert item_start(c, "m-1", []) == {"item": "m-1", "ref": "TD-009", **go}
+    assert item_start(c, "s#TD-009", []) == {"item": "s#TD-009", "ref": "TD-009", **go}
+    # a ledger entry that is no Decide or Do of the card, a red PR, a card with no `start`: no button
+    assert item_start(c, "s#TD-020", []) == {}
+    assert item_start(c, "s#12", []) == {}
+    assert item_start({**c, "start": ""}, "board:bb", []) == {}
+    # another session on the entry it starts on, none of the person's: no button (the road refuses 409)
+    assert item_start(c, "board:bb", [_rec("g1", "/x/s", "TD-9", name="grinder-1")]) == {}
+    # the person's own session on the card: Open session, to that one
+    assert item_start(c, "board:bb", [_rec("p", "/x/s", "TD-20", unattended=False)])["own"] == "p"
+
+
+def test_an_item_on_a_free_entry_starts_though_a_worker_holds_start():
+    top = row("s", "TD-020", "top", key="2|1|000020")
+    rows = [
+        row("s", "TD-009", "mine", needs="owner", key="2|1|000009", depth=1, parent="s#TD-020"),
+        row("s", "TD-012", "decide", needs="decision", key="1|1|000012", depth=1, parent="s#TD-020"),
+    ]
+    c = {**card(top, rows), "start": "s#TD-009"}
+    worker = [_rec("g1", "/x/s", "TD-9", name="grinder-1")]
+    assert item_start(c, "s#TD-012", worker)["ref"] == "TD-012"
+    assert item_start(c, "s#TD-009", worker) == {} and item_start(c, "m-1", worker) == {}
+
+
+def test_attach_hands_each_decide_and_do_item_its_start_but_a_red_pr():
+    seen: list[dict] = []
+    es = [
+        {"id": "m-1", "kind": "ask", "home": "queue", "on_card": "s#TD-020", "on_row": "s#TD-020"},
+        {"id": "red_pr:s:12", "row": "red_pr", "repo": "s", "pr": 12, "home": "queue", "on_card": "s#TD-020",
+         "on_row": "s#TD-020"},
+        {"id": "m-2", "kind": "note", "home": "queue", "on_card": "s#TD-020", "on_row": "s#TD-020"},
+    ]  # fmt: skip
+    asked: list[tuple[str, str]] = []
+
+    def start(cid: str, item: str) -> dict:
+        asked.append((cid, item))
+        return {"item": item}
+
+    attach({"needs": es[:2], "fyi": es[2:]}, lambda e, sec: seen.append(e) or "", (), start)
+    assert asked == [("s#TD-020", "m-1")], "a red PR and a Read item ask nothing"
+    assert [e["start"] for e in seen] == [{"item": "m-1"}, {}, {}]
+    seen.clear()
+    attach({"needs": es[:1]}, lambda e, sec: seen.append(e) or "")
+    assert seen[0]["start"] == {}, "with no `start` reader no item draws one"
+
+
+def test_each_item_draws_its_start_session_after_its_answers_and_before_its_dots(tmp_path, monkeypatch):
+    from test_ui_board import host, item, report
+    from test_ui_inbox import entry
+
+    from shiftlead.ui.app import board_rows, templates
+
+    host(tmp_path, monkeypatch)
+    root = tmp_path / "samscrape"
+    of = {"name": "samscrape", "label": "samscrape", "teams": ["sam"]}
+    (line,) = board_rows(
+        report(root, item(9, "pick a name. Due: 2026-09-20.", "2026-09-20", "2d overdue")),
+        {str(root.resolve()): of},
+    )
+    ask = entry("m-1", "ask", text="merge PR 9?", subject="merge PR 9?", answers=["merge it", "hold it"])
+    one = templates.get_template("queue_mail.html")
+    go = {"repo": "samscrape", "ref": "TD-009", "card": "samscrape#TD-020", "own": ""}
+    for e, want, ref in ((ask, "decide", "m-1"), (line, "do", line["key"])):
+        html = one.render(e={**e, "want": want, "start": {**go, "item": ref}}, section="needs")
+        btn = html[html.index('class="btn sm qstart qistart"') :]
+        assert btn.index(">Start session<") < btn.index('class="more qdots"'), "before its ⋯"
+        assert f'data-item="{ref}"' in btn and 'data-card="samscrape#TD-020"' in btn and 'data-ref="TD-009"' in btn
+        assert html.index(">Start session<") > html.index(">Answer…<"), "after its answers"
+        row = html[html.index('class="row gap wrap sugg qanswers"') :]
+        assert row.index(">Start session<") < row.index("</div>"), "the last of its answer row"
+        own = one.render(e={**e, "want": want, "start": {**go, "item": ref, "own": "p"}}, section="needs")
+        assert ">Open session<" in own and ">Start session<" not in own and f"with {ref} on the clipboard" in own
+        assert "qistart" not in one.render(e={**e, "want": want, "start": {}}, section="needs")
+        # the Inbox draws none: the card's alone
+        inbox = templates.get_template("inbox_rows.html").render(rows=[{**e, "start": {**go, "item": ref}}])
+        assert "qistart" not in inbox
+
+
+def test_the_header_draws_start_session_only_where_no_item_does():
+    from shiftlead.ui.app import templates
+
+    q = _q()
+    cid = "samscrape#TD-020"
+    head = templates.env.from_string('{% from "queue_card.html" import card %}{{ card(c) }}')
+
+    def drawn(got: dict) -> str:
+        (c,) = queue_view(q, NOW, {"cards": {cid: got}} if got else None)["up_next"]
+        html = head.render(c=c)
+        return html[: html.index('<span class="qgap">')]
+
+    item = {"section": "needs", "id": "m-1", "item": "m-1", "html": "", "kind": "decide", "want": "decide",
+            "red": False, "running": False, "on_row": cid}  # fmt: skip
+    red = {**item, "id": "red_pr:s:12", "item": "samscrape#12", "want": "do", "kind": "do", "red": True}
+    assert ">Start session<" in drawn({}), "no item: the header's"
+    assert ">Start session<" in drawn({"needs": [red]}), "a red PR draws none of its own"
+    assert ">Start session<" not in drawn({"needs": [item]}), "an item draws its own: none in the header"
+    assert ">Open session<" not in drawn({"needs": [item, red]})
+
+
+def test_an_items_open_session_copies_its_id_and_the_toast_shows_it_where_refused():
+    js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
+    press = js[js.index('if (action === "ledger_start") {') :]
+    press = press[: press.index('if (action === "board_add")')]
+    assert "...(b.dataset.item ? { item: b.dataset.item } : {})" in press
+    assert "navigator.clipboard.writeText(b.dataset.item)" in press
+    refused = press[press.index("catch (e) {") : press.index("say(`${b.dataset.item} copied")]
+    assert "AO.unPend(row)" in refused and "the browser refused the clipboard" in refused and "return;" in refused
+
+
+def test_the_queue_page_draws_an_asks_start_session_on_its_card_and_none_in_the_header(tmp_path, monkeypatch):
+    from test_ui_inbox import entry
+
+    ask = entry("m-1", "ask", text="TD-20: merge PR 9?", subject="TD-20: merge PR 9?", answers=["merge it"])
+    html = client(monkeypatch, tmp_path, fake(_q(), entries=[{**ask, "about": "samscrape#TD-020"}])).get("/queue").text
+    i = html.index('data-card="samscrape#TD-020"')
+    head = html[i : html.index('<span class="qgap">', i)]
+    assert 'data-act="ledger_start"' not in head, "the item draws its own: none in the header"
+    btn = html[html.index('class="btn sm qstart qistart"') :]
+    assert btn.index('data-item="m-1"') < btn.index(">") and 'data-ref="TD-009"' in btn[: btn.index(">")]

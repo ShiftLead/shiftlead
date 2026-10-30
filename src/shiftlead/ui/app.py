@@ -409,6 +409,7 @@ from .queue import (
     card_index,
     card_session,
     card_wants,
+    item_start,
     picks_query,
     queue_picks,
     queue_view,
@@ -3887,13 +3888,14 @@ def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
 
 async def card_mail(
-    h: SimpleNamespace, fleet: list[dict[str, Any]], index: Any, drawn: Any = None
+    h: SimpleNamespace, fleet: list[dict[str, Any]], index: Any, drawn: Any = None, cards: Any = ()
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """What is attached to each Queue card (§4.5 screen 12 *What is attached to a card*, TD-771, TD-828): the
     Inbox's own sections over the same reads, and `attach`'s cards, each `home: queue` row in its card's section —
     with *Later*'s ledger rows and the board's lines not yet due, folded or not, whose entry a card holds. `drawn(e,
-    section, choices)` draws a row (the Queue page, by the Inbox's own renderer); the start road (TD-1246) draws
-    none and reads each item's id."""
+    section, choices)` draws a row (the Queue page, by the Inbox's own renderer), each Decide or Do item with its
+    own Start session on its card of `cards` (`item_start`, TD-1246); the start road draws none and reads each
+    item's id."""
     choices = board_choices()  # once for the request, never once a row (§4.5 *Page loads*, TD-879)
     inbox, states = await h.person_inbox(fleet, choices=choices), await h.person_states(fleet)
     hz = with_standings((await h.board_view(choices))[0], fleet)
@@ -3909,7 +3911,13 @@ async def card_mail(
     )
     later = split_later(await h.ledger_view(fleet), hz["ahead"], index, hz["hidden"])[2]
     with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
-        mail = attach(sections, lambda e, sec: drawn(e, sec, choices) if drawn else "", later)
+        by_id = {str(c.get("id")): c for c in cards if isinstance(c, dict)}
+        mail = attach(
+            sections,
+            lambda e, sec: drawn(e, sec, choices) if drawn else "",
+            later,
+            (lambda c, item: item_start(by_id[c], item, fleet) if c in by_id else {}) if by_id else None,
+        )
     return sections, mail
 
 
@@ -3951,6 +3959,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     fleet,
                     card_index(got),
                     lambda e, sec, choices: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
+                    got.get("cards") or (),
                 )
                 tabs = tab_counts(sections)
         # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,
