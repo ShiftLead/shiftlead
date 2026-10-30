@@ -3846,13 +3846,19 @@ def _offered(reply_to: str) -> list[str] | None:
     return None
 
 
-def shape_warning(text: str) -> str | None:
+def shape_warning(text: str, question: bool = False) -> str | None:
     """The one line `ao msg` prints when a message the person will read is not shaped for them
     (design §4.10): its first paragraph runs past `FIRST_PARA_WORDS`, or it has no blank line and
     runs past the Inbox's `FOLD_CHARS`, where the row cuts it at a sentence for them. It warns and
     never refuses: mail is never lost to a style rule. The blank line is the Inbox row's own
-    (`paragraph_break`, which `fold` uses), so what is counted here is what the row draws."""
-    from shiftlead.ui.render import FIRST_PARA_WORDS, FOLD_CHARS, paragraph_break
+    (`paragraph_break`, which `fold` uses), so what is counted here is what the row draws. A
+    `question` — an `ask` or `steer` to the person, never a `--source` reply — is held to the
+    stricter rule first (§4.10 *An item leads with one sentence*, TD-916): its first paragraph is
+    one sentence (`render.one_sentence`), and a long one fails that too, so one line is said."""
+    from shiftlead.ui.render import FIRST_PARA_WORDS, FOLD_CHARS, one_sentence, paragraph_break
+
+    if question and not one_sentence(text):
+        return "the person reads one sentence first: this paragraph is not one"
 
     split = paragraph_break(text)
     if split is None:  # no blank line: the whole text is its first paragraph
@@ -3963,7 +3969,7 @@ def cmd_msg(args: argparse.Namespace) -> int:
     # design §4.10: a message the person reads — to `person`, or a `--source` reply, which the home
     # files to the person as *answered for you* — is checked for its shape once it has been sent
     if "person" in (params["to"] or ()) or args.source:
-        warn = shape_warning(text)
+        warn = shape_warning(text, question=params["kind"] in ("ask", "steer") and not args.source)
         if warn:
             print(warn, file=sys.stderr)
     for warn in got.get("warnings") or []:  # the home's own, said and never refused (§4.10)

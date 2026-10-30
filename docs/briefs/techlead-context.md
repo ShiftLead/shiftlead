@@ -59,7 +59,8 @@ person is `docs/user_attention.md`.
   one entry opens as a page, §4.5 screen 6 *The rail* and *The message page*, TD-129; a message to
   the person has one shape, its first paragraph the whole of what they need, §4.10 *How a message
   to a person is written*, TD-127, and a `--subject`, a headline apart from that paragraph, §4.10
-  *A subject on every entry*, TD-561).
+  *A subject on every entry*, TD-561; an `ask` or `steer` to the person leads with one sentence, then what
+  each answer leads to, `ao msg` warning when it does not, §4.10 *An item leads with one sentence*, TD-916).
 - **Settings** (§4.5 screen 8, §5, §4.4a *Settings, replicated*): a *definition* stays in its file;
   a *setting* lives in the home's `settings.yml`, written only by `set_settings`, replicated to
   nodes; the ADR `2026-09-25-settings-audit.md` is the inventory and the reasoning. **State and alarm marks are
