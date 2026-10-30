@@ -1583,6 +1583,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-26 (TD-176, with Paul): **the doing log** beside the `doing` value — the last fifty calls per team for the Doing feed — and the rule that the manager says its round with `ao doing` too, so the feed shows the team and not only its grinders.
 
 ## 4.9 Org, Team, Project: the definitions above a session
+- 2026-10-30 (TD-1248, grinder-ao-1): the compact facet is built — `repo_line.html` carries the whole facet and the compact one (`.rcompact`), CSS shows the whole only under `.repopage` and the compact only on the Sessions page, and `syncLineFacets` toggles the compact by `AO.lineFacetShown`; TD-1240 archived with its one part.
 - 2026-10-30 (TD-1240's review, round 6, Sonnet, READY, 2 nits, both adopted; rounds 4–5 checked as landed): the loop ends — Fable READY in round 5, Sonnet READY in round 6.
 - 2026-10-30 (TD-1240's review, round 5, Fable, READY, 1 nit, a follow-on of round 4, adopted; round 4 checked as landed): the `.repopage` re-show is `display: flex`, `.tsum`'s own.
 - 2026-10-30 (TD-1240's review, round 4, Sonnet, NOT READY, 1 finding and 3 nits, all adopted; round 3 checked as landed): §4.5 screen 1's facet sentence names the compact form; the Repo facet row's doubled clause goes; TD-1248 states the CSS as a default hide with a `.repopage` re-show, tested on `app.css` and the shot, and names `repo_facet.html`'s header comment.

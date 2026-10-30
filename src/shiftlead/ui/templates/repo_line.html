@@ -1,13 +1,29 @@
 {# A repo's **line** on the Sessions page (design §4.9 *The Sessions page*, §4.5a *team card: Repo facet*, TD-725):
-   its name, a link to its Repo page, and the Repo facet — the repo's numbers, with the repo's lanes. The
-   server renders it for every repo it reads; the client shows it only while no team card of the repo shows
-   its own (`AO.lineFacetShown`, TD-1189), and always on the Repo page, whose cards draw none. Where its project holds only this repo the line is the
-   heading (`g.heading`). The facet's entries selector is remembered per repo (`data-team` *repo:<name>*,
-   the key the client stores it under). A stop in the ring, before the repo's team cards (§4.5a *Sessions:
-   keys*). Rendered on page load and re-sent with the groups on every delta. #}
+   its name, a link to its Repo page, and the repo's numbers in two forms, since the line is rendered from
+   the `org_layout` item alone, the same for both pages (TD-1240): the whole Repo facet (`.rsum`), which
+   only the Repo page shows, whose cards draw none; and **the compact facet** (`.rcompact`), two rows,
+   Technical debt and Pull requests, which only the Sessions page shows, and only while no team card of
+   the repo shows its own (`AO.lineFacetShown`, TD-1189). Where its project holds only this repo the line
+   is the heading (`g.heading`). The whole facet's entries selector is remembered per repo (`data-team`
+   *repo:<name>*, the key the client stores it under); the compact one has no selector and no key. A stop
+   in the ring, before the repo's team cards (§4.5a *Sessions: keys*). Rendered on page load and re-sent
+   with the groups on every delta. #}
 <div class="rline{% if g.heading %} rhead{% endif %}" data-key="{{ g.key }}" data-repo="{{ g.repo }}" data-project="{{ g.project }}" tabindex="0">
   <div class="row gap wrap rname"><a class="{{ 'h2' if g.heading else 'strong' }}" href="{{ g.url }}">{{ g.repo }}</a><span class="grow"></span><a class="meta" href="{{ g.url }}">open →</a></div>
   {% if g.facet %}{% set m = {"repo": g.facet} %}{% set on_line = true %}
   <div class="tsum rsum" data-team="repo:{{ g.repo }}" data-face-default="doing" data-answer-key="">{% include "repo_facet.html" %}</div>
+  {% set r = g.facet %}{% set led = r.ledger %}{% set p = r.prs %}
+  <div class="rcompact">
+    <div class="crow"><span class="kind">Technical debt</span>{% if led.n is none %}<span class="meta dim" title="{{ led.error or 'not read yet' }}">could not look</span>{% else %}
+      <a class="cfig" href="{{ r.url }}#debt"><b>{{ led.n }}</b> open</a>{% for b in led.priority %}<span class="cdot">·</span><a class="cfig" href="{{ r.url }}#debt" title="{{ b.n }} {{ b.label }}"><i class="csw p-{{ b.key }}"></i>{{ b.n }} {{ b.label | lower }}</a>{% endfor %}
+      {%- if led.error %}<span class="meta dim" title="{{ led.error }}">· the last read failed</span>{% endif %}{% endif %}
+      {%- if led.lanes %}<span class="tipmark" tabindex="0" role="img" aria-label="{{ led.lanes.text }}" title="{{ led.lanes.text }}">i</span>{% endif %}
+      <button class="btn sm ghost" type="button" data-addentry="{{ r.name }}" title="write what you have; a session drafts the entry (design §4.9)">Add entry…</button></div>
+    <div class="crow"><span class="kind">Pull requests</span>{% if p.n is none %}<span class="meta dim" title="{{ p.error or 'not read yet' }}">could not look</span>{% else %}
+      <a class="cfig" href="{{ r.url }}#prs"><b>{{ p.n }}</b> open</a>
+      {%- if p.red %}<a class="cfig prred" href="{{ r.url }}#prs" title="{{ p.red_title }}">· {{ p.red | length }} red</a>{% endif %}
+      {%- if p.not_run %}<a class="cfig prnotrun" href="{{ r.url }}#prs" title="{{ p.not_run_title }}">· {{ p.not_run }} CI never ran</a>{% endif %}
+      <span class="meta{% if p.error %} dim{% endif %}"{% if p.error %} title="the last read failed: {{ p.error }}"{% endif %}>{% if p.oldest %}· oldest {{ p.oldest }} {% endif %}{% if p.waiting %}· {{ p.waiting.n }} waiting on review {% endif %}{% if p.error %}· could not look {% endif %}· read {{ r.read }} ago</span>{% endif %}</div>
+  </div>
   {% else %}<div class="meta" title="this host's repos registry lists no checkout of this name, so its numbers are not read here (design §4.4 Repo facts)">not read on this host</div>{% endif %}
 </div>

@@ -2388,7 +2388,7 @@
   AO.lineFacetShown = (cards) => !cards.some((c) => !c.hidden && (!c.folded || c.filtering) && c.facet);
   function syncLineFacets() {
     $$("#groups .rline").forEach((line) => {
-      const f = $(".rsum", line); if (!f) return;
+      const f = $(".rcompact", line); if (!f) return;  // the compact facet; the whole (`.rsum`) is the Repo page's (TD-1240)
       const cards = sections().filter((s) => s.dataset.repo === line.dataset.repo).map((s) => ({
         hidden: s.hidden, folded: isFolded(s), filtering: s.classList.contains("filtering"), facet: !!$(".tsum > .frepo", s),
       }));

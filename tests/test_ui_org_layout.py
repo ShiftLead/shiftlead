@@ -116,6 +116,7 @@ def test_two_teams_on_one_repo_are_two_cards_under_one_line_each_drawing_the_rep
     ]  # the line's: the repo's, one line per team
     html = page(items)
     assert html.count('class="facet frepo"') == 3  # the line's, and each card's
+    assert html.count('class="rcompact"') == 1  # the line's compact form, shown while no card shows its facet
     line = html[html.index('class="rline') : html.index('<section class="tgroup" data-team="alpha"')]
     assert 'class="facet frepo"' in line and 'href="/repo/shiftlead"' in line
     for team in ("alpha", "beta"):
@@ -178,6 +179,7 @@ def test_a_registered_repo_with_no_team_draws_its_line_and_facet(tmp_path, monke
     assert items[-1]["facet"] and items[-1]["facet"]["name"] == "quiet"
     html = page(items)
     assert html.count('class="facet frepo"') == 3  # main's line and its card, and quiet's line
+    assert html.count('class="rcompact"') == 2  # each line's compact form too, the Sessions page's (TD-1240)
 
 
 def test_a_session_with_no_team_sits_in_its_repos_strip_or_under_no_repo(tmp_path, monkeypatch):
