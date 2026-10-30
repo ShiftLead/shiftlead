@@ -1244,12 +1244,11 @@ def add_entry():
     return head("Add entry") + f'''<div style="width: 1440px; min-height: 860px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Sessions")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
-  <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Add an entry to the ledger</span><span class="meta mono" style="font-size: 12px;">shiftlead · docs/technical_debt.md</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
-    <div class="note">Write what you have: a title, or a page. The number, the other header lines and the file locations are found for you, and you are asked only what cannot be found.</div>
-    <div class="field"><label>What</label><span class="input" style="height: 132px; align-items: flex-start; padding: 8px 10px; flex-direction: column; gap: 6px;"><span>{words}</span><span class="mono" style="font-size: 12px; color: #2563eb;">~/.shiftlead/attachments/draft-7f3a/paste-2026-10-13-0942.png</span></span></div>
-    <div style="display: flex; align-items: center; gap: 10px; margin-top: -4px;"><span class="btn sm">Attach</span><span class="note" title="design §4.5a Add entry form: Attach / drop / paste (TD-630)">or paste a screenshot, or drop a file on the box — its path goes in at the cursor</span></div>
-    <div style="display: flex; gap: 28px; align-items: flex-start;">
+  <div class="card" style="width: 720px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Add an entry to the ledger</span><span class="meta mono" style="font-size: 12px;">shiftlead · docs/ledger</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
+    <div class="field"><label>What</label><span class="note" title="design §4.5a Add entry… (TD-1190): one sentence per line">A title or a page: the number, the header lines and the locations are found for you.</span><span class="input" style="height: 132px; align-items: flex-start; padding: 8px 10px; flex-direction: column; gap: 6px;"><span>{words}</span><span class="mono" style="font-size: 12px; color: #2563eb;">~/.shiftlead/attachments/draft-7f3a/paste-2026-10-13-0942.png</span></span></div>
+    <div style="display: flex; align-items: center; gap: 10px; margin-top: -4px;"><span class="btn sm">Attach</span><span class="note" title="design §4.5a Add entry form: Attach / drop / paste (TD-630)">or paste a screenshot, or drop a file on the box.</span></div>
+    <div style="display: flex; flex-direction: column; gap: 12px;">
     <div class="field"><label>Type</label><div style="display: flex; gap: 10px;">
       <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>debt</div><div class="note">something wrong now</div></div></div>
       <div class="radio" style="gap: 8px;"><span class="rb"></span><div><div>feature</div><div class="note">something new</div></div></div>
@@ -1260,16 +1259,15 @@ def add_entry():
       <div class="radio" style="gap: 8px;"><span class="rb"></span><div>Low</div></div>
     </div></div>
     </div>
-    <div style="border-top: 1px solid #eceef1; padding-top: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+    <div style="border-top: 1px solid #dfe3e8; padding-top: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
       <div style="display: flex; flex-direction: column; gap: 6px;">
-        <span class="btn primary" style="align-self: flex-start;">Hand to the techlead</span>
-        <span class="note"><b>techlead-ao-1</b> {pill("oncall")} drafts the entry and lands it by PR. Its questions come to your Inbox; the entry's id and PR come back as the outcome.</span>
-        <span class="note">When it is read: fills this seat — a session starts on the next tick and reads it first.</span>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="btn primary">Hand to the techlead</span><span class="mono">techlead-ao-1</span></div>
+        <span class="note">Drafts the entry and lands it by PR; its questions and the result come to your Inbox.</span>
+        <span class="note">No techlead is running: one starts on the next tick and reads it first.</span>
       </div>
       <div style="display: flex; flex-direction: column; gap: 6px;">
-        <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">Open a session</span><span class="note">named</span><span class="input mono" style="width: 170px; height: 30px; font-size: 12.5px;" title="design §4.5a Add entry form: Name (TD-675)">entry-3</span></div>
-        <span class="note">Starts <b>an interactive techlead session, entry-3, in a new worktree</b>, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, in the Session card under <i>told at start</i>.</span>
-        <span class="note">With Type <i>feature</i>: an interactive designer session (the team's <span class="mono">entries:</span>).</span>
+        <div style="display: flex; align-items: center; gap: 8px;"><span class="btn" title="what the session is told besides is on its Focus, in the Session card under told at start">Open a session</span><span class="note">named</span><span class="input mono" style="width: 170px; height: 30px; font-size: 12.5px;" title="design §4.5a Add entry form: Name (TD-675)">entry-3</span></div>
+        <span class="note">Starts an interactive techlead session in a new worktree, with your words in its composer, not sent.</span>
         <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px; opacity: 0.95;"><span class="btn" style="opacity: 0.45;">Open a session</span><span class="note">named</span><span class="input mono" style="width: 170px; height: 30px; font-size: 12.5px; border-color: #dc2626;">entry-2</span></div>
         <span class="note" style="color: #b91c1c;">entry-2 is running — switch to it, or pick another name</span>
       </div>
@@ -1286,7 +1284,7 @@ def add_entry():
       {entry_session(True)}
     </div>
   </div>
-  <div class="note" style="width: 760px;">Design notes, not page text. The Session card is drawn twice here, its <b>told at start</b> row closed as it arrives and open as it reads; the page has one (TD-993, 2026-10-24: the row of the Session card, right after <i>started</i>, where a side-panel card of its own stood until then; TD-283 part 2, 2026-10-03: the entry brief left the composer). One form from two places: <b>Add entry…</b> beside Open ledger on the Repo page, and on the team card's Repo facet. The page writes no file. A team with no techlead seat draws the first button disabled with its reason; a repo no team services starts a <span class="mono">plain</span> session. The <b>Name</b> box (TD-675) holds the default <span class="mono">entry-&lt;n&gt;</span> until the person types; the second, disabled <b>Open a session</b> shows a typed name that is not free, its reason in place of the line under the button — the same test picks the default and checks a typed name, as typed and again at the press.</div>
+  <div class="note" style="width: 760px;">Design notes, not page text. The Session card is drawn twice here, its <b>told at start</b> row closed as it arrives and open as it reads; the page has one (TD-993, 2026-10-24: the row of the Session card, right after <i>started</i>, where a side-panel card of its own stood until then; TD-283 part 2, 2026-10-03: the entry brief left the composer). One form from two places: <b>Add entry…</b> beside Open ledger on the Repo page, and on the team card's Repo facet. The page writes no file. A team with no techlead seat draws the first button disabled with its reason; a repo no team services starts a <span class="mono">plain</span> session. With Type <i>feature</i> the line says <i>designer</i> (the team's <span class="mono">entries:</span>). The line under Open a session never names the session: the box beside it does (TD-1190), and a read of the plan rewrites only a line it changed. Where two or more teams service the repo, a Team pick sits between Priority and the rule (not drawn here). Below 640px of viewport the two ways out stack, Hand first; Close stays at the heading's right, and Type's options share one row, each hint under its word. The <b>Name</b> box (TD-675) holds the default <span class="mono">entry-&lt;n&gt;</span> until the person types; the second, disabled <b>Open a session</b> shows a typed name that is not free, its reason in place of the line under the button — the same test picks the default and checks a typed name, as typed and again at the press.</div>
 </div>
 </div>
 ''' + TAIL
