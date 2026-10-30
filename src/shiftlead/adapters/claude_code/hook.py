@@ -150,7 +150,7 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         # its own no longer clears the main thread's `needs-you` (TD-201). It does say a subagent is
         # alive, which `subagent_seen` carries: the core reads no tool's field (§4.2 *Working on its
         # own*, §4.3, TD-734). Its call, still with no state, is that subagent's thread's (TD-950).
-        return {**out, "subagent_seen": True, **_call(ev, payload)}
+        return {**out, "subagent_seen": True, **_call(ev, payload), **_stopped(ev, payload)}
     if ev == "Notification":
         kind = NOTIFICATION_KINDS.get(payload.get("notification_type", ""))
         if kind is None:
@@ -193,6 +193,7 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
             "pending": None,
             "event": f"{ev}:{tool}" if tool else ev,
             **_call(ev, payload),
+            **_stopped(ev, payload),
         }
     if ev == "UserPromptSubmit":
         # `prompt`: a prompt went in, which is what the host agent's typed brief waits on (§4.1 *No
@@ -211,6 +212,19 @@ def _call(ev: str, payload: dict[str, Any]) -> dict[str, Any]:
     if ev == "PreToolUse":
         call["call_sig"] = call_sig(payload)
     return call
+
+
+def _stopped(ev: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """A `PostToolUse` of `TaskStop` names the task it stopped: a background subagent stopped so sends no
+    `SubagentStop`, and the core counts it down if the record lists it (design §4.2, TD-1277). No
+    `subagent_seen` of its own: a stop is no sign of the stopped one's life."""
+    if ev != "PostToolUse" or payload.get("tool_name") != "TaskStop":
+        return {}
+    ti = payload.get("tool_input") or {}
+    task = ti.get("task_id") if isinstance(ti, dict) else None
+    if task is None and isinstance(ti, dict):
+        task = ti.get("shell_id")
+    return {"subagent_stopped": task} if isinstance(task, str) and task else {}
 
 
 def first_question(ti: dict[str, Any]) -> str:
