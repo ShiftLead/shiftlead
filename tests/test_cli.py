@@ -1005,6 +1005,12 @@ SHAPE = (
 )
 
 SUBJECT = " With it a `--subject`: the entry's headline in a few words, apart from the first paragraph."
+QUESTION = (
+    " An `ask` or a `steer` to the person leads with one sentence (design §4.10 *An item leads with one sentence*): "
+    "its first paragraph is the decision or the task, readable cold; its second, what each answer leads to; then the "
+    "context. Write each `--answer` as `<label> (default) — <consequence>`, and set `--about TD-NNN` when your claim "
+    "is not what it is about."
+)
 
 
 def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
@@ -1015,6 +1021,8 @@ def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
         assert SHAPE in (root / name).read_text(encoding="utf-8"), name
         # TD-566 (§4.10 *A subject on every entry*): a headline beside the first-paragraph rule
         assert SHAPE + SUBJECT in (root / name).read_text(encoding="utf-8"), name
+        # TD-916 (§4.10 *An item leads with one sentence*): a question leads with one sentence, and `--about`
+        assert SHAPE + SUBJECT + QUESTION in (root / name).read_text(encoding="utf-8"), name
     # since TD-310 the repo's designer brief is the template's `{repo}` supplement, so it says it no
     # longer: the rule is in the template around it, once (§4.9c *The designer gets a template*)
     designer = pathlib.Path(__file__).parents[1] / "docs" / "briefs" / "designer-ao-1.md"
@@ -1066,6 +1074,12 @@ def test_msg_to_the_person_warns_on_an_unshaped_message_and_sends_it(subprocess_
     assert cli.main(["msg", "person", "merged #9 — nothing to do\n\n" + long, "--kind", "note"]) == 0
     assert "the person reads" not in capsys.readouterr().err
     assert cli.main(["msg", other, long]) == 0
+    assert "the person reads" not in capsys.readouterr().err
+    # TD-916 (§4.10 *An item leads with one sentence*): a steer to the person is held to one sentence, and sent
+    assert cli.main(["msg", "person", "Merge it. Then tag it.", "--kind", "steer", "--default", "merge"]) == 0
+    got = capsys.readouterr()
+    assert "steer → person" in got.out and "the person reads one sentence first" in got.err
+    assert cli.main(["msg", "person", "Merge #9 today?\n\nIt ships.", "--kind", "steer", "--default", "merge"]) == 0
     assert "the person reads" not in capsys.readouterr().err
     for x in (sid, other):
         call_sync("kill", id=x)

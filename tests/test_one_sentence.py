@@ -28,6 +28,16 @@ def test_first_para_words_lives_in_render_and_ao_msg_reads_it():
     assert cli.shape_warning(" ".join(["w"] * 61)) is not None and cli.shape_warning("Short?") is None
 
 
+def test_a_question_to_the_person_is_warned_unless_it_leads_with_one_sentence():
+    """TD-916, design §4.10 *The home warns, never refuses*: an `ask` or `steer` whose first paragraph is not
+    one sentence gets the rule's own line, a long one too (one line, not two); a note keeps the old rule."""
+    line = "the person reads one sentence first: this paragraph is not one"
+    assert cli.shape_warning("Merge it. Then tag it.", question=True) == line
+    assert cli.shape_warning(" ".join(["w"] * 90) + "?", question=True) == line
+    assert cli.shape_warning("Merge #12 today?\n\nMerge — it ships. Wait — a week.", question=True) is None
+    assert cli.shape_warning("Merge it. Then tag it.") is None  # not a question: one to three sentences
+
+
 def test_an_answer_splits_on_its_first_dash_and_a_dashless_one_reads_whole():
     assert mail.split_answer("Merge it (default) — it ships — Friday") == ("Merge it (default)", "it ships — Friday")
     assert mail.split_answer("Merge it - no em dash") == ("Merge it - no em dash", "")
