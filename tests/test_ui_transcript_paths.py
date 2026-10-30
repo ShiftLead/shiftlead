@@ -104,7 +104,10 @@ const ANSWER = { "src/a.py": "/r/wt/src/a.py", "docs/x.md": "/r/wt/docs/x.md", "
   console.log(JSON.stringify({ askedAtStart, again, asked, most, none, noRunAsks: asked.length - before,
     after: after.innerHTML, shortAsks, hostile,
     said: said.innerHTML, plain: plain.innerHTML, t2: t2.innerHTML, t3: t3.innerHTML, lost: lost.innerHTML,
-    oneLaunch: AO.pathLinksHtml("src/a.py", { "src/a.py": "/r/wt/src/a.py" }, { ...ED, url: null }) }));
+    oneLaunch: AO.pathLinksHtml("src/a.py", { "src/a.py": "/r/wt/src/a.py" }, { ...ED, url: null }),
+    pieces: AO.pathLinksHtml("src/a.py#L12 x/y.py,z/w.py out/a,b.txt",
+      { "src/a.py": "/r/src/a.py", "z/w.py": "/r/z/w.py", "out/a,b.txt": "/r/out/a,b.txt", "out/a": "/r/out/a" },
+      ED) }));
 })();
 """
 
@@ -146,6 +149,10 @@ def test_a_resolved_run_is_a_ctrl_link_with_the_folder_first_and_the_rest_stays_
     assert 'href="vscode://file/r/wt/docs/x.md:3"' in got["t3"]
     assert got["lost"] is None
     assert "data-folder" not in got["oneLaunch"]  # folder_first off: the file alone
+    # a run's pieces (TD-1262): an anchor's path and a list's member link where the whole is no file, the whole
+    # wins where it is, and nothing is linked twice
+    assert re.findall(r">([^<]+)</a>", got["pieces"]) == ["src/a.py", "z/w.py", "out/a,b.txt"]
+    assert "#L12 x/y.py," in got["pieces"]
     hostile = got["hostile"]  # the session's words and the person's label are escaped wherever they land
     assert hostile.count("<a ") == 1 and "<i>" not in hostile and "&lt;i&gt;" in hostile
     assert 'data-label="V&quot;S &lt;x&gt;"' in hostile and "/r/%22a'.py:1" in hostile  # the path percent-encoded

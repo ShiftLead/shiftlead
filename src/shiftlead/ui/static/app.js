@@ -5237,21 +5237,37 @@
   // **a path is a link** (§4.6 *A path in the pane is a link*, §4.5a, TD-501): the runs one row of
   // the pane names that could be a file — a run with a `/` in it, relative, `./`, `~/` or absolute,
   // with an optional `:line` or `:line:col`, the bracket or sentence stop at its tail cut off; a run
-  // inside a URL is the URL's. Each is `{run, path, line, col, start, end}`, `start`/`end` the run's
-  // columns in the row's text (end exclusive). The shape only asks: the host says which are files.
+  // inside a URL is the URL's. A segment takes any letter, mark or digit and `_.@+-`; one after the
+  // first `/` takes `#`, `,` and `=` too, so `--file=src/a.py` is still `src/a.py` (TD-1262). A run
+  // holding one of those is followed by its pieces without them (`a/b.py,c/d.py`, `src/a.py#L12`), in
+  // order of start, so the first the host resolves is the link. Each is `{run, path, line, col, start,
+  // end}`, `start`/`end` the run's columns in the row's text (end exclusive). The shape only asks: the
+  // host says which are files.
   AO.pathRuns = function (text) {
     const urls = [];
     for (const m of String(text).matchAll(/[A-Za-z][A-Za-z0-9+.-]*:\/\/\S+/g)) urls.push([m.index, m.index + m[0].length]);
+    const seg = "[\\p{L}\\p{M}\\p{N}_.@+-]";
+    const wide = new RegExp(`(?:~|\\.{1,2})?\\/?${seg}+(?:\\/[\\p{L}\\p{M}\\p{N}_.@+#,=-]+)+(?::\\d+(?::\\d+)?)?`, "gu");
+    const narrow = new RegExp(`(?:~|\\.{1,2})?\\/?${seg}+(?:\\/${seg}+)+(?::\\d+(?::\\d+)?)?`, "gu");
+    const scan = (s, re, base) => {
+      const got = [];
+      for (const m of s.matchAll(re)) {
+        const start = base + m.index;
+        let run = m[0];
+        if (urls.some(([a, b]) => start < b && start + run.length > a)) continue;
+        const lc = run.match(/:(\d+)(?::(\d+))?$/);
+        let path = lc ? run.slice(0, lc.index) : run;
+        if (!lc) { path = path.replace(/[.,;:)\]}'"]+$/, ""); run = path; }
+        if (!path.includes("/") || /^\.*\/*$/.test(path) || path.length > 512) continue;  // the read's bound
+        got.push({ run, path, line: lc ? +lc[1] : null, col: lc && lc[2] ? +lc[2] : null, start, end: start + run.length });
+      }
+      return got;
+    };
     const out = [];
-    for (const m of String(text).matchAll(/(?:~|\.{1,2})?\/?[\w.@+-]+(?:\/[\w.@+-]+)+(?::\d+(?::\d+)?)?/g)) {
-      const start = m.index;
-      let run = m[0];
-      if (urls.some(([a, b]) => start < b && start + run.length > a)) continue;
-      const lc = run.match(/:(\d+)(?::(\d+))?$/);
-      let path = lc ? run.slice(0, lc.index) : run;
-      if (!lc) { path = path.replace(/[.,;:)\]}'"]+$/, ""); run = path; }
-      if (!path.includes("/") || /^\.*\/*$/.test(path) || path.length > 512) continue;  // the read's bound
-      out.push({ run, path, line: lc ? +lc[1] : null, col: lc && lc[2] ? +lc[2] : null, start, end: start + run.length });
+    for (const r of scan(String(text), wide, 0)) {
+      out.push(r);
+      if (!/[#,=]/.test(r.run)) continue;
+      out.push(...scan(r.run, narrow, r.start).filter((p) => p.run !== r.run).map((p) => ({ ...p, piece: true })));
     }
     return out;
   };
@@ -5661,7 +5677,9 @@
         const joined = AO.pathRuns(text).filter((r) => at[r.start].y <= y && y <= at[r.end - 1].y);
         const alone = AO.pathRuns(own).map((r) => ({ ...r, start: r.start + off, end: r.end + off }))
           .filter((r) => !joined.some((j) => j.start === r.start && j.end === r.end));
-        const runs = [...joined, ...alone].slice(0, 8);
+        // eight runs, each with its pieces (TD-1262), asked eight paths at a time
+        let whole = 0;
+        const runs = [...joined, ...alone].filter((r) => (r.piece ? whole <= 8 : ++whole <= 8));
         if (!runs.length) { callback(undefined); return; }
         // a joined run the host resolved wins over a run of the row alone it covers
         const links = (paths) => runs.filter((r) => paths[r.path]).filter((r, i, ok) =>
@@ -5674,8 +5692,10 @@
         const key = `${off}|${text}`;
         if (known.has(key)) { const l = links(known.get(key)); callback(l.length ? l : undefined); return; }
         const asked = era;
-        ask([...new Set(runs.map((r) => r.path))]).then((got) => {
-          const paths = (got && got.paths) || {};
+        const want = [...new Set(runs.map((r) => r.path))], batches = [];
+        for (let i = 0; i < want.length; i += 8) batches.push(want.slice(i, i + 8));
+        Promise.all(batches.map((b) => ask(b))).then((all) => {
+          const paths = Object.assign({}, ...all.map((got) => (got && got.paths) || {}));
           if (asked === era) known.set(key, paths);
           const l = links(paths); callback(l.length ? l : undefined);
         }, () => callback(undefined));
