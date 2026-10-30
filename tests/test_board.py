@@ -165,19 +165,27 @@ def test_origin_out_of_reach_refuses_the_press_and_lands_nothing(repo, monkeypat
         board.write_back(repo, 7, ITEM, "done")
 
 
-def test_a_push_the_forge_refuses_reads_apart_from_an_unreachable_origin(repo, tmp_path):
+def test_a_push_the_forge_refuses_reads_apart_from_an_unreachable_origin(repo, tmp_path, monkeypatch):
     """TD-1242, design §4.4 *Board write-back*: a push origin took and refused reads *origin refused the push
     (<the forge's reason>)*, its `remote: error:` line else its status line's parenthesis, the tree reset and no
-    branch left; a push that cannot connect still reads *origin could not be reached*."""
+    branch left; a push that cannot connect still reads *origin could not be reached*. The push runs under
+    `LC_ALL=C` whatever the process's locale, so the words read are git's English ones (TD-1251)."""
+    monkeypatch.setenv("LC_ALL", "de_DE.UTF-8")
+    monkeypatch.setenv("LANGUAGE", "de")
     before = on_origin(repo, "rev-parse", "origin/main")
     hook = Path(git(repo, "remote", "get-url", "origin")) / "hooks" / "pre-receive"
-    hook.write_text("#!/bin/sh\necho 'error: GH007: Your push would publish a private email address.' >&2\nexit 1\n")
+    seen = tmp_path / "push-locale"
+    hook.write_text(
+        f"#!/bin/sh\nprintf %s \"$LC_ALL\" > {seen}\n"
+        "echo 'error: GH007: Your push would publish a private email address.' >&2\nexit 1\n"
+    )
     hook.chmod(0o755)
     with pytest.raises(board.Refused) as e:
         board.write_back(repo, 7, ITEM, "done")
     assert str(e.value) == (
         "origin refused the push (GH007: Your push would publish a private email address.): the edit was not made"
     )
+    assert seen.read_text() == "C"
     assert "could not be reached" not in str(e.value)
     assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
     assert git(board.tree_dir(repo), "status", "--porcelain") == ""
