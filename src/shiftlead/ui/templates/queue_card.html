@@ -60,7 +60,7 @@
     </span>
     {{ builds(t.ext) }}
     {% if c.pending and not c.not_landed %}<div class="qnote">moved — lands within a minute</div>{% endif %}
-    {% if c.not_landed %}<div class="qnote">not landed — retrying</div>{% endif %}
+    {% if c.not_landed %}<div class="qnote" title="{{ c.not_landed }}">not landed — retrying</div>{% endif %}
     {% for f in c.passed_over or [] %}<div class="qnote">passed over by {{ f.name }}{% if f.why %}: {{ f.why }}{% endif %}</div>{% endfor %}
     {{ mentioned(t) }}
     {#- the card's Decide and Do are drawn in the header, so a folded card still shows them (§4.5 screen 12) #}

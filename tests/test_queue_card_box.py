@@ -132,3 +132,16 @@ def test_the_colours_are_tokens_in_both_themes():
     root = css[css.index(":root {") : css.index("}", css.index(":root {"))]
     for token in used:
         assert f"--{token}:" in root
+
+
+def test_a_card_not_landed_carries_the_flushs_refusal_on_its_note():
+    """TD-1242, design §4.4 *A move lands*: the *not landed — retrying* note's hover is the flush's refusal,
+    escaped."""
+    from shiftlead.ui.app import templates
+
+    q = queue()
+    q["cards"][0]["not_landed"] = 'origin refused the push (GH007: <a> & "b"): the edit was not made'
+    c = queue_view(q, NOW)["up_next"][0]
+    html = str(templates.env.get_template("queue_card.html").module.card(c))
+    note = 'title="origin refused the push (GH007: &lt;a&gt; &amp; &#34;b&#34;): the edit was not made">'
+    assert f'<div class="qnote" {note}not landed — retrying</div>' in html

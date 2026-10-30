@@ -21,6 +21,8 @@ moved are each refused in words, with nothing landed.
 from __future__ import annotations
 
 import contextlib
+import os
+import re
 import shutil
 import subprocess
 import threading
@@ -128,10 +130,15 @@ def message(text: str, action: str, due: str | None = None, *, answer: str = "",
     return got
 
 
-def _git(root: Path, *args: str, timeout: float = GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
-    """One git call; a git that cannot be run or does not finish is a refusal, never a raw error."""
+def _git(
+    root: Path, *args: str, timeout: float = GIT_TIMEOUT, c_locale: bool = False
+) -> subprocess.CompletedProcess[str]:
+    """One git call; a git that cannot be run or does not finish is a refusal, never a raw error.
+    `c_locale` runs it under `LC_ALL=C` on the rest of the environment, so its own words are English."""
     try:
         env = gitinfo.read_only_env() if args[:1] == ("status",) else None
+        if c_locale:
+            env = {**(os.environ if env is None else env), "LC_ALL": "C"}
         return subprocess.run(
             ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=timeout, check=False, env=env
         )
@@ -182,6 +189,31 @@ RANK_BODY = (
 
 def unreachable(why: str) -> Refused:
     return Refused(f"origin could not be reached ({why}): the edit was not made")
+
+
+def refused_push(reason: str) -> Refused:
+    return Refused(f"origin refused the push ({reason}): the edit was not made")
+
+
+_REJECTED = re.compile(r"^\s*! \[(?:remote )?rejected\](?:.*\(([^()]*)\))?")
+
+
+def _push_refusal(cp: subprocess.CompletedProcess[str]) -> str | None:
+    """The forge's reason when a failed push reached it and was refused (§4.4): the first `remote: error:`
+    line, else the parenthesis ending a `! [remote rejected]` or `! [rejected]` line, else git's last line;
+    None when the output holds neither, so the push never reached a forge that could refuse it."""
+    lines = (cp.stderr or cp.stdout or "").splitlines()
+    for line in lines:
+        head, sep, rest = line.strip().partition("remote: error:")
+        if sep and not head:
+            return rest.strip()[:200]
+    rejected = [m for line in lines if (m := _REJECTED.match(line))]
+    if not rejected:
+        return None
+    for m in rejected:
+        if m.group(1):
+            return m.group(1).strip()[:200]
+    return _why(cp, "git push").removeprefix("git push: ")[:200]
 
 
 class _Neighbour(Refused):
@@ -368,9 +400,12 @@ def _land(
     branch = f"{prefix}/{Path(root).name}/{datetime.now(UTC):%Y%m%d%H%M%S}-{sha[:7]}"
     pushed = False
     try:
-        cp = _git(t, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", timeout=clock.left("git push"))
+        cp = _git(
+            t, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", timeout=clock.left("git push"), c_locale=True
+        )
         if cp.returncode != 0:
-            raise unreachable(_why(cp, "git push"))
+            reason = _push_refusal(cp)
+            raise unreachable(_why(cp, "git push")) if reason is None else refused_push(reason)
         pushed = True
         cp = _gh(
             t,
