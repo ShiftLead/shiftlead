@@ -15,6 +15,9 @@ from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
 
+# the close of the Open a session line (§4.5a, TD-1190)
+COMPOSER = "with your words in its composer, not sent."
+
 
 def world(tmp_path, *, team: bool = True, entries: dict | None = None, seat: bool = True):
     home = tmp_path / "home"
@@ -84,7 +87,7 @@ def test_open_a_session_starts_the_types_role_interactive_in_a_new_worktree_with
     # the line under the button, as the Type changes: the first free number, the role entries: names
     got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "feature"}).json()
     assert (got["team"], got["role"], got["name"]) == ("sam-grind", "designer", "entry-2")
-    assert got["line"] == "an interactive designer session, entry-2, in a new worktree"
+    assert got["line"] == f"Starts an interactive designer session in a new worktree, {COMPOSER}"
     assert c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()["role"] == "techlead"
     # the press: interactive, in worktree entry-2, the role, the team's badge, its live manager, no prompt
     words = "The Inbox lists a board item only once it is due."
@@ -115,7 +118,8 @@ def test_a_repo_no_team_services_starts_plain_with_no_badge(tmp_path, monkeypatc
     created: list[dict] = []
     c = client(monkeypatch, tmp_path, fake([], created=created))
     got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()
-    assert got["role"] == "plain" and got["team"] == "" and got["line"].endswith("no team services this repo")
+    assert got["role"] == "plain" and got["team"] == ""
+    assert got["line"] == f"Starts an interactive plain session in a new worktree, {COMPOSER}"  # no tail (TD-1190)
     r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": ""})
     (kw,) = created
     assert kw["role"] == "plain" and kw["team"] == "" and kw["controllers"] == [] and kw["unattended"] is False
@@ -202,7 +206,7 @@ def test_hand_to_the_techlead_sends_the_words_to_the_repos_first_seat_and_names_
     hand = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()["hand"]
     assert (hand["team"], hand["name"], hand["why"]) == ("sam-grind", "techlead-sam", "")
     assert hand["to"].endswith("techlead-sam")
-    assert hand["line"] == "fills this seat: a session starts on the next tick and reads it first"
+    assert hand["line"] == "No techlead is running: one starts on the next tick and reads it first."  # on call
     r = c.post("/api/entry/hand", json={"repo": "samscrape", "type": "feature", "words": "a board line is hidden"})
     assert r.status_code == 200, r.text
     (kw,) = handed
@@ -226,7 +230,7 @@ def test_a_live_seat_says_its_own_sentence(tmp_path, monkeypatch):
     live = {"id": sid, "name": "techlead-sam", "state": "working", "read_when": {"refill": "read when its turn ends"}}
     c = client(monkeypatch, tmp_path, fake([live]))
     assert c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()["hand"]["line"] == (
-        "read when its turn ends"
+        "Read when its turn ends."
     )
 
 
@@ -241,18 +245,86 @@ def test_hand_is_disabled_with_its_reason(tmp_path, monkeypatch, team, seat, why
     assert hand["why"] == why and hand["to"] == ""
 
 
+def test_the_open_a_session_line_holds_no_name_typed_or_default_and_the_heading_names_the_ledger(tmp_path, monkeypatch):
+    """§4.5a *Add entry form: Open a session* (TD-1190, built by TD-1197): the line under the button is one
+    sentence that never names the session — the **Name** box beside it does — whether the name is the
+    default or typed; and the plan carries the ledger the heading shows beside the repo."""
+    world(tmp_path)
+    c = client(monkeypatch, tmp_path, fake([]))
+    got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()
+    typed = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt", "name": "inbox-counts"}).json()
+    assert got["name"] == "entry-1" and typed["name"] == "inbox-counts"
+    assert got["line"] == typed["line"] and "entry-1" not in got["line"] and "inbox-counts" not in typed["line"]
+    assert got["ledger"] == "docs/technical_debt.md"
+    from shiftlead.ui import app as ui
+
+    js = (Path(ui.__file__).parent / "static" / "app.js").read_text()
+    assert 'put("#entrywhere", `${v.repo} · ${v.ledger}`);' in js  # the heading's *<repo> · <ledger>*
+
+
+def test_no_read_of_the_plan_blanks_a_line_or_disables_hand_while_it_waits():
+    """TD-1197 (2): `plan()` writes each line from its answer only where the text changed, and sets no
+    *…* reason before it asks, so a keystroke in **Name** leaves both buttons' lines standing; each line
+    is drawn bare, with no *Hand to the techlead:* or *When it is read:* before it."""
+    from shiftlead.ui import app as ui
+
+    js = (Path(ui.__file__).parent / "static" / "app.js").read_text()
+    body = js[js.index("    async function plan() {") : js.index("    hand.onclick = async () => {")]
+    assert 'textContent = ""' not in body and 'handWhy = "…"' not in body
+    assert "if (el && el.textContent !== text) el.textContent = text;" in js
+    assert 'put("#entryline", v.name_why || v.line || "");' in body
+    assert 'put("#entrywhen", h.why || h.line || "");' in body
+    assert "Hand to the techlead: ${" not in js and "`When it is read: ${h.line}`" not in js
+
+
+def test_the_add_entry_dialog_alone_widens_to_720():
+    """§4.5a *Add entry…* *Its layout*: the dialog's 720px is its own; `.maildlg`, which four other dialogs share,
+    keeps 560px; and the Team pick keeps its `row` class, so `.maildlg .row[hidden]` still hides it."""
+    from shiftlead.ui import app as ui
+
+    root = Path(ui.__file__).parent
+    css = (root / "static" / "app.css").read_text()
+    assert "#entrydlg.maildlg { width: min(720px, 94vw); }" in css
+    assert ".maildlg { width: min(560px, 92vw);" in css and ".maildlg .row[hidden] { display: none; }" in css
+    html = (root / "templates" / "base.html").read_text()
+    form = html[html.index('<dialog id="entrydlg"') : html.index("</dialog>", html.index('<dialog id="entrydlg"'))]
+    assert 'title="what the session is told besides is on its Focus, in the Session card under told at start"' in form
+    assert form.index('id="entryhand"') < form.index('id="entrygo"')  # Hand on the left, and first when stacked
+
+
+@pytest.mark.parametrize(
+    ("record", "line"),
+    [
+        (None, "No techlead is running: one starts on the next tick and reads it first."),
+        ({"state": "exited"}, "No techlead is running: one starts on the next tick and reads it first."),
+        ({"state": "closed", "read_when": {"refill": "x"}},
+         "No techlead is running: one starts on the next tick and reads it first."),
+        ({"state": "idle", "read_when": {"refill": "rings it now"}}, "Rings it now."),
+        ({"state": "unreachable", "read_when": {"refill": "lands at the home; its host cannot be reached"}},
+         "Lands at the home; its host cannot be reached."),
+        ({"state": "working", "read_when": {"refill": "read when its turn ends."}}, "Read when its turn ends."),
+    ],
+)  # fmt: skip
+def test_the_hand_line_is_in_the_forms_voice(record, line):
+    """§4.5a *Add entry form: Hand to the techlead* (TD-1190): a seat on call — no record, or one exited or
+    closed — reads *No techlead is running…*; any other record its own `refill` sentence (an unreachable seat's
+    included), a capital first and one full stop at its end."""
+    from shiftlead.ui.repo import entry_hand
+
+    seat = {"team": "t", "seat": "ao-x-techlead", "name": "techlead-x", "techlead": "techlead-x"}
+    records = {"ao-x-techlead": record} if record else {}
+    assert entry_hand([seat], records)["line"] == line
+
+
 def test_a_seat_with_no_checkout_is_not_read_as_no_seat():
     """From the review of slice 4: `teams.seat_id` answers "" both for a team with no techlead and
     for a seat whose home has no checkout on its host, and `entry_add` refuses both — but the reason
     under the button says which, so the person knows whether to add a seat or a checkout."""
-    from datetime import UTC, datetime
-
     from shiftlead.ui.repo import entry_hand
 
-    now = datetime(2026, 9, 29, tzinfo=UTC)
-    none = entry_hand([{"team": "t", "seat": "", "name": "", "techlead": ""}], {}, now)
+    none = entry_hand([{"team": "t", "seat": "", "name": "", "techlead": ""}], {})
     assert none["why"] == "this team has no techlead seat" and none["to"] == ""
-    bare = entry_hand([{"team": "t", "seat": "", "name": "", "techlead": "techlead-sam"}], {}, now)
+    bare = entry_hand([{"team": "t", "seat": "", "name": "", "techlead": "techlead-sam"}], {})
     assert bare["why"] == "techlead-sam: the techlead seat has no checkout on its host" and bare["to"] == ""
 
 
@@ -386,7 +458,7 @@ def test_a_free_typed_name_starts_the_session_its_worktree_and_its_branch_under_
     assert (got["name"], got["default"], got["name_why"]) == ("entry-1", "entry-1", "")
     got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt", "name": "inbox-counts"}).json()
     assert (got["name"], got["default"], got["name_why"]) == ("inbox-counts", "entry-1", "")
-    assert got["line"] == "an interactive techlead session, inbox-counts, in a new worktree"
+    assert got["line"] == f"Starts an interactive techlead session in a new worktree, {COMPOSER}"
     r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": "", "name": "inbox-counts"})
     assert r.status_code == 200, r.text
     (kw,) = created

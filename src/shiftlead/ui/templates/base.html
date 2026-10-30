@@ -158,42 +158,48 @@
 </dialog>
 {#- design §4.5a **Add entry…** and the *Add entry form* (§4.9 *Add an entry to the ledger*, TD-219): one
     form from the Repo page and the team card's Repo facet, the repo fixed by the press and shown;
-    **What** and **Type**, nothing else. **Open a session** starts the entry session; the page writes
+    **What**, **Type** and **Priority**, nothing else. **Open a session** starts the entry session; the page writes
     no file. **Hand to the techlead** (TD-219 slice 4) sends the words to `entry_add`; disabled with its
     reason where no team or no seat takes it, and while **What** is empty. Filled by the script. -#}
 <dialog id="entrydlg" class="card pad maildlg" aria-labelledby="entryhead">
   <form method="dialog" class="col gap">
-    <div class="row gap"><span class="h2" id="entryhead">Add an entry to the ledger</span><span class="grow"></span><button class="btn sm ghost" value="close">Close</button></div>
-    <div class="meta" id="entrywhere"></div>
-    <p class="note">Write what you have: a title, or a page. The number, the header lines and the file locations are found for you, and you are asked only what cannot be found.</p>
-    <label class="field">What <textarea class="input tall" id="entrywhat" rows="6"></textarea></label>
+    {#- *Its layout* (TD-1190, built by TD-1197): the repo and ledger beside the title, wrapping under it on a phone, Close at its right -#}
+    <div class="entryhead"><div class="entrytitle"><span class="h2" id="entryhead">Add an entry to the ledger</span><span class="mono" id="entrywhere"></span></div>
+      <button class="btn sm ghost" value="close">Close</button></div>
+    <div class="field"><label for="entrywhat">What</label>
+      <span class="note">A title or a page: the number, the header lines and the locations are found for you.</span>
+      <textarea class="input tall" id="entrywhat" rows="6"></textarea></div>
     {#- §4.5a *Add entry form: Attach / drop / paste* (TD-630, built by TD-633): the composer's road on
         **What**, into the form's draft folder at the home; each path at the caret, and final. A repo whose
         team runs on a node refuses it in place, in the words a node session's composer gets -#}
     <div class="row gap" id="entryattachrow"><button type="button" class="btn sm" id="entryattach" data-piece="{{ attach_piece }}" title="attach files: their paths go into What at the cursor"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
       <input type="file" id="entryattachfile" multiple hidden>
       <button type="button" class="btn sm ghost hidden" id="entryattachcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
-      <span class="note" id="entryattachnote">or paste a screenshot, or drop a file on the box — its path goes in at the cursor</span></div>
-    <div class="row gap wrap"><div class="row gap wrap" role="radiogroup" aria-label="Type"><span class="field">Type</span>
-      <label><input type="radio" name="entrytype" value="debt" checked> debt <span class="meta">something wrong now</span></label>
-      <label><input type="radio" name="entrytype" value="feature"> feature <span class="meta">something new</span></label>
-    </div>
-    {#- §4.5a *Add entry…* (TD-851, built by TD-855): **Priority** beside Type, drawn as Type is, *Medium* selected -#}
-    <div class="row gap wrap" role="radiogroup" aria-label="Priority" id="entrypriority"><span class="field">Priority</span>
-      <label><input type="radio" name="entrypriority" value="high"> High</label>
-      <label><input type="radio" name="entrypriority" value="medium" checked> Medium</label>
-      <label><input type="radio" name="entrypriority" value="low"> Low</label>
+      <span class="note" id="entryattachnote">or paste a screenshot, or drop a file on the box.</span></div>
+    {#- Type and Priority each a row of bordered options; below 640px the options share one row in equal columns -#}
+    <div class="field"><span class="fieldcap">Type</span><div class="entryopts" role="radiogroup" aria-label="Type" style="--n: 2;">
+      <label class="entryopt"><input type="radio" name="entrytype" value="debt" checked><span class="entryword"><span>debt</span><span class="note">something wrong now</span></span></label>
+      <label class="entryopt"><input type="radio" name="entrytype" value="feature"><span class="entryword"><span>feature</span><span class="note">something new</span></span></label>
+    </div></div>
+    {#- §4.5a *Add entry…* (TD-851, built by TD-855): **Priority** under Type, drawn as Type is, *Medium* selected -#}
+    <div class="field"><span class="fieldcap">Priority</span><div class="entryopts" role="radiogroup" aria-label="Priority" id="entrypriority" style="--n: 3;">
+      <label class="entryopt"><input type="radio" name="entrypriority" value="high"><span>High</span></label>
+      <label class="entryopt"><input type="radio" name="entrypriority" value="medium" checked><span>Medium</span></label>
+      <label class="entryopt"><input type="radio" name="entrypriority" value="low"><span>Low</span></label>
     </div></div>
     {#- §4.5a *Add entry form: Hand to the techlead* (TD-740): where two or more teams service the repo, the
         optional **Team** pick — blank hands to the first with a techlead seat, a pick to that team's -#}
-    <label class="row gap" id="entryteamrow" hidden><span class="field">Team</span><select class="input" id="entryteam" aria-label="Team" style="width: auto; flex: none;"></select><span class="meta">its techlead takes the entry</span></label>
-    <div class="col gap"><div class="row gap wrap"><button class="btn primary" type="button" id="entryhand" disabled>Hand to the techlead</button>
-        <span class="mono" id="entryseat"></span><span class="meta" id="entryhandwhat">drafts the entry and lands it by PR. Its questions come to your Inbox; the entry's id and PR come back as the outcome.</span></div>
-      <span class="meta" id="entrywhen"></span></div>
-    <div class="col gap"><div class="row gap"><button class="btn" type="button" id="entrygo">Open a session</button>
+    <div class="row gap wrap" id="entryteamrow" hidden><label class="fieldcap" for="entryteam">Team</label><select class="input" id="entryteam" style="width: auto; flex: none;"></select><span class="note">Its techlead takes the entry.</span></div>
+    {#- the two ways out side by side under a rule, Hand on the left; stacked, Hand first, below 640px -#}
+    <div class="entryways">
+      <div class="entryway"><div class="row gap wrap"><button class="btn primary" type="button" id="entryhand" disabled>Hand to the techlead</button><span class="mono" id="entryseat"></span></div>
+        <span class="note" id="entryhandwhat">Drafts the entry and lands it by PR; its questions and the result come to your Inbox.</span>
+        <span class="note" id="entrywhen"></span></div>
+      <div class="entryway"><div class="row gap entrynamed"><button class="btn" type="button" id="entrygo" title="what the session is told besides is on its Focus, in the Session card under told at start">Open a session</button>
         {#- §4.5a *Add entry form: Name* (TD-675, built by TD-677): the session's, its worktree's and its branch's name -#}
         <span class="note">named</span><input class="input mono" id="entryname" maxlength="32" autocomplete="off" spellcheck="false" aria-label="Name" title="the session's name, its worktree's and its branch's"></div>
-      <span class="meta" id="entryline"></span></div>
+        <span class="note" id="entryline"></span></div>
+    </div>
     <p class="note warn" id="entryerr" hidden></p>
   </form>
 </dialog>

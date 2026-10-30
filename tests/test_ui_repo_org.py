@@ -135,7 +135,7 @@ def test_the_team_pick_hands_to_the_picked_teams_seat_and_blank_to_the_first(tmp
 
 def test_the_form_draws_the_team_pick_hidden_and_sends_it():
     base = (APP.parent.parent / "templates" / "base.html").read_text()
-    assert '<label class="row gap" id="entryteamrow" hidden>' in base and 'id="entryteam"' in base
+    assert '<div class="row gap wrap" id="entryteamrow" hidden>' in base and 'id="entryteam"' in base
     js = APP.read_text()
     assert "draft: draft(), team: picked() })" in js  # the hand carries the pick
     assert '$("#entryteamrow").hidden = ts.length < 2' in js  # drawn where two or more teams service the repo

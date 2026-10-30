@@ -16,6 +16,9 @@ from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
 
+# the close of the Open a session line (§4.5a, TD-1190)
+COMPOSER = "with your words in its composer, not sent."
+
 NODE_DIR = "/srv/node/samscrape"
 NODE_FILES = {
     ".shiftlead.yml": "ledger: docs/node-ledger.md\n",
@@ -120,7 +123,7 @@ def test_a_container_nodes_team_plans_and_creates_on_its_host(tmp_path, monkeypa
     got = plan(c)
     assert (got["host"], got["dir"], got["why"]) == ("node1", str(repo), "")
     assert got["default"] == "entry-2", "the home's own branch test skips entry-1 in the shared checkout"
-    assert got["line"] == "an interactive techlead session, entry-2, in a new worktree on node1"
+    assert got["line"] == f"Starts an interactive techlead session in a new worktree on node1, {COMPOSER}"
     assert not any(m == "host_branch" for m, _ in calls), "a container node's branch is read here"
     checks = [kw for m, kw in calls if m == "name_check"]
     assert checks and all(kw["host"] == "node1" and kw["repo"] == str(repo) for kw in checks)

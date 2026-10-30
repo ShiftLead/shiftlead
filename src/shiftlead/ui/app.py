@@ -2974,10 +2974,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "default": default,  # the **Name** box's prefill and placeholder (§4.5a, TD-677)
             "name_why": name_why,  # stands in place of the line, and disables **Open a session**
             "manager": manager,
-            "line": entry_line(role, name, team, place["host"]),
+            "line": entry_line(role, place["host"]),
             "teams": servicing,  # what `entry_add` is handed (TD-218), the picked team first (TD-740)
             "picked": picked["team"] if picked else "",
-            "hand": entry_hand(servicing, records, datetime.now(UTC)),  # **Hand to the techlead** (TD-219 slice 4)
+            "hand": entry_hand(servicing, records),  # **Hand to the techlead** (TD-219 slice 4)
             "attach": attach,  # why **Attach** refuses, or "" (§4.5a *Add entry form: Attach / drop / paste*)
         }, node_cfg
 
