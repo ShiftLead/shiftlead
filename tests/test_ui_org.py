@@ -1643,7 +1643,7 @@ def test_the_occupancy_check_names_a_seat_with_its_state_and_claim():
 def test_an_idle_session_with_a_live_subagent_reads_working(tmp_path, monkeypatch):
     """§4.2 *Working on its own* (TD-734): an `idle` record whose view carries `subagents_live` draws
     the green *working* pill, ranked, counted and filtered with `working`, its slot *working · 2
-    subagents*; a wait outranks it, and it outranks *idle · unseen*. The payload's state stays `idle`."""
+    subagents*; it outranks a wait (*One order*, TD-1227) and *idle · unseen*. The payload's state stays `idle`."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from sessionorc.models import STATE_RANK
     from shiftlead.ui.app import card_order, rollup, state_counts, view, waits_of
@@ -1655,9 +1655,10 @@ def test_an_idle_session_with_a_live_subagent_reads_working(tmp_path, monkeypatc
     assert view(_card(subagents=1, subagents_live=True))["slot"]["text"] == "working · 1 subagent"
     # past STALL_AFTER the view says not live (a lost SubagentStop): plain idle
     assert view(_card(subagents=1, subagents_live=False))["pill_word"] == "idle"
-    # an open person ask on top of a live subagent: *waiting*
+    # an open person ask on top of a live subagent: still *working*, the wait leading the slot (TD-1227)
     ask = {"id": "m-a", "from": "ao-w", "to": ["person"], "kind": "ask", "about": "TD-222", "text": "q?"}
-    assert view(_card(subagents=1, subagents_live=True), waits=waits_of([ask]))["pill_word"] == "waiting"
+    asked = view(_card(subagents=1, subagents_live=True), waits=waits_of([ask]))
+    assert asked["pill_word"] == "working" and asked["slot"]["text"] == "waiting on you: TD-222 · working · 1 subagent"
     # an interactive session with a live subagent and nothing waiting: *working*, not *idle · unseen*
     mine = view(_card(unattended=False, seen_at=None, subagents=1, subagents_live=True))
     assert mine["pill_word"] == "working" and not mine["unseen"]
@@ -1802,6 +1803,52 @@ def test_a_live_shell_flag_with_no_shell_to_name_stays_idle(tmp_path, monkeypatc
     for shells in ([], ["x"]):
         v = view(_card(git=clean, shells=shells, shells_live=True))
         assert (v["pill_word"], v["own_work"]) == ("idle", ""), shells
+
+
+def test_own_work_reads_working_whether_or_not_a_wait_reads(tmp_path, monkeypatch):
+    """§4.2 *One order* (TD-1222, TD-1227): an `idle` record with a live background shell and an open ask
+    naming a reference reads *working*, its slot leading with the wait and then the counts, the shell's
+    command and age on the pill's hover; a reader's review wait leads the same way; an unseen record with
+    own work and an ask out reads *working*; with no own work the ask reads *waiting*, and an unseen one
+    keeps the interim *idle · unseen* until TD-1228."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from datetime import UTC, datetime, timedelta
+
+    from sessionorc.models import STATE_RANK
+    from shiftlead.ui.app import view, waits_of
+
+    since = (datetime.now(UTC) - timedelta(minutes=4, seconds=5)).isoformat().replace("+00:00", "Z")
+    gh = {"pid": 7, "start": 1, "cmd": "timeout 1500 gh pr checks 2658", "since": since}
+    shell = {"shells": [gh], "shells_live": True}
+    ask = {"id": "m-a", "from": "ao-w", "to": ["person"], "kind": "ask", "about": "TD-222", "text": "q?"}
+    v = view(_card(**shell), waits=waits_of([ask]))
+    assert (v["state"], v["state_class"], v["pill_word"]) == ("idle", "working", "working")
+    assert v["rank"] == STATE_RANK["working"]
+    assert v["slot"]["text"] == "waiting on you: TD-222 · working · 1 shell"
+    assert v["pill_title"] == (
+        "working · 1 shell — idle in every payload, its own background shells running"
+        " · waiting on you: TD-222 · timeout 1500 gh pr checks 2658 · 4m"
+    )
+    # a reader's review wait instead of an ask: *working*, the slot leading with the review wait
+    repos = {"/r": {"name": "r", "prs": {"open": [{"number": 1302, "branch": "td009-x"}]}}}
+    seat = {"id": "ao-tl", "name": "techlead-1", "role": "techlead", "state": "idle",
+            "prs_waiting": {"n": 1, "asks": [{"from": "ao-w@kmaster", "pr": 1302}]}}  # fmt: skip
+    rec = _card(progress=[{"ref": "TD-009", "status": "claimed", "pr": 1302}], **shell)
+    r = view(rec, [rec, seat], repos=repos)
+    assert r["pill_word"] == "working"
+    assert r["slot"]["text"] == "waiting · review #1302 with the techlead · working · 1 shell"
+    assert r["slot"]["full"].startswith("waiting · review #1302 with the techlead: the reader holds its ask")
+    # unseen, own work and an ask out: *working*, never *idle · unseen*
+    unseen = view(_card(unattended=False, seen_at=None, **shell), waits=waits_of([ask]))
+    assert unseen["pill_word"] == "working" and not unseen["unseen"]
+    # no own work: the ask reads *waiting* when seen, and the interim *idle · unseen* when unseen
+    seen = view(_card(unattended=False, seen_at="2099-01-01T00:00:00Z"), waits=waits_of([ask]))
+    assert seen["pill_word"] == "waiting" and seen["slot"]["text"] == "waiting on you: TD-222"
+    assert view(_card(unattended=False, seen_at=None), waits=waits_of([ask]))["pill_word"] == "unseen"
+    # no wait: the slot names the oldest shell, the hover says nothing of a wait
+    alone = view(_card(**shell))
+    assert alone["slot"]["text"] == "working · 1 shell: timeout 1500 gh pr checks 2658 · 4m"
+    assert alone["pill_title"] == "working · 1 shell — idle in every payload, its own background shells running"
 
 
 def test_an_idle_session_that_waits_on_someone_reads_waiting(tmp_path, monkeypatch):
