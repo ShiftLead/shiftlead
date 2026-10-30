@@ -170,9 +170,9 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
   AO.openEditor = savedOpen;
   // a wide character before the path: one character, two cells (xterm's width-0 cell after it)
   const cells = [["界", 2], ["", 0], [" ", 1], ..."a/b.py".split("").map((c) => [c, 1])];
-  const wide = { buffer: { active: { getLine: () => ({ length: cells.length,
+  const wide = { buffer: { active: { getLine: (y) => (y === 0 ? { length: cells.length,
     translateToString: () => "界 a/b.py",
-    getCell: (x) => ({ getChars: () => cells[x][0], getWidth: () => cells[x][1] }) }) } } };
+    getCell: (x) => ({ getChars: () => cells[x][0], getWidth: () => cells[x][1] }) } : undefined) } } };
   const wp = AO.pathProvider(wide, "ao-x-1", { file: FILE },
     (r) => Promise.resolve({ paths: { "a/b.py": "/r/a/b.py" } }));
   const wideLinks = await new Promise((res) => wp.provideLinks(1, (l) => res(l.map((k) => k.range))));
@@ -388,3 +388,76 @@ def test_open_editor_toasts_unless_quiet_and_a_pair_toasts_once():
     assert got["quiet"] == {"toasts": [], "frames": ["vscode://file/r/a.py:1"]}
     assert got["pair"]["frames"] == ["vscode://file/r?windowId=_blank", "vscode://file/r/a.py:1"]
     assert got["pair"]["toasts"] == [["opening in VS Code…", True]]
+
+
+# TD-1259: the provider reads a row in its logical line. The screen's rows are strings padded to the width, a
+# cell a character, with a soft wrap marked `isWrapped`; `links(y)` is what the provider hands xterm for row y.
+WRAP_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+global.window = {}; global.document = { documentElement: el(), body: el(), querySelector: () => null,
+  querySelectorAll: () => [], addEventListener: noop, createElement: el };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+const cols = 40;
+const cell = (ch) => ({ getChars: () => ch, getWidth: () => 1 });
+const screen = (rows, files) => {
+  const lines = rows.map(([text, wrapped]) => {
+    const cells = text.padEnd(cols, "\\0").slice(0, cols).split("").map((c) => (c === "\\0" ? "" : c));
+    return { isWrapped: wrapped, length: cols, getCell: (x) => cell(cells[x]),
+      translateToString: (trim) => { const t = cells.map((c) => c || " ").join(""); return trim ? t.trimEnd() : t; } };
+  });
+  const asked = [];
+  const term = { registerLinkProvider: noop,
+    buffer: { active: { getLine: (y) => lines[y], getNullCell: () => cell("") } } };
+  const p = AO.pathProvider(term, "ao-x-1", { file: "vscode://file{path}" }, (r) => { asked.push(r);
+    return Promise.resolve({ paths: Object.fromEntries(r.map((k) => [k, files[k] || null])) }); });
+  const links = (y) => new Promise((res) => p.provideLinks(y, (l) =>
+    res(l ? l.map((k) => ({ text: k.text, range: k.range })) : null)));
+  return { links, asked };
+};
+(async () => {
+  // one path over three rows: row 2 soft-wrapped, row 3 cut by the program at the width (no wrap mark)
+  const path = "/tmp/claude-1000/-home-kmaster-agent-cadence/5634736a-ec3f-495f-82d9/scratchpad/td203-plan.md";
+  const head = "see " + path.slice(0, cols - 4), mid = path.slice(cols - 4, 2 * cols - 4);
+  const rest = path.slice(2 * cols - 4);
+  const long = screen([[head, false], [mid, true], [rest + " done", false], ["next line", false]],
+    { [path]: "/r" + path });
+  const spans = [await long.links(1), await long.links(2), await long.links(3), await long.links(4)];
+  // a path that ends at the last column, and a cut row of prose after it: the joined run is no file,
+  // the row's own run is, so the link stays the row's
+  const full = "x".repeat(cols - 11) + " src/a/b.py";
+  const prose = screen([[full.slice(-cols), false], ["and more words", false]], { "src/a/b.py": "/r/src/a/b.py" });
+  const kept = [await prose.links(1), await prose.links(2)];
+  console.log(JSON.stringify({ path, rest, spans, longAsked: long.asked, kept, proseAsked: prose.asked }));
+})().catch((e) => { console.error(e); process.exit(1); });
+"""
+
+
+@pytest.mark.unit
+def test_a_path_that_wraps_or_is_cut_across_rows_is_one_link_on_every_row():
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the provider is JavaScript, and nothing else runs it")
+    probe = scratch_dir() / "wrap_probe.js"
+    probe.write_text(WRAP_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    path, rest = got["path"], got["rest"]
+    link = {"text": path, "range": {"start": {"x": 5, "y": 1}, "end": {"x": len(rest), "y": 3}}}
+    # the same link from each of its three rows, the soft-wrapped one and the cut one alike; the row after is none
+    assert got["spans"] == [[link], [link], [link], None]
+    assert all(path in a for a in got["longAsked"])
+    # a joined run that is no file leaves the row's own run its link, and the prose row takes none
+    one = {"text": "src/a/b.py", "range": {"start": {"x": 31, "y": 1}, "end": {"x": 40, "y": 1}}}
+    assert got["kept"] == [[one], None]
+    assert got["proseAsked"][0] == ["src/a/b.pyand", "src/a/b.py"]
