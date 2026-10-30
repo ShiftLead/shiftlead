@@ -541,8 +541,36 @@ body.popped .page { padding: 10px 12px; } body.popped .termbox, body.popped .ter
 .kv dd.told { grid-column: 1 / -1; display: none; margin: 2px 0 4px; font-size: var(--t-small); line-height: 1.5; overflow-wrap: anywhere; color: var(--muted); }
 .kv dd:has(> details.toldfold[open]) + dd.told { display: block; }
 .kv dd.told p, .kv dd.told ul { margin: 0 0 6px; } .kv dd.told ul { padding-left: 16px; }
-#entryline { white-space: normal; }  /* the note under Open a session wraps: its second sentence says where the rest is read */
-input.input#entryname { width: 170px; }  /* §4.5a *Add entry form: Name* beside Open a session, as the mockup draws it (TD-677) */
+#entryline { white-space: normal; }  /* the note under Open a session wraps */
+/* §4.5a *Add entry…*: *Its layout* (TD-1190, built by TD-1197), the mockup AddEntry.dc.html. The dialog's 720px is
+   its own: the other dialogs that share .maildlg keep 560px */
+#entrydlg.maildlg { width: min(720px, 94vw); }
+#entrydlg .entryhead { display: flex; align-items: flex-start; gap: 10px; }
+#entrydlg .entrytitle { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 2px; min-width: 0; flex: 1; }
+#entrywhere { font-size: var(--t-mono-s); color: var(--muted); overflow-wrap: anywhere; }
+#entryattachrow { margin-top: -6px; }
+#entrydlg .fieldcap { font-size: var(--t-cap); font-weight: 600; color: var(--strong); text-transform: uppercase; letter-spacing: .04em; }  /* as .field > label */
+#entrydlg .entryopts { display: flex; flex-wrap: wrap; gap: 6px; }
+#entrydlg .entryopt { display: flex; align-items: center; gap: 8px; padding: 5px 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); cursor: pointer; }
+#entrydlg .entryopt:has(input:checked) { border-color: var(--strong); }
+#entrydlg .entryopt input { margin: 0; }
+#entrydlg .entryword { display: flex; flex-wrap: wrap; column-gap: 6px; align-items: baseline; }
+#entrydlg .entryword .note { font-size: var(--t-small); }
+#entrydlg .entryways { border-top: 1px solid var(--line); padding-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#entrydlg .entryway { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#entrydlg .entryway:first-child { padding-right: 16px; }
+#entrydlg .entryway + .entryway { border-left: 1px solid var(--line); padding-left: 16px; }
+#entrydlg .entryway > .note[hidden] { display: none; }
+#entrydlg .entrynamed { flex-wrap: nowrap; }
+#entryline.bad { color: var(--stalled-fg); } input.input#entryname.bad { border-color: var(--stalled); }  /* a name not free, as the *taken* shot draws it */
+input.input#entryname { flex: 1 1 0; min-width: 0; max-width: 170px; height: 30px; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }  /* §4.5a *Add entry form: Name* (TD-677) */
+@media (max-width: 640px) {
+  #entrydlg .entryways { grid-template-columns: minmax(0, 1fr); row-gap: 14px; }
+  #entrydlg .entryway:first-child { padding-right: 0; }
+  #entrydlg .entryway + .entryway { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 14px; }
+  #entrydlg .entryopts { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); }
+  #entrydlg .entryopt { align-items: flex-start; }
+}
 details.side .doing { margin-top: 8px; font-size: var(--t-small); line-height: 1.55; overflow-wrap: anywhere; }
 /* the Focus Prompts card (§4.5 *The Prompts card*, TD-977): two lines a row, the body scrolling past eight */
 .promptlist { margin-top: 6px; max-height: calc(8 * 2.9em); overflow-y: auto; }

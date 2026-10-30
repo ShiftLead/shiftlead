@@ -3771,11 +3771,10 @@
       hand.title = handWhy || (empty ? "write what the entry is first" : "");
     };
     $("#entrywhat").oninput = handState;
+    // no read of the plan blanks a line (TD-1190): each is written from the answer, and only where its text changed
+    const put = (sel, text) => { const el = $(sel); if (el && el.textContent !== text) el.textContent = text; };
     async function plan() {
       const mine = ++asked;
-      $("#entryline").textContent = "";
-      handWhy = "…"; handState();
-      $("#entryseat").textContent = ""; $("#entrywhen").textContent = "";  // the last Type's, until this answer
       let r, v;
       try {
         const q = (typed() ? `&name=${encodeURIComponent(typed())}` : "") + (picked() ? `&team=${encodeURIComponent(picked())}` : "");
@@ -3787,7 +3786,7 @@
       say(""); $("#entrygo").disabled = !!v.name_why;
       nameBox.placeholder = v.default || "";
       if (!named) nameBox.value = v.default || "";
-      $("#entrywhere").textContent = `${v.repo} · ${v.ledger}`;
+      put("#entrywhere", `${v.repo} · ${v.ledger}`);
       const ts = (v.teams || []).map((t) => t.team), set = [...ts].sort().join(" ");
       if (teamSel && set !== (teamSel.dataset.teams || "")) {
         // the options once per set of teams, in the plan's order — the blank first, *first with a seat* — read
@@ -3799,12 +3798,13 @@
       }
       if ($("#entryteamrow")) $("#entryteamrow").hidden = ts.length < 2;
       // a name that is not free: its reason stands in place of the line, and the button is disabled
-      $("#entryline").textContent = v.name_why || `Starts ${v.line}, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, in the Session card under told at start.`;
+      put("#entryline", v.name_why || v.line || "");  // the server's whole sentence, the page wrapping nothing
+      $("#entryline").classList.toggle("bad", !!v.name_why); nameBox.classList.toggle("bad", !!v.name_why);  // as the *taken* shot draws it
       const h = v.hand || { why: "the host agent did not say who takes it" };
       handWhy = h.why || "";
-      $("#entryseat").textContent = h.name || h.to || "";
+      put("#entryseat", h.name || h.to || "");
       $("#entryhandwhat").hidden = !!handWhy;
-      $("#entrywhen").textContent = handWhy ? `Hand to the techlead: ${handWhy}` : `When it is read: ${h.line}`;
+      put("#entrywhen", h.why || h.line || "");  // the reason in place of both lines, else when it is read
       if (entryAttach) entryAttach.refuse(v.attach || "");
       handState();
     }
@@ -3822,8 +3822,8 @@
       AO.toast(got.text, true, got.href);
     };
     $("#entrywhere").textContent = repo;
-    $("#entrywhat").value = ""; $("#entryseat").textContent = ""; $("#entrywhen").textContent = "";
-    named = false; nameBox.value = ""; nameBox.placeholder = "";
+    $("#entrywhat").value = ""; $("#entryseat").textContent = ""; $("#entrywhen").textContent = ""; $("#entryline").textContent = "";
+    named = false; nameBox.value = ""; nameBox.placeholder = ""; nameBox.classList.remove("bad"); $("#entryline").classList.remove("bad");
     // checked as typed, debounced as New session's name field is (§4.5a *New session: name field → holder*)
     nameBox.oninput = () => { named = true; clearTimeout(nameBox._t); nameBox._t = setTimeout(plan, 250); };
     dlg.querySelector("input[name=entrytype][value=debt]").checked = true;

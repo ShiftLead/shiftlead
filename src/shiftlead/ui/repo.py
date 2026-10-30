@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import ledger, mail
+from sessionorc import ledger
 from sessionorc import settle as settle_mod
 from sessionorc.models import (
     has_control,
@@ -79,25 +79,25 @@ def entry_role(org: orgmod.Org, team: str, type_: str, files: teams.Files | None
     return teams.entry_role(org, t, type_, t.host or here, here, files=files)
 
 
-def entry_line(role: str, name: str, team: str, host: str = "") -> str:
-    """The one line under **Open a session** (§4.5a): what the press will start, and the host it starts
-    on where that is the team's on another host (TD-1064)."""
-    tail = "" if team else " — no team services this repo"
+def entry_line(role: str, host: str = "") -> str:
+    """The one line under **Open a session** (§4.5a), the page's whole sentence: what the press will start,
+    and the host it starts on where that is the team's on another host (TD-1064). No name, which the **Name**
+    box beside the button shows, and no *no team* tail, which **Hand to the techlead**'s reason says (TD-1190)."""
     on = f" on {host}" if host else ""
-    return f"an interactive {role} session, {name}, in a new worktree{on}{tail}"
+    return f"Starts an interactive {role} session in a new worktree{on}, with your words in its composer, not sent."
 
 
 # the teams that service a checkout: `shiftlead.teams`' since TD-218 slice 4, where `ao td add` reads it too
 entry_teams = teams.entry_teams
 
 
-def entry_hand(servicing: list[dict[str, str]], records: Mapping[str, dict[str, Any]], now: datetime) -> dict[str, str]:
+def entry_hand(servicing: list[dict[str, str]], records: Mapping[str, dict[str, Any]]) -> dict[str, str]:
     """**Hand to the techlead**'s state on the Add entry form (§4.5a): `{team, to, name, why, line}`.
     `why` is the reason the button is disabled — *no team services this repo*, *this team has no
     techlead seat*, *<seat>: the techlead seat has no checkout on its host* — else empty; `line` is
-    §4.10's *When it is read* for an `ask` with no bound, the
-    sentence the Message composer draws: the seat's record's own (`refill`, the agent's sentence for
-    what fills a seat as an `ask` does), or a seat nobody fills where there is no record."""
+    §4.10's *When it is read* for an `ask` with no bound in the form's voice (TD-1190): a seat on call —
+    no record, or one `exited` or `closed`, `read_when`'s test — *No techlead is running: …*; else the
+    record's own sentence (`refill`), a capital first and a full stop at its end."""
     if not servicing:
         return {"team": "", "to": "", "name": "", "why": "no team services this repo", "line": ""}
     first = servicing[0]
@@ -105,9 +105,13 @@ def entry_hand(servicing: list[dict[str, str]], records: Mapping[str, dict[str, 
         lead = first.get("techlead") or ""
         why = f"{lead}: the techlead seat has no checkout on its host" if lead else "this team has no techlead seat"
         return {"team": first["team"], "to": "", "name": "", "why": why, "line": ""}
-    rw = (records.get(first["seat"]) or {}).get("read_when")
-    line = rw.get("refill") if isinstance(rw, dict) and rw.get("refill") else ""
-    line = line or mail.read_when(None, "ask", now, seat=True, lapses=False)
+    rec = records.get(first["seat"])
+    if not rec or rec.get("state") in ("exited", "closed"):
+        line = "No techlead is running: one starts on the next tick and reads it first."
+    else:
+        rw = rec.get("read_when")
+        line = str(rw.get("refill") or "") if isinstance(rw, dict) else ""
+        line = line[:1].upper() + line[1:] + ("" if not line or line.endswith((".", "!", "?")) else ".")
     return {"team": first["team"], "to": first["seat"], "name": first["name"], "why": "", "line": line}
 
 
