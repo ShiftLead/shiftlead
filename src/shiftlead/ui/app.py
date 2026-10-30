@@ -43,7 +43,7 @@ from sessionorc.models import (
     start_note,
     stop_note,
 )
-from sessionorc.queue import card_entries, qid
+from sessionorc.queue import TD_REF, card_entries, qid
 from sessionorc.store import kept as doing_kept
 from shiftlead import org as orgmod
 from shiftlead import profiles as profiles_mod
@@ -408,6 +408,7 @@ from .queue import (
     attach,
     card_index,
     card_session,
+    card_wants,
     picks_query,
     queue_picks,
     queue_view,
@@ -415,6 +416,7 @@ from .queue import (
     same_td,
     send_window,
     split_later,
+    waits_on_me,
 )
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
@@ -3168,13 +3170,20 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         now, in place of *for you* (409 in words otherwise); the person's own session on any of the card's
         entries answers `{focus}`, another holder of `start` is refused 409 *held by <name>* (`card_session`);
         `why_key` is the entry's — *yours*, *decision*, else *card* — and the prompt reads *from the Queue*.
-        Either way the prompt names the card's entries, waits on me and the rest (`card_entries`); an entry
-        on no card is the one it names."""
+        Either way the prompt names the card's ids, waits on me — its Decide and Do items (`waits_on_me`) — and
+        the rest (`card_entries`); an entry on no card is the one it names.
+
+        **Started from an item** (TD-1246, §4.5 screen 12): `item`, the item's id — `board:<key>`, `m-…` or
+        `<repo>#TD-n` — beside `card`. A ledger item starts on its own entry, which must be one of the card's
+        Decide or Do ledger entries or its `start` (409 otherwise); any other item on the card's `start`. The
+        holder rules read the entry it starts on (`card_session`'s `on`): another holder is refused 409 *held by
+        <name>*, never answered with its Focus. The prompt's first sentence names the item (`WORK_ITEM`)."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if not isinstance(body, dict):
             raise HTTPException(400, "send {repo, id}")
         repo, ref = str(body.get("repo") or ""), str(body.get("id") or "")
         card_id = str(body.get("card") or "")
+        item = str(body.get("item") or "") if card_id else ""
         root = next((p for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), None)
         if root is None:
             raise HTTPException(404, f"no registered repo is named {repo!r} — ao repo --all lists them")
@@ -3206,11 +3215,18 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             card = next((c for c in cards if c.get("id") == card_id), None)
             if card is None or entry is None:
                 raise HTTPException(409, f"the card around {card_id} is no longer open — nothing was started")
-            if card.get("start") != qid(repo, ref):
+            here_q = qid(repo, ref)
+            if TD_REF.fullmatch(item):  # a ledger item: its own entry, one of the card's Decide or Do entries
+                it_repo, _, it_ref = item.rpartition("#")
+                if qid(it_repo or repo, it_ref) != here_q or (
+                    here_q not in card_entries(card)[0] and card.get("start") != here_q
+                ):
+                    raise HTTPException(409, f"{item} is not an item of this card's to start on — nothing was started")
+            elif card.get("start") != here_q:
                 raise HTTPException(
                     409, f"{ref} is no longer the entry this card starts on ({card.get('start')}) — nothing was started"
                 )
-            met = card_session(card, records)
+            met = card_session(card, records, on=here_q)
             if met["own"]:
                 return {"ok": True, "focus": met["own"]}
             if met["other"]:
@@ -3220,6 +3236,13 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 raise HTTPException(409, f"{ref} no longer waits on you in {repo}'s ledger — nothing was started")
             card = next((c for c in cards if qid(repo, ref) in sum(card_entries(c), [])), None)
         mine, rest = card_entries(card) if card is not None else ([qid(repo, ref)], [])
+        if card is not None:  # every Decide and Do item, by its id (§4.5 screen 12 *Started from an item*)
+            with contextlib.suppress(Exception):  # unread, *waits on me* is the card's ledger entries
+                got = (await card_mail(h, records, card_index({"cards": cards})))[1]
+                wants = card_wants((got.get("cards") or {}).get(str(card.get("id"))), "", False)
+                mine = waits_on_me(mine, wants)
+            if item and not TD_REF.fullmatch(item) and item not in mine:  # the item pressed, read or not
+                mine.append(item)
         name = ref.lower()  # cadence's work-branch shape: the tick derives the claim from it (§4.8)
         live = [
             s
@@ -3237,6 +3260,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ),
             None,
         ) or next((s for s in live if s.get("name") == name), None)
+        if holder is not None and card_id:  # `card_session` met none of the person's: never another's Focus
+            raise HTTPException(409, f"held by {holder.get('name') or holder['id']} — nothing was started")
         if holder is not None:  # **Open session**, and a second press before the tick: never a second one
             return {"ok": True, "focus": holder["id"]}
         type_ = str(entry.get("type") or "")
@@ -3257,7 +3282,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except ValueError as e:
             cfg, cfg_why = None, str(e).strip('"')
         prompt = repoconfig.work_text(
-            ref, repo, ledger, why_key, where="Queue" if card_id else "Inbox", mine=mine, rest=rest
+            ref, repo, ledger, why_key, where="Queue" if card_id else "Inbox", mine=mine, rest=rest, item=item
         )
         t = org.teams.get(team) if team else None
         if t is not None:
@@ -3861,6 +3886,33 @@ def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
 
 
+async def card_mail(
+    h: SimpleNamespace, fleet: list[dict[str, Any]], index: Any, drawn: Any = None
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """What is attached to each Queue card (§4.5 screen 12 *What is attached to a card*, TD-771, TD-828): the
+    Inbox's own sections over the same reads, and `attach`'s cards, each `home: queue` row in its card's section —
+    with *Later*'s ledger rows and the board's lines not yet due, folded or not, whose entry a card holds. `drawn(e,
+    section, choices)` draws a row (the Queue page, by the Inbox's own renderer); the start road (TD-1246) draws
+    none and reads each item's id."""
+    choices = board_choices()  # once for the request, never once a row (§4.5 *Page loads*, TD-879)
+    inbox, states = await h.person_inbox(fleet, choices=choices), await h.person_states(fleet)
+    hz = with_standings((await h.board_view(choices))[0], fleet)
+    sections = inbox_sections(
+        inbox["entries"],
+        states=states,
+        trail=inbox.get("trail") or (),
+        attention_snoozed=inbox.get("attention_snoozed"),
+        handed=inbox.get("handed") or (),
+        boards=hz["due"] + hz["waiting"],
+        fleet=fleet,
+        cards=index,
+    )
+    later = split_later(await h.ledger_view(fleet), hz["ahead"], index, hz["hidden"])[2]
+    with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
+        mail = attach(sections, lambda e, sec: drawn(e, sec, choices) if drawn else "", later)
+    return sections, mail
+
+
 def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The Settings page (design §4.5 screen 8, §4.5a *Settings page*; TD-148): the page and its
     writes. Every write goes through the host agent's `set_settings` — a person's own, refused to a
@@ -3890,34 +3942,17 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # what is attached to a card (§4.5 screen 12, TD-771, TD-828): the Inbox's own sections over the
             # same reads, each `home: queue` row drawn in its card's section by the Inbox's own renderer
             repos_omit(REPOS_OMIT_INBOX)
-            index = card_index(got)
             with contextlib.suppress(HTTPException):
                 fleet = await call("list")
-                choices = board_choices()  # once for the request, never once a row (§4.5 *Page loads*, TD-879)
-                inbox, states = await h.person_inbox(fleet, choices=choices), await h.person_states(fleet)
-                hz = with_standings((await h.board_view(choices))[0], fleet)
-                sections = inbox_sections(
-                    inbox["entries"],
-                    states=states,
-                    trail=inbox.get("trail") or (),
-                    attention_snoozed=inbox.get("attention_snoozed"),
-                    handed=inbox.get("handed") or (),
-                    boards=hz["due"] + hz["waiting"],
-                    fleet=fleet,
-                    cards=index,
-                )
-                # *Later*'s ledger rows and the board's lines not yet due, folded or not, whose entry a card
-                # holds (TD-771, TD-828)
-                later = split_later(await h.ledger_view(fleet), hz["ahead"], index, hz["hidden"])[2]
-                tabs = tab_counts(sections)
                 one = templates.get_template("queue_mail.html")
                 origin = page_origin(request)
-                with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
-                    mail = attach(
-                        sections,
-                        lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
-                        later,
-                    )
+                sections, mail = await card_mail(
+                    h,
+                    fleet,
+                    card_index(got),
+                    lambda e, sec, choices: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
+                )
+                tabs = tab_counts(sections)
         # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,
         # what it hides marked, never dropped — a move's neighbours are the whole Up next order
         picks = queue_picks(request.query_params)

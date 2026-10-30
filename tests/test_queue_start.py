@@ -15,7 +15,7 @@ from test_ui_queue import card, client, fake, queue, row
 
 from sessionorc.queue import card_entries
 from shiftlead import repoconfig
-from shiftlead.ui.queue import card_session, queue_view
+from shiftlead.ui.queue import card_session, item_ref, queue_view, waits_on_me
 
 
 def _read(tmp: Path, entries: list[str], **marks: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -228,3 +228,104 @@ def test_an_inbox_press_names_its_entrys_card(tmp_path, monkeypatch):
         "it waits on me (it is blocked by a decision of mine). Its entries are: waits on me — samscrape#TD-012, "
         f"samscrape#TD-009; the rest — samscrape#TD-020. {TAIL}"
     )
+
+
+# -- started from an item (TD-1246; §4.5 screen 12 *Started from an item*) ---------------------------------
+
+
+def test_an_items_id_is_its_board_key_mail_id_entry_or_pr_and_waits_on_me_names_every_item():
+    assert item_ref({"row": "board", "key": "board:91aa0c3e", "id": "board:/r:3"}) == "board:91aa0c3e"
+    assert item_ref({"id": "m-1524a3b5b9cc", "kind": "ask"}) == "m-1524a3b5b9cc"
+    assert item_ref({"row": "ledger", "name": "s", "id": "TD-9"}) == "s#TD-009"
+    assert item_ref({"row": "red_pr", "repo": "s", "pr": 12, "id": "red_pr:s:12"}) == "s#12"
+    assert item_ref({"row": "alarm", "id": "m-x"}) == "", "a state row is no item to start from"
+    wants = {
+        "decide": [{"item": "s#TD-012"}, {"item": "m-aa"}, {"item": ""}],
+        "do": [{"item": "board:bb"}, {"item": "s#12"}, {"item": "m-aa"}],
+    }
+    # the ledger entries as `card_entries` orders them, then every other item once, in the card's order
+    assert waits_on_me(["s#TD-012", "s#TD-009"], wants) == ["s#TD-012", "s#TD-009", "m-aa", "board:bb", "s#12"]
+
+
+def test_card_session_reads_the_entry_an_item_starts_on():
+    c = _card()  # start s#TD-009; TD-020 its top
+    worker = _rec("g1", "/x/s", "TD-009", name="grinder-1")
+    assert card_session(c, [worker], on="s#TD-020") == {"start": "s#TD-009", "own": "", "other": ""}
+    assert card_session(c, [_rec("g2", "/x/s", "TD-20", name="grinder-2")], on="s#TD-020")["other"] == "grinder-2"
+    # the person's own session anywhere on the card still opens, whichever entry the item reads
+    own = _rec("p", "/x/s", "TD-9", unattended=False)
+    assert card_session(c, [own], on="s#TD-020")["own"] == "p"
+
+
+def test_a_board_items_press_starts_on_the_cards_start_and_names_the_item_first(tmp_path, monkeypatch):
+    repo, c, created = _start_world(tmp_path, monkeypatch, fleet=[MANAGER], queue=_q())
+    r = c.post(
+        "/api/ledger/start",
+        json={"repo": "samscrape", "id": "TD-009", "card": "samscrape#TD-020", "item": "board:91aa0c3e"},
+    )
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert kw["worktree"] == "td-9", "a board line is no entry: the card's `start`"
+    assert kw["prompt"] == (
+        "I opened this session from the Queue about board:91aa0c3e, on the card around TD-9 of samscrape's ledger "
+        "(docs/technical_debt.md). Read it first with `ao board show board:91aa0c3e`, and walk me through its goal "
+        "and what each answer leads to. Its entries are: waits on me — samscrape#TD-012, samscrape#TD-009, "
+        f"board:91aa0c3e; the rest — samscrape#TD-020. {TAIL}"
+    )
+    # an item that is no entry starts on `start` alone
+    r = c.post(
+        "/api/ledger/start", json={"repo": "samscrape", "id": "TD-012", "card": "samscrape#TD-020", "item": "m-1"}
+    )
+    assert r.status_code == 409 and "no longer the entry this card starts on" in r.text
+
+
+def test_a_mail_and_a_ledger_items_first_sentence():
+    m = repoconfig.work_text("TD-9", "s", "L", "card", "Queue", item="m-1524a3b5b9cc")
+    assert m.startswith(
+        "I opened this session from the Queue about m-1524a3b5b9cc, on the card around TD-9 of s's ledger (L). "
+        "Read it first with `ao inbox --thread m-1524a3b5b9cc`, and walk me through"
+    )
+    e = repoconfig.work_text("TD-12", "s", "L", "decision", "Queue", item="s#TD-012")
+    assert e.startswith("I opened this session from the Queue about s#TD-012, on the card around TD-12 of s's ")
+    assert "Read it first, in the ledger, and walk me through" in e
+    pr = repoconfig.work_text("TD-9", "s", "L", "card", "Queue", item="s#12")
+    assert "about s#12, on the card around TD-9 of s's ledger (L). Read it first, and walk me through" in pr
+
+
+def test_a_ledger_items_press_starts_on_its_own_entry_by_the_holder_rules_of_that_entry(tmp_path, monkeypatch):
+    def press(name: str, ref: str, holders: list[dict]) -> tuple[Any, list[dict]]:
+        repo, c, created = _start_world(tmp_path / name, monkeypatch, fleet=[MANAGER, *holders], queue=_q())
+        for h in holders:
+            h["repo"] = str(repo.resolve())
+        body = {"repo": "samscrape", "id": ref, "card": "samscrape#TD-020", "item": f"samscrape#{ref}"}
+        return c.post("/api/ledger/start", json=body), created
+
+    # TD-12, the card's decision, is free though a worker holds `start` (TD-9): it starts on TD-12
+    r, created = press("free", "TD-12", [_rec("ao-samscrape-g1", "", "TD-9", name="grinder-1")])
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert kw["worktree"] == "td-12" and kw["lane"] == ["TD-12"]
+    assert kw["prompt"].startswith("I opened this session from the Queue about samscrape#TD-12, on the card around")
+    # an unattended worker holds TD-12: refused in words, never its Focus
+    r, created = press("held", "TD-12", [_rec("ao-samscrape-g2", "", "TD-12", name="grinder-2")])
+    assert r.status_code == 409 and "held by grinder-2" in r.text and created == []
+    # the item names another repo's TD-12: not this card's item
+    repo, c, created = _start_world(tmp_path / "other", monkeypatch, fleet=[MANAGER], queue=_q())
+    body = {"repo": "samscrape", "id": "TD-12", "card": "samscrape#TD-020", "item": "otherrepo#TD-12"}
+    r = c.post("/api/ledger/start", json=body)
+    assert r.status_code == 409 and "not an item of this card" in r.text and created == []
+    # TD-20 is the card's top, no Decide or Do item and not `start`
+    r, created = press("not", "TD-20", [])
+    assert r.status_code == 409 and "not an item of this card" in r.text and created == []
+
+
+def test_the_roads_record_is_the_persons_own_end_with_the_manager_its_controller(tmp_path, monkeypatch):
+    """What `thread` reads on a Queue-started session (§4.8 *thread passes an own end*): the road creates it as
+    the person, interactive, not supervised, no seat — so the create writes `by_person` (`test_person_only`'s
+    controlled `by_person=True` record, which passes `thread` alone) — with the live manager its controller."""
+    repo, c, created = _start_world(tmp_path, monkeypatch, fleet=[MANAGER], queue=_q())
+    r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-009", "card": "samscrape#TD-020"})
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert kw["unattended"] is False and kw["controllers"] == [MANAGER["id"]]
+    assert not kw.get("supervised") and not kw.get("seat") and "by_person" not in kw

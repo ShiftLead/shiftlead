@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from sessionorc.queue import TD_REF, card_index  # noqa: F401 — the page's names for the home's
+from sessionorc.queue import TD_REF, card_index, qid  # noqa: F401 — the page's names for the home's
 from sessionorc.queue import refs as _refs
 
 from .common import _age, _instant, close_state, promote_reading
@@ -211,15 +211,45 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
     return "do"
 
 
+def item_ref(e: Mapping[str, Any]) -> str:
+    """An attached item's id as **Start session** names it (§4.5 screen 12 *Started from an item*, TD-1246): a board
+    line `board:<key>`, a mail item its `m-…`, a ledger row `<repo>#TD-n`, a red PR `<repo>#<n>`; '' for any other
+    row, which no button starts from and the id list does not name."""
+    row = e.get("row")
+    if row == "board":
+        return str(e.get("key") or "")
+    if row == "ledger":
+        tid = str(e.get("id") or "")
+        return qid(str(e.get("name") or ""), tid) if TD_REF.fullmatch(tid) else ""
+    if row == "red_pr":
+        return f"{e.get('repo')}#{e.get('pr')}"
+    mid = str(e.get("id") or "")
+    return mid if not row and mid.startswith("m-") else ""
+
+
+def waits_on_me(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
+    """*waits on me* in **Start session**'s id list (§4.5 screen 12 *Started from an item*, TD-1246): the card's
+    Decide and Do ledger entries in key order (`card_entries`), then every other Decide and Do item — a board
+    line, a mail item, a red PR — by its id, in the card's order."""
+    out = list(mine)
+    for w in WANTS:
+        for m in wants.get(w) or ():
+            ref = str(m.get("item") or "")
+            if ref and not TD_REF.fullmatch(ref) and ref not in out:
+                out.append(ref)
+    return out
+
+
 def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str, Any]:
     """The Inbox's rows the Queue draws (`home: queue`, §4.5 screen 6 *Where a row is drawn*), by the card each
     is attached to and the card's section it is in (§4.5 screen 12 *What is attached to a card*, TD-828):
-    `cards`, each card's `{section: [item]}`, every item `{section, id, html, kind, on_row}` with the row drawn
-    by the Inbox's own renderer (`drawn(e, section)`), in the Inbox's order; and `mentioned`, on each row an item
-    names beside its own, `{item id: its first words}` — one per item however often it is drawn, so the row's
-    one phrase counts items (*mentioned in n items*, TD-915). The snoozed list is the Inbox's alone: no Snooze on the
-    Queue. `later` is `split_later`'s rows, all under *Needs you* whatever their `Due:`: a ledger row the
-    person's, drawn first, and a board line not yet due after the questions, drawn with its due date."""
+    `cards`, each card's `{section: [item]}`, every item `{section, id, item, html, kind, on_row}` with the row
+    drawn by the Inbox's own renderer (`drawn(e, section)`) and `item` its id (`item_ref`), in the Inbox's order;
+    and `mentioned`, on each row an item names beside its own, `{item id: its first words}` — one per item however
+    often it is drawn, so the row's one phrase counts items (*mentioned in n items*, TD-915). The snoozed list is
+    the Inbox's alone: no Snooze on the Queue. `later` is `split_later`'s rows, all under *Needs you* whatever their
+    `Due:`: a ledger row the person's, drawn first, and a board line not yet due after the questions, drawn with
+    its due date."""
     cards: dict[str, dict[str, list[Any]]] = {}
     mentioned: dict[str, dict[str, str]] = {}
 
@@ -231,6 +261,7 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
             {
                 "section": sec,
                 "id": str(mid or ""),
+                "item": item_ref(e),
                 "html": drawn({**e, "want": want}, drawn_as),  # its renderer's `card` mode reads the want
                 "kind": kind,
                 "want": want,
@@ -340,13 +371,15 @@ def same_td(a: Any, b: Any) -> bool:
     return a == b
 
 
-def card_session(card: Mapping[str, Any], fleet: Iterable[Mapping[str, Any]] | None) -> dict[str, Any]:
+def card_session(card: Mapping[str, Any], fleet: Iterable[Mapping[str, Any]] | None, on: str = "") -> dict[str, Any]:
     """Who a card's **Start session** meets (§4.5a *Queue card: Start session / Open session*, TD-912), one answer
     the button and `/api/ledger/start` both read: `start`, the reading's entry to start on; `own`, the person's
     own session (`unattended: false`) holding any of the card's open entries — the one holding `start`, else the
     first by id — whose Focus the press opens; `other`, the name of any other live session holding `start` while
     none of the person's does, when the button is absent and a press is refused. A session holds an entry by its
-    claim, or by the name `td-<n>` in the entry's repo before the tick derives the claim (TD-678)."""
+    claim, or by the name `td-<n>` in the entry's repo before the tick derives the claim (TD-678). `on` is the entry
+    an item's press starts on where that is not `start` (§4.5 screen 12 *Started from an item*, TD-1246): the
+    holder rules read it in `start`'s place, so `other` is its holder and `own` the one holding it first."""
     start = str(card.get("start") or "")
     rows = [r for r in [card.get("top"), *(card.get("rows") or [])] if isinstance(r, Mapping) and not r.get("archived")]
     live = [s for s in fleet or () if s.get("state") not in ("exited", "closed") and s.get("repo")]
@@ -369,7 +402,8 @@ def card_session(card: Mapping[str, Any], fleet: Iterable[Mapping[str, Any]] | N
     def mine(ss: Iterable[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
         return sorted((s for s in ss if not s.get("unattended")), key=lambda s: str(s.get("id")))
 
-    on_start = holders(start) if start else []
+    on = on or start
+    on_start = holders(on) if on else []
     own = mine(on_start) or mine(s for r in rows for s in holders(str(r.get("qid") or "")))
     other = on_start[0] if on_start and not own else {}
     return {
