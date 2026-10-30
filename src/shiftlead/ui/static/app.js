@@ -1321,7 +1321,11 @@
         // session (§4.5 screen 12 *Started from an item*); refused (plain http off localhost), the toast shows it
         if (r.focus && b.dataset.item) {
           try { await navigator.clipboard.writeText(b.dataset.item); }
-          catch (e) { AO.toast(`copy ${b.dataset.item} — the browser refused the clipboard`, false, to, false, true); return; }
+          catch (e) {
+            if (row && row.isConnected) AO.unPend(row);  // the page stays: its row is pressable again
+            AO.toast(`copy ${b.dataset.item} — the browser refused the clipboard`, false, to, false, true);
+            return;
+          }
           say(`${b.dataset.item} copied — paste it into your session`, true);
         }
         if (!r.focus) say(`started ${r.name || r.id} on ${b.dataset.item || b.dataset.ref}`, true);

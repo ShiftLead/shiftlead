@@ -444,7 +444,8 @@ def test_an_items_open_session_copies_its_id_and_the_toast_shows_it_where_refuse
     press = press[: press.index('if (action === "board_add")')]
     assert "...(b.dataset.item ? { item: b.dataset.item } : {})" in press
     assert "navigator.clipboard.writeText(b.dataset.item)" in press
-    assert "the browser refused the clipboard" in press and "true); return; }" in press
+    refused = press[press.index("catch (e) {") : press.index("say(`${b.dataset.item} copied")]
+    assert "AO.unPend(row)" in refused and "the browser refused the clipboard" in refused and "return;" in refused
 
 
 def test_the_queue_page_draws_an_asks_start_session_on_its_card_and_none_in_the_header(tmp_path, monkeypatch):
