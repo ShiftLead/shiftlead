@@ -56,6 +56,10 @@
 {% macro fold_body(kind, e, rest=none) -%}
 {%- if kind == 'mail' %}<div class="body md">{{ rest if rest is not none else shaped(e.text, origin).rest }}</div>
 {%- elif kind == 'card' %}<div class="body md">{{ rest if rest is not none else card_shape(e.text, origin).context }}</div>
+{%- elif kind == 'boardcard' %}
+{%- if e.card.context %}<div class="body md">{{ md(e.card.context, origin) }}</div>{% endif %}
+{%- if e.key %}<div class="st"><button class="mono boardkey" type="button" data-copy="{{ e.key }}" data-copied="copied {{ e.key }}" title="the line's id: type it in chat or in ao board show; a click copies it">{{ e.key }}</button></div>{% endif %}
+{%- if e.detail %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}
 {%- elif kind == 'board' %}
 {%- if e.rest %}<div class="body md">{{ md(e.rest, origin) }}</div>{% endif %}
 {%- if e.detail %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}
@@ -202,14 +206,27 @@
   {%- elif how == 'ledger' and e.home == 'queue' %}
   <button class="btn sm ghost" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button>
   {%- endif %}
-  {%- if how == 'board' %}
-  <button class="btn sm ghost" type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ where }}" title="{{ help_title('card-answers') }}">Answer…</button>
+  {#- an `act` line is a Do (TD-1066): **Done**, the write-back's check-off, is its one answer, outlined, and its
+      Answer… is in its ⋯; on any board item Answer…'s title is its *standing* (§4.5a *Inbox board row: standing*) -#}
+  {%- if how == 'board' and e.kind == 'act' %}
+  {{ board_done(e, 'btn sm answer rec') }}
+  {%- elif how == 'board' %}
+  {{ board_answer(e, 'btn sm ghost') }}
   {%- elif how == 'ledger' %}
   <button class="btn sm ghost" type="button" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="{{ help_title('card-answers') }}">Answer…</button>
   {%- elif e['from'] not in ('person', 'system') %}
   <button class="btn sm ghost" type="button" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" title="{{ help_title('card-answers') }}">Answer…</button>
   {%- endif %}
 </div>
+{%- endmacro %}
+
+{#- a card's board item's **Done** — the write-back's, its *landed on origin* words its title — and **Answer…**, the
+    words written on its line, its *standing* its title where the page has one (§4.5 screen 12, TD-1066) -#}
+{% macro board_done(e, cls, role='') -%}
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="checks the line off {{ e.repo_name or e.repo }}'s board: one edit landed on its origin by shiftlead's own pull request" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
+{%- endmacro %}
+{% macro board_answer(e, cls, role='') -%}
+<button{% if cls %} class="{{ cls }}"{% endif %}{% if role %} role="{{ role }}"{% endif %} type="button" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ (e.repo_name or e.repo or e.name or 'the repo') ~ "'s board" }}" title="{{ ((e.session ~ ' · ') if e.session else '') ~ e.standing.text if e.standing else help_title('card-answers') }}">Answer…</button>
 {%- endmacro %}
 
 {# §4.5a **Snooze** on an `ask`: 1 h · tomorrow 08:00 · a date. The person's own bookkeeping — the
@@ -794,6 +811,18 @@
     actionable as any (TD-264): the write-back works on origin's line. -#}
 {%- set on = origin_note(e) if origin_first else none %}
 {%- if on %}<div class="originnote meta{% if on.warn %} warnish{% endif %}">{{ on.text }}</div>{% endif %}
+{#- on a card a board item drawn whole has a kind line (§4.5 screen 12 *A board item says where its task is*,
+    TD-1066): its want, *in <repo>* where its `Context:` names another repo, *board line*; its standing is
+    Answer…'s title and its key is under *context* -#}
+{%- if card_whole(mode, e) %}
+<div class="row gap wrap mhead">
+  <span class="badge kindmark k-{{ e.want }}">{{ e.want }}</span>
+  {%- if e.card and e.card.in_repo %}<b class="inrepo" title="the line's Context names {{ e.card.in_repo }}: its task is there">in {{ e.card.in_repo }}</b>{% endif %}
+  <span class="st">board line</span>
+  <span class="grow"></span>
+  <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
+</div>
+{%- else %}
 {#- the board is the repo's (TD-722, built by TD-741): the row names its repo — *ContractMatch ·
     samscrape* where its project has several repos — and carries no team badge -#}
 <div class="row gap wrap mhead">
@@ -812,12 +841,20 @@
   {%- if e.key %}<button class="mono boardkey" type="button" data-copy="{{ e.key }}" data-copied="copied {{ e.key }}" title="the line's id: type it in chat or in ao board show; a click copies it">{{ e.key }}</button>{% endif %}
   <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
 </div>
+{%- endif %}
 {#- §4.5a **Inbox board row: text** (TD-279): the line in the closed markdown subset as a message's
     text is (§4.10), its bold head and the sentence after it drawn and the rest under *details*,
     kept open across the poll as a message's fold is; the `Due:` is the head's due words, the
     `Context:` closes the fold, and the person's replies stand under the text, outside it. -#}
+{%- if card_whole(mode, e) and e.card %}
+<div class="body md sentence">{{ md(e.card.sentence, origin) }}</div>
+{%- if e.card.leads %}<div class="body md leads">{{ md(e.card.leads, origin) }}</div>{% endif %}
+{%- if e.card.context or e.key or e.detail %}{{ fold('cb:' ~ e.id, fold_open, 'boardcard', e) }}{% endif %}
+{%- for r in e.replies %}
+<div class="st boardreply">{{ r.by }}, {{ r.date }}: {{ md(r.text, origin, inline=True) }}</div>
+{%- endfor %}
+{%- elif e.lead is defined %}
 {%- if not card_whole(mode, e) %}{{ subj(e) }}{% endif %}
-{%- if e.lead is defined %}
 <div class="body md{% if card_whole(mode, e) %} sentence{% endif %}">{{ md(e.lead, origin) }}</div>
 {#- §4.5a **Inbox board row: detail block** (TD-312): the reader's `detail` drawn after the rest of
     the line inside the same fold, through the same renderer — text, never a control or a field. A
@@ -869,11 +906,12 @@
 {#- a live look's default is its Works button, *Go with it: Works* (§4.5a) -#}
 {%- set gwi = e.default and e.answers and not e.decided and not e.pair and not waits %}
 <div class="row gap wrap mfoot">
-  {%- if mode == 'card' %}{# a card: no Reply word, no Snooze; Done is behind the ⋯ (screen 12 *Three verbs*) #}
-  <span class="st" title="each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request">on the board — {% if not (waits or e.decided) %}Answer… writes on its line and {% endif %}Done checks it off</span>
+  {%- if mode == 'card' %}{# a card: no Reply word, no Snooze, no *on the board —* footer (TD-1066); an `act` line's
+     Done is its answer and its Answer… behind the ⋯, any other line's Done behind the ⋯ (screen 12 *Three verbs*) #}
   <span class="grow"></span>
-  {%- call qrow.dots(['Done'] + (['Open board'] if e.editor else [])) %}
-  <button role="menuitem" type="button" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
+  {%- set act = card_whole(mode, e) and e.kind == 'act' and not (waits or e.decided) %}
+  {%- call qrow.dots((['Answer…'] if act else ['Done']) + (['Open board'] if e.editor else [])) %}
+  {%- if act %}{{ board_answer(e, '', 'menuitem') }}{% else %}{{ board_done(e, '', 'menuitem') }}{% endif %}
   {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "", role="menuitem") }}{% endif %}
   {%- endcall %}
 </div>

@@ -4545,14 +4545,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def api_fold(request: Request, key: str = ""):
         """design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): one fold's body, read
         on its first open, by the row renderer's own macro — the one source its key names: a board line
-        (`board:<root>:<line>`) from the home's board reading, a ledger row (`ledger:<repo>:<id>`) from its
-        repo's ledger reading, a mail item's *context* on a card (`card:<id>`, TD-911), else a person-inbox
-        entry or a row handed to a seat by its id, a person's read marking nothing. A key that names nothing is a
-        404, which the fold says as *gone — reload*."""
+        (`board:<root>:<line>`, or `cb:board:…` for its *context* on a card) from the home's board reading, a
+        ledger row (`ledger:<repo>:<id>`) from its repo's ledger reading, a mail item's *context* on a card
+        (`card:<id>`, TD-911), else a person-inbox entry or a row handed to a seat by its id, a person's read marking
+        nothing. A key that names nothing is a 404, which the fold says as *gone — reload*."""
         e: Any = None
-        if key.startswith("board:"):
-            kind = "board"
-            e = next((r for r in (await h.board_all())[0] if r.get("id") == key), None)
+        if key.startswith(("board:", "cb:board:")):
+            # a board line's details, or its *context* drawn whole on a card (`cb:board:…`, TD-1066)
+            kind, bid = ("boardcard", key.removeprefix("cb:")) if key.startswith("cb:") else ("board", key)
+            e = next((r for r in (await h.board_all())[0] if r.get("id") == bid), None)
         elif key.startswith("ledger:"):
             kind, fleet = "ledger", []
             with contextlib.suppress(HTTPException):

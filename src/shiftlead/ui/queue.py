@@ -192,8 +192,9 @@ READ_LINES = {"answered": "answered for you", "waiting": "waiting on them", "fyi
 
 def want_of(e: Mapping[str, Any], sec: str) -> str:
     """An attached item's want (§4.5 screen 12 *Three wants*): `decide` — an `ask`, a `steer` running or
-    paused, a board line but a `watch` or `fyi` one, a `decision (paul)` entry; `do` — an `Owner: paul` entry,
-    a red PR nobody holds, and what else needs the person (a blocked outcome); `read` — what is answered,
+    paused, a `decide` or `look` board line, a `decision (paul)` entry; `do` — an `act` board line (TD-1066: Done
+    its answer), an `Owner: paul` entry, a red PR nobody holds, and what else needs the person (a blocked
+    outcome); `read` — what is answered,
     waits on others or is for reading; `held` — an entry the person holds, which is no want while held."""
     if sec in READ_LINES:
         return "read"
@@ -203,7 +204,8 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
     if row == "red_pr":
         return "do"
     if row == "board":
-        return "read" if str(e.get("kind") or "").lower() in ("watch", "fyi") else "decide"
+        kind = str(e.get("kind") or "").lower()
+        return "read" if kind in ("watch", "fyi") else ("do" if kind == "act" else "decide")
     if sec == "steering" or e.get("kind") in ("ask", "steer"):
         return "decide"
     return "do"

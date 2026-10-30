@@ -35,8 +35,9 @@ def test_each_kind_lands_in_its_want():
     assert want_of({"kind": "ask"}, "needs") == "decide"
     assert want_of({"kind": "steer"}, "needs") == "decide"  # a paused steer
     assert want_of({"kind": "steer"}, "steering") == "decide"  # a running one
-    for kind in ("decide", "act", "look", ""):
+    for kind in ("decide", "look", ""):
         assert want_of({"row": "board", "kind": kind}, "needs") == "decide"
+    assert want_of({"row": "board", "kind": "act"}, "needs") == "do"  # TD-1066: Done its answer
     assert want_of({"row": "board", "kind": "watch"}, "needs") == "read"
     assert want_of({"row": "ledger", "why": "decision"}, "needs") == "decide"  # held until
     assert want_of({"row": "ledger", "why": "yours"}, "needs") == "do"  # yours to do
