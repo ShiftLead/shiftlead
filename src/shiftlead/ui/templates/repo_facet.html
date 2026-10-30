@@ -1,13 +1,14 @@
 {# The **Repo facet** (design §4.5a *team card: Repo facet*): the repo's name and page, Technical debt's
    bars and windows, Pull requests' windows. Drawn first on each team card of the repo on the
    Sessions page (`team_summary.html`, TD-1189), and on the repo's line (`repo_line.html`, §4.9 *The Sessions
-   page*) while no card shows it and always on the Repo page; `m.repo` is the facet, set by whoever includes it. #}
+   page*), which only the Repo page shows — the Sessions page's line draws the compact facet (TD-1240);
+   `m.repo` is the facet, set by whoever includes it. #}
   <div class="facet frepo">
     {% if not m.repo %}
     <div class="fhead"><span class="kind">Repo</span></div>
     <div class="meta" title="no member of this team works in a checkout this host's repos registry lists (design §4.4 Repo facts)">no repo here</div>
     {% else %}{% set r = m.repo %}
-    {# the repo's line says its name and *open →* itself (`repo_line.html`) #}
+    {# the name row: the team card's, since the repo's line says its name and *open →* itself (`repo_line.html`) #}
     {% if not on_line %}<div class="fhead"><span class="kind">Repo</span> <a class="strong" href="{{ r.url }}">{{ r.name }}</a><span class="grow"></span><a class="meta" href="{{ r.url }}">open →</a></div>{% endif %}
     {% set led = r.ledger %}
     <div class="fhead"><span class="kind">Technical debt{% if led.n is not none %} ({{ led.n }} open){% endif %}</span>{% if led.lanes %}<span class="tipmark" tabindex="0" role="img" aria-label="{{ led.lanes.text }}" title="{{ led.lanes.text }}">i</span>{% endif %}
