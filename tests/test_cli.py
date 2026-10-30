@@ -1081,6 +1081,10 @@ def test_msg_to_the_person_warns_on_an_unshaped_message_and_sends_it(subprocess_
     assert "steer → person" in got.out and "the person reads one sentence first" in got.err
     assert cli.main(["msg", "person", "Merge #9 today?\n\nIt ships.", "--kind", "steer", "--default", "merge"]) == 0
     assert "the person reads" not in capsys.readouterr().err
+    assert cli.main(["msg", "person", "Merge it. Then tag it.", "--kind", "ask"]) == 0
+    assert "the person reads one sentence first" in capsys.readouterr().err
+    assert cli.main(["msg", "person", "Merged it. Then tagged it.", "--kind", "note"]) == 0  # a note: TD-127's rule
+    assert "the person reads" not in capsys.readouterr().err
     for x in (sid, other):
         call_sync("kill", id=x)
 
