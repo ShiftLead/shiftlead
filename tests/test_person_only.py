@@ -24,13 +24,15 @@ CHECKS = {"agent_common.person_only", "self._person_entry", "self._promote_perso
 # the refusal's words: today's for every name, and for `mail.PERSON_SESSION`'s the carve-out's (TD-1117)
 OLD = ": a person's own act, refused to every session but the person's own shell (design §"
 NEW = OLD.replace(" (design", " and a session the person started by hand (design")
+# and `thread`'s, which passes an own end whatever its controllers (§4.8 *`thread` passes an own end*, TD-1066)
+THREAD = OLD.replace(" (design", " and an own end of the person's (design")
 
 # what the bare call supplies beyond `None`: a road, without which `ledger_decide` sets no `session_ok`
 SUPPLY = {"ledger_decide": {"road": "done"}}
 
 
 def _refusal(name: str) -> str:
-    return NEW if name in mail.PERSON_SESSION else OLD
+    return NEW if name in mail.PERSON_SESSION else THREAD if name == "thread" else OLD
 
 
 def _first_call(fn) -> str | None:
@@ -84,6 +86,7 @@ def test_the_person_session_subset_is_in_the_list_and_its_rpcs_alone_set_session
     for name in sorted(mail.PERSON_ONLY):
         src = textwrap.dedent(inspect.getsource(rpcs[name]))
         assert ("session_ok=" in src) == (name in mail.PERSON_SESSION), name
+        assert ("own_end_ok=" in src) == (name == "thread"), name
 
 
 def test_every_rpc_that_makes_the_check_is_in_the_list():
@@ -132,6 +135,13 @@ NOT_THE_PERSONS = {
 # controller and no seat, a role not ending it — they pass `PERSON_SESSION`'s two names
 PERSONS_SESSIONS = {"an agent session", "a role's shell", "a team's shell with a role"}
 
+# an own end with a controller (§4.8 *`thread` passes an own end*, TD-1066): the person's session started
+# from a Queue card, the live manager its controller — `by_person` written by the create is what tells it
+# from the controlled shells above, which carry no such field; it passes `thread` alone
+OWN_ENDS = {
+    "a Queue-started session": {"adapter": "claude-code", "controllers": ["ao-repo-manager"], "by_person": True},
+}
+
 # and sessions refused every name: an unattended agent, and an interactive one holding a seat
 NEVER = {
     "an unattended agent session": {"adapter": "claude-code", "unattended": True},
@@ -153,14 +163,18 @@ def test_the_persons_shell_passes_every_act_in_the_list_and_nothing_else_does():
     past the check (whatever it fails on next, it is not the refusal); called from an unattended,
     controlled or seat-holding session, or a caller the host does not hold, each is refused in its
     words. The third class (TD-1117): a person's session — an interactive agent session, a role's shell,
-    with no controller — passes each name in `PERSON_SESSION` and is refused every other name."""
+    with no controller — passes each name in `PERSON_SESSION` and is refused every other name. And `thread`
+    (TD-1066) passes every own end, a Queue-started session with the manager its controller among them, while
+    the controlled shells written before `by_person` stay refused."""
     rpcs = _rpcs()
     shells = {"ao-sh": _shell("ao-sh"), "ao-tsh": _shell("ao-tsh", team="ao-grind")}
     others = {
-        f"ao-{i}": (what, _shell(f"ao-{i}", **o)) for i, (what, o) in enumerate((NOT_THE_PERSONS | NEVER).items())
+        f"ao-{i}": (what, _shell(f"ao-{i}", **o))
+        for i, (what, o) in enumerate((NOT_THE_PERSONS | OWN_ENDS | NEVER).items())
     }
     sessions = {sid for sid, (what, _) in others.items() if what in PERSONS_SESSIONS}
     assert len(sessions) == len(PERSONS_SESSIONS)
+    own_ends = sessions | {sid for sid, (what, _) in others.items() if what in OWN_ENDS}
     bare = HostAgent.__new__(HostAgent)
     bare.sessions = shells | {sid: r for sid, (_, r) in others.items()}
     bare.remote = {}
@@ -172,7 +186,7 @@ def test_the_persons_shell_passes_every_act_in_the_list_and_nothing_else_does():
             if inspect.iscoroutine(out):
                 asyncio.run(out)
 
-        passing = {*shells, *(sessions if name in mail.PERSON_SESSION else ())}
+        passing = {*shells, *(sessions if name in mail.PERSON_SESSION else ()), *(own_ends if name == "thread" else ())}
         for own in sorted(passing):
             try:
                 call(own)

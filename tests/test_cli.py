@@ -1309,9 +1309,16 @@ def test_msg_subject_and_the_inbox_head_line_that_shows_it(subprocess_agent, tmp
 def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-136 slice 1 (design §4.7): `ao inbox --thread <id>` prints the thread oldest first, the
     person's own reply in it and the named entry marked; `--json` is the RPC result; a session is
-    refused in the host agent's words; `--unread` does not combine with it."""
+    refused in the host agent's words — an unattended one, since an own end may read it (§4.8, TD-1066);
+    `--unread` does not combine with it."""
     worker = call_sync(
-        "create", name="w", dir=str(tmp_path), adapter="agentshell", role="worker", argv=["bash", "--norc"]
+        "create",
+        name="w",
+        dir=str(tmp_path),
+        adapter="agentshell",
+        role="worker",
+        argv=["bash", "--norc"],
+        unattended=True,
     )["id"]
     monkeypatch.setenv("SHIFTLEAD_SESSION", worker)
     assert cli.main(["--json", "msg", "person", "rebase or merge?", "--kind", "ask"]) == 0
@@ -1329,7 +1336,13 @@ def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, t
     monkeypatch.setenv("SHIFTLEAD_SESSION", worker)
     assert cli.main(["inbox", "--thread", asked]) == 1
     assert "cannot read a thread" in capsys.readouterr().err
+    (tmp_path / "own").mkdir()  # one directory each: the anchor rule (§9 invariant 2)
+    own = call_sync("create", name="o", dir=str(tmp_path / "own"), adapter="agentshell", argv=["bash", "--norc"])
+    monkeypatch.setenv("SHIFTLEAD_SESSION", own["id"])  # the person's own end reads it (§4.8, TD-1066)
+    assert cli.main(["--json", "inbox", "--thread", asked]) == 0
+    assert [e["from"] for e in json.loads(capsys.readouterr().out)["entries"]] == [worker, "person"]
     call_sync("kill", id=worker)
+    call_sync("kill", id=own["id"])
 
 
 def test_msg_verdict_rides_a_readers_reply_to_a_prs_ask(subprocess_agent, tmp_path, capsys, monkeypatch):
