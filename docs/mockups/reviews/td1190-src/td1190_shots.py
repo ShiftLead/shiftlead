@@ -37,7 +37,7 @@ body { background: var(--bg); padding: 16px; }
 .ae-way:first-child { padding-right: 16px; }
 .ae-btnline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .ae-btnline.ae-named { flex-wrap: nowrap; }
-.ae-name { width: auto; flex: 1 1 0; min-width: 0; max-width: 180px; box-sizing: border-box; height: 30px; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
+.ae-name { width: auto; flex: 1 1 0; min-width: 0; max-width: 170px; box-sizing: border-box; height: 30px; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
 .ae-name.ae-bad { border-color: #dc2626; }
 .ae-bad-line { color: #b91c1c; }
 @media (max-width: 640px) {
