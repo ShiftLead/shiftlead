@@ -141,7 +141,8 @@
     const first = !!note && !edge;
     if (first) state.firstFree = false;
     const say = (t, ok, n) => (n ? toast(`${t} — ${n}`, ok, undefined, undefined, undefined, 7000) : toast(t, ok));
-    return write(text).then(() => say("copied", true, note), () => {
+    // a write that throws (no clipboard outside a secure context) is a refusal too
+    return Promise.resolve().then(() => write(text)).then(() => say("copied", true, note), () => {
       if (first) state.firstFree = true;
       say("clipboard blocked (needs https or localhost)", false, edge ? note : "");
     });

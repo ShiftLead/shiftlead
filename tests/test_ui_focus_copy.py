@@ -43,7 +43,10 @@ const copies = async (runs) => {
   for (const [text, edge, transcript, refuse] of runs) {
     const seen = [];
     await AO.copyWith({ text, edge, transcript, state,
-      write: () => (refuse ? Promise.reject(new Error("no")) : Promise.resolve()),
+      write: () => {
+        if (refuse === "throw") throw new Error("no clipboard");
+        return refuse ? Promise.reject(new Error("no")) : Promise.resolve();
+      },
       toast: (t, ok, href, wait, sticky, ms) => seen.push([t, !!ok, ms || null]) });
     out.push([...seen, state.firstFree]);
   }
@@ -70,6 +73,7 @@ const copies = async (runs) => {
     plain: await copies([["one row", null, true], ["a\\nb", null, true], ["c\\nd", null, true]]),
     // a refused write of several rows draws no note and spends nothing; the next one carries it
     refused: await copies([["a\\nb", null, true, true], ["a\\nb", null, true]]),
+    thrown: await copies([["a\\nb", null, true, "throw"], ["a\\nb", null, true]]),
     // the edge and several rows: the edge's note, and the first-copy note left for the next copy of several rows
     edgeFirst: await copies([["a\\nb", "top", true], ["a\\nb", null, true]]),
     // the edge's note on a refused write too; no Transcript: the shell's edge note, and no first-copy note
@@ -149,6 +153,7 @@ def test_a_copy_carries_its_note_for_seven_seconds_and_the_first_copy_note_once(
     ]
     # a refused write draws no first-copy note and gives the flag back, so the next copy of several rows carries it
     assert got["refused"] == [[[BLOCKED, False, None], True], [[f"copied — {FIRST}", True, 7000], False]]
+    assert got["thrown"] == got["refused"]  # a write that throws is a refusal: the flag given back
     # the edge's note wins and leaves the first-copy note for the next copy of several rows
     assert got["edgeFirst"] == [[[f"copied — {EDGE}", True, 7000], True], [[f"copied — {FIRST}", True, 7000], False]]
     # the edge's note goes on *clipboard blocked* too
