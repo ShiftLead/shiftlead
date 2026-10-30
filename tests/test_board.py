@@ -201,6 +201,21 @@ def test_a_push_the_forge_refuses_reads_apart_from_an_unreachable_origin(repo, t
     assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
 
 
+def test_a_refused_push_without_a_remote_error_reads_its_status_line_else_the_last_line():
+    """TD-1252, design §4.4 *Board write-back*: with no `remote: error:` line, a plain `! [rejected]` (git's
+    non-fast-forward) gives its parenthesis, a rejection with none gives git's last line, and an output with
+    neither reads as no forge reached (None)."""
+
+    def cp(err: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(["git", "push"], 1, "", err)
+
+    to = "To github.com:o/r.git\n"
+    assert board._push_refusal(cp(to + " ! [rejected]        HEAD -> board/x (fetch first)\n")) == "fetch first"
+    bare = to + " ! [remote rejected] HEAD -> board/x\nerror: failed to push some refs to 'github.com:o/r.git'\n"
+    assert board._push_refusal(cp(bare)) == "error: failed to push some refs to 'github.com:o/r.git'"
+    assert board._push_refusal(cp("fatal: unable to access 'https://x/': Could not resolve host: x\n")) is None
+
+
 def test_a_merge_the_forge_refuses_closes_the_pr_and_names_a_moved_line(repo, monkeypatch, forge):
     """§4.4: origin moving elsewhere between fetch and merge refuses nothing (the squash lands); a
     refused merge closes the PR and deletes its branch, and is the moved-line refusal when origin
