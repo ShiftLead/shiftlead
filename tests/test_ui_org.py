@@ -1837,6 +1837,7 @@ def test_own_work_reads_working_whether_or_not_a_wait_reads(tmp_path, monkeypatc
     r = view(rec, [rec, seat], repos=repos)
     assert r["pill_word"] == "working"
     assert r["slot"]["text"] == "waiting · review #1302 with the techlead · working · 1 shell"
+    assert r["slot"]["full"].startswith("waiting · review #1302 with the techlead: the reader holds its ask")
     # unseen, own work and an ask out: *working*, never *idle · unseen*
     unseen = view(_card(unattended=False, seen_at=None, **shell), waits=waits_of([ask]))
     assert unseen["pill_word"] == "working" and not unseen["unseen"]

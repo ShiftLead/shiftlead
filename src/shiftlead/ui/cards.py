@@ -1129,10 +1129,8 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         )
         if own := d.get("own_slot"):
             what = d.get("own_what") or "subagents"
+            full = f"{text}: the reader holds its ask for its claim's pull request, and its own {what} run — {own}"
             text = f"{text} · {own}"
-            full = (
-                f"{text}: the reader holds its ask for its claim's pull request, and its own {what} run (design §4.2)"
-            )
     elif d.get("own_work"):
         # §4.2 *Working on its own* (TD-734, TD-761): its turn ended, its own subagents or shells still run
         text = d.get("own_slot") or d["own_work"]

@@ -329,7 +329,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         # what each session waits on from the person (§4.5a **waiting** mark, TD-274): the home's reading
         with contextlib.suppress(Exception):
             asked = teamrun.waiting_of_home(call_sync)
-    # a wait the home reads wins over working on its own (§4.2 *Waiting*), as on the card
+    # the wait the home reads: `-v` prints it, and with nothing of its own running it is *waiting* (§4.2 *One order*)
     waits = {s["id"]: bool(waiting_words(asked.get(s["id"]))) for s in sessions}
     sessions.sort(key=lambda s: (STATE_RANK.get(shown_state(s, waits[s["id"]])[0], 9), s["name"]))
     w = max(len(s["id"]) for s in sessions)
