@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from sessionorc.queue import TD_REF, card_index, qid  # noqa: F401 — the page's names for the home's
+from sessionorc.queue import TD_REF, card_entries, card_index, qid  # noqa: F401 — the page's names for the home's
 from sessionorc.queue import refs as _refs
 
 from .common import _age, _instant, close_state, promote_reading
@@ -240,7 +240,7 @@ def waits_on_me(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
     return out
 
 
-def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str, Any]:
+def attach(sections: Mapping[str, Any], drawn: Any, later: Any = (), start: Any = None) -> dict[str, Any]:
     """The Inbox's rows the Queue draws (`home: queue`, §4.5 screen 6 *Where a row is drawn*), by the card each
     is attached to and the card's section it is in (§4.5 screen 12 *What is attached to a card*, TD-828):
     `cards`, each card's `{section: [item]}`, every item `{section, id, item, html, kind, on_row}` with the row
@@ -249,7 +249,8 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
     often it is drawn, so the row's one phrase counts items (*mentioned in n items*, TD-915). The snoozed list is
     the Inbox's alone: no Snooze on the Queue. `later` is `split_later`'s rows, all under *Needs you* whatever their
     `Due:`: a ledger row the person's, drawn first, and a board line not yet due after the questions, drawn with
-    its due date."""
+    its due date. `start(card id, item id)` is a Decide or Do item's `item_start`, which its renderer draws as the
+    item's own **Start session** (TD-1246); without it no item draws one."""
     cards: dict[str, dict[str, list[Any]]] = {}
     mentioned: dict[str, dict[str, str]] = {}
 
@@ -257,12 +258,15 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
         want = want_of(e, sec)
         if want == "held":  # the held row, never the for-you row (§4.5a *Inbox row: held entry*)
             e = {**e, "kind": "ledger · held", "claimed": True, "answers": [], "default": ""}
-        cards.setdefault(str(e.get("on_card") or ""), {}).setdefault(sec, []).append(
+        card, ref = str(e.get("on_card") or ""), item_ref(e)
+        go = start(card, ref) if start is not None and want in WANTS and e.get("row") != "red_pr" else {}
+        cards.setdefault(card, {}).setdefault(sec, []).append(
             {
                 "section": sec,
                 "id": str(mid or ""),
-                "item": item_ref(e),
-                "html": drawn({**e, "want": want}, drawn_as),  # its renderer's `card` mode reads the want
+                "item": ref,
+                # its renderer's `card` mode reads the want, and draws the item's Start session from `start`
+                "html": drawn({**e, "want": want, "start": go}, drawn_as),
                 "kind": kind,
                 "want": want,
                 "red": e.get("row") == "red_pr",
@@ -411,6 +415,28 @@ def card_session(card: Mapping[str, Any], fleet: Iterable[Mapping[str, Any]] | N
         "own": str(own[0]["id"]) if own else "",
         "other": str(other.get("name") or other.get("id") or ""),
     }
+
+
+def item_start(card: Mapping[str, Any], item: str, fleet: Iterable[Mapping[str, Any]] | None) -> dict[str, Any]:
+    """What an item's **Start session** / **Open session** on a card sends and reads (§4.5 screen 12 *Started from
+    an item*, TD-1246): `{item, repo, ref, card, own}` — the entry it starts on (a ledger item's own where it is one
+    of the card's Decide or Do entries, any other item the card's `start`) and the person's own session the press
+    opens — or `{}` where it draws no button: a red PR, a ledger item the road would refuse, a card with no
+    `start`, or another session holding the entry it starts on while none of the person's is on the card."""
+    if not item or not card.get("start"):
+        return {}
+    on = str(card["start"])
+    if TD_REF.fullmatch(item):
+        if item not in card_entries(card)[0] and item != on:
+            return {}
+        on = item
+    elif re.fullmatch(r"[\w.-]+#\d+", item):  # a red PR draws none
+        return {}
+    met = card_session(card, fleet, on=on)
+    if met["other"]:
+        return {}
+    repo, _, ref = on.partition("#")
+    return {"item": item, "repo": repo, "ref": ref, "card": str(card.get("id") or ""), "own": met["own"]}
 
 
 def _mail_status(status: str, wants: Mapping[str, Any]) -> str:
@@ -584,6 +610,8 @@ def queue_view(
                 "kinds": _card_kinds([top, *rows], wants),
                 "find": _find_text([top, *rows]),
                 "session": card_session(c, fleet),
+                # a Decide or Do item but a red PR draws its own Start session, the header then none (TD-1246)
+                "items_start": any(not m.get("red") for w in WANTS for m in wants.get(w) or ()),
             }
         )
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]

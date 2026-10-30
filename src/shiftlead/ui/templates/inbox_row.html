@@ -217,6 +217,7 @@
   {%- elif e['from'] not in ('person', 'system') %}
   <button class="btn sm ghost" type="button" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" title="{{ help_title('card-answers') }}">Answer…</button>
   {%- endif %}
+  {{- item_start(e) }}
 </div>
 {%- endmacro %}
 
@@ -404,6 +405,14 @@
    line, drawn above the answers as text — the answer is still the person's one press. #}
 {% macro looked_by(e) -%}
 {%- if e.looked_by and e.looked_by.text %}<div class="st dflt lookedby" title="what the reviewer you sent it to reported (design §4.10 *A look*)">{{ e.looked_by.name or e.looked_by.seat or 'the reviewer' }} read it: {{ e.looked_by.text }}</div>{% endif %}
+{%- endmacro %}
+
+{# an item's own **Start session** on its Queue card (§4.5 screen 12 *Started from an item*, §4.5a *Queue card:
+   Start session / Open session*; TD-1246): on every Decide and Do item but a red PR, plain, the last of its answer
+   row, so after its answers and before its ⋯ (the mockup Paul agreed, `docs/mockups/reviews/2026-10-26-td1066-card-items.png`) — `e.start`, `queue.item_start`, which is empty where the item draws none. With the person's own
+   session on the card it reads **Open session**: the press goes there and puts the item's id on the clipboard. #}
+{% macro item_start(e) -%}
+{%- set s = e.start %}{% if mode == 'card' and s %}<button class="btn sm qstart qistart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ s.repo }}" data-ref="{{ s.ref }}" data-card="{{ s.card }}" data-item="{{ s.item }}" title="{{ ('your session on this card: go to its Focus with ' ~ s.item ~ ' on the clipboard to paste — nothing is started') if s.own else help_title('card-item-start') }}">{{ 'Open session' if s.own else 'Start session' }}</button>{% endif %}
 {%- endmacro %}
 
 {# §4.5a **Inbox row: `ask`** — the whole text, sender, `about`, age, and no countdown: an `ask` to

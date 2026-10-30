@@ -613,9 +613,19 @@ HELP: tuple[Help, ...] = (
         "Start session",
         "Queue card",
         (
-            "Starts your own session on this card's team, on the one entry owned by you, else the first decision "
-            "of yours, else its top entry, with the card's entries as its context. Reads Open session while yours "
-            "is running."
+            "Starts your own session on this card's team, on its top entry, with the card's entries as its "
+            "context. It is drawn only where no item on the card asks you anything: each such item has its own. "
+            "Reads Open session while yours is running."
+        ),
+    ),
+    Help(
+        "card-item-start",
+        "Start session",
+        "Queue card item",
+        (
+            "Starts your own session about this item: it opens on the card's entry, or on this entry where the "
+            "item is one, with the item as its subject, to read first and walk through with you. Reads Open "
+            "session while yours is on the card: the press goes there and copies the item's id for you to paste."
         ),
     ),
     Help(
@@ -799,6 +809,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "wait-column",
             "read-n",
             "card-start",
+            "card-item-start",
             "card-answers",
             "card-dots",
             "live-mark",

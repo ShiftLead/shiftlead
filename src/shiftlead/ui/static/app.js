@@ -1306,14 +1306,26 @@
         pressed();
         const got = await fetch("/api/ledger/start", {
           method: "POST", headers: { "content-type": "application/json" },
-          // a Queue card's press names its card (TD-912): the road checks the entry is the card's `start`
-          body: JSON.stringify({ repo: b.dataset.repo, id: b.dataset.ref, ...(b.dataset.card ? { card: b.dataset.card } : {}) }),
+          // a Queue card's press names its card (TD-912): the road checks the entry is the card's `start`; an
+          // item's names the item too (TD-1246), which the prompt names first
+          body: JSON.stringify({
+            repo: b.dataset.repo, id: b.dataset.ref,
+            ...(b.dataset.card ? { card: b.dataset.card } : {}), ...(b.dataset.item ? { item: b.dataset.item } : {}),
+          }),
         });
         if (!got.ok) { let t = got.statusText; try { t = (await got.json()).detail || t; } catch (e) {} throw new Error(t); }
         const r = await got.json();
         if (r.form) { say(`start session needs the form: ${r.why}`, true); location.href = r.form; return; }
-        if (!r.focus) say(`started ${r.name || r.id} on ${b.dataset.ref}`, true);
-        location.href = `/focus/${r.focus || r.id}${AO.poppedId ? "?window=1" : ""}`;
+        const to = `/focus/${r.focus || r.id}${AO.poppedId ? "?window=1" : ""}`;
+        // an item's **Open session** puts its id on the clipboard for the person to paste, typing nothing into the
+        // session (§4.5 screen 12 *Started from an item*); refused (plain http off localhost), the toast shows it
+        if (r.focus && b.dataset.item) {
+          try { await navigator.clipboard.writeText(b.dataset.item); }
+          catch (e) { AO.toast(`copy ${b.dataset.item} — the browser refused the clipboard`, false, to, false, true); return; }
+          say(`${b.dataset.item} copied — paste it into your session`, true);
+        }
+        if (!r.focus) say(`started ${r.name || r.id} on ${b.dataset.item || b.dataset.ref}`, true);
+        location.href = to;
         return;
       }
       if (action === "board_add") {
