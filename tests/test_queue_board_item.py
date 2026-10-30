@@ -93,3 +93,9 @@ def test_a_line_with_no_bold_head_is_its_own_sentence():
     got = inbox_mod.board_card("act 2026-10-26 — run the setup once. Context: TD-9.", {}, "samscrape")
     assert got["sentence"] == "act 2026-10-26 — run the setup once." and got["leads"] == "" and got["in_repo"] == ""
     assert got["context"] == "Context: TD-9"
+
+
+def test_a_bold_word_past_the_heads_reach_is_no_head():
+    late = "decide 2026-10-01 — " + "word " * 60 + "**foo** bar."
+    got = inbox_mod.board_card(late, {}, "samscrape")
+    assert got["sentence"].startswith("decide 2026-10-01") and got["sentence"].endswith("**foo** bar.")

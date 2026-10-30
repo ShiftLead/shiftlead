@@ -205,6 +205,7 @@ from .counts import CountsKeeper
 from .fanout import FAILED, SAID_MAX, Every, Fanout, OpenRate, Stream
 from .inbox import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _FIND_EDGE,  # noqa: F401
+    _REPO_REF,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
     BOARD_WAIT_DAYS,  # noqa: F401
     CI_BILLING_REASON,  # noqa: F401
@@ -241,6 +242,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _board_holder,  # noqa: F401
     _board_named,  # noqa: F401
     _board_order,  # noqa: F401
+    _board_split,  # noqa: F401
     _civil,  # noqa: F401
     _decided,  # noqa: F401
     _entry_open,  # noqa: F401
@@ -269,6 +271,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     billing_url,  # noqa: F401
     board_answered,  # noqa: F401
     board_body,  # noqa: F401
+    board_card,  # noqa: F401
     board_choices,  # noqa: F401
     board_detail,  # noqa: F401
     board_due_now,  # noqa: F401
