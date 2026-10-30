@@ -106,7 +106,8 @@ const ANSWER = { "src/a.py": "/r/wt/src/a.py", "docs/x.md": "/r/wt/docs/x.md", "
     said: said.innerHTML, plain: plain.innerHTML, t2: t2.innerHTML, t3: t3.innerHTML, lost: lost.innerHTML,
     oneLaunch: AO.pathLinksHtml("src/a.py", { "src/a.py": "/r/wt/src/a.py" }, { ...ED, url: null }),
     pieces: AO.pathLinksHtml("src/a.py#L12 x/y.py,z/w.py out/a,b.txt",
-      { "src/a.py": "/r/src/a.py", "z/w.py": "/r/z/w.py", "out/a,b.txt": "/r/out/a,b.txt", "out/a": "/r/out/a" }, ED) }));
+      { "src/a.py": "/r/src/a.py", "z/w.py": "/r/z/w.py", "out/a,b.txt": "/r/out/a,b.txt", "out/a": "/r/out/a" },
+      ED) }));
 })();
 """
 

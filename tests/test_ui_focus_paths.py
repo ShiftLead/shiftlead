@@ -252,7 +252,8 @@ def test_the_runs_a_row_yields():
                                            "dir/name=v.txt", "dir/name", "src/a.py", "docs/界/a.md"]  # fmt: skip
     # so an anchor, a list without spaces and a trailing `=` still ask what linked before
     assert [r[0] for r in got["pieces"]] == ["src/a.py#L12", "src/a.py", "a/b.py,c/d.py", "a/b.py", "c/d.py",
-                                             "x/a=b/c.py", "x/a", "b/c.py", "e/f.py=", "e/f.py", "g/h.py:3"]  # fmt: skip
+                                             "x/a=b/c.py", "x/a", "b/c.py", "e/f.py=", "e/f.py",
+                                             "g/h.py:3"]  # fmt: skip
     assert [r[4] for r in got["pieces"]][:5] == [0, 0, 13, 13, 20]  # a piece's columns are the row's
 
 
