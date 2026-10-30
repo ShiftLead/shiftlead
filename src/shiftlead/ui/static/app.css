@@ -163,7 +163,12 @@ details#morefields[open] > summary { margin-bottom: 10px; }
 .pill.s-closed::before { content: "✓"; font-size: 1.1em; } .pill.s-unreachable::before { content: "⌀"; font-size: 1.1em; }
 .pill.s-oncall::before { content: "◇"; font-size: 1.1em; }  /* a seat with nobody in it (TD-097) */
 .pill.s-waiting::before { content: "⋯"; font-size: 1.1em; }  /* idle on someone else's move (TD-418) */
-.sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: .9em; letter-spacing: 0; }  /* not the idle glyph's tuning */
+/* the unseen mark (§4.5a *card: unseen mark*, TD-1228): a chip after the pill, never in it — the accent blue,
+   unfilled, display only; the ● is the chip's, no state glyph. *n unseen* in a header's counts and the rollup's */
+.unseenmark { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border: 1px solid var(--new); border-radius: 999px;
+  color: var(--new); font-size: var(--t-cap); font-weight: 500; white-space: nowrap; cursor: default; }
+.unseen-n { color: var(--new); }
+button.unseen-n { background: none; border: 1px solid var(--new); border-radius: 999px; padding: 1px 7px; font: inherit; font-size: var(--t-cap); cursor: pointer; }
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
    dashed, the same signal a scraped state carries */

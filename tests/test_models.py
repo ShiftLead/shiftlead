@@ -100,6 +100,30 @@ def test_set_state_since_only_moves_on_change():
     assert s.since != "2000-01-01T00:00:00Z" and s.confidence == "scraped" and s.pending is None
 
 
+def test_set_state_stamps_the_end_of_a_turn_and_never_moves_it_back():
+    """Design §4.2 *Unseen* (TD-1228): `turn_at` is the `since` of the last move into `idle`, with no `None`
+    compared on the first; a same-state call does not re-stamp, a turn starting keeps it, and a state taken
+    back with an older `since` (TD-950) leaves it. `turn_stamp` falls back to an idle `since` for a record
+    written before the stamp, and has none on a first turn."""
+    from sessionorc.models import turn_stamp
+
+    s = Session(id="a", name="a", kind="interactive", adapter="shell", dir="/", state="working")
+    assert s.turn_at is None and turn_stamp(s.to_dict()) is None  # still on its first turn
+    s.set_state("idle", confidence="hook", since="2026-10-29T10:00:00Z")
+    assert s.turn_at == "2026-10-29T10:00:00Z"
+    s.set_state("idle", confidence="tick")  # a tick re-reading idle: no re-stamp
+    assert s.turn_at == "2026-10-29T10:00:00Z"
+    s.set_state("working", confidence="hook", since="2026-10-29T10:05:00Z")
+    assert s.turn_at == "2026-10-29T10:00:00Z" and turn_stamp(s.to_dict()) == "2026-10-29T10:00:00Z"
+    s.set_state("idle", confidence="hook", since="2026-10-29T09:00:00Z")  # taken back, older
+    assert s.turn_at == "2026-10-29T10:00:00Z"
+    s.set_state("idle", confidence="hook", since="2026-10-29T11:00:00Z")
+    assert s.turn_at == "2026-10-29T11:00:00Z"
+    assert Session.from_dict(s.to_dict()).turn_at == "2026-10-29T11:00:00Z"
+    assert turn_stamp({"state": "idle", "since": "2026-10-01T00:00:00Z"}) == "2026-10-01T00:00:00Z"
+    assert turn_stamp({"state": "working", "since": "2026-10-01T00:00:00Z"}) is None
+
+
 def test_normalize_ref_canonicalises_the_two_machine_shapes():
     """`td-27` and `TD-027` are one entry, not two (design §4.8); prose is left alone."""
     assert normalize_ref("td-27") == normalize_ref(" TD-027 ") == "TD-027"

@@ -506,19 +506,27 @@ def test_closed_session_terminal_is_final_and_occupancy_endpoint(client, tmp_pat
 
 
 def test_unseen_idle_until_focused(client, tmp_path):
-    """TD-017: an idle session nobody has looked at renders "idle · unseen" and sorts just above
-    plain idle; opening Focus (or acting on the card) marks it seen; a later finish is unseen again."""
+    """TD-017, TD-1228: an interactive session whose turn ended after the person last looked carries the
+    unseen mark — a chip beside the pill, which still reads *idle*, and the card sorts first within its rank;
+    loading Focus is not the look, the visible page's `seen` is (or acting on the card); a later turn's end is
+    unseen again."""
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "unseen"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]  # the redirect to Focus is not followed: never seen
     s = wait_state(client, sid, "idle")
-    assert s["unseen"] is True and s["state_label"] == "idle · unseen" and s["rank"] == 4.5
+    assert s["unseen"] is True and s["state_label"] == "idle" and s["rank"] == 5 and s["pill_word"] == "idle"
+    assert s["turn_at"] and s["unseen_age"]
     r = client.get("/")
-    assert f'id="card-{sid}"' in r.text and "idle · unseen" in r.text and 'data-unseen="1"' in r.text
-    assert client.get(f"/focus/{sid}").status_code == 200  # Focus = seen
+    assert f'id="card-{sid}"' in r.text and 'class="unseenmark"' in r.text and 'data-unseen="1"' in r.text
+    assert "idle · unseen" not in r.text  # the pill no longer reads it
+    focus = client.get(f"/focus/{sid}")
+    assert focus.status_code == 200 and "unseen · idle · unseen</title>" in focus.text  # the title says the mark
     s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
-    assert s["unseen"] is False and s["state_label"] == "idle" and s["rank"] == 5 and s["seen_at"]
-    # a new turn that finishes after that look is unseen again. Whole-second stamps: the send
-    # itself counts as a look, so the turn must outlast the second it was sent in (a tie is "seen").
+    assert s["unseen"] is True  # loading the page is not the look (§4.2 *Unseen*)
+    assert client.post(f"/api/sessions/{sid}/seen").json() == {"ok": True}  # what the visible Focus page sends
+    s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert s["unseen"] is False and s["state_label"] == "idle" and s["seen_at"] == s["turn_at"]
+    # a new turn that finishes after that look is unseen again: the look recorded the turn it saw, and
+    # the next turn's stamp is that turn's end, later whatever the clock of the look
     assert client.post(f"/api/sessions/{sid}/send", json={"text": "sleep 2"}).json() == {"ok": True}
     # the paste can take a moment to reach the pane, and `sleep 2` is only `working` for two
     # seconds: wait for the command on the screen first, so the state wait starts once it is
@@ -532,7 +540,7 @@ def test_unseen_idle_until_focused(client, tmp_path):
     wait_state(client, sid, "working")
     s = wait_state(client, sid, "idle")
     assert s["unseen"] is True
-    assert client.post(f"/api/sessions/{sid}/seen").json() == {"ok": True}  # what the open Focus page sends
+    assert client.post(f"/api/sessions/{sid}/seen").json() == {"ok": True}
     s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert s["unseen"] is False
     client.post(f"/api/sessions/{sid}/kill")
@@ -1418,7 +1426,7 @@ def test_a_declaration_of_no_work_is_a_chip_on_the_card_and_the_focus_header(tmp
     assert f"out of work — {why}" in html and "out of work 2h" in view(done)["slot"]["full"]
     assert 'class="badge oow' not in html
     assert view(done)["out_of_work"]["age"].startswith("2h")
-    # the chip does not pretend to be a state: the card still reads `idle` (§4.2's unseen-idle rule)
+    # the chip does not pretend to be a state: the card still reads `idle` (a declaration is not a state, §4.9a)
     assert 'data-state="idle"' in html and "out-of-work" not in html
     # a declaration with no reason is still a declaration — the hover says so rather than being empty
     bare = card.render(s=view({**base, "out_of_work": {"at": at, "why": ""}}))
@@ -1520,7 +1528,7 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
 
     at = (datetime.now(UTC) - timedelta(minutes=11)).isoformat().replace("+00:00", "Z")
     records = [
-        {"id": "ao-orc", "name": "orc", "state": "idle", "dir": str(tmp_path), "kind": "agent",
+        {"id": "ao-orc", "name": "orc", "state": "idle", "since": at, "dir": str(tmp_path), "kind": "agent",
          "team": "ao-grind", "capabilities": ["control"], "doing": {"text": "round 3: reviewing PR 236", "at": at}},
         {"id": "ao-g1", "name": "g1", "state": "working", "dir": str(tmp_path), "kind": "agent",
          "team": "ao-grind", "controllers": ["ao-orc"], "tail": ["…"]},
@@ -1530,8 +1538,11 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     assert "round 3: reviewing PR 236" not in head and ">orc<" not in head and "s-idle" not in head
     # the counts stay in the group (a stopped team's row draws them), and on a live team's header
     # only for its fold (TD-176, TD-194): unfolded, CSS hides them, since the compact cards say it
-    assert g["counts"] == ["1 working", "1 unseen"] and "▾ 2 sessions" in head  # the count once, on the fold (TD-418)
-    assert 'class="meta counts foldonly">· 1 working · 1 unseen<' in head
+    assert g["counts"] == ["1 working", "1 idle"] and "▾ 2 sessions" in head  # the count once, on the fold (TD-418)
+    # by pill, then *n unseen* in the accent blue: the mark is no pill (TD-1228); a record written before
+    # the `turn_at` stamp reads its idle `since`
+    assert g["unseen_n"] == 1
+    assert 'class="meta counts foldonly">· 1 working · 1 idle · <span class="unseen-n">1 unseen</span><' in head
     # the host alone: the repo, or the directory, is not the header's (§4.9 *The Sessions page*, TD-725)
     assert g["place"] and " / " not in g["place"] and f'<span class="meta">{g["place"]}</span>' in head
     card = templates.get_template("card.html").render(s=g["members"][0])

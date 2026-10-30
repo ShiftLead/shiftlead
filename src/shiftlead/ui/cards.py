@@ -30,6 +30,7 @@ from sessionorc.models import (
     start_note,
     stop_note,
     tokens_short,
+    turn_stamp,
 )
 from sessionorc.reports import branch_ref
 from shiftlead import profiles as profiles_mod
@@ -43,6 +44,7 @@ from shiftlead.ending import (
     pill_of,
     restart_words,
     shells_of,
+    unseen,
     waiting_words,
     worktree_words,
 )
@@ -254,19 +256,8 @@ def view(
     d["state_class"] = STATE_CLASS.get(state, state)
     d["state_label"] = {"needs-you": "needs you", "closed": "closed"}.get(state, state)
     d["rank"] = STATE_RANK.get(state, 9)
-    # Finished while nobody was looking (design §4.2, TD-017): not a state, a rendering of `idle`
-    # that sorts just above the idle it will become once someone opens Focus. Both stamps are whole
-    # seconds, so a finish in the same second as the last look reads as seen. **Interactive only**
-    # (Paul, 2026-09-21, TD-095 f): an unattended session's result is its manager's to read, and
-    # its slot already says how it ended — a finished worker is plain `idle`.
-    d["unseen"] = (
-        state == "idle" and not s.get("unattended") and (not s.get("seen_at") or (s.get("since") or "") > s["seen_at"])
-    )
-    if d["unseen"]:
-        d["state_label"] = "idle · unseen"  # not *finished*: that word is a declaration's (§4.9a, TD-095 e)
-        d["rank"] = STATE_RANK["idle"] - 0.5
     # A seat with nobody in it reads *on call* (design §4.5 *The card's anatomy*, TD-097): composed
-    # as *idle · unseen* is, from `exited` / `closed` and the definition — the state stays what it
+    # from `exited` / `closed` and the definition — the state stays what it
     # is in every payload. A seat ends between questions by design, and drawn as *exited* the one
     # card behaving exactly as designed looked like the one that had failed.
     seats = seats or {}
@@ -296,8 +287,13 @@ def view(
             d["seat_when"] += swept_words(s, repos)
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
+    # **unseen** (§4.2 *Unseen*, §4.5a *card: unseen mark*, TD-1228): a turn ended after the person last
+    # looked — a mark beside the pill, never in it, whatever the pill reads; never on a seat drawn *on call*,
+    # whose pill already says why nothing is there. Both stamps are whole seconds, so equal reads seen.
+    d["unseen"] = unseen(s) and not d["seat"]
+    d["unseen_age"] = _age(turn_stamp(s), now) if d["unseen"] else ""
     # the word the Org filter's `state:` matches (§4.5a **filter…**, TD-176): the pill's, hyphenated
-    d["pill_word"] = "on-call" if d["seat"] else "unseen" if d["unseen"] else str(state).rstrip("?")
+    d["pill_word"] = "on-call" if d["seat"] else str(state).rstrip("?")
     # §4.10 *When it is read* (TD-168): the composer's sentence for each kind, the host agent's; a
     # seat the definition names reads as one whatever the record's own `seat` says, so the pair is
     # the seat's from here (`mail.read_when` is the one function either way)
@@ -453,18 +449,17 @@ def view(
     # **waiting** (§4.2 *Waiting*, §4.5 *The card's anatomy*, TD-734): an `idle` session that waits on a
     # person or another session — a reader holding its ask for a claim's PR, or the mark above — and has no
     # own work live (*One order*, TD-1227) is drawn *waiting*, teal, in the order after `working`; it stays
-    # `idle` in every payload. *idle · unseen* wins over it until TD-1228: the slot still says the wait.
+    # `idle` in every payload. The unseen mark is beside it, never instead of it (TD-1228).
     d["review_wait"] = review_wait(s, fleet, repos) if state == "idle" else ""
     d["wait_reason"] = (d["waiting"] or {}).get("text") or (f"waiting · {d['review_wait']}" if d["review_wait"] else "")
     pill = pill_of(s, bool(d["wait_reason"])) if state == "idle" else None
-    if pill == "waiting" and not d["unseen"]:
+    if pill == "waiting":
         d["state_class"] = d["state_label"] = d["pill_word"] = "waiting"
-        d["rank"] = STATE_RANK["working"] + 0.25  # after `working`, before an unseen `idle` (idle - 0.5)
+        d["rank"] = STATE_RANK["working"] + 0.25  # after `working`, before `idle`
     # **working on its own** (§4.2 *Working on its own*, TD-734, TD-761): an `idle` session with a live
     # subagent or a live background shell (the view's `subagents_live`, `shells_live`) is drawn *working*,
-    # whether or not a wait reads (*One order*, TD-1227), ranked and filtered with it, over *idle · unseen*,
-    # whose cue shows again once its own work ends; idle in every payload. The ending joins the parts that
-    # are live, never *0 subagents*.
+    # whether or not a wait reads (*One order*, TD-1227), ranked and filtered with it, the unseen mark beside
+    # it (TD-1228); idle in every payload. The ending joins the parts that are live, never *0 subagents*.
     shells = shells_of(s)
     d["own_work"] = d["own_slot"] = d["own_what"] = d["own_shell"] = ""
     if pill == "working" and (own := own_work(s)):
@@ -478,7 +473,7 @@ def view(
         # counts alone, the command on the pill's hover (*One order*)
         d["own_slot"] = d["own_work"] + (f": {d['own_shell']}" if d["own_shell"] and not d["wait_reason"] else "")
         d["state_class"] = d["state_label"] = d["pill_word"] = "working"
-        d["rank"], d["unseen"] = STATE_RANK["working"], False
+        d["rank"] = STATE_RANK["working"]
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
     # third ending — *my run is over and my lane is not*. Shaped exactly like `out_of_work` above,
     # and for the same reasons: fixed words, the `why` on hover because it is a sentence a card
@@ -1353,12 +1348,12 @@ NO_TEAM = ""  # the group key for sessions carrying no `team` badge: `org_layout
 DEAD = ("exited", "closed")
 
 
-def card_order(v: dict[str, Any]) -> tuple[float, bool, str]:
+def card_order(v: dict[str, Any]) -> tuple[float, bool, bool, str]:
     """The grid's one order (design §4.5 *One order, no control*): urgency first, then — within one
-    urgency — an `interactive` session ahead of an unattended one (TD-095, second pass: the person's
-    own are what a person looks for), then the name. The manager's card is placed first before any
-    of this, by `team_groups` and by the page's layout."""
-    return (v["rank"], bool(v.get("unattended")), str(v.get("name") or ""))
+    urgency — an unseen session first (§4.2 *Unseen*, TD-1228), then an `interactive` session ahead of an
+    unattended one (TD-095, second pass: the person's own are what a person looks for), then the name. The
+    manager's card is placed first before any of this, by `team_groups` and by the page's layout."""
+    return (v["rank"], not v.get("unseen"), bool(v.get("unattended")), str(v.get("name") or ""))
 
 
 # The header's counts, in the order the grid sorts by (§4.5 *One order*). *needs you* is not among
@@ -1369,7 +1364,6 @@ COUNT_ORDER = (
     ("unreachable", "unreachable"),
     ("working", "working"),
     ("waiting", "waiting"),
-    ("unseen", "unseen"),
     ("idle", "idle"),
     ("oncall", "on call"),
     ("exited", "exited"),
@@ -1378,16 +1372,22 @@ COUNT_ORDER = (
 
 
 def state_counts(members: list[dict[str, Any]]) -> list[str]:
-    """A team header's counts by state — `["1 limited", "2 working", "1 unseen"]`, in urgency order,
-    zeros left out. An idle session nobody has looked at counts as *unseen*, and a seat with nobody
-    in it as *on call* (TD-097), as their pills say."""
+    """A team header's counts by pill — `["1 limited", "2 working", "1 idle"]`, in urgency order, zeros
+    left out. A seat with nobody in it counts as *on call* (TD-097), as its pill says; the unseen mark is
+    no pill and is counted apart (`unseen_count`, TD-1228)."""
     tally: dict[str, int] = {}
     for m in members:
-        key = "unseen" if m.get("unseen") else "oncall" if m.get("seat") else str(m.get("state") or "")
+        key = "oncall" if m.get("seat") else str(m.get("state") or "")
         key = "waiting" if m.get("pill_word") == "waiting" else key
         key = "working" if m.get("pill_word") == "working" else key  # an idle record working on its own (TD-734)
         tally[key] = tally.get(key, 0) + 1
     return [f"{tally[k]} {label}" for k, label in COUNT_ORDER if tally.get(k)]
+
+
+def unseen_count(members: Collection[dict[str, Any]]) -> int:
+    """How many of a team header's cards carry the **unseen** mark (§4.5a *card: unseen mark*, TD-1228): the
+    *n unseen* the folded header draws after its counts by pill, over the same cards. A seat is never one."""
+    return sum(1 for m in members if m.get("unseen") and not m.get("seat"))
 
 
 def group_place(members: list[dict[str, Any]]) -> str:

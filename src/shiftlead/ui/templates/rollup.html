@@ -83,7 +83,9 @@
   {%- endif %}
   <div class="ru-tot">
     <span class="ru-grp"><span class="kind">Agents ({{ ro.n_agents }})</span><span class="tipmark" tabindex="0" role="img" aria-label="in urgency order, as the cards sort · a pill filters the page to that state" title="in urgency order, as the cards sort · a pill filters the page to that state">i</span>
-      {%- for a in ro.agents %} <button type="button" class="pill nog s-{{ a.cls }}" data-state-filter="{{ a.word }}" title="show only the {{ a.label }} sessions — the filter box's state:{{ a.word }}">{{ a.label }} ({{ a.n }})</button>{% endfor %}</span>
+      {%- for a in ro.agents %} <button type="button" class="pill nog s-{{ a.cls }}" data-state-filter="{{ a.word }}" title="show only the {{ a.label }} sessions — the filter box's state:{{ a.word }}">{{ a.label }} ({{ a.n }})</button>{% endfor %}
+      {#- the unseen mark is no state: its count after the pills, in the accent blue, pressing the bare word (TD-1228) #}
+      {%- if ro.n_unseen %} <button type="button" class="unseen-n nog" data-word-filter="unseen" title="show only the sessions with a turn you have not seen — the filter box's unseen">unseen ({{ ro.n_unseen }})</button>{% endif %}</span>
     {%- if ro.has_repo %}
     <span class="ru-grp"><span class="kind">PRs</span><a href="{{ ro.prs_url or '#' }}"{% if ro.prs_errors %} title="{{ ro.prs_errors | join('\n') }}"{% endif %}>({{ ro.prs_open }}) open{% if ro.waiting %}, {{ ro.waiting }} waiting on review{% endif %}
       {%- for w, word in (('day', 'today'), ('week', 'this week'), ('month', 'this month')) %}{% set b = ro.prs[w] %}<span class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}> · {{ b.opened }} opened {{ b.closed }} closed {{ word }}</span>{% endfor %}

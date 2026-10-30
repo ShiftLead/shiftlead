@@ -1164,6 +1164,7 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     counts by state in the grid's order, *needs you* being its ringed mark instead; *No repo* is
     headed by its count and nothing else."""
     from shiftlead.ui.app import group_place, state_counts, team_groups, templates
+    from shiftlead.ui.cards import unseen_count
 
     def v(sid, state, place, unseen=False, **kw):
         host = place.split(" / ")[0]
@@ -1175,7 +1176,8 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     # two repos on one host: still one place, the host (the repos are their headings')
     assert group_place([*same, v("d", "idle", "kmaster / wg", team="t")]) == "kmaster"
     many = [*same, v("c", "needs-you", "x"), v("d", "idle", "x", unseen=True), v("e", "limited", "x")]
-    assert state_counts(many) == ["1 limited", "1 working", "1 unseen", "1 idle"]  # urgency order
+    # urgency order, by pill: the unseen mark is no pill, counted apart (TD-1228)
+    assert state_counts(many) == ["1 limited", "1 working", "2 idle"] and unseen_count(many) == 1
     groups = team_groups([*same, v("n1", "idle", "kmaster / wg"), v("n2", "exited", "kmaster / wg")])
     team, none = groups
     head = templates.get_template("group_head.html").render(g=team)
@@ -1215,7 +1217,7 @@ def test_within_one_urgency_the_persons_own_sort_first_and_the_card_says_it_is_m
         agent_down=False, volatile=False, usage={},
     )  # fmt: skip
     assert 'id="mine"' not in html and 'id="showcmd"' not in html  # the words replaced them (TD-428)
-    assert 'placeholder="filter… team: state: mine kind:command"' in html
+    assert 'placeholder="filter… team: state: mine unseen kind:command"' in html
 
 
 def test_a_seats_last_came_is_its_fill_and_a_compact_flag_keeps_its_count(tmp_path, monkeypatch):
@@ -1305,17 +1307,36 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
 
 
 def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):
-    """Design §4.2 *Unseen idle*, TD-095 (f), Paul 2026-09-21: an unattended session that finished
-    while nobody looked is plain `idle` — its manager read the result and its slot says how it
-    ended; the person's own interactive session is *idle · unseen* and sorts above idle."""
+    """Design §4.2 *Unseen*, TD-095 (f), TD-1228: an unattended session that finished while nobody looked
+    carries no mark — its manager read the result and its slot says how it ended; the person's own
+    interactive session carries the mark beside its *idle* pill and sorts first within the rank. A
+    session on its first turn (no stamp) has none; an `exited` record keeps it, a `closed` one and a seat
+    drawn *on call* never carry it."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
-    from shiftlead.ui.app import view
+    from shiftlead.ui.app import templates, view
+    from shiftlead.ui.cards import card_order
 
-    finished = {"since": "2026-09-21T03:00:00Z", "seen_at": "2026-09-21T02:00:00Z"}
+    finished = {"turn_at": "2026-09-21T03:00:00Z", "seen_at": "2026-09-21T02:00:00Z"}
     worker = view(_card(**finished))  # `_card` is unattended
     assert not worker["unseen"] and worker["state_label"] == "idle"
-    mine = view(_card(**finished, unattended=False))
-    assert mine["unseen"] and mine["state_label"] == "idle · unseen" and mine["rank"] < worker["rank"]
+    mine = view(_card(**finished, unattended=False, name="z"))
+    assert mine["unseen"] and mine["state_label"] == "idle" and mine["rank"] == worker["rank"]
+    assert mine["unseen_age"] and [c["name"] for c in sorted([worker, mine], key=card_order)] == ["z", "w"]
+    card = templates.get_template("card.html").render(s=mine)
+    assert 'class="unseenmark" title="a turn ended ' in card and "● unseen</span>" in card
+    assert "unseenmark" not in templates.get_template("card.html").render(s=worker)
+    # seen at that turn: no mark; equal stamps read seen
+    assert not view(_card(turn_at="2026-09-21T03:00:00Z", seen_at="2026-09-21T03:00:00Z", unattended=False))["unseen"]
+    # on its first turn: no stamp, no mark, whatever `seen_at` says
+    assert not view(_card(state="working", seen_at=None, unattended=False))["unseen"]
+    # a turn started after an unseen one keeps the mark, on a working pill
+    assert view(_card(**finished, state="working", since="2026-09-21T04:00:00Z", unattended=False))["unseen"]
+    # exited keeps it; closed never
+    assert view(_card(**finished, state="exited", unattended=False))["unseen"]
+    assert not view(_card(**finished, state="closed", unattended=False))["unseen"]
+    # a seat drawn *on call*: its pill says why nothing is there
+    seat = view(_card(**finished, state="exited", unattended=False), seats={"ao-w": "on a question"})
+    assert seat["seat"] and not seat["unseen"]
 
 
 def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_path, monkeypatch):
@@ -1659,10 +1680,10 @@ def test_an_idle_session_with_a_live_subagent_reads_working(tmp_path, monkeypatc
     ask = {"id": "m-a", "from": "ao-w", "to": ["person"], "kind": "ask", "about": "TD-222", "text": "q?"}
     asked = view(_card(subagents=1, subagents_live=True), waits=waits_of([ask]))
     assert asked["pill_word"] == "working" and asked["slot"]["text"] == "waiting on you: TD-222 · working · 1 subagent"
-    # an interactive session with a live subagent and nothing waiting: *working*, not *idle · unseen*
+    # an interactive session with a live subagent and a turn nobody saw: *working*, the unseen mark beside it
     mine = view(_card(unattended=False, seen_at=None, subagents=1, subagents_live=True))
-    assert mine["pill_word"] == "working" and not mine["unseen"]
-    assert view(_card(unattended=False, seen_at=None, subagents=1))["pill_word"] == "unseen"
+    assert mine["pill_word"] == "working" and mine["unseen"]
+    assert view(_card(unattended=False, seen_at=None, subagents=1))["pill_word"] == "idle"
     # the header's counts, the sort and the Org rollup's Agents pill count it with `working`
     cards = [view(_card(name="b")), v]
     assert [c["pill_word"] for c in sorted(cards, key=card_order)] == ["working", "idle"]
@@ -1838,13 +1859,14 @@ def test_own_work_reads_working_whether_or_not_a_wait_reads(tmp_path, monkeypatc
     assert r["pill_word"] == "working"
     assert r["slot"]["text"] == "waiting · review #1302 with the techlead · working · 1 shell"
     assert r["slot"]["full"].startswith("waiting · review #1302 with the techlead: the reader holds its ask")
-    # unseen, own work and an ask out: *working*, never *idle · unseen*
+    # unseen, own work and an ask out: *working*, the unseen mark beside it (TD-1228)
     unseen = view(_card(unattended=False, seen_at=None, **shell), waits=waits_of([ask]))
-    assert unseen["pill_word"] == "working" and not unseen["unseen"]
-    # no own work: the ask reads *waiting* when seen, and the interim *idle · unseen* when unseen
+    assert unseen["pill_word"] == "working" and unseen["unseen"]
+    # no own work: the ask reads *waiting*, unseen or not
     seen = view(_card(unattended=False, seen_at="2099-01-01T00:00:00Z"), waits=waits_of([ask]))
-    assert seen["pill_word"] == "waiting" and seen["slot"]["text"] == "waiting on you: TD-222"
-    assert view(_card(unattended=False, seen_at=None), waits=waits_of([ask]))["pill_word"] == "unseen"
+    assert seen["pill_word"] == "waiting" and seen["slot"]["text"] == "waiting on you: TD-222" and not seen["unseen"]
+    unseen = view(_card(unattended=False, seen_at=None), waits=waits_of([ask]))
+    assert unseen["pill_word"] == "waiting" and unseen["unseen"]
     # no wait: the slot names the oldest shell, the hover says nothing of a wait
     alone = view(_card(**shell))
     assert alone["slot"]["text"] == "working · 1 shell: timeout 1500 gh pr checks 2658 · 4m"
@@ -1913,9 +1935,9 @@ def test_an_idle_session_that_waits_on_someone_reads_waiting(tmp_path, monkeypat
     v = view(_card(out_of_work=oow), waits=waits_of([ask("TD-222")]))
     assert v["pill_word"] == "waiting"
     assert v["slot"]["text"] == "out of work · waiting on you: TD-222 — nothing pickable"
-    # *idle · unseen* wins on an interactive session that waits; the slot still says the wait
-    mine = view(_card(unattended=False, seen_at=None), waits=waits_of([ask("TD-222")]))
-    assert (mine["state_label"], mine["pill_word"]) == ("idle · unseen", "unseen")
+    # an interactive session that waits reads *waiting*, the unseen mark beside it (TD-1228)
+    mine = view(_card(unattended=False, seen_at=None, name="m"), waits=waits_of([ask("TD-222")]))
+    assert (mine["state_label"], mine["pill_word"], mine["unseen"]) == ("waiting", "waiting", True)
     assert mine["slot"]["text"] == "waiting on you: TD-222"
 
     # the sort, the header's counts and the rollup's Agents pill
@@ -1926,16 +1948,22 @@ def test_an_idle_session_that_waits_on_someone_reads_waiting(tmp_path, monkeypat
         waiting,
         view(_card(name="c", state="working")),
     ]
-    assert [c["pill_word"] for c in sorted(cards, key=card_order)] == ["working", "waiting", "unseen", "idle"]
-    assert state_counts(cards) == ["1 working", "1 waiting", "1 unseen", "1 idle"]
+    # within the *waiting* rank the unseen card first; the mark counted apart from the pills
+    assert [(c["pill_word"], c["name"]) for c in sorted(cards, key=card_order)] == [
+        ("working", "c"),
+        ("waiting", "m"),
+        ("waiting", waiting["name"]),
+        ("idle", "b"),
+    ]
+    assert state_counts(cards) == ["1 working", "2 waiting", "1 idle"]
     for c in cards:
         c["team"] = "t"
     agents = rollup(
         [{"team": "t", "live": True, "members": cards, "summary": {"phases": {}, "answers": [], "asked": None}}]
-    )["agents"]
-    assert [(a["word"], a["cls"], a["n"]) for a in agents] == [
+    )
+    assert [(a["word"], a["cls"], a["n"]) for a in agents["agents"]] == [
         ("working", "working", 1),
-        ("waiting", "waiting", 1),
-        ("unseen", "idle", 1),
+        ("waiting", "waiting", 2),
         ("idle", "idle", 1),
     ]
+    assert agents["n_unseen"] == 1  # *unseen (n)* after the pills (TD-1228)

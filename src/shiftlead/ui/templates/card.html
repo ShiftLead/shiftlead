@@ -19,6 +19,7 @@
       <span class="grow"></span>
       <span class="pill nog s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ s.pill_title }}">{{ s.state_label }}{% import "lanecount.html" as lcm %}{{ lcm.span(s.lane_count) }}</span>
+      {%- import "unseen_mark.html" as um %}{{ um.chip(s) }}
     </div>
     <div class="row r2"><span class="meta cline" title="{{ s.slot.full or s.slot.text }}">{{ s.compact_line }}</span><span class="grow"></span>{% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}{% if s.flag %}<span class="flag" title="{{ s.flag }}">⚠ {{ s.flag_short or s.flag }}</span>{% endif %}</div>
   </div>
@@ -32,6 +33,7 @@
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ s.pill_title }}"><span class="dot"></span>{{ s.state_label }}</span>
+      {%- import "unseen_mark.html" as um %}{{ um.chip(s) }}
     </div>
     {# (2) what it is: the role, the mode as a word — never pressable, its toggle is in *more* —
        the marks, the stops note, and the one clock on a card #}

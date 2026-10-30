@@ -1,0 +1,4 @@
+{# design §4.5a **card: unseen mark** (§4.2 *Unseen*, TD-1228): the chip after the pill, never in it — on a
+   card, full or compact, an Inbox session row and the transcript page alike, each the record's view. Display
+   only, in the accent blue and unfilled; nothing where the view carries no mark. #}
+{% macro chip(v) %}{% if v.unseen %}<span class="unseenmark" title="a turn ended {{ v.unseen_age or '0s' }} ago, after you last looked">● unseen</span>{% endif %}{% endmacro %}
