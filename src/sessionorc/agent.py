@@ -258,6 +258,7 @@ from sessionorc.models import (
     Session,
     State,
     now_iso,
+    turn_stamp,
 )
 from sessionorc.store import (
     AttentionStore,
@@ -3209,10 +3210,13 @@ class HostAgent(
             raise RpcError(f"git_files: {e}") from None
 
     async def rpc_seen(self, id: str) -> dict[str, Any]:
-        """A person looked at this session (Focus opened, a card control used). The UI reads
-        `since > seen_at` on an `idle` record as "finished while you were away" (design §4.2)."""
+        """A person looked at this session (a visible Focus, a card control used). The look records the
+        turn it saw: `seen_at` becomes the larger of itself and the record's turn stamp (`turn_stamp`), the
+        clock of the host that ran the turn, and stays as it is where no turn has ended; the UI reads a
+        stamp past `seen_at` as the **unseen** mark (design §4.2 *Unseen*, TD-1228)."""
         s = self._find(id)  # a person may look at another host's session: `seen_at` is the home's
-        s.seen_at = now_iso()
+        if stamp := turn_stamp({"turn_at": s.turn_at, "since": s.since, "state": s.state}):
+            s.seen_at = max(filter(None, (s.seen_at, stamp)))
         self._save(s)
         await self._push_changes()
         return self._view(s)

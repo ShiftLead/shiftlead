@@ -17,7 +17,7 @@ from test_ui_waiting_wiring import NOW, member, reading
 pytestmark = pytest.mark.unit
 
 
-def client(monkeypatch, tmp_path, hold=0.0):
+def client(monkeypatch, tmp_path, hold=0.0, moves=None):
     """g1 holds TD-301, g2 works. The agent pushes: g1's tail moves, g2 goes idle, g1's tail moves
     again, g1 drops its claim (no shape field: the groups wait for the flush) — and stays open long
     enough for one."""
@@ -25,7 +25,7 @@ def client(monkeypatch, tmp_path, hold=0.0):
     root = str(tmp_path / "samscrape")
     claim = [{"ref": "TD-301", "status": "claimed", "at": NOW, "pr": 811}]
     g1, g2 = member("g1", root, progress=claim, tail=["a"]), member("g2", root, state="working")
-    pushed = [
+    pushed = (moves or (lambda g1, g2: None))(g1, g2) or [
         {**g1, "tail": ["b"]},
         {**g2, "state": "idle"},
         {**g1, "tail": ["c"]},
@@ -97,6 +97,19 @@ def test_a_light_stream_without_a_focus_hears_only_moves(tmp_path, monkeypatch):
     claim (`LIGHT_KEYS`: a light page draws claims, lanes and reports, which move no group)."""
     evs = received(client(monkeypatch, tmp_path), "/events?light=1")
     assert evs == [{"event": "session", "id": "g2", "state": "idle"}, {"event": "session", "id": "g1", "state": "idle"}]
+
+
+def test_a_look_that_clears_the_unseen_mark_on_a_working_record_reaches_a_light_stream(tmp_path, monkeypatch):
+    """§4.2 *Unseen* (TD-1228): the mark can change with no state change — Focus setting `seen_at` on a
+    working record — so `seen_at` is a light key and the Inbox's stream hears it; the `turn_at` alone, which
+    moves only with a state, is not."""
+    turn = "2026-10-29T10:00:00Z"
+
+    def moves(g1, g2):
+        return [{**g2, "turn_at": turn}, {**g2, "turn_at": turn, "seen_at": turn}]
+
+    evs = received(client(monkeypatch, tmp_path, moves=moves), "/events?light=1")
+    assert evs == [{"event": "session", "id": "g2", "state": "working"}]
 
 
 def test_three_pages_share_one_subscription_and_each_delta_is_computed_once(tmp_path, monkeypatch):

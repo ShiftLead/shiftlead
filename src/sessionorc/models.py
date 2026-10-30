@@ -71,6 +71,7 @@ NODE_OWNED = frozenset(
         "identity_alarms",
         "state",
         "since",
+        "turn_at",
         "pending",
         "pendings",
         "kept",
@@ -311,6 +312,13 @@ def open_prompts(rec: Mapping[str, Any]) -> list[dict[str, Any]]:
     if not pends and isinstance(rec.get("pending"), dict) and rec["pending"]:
         pends = [rec["pending"]]
     return pends[::-1]
+
+
+def turn_stamp(rec: Mapping[str, Any]) -> str | None:
+    """The stamp of the last turn a record ended (design §4.2 *Unseen*, TD-1228): its `turn_at`, else, on a
+    record written before the stamp, its `since` while it is `idle`; None while it has ended no turn. The
+    unseen mark compares it with `seen_at`, and a look (`rpc_seen`) records it there, so the two cannot drift."""
+    return rec.get("turn_at") or (rec.get("since") if rec.get("state") == "idle" else None)
 
 
 def permission_entry(rec: Mapping[str, Any], call: str | None = None) -> dict[str, Any] | None:
@@ -1003,6 +1011,10 @@ class Session:
     transcript: str | None = None
     state: State = "working"
     since: str = field(default_factory=now_iso)
+    # When `set_state` last moved the record into `idle` — the end of a turn, its `since` (design §4.2
+    # *Unseen*, TD-1228): never moved back, so a state taken back with an older `since` (TD-950) leaves it.
+    # None until the first turn ends; the unseen mark compares it with `seen_at`.
+    turn_at: str | None = None
     pending: Pending | None = None
     # Open prompts are a stack (design §4.2 *Open prompts are a stack; the main thread's state is kept
     # beneath it*, TD-950): every open prompt, oldest first, `pending` being the newest; and `kept`, the
@@ -1096,7 +1108,7 @@ class Session:
     # routes the close, and hands the word to the node in the close's params so the node's record
     # holds it too; absent on a record closed before this field existed.
     closer: dict[str, Any] | None = None
-    seen_at: str | None = None  # last time a person looked (Focus opened, card acted on); TD-017
+    seen_at: str | None = None  # the last turn a person saw: a look stamps its `turn_at` (§4.2 *Unseen*, TD-1228)
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
     capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)
     # Membership (design §4.8, TD-036): the session ids that may act on *this* session. The list
@@ -1599,6 +1611,8 @@ class Session:
         if state != self.state or (since is not None and since != self.since):
             self.since = since or now_iso()
             self.rev += 1
+            if state == "idle":  # a turn ended (§4.2 *Unseen*); `max`, so an older `since` taken back leaves it
+                self.turn_at = max(filter(None, (self.turn_at, self.since)))
         self.state = state
         self.confidence = confidence
         self.pending = pending

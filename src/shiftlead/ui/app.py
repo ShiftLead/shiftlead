@@ -108,6 +108,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     suspended_note,  # noqa: F401
     swept_words,  # noqa: F401
     terminal_only,  # noqa: F401
+    unseen_count,  # noqa: F401
     view,  # noqa: F401
     waiting_view,  # noqa: F401
     waits_of,
@@ -1966,7 +1967,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def focus(request: Request, sid: str, window: str = ""):
         repos_omit(REPOS_OMIT_PAGE)
         try:
-            s = await call("seen", id=sid)  # opening Focus is the "seen" (TD-017); returns the record
+            # loading the page is not the look (§4.2 *Unseen*, TD-1228): the page sends `seen` once it is visible
+            s = await call("get", id=sid)
         except HTTPException as e:
             if e.status_code == 503:
                 return RedirectResponse("/", status_code=303)  # the Org shows the down banner
@@ -3570,7 +3572,7 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         elif action == "remove":
             await call("remove", id=sid)
         elif action == "seen":
-            pass  # the mark below is the whole action (the Focus page sends it when its session goes idle)
+            pass  # the mark below is the whole action (a visible Focus sends it while its record is unseen)
         else:
             raise HTTPException(404, f"no action {action}")
         if action != "remove":
@@ -5088,7 +5090,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
         team_def = (await h.defs()).teams.get(str(v.get("team") or ""))  # its repo is the definition's (TD-725)
         compact_in(v, st.known.values(), st.repos, team_def.repo if team_def else "")
-        # the view's rank: unseen idle sorts above idle
+        # the view's rank, the card's: waiting and own work move it; the unseen mark sorts within it (TD-1228)
         return {"event": "session", "id": s["id"], "state": s["state"], "rank": v["rank"], "session": v}
 
     async def fan_kin(run: Any, s: dict[str, Any], was: dict[str, Any]) -> None:

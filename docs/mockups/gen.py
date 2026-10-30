@@ -19,11 +19,13 @@ CSS = """
   .pill.s-working::before { content: "∿"; font-size: 14px; } .pill.s-idle::before { content: "›_"; font-size: 12px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 12px; }
   .pill.s-closed::before { content: "✓"; font-size: 12px; } .pill.s-unreachable::before { content: "⌀"; font-size: 12px; } .pill.s-oncall::before { content: "◇"; font-size: 12px; }
   .pill.s-waiting::before { content: "⋯"; font-size: 12px; }
-  .pill.s-idle.unseen::before { content: "●"; font-size: 11px; letter-spacing: 0; }
+  /* the unseen mark (§4.5a *card: unseen mark*, TD-1228): a chip after the pill, never in it — the accent
+     blue, unfilled, display only; the ● is the chip's, no state glyph */
+  .unseenmark { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 7px; border: 1px solid #2563eb; border-radius: 999px; color: #2563eb; font-size: 11px; font-weight: 500; white-space: nowrap; }
   .pill.plain::before { content: none; }  /* a due date or a report's status is not a session state */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
-     alive, at rest, may be spoken to (idle · unseen is idle's blue); everything over or out of
+     alive, at rest, may be spoken to (the unseen mark is the accent blue beside it); everything over or out of
      reach one grey (--ended). On a card green means working and nothing else. */
   .s-working { background: #dcfce7; color: #166534; }
   .s-needs { background: #fde68a; color: #7c3d00; }
@@ -206,18 +208,21 @@ def role_icon(role):
 # the card's left bar, the state token's strong colour: working green, idle blue, and one grey for
 # everything over or out of reach (§4.5 *The card's anatomy*, TD-095)
 BAR = {'needs': '#f59e0b', 'limited': '#7c3aed', 'stalled': '#dc2626', 'working': '#16a34a', 'idle': '#2563eb', 'exited': '#9ca3af', 'done': '#9ca3af', 'unreachable': '#9ca3af'}
-# §4.5 *One order*: … working → waiting → unseen idle → idle / unreachable on a volatile host → exited → closed
-RANK = {"needs": 0, "limited": 1, "stalled": 2, "working": 3, "unseen": 3.5, "idle": 4, "exited": 5, "done": 6}
+# §4.5 *One order*: … working → waiting → idle / unreachable on a volatile host → exited → closed; within a
+# rank an unseen card first (TD-1228)
+RANK = {"needs": 0, "limited": 1, "stalled": 2, "working": 3, "idle": 4, "exited": 5, "done": 6}
 VOLATILE = {"laptop"}
 def rank(host, state):
     if state == "unreachable":
         return 4 if host in VOLATILE else 2.5
     return RANK[state]
 
-def pill(state, label=None, scraped=False, unseen=False):
+def pill(state, label=None, scraped=False):
     names = {"oncall": "on call", "working": "working", "needs": "needs you", "idle": "idle", "stalled": "stalled?", "exited": "exited", "done": "closed", "limited": "limited", "unreachable": "unreachable", "waiting": "waiting"}
     cls = {"done": "closed"}.get(state, state)  # a closed session is grey; s-done is Focus's green tick
-    return f'<span class="pill s-{cls}{" unseen" if unseen else ""}{" scraped" if scraped else ""}"><span class="dot"></span>{label or names[state]}</span>'
+    return f'<span class="pill s-{cls}{" scraped" if scraped else ""}"><span class="dot"></span>{label or names[state]}</span>'
+
+UNSEEN = '<span class="unseenmark" title="a turn ended 2h ago, after you last looked">● unseen</span>'
 
 def head(title):
     return f'<!doctype html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <script src="./support.js"></script>\n</head>\n<body>\n<x-dc>\n<helmet>{CSS}</helmet>\n'
@@ -332,7 +337,8 @@ EXTRA = {
     # *on call* (◇) with what would make it come, and Message… first (§4.5, TD-097)
     "techlead-1": {"team": "samscrape-grind", "role": "techlead", "under": "orc-1", "report": "3 answered", "seat": True},
     "main":      {"findings": "1 filed"},
-    # the person's own, finished while nobody was looking: *idle · unseen* (§4.2, interactive only)
+    # the person's own, a turn ended while nobody was looking: *idle* and the unseen mark beside it (§4.2,
+    # interactive only, TD-1228)
     "errors-alerts": {"title": "Error Checker", "unseen": True},
 }
 
@@ -389,7 +395,7 @@ def team_desktop(team_first=False):
     def card(host, repo, s, in_team, compact=False):
         name, tool, state, age, where, flag, conf, pending, tag = s
         e = EXTRA.get(name, {})
-        unseen = state == "idle" and e.get("unseen")
+        unseen = e.get("unseen")
         seat = state in ("exited", "done") and e.get("seat")
         ready = e.get("ready") or pending.startswith("ready")
         # (1) name and state: the tool's title only when it differs from the name; the pill says the
@@ -397,8 +403,7 @@ def team_desktop(team_first=False):
         title = e.get("title")
         title_html = (f'<span class="meta fill" title="the session\'s name as its tool holds it">{title}</span>'
                       if title and title != name else "")
-        state_pill = (pill("idle", "idle · unseen", unseen=True) if unseen else pill("oncall") if seat
-                      else pill(state, scraped=(conf == "scraped")))
+        state_pill = (pill("oncall") if seat else pill(state, scraped=(conf == "scraped"))) + (UNSEEN if unseen else "")
         # (2) what it is: role, mode (a word, never pressable), marks, the stops note, the one clock
         role = (f'<span class="badge" title="the role preset it was started under (design §4.8)">'
                 f'{role_icon(e["role"])}{ROLE_LABEL.get(e["role"], e["role"].capitalize())}</span>') if e.get("role") else ""
@@ -472,7 +477,7 @@ def team_desktop(team_first=False):
         editor = f'<span class="lk">{ICON["code"]}VS Code</span>' if state != "done" else ""
         ring = (" ring" if state == "needs" else "") + (" kring" if e.get("kring") else "")
         off = " off" if state == "unreachable" else ""
-        bar = BAR["idle"] if unseen else BAR[state]
+        bar = BAR[state]
         if compact:
             # the team-first shape compared 2026-09-25 (Paul): a member's card is its name, its
             # state and its buttons — the team's summary block above carries the rest
@@ -494,9 +499,8 @@ def team_desktop(team_first=False):
     def key(t):
         host, _, s = t
         e = EXTRA.get(s[0], {})
-        r = RANK["unseen"] if s[2] == "idle" and e.get("unseen") else rank(host, s[2])
-        # §4.5 *One order*, second pass: (rank, interactive first, name)
-        return (r, s[8] == "unattended", s[0])
+        # §4.5 *One order*: (rank, unseen first, interactive first, name)
+        return (rank(host, s[2]), not e.get("unseen"), s[8] == "unattended", s[0])
 
     ordered = []
     for host, repo, path, rows in SESS:
@@ -586,11 +590,13 @@ def team_desktop(team_first=False):
         counts = {}  # by state, in the grid's own order (members are sorted already); needs you is the pill
         for h, r, x in counted:
             ex = EXTRA.get(x[0], {})
-            w = ("unseen" if x[2] == "idle" and ex.get("unseen") else "on call" if x[2] == "exited" and ex.get("seat")
-                 else WORDS.get(x[2], x[2]))
+            w = "on call" if x[2] == "exited" and ex.get("seat") else WORDS.get(x[2], x[2])
             if x[2] != "needs":
                 counts[w] = counts.get(w, 0) + 1
-        tally = " · ".join(f"{n} {w}" for w, n in counts.items())
+        n_unseen = sum(1 for _, _, x in counted if EXTRA.get(x[0], {}).get("unseen"))
+        # by pill, then *n unseen* in the accent blue: the mark is no pill (TD-1228)
+        tally = " · ".join([*(f"{n} {w}" for w, n in counts.items()),
+                            *([f'<span style="color: #2563eb;">{n_unseen} unseen</span>'] if n_unseen else [])])
         grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True, compact=team_first) for h, r, x in members) + plus_card(team, compact=team_first), needs, team=True,
                       strip=summary(team) if team_first else STRIPS.get(team, ""), stops="06:00" if team == "samscrape-grind" else "")
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
@@ -610,7 +616,7 @@ def team_desktop(team_first=False):
     cards = grid
     # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
-                              pill("working"), pill("waiting"), pill("idle", "idle · unseen", unseen=True), pill("idle"), pill("exited"),
+                              pill("working"), pill("waiting"), pill("idle"), pill("exited"),
                               pill("done")])  # an on-call seat sorts as the `exited` / `closed` it is (TD-097)
     return head("Sessions") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Sessions")}
@@ -625,7 +631,7 @@ def team_desktop(team_first=False):
   {due_strip()}
   <div class="warn" style="background: #f3f4f6; border-color: #cbd0d6; color: #374151; align-items: center;">{ICON["warn"]}<span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
   <div style="display: flex; flex-direction: column; gap: 22px;">{cards}</div>
-  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (idle · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>, by the pills' own glyphs: the manager's card first, then {ORDER_PILLS}, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab. <b>Keys</b> (§4.5a <b>keys</b>, TD-124): <span class="mono">j</span> / <span class="mono">k</span> move the keyboard's ring — the blue focus ring on <span class="mono">tdgrind-2</span>, apart from the amber <i>needs you</i> one — through the cards in this order; <span class="mono">g</span> then a team's initial or a group's number jumps; <span class="mono">Enter</span> opens the ringed card's Focus, <span class="mono">a</span> / <span class="mono">d</span> answer its permission; <span class="mono">?</span> lists every key.</div>
+  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue, the unseen mark the accent blue beside any pill, everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>, by the pills' own glyphs: the manager's card first, then {ORDER_PILLS}, and within one urgency an unseen session first, then an interactive session ahead of an unattended one. A team's header carries its place, its counts by state (then <i>n unseen</i>) and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab. <b>Keys</b> (§4.5a <b>keys</b>, TD-124): <span class="mono">j</span> / <span class="mono">k</span> move the keyboard's ring — the blue focus ring on <span class="mono">tdgrind-2</span>, apart from the amber <i>needs you</i> one — through the cards in this order; <span class="mono">g</span> then a team's initial or a group's number jumps; <span class="mono">Enter</span> opens the ringed card's Focus, <span class="mono">a</span> / <span class="mono">d</span> answer its permission; <span class="mono">?</span> lists every key.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1002,20 +1008,20 @@ def legend():
         ("needs", "Waiting on you: a permission (Allow / Deny answer it through the tool's hook; the terminal dialog only appears if the hook times out), a question (Focus — the terminal owns menus), or an empty prompt. Sorted to the top."),
         ("limited", "Hit a usage or token cap and is waiting on a reset. Reset time shown. Nothing you do unblocks it except switching the profile (account/model)."),
         ("idle", "Blue: alive, at rest, and may be spoken to. Turn finished (Stop hook), nothing pending. Flagged if the tree is dirty or unpushed."),
-        ("unseen", "Still <span class=\"mono\">idle</span> in every payload, drawn in idle's blue with its own glyph and words: an <b>interactive</b> session finished and nobody has looked since — never an unattended one, whose manager read the result. A declaration is not a state — how it ended is said in the slot, <i>ready to close ✓</i> in its caption."),
+        ("unseen", "No state and no pill: a mark beside the pill, whatever it reads, in the accent blue and unfilled — an <b>interactive</b> session a turn of which ended after you last looked; never an unattended one, whose manager read the result. A visible Focus clears it. Within a rank an unseen card sorts first."),
         ("stalled", "Reported working, but no output for longer than the adapter's stall_after. How a credential lapse shows up."),
         ("exited", "Grey, like everything over or out of reach. Process ended or tmux session gone. Run log kept; the slot says <i>exited · code N</i>, and the foot's first button is Forget."),
         ("done", "Grey. You clicked Close: session killed, worktree reaped, card kept a day then filed under Resumable. The checklist just says when it is ready; the slot names who closed it — <i>closed by you</i>, <i>closed by manager-dc-1</i>, <i>closed by the tick · team finished</i> — in the text colour, no longer green, with a declaration after the ending."),
         ("unreachable", "Grey, and the card is dimmed. The host stopped answering, so every card on it flips at once and keeps its last known state. Sorts with idle on a volatile host (asleep laptop), after stalled? on one that should be up."),
     ]
     def lpill(s):
-        return pill("idle", "idle · unseen", unseen=True) if s == "unseen" else pill(s)
+        return pill("idle") + UNSEEN if s == "unseen" else pill(s)
     body = "".join(f'<tr><td style="width: 150px;">{lpill(s)}</td><td>{d}</td></tr>' for s, d in rows)
     # the state tokens the page's stylesheet carries (design §4.5 *The card's anatomy*, TD-095)
     tokens = [
         ("--working", "#16a34a", "working", "green — alive"),
-        ("--idle", "#2563eb", "idle, idle · unseen", "blue — alive, at rest, may be spoken to"),
-        ("--new", "#2563eb", "unread, <i>new</i> mail", "blue, idle's values under its own name, so the accent for what is new survives <i>working</i> turning green; an idle card with unread mail is blue twice, which reads rightly"),
+        ("--idle", "#2563eb", "idle", "blue — alive, at rest, may be spoken to"),
+        ("--new", "#2563eb", "unread, <i>new</i> mail, the unseen mark", "blue, idle's values under its own name, so the accent for what is new survives <i>working</i> turning green; an idle card with unread mail is blue twice, which reads rightly"),
         ("--ended", "#9ca3af", "exited, closed, unreachable", "one grey for everything over or out of reach"),
         ("--needs", "#f59e0b", "needs you", "amber, and the card is ringed — with red, the loudest on the page"),
         ("--stalled", "#dc2626", "stalled?", "red"),

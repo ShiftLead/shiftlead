@@ -87,7 +87,8 @@
 {% if g.team and g.defined %}{% import "help_mark.html" as hm %}{{ hm.mark('team', 'team-' ~ g.team) }}{% endif %}
 {# the header carries no state chips while the cards that say them are shown (TD-176), and folded
    it does, last on the row (TD-194, §4.5a *team card: fold*); the session count is the fold's alone (TD-418) #}
-{% if g.team and g.counts %}<span class="meta counts foldonly">· {{ g.counts | join(' · ') }}</span>{% endif %}
+{#- …ending with *n unseen*, the cards carrying the unseen mark, in the accent blue (§4.5a *card: unseen mark*, TD-1228) #}
+{% if g.team and (g.counts or g.unseen_n) %}<span class="meta counts foldonly">· {{ g.counts | join(' · ') }}{% if g.unseen_n %}{{ ' · ' if g.counts }}<span class="unseen-n">{{ g.unseen_n }} unseen</span>{% endif %}</span>{% endif %}
 {#- under the header, while the definition cannot follow its flow, the reason and the flows it could (§4.9c) #}
 {% for line in g.flow_lines %}<div class="meta flowcannot">{{ line }}</div>{% endfor %}
 {#- design §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark in its own numbers,

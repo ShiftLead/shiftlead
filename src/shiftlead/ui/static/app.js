@@ -494,8 +494,19 @@
   // nothing about a window is written to the record. The window is named for the session, so a
   // second press finds it by name and raises it instead of opening another.
   AO.popName = (id) => `ao-focus-${id}`;
-  // `<name> · <state>`, `▲ ` in front while it needs the person: the switcher's one line.
-  AO.focusTitle = (v) => `${v.state === "needs-you" ? "▲ " : ""}${v.name} · ${v.state_label || v.state}`;
+  // §4.2 *Unseen* (TD-1228): the look is a Focus the person can see — never the page's load, never a
+  // background tab. The returned function takes each record the page renders, and `send` (the `seen`
+  // action) goes when the record is unseen and `doc` is visible, and on every switch back to it while the
+  // last record rendered is unseen.
+  AO.unseenLook = function (doc, send) {
+    let last = null;
+    const look = () => { if (last && last.unseen && doc.visibilityState === "visible") send(); };
+    doc.addEventListener("visibilitychange", look);
+    return (v) => { last = v || last; look(); };
+  };
+  // `<name> · <state>`, ` · unseen` after it while the record carries the unseen mark (TD-1228), `▲ ` in front
+  // while it needs the person: the switcher's one line.
+  AO.focusTitle = (v) => `${v.state === "needs-you" ? "▲ " : ""}${v.name} · ${v.state_label || v.state}${v.unseen ? " · unseen" : ""}`;
   // §4.5 *A tab's icon* (TD-1155): the tab's tile follows the state its title says, from the URLs the
   // page's icon link carries (`data-icons`, read once); none, or a class with no URL, leaves it as it is
   let focusIcons;
@@ -2111,9 +2122,11 @@
       // a team's + card (§4.5a *team card: + card*, TD-379) is no session: it is not sorted, and
       // placing every session from index 0 leaves it last
       const cards = $$(".sc:not(.plus)", grid);
-      // `card_order` in app.py: urgency, then an interactive session ahead of an unattended one (TD-095)
+      // `card_order` in cards.py: urgency, then an unseen session first (TD-1228), then an interactive
+      // session ahead of an unattended one (TD-095)
       cards.sort((a, b) => (b.dataset.id === manager) - (a.dataset.id === manager) || (+a.dataset.rank - +b.dataset.rank)
-        || (!!b.dataset.mine - !!a.dataset.mine) || a.dataset.name.localeCompare(b.dataset.name))
+        || (!!b.dataset.unseen - !!a.dataset.unseen) || (!!b.dataset.mine - !!a.dataset.mine)
+        || a.dataset.name.localeCompare(b.dataset.name))
         .forEach((c, i) => AO.placeAt(grid, c, i));
     });
     applyFilter();
@@ -2131,16 +2144,18 @@
   // exact match on the badge, not a substring of the card's text, so a team whose name also appears
   // in a branch stays clean. `state:<word>` is the form the rollup's Agents pills write (TD-176): the
   // card's pill word, hyphenated — `needs-you`, `working`, `on-call`. `mine`, the whole word alone,
-  // is the person's own — the interactive sessions — and `kind:command` shows the command runs,
+  // is the person's own — the interactive sessions — `unseen`, the whole word alone, the cards carrying
+  // the unseen mark whatever their pill (TD-1228), and `kind:command` shows the command runs,
   // hidden without it (the two in place of the *mine* toggle and the *show command runs* box). Any
   // other word is text the card must contain.
   AO.orgWords = function (raw) {
-    const w = { team: null, state: null, mine: false, command: false, text: [] };
+    const w = { team: null, state: null, mine: false, unseen: false, command: false, text: [] };
     String(raw || "").trim().split(/\s+/).filter(Boolean).forEach((word) => {
       const low = word.toLowerCase();
       if (low.startsWith("team:")) w.team = low.slice(5);
       else if (low.startsWith("state:")) w.state = low.slice(6);
       else if (low === "mine") w.mine = true;
+      else if (low === "unseen") w.unseen = true;
       else if (low === "kind:command") w.command = true;
       else w.text.push(low);
     });
@@ -2148,27 +2163,28 @@
   };
   // A team badge or an Agents pill presses one word (`team:<name>`, `state:<word>`): it replaces a
   // word of the same prefix, or is added, and pressed again it is taken out — the box's other words
-  // (`mine`, `kind:command`, text) stay as they were.
+  // (`mine`, `kind:command`, text) stay as they were. A bare word (`unseen`) is added or taken out alone.
   AO.orgToggleWord = function (raw, word) {
     const prefix = word.slice(0, word.indexOf(":") + 1).toLowerCase(), low = word.toLowerCase();
     const words = String(raw || "").trim().split(/\s+/).filter(Boolean);
     const had = words.some((w) => w.toLowerCase() === low);
-    const rest = words.filter((w) => !w.toLowerCase().startsWith(prefix));
+    const rest = words.filter((w) => (prefix ? !w.toLowerCase().startsWith(prefix) : w.toLowerCase() !== low));
     return (had ? rest : [...rest, word]).join(" ");
   };
-  // `c` is what a card says of itself: its `data-*` (`kind`, `team`, `pill`, `mine`) and its text.
+  // `c` is what a card says of itself: its `data-*` (`kind`, `team`, `pill`, `mine`, `unseen`) and its text.
   AO.orgPasses = function (c, w) {
     if (c.kind === "command" && !w.command) return false;
     if (w.team !== null && (c.team || "").toLowerCase() !== w.team) return false;
     if (w.state !== null && (c.pill || "") !== w.state) return false;
     if (w.mine && !c.mine) return false;
+    if (w.unseen && !c.unseen) return false;
     const text = (c.text || "").toLowerCase();
     return w.text.every((t) => text.includes(t));
   };
   function applyFilter() {
     const raw = ($("#filter") ? $("#filter").value : "").trim(), words = AO.orgWords(raw);
     // `kind:command` alone shows more than the bare page, so it is no filter: the + card stays
-    const filtering = words.team !== null || words.state !== null || words.mine || words.text.length > 0;
+    const filtering = words.team !== null || words.state !== null || words.mine || words.unseen || words.text.length > 0;
     $$("#groups .sc").forEach((c) => {
       if (c.classList.contains("plus")) { c.hidden = filtering; return; }  // a filter hides the + card (§4.5a)
       c.hidden = !AO.orgPasses({ ...c.dataset, text: c.textContent }, words);
@@ -2495,10 +2511,10 @@
       if (at) at.scrollIntoView({ block: "start" });
       return;
     }
-    const pill = e.target.closest("[data-state-filter]");
+    const pill = e.target.closest("[data-state-filter], [data-word-filter]");
     if (pill) {
       const f = $("#filter");
-      f.value = AO.orgToggleWord(f.value, "state:" + pill.dataset.stateFilter);
+      f.value = AO.orgToggleWord(f.value, pill.dataset.wordFilter || "state:" + pill.dataset.stateFilter);
       return layout();
     }
     const row = e.target.closest("tr[data-row]");
@@ -6639,6 +6655,8 @@
     });
     document.addEventListener("click", (e) => { if (e.target.closest("details.side > summary button")) e.preventDefault(); });
     render(s);
+    const looked = AO.unseenLook(document, () => act(id, "seen", {}).catch(() => {}));
+    looked(s);
     connectEvents((ev) => {
       if (ev.event === "session" && ev.id === id) {
         // The pushed delta is authoritative and arrives before any reconnect (TD-029): a closed or
@@ -6653,8 +6671,8 @@
           mk.state = ev.session.state; drawMark();
         }
         if (!!ev.session.unattended !== mode) { mode = !!ev.session.unattended; reattach(); drawMark(); }
-        // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
-        if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
+        // a visible Focus is the look, so a turn ending here is seen the moment it happens (TD-017, TD-1228)
+        looked(ev.session);
       } else if (ev.event === "repos" && ev.root) {
         // a repo's PRs moved: its marks replace what the page held, and the Reports panel redraws (TD-617);
         // a light stream sends the marks alone, `null` for a repo dropped (TD-670)

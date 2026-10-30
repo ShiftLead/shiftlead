@@ -15,7 +15,7 @@
     {# design §4.5a Sessions top bar **filter…** (TD-418, built by TD-428): words that compose — `team:`,
        `state:`, `mine` (the person's own, the interactive sessions) and `kind:command` (the command
        runs, hidden without it) — in place of the ***mine*** toggle and the *show command runs* box #}
-    <input class="input" id="filter" placeholder="filter… team: state: mine kind:command" title="every word must match: team:<name>, state:<pill>, mine (your own sessions), kind:command (the command runs, hidden without it), or any text" style="width: 320px; max-width: 100%;">
+    <input class="input" id="filter" placeholder="filter… team: state: mine unseen kind:command" title="every word must match: team:<name>, state:<pill>, mine (your own sessions), unseen (a turn you have not seen), kind:command (the command runs, hidden without it), or any text" style="width: 320px; max-width: 100%;">
   </div>
   {# design §4.5a *Sessions: rollup* (TD-176 slice 4, TD-924): counts the page's sessions and sums the live teams, re-sent with the groups #}
   <div id="rollup">{% with ro = rollup %}{% include "rollup.html" %}{% endwith %}</div>

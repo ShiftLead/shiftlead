@@ -62,6 +62,11 @@ def test_every_focus_is_titled_by_its_name_and_state(tmp_path, monkeypatch):
     pend = {"kind": "permission", "text": "Bash: ls", "tool_use_id": "t"}
     assert "<title>▲ w · needs you</title>" in _focus(monkeypatch, tmp_path, True, state="needs-you", pending=pend)
     assert "<title>w · working</title>" in _focus(monkeypatch, tmp_path, True, state="working")
+    # ` · unseen` from the mark, not the pill (§4.5a *Focus: title*, TD-1228)
+    assert "<title>w · idle · unseen</title>" in _focus(monkeypatch, tmp_path, False, seen_at=None)
+    assert "<title>w · working · unseen</title>" in _focus(
+        monkeypatch, tmp_path, False, state="working", seen_at=None, turn_at="2026-09-23T16:00:00Z"
+    )
 
 
 @pytest.mark.unit
@@ -107,7 +112,27 @@ global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const AO = window.AO;
 const out = {};
-out.title_idle = AO.focusTitle({ name: "w", state: "idle", state_label: "idle · unseen" });
+out.title_idle = AO.focusTitle({ name: "w", state: "idle", state_label: "idle", unseen: true });
+out.title_seen = AO.focusTitle({ name: "w", state: "working", state_label: "working", unseen: false });
+// the look (§4.2 *Unseen*, TD-1228): a page loaded hidden sends nothing until it is shown; a turn that
+// ended while hidden is sent on the switch back; a seen record sends nothing
+const vdoc = { visibilityState: "hidden", fns: [], addEventListener(k, f) { this.fns.push(f); } };
+const sent = [];
+const looked = AO.unseenLook(vdoc, () => sent.push(vdoc.visibilityState));
+looked({ unseen: true });
+out.look_hidden = sent.length;
+vdoc.visibilityState = "visible"; vdoc.fns.forEach((f) => f());
+out.look_shown = sent.length;
+looked({ unseen: false });
+vdoc.visibilityState = "hidden"; vdoc.fns.forEach((f) => f());
+looked({ unseen: true });
+out.look_hidden_turn = sent.length;
+vdoc.visibilityState = "visible"; vdoc.fns.forEach((f) => f());
+out.look_back = sent.length;
+looked({ unseen: false }); vdoc.fns.forEach((f) => f());
+out.look_seen = sent.length;
+looked({ unseen: true });
+out.look_visible_delta = sent.length;
 out.title_needs = AO.focusTitle({ name: "w", state: "needs-you", state_label: "needs you" });
 out.features_default = AO.popFeatures(null);
 out.features_saved = AO.popFeatures({ w: 900, h: 700, x: 10, y: 20 });
@@ -150,6 +175,10 @@ def test_the_pop_out_rules_run_as_themselves():
     assert out.returncode == 0, out.stderr
     got = json.loads(out.stdout)
     assert got["title_idle"] == "w · idle · unseen" and got["title_needs"] == "▲ w · needs you"
+    assert got["title_seen"] == "w · working"
+    assert (got["look_hidden"], got["look_shown"]) == (0, 1)  # loaded hidden: cleared only once shown
+    assert (got["look_hidden_turn"], got["look_back"]) == (1, 2)  # a turn ended while hidden: on the switch back
+    assert (got["look_seen"], got["look_visible_delta"]) == (2, 3)  # seen sends nothing; a visible delta sends
     assert got["features_default"] == "popup,width=1184,height=860"
     assert got["features_saved"] == "popup,width=900,height=700,left=10,top=20"
     assert got["features_junk"] == "popup,width=1184,height=860"

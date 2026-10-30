@@ -33,8 +33,10 @@ PHASES = ("add", "design", "grind", "review")
 HEADS_EVERY = 1.0
 SHAPE_KEYS = ("state", "team", "controllers", "name", "seat", "unattended")
 # what a light stream (the Focus and Inbox pages) also hears of another record: the fields their re-reads
-# draw — Focus's members' lanes and reports, the Inbox's unseen and open-work rows, a claim
-LIGHT_KEYS = ("lane", "report", "progress", "unseen", "idle_open", "out_of_work")
+# draw — Focus's members' lanes and reports, the Inbox's unseen and open-work rows, a claim. `seen_at`, so a
+# look that clears the unseen mark on a working record re-reads (§4.2 *Unseen*, TD-1228); its `turn_at`
+# moves only with `state`, which `SHAPE_KEYS` carries
+LIGHT_KEYS = ("lane", "report", "progress", "seen_at", "idle_open", "out_of_work")
 WINDOWS = ("day", "week", "month")
 LEDGER_VIEWS = ("open", *WINDOWS)  # the Technical debt selector: the open entries, or a window
 PRIORITY_BARS = (("high", "High"), ("medium", "Medium"), ("low", "Low"))
@@ -655,7 +657,6 @@ ROLLUP_STATES = (
     ("unreachable", "unreachable", "unreachable"),
     ("working", "working", "working"),
     ("waiting", "waiting", "waiting"),
-    ("unseen", "idle", "unseen"),
     ("idle", "idle", "idle"),
     ("on-call", "oncall", "on call"),
     ("exited", "exited", "exited"),
@@ -825,6 +826,8 @@ def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]
         word = str(m.get("pill_word") or m.get("state"))
         tally[word] = tally.get(word, 0) + 1
     agents = [{"word": w, "cls": c, "label": label, "n": tally[w]} for w, c, label in ROLLUP_STATES if tally.get(w)]
+    # the unseen mark is no pill: the Agents line ends with *unseen (n)* after the pills (TD-1228)
+    n_unseen = sum(1 for _, m in counted if m.get("unseen") and not m.get("seat"))
     repos: dict[str, dict[str, Any]] = {}
     for g in live:
         r = g["summary"].get("repo")
@@ -853,6 +856,7 @@ def rollup(groups: list[dict[str, Any]] | None, views: Collection[dict[str, Any]
         # every row's number added up: the rows partition the counted set, so it is the two counts' sum
         "n_from_teams": answer_members(answers) + sum(a["n"] for _, a in asked),
         "agents": agents,
+        "n_unseen": n_unseen,
         "n_agents": len(counted),
         "prs": {w: _blocks(wins[w]) for w in WINDOWS},
         "prs_open": n_open,

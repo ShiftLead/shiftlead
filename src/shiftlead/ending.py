@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
-from sessionorc.models import tokens_short
+from sessionorc.models import tokens_short, turn_stamp
 
 # the tick's closes (§6): rule 9's, rule 2's, rule 7's two (its brief, its team's flow, §4.9c), rule 3's and a
 # sit-out's (§4.9c) — rule 8's start closes nothing
@@ -117,6 +117,17 @@ def own_work(s: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
         parts.append(f"{len(shells)} shell{'' if len(shells) == 1 else 's'}")
         what.append("background shells")
     return parts, what
+
+
+def unseen(s: Mapping[str, Any]) -> bool:
+    """**Unseen** (§4.2 *Unseen*, TD-1228): an interactive record, not `closed`, a turn of which ended after
+    the person last looked — its turn stamp (`turn_stamp`) past `seen_at` — whatever its pill reads; a record
+    still on its first turn has no stamp and no mark. A mark beside the pill, never in it; the card leaves it
+    off a seat drawn *on call*."""
+    stamp = turn_stamp(s)
+    if not stamp or s.get("unattended") or s.get("state") == "closed":
+        return False
+    return not s.get("seen_at") or stamp > str(s["seen_at"])
 
 
 def pill_of(s: Mapping[str, Any], waiting: bool) -> str | None:

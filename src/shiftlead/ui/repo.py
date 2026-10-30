@@ -23,7 +23,7 @@ from shiftlead import doctor, repoconfig, review, teamrun, teams
 from shiftlead import org as orgmod
 
 from . import uiconf
-from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
+from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts, unseen_count
 from .common import _age, host_name, live_divider, promote_reading
 from .inbox import work_note, work_started
 from .org import (
@@ -796,6 +796,7 @@ def team_groups(
                 "place": group_place(members),
                 # drawn only while folded (TD-418): unfolded, the member cards say it
                 "counts": state_counts(members),
+                "unseen_n": unseen_count(members),  # *n unseen* after them, in the accent blue (TD-1228)
                 # …and, on any team, folded or not, how many wait for a person's Close — a mark
                 # (TD-156 (b): a concluded team's idle cards were folded away and read as already closed)
                 "ready": ready,

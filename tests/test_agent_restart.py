@@ -118,6 +118,28 @@ async def test_orchestrate_is_not_a_grant(tmp_path, monkeypatch):
         kill_private_server(tmux)
 
 
+async def test_a_look_records_the_turn_it_saw(tmp_path, monkeypatch):
+    """Design §4.2 *Unseen* (TD-1228): `seen` sets `seen_at` to the larger of itself and the record's turn
+    stamp — the clock of the host that ran the turn, not the look's — and leaves it where no turn has ended."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    paths.ensure_layout()
+    tmux = Tmux(socket_name=private_socket_name())
+    try:
+        a = HostAgent(tmux=tmux)
+        s = Session(id="ao-w", name="w", kind="interactive", adapter="shell", dir=str(tmp_path), state="working")
+        a.sessions["ao-w"] = s
+        await a.rpc_seen("ao-w")
+        assert s.seen_at is None  # a first turn: nothing seen yet, and its stamp will compare greater
+        s.set_state("idle", confidence="hook", since="2099-01-01T00:00:00Z")  # a node's clock running ahead
+        await a.rpc_seen("ao-w")
+        assert s.seen_at == "2099-01-01T00:00:00Z"
+        s.turn_at = "2026-01-01T00:00:00Z"  # never moves `seen_at` back
+        await a.rpc_seen("ao-w")
+        assert s.seen_at == "2099-01-01T00:00:00Z"
+    finally:
+        kill_private_server(tmux)
+
+
 def test_restart_seeds_hook_freshness(tmp_path, monkeypatch):
     """TD-015: after a restart a hook-confirmed record counts as freshly reported (as of the load),
     so a screen rule cannot outrank it until the stall window passes; a scraped record is cold."""
