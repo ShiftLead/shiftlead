@@ -355,3 +355,36 @@ def test_an_ask_to_a_question_seat_is_the_seats_and_a_pr_ask_is_a_teams():
         assert mail.message_gate(records, "a", "qs", kind=kind) is None
         assert mail.message_edge(records, "a", "qs", kind=kind) == "own"
     assert mail.message_gate(records, "a", "w", kind="ask", carries=True) is not None
+
+
+@pytest.mark.integration
+async def test_a_queue_started_session_reads_its_items_thread_and_a_member_does_not(agent, hookstub, tmp_path):
+    """TD-1246 (§4.8 *thread passes an own end*): the Queue's **Start session** creates the person's session as
+    `/api/ledger/start` does (`test_queue_start`: interactive, not supervised, no seat, the team's live manager its
+    controller), so the create writes `by_person` and `thread` answers it; an unattended member and a seat holder
+    under the same manager are refused."""
+    await park_ticks(agent)
+    made: dict[str, str] = {}
+    async with LocalClient() as person:
+
+        async def mk(n: str, **kw) -> str:
+            (tmp_path / n).mkdir()
+            made[n] = (await person.call("create", name=n, dir=str(tmp_path / n), adapter="hookstub", **kw))["id"]
+            return made[n]
+
+        mgr = await mk("mgr", unattended=True, supervised=True, capabilities=["control"])
+        road = await mk("td-9", unattended=False, controllers=[mgr], lane=["TD-9"])
+        member = await mk("worker", unattended=True, controllers=[mgr])
+        seat = await mk("seat", unattended=False, controllers=[mgr], seat={"trigger": "team"})
+        assert agent.sessions[road].by_person is True and agent.sessions[road].controllers == [mgr]
+        async with LocalClient(caller=road) as own:
+            asked = (await own.call("msg", to="person", text="which?", kind="ask"))["entry"]
+            got = await own.call("thread", msg=asked["id"])
+            assert [e["id"] for e in got["entries"]] == [asked["id"]]
+        for sid in (member, seat):
+            async with LocalClient(caller=sid) as other:
+                with pytest.raises(AgentError, match=r"cannot read a thread"):
+                    await other.call("thread", msg=asked["id"])
+        for sid in made.values():
+            if agent.sessions.get(sid) is not None and agent.sessions[sid].pane:
+                await person.call("kill", id=sid)
