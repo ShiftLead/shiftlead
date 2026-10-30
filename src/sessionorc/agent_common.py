@@ -746,7 +746,7 @@ def _controllers(ids: list[Any]) -> list[str]:
 
 def _lane(refs: list[str]) -> list[str]:
     """The references a session was handed (design §4.8), in the order given and each canonical, so
-    a lane item and the session's own claim are the same string. `free-pick` is a lane of its own.
+    a listed reference and the session's own claim are the same string. `free-pick` is a lane of its own.
     An `owner:<word>` narrows the lane (§6 rule 6, TD-227): set aside before the checks, kept last
     as `owner:<word>`, and never a lane by itself."""
     owners = list(dict.fromkeys(f"{OWNER_WORD}{o}" for r in refs if (o := owner_word(r))))
@@ -760,8 +760,7 @@ def _lane(refs: list[str]) -> list[str]:
         if len(refs) > 1:
             raise RpcError("a lane is either `free-pick` or a list of references, not both")
         return ["free-pick", *owners]
-    # deduped after canonicalisation: `--lane TD-027,td-27` is one item, or the lane count the card
-    # shows (*1 of 2*) would be a lie about how much work there is (review 2026-09-11)
+    # deduped after canonicalisation: `--lane TD-027,td-27` is one reference, so the record keeps it once
     return [*dict.fromkeys(_ref(r) for r in refs), *owners]
 
 
