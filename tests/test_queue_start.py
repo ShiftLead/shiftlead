@@ -176,6 +176,22 @@ def test_a_card_press_starts_on_its_start_with_the_queue_prompt_and_the_cards_id
     )
 
 
+def test_a_card_press_names_the_cards_mail_item_among_waits_on_me(tmp_path, monkeypatch):
+    """The road's own `card_mail` read (TD-1256): an ask about TD-12 is a Decide item of the card, so the prompt's
+    *waits on me* names its id after the card's ledger entries — not the ledger entries alone."""
+    from test_ui_inbox import entry
+
+    ask = entry("m-41", "ask", from_="ao-samscrape-manager-sam", about="samscrape#TD-012", text="which name?")
+    repo, c, created = _start_world(tmp_path, monkeypatch, fleet=[MANAGER], queue=_q(), inbox=[ask])
+    r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-009", "card": "samscrape#TD-020"})
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert (
+        "Its entries are: waits on me — samscrape#TD-012, samscrape#TD-009, m-41; the rest — samscrape#TD-020."
+        in kw["prompt"]
+    )
+
+
 def test_a_card_with_nothing_of_the_persons_starts_on_its_top_entry_with_the_card_key(tmp_path, monkeypatch):
     q = {"cards": [{**card(row("samscrape", "TD-020", "top")), "start": "samscrape#TD-020"}]}
     repo, c, created = _start_world(tmp_path, monkeypatch, fleet=[MANAGER], queue=q)

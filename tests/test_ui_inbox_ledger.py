@@ -392,11 +392,12 @@ def test_a_repos_name_goes_with_its_last_row_and_the_poll_puts_later_back():
 
 
 def _start_world(
-    tmp_path, monkeypatch, *, fleet=(), team=True, entries=None, checks=None, refuse="", host="", queue=None
+    tmp_path, monkeypatch, *, fleet=(), team=True, entries=None, checks=None, refuse="", host="", queue=None, inbox=None
 ):
     """`test_ui_entry`'s repo, team and fake host agent, whose repo facts hold TD-9 (*ledger · yours*, a
     debt), TD-12 (*ledger · your decision*, a feature) and TD-20 (pickable: no longer for you); `queue` the
-    `queue` reading it serves (TD-912), else none."""
+    `queue` reading it serves (TD-912), else none; `inbox` the person inbox's entries it serves (TD-1256), else
+    none, so the road's `card_mail` read fails and *waits on me* is the card's ledger entries."""
     import yaml
     from test_ui_entry import client, fake, world
 
@@ -423,6 +424,8 @@ def _start_world(
                 return {root: reading}
             if method == "queue" and queue is not None:
                 return queue
+            if method == "inbox" and inbox is not None:
+                return {"entries": [dict(e) for e in inbox]}
             if method == "create" and refuse:
                 raise AgentError(refuse)
             return await super().call(method, **kw)
