@@ -2073,6 +2073,16 @@ def test_msg_source_and_the_answered_for_you_lines(subprocess_agent, tmp_path, c
     out = capsys.readouterr().out
     assert f"answered for you — {asker} asked: is the seat counted in a wind-down?" in out
     assert f"answered by {answerer} from design §4.9b, the seat; a reply here goes to the asker" in out
+    # TD-1250 (§4.10 *An item leads with one sentence*): a `--source` reply is the asker's answer, never a question
+    # to the person, so an `ask` that is one is not held to one sentence
+    monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
+    assert cli.main(["--json", "msg", answerer, "may the seat close itself?", "--kind", "ask"]) == 0
+    q = json.loads(capsys.readouterr().out)["entry"]
+    monkeypatch.setenv("SHIFTLEAD_SESSION", answerer)
+    reply = ["msg", "--reply-to", q["id"], "No. Ask the tick.", "--kind", "ask", "--source", "design §6, rule 3"]
+    assert cli.main(reply) == 0
+    got = capsys.readouterr()
+    assert "source: design §6, rule 3" in got.out and "the person reads one sentence first" not in got.err
     for sid in (asker, answerer):
         call_sync("kill", id=sid)
 
