@@ -82,8 +82,8 @@ A card can want three things of the person, and the section names say which:
 
 | Want | What it is today | Where it is drawn |
 |---|---|---|
-| **Decide** | an `ask` with or without answers; a `steer`, running (with its countdown and Go with it) or paused; a board line of kind `decide`, `act` or `look` (cadence §3.3); a `Blocked by: decision (paul)` hold (*Lift the hold* its answer); an entry with `Answers:` | the header, open, amber, counted |
-| **Do** | an entry whose `Owner:` is the person (*yours*); a red PR nobody holds that names one of the card's entries, in a repo no team services (§4.5a *Inbox row: red PR*; the card is In progress, its PR open) — the row stays in the Inbox, counted once there as today; the card draws it as a Do item, *#n red — Open*, counted in the pill only, never a second top-bar count, amber; no Snooze on the card, and Start session never chooses it (it is no entry) | the header, open, amber, counted |
+| **Decide** | an `ask` with or without answers; a `steer`, running (with its countdown and Go with it) or paused; a board line of kind `decide` or `look` (cadence §3.3; `act` moved to Do, §9); a `Blocked by: decision (paul)` hold (*Lift the hold* its answer); an entry with `Answers:` | the header, open, amber, counted |
+| **Do** | an entry whose `Owner:` is the person (*yours*); a board line of kind `act`, *Done* its answer (§9); a red PR nobody holds that names one of the card's entries, in a repo no team services (§4.5a *Inbox row: red PR*; the card is In progress, its PR open) — the row stays in the Inbox, counted once there as today; the card draws it as a Do item, *#n red — Open*, counted in the pill only, never a second top-bar count, amber; no Snooze on the card, and Start session never chooses it (it is no entry) | the header, open, amber, counted |
 | **Read** | FYI (notes, the trail, a `watch` or `fyi` board line), *Answered for you*, *Waiting on them* (an answered ask or steer, a decided line its session has not landed) | under the rows, **folded, with its count**, uncounted |
 
 Decide and Do both colour the card amber and both are counted on its pill, *Decide 1 · Do 1*; the page
@@ -116,7 +116,7 @@ Whatever the item's kind, the person does one of three things, and the words are
   the page draws by their words, §4.5a *Inbox row: a look*) are answers, drawn in this row, each taking the
   road its kind already has (§4.4 *Board write-back*, §4.5a *Inbox row: ledger entry*). No **Reply** word on
   a card: a reply on a ledger row is a work order, not a conversation, and the word hid that.
-- **Start session** — **once per card, in its header**, plain (a filled button was too loud; Paul,
+- **Start session** — **once per card, in its header** (amended by §9: on every Decide and Do item, the header's only where no item has one), plain (a filled button was too loud; Paul,
   2026-10-19), on the Repo page's card too (the one partial). It is the Do verb: *if I have a "Do" item I
   am going to start a session and have the AI do as much of it as possible, giving me easy copy/paste or
   instructions for the rest.* **It starts the person's own interactive session on the card's repo's team,
@@ -139,8 +139,8 @@ Whatever the item's kind, the person does one of three things, and the words are
   it), and a third key, *card*, for any chosen entry that is neither `Owner: paul` nor a `decision (paul)`
   hold, reads *I opened this session from the Queue to work the card around TD-n*; then, for every key, **the
   id-list sentence** — *Its entries are: waits on me — <ids>; the rest — <ids>*, each `<repo>#TD-n`,
-  comma-separated, *waits on me* the Decide and Do ledger entries, either group *none* when empty (a card
-  whose only want is a red PR has no such entry) — ids only, never an entry's own words (§4.5a); then today's closing sentences unchanged (*check the code and the design for what is already
+  comma-separated, *waits on me* the Decide and Do ledger entries (amended, §9: every Decide and Do item, by its id), either group *none* when empty (a card
+  whose only want is a red PR has no such entry; amended, §9: a red PR is in it as `<repo>#<n>`) — ids only, never an entry's own words (§4.5a); then today's closing sentences unchanged (*check the code and the design for what is already
   built or decided*, *I drive this one*), so the three keys read in one voice. **The session's claim is the
   tick's derived one** from the branch `td-<n>` (§4.8): `reports.derive` writes it from the branch alone and
   never calls `claim_refusal`, which only a declared `ao progress claim` meets; `work.md` runs none, so a
@@ -153,7 +153,7 @@ Whatever the item's kind, the person does one of three things, and the words are
   the person's own sessions on the card, Open session goes to the one holding the chosen entry, else the
   first by id.
   While **the person's own interactive session** holds any of the card's entries the button reads **Open
-  session** and goes there, **whatever holds the chosen entry** — the button is once per card and the
+  session** and goes there, **whatever holds the chosen entry** — the button is once per card (amended, §9) and the
   person's session is where the card's work is; the road does the same before it starts anything, so a
   stale page's press never starts a second session on the card. With no session of the person's on the card
   and an unattended worker on the chosen entry, the button is absent, the row says *held by <name>*, and the
@@ -229,7 +229,7 @@ part lives is fixed per kind**:
 | Kind | The sentence | The consequences | The context |
 |---|---|---|---|
 | an `ask` or `steer` to the person | its first paragraph | its second paragraph | the rest, under *context* |
-| a board line | its line, before `Context:` (cadence §3.3) | `Answers:`, each `text — what it leads to`; `Recommended:` | the item's sub-bullets |
+| a board line | its line, before `Context:` (cadence §3.3) — amended by §9: its bold head | `Answers:`, each `text — what it leads to`; `Recommended:` | the item's sub-bullets |
 | a ledger entry that waits on the person | a new **`**Ask:**`** line **in the entry's body, beside `**Why:**` and `**Fix:**`, never in the header block** (ledgerboard validates the header field by field and rejects an undeclared one on an edited entry; `Answers:` goes in the body for the same reason) — new to cadence §2's entry shape | `**Answers:**`, each `text — what it leads to` | `**Why:**` and `**Fix:**`, as today; **an entry with no `Ask:` yet** (the backfill lands after the read-back) draws its title as the sentence and Why and Fix under *context*, as today |
 
 **The test for one sentence is a reader of its own beside `subject_of`**, `mail.one_sentence(text)`: the
@@ -271,7 +271,7 @@ unchanged for mail that is not to the person.
 ## 7. Decided with Paul (2026-10-19)
 1. The Waiting group, as §1 — *it's like up next but blocked on a date*.
 2. FYI and Answered for you fold by default, with counts.
-3. Start session once per card, on the repo's team, with the card as context.
+3. Start session once per card, on the repo's team, with the card as context (amended, §9).
 4. Decide and Do both colour the card; the backlog is large and that is fine.
 5. Start session plain, not filled.
 6. The pill carries counts.
@@ -314,6 +314,30 @@ The rest change what the person sees and may land now:
 - help text and §4.5a rows for every control whose words change, the filter row's *Needs you (n)* and the
   kind pick's words among them, and display-only rows for the wait column with *would be n* and for *Read n* (bound to `help.py`: the build entry's; run `grep -ln 4.5a tests` first,
   since §4.5a rows are test keys)
+
+## 9. Amended 2026-10-30 (TD-1066): what a board item asks, and a session on every item
+Paul's TD-1033 card on 2026-10-26 showed one *Decide (1)* item, an `act` line asking him to file an entry
+in another repo, and he could not tell what was asked of him. The layout was agreed with him on the
+mockups of #2444 (`docs/mockups/reviews/2026-10-26-td1066-card-items.*`; his answer of 2026-10-30, *Yes*).
+Design §4.5 screen 12 holds the rules; this section is what they change here.
+
+- **An `act` line is a Do** (§2's table): cadence §3.3 gives an `act` no answers, so its answer is
+  **Done**, outlined, the write-back's check-off; **Answer…** moves into its ⋯. `decide` and `look` stay
+  Decide.
+- **Start session on every Decide and Do item** but a red PR (§3), on the card's `start`, or on a ledger
+  item's own entry, with the item as the session's subject; the header's button only on a card with no
+  such item. With the person's own session on the card each item's button reads **Open session**, goes
+  there and puts the item's id on the clipboard; the page types nothing into a session the person drives.
+- **The id list names the items**: *waits on me* carries every Decide and Do item by its id
+  (`board:<key>`, `m-…`, `<repo>#TD-n`, a red PR's `<repo>#<n>`), ids only as before; the session reads each itself.
+- **A board item leads with its task** (§6's table): its bold head is the sentence, *in <repo>* on its
+  kind line where its `Context:` names another repo, its prefix and key under *context*, and its
+  *standing* in Answer…'s `title`, not its head.
+- **No footer** on a card's board item: its write-back words are Done's `title`.
+- **A line found done closes in a PR of its own** where no open PR of the session's does its task, never
+  folded into a PR that does other work (design §4.9a).
+  *Closing in #n*, read from an open PR's description, was left out: the close in its own PR makes it
+  rarely needed.
 
 ## Review record
 Round 1 (2026-10-19, Fable and Sonnet in parallel, both NOT READY, 16 and 12 findings; adopted into this
