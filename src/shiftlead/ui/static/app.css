@@ -562,6 +562,7 @@ body.popped .page { padding: 10px 12px; } body.popped .termbox, body.popped .ter
 #entrydlg .entryway + .entryway { border-left: 1px solid var(--line); padding-left: 16px; }
 #entrydlg .entryway > .note[hidden] { display: none; }
 #entrydlg .entrynamed { flex-wrap: nowrap; }
+#entryline.bad { color: var(--stalled-fg); } input.input#entryname.bad { border-color: var(--stalled); }  /* a name not free, as the *taken* shot draws it */
 input.input#entryname { flex: 1 1 0; min-width: 0; max-width: 170px; height: 30px; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }  /* §4.5a *Add entry form: Name* (TD-677) */
 @media (max-width: 640px) {
   #entrydlg .entryways { grid-template-columns: minmax(0, 1fr); row-gap: 14px; }

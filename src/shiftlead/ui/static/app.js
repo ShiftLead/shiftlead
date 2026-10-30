@@ -3799,6 +3799,7 @@
       if ($("#entryteamrow")) $("#entryteamrow").hidden = ts.length < 2;
       // a name that is not free: its reason stands in place of the line, and the button is disabled
       put("#entryline", v.name_why || v.line || "");  // the server's whole sentence, the page wrapping nothing
+      $("#entryline").classList.toggle("bad", !!v.name_why); nameBox.classList.toggle("bad", !!v.name_why);  // as the *taken* shot draws it
       const h = v.hand || { why: "the host agent did not say who takes it" };
       handWhy = h.why || "";
       put("#entryseat", h.name || h.to || "");
@@ -3822,7 +3823,7 @@
     };
     $("#entrywhere").textContent = repo;
     $("#entrywhat").value = ""; $("#entryseat").textContent = ""; $("#entrywhen").textContent = ""; $("#entryline").textContent = "";
-    named = false; nameBox.value = ""; nameBox.placeholder = "";
+    named = false; nameBox.value = ""; nameBox.placeholder = ""; nameBox.classList.remove("bad"); $("#entryline").classList.remove("bad");
     // checked as typed, debounced as New session's name field is (§4.5a *New session: name field → holder*)
     nameBox.oninput = () => { named = true; clearTimeout(nameBox._t); nameBox._t = setTimeout(plan, 250); };
     dlg.querySelector("input[name=entrytype][value=debt]").checked = true;

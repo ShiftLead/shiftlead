@@ -275,6 +275,9 @@ def test_no_read_of_the_plan_blanks_a_line_or_disables_hand_while_it_waits():
     assert 'put("#entryline", v.name_why || v.line || "");' in body
     assert 'put("#entrywhen", h.why || h.line || "");' in body
     assert "Hand to the techlead: ${" not in js and "`When it is read: ${h.line}`" not in js
+    # a name not free: its reason in red and the box's border red, as the *taken* shot draws it
+    assert '$("#entryline").classList.toggle("bad", !!v.name_why);' in body
+    assert 'nameBox.classList.toggle("bad", !!v.name_why);' in body
 
 
 def test_the_add_entry_dialog_alone_widens_to_720():
