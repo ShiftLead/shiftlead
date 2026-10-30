@@ -513,7 +513,7 @@ def test_a_path_that_wraps_or_is_cut_across_rows_is_one_link_on_every_row():
     assert got["proseAsked"][0] == ["src/a/b.pyand", "src/a/b.py"]
     # where both are files, the joined run wins and the row's own run it covers is no second link (TD-1273)
     assert got["won"] == [{"text": "src/a/b.pyand", "range": {"start": {"x": 31, "y": 1}, "end": {"x": 3, "y": 2}}}]
-    # each row of one wrapped line asks for its own runs: the first row's cached answer never serves the second (TD-1275)
+    # each row of one wrapped line asks for its own runs: the first row's cached answer never serves the next (TD-1275)
     assert got["pairAsked"] == [["src/a.py"], ["src/b.py"]]
     assert got["rows"] == [
         [{"text": "src/a.py", "range": {"start": {"x": 5, "y": 1}, "end": {"x": 12, "y": 1}}}],
