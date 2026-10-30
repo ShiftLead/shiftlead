@@ -93,7 +93,7 @@ def test_concurrent_pastes_do_not_share_one_buffer(tmux, tmp_path):
 
     assert errors == []
     for name, log in logs.items():
-        assert wait_for(lambda log=log, name=name: f"mine={name}" in log.read_text())
+        assert wait_for(lambda log=log, name=name: log.exists() and f"mine={name}" in log.read_text())
         # Nobody received anybody else's text.
         text = log.read_text()
         assert not [other for other in logs if other != name and f"mine={other}" in text]
