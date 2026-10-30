@@ -5616,7 +5616,13 @@
   // The provider the page registers beside the web-links addon when the Session card has an editor button:
   // a row with candidates asks the `paths` route once — the answer kept by the row's text until
   // `clear` (a re-attach) — and the runs the host resolved are links; a failed ask is no link and is
-  // remembered nowhere, so the next hover asks again.
+  // remembered nowhere, so the next hover asks again. **A path that wraps is one link** (§4.6, TD-1259):
+  // the row is read in its logical line, through `AO.cutRows`' view so a row the program cut at the width
+  // joins as it does for the addon — back while a row is wrapped, forward while the next is, as far as
+  // `AO.PATH_JOIN` characters — and a run of the joined text on this row is a link whose range spans the
+  // rows; the runs of the row alone are asked beside them, so a joined row that runs two words together
+  // takes no link a row had before.
+  AO.PATH_JOIN = 2048;
   AO.pathProvider = function (term, id, editor, fetchPaths) {
     const known = new Map();
     let era = 0;  // an answer that lands after a `clear` belongs to the attach before it
@@ -5626,31 +5632,51 @@
     return {
       clear: () => { known.clear(); era += 1; },
       provideLinks(y, callback) {
-        const row = term.buffer.active.getLine(y - 1);
-        const text = row ? row.translateToString(true) : "";
-        const runs = AO.pathRuns(text).slice(0, 8);
-        if (!runs.length) { callback(undefined); return; }
-        // the text's indices as the row's cells: a wide character is one character over two cells
-        const cellOf = [];
-        if (row && row.getCell) {
-          for (let x = 0; x < row.length; x++) {
-            const c = row.getCell(x);
-            if (!c || c.getWidth() === 0) continue;
-            for (let k = 0; k < (c.getChars() || " ").length; k++) cellOf.push(x);
-          }
+        const buf = AO.cutRows(term).buffer.active;
+        const line = (i) => (i >= 0 ? buf.getLine(i) : undefined);
+        const own = line(y - 1) ? line(y - 1).translateToString(true) : "";
+        let top = y - 1, bottom = y - 1, size = own.length;
+        while (top > 0 && line(top) && line(top).isWrapped && size < AO.PATH_JOIN) {
+          top -= 1; size += line(top).translateToString(false).length;
         }
-        const col = (i) => (i < cellOf.length ? cellOf[i] : i);
-        const links = (paths) => runs.filter((r) => paths[r.path]).map((r) => ({
-          range: { start: { x: col(r.start) + 1, y }, end: { x: col(r.end - 1) + 1, y } },
+        while (line(bottom + 1) && line(bottom + 1).isWrapped && size < AO.PATH_JOIN) {
+          bottom += 1; size += line(bottom).translateToString(true).length;
+        }
+        // each character of the joined text as its row and cell: a wide character is one character over two cells
+        let text = "", off = 0;
+        const at = [];
+        for (let i = top; i <= bottom && line(i); i++) {
+          const row = line(i), t = row.translateToString(i === bottom), cellOf = [];
+          if (i === y - 1) off = text.length;
+          if (row.getCell) {
+            for (let x = 0; x < row.length; x++) {
+              const c = row.getCell(x);
+              if (!c || c.getWidth() === 0) continue;
+              for (let k = 0; k < (c.getChars() || " ").length; k++) cellOf.push(x);
+            }
+          }
+          for (let k = 0; k < t.length; k++) at.push({ x: (k < cellOf.length ? cellOf[k] : k) + 1, y: i + 1 });
+          text += t;
+        }
+        const joined = AO.pathRuns(text).filter((r) => at[r.start].y <= y && y <= at[r.end - 1].y);
+        const alone = AO.pathRuns(own).map((r) => ({ ...r, start: r.start + off, end: r.end + off }))
+          .filter((r) => !joined.some((j) => j.start === r.start && j.end === r.end));
+        const runs = [...joined, ...alone].slice(0, 8);
+        if (!runs.length) { callback(undefined); return; }
+        // a joined run the host resolved wins over a run of the row alone it covers
+        const links = (paths) => runs.filter((r) => paths[r.path]).filter((r, i, ok) =>
+          !ok.slice(0, i).some((k) => r.start < k.end && k.start < r.end)).map((r) => ({
+          range: { start: at[r.start], end: at[r.end - 1] },
           text: r.run,
           decorations: { underline: true, pointerCursor: true },
           activate: (event) => AO.pathLink(event, editor, paths[r.path], r.line, r.col),
         }));
-        if (known.has(text)) { const l = links(known.get(text)); callback(l.length ? l : undefined); return; }
+        const key = `${off}|${text}`;
+        if (known.has(key)) { const l = links(known.get(key)); callback(l.length ? l : undefined); return; }
         const asked = era;
         ask([...new Set(runs.map((r) => r.path))]).then((got) => {
           const paths = (got && got.paths) || {};
-          if (asked === era) known.set(text, paths);
+          if (asked === era) known.set(key, paths);
           const l = links(paths); callback(l.length ? l : undefined);
         }, () => callback(undefined));
       },
