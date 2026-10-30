@@ -4820,6 +4820,12 @@ class TickMixin:
             agent_common.write_model_file(s)  # the commit hook's trailer follows it (§4.2, TD-638)
         running = s.subagents
         self._apply_subagents(s, event, at)
+        if (stopped := event.get("subagent_stopped")) and isinstance(stopped, str):
+            # a `TaskStop` of a subagent (TD-1277): its waiter and entries end, listed or not — an agent
+            # counted with no id may still wait under its own — before the `queued` gate and whatever the
+            # event's age, and before the zero branch below, so this end is the session's last sure one
+            self._end_waiters(sid, None, stopped, None)
+            self._end_entries(s, lambda p: p.subagent == stopped, sure=True)
         if not queued:
             self._track_call(sid, event)  # a replayed event touches no list: no waiter outlived the outage
         if event.get("prompt") or (event.get("state") == "idle" and not event.get("subagent")):
@@ -4994,7 +5000,8 @@ class TickMixin:
         time — a queued event's `at`, else now — so a drained event never moves it back; a
         `subagents_reset` older than the record's `subagent_at` is a stale start, and is not applied. A
         `SubagentStop` for an id no `SubagentStart` announced — the tool's own, about thirty seconds into
-        a subagent's permission — moves no count, so it never reads as the last subagent's end (TD-960)."""
+        a subagent's permission — moves no count, so it never reads as the last subagent's end (TD-960). A
+        `subagent_stopped` (a `TaskStop` of it, TD-1277) counts down only an id the record lists."""
         when = datetime.fromtimestamp(at, UTC) if isinstance(at, int | float) else datetime.now(UTC)
         try:
             last = _parse(s.subagent_at) if s.subagent_at else None
@@ -5016,6 +5023,9 @@ class TickMixin:
                 s.subagents = max(0, s.subagents - 1)
             elif s.subagents > len(s.subagent_ids):
                 s.subagents -= 1  # a start with no id, or counted by an older build
+        if (stopped := event.get("subagent_stopped")) and isinstance(stopped, str) and stopped in s.subagent_ids:
+            s.subagent_ids.remove(stopped)
+            s.subagents = max(0, s.subagents - 1)
         if event.get("subagent_seen") and (last is None or when > last):
             s.subagent_at = when.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -5078,8 +5088,8 @@ class TickMixin:
     def _track_call(self, sid: str, event: dict[str, Any]) -> None:
         """Each thread's open calls, what `_await_permission` matches a permission to (design §4.2 *A
         waiter is keyed by its call*, TD-950): a `call: start` with its `call_sig` joins its thread's
-        list, its own `call: end` leaves it. A thread's list goes at its `SubagentStop`, every
-        subagent's at a `subagents_reset`, and the session's at its end."""
+        list, its own `call: end` leaves it. A thread's list goes at its `SubagentStop` or a `TaskStop` of
+        it (TD-1277), every subagent's at a `subagents_reset`, and the session's at its end."""
         threads = self._open_calls.get(sid)
         if event.get("state") in ("exited", "closed"):
             self._open_calls.pop(sid, None)
@@ -5091,6 +5101,8 @@ class TickMixin:
                     del threads[k]
             if thread is not None and (event.get("subagent_delta") or 0) < 0:
                 threads.pop(thread, None)
+            if (stopped := event.get("subagent_stopped")) and isinstance(stopped, str):
+                threads.pop(stopped, None)
         tid, edge = event.get("tool_use_id"), event.get("call")
         if not isinstance(tid, str) or not tid:
             return
