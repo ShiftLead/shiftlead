@@ -182,10 +182,18 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
   const sp = AO.pathProvider(term, "ao-x-1", { file: FILE }, (r) => { slowAsked.push(r);
     return new Promise((res) => { release = () => res({ paths: { "scripts/x.py": "/r/scripts/x.py" } }); }); });
   const pending = new Promise((res) => sp.provideLinks(3, res));
+  // a row of two lists without spaces (TD-1262): every member asked, eight paths an ask, and a member links
+  const lists = { buffer: { active: { getLine: (y) => (y === 0
+    ? { translateToString: () => "a/1,b/2,c/3,d/4 e/5,f/6,g/7,h/8 src/a.py#L12" } : undefined) } } };
+  const listAsks = [];
+  const lp = AO.pathProvider(lists, "ao-x-1", { file: FILE }, (r) => { listAsks.push(r);
+    const ok = (k) => (["h/8", "src/a.py"].includes(k) ? "/r/" + k : null);
+    return Promise.resolve({ paths: Object.fromEntries(r.map((k) => [k, ok(k)])) }); });
+  const listLinks = await new Promise((res) => lp.provideLinks(1, (l) => res((l || []).map((k) => k.text))));
   sp.clear(); release(); await pending;
   sp.provideLinks(3, noop); await new Promise((r) => setImmediate(r));
   console.log(JSON.stringify({
-    wideLinks, slowAsks: slowAsked.length,
+    wideLinks, slowAsks: slowAsked.length, listAsks, listLinks,
     long: runs("x/" + "a".repeat(600) + " and src/ok.py"),
     one: runs("see src/shiftlead/cli.py:364 and build/review."),
     shapes: runs("(./a/b.py) ~/x/y.md, /etc/hosts; ../up/z.ts:3:7] word a/"),
@@ -263,6 +271,16 @@ def test_a_links_range_is_in_cells_and_an_answer_from_before_a_reattach_is_not_k
     # `界` is one character over two cells: the path starts at cell 4, not 3
     assert got["wideLinks"] == [{"start": {"x": 4, "y": 1}, "end": {"x": 9, "y": 1}}]
     assert got["slowAsks"] == 2
+
+
+@pytest.mark.unit
+def test_a_runs_pieces_are_asked_beside_eight_runs_eight_paths_an_ask():
+    got = _probe()
+    # three runs and their nine pieces: twelve paths over two asks, none past eight (PATHS_RUNS_MAX)
+    asked = [p for ask in got["listAsks"] for p in ask]
+    assert [len(a) for a in got["listAsks"]] == [8, 4]
+    assert {"a/1", "d/4", "e/5", "h/8", "src/a.py#L12", "src/a.py"} <= set(asked)
+    assert got["listLinks"] == ["h/8", "src/a.py"]  # the member and the anchor's file, where the wholes are no file
 
 
 @pytest.mark.unit

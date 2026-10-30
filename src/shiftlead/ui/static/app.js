@@ -5266,7 +5266,8 @@
     const out = [];
     for (const r of scan(String(text), wide, 0)) {
       out.push(r);
-      if (/[#,=]/.test(r.run)) out.push(...scan(r.run, narrow, r.start).filter((p) => p.run !== r.run));
+      if (!/[#,=]/.test(r.run)) continue;
+      out.push(...scan(r.run, narrow, r.start).filter((p) => p.run !== r.run).map((p) => ({ ...p, piece: true })));
     }
     return out;
   };
@@ -5676,7 +5677,9 @@
         const joined = AO.pathRuns(text).filter((r) => at[r.start].y <= y && y <= at[r.end - 1].y);
         const alone = AO.pathRuns(own).map((r) => ({ ...r, start: r.start + off, end: r.end + off }))
           .filter((r) => !joined.some((j) => j.start === r.start && j.end === r.end));
-        const runs = [...joined, ...alone].slice(0, 8);
+        // eight runs, each with its pieces (TD-1262), asked eight paths at a time
+        let whole = 0;
+        const runs = [...joined, ...alone].filter((r) => (r.piece ? whole <= 8 : ++whole <= 8));
         if (!runs.length) { callback(undefined); return; }
         // a joined run the host resolved wins over a run of the row alone it covers
         const links = (paths) => runs.filter((r) => paths[r.path]).filter((r, i, ok) =>
@@ -5689,8 +5692,10 @@
         const key = `${off}|${text}`;
         if (known.has(key)) { const l = links(known.get(key)); callback(l.length ? l : undefined); return; }
         const asked = era;
-        ask([...new Set(runs.map((r) => r.path))]).then((got) => {
-          const paths = (got && got.paths) || {};
+        const want = [...new Set(runs.map((r) => r.path))], batches = [];
+        for (let i = 0; i < want.length; i += 8) batches.push(want.slice(i, i + 8));
+        Promise.all(batches.map((b) => ask(b))).then((all) => {
+          const paths = Object.assign({}, ...all.map((got) => (got && got.paths) || {}));
           if (asked === era) known.set(key, paths);
           const l = links(paths); callback(l.length ? l : undefined);
         }, () => callback(undefined));
