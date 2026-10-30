@@ -165,6 +165,34 @@ def test_origin_out_of_reach_refuses_the_press_and_lands_nothing(repo, monkeypat
         board.write_back(repo, 7, ITEM, "done")
 
 
+def test_a_push_the_forge_refuses_reads_apart_from_an_unreachable_origin(repo, tmp_path):
+    """TD-1242, design §4.4 *Board write-back*: a push origin took and refused reads *origin refused the push
+    (<the forge's reason>)*, its `remote: error:` line else its status line's parenthesis, the tree reset and no
+    branch left; a push that cannot connect still reads *origin could not be reached*."""
+    before = on_origin(repo, "rev-parse", "origin/main")
+    hook = Path(git(repo, "remote", "get-url", "origin")) / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\necho 'error: GH007: Your push would publish a private email address.' >&2\nexit 1\n")
+    hook.chmod(0o755)
+    with pytest.raises(board.Refused) as e:
+        board.write_back(repo, 7, ITEM, "done")
+    assert str(e.value) == (
+        "origin refused the push (GH007: Your push would publish a private email address.): the edit was not made"
+    )
+    assert "could not be reached" not in str(e.value)
+    assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
+    assert git(board.tree_dir(repo), "status", "--porcelain") == ""
+    assert git(board.tree_dir(repo), "rev-parse", "HEAD") == before
+    hook.write_text("#!/bin/sh\nexit 1\n")
+    with pytest.raises(board.Refused) as e:
+        board.write_back(repo, 7, ITEM, "done")
+    assert str(e.value) == "origin refused the push (pre-receive hook declined): the edit was not made"
+    hook.unlink()
+    git(repo, "config", "remote.origin.pushurl", str(tmp_path / "gone.git"))
+    with pytest.raises(board.Refused, match=r"origin could not be reached \(git push: "):
+        board.write_back(repo, 7, ITEM, "done")
+    assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
+
+
 def test_a_merge_the_forge_refuses_closes_the_pr_and_names_a_moved_line(repo, monkeypatch, forge):
     """§4.4: origin moving elsewhere between fetch and merge refuses nothing (the squash lands); a
     refused merge closes the PR and deletes its branch, and is the moved-line refusal when origin
