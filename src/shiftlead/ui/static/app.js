@@ -88,8 +88,9 @@
   // `wait` makes **a toast that waits** (§4.5 screen 6 *A control answers the press*, TD-340): no
   // clock until `settle(text, ok, href)` rewrites it with the answer and starts one. `sticky` makes one
   // that stays until it is pressed (a blocked open's, TD-810: the page is the only place it shows).
+  // `ms`, when given, replaces the clock's length (a copy's note stays 7 s and keeps its colour, TD-1267).
   // Returns the toast.
-  AO.toast = function (text, ok, href, wait, sticky) {
+  AO.toast = function (text, ok, href, wait, sticky, ms) {
     const el = document.createElement("div");
     const draw = (t, good, link) => {
       el.className = "toast" + (good ? " ok" : "");
@@ -97,13 +98,53 @@
       // a toast that names a thing links to its page (*handed to techlead-ao-1 · m-…*, TD-219 slice 4)
       if (link) { const a = document.createElement("a"); a.href = link; a.textContent = " open"; el.appendChild(a); }
       if (sticky) { el.style.cursor = "pointer"; el.onclick = () => el.remove(); }
-      else setTimeout(() => el.remove(), link ? 10000 : good ? 3000 : 7000);  // a link needs the time to be pressed
+      else setTimeout(() => el.remove(), ms || (link ? 10000 : good ? 3000 : 7000));  // a link needs the time to be pressed
     };
     el.settle = (t, good, link) => { draw(t, good, link); return el; };
     const box = $("#toasts");
     if (wait) { el.className = "toast wait"; el.textContent = text; } else draw(text, ok, href);
     if (box) box.appendChild(el);
     return el;
+  };
+
+  // **A selection is one screen, and a copy is its rows** (§4.6, TD-1263, TD-1267): the pane says so at the two
+  // moments the limit bites, as a note on the toast the copy or the release already draws. A drag's pointer is
+  // past an edge once it is a screen row's height or more above the screen's top or below its bottom.
+  AO.pastEdge = function (clientY, rect, cell) {
+    if (clientY <= rect.top - cell) return "top";
+    if (clientY >= rect.bottom + cell) return "bottom";
+    return null;
+  };
+  // …the drag's mark, `{drag, edge}`, over the page's mouse events: a press on the terminal resets it and starts a
+  // drag unless it is a Shift press (or not the primary button); a crossing while the drag is held sets the edge,
+  // the last crossed winning, and a return keeps it; a release fires the edge once, only if the drag moved the
+  // selection, and clears it
+  AO.edgeMark = function (mark, ev) {
+    const m = mark || { drag: false, edge: null };
+    if (ev.type === "down") return { mark: { drag: !ev.shift, edge: null }, fire: null };
+    if (ev.type === "move") return { mark: m.drag && ev.edge ? { drag: true, edge: ev.edge } : m, fire: null };
+    if (ev.type === "up") return { mark: { drag: false, edge: null }, fire: m.drag && ev.moved ? m.edge : null };
+    return { mark: m, fire: null };
+  };
+  // …the note's words, or "": the edge's first; else the first copy of several rows on the page's load, only
+  // where the header draws **Transcript**
+  AO.copyNote = function ({ edge, multi, flagFree, transcript }) {
+    if (edge) return transcript ? "the selection stops at the screen's edge; Transcript has the whole conversation"
+      : "the selection stops at the screen's edge: copy a screen at a time";
+    return multi && flagFree && transcript ? "as the screen's rows; Transcript has wrapped lines whole" : "";
+  };
+  // …a copy of `text` through `write` (the clipboard's), its toast after a dash with the note. The first-copy
+  // flag (`state.firstFree`) is taken as the write is called, so two quick copies draw one note, and given back
+  // if the write is refused, whose toast carries the edge's note alone. Returns the write's promise.
+  AO.copyWith = function ({ text, edge, transcript, state, write, toast }) {
+    const note = AO.copyNote({ edge, multi: text.includes("\n"), flagFree: state.firstFree, transcript });
+    const first = !!note && !edge;
+    if (first) state.firstFree = false;
+    const say = (t, ok, n) => (n ? toast(`${t} — ${n}`, ok, undefined, undefined, undefined, 7000) : toast(t, ok));
+    return write(text).then(() => say("copied", true, note), () => {
+      if (first) state.firstFree = true;
+      say("clipboard blocked (needs https or localhost)", false, edge ? note : "");
+    });
   };
 
   // The Focus pane's **copy on select** (§4.5a, TD-174): written to the person's settings, which
@@ -6016,7 +6057,16 @@
     // Copy / paste: Ctrl+C with a selection copies (no ^C), Ctrl+Shift+C copies, Ctrl+Shift+V and
     // right-click paste; the header buttons do the same for discoverability. Clipboard access
     // needs a secure context (https or localhost) — ssh -L to 127.0.0.1 qualifies.
-    const copySel = () => { const t = term.getSelection(); if (t) navigator.clipboard.writeText(t).then(() => AO.toast("copied", true), () => AO.toast("clipboard blocked (needs https or localhost)")); return !!t; };
+    // A copy carries §4.6's notes (TD-1267): `edge` comes from a release alone, and whether the header draws
+    // **Transcript** is read at the copy, from `#ftranscript` (absent counts as hidden).
+    const copyState = { firstFree: true };
+    const hasTranscript = () => { const tr = $("#ftranscript"); return !!tr && !tr.classList.contains("hidden"); };
+    const copySel = (edge) => {
+      const t = term.getSelection();
+      if (t) AO.copyWith({ text: t, edge, transcript: hasTranscript(), state: copyState, toast: AO.toast,
+        write: (x) => navigator.clipboard.writeText(x) });
+      return !!t;
+    };
     // A screenshot (a file and no text) takes the attach road whether or not the composer is open, and
     // its path is pasted here — a bracketed paste, so it lands in the tool's input unsent (TD-479)
     let attachFiles = null;
@@ -6147,14 +6197,31 @@
     // the mouse released, which a Shift+click is too — is copied when it is on, and says so with
     // Copy's own toast, *copied* or *clipboard blocked* (TD-273: a silent copy could not be told from
     // a selection); Ctrl+C and Copy are unchanged either way. It needs the secure context the clipboard needs.
+    // A drag held past the screen's top or bottom (§4.6 *A selection is one screen*, TD-1267) marks its edge
+    // (`AO.edgeMark`); the release reads the mark, and draws the edge's note when the selection then touches that
+    // row — on the copy's toast, or alone, not green, when copy on select is off or disabled.
     const cos = $("#tcopysel");
-    let selMoved = false;
+    let selMoved = false, mark = null;
     term.onSelectionChange(() => { selMoved = true; });
+    $("#term").addEventListener("mousedown", (e) => {
+      mark = AO.edgeMark(mark, { type: "down", shift: e.shiftKey || e.button !== 0 }).mark;
+    }, { capture: true });
+    document.addEventListener("mousemove", (e) => {
+      if (!mark || !mark.drag) return;
+      const scr = document.querySelector("#term .xterm-screen");
+      if (scr) mark = AO.edgeMark(mark, { type: "move", edge: AO.pastEdge(e.clientY, scr.getBoundingClientRect(), cellH()) }).mark;
+    });
     document.addEventListener("mouseup", () => {  // the page's: a drag may end outside the pane
-      if (!selMoved) return;
+      const moved = selMoved;
       selMoved = false;
-      const t = cos && cos.checked && !cos.disabled && term.getSelection();
-      if (t) copySel();
+      const up = AO.edgeMark(mark, { type: "up", moved });
+      mark = up.mark;
+      if (!moved) return;
+      const t = term.getSelection(), pos = t && term.getSelectionPosition();
+      const edge = pos && (up.fire === "top" ? pos.start.y === 0 : up.fire === "bottom" && pos.end.y === term.rows - 1)
+        ? up.fire : null;
+      if (cos && cos.checked && !cos.disabled) { if (t) copySel(edge); }
+      else if (edge) AO.toast(AO.copyNote({ edge, transcript: hasTranscript() }), false, undefined, undefined, undefined, 7000);
     });
     if (cos) {
       if (!window.isSecureContext) {
