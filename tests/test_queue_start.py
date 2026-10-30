@@ -6,9 +6,14 @@ them, refused while another holds `start`."""
 
 from __future__ import annotations
 
+import json
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
+import pytest
+from conftest import scratch_dir
 from test_queue import NOW, _by_id, _cards, _entry, _repo
 from test_ui_inbox_ledger import MANAGER, _start_world
 from test_ui_queue import card, client, fake, queue, row
@@ -454,14 +459,60 @@ def test_the_header_draws_start_session_only_where_no_item_does():
     assert ">Open session<" not in drawn({"needs": [item, red]})
 
 
+PRESS_PROBE = """
+const fs = require("fs");
+const js = fs.readFileSync(process.argv[2], "utf8");
+const block = js.slice(js.indexOf('if (action === "ledger_start") {'), js.indexOf('if (action === "board_add")'));
+const press = new Function("b", "row", "fetch", "navigator", "location", "AO", "pressed", "say",
+  "return (async () => { const action = 'ledger_start'; " + block + " })();");
+(async () => {
+  const out = {};
+  for (const [name, focus, item, refuse] of [
+    ["copied", "ao-p", "m-41", false], ["refused", "ao-p", "m-41", true], ["started", "", "m-41", false],
+    ["entry", "ao-p", "", false],
+  ]) {
+    const seen = [], loc = { href: "/queue" };
+    const clip = { writeText: async (t) => {
+      seen.push(`clip ${t} at ${loc.href}`);
+      if (refuse) throw new Error("no");
+    } };
+    const ao = { poppedId: "", unPend: () => seen.push("unpend"),
+      toast: (t, bad, to) => seen.push(`toast ${t} → ${to}`) };
+    const got = { ok: true, json: async () => (focus ? { ok: true, focus } : { ok: true, id: "ao-n", name: "td-9" }) };
+    const b = { dataset: { repo: "s", ref: "TD-9", card: "s#TD-20", ...(item ? { item } : {}) } };
+    await press(b, { isConnected: true }, async () => got, { clipboard: clip }, loc, ao, () => {},
+      (t) => seen.push(`say ${t}`));
+    out[name] = [...seen, `href ${loc.href}`];
+  }
+  console.log(JSON.stringify(out));
+})().catch((e) => { console.error(e); process.exit(1); });
+"""
+
+
+@pytest.mark.unit
 def test_an_items_open_session_copies_its_id_and_the_toast_shows_it_where_refused():
-    js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
-    press = js[js.index('if (action === "ledger_start") {') :]
-    press = press[: press.index('if (action === "board_add")')]
-    assert "...(b.dataset.item ? { item: b.dataset.item } : {})" in press
-    assert "navigator.clipboard.writeText(b.dataset.item)" in press
-    refused = press[press.index("catch (e) {") : press.index("say(`${b.dataset.item} copied")]
-    assert "AO.unPend(row)" in refused and "the browser refused the clipboard" in refused and "return;" in refused
+    """TD-1257: the `ledger_start` press, run as itself under node with a stub clipboard and `location` — an item's
+    **Open session** copies its id before it leaves for the session; refused, the toast shows the id and the page
+    stays; a start, or a press with no item, copies nothing."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the press is JavaScript, and nothing else runs it")
+    probe = scratch_dir() / "open_session_probe.js"
+    probe.write_text(PRESS_PROBE)
+    js = Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js"
+    out = subprocess.run([node, str(probe), str(js)], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == {
+        "copied": ["clip m-41 at /queue", "say m-41 copied — paste it into your session", "href /focus/ao-p"],
+        "refused": [
+            "clip m-41 at /queue",
+            "unpend",
+            "toast copy m-41 — the browser refused the clipboard → /focus/ao-p",
+            "href /queue",
+        ],
+        "started": ["say started td-9 on m-41", "href /focus/ao-n"],
+        "entry": ["href /focus/ao-p"],
+    }
 
 
 def test_the_queue_page_draws_an_asks_start_session_on_its_card_and_none_in_the_header(tmp_path, monkeypatch):
