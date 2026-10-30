@@ -253,6 +253,21 @@ def fold_head(text: str) -> tuple[str, str]:
     return t[:cut].rstrip(), t[cut:].strip()
 
 
+def head_split(text: str) -> tuple[str, str, str, str]:
+    """design §4.5 screen 12 *An item's shape* (TD-1066): a board line as a card draws it — `(prefix, head,
+    leads, after)`: what stands before its first bold run (kind, date, *(session … on <host>)*), the run's
+    words, the one sentence after it, and the rest. A line with no bold run opening within `HEAD_WITHIN`
+    characters, as `fold_head` reads it, is its own head."""
+    t = " ".join((text or "").split())
+    h = _BOLD_HEAD.search(t)
+    if h is None or h.start() > HEAD_WITHIN:
+        return "", t, "", ""
+    after = t[h.end() :].strip()
+    end = _SENTENCE_END.search(after)
+    cut = end.end() if end else len(after)
+    return t[: h.start()].rstrip(" —-"), h.group("head"), after[:cut].strip(), after[cut:].strip()
+
+
 # a bold run ending in a colon after a sentence's end — *… (TD-095). **Cards:** a report …* — is the
 # head of a part of a long line, and opens a paragraph under *details*: markdown, not the board's format
 _PART_HEAD = re.compile(r"(?<=[.;!?)])\s+(?=\*\*[^*\n]{1,80}?:\*\*)")

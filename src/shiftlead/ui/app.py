@@ -205,6 +205,7 @@ from .counts import CountsKeeper
 from .fanout import FAILED, SAID_MAX, Every, Fanout, OpenRate, Stream
 from .inbox import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _FIND_EDGE,  # noqa: F401
+    _REPO_REF,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
     BOARD_WAIT_DAYS,  # noqa: F401
     CI_BILLING_REASON,  # noqa: F401
@@ -241,6 +242,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _board_holder,  # noqa: F401
     _board_named,  # noqa: F401
     _board_order,  # noqa: F401
+    _board_split,  # noqa: F401
     _civil,  # noqa: F401
     _decided,  # noqa: F401
     _entry_open,  # noqa: F401
@@ -269,6 +271,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     billing_url,  # noqa: F401
     board_answered,  # noqa: F401
     board_body,  # noqa: F401
+    board_card,  # noqa: F401
     board_choices,  # noqa: F401
     board_detail,  # noqa: F401
     board_due_now,  # noqa: F401
@@ -4545,14 +4548,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def api_fold(request: Request, key: str = ""):
         """design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): one fold's body, read
         on its first open, by the row renderer's own macro — the one source its key names: a board line
-        (`board:<root>:<line>`) from the home's board reading, a ledger row (`ledger:<repo>:<id>`) from its
-        repo's ledger reading, a mail item's *context* on a card (`card:<id>`, TD-911), else a person-inbox
-        entry or a row handed to a seat by its id, a person's read marking nothing. A key that names nothing is a
-        404, which the fold says as *gone — reload*."""
+        (`board:<root>:<line>`, or `cb:board:…` for its *context* on a card) from the home's board reading, a
+        ledger row (`ledger:<repo>:<id>`) from its repo's ledger reading, a mail item's *context* on a card
+        (`card:<id>`, TD-911), else a person-inbox entry or a row handed to a seat by its id, a person's read marking
+        nothing. A key that names nothing is a 404, which the fold says as *gone — reload*."""
         e: Any = None
-        if key.startswith("board:"):
-            kind = "board"
-            e = next((r for r in (await h.board_all())[0] if r.get("id") == key), None)
+        if key.startswith(("board:", "cb:board:")):
+            # a board line's details, or its *context* drawn whole on a card (`cb:board:…`, TD-1066)
+            kind, bid = ("boardcard", key.removeprefix("cb:")) if key.startswith("cb:") else ("board", key)
+            e = next((r for r in (await h.board_all())[0] if r.get("id") == bid), None)
         elif key.startswith("ledger:"):
             kind, fleet = "ledger", []
             with contextlib.suppress(HTTPException):

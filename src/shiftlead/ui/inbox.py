@@ -8,6 +8,7 @@ read through it: the suite patches both there.
 from __future__ import annotations
 
 import functools
+import re
 import subprocess
 import time
 from collections.abc import Callable, Collection, Iterable, Mapping
@@ -1161,13 +1162,10 @@ def board_body(text: str, it: Mapping[str, Any]) -> str:
 # text drawn here is cut where ledgerboard's own patterns find them, never by a second pattern of ours
 
 
-def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
-    """A board row's text as the row draws it (§4.5a *Inbox board row: text*, TD-279), from its
-    `board_body`: `lead`, up to the end of its bold head and the sentence after it (`fold_head`),
-    and `rest`, under *details*, ending with the line's `Context:` as a paragraph of its own; the
-    `Due:` is the row's due words and goes, and the person's replies are `replies`, drawn under the
-    text — from the reader's field, so a reader that gives none leaves them in the text. Display
-    only: nothing here is a control."""
+def _board_split(body: str, it: Mapping[str, Any]) -> tuple[str, str, list[dict[str, str]]]:
+    """A board line's `(text, context, replies)`: its words with the `Due:` and the `Context:` cut out, what
+    the `Context:` says, and the person's replies from the reader's field — a reader that gives none, or a
+    tail after the `Due:` that is more than those replies, leaves them in the text."""
     replies = [
         {"by": str(r.get("by") or ""), "date": str(r.get("date") or ""), "text": str(r.get("text") or "")}
         for r in it.get("replies") or ()
@@ -1187,6 +1185,17 @@ def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
     context = ctx.group("ctx").rstrip(" .") if ctx else ""
     if ctx:
         text = (text[: ctx.start()] + text[ctx.end() :]).rstrip()
+    return text, context, replies
+
+
+def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
+    """A board row's text as the row draws it (§4.5a *Inbox board row: text*, TD-279), from its
+    `board_body`: `lead`, up to the end of its bold head and the sentence after it (`fold_head`),
+    and `rest`, under *details*, ending with the line's `Context:` as a paragraph of its own; the
+    `Due:` is the row's due words and goes, and the person's replies are `replies`, drawn under the
+    text — from the reader's field, so a reader that gives none leaves them in the text. Display
+    only: nothing here is a control."""
+    text, context, replies = _board_split(body, it)
     lead, rest = rendermod.fold_head(text)
     rest = rendermod.part_heads(rest)  # a walk's **Part:** heads each open a paragraph
     if context:
@@ -1195,6 +1204,32 @@ def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
         d = _civil(r["date"])
         r["date"] = f"{d:%b} {d.day}" if d else r["date"]
     return {"lead": lead, "rest": rest, "replies": replies}
+
+
+# a `Context:` reference into a named repo — `<repo>#TD-n` or `<repo>#n` — read for a card's *in <repo>*
+_REPO_REF = re.compile(r"(?<![\w/.#-])(?P<repo>[A-Za-z0-9][\w.-]*)#(?:TD-\d+|\d+)\b")
+
+
+def board_card(body: str, it: Mapping[str, Any], repo: str) -> dict[str, str]:
+    """A board item as a Queue card draws it whole (§4.5 screen 12 *An item's shape*, *A board item says where
+    its task is*; TD-1066, built by TD-1245): `sentence`, its bold head (`head_split`; a line with none, the
+    line before its `Context:`); `leads`, the line's next sentence after the head where the item has no
+    `Answers:`; `context`, under *context* — the prefix (kind, date, *(session … on <host>)*), the rest of the
+    line and its `Context:`; and `in_repo`, the first repo other than `repo` the `Context:` names
+    (`<repo>#TD-n`, `<repo>#n`), else "". Display only: nothing here is a control."""
+    text, context, _ = _board_split(body, it)
+    prefix, head, leads, after = rendermod.head_split(text)
+    if it.get("answers"):
+        leads, after = "", f"{leads} {after}".strip()
+    here = repo.lower()
+    in_repo = next((m.group("repo") for m in _REPO_REF.finditer(context) if m.group("repo").lower() != here), "")
+    parts = [prefix, rendermod.part_heads(after), f"Context: {context}" if context else ""]
+    return {
+        "sentence": head,
+        "leads": leads,
+        "context": "\n\n".join(p for p in parts if p),
+        "in_repo": in_repo,
+    }
 
 
 def live_look(it: Mapping[str, Any]) -> bool:
@@ -1605,6 +1640,8 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                     # §4.5a *Inbox board row: text* (TD-279): the body folded after its head, the
                     # `Context:` under *details*, the replies from the reader's field
                     **board_text(board_body(text, it), it),
+                    # §4.5 screen 12 *An item's shape* (TD-1066): the same text as a card draws it whole
+                    "card": board_card(board_body(text, it), it, repo_name),
                     "detail": detail,  # §4.5a *Inbox board row: detail block* (TD-312)
                     "answers": [str(a) for a in it.get("answers") or () if str(a).strip()],
                     "default": str(it.get("default") or ""),
