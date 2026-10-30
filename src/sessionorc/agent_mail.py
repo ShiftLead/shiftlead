@@ -1391,10 +1391,12 @@ class MailMixin:
         (the person inbox's copy first, then the first found), oldest first. The person's own
         replies are in it though the person inbox keeps no sent list: they live in the askers'
         inboxes. `pruned` says the root itself is held nowhere any more, so the thread starts
-        after a gap. A read, marking nothing; **a person's only** — a thread spans other
-        sessions' mailboxes, which no session reads (§4.10)."""
+        after a gap. A read, marking nothing; **a person's only, and an own end's** — a thread spans
+        other sessions' mailboxes, which no other session reads (§4.10); an own end (`mail.own_end`)
+        reads it whatever its `controllers`, so a session the person started from a Queue card's mail
+        item reads the item it was started on (§4.8 *`thread` passes an own end*, TD-1066)."""
         agent_common.person_only(
-            caller, "read a thread, gathered across every session's mailbox", "§4.10", self._graph()
+            caller, "read a thread, gathered across every session's mailbox", "§4.10", self._graph(), own_end_ok=True
         )
         held = [e for e in self.person_inbox if e.id == msg]
         if not held:

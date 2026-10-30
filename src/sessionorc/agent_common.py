@@ -329,7 +329,13 @@ class LeadTyped(RpcError):
 
 
 def person_only(
-    caller: Any, act: str, section: str, records: Mapping[str, Session], *, session_ok: bool = False
+    caller: Any,
+    act: str,
+    section: str,
+    records: Mapping[str, Session],
+    *,
+    session_ok: bool = False,
+    own_end_ok: bool = False,
 ) -> None:
     """The one check of a person's own act (`mail.PERSON_ONLY`, design §4.8 *A person's own act is a
     named RPC, and the gate is one list*): the first statement of each such RPC, refusing every
@@ -338,12 +344,17 @@ def person_only(
     (`_graph`), so a node's shell forwarding a home edit is read from the home's copy of its record
     under `id@host`. A caller it does not hold stays a session, refused. With `session_ok` — set by
     `mail.PERSON_SESSION`'s RPCs alone — a person's session (`mail.person_session`) passes too, and the
-    refusal names it (§4.8 *A person's session passes two of them*, TD-1117)."""
+    refusal names it (§4.8 *A person's session passes two of them*, TD-1117). With `own_end_ok` — set by
+    `thread` alone — an own end (`mail.own_end`) passes whatever its `controllers`, since a session the
+    person starts from a Queue card has the team's live manager as its controller (§4.8, TD-1066)."""
     if mail.as_person(caller, records):
         return
     if session_ok and isinstance(caller, str) and mail.person_session(records.get(caller)):
         return
+    if own_end_ok and isinstance(caller, str) and (record := records.get(caller)) and mail.own_end(record):
+        return
     but = "the person's own shell" + (" and a session the person started by hand" if session_ok else "")
+    but += " and an own end of the person's" if own_end_ok else ""
     raise RpcError(f"{caller} cannot {act}: a person's own act, refused to every session but {but} (design {section})")
 
 
