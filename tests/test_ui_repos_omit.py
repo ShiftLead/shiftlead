@@ -143,7 +143,7 @@ def recording(log: list[dict], whole: dict, honour: bool = True, fleet: list | N
             if method == "repos":
                 log.append(kw)
                 return reports.omitted(whole, kw.get("omit") or []) if honour else whole
-            if method == "seen":  # Focus opens on a record (TD-756), drawn whole
+            if method == "get":  # Focus opens on a record (TD-756), drawn whole; the look is the page's (TD-1228)
                 at = datetime.now(UTC).isoformat()
                 rec = {"since": at, "created": at, "confidence": "hook", "kind": "agent", "adapter": "shell"}
                 return {**rec, **member(next(iter(whole)))}

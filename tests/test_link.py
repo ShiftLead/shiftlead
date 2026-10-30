@@ -396,7 +396,7 @@ async def test_the_home_adopts_applies_by_owner_and_a_snapshot_is_the_truth(agen
 
 
 async def test_another_hosts_record_is_addressed_unreachable_until_its_node_dials_and_never_acted_on(agent):
-    agent._take_records("laptop", [record()], whole=True)
+    agent._take_records("laptop", [record(turn_at="2026-10-29T10:00:00Z")], whole=True)
     async with LocalClient() as c:
         (v,) = await c.call("list")
         assert v["id"] == "ao-x-w@laptop" and v["host"] == "laptop"
@@ -405,7 +405,7 @@ async def test_another_hosts_record_is_addressed_unreachable_until_its_node_dial
         agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
         assert (await c.call("get", id="ao-x-w@laptop"))["state"] == "working"
         seen = await c.call("seen", id="ao-x-w@laptop")
-        assert seen["seen_at"]  # a look is the home's to record
+        assert seen["seen_at"] == "2026-10-29T10:00:00Z"  # a look is the home's to record: the turn it saw
         # …and the reply frames the record as the home addresses it, as `get` does (TD-075's review
         # of #348): the node's own `id` came back before, until the next push corrected it
         assert seen["id"] == "ao-x-w@laptop" and "asks_waiting" in seen and "alarm_to" in seen
