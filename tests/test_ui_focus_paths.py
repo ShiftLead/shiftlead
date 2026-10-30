@@ -191,6 +191,7 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
     shapes: runs("(./a/b.py) ~/x/y.md, /etc/hosts; ../up/z.ts:3:7] word a/"),
     url: runs("https://github.com/a/b/pull/1 and http://x/y/z"),
     bare: runs("no paths, just words and a.b and ./ and /"),
+    wide: runs("docs/café/notes.md, build/a#1.txt out/a,b.txt dir/name=v.txt --file=src/a.py docs/界/a.md"),
     first, again, empty, third, askedBefore, asked, failed, after, plainClick, ctrlClick, opened,
     file: press({ ctrlKey: true }, FILE, "/r/my dir/a#b.py", 12, 3),
     fileNoLine: press({ metaKey: true }, FILE, "/r/a.py", null, null),
@@ -244,6 +245,9 @@ def test_the_runs_a_row_yields():
     assert got["url"] == [] and got["bare"] == []
     # a run past the read's 512 characters is no candidate, so the rest of its row is still asked
     assert [r[0] for r in got["long"]] == ["src/ok.py"]
+    # any letter, and `#`, `,` and `=` after the first `/`; the tail's `,` is still cut (TD-1262)
+    assert [r[0] for r in got["wide"]] == ["docs/café/notes.md", "build/a#1.txt", "out/a,b.txt", "dir/name=v.txt",
+                                           "src/a.py", "docs/界/a.md"]  # fmt: skip
 
 
 @pytest.mark.unit

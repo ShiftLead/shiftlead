@@ -5237,13 +5237,14 @@
   // **a path is a link** (§4.6 *A path in the pane is a link*, §4.5a, TD-501): the runs one row of
   // the pane names that could be a file — a run with a `/` in it, relative, `./`, `~/` or absolute,
   // with an optional `:line` or `:line:col`, the bracket or sentence stop at its tail cut off; a run
-  // inside a URL is the URL's. Each is `{run, path, line, col, start, end}`, `start`/`end` the run's
+  // inside a URL is the URL's. A segment takes any letter, mark or digit and `_.@+-`; one after the
+  // first `/` takes `#`, `,` and `=` too, so `--file=src/a.py` is still `src/a.py` (TD-1262). Each is `{run, path, line, col, start, end}`, `start`/`end` the run's
   // columns in the row's text (end exclusive). The shape only asks: the host says which are files.
   AO.pathRuns = function (text) {
     const urls = [];
     for (const m of String(text).matchAll(/[A-Za-z][A-Za-z0-9+.-]*:\/\/\S+/g)) urls.push([m.index, m.index + m[0].length]);
     const out = [];
-    for (const m of String(text).matchAll(/(?:~|\.{1,2})?\/?[\w.@+-]+(?:\/[\w.@+-]+)+(?::\d+(?::\d+)?)?/g)) {
+    for (const m of String(text).matchAll(/(?:~|\.{1,2})?\/?[\p{L}\p{M}\p{N}_.@+-]+(?:\/[\p{L}\p{M}\p{N}_.@+#,=-]+)+(?::\d+(?::\d+)?)?/gu)) {
       const start = m.index;
       let run = m[0];
       if (urls.some(([a, b]) => start < b && start + run.length > a)) continue;
