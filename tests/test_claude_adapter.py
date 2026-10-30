@@ -852,7 +852,7 @@ def test_a_task_stop_names_the_task_it_stopped():
     assert "subagent_stopped" not in translate({**stop({"task_id": "a1"}), "tool_name": "Bash"})
 
 
-async def _hook(c, sid, **payload):
+async def _hook(sid, **payload):
     """One hook payload, translated as the hook script does, to the host agent."""
     async with LocalClient() as h:
         await h.call("hook", session=sid, **translate(payload))
@@ -871,28 +871,28 @@ async def test_a_task_stop_ends_the_listed_subagent_it_names(agent, hookstub, tm
 
     async with LocalClient() as c:
         sid = (await c.call("create", name="t", dir=str(tmp_path), adapter=hookstub.name))["id"]
-        await _hook(c, sid, hook_event_name="SubagentStart", agent_id="a1", agent_type="general-purpose")
+        await _hook(sid, hook_event_name="SubagentStart", agent_id="a1", agent_type="general-purpose")
         rec = await c.call("get", id=sid)
         assert rec["subagents"] == 1 and ("no subagents running", False) in ready_to_close(rec, [])
         at = rec["subagent_at"]
-        await _hook(c, sid, **_task_stop("bq3x9"))  # a background shell's id: listed nowhere
+        await _hook(sid, **_task_stop("bq3x9"))  # a background shell's id: listed nowhere
         assert (await c.call("get", id=sid))["subagent_ids"] == ["a1"]
-        await _hook(c, sid, **_task_stop("a1"))
+        await _hook(sid, **_task_stop("a1"))
         rec = await c.call("get", id=sid)
         assert rec["subagents"] == 0 and rec["subagent_ids"] == [] and rec["subagent_at"] == at
         assert ("no subagents running", True) in ready_to_close(rec, [])
 
         # two listed, one stopped from inside the other: one is left, and its late SubagentStop moves nothing
-        await _hook(c, sid, hook_event_name="SubagentStart", agent_id="a2")
-        await _hook(c, sid, hook_event_name="SubagentStart", agent_id="a3")
-        await _hook(c, sid, **_task_stop("a2", agent_id="a3"))
+        await _hook(sid, hook_event_name="SubagentStart", agent_id="a2")
+        await _hook(sid, hook_event_name="SubagentStart", agent_id="a3")
+        await _hook(sid, **_task_stop("a2", agent_id="a3"))
         rec = await c.call("get", id=sid)
         assert rec["subagents"] == 1 and rec["subagent_ids"] == ["a3"]
-        await _hook(c, sid, hook_event_name="SubagentStop", agent_id="a2")
+        await _hook(sid, hook_event_name="SubagentStop", agent_id="a2")
         rec = await c.call("get", id=sid)
         assert rec["subagents"] == 1 and rec["subagent_ids"] == ["a3"]
         # `shell_id` names it as well
-        await _hook(c, sid, hook_event_name="PostToolUse", tool_name="TaskStop", tool_input={"shell_id": "a3"})
+        await _hook(sid, hook_event_name="PostToolUse", tool_name="TaskStop", tool_input={"shell_id": "a3"})
         rec = await c.call("get", id=sid)
         assert rec["subagents"] == 0 and rec["subagent_ids"] == []
 
@@ -904,23 +904,23 @@ async def test_a_task_stop_ends_the_stopped_subagents_permission(agent, hookstub
     async with LocalClient() as c:
         sid = (await c.call("create", name="p", dir=str(tmp_path), adapter=hookstub.name))["id"]
         for a in ("a1", "a2"):
-            await _hook(c, sid, hook_event_name="SubagentStart", agent_id=a)
+            await _hook(sid, hook_event_name="SubagentStart", agent_id=a)
         perm = translate({**ask, "agent_id": "a1", "agent_type": "general-purpose"})
         task = await _feed(agent, c, sid, [perm], wait=60)
         rec = await c.call("get", id=sid)
         assert rec["state"] == "needs-you" and rec["pending"]["subagent"] == "a1"
-        await _hook(c, sid, **_task_stop("a1"))
+        await _hook(sid, **_task_stop("a1"))
         assert await asyncio.wait_for(task, 5) is None and not agent._permission_waiting(sid)
         rec = await c.call("get", id=sid)
         assert rec["state"] != "needs-you" and not rec.get("pendings")
         assert rec["subagents"] == 1 and rec["subagent_ids"] == ["a2"]
         # a question in a stopped subagent's pane has no waiter: the stop ends its entry all the same
-        await _hook(c, sid, hook_event_name="SubagentStart", agent_id="a3")
+        await _hook(sid, hook_event_name="SubagentStart", agent_id="a3")
         q = {"questions": [{"question": "Which one?", "options": [{"label": "x"}, {"label": "y"}]}]}
-        await _hook(c, sid, hook_event_name="PreToolUse", tool_name="AskUserQuestion", tool_input=q, agent_id="a3")
+        await _hook(sid, hook_event_name="PreToolUse", tool_name="AskUserQuestion", tool_input=q, agent_id="a3")
         rec = await c.call("get", id=sid)
         assert rec["state"] == "needs-you" and rec["pending"]["subagent"] == "a3"
-        await _hook(c, sid, **_task_stop("a3"))
+        await _hook(sid, **_task_stop("a3"))
         rec = await c.call("get", id=sid)
         assert rec["state"] != "needs-you" and not rec.get("pendings") and rec["subagent_ids"] == ["a2"]
 
@@ -929,7 +929,7 @@ async def test_a_task_stop_ends_the_stopped_subagents_permission(agent, hookstub
         sid = (await c.call("create", name="q", dir=str(tmp_path / "q"), adapter=hookstub.name))["id"]
         await c.call("hook", session=sid, subagent_delta=1, subagent_seen=True)  # an id-less start
         task = await _feed(agent, c, sid, [translate({**ask, "agent_id": "z9"})], wait=60)
-        await _hook(c, sid, **_task_stop("z9"))
+        await _hook(sid, **_task_stop("z9"))
         assert await asyncio.wait_for(task, 5) is None and not agent._permission_waiting(sid)
         rec = await c.call("get", id=sid)
         assert rec["state"] != "needs-you" and rec["subagents"] == 1  # accepted: no id to match

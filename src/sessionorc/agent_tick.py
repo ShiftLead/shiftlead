@@ -5088,8 +5088,8 @@ class TickMixin:
     def _track_call(self, sid: str, event: dict[str, Any]) -> None:
         """Each thread's open calls, what `_await_permission` matches a permission to (design §4.2 *A
         waiter is keyed by its call*, TD-950): a `call: start` with its `call_sig` joins its thread's
-        list, its own `call: end` leaves it. A thread's list goes at its `SubagentStop` or a `TaskStop` of it, every
-        subagent's at a `subagents_reset`, and the session's at its end."""
+        list, its own `call: end` leaves it. A thread's list goes at its `SubagentStop` or a `TaskStop` of
+        it (TD-1277), every subagent's at a `subagents_reset`, and the session's at its end."""
         threads = self._open_calls.get(sid)
         if event.get("state") in ("exited", "closed"):
             self._open_calls.pop(sid, None)
