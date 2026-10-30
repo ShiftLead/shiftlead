@@ -190,10 +190,17 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
     const ok = (k) => (["h/8", "src/a.py"].includes(k) ? "/r/" + k : null);
     return Promise.resolve({ paths: Object.fromEntries(r.map((k) => [k, ok(k)])) }); });
   const listLinks = await new Promise((res) => lp.provideLinks(1, (l) => res((l || []).map((k) => k.text))));
+  // nine runs, each a list of two (TD-1272): the first eight are asked with their pieces, the ninth and its pieces not
+  const nine = Array.from({ length: 9 }, (_, i) => `a/${i + 1},b/${i + 1}`).join(" ");
+  const capped = { buffer: { active: { getLine: (y) => (y === 0 ? { translateToString: () => nine } : undefined) } } };
+  const capAsks = [];
+  const cp = AO.pathProvider(capped, "ao-x-1", { file: FILE }, (r) => { capAsks.push(r);
+    return Promise.resolve({ paths: Object.fromEntries(r.map((k) => [k, null])) }); });
+  await new Promise((res) => cp.provideLinks(1, res));
   sp.clear(); release(); await pending;
   sp.provideLinks(3, noop); await new Promise((r) => setImmediate(r));
   console.log(JSON.stringify({
-    wideLinks, slowAsks: slowAsked.length, listAsks, listLinks,
+    wideLinks, slowAsks: slowAsked.length, listAsks, listLinks, capAsks,
     long: runs("x/" + "a".repeat(600) + " and src/ok.py"),
     one: runs("see src/shiftlead/cli.py:364 and build/review."),
     shapes: runs("(./a/b.py) ~/x/y.md, /etc/hosts; ../up/z.ts:3:7] word a/"),
@@ -281,6 +288,10 @@ def test_a_runs_pieces_are_asked_beside_eight_runs_eight_paths_an_ask():
     assert [len(a) for a in got["listAsks"]] == [8, 4]
     assert {"a/1", "d/4", "e/5", "h/8", "src/a.py#L12", "src/a.py"} <= set(asked)
     assert got["listLinks"] == ["h/8", "src/a.py"]  # the member and the anchor's file, where the wholes are no file
+    # past eight runs (TD-1272): the ninth run is not asked, nor its pieces, and each of the first eight's pieces is
+    capped = {p for ask in got["capAsks"] for p in ask}
+    assert len(capped) == 24 and all(len(a) <= 8 for a in got["capAsks"])
+    assert {f"a/{i},b/{i}" for i in range(1, 9)} | {f"{c}/{i}" for c in "ab" for i in range(1, 9)} == capped
 
 
 @pytest.mark.unit
@@ -466,7 +477,11 @@ const screen = (rows, files) => {
   const full = "x".repeat(cols - 11) + " src/a/b.py";
   const prose = screen([[full.slice(-cols), false], ["and more words", false]], { "src/a/b.py": "/r/src/a/b.py" });
   const kept = [await prose.links(1), await prose.links(2)];
-  console.log(JSON.stringify({ path, rest, spans, longAsked: long.asked, kept, proseAsked: prose.asked }));
+  // both the joined run and the row's own run it covers are files (TD-1273): one link, the joined one
+  const both = screen([[full.slice(-cols), false], ["and more words", false]],
+    { "src/a/b.py": "/r/src/a/b.py", "src/a/b.pyand": "/r/src/a/b.pyand" });
+  const won = await both.links(1);
+  console.log(JSON.stringify({ path, rest, spans, longAsked: long.asked, kept, proseAsked: prose.asked, won }));
 })().catch((e) => { console.error(e); process.exit(1); });
 """
 
@@ -490,3 +505,5 @@ def test_a_path_that_wraps_or_is_cut_across_rows_is_one_link_on_every_row():
     one = {"text": "src/a/b.py", "range": {"start": {"x": 31, "y": 1}, "end": {"x": 40, "y": 1}}}
     assert got["kept"] == [[one], None]
     assert got["proseAsked"][0] == ["src/a/b.pyand", "src/a/b.py"]
+    # where both are files, the joined run wins and the row's own run it covers is no second link (TD-1273)
+    assert got["won"] == [{"text": "src/a/b.pyand", "range": {"start": {"x": 31, "y": 1}, "end": {"x": 3, "y": 2}}}]
