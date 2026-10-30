@@ -296,7 +296,8 @@ def work_text(
     text = resources.files("shiftlead").joinpath("briefs", WORK_TEMPLATE).read_text(encoding="utf-8")
     opening = WORK_OPENING[why]
     if item:
-        read = next((r for k, r in WORK_ITEM_READ.items() if item.startswith(k)), ", in the ledger")
+        read = next((r for k, r in WORK_ITEM_READ.items() if item.startswith(k)), "")
+        read = read or (", in the ledger" if re.fullmatch(r"(?:[\w.-]+#)?TD-\d+", item) else "")
         opening = WORK_ITEM.replace("{read}", read).replace("{item}", item)
     for slot, value in (("{where}", where), ("{id}", id_), ("{repo}", repo), ("{ledger}", ledger)):
         opening = opening.replace(slot, value)

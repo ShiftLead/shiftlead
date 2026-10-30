@@ -3217,7 +3217,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 raise HTTPException(409, f"the card around {card_id} is no longer open — nothing was started")
             here_q = qid(repo, ref)
             if TD_REF.fullmatch(item):  # a ledger item: its own entry, one of the card's Decide or Do entries
-                if not same_td(item.rpartition("#")[2], ref) or (
+                it_repo, _, it_ref = item.rpartition("#")
+                if qid(it_repo or repo, it_ref) != here_q or (
                     here_q not in card_entries(card)[0] and card.get("start") != here_q
                 ):
                     raise HTTPException(409, f"{item} is not an item of this card's to start on — nothing was started")

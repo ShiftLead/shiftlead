@@ -288,6 +288,8 @@ def test_a_mail_and_a_ledger_items_first_sentence():
     e = repoconfig.work_text("TD-12", "s", "L", "decision", "Queue", item="s#TD-012")
     assert e.startswith("I opened this session from the Queue about s#TD-012, on the card around TD-12 of s's ")
     assert "Read it first, in the ledger, and walk me through" in e
+    pr = repoconfig.work_text("TD-9", "s", "L", "card", "Queue", item="s#12")
+    assert "about s#12, on the card around TD-9 of s's ledger (L). Read it first, and walk me through" in pr
 
 
 def test_a_ledger_items_press_starts_on_its_own_entry_by_the_holder_rules_of_that_entry(tmp_path, monkeypatch):
@@ -307,6 +309,11 @@ def test_a_ledger_items_press_starts_on_its_own_entry_by_the_holder_rules_of_tha
     # an unattended worker holds TD-12: refused in words, never its Focus
     r, created = press("held", "TD-12", [_rec("ao-samscrape-g2", "", "TD-12", name="grinder-2")])
     assert r.status_code == 409 and "held by grinder-2" in r.text and created == []
+    # the item names another repo's TD-12: not this card's item
+    repo, c, created = _start_world(tmp_path / "other", monkeypatch, fleet=[MANAGER], queue=_q())
+    body = {"repo": "samscrape", "id": "TD-12", "card": "samscrape#TD-020", "item": "otherrepo#TD-12"}
+    r = c.post("/api/ledger/start", json=body)
+    assert r.status_code == 409 and "not an item of this card" in r.text and created == []
     # TD-20 is the card's top, no Decide or Do item and not `start`
     r, created = press("not", "TD-20", [])
     assert r.status_code == 409 and "not an item of this card" in r.text and created == []

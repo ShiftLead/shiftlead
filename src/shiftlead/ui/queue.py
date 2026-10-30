@@ -219,7 +219,8 @@ def item_ref(e: Mapping[str, Any]) -> str:
     if row == "board":
         return str(e.get("key") or "")
     if row == "ledger":
-        return qid(str(e.get("name") or ""), str(e.get("id") or ""))
+        tid = str(e.get("id") or "")
+        return qid(str(e.get("name") or ""), tid) if TD_REF.fullmatch(tid) else ""
     if row == "red_pr":
         return f"{e.get('repo')}#{e.get('pr')}"
     mid = str(e.get("id") or "")
