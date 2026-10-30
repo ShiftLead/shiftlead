@@ -1322,6 +1322,10 @@ def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):
     mine = view(_card(**finished, unattended=False, name="z"))
     assert mine["unseen"] and mine["state_label"] == "idle" and mine["rank"] == worker["rank"]
     assert mine["unseen_age"] and [c["name"] for c in sorted([worker, mine], key=card_order)] == ["z", "w"]
+    # within one rank and one `unattended`, unseen sorts before seen whatever the name (TD-1253)
+    seen = view(_card(turn_at="2026-09-21T03:00:00Z", seen_at="2026-09-21T03:00:00Z", unattended=False, name="a"))
+    assert not seen["unseen"] and seen["rank"] == mine["rank"]
+    assert [c["name"] for c in sorted([seen, mine], key=card_order)] == ["z", "a"]
     card = templates.get_template("card.html").render(s=mine)
     assert 'class="unseenmark" title="a turn ended ' in card and "● unseen</span>" in card
     assert "unseenmark" not in templates.get_template("card.html").render(s=worker)
