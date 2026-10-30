@@ -50,7 +50,15 @@ from sessionorc.models import (
 from sessionorc.tmux import attach_argv
 from shiftlead import connect, doctor, orgcheck, repoconfig, service, teamrun, teams
 from shiftlead import org as orgmod
-from shiftlead.ending import closer_words, exit_words, own_work, restart_words, waiting_words, worktree_words
+from shiftlead.ending import (
+    closer_words,
+    exit_words,
+    own_work,
+    pill_of,
+    restart_words,
+    waiting_words,
+    worktree_words,
+)
 
 
 def _age(iso: str) -> str:
@@ -251,9 +259,10 @@ def pending_words(p: Any) -> str:
 
 def shown_state(s: Mapping[str, Any], waiting: bool = False) -> tuple[str, str]:
     """The state `ao status` prints and the ending after the mode: an `idle` record working on its own
-    (§4.2, TD-1147) reads *working*, ending *· 1 shell*, as its card does, unless it waits (`waiting`, the
-    home's reading under `-v`) or something is pending; `--json` keeps `idle`."""
-    own = None if waiting or s.get("pending") else own_work(s)
+    (§4.2, TD-1147) reads *working*, ending *· 1 shell*, as its card does, whether or not it waits (§4.2
+    *One order*, TD-1227: `-v` prints the wait on its own line), unless something is pending; `--json`
+    keeps `idle`."""
+    own = own_work(s) if not s.get("pending") and pill_of(s, waiting) == "working" else None
     if own is None:
         return str(s["state"]), ""
     return "working", "".join(f" · {p}" for p in own[0])

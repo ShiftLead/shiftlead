@@ -100,7 +100,7 @@ def own_work(s: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
     live background shell (the view's `subagents_live`, `shells_live`) — the card and `ao status` both draw
     it *working*. The ending's parts (*1 subagent*, *2 shells*, never *0 subagents*) and what is live
     (*subagents*, *background shells*); None when it is not idle or nothing of its own is live. A wait the
-    caller reads (§4.2 *Waiting*) wins over it, and the record stays `idle` in every payload."""
+    caller reads (§4.2 *Waiting*) does not hide it (`pill_of`), and the record stays `idle` in every payload."""
     if s.get("state") != "idle":
         return None
     n = s.get("subagents") if isinstance(s.get("subagents"), int) else 0
@@ -117,6 +117,15 @@ def own_work(s: Mapping[str, Any]) -> tuple[list[str], list[str]] | None:
         parts.append(f"{len(shells)} shell{'' if len(shells) == 1 else 's'}")
         what.append("background shells")
     return parts, what
+
+
+def pill_of(s: Mapping[str, Any], waiting: bool) -> str | None:
+    """**One order** (§4.2, TD-1222, TD-1227): the pill of an `idle` record, which the card and `ao status`
+    both draw — its own work live reads *working* whether or not a wait reads (`waiting`, the caller's
+    reading); with none, a wait reads *waiting*; with neither, None (the record's own state)."""
+    if own_work(s):
+        return "working"
+    return "waiting" if waiting and s.get("state") == "idle" else None
 
 
 def clock(iso: Any, now: datetime | None = None) -> str:

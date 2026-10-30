@@ -40,6 +40,7 @@ from shiftlead.ending import (
     ending_hover,
     exit_words,
     own_work,
+    pill_of,
     restart_words,
     shells_of,
     waiting_words,
@@ -450,29 +451,32 @@ def view(
     d["flow_mark"] = flow_mark(s, hosts.local_host().name) if s.get("team") else None
     d["waiting"] = waiting_view((waits or {}).get(s.get("id")))
     # **waiting** (§4.2 *Waiting*, §4.5 *The card's anatomy*, TD-734): an `idle` session that waits on a
-    # person or another session — a reader holding its ask for a claim's PR, or the mark above — is drawn
-    # *waiting*, teal, in the order after `working`; it stays `idle` in every payload. *idle · unseen*
-    # wins over it: the person's cue to go and look, and the slot still says the wait.
+    # person or another session — a reader holding its ask for a claim's PR, or the mark above — and has no
+    # own work live (*One order*, TD-1227) is drawn *waiting*, teal, in the order after `working`; it stays
+    # `idle` in every payload. *idle · unseen* wins over it until TD-1228: the slot still says the wait.
     d["review_wait"] = review_wait(s, fleet, repos) if state == "idle" else ""
     d["wait_reason"] = (d["waiting"] or {}).get("text") or (f"waiting · {d['review_wait']}" if d["review_wait"] else "")
-    if state == "idle" and not d["unseen"] and d["wait_reason"]:
+    pill = pill_of(s, bool(d["wait_reason"])) if state == "idle" else None
+    if pill == "waiting" and not d["unseen"]:
         d["state_class"] = d["state_label"] = d["pill_word"] = "waiting"
         d["rank"] = STATE_RANK["working"] + 0.25  # after `working`, before an unseen `idle` (idle - 0.5)
     # **working on its own** (§4.2 *Working on its own*, TD-734, TD-761): an `idle` session with a live
-    # subagent or a live background shell (the view's `subagents_live`, `shells_live`) and nothing waiting
-    # is drawn *working*, ranked and filtered with it, over *idle · unseen*, whose cue shows again once its
-    # own work ends; idle in every payload. The ending joins the parts that are live, never *0 subagents*.
+    # subagent or a live background shell (the view's `subagents_live`, `shells_live`) is drawn *working*,
+    # whether or not a wait reads (*One order*, TD-1227), ranked and filtered with it, over *idle · unseen*,
+    # whose cue shows again once its own work ends; idle in every payload. The ending joins the parts that
+    # are live, never *0 subagents*.
     shells = shells_of(s)
-    d["own_work"] = d["own_slot"] = d["own_what"] = ""
-    if (own := own_work(s)) and state == "idle" and not d["wait_reason"]:
+    d["own_work"] = d["own_slot"] = d["own_what"] = d["own_shell"] = ""
+    if pill == "working" and (own := own_work(s)):
         parts, what = own
         d["own_work"] = " · ".join(["working", *parts])
         d["own_what"] = " and ".join(what) or "subagents"
-        # the slot's ending names the oldest shell and its age (§4.2 *What it draws*)
-        d["own_slot"] = d["own_work"]
         if "background shells" in what:
             age = _age(shells[0].get("since"), now)
-            d["own_slot"] += f": {shell_cmd(shells[0])}" + (f" · {age}" if age else "")
+            d["own_shell"] = shell_cmd(shells[0]) + (f" · {age}" if age else "")
+        # the slot's ending names the oldest shell and its age (§4.2 *What it draws*); after a wait, the
+        # counts alone, the command on the pill's hover (*One order*)
+        d["own_slot"] = d["own_work"] + (f": {d['own_shell']}" if d["own_shell"] and not d["wait_reason"] else "")
         d["state_class"] = d["state_label"] = d["pill_word"] = "working"
         d["rank"], d["unseen"] = STATE_RANK["working"], False
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
@@ -675,7 +679,10 @@ def pill_title(d: Mapping[str, Any], ending: str = "") -> str:
     if d.get("state_class") == "waiting":
         return f"{d.get('wait_reason') or ''} — idle in every payload, on someone else’s move"
     if d.get("own_work"):
-        return f"{d['own_work']} — idle in every payload, its own {d.get('own_what') or 'subagents'} running"
+        said = f"{d['own_work']} — idle in every payload, its own {d.get('own_what') or 'subagents'} running"
+        if d.get("wait_reason"):  # §4.2 *One order* (TD-1227): the wait after it, then the oldest shell
+            said += f" · {d['wait_reason']}" + (f" · {d['own_shell']}" if d.get("own_shell") else "")
+        return said
     if d.get("seat"):
         return "a seat on call: read from its record, not from a screen"
     if ending:
@@ -1112,12 +1119,20 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     elif d.get("waiting"):
         # alone, on a session that declared nothing: still an ending's place, row 5 (b)
         text, full = d["waiting"]["text"], d["waiting"]["full"]
+        if own := d.get("own_slot"):  # §4.2 *One order* (TD-1227): the wait leads, its own work after
+            text, full = f"{text} · {own}", f"{full} · {own}"
     elif d.get("review_wait"):
         # the *waiting* pill's reason (§4.2 *Waiting*, TD-734): a reader holds its ask for its claim's PR
         text = f"waiting · {d['review_wait']}"
         full = (
             f"{text}: the reader holds its ask for its claim's pull request — idle on someone else's move (design §4.2)"
         )
+        if own := d.get("own_slot"):
+            what = d.get("own_what") or "subagents"
+            text = f"{text} · {own}"
+            full = (
+                f"{text}: the reader holds its ask for its claim's pull request, and its own {what} run (design §4.2)"
+            )
     elif d.get("own_work"):
         # §4.2 *Working on its own* (TD-734, TD-761): its turn ended, its own subagents or shells still run
         text = d.get("own_slot") or d["own_work"]

@@ -2565,8 +2565,9 @@ def test_msg_addresses_a_team_or_a_repo(monkeypatch, capsys):
 @pytest.mark.unit
 def test_status_says_working_for_an_idle_record_working_on_its_own():
     """§4.2 *Working on its own*, §4.7 (TD-1147): `ao status` prints an `idle` record with a live background
-    shell or live subagents *working*, the card's ending after the mode; with neither, or a wait the home
-    reads, or something pending, the raw state stands — and the record itself stays `idle`."""
+    shell or live subagents *working*, the card's ending after the mode, whether or not the home reads a wait
+    (§4.2 *One order*, TD-1227); with neither, or something pending, the raw state stands — and the record
+    itself stays `idle`."""
     from sessionorc.models import Session
 
     base = Session(id="ao-x", name="x", kind="interactive", dir="/tmp", adapter="claude-code", state="idle").view()
@@ -2583,15 +2584,17 @@ def test_status_says_working_for_an_idle_record_working_on_its_own():
         {**base, "shells": [shell], "shells_live": False},
     ):
         assert re.search(r"  idle\s", line := cli.status_line(rec)) and "·" not in line, (rec, line)
-    assert "  idle " in cli.status_line(on_shell, waiting=True)  # a wait wins, as on the card
+    assert "  working " in cli.status_line(on_shell, waiting=True)  # own work wins over a wait, as on the card
+    assert "  idle " in cli.status_line(base, waiting=True)
     pending = {**on_shell, "pending": {"kind": "permission", "text": "Bash"}}
     assert "working" not in cli.status_line(pending)
     assert on_shell["state"] == base["state"] == "idle"
 
 
-def test_status_v_ranks_own_work_with_the_working_and_a_wait_wins(monkeypatch, capsys):
-    """§4.7 (TD-1147, TD-1151): `cmd_status` ranks an `idle` record working on its own with the working,
-    ahead of a plain idle one, and under `-v` a wait the home reads keeps such a record *idle*."""
+def test_status_v_ranks_own_work_with_the_working_whether_or_not_it_waits(monkeypatch, capsys):
+    """§4.7 (TD-1147, TD-1151), §4.2 *One order* (TD-1227): `cmd_status` ranks an `idle` record working on
+    its own with the working, ahead of a plain idle one, and under `-v` a wait the home reads does not
+    hide it: such a record reads *working* too, the wait on its own line."""
     at = (datetime.datetime.now(datetime.UTC) - datetime.timedelta(minutes=5)).isoformat()
     base = {"state": "idle", "confidence": "hook", "since": at, "adapter": "claude-code"}
     shell = {"shells": [{"cmd": "timeout 1500 gh pr checks 9 --watch", "since": at}], "shells_live": True}
@@ -2608,6 +2611,8 @@ def test_status_v_ranks_own_work_with_the_working_and_a_wait_wins(monkeypatch, c
 
     monkeypatch.setattr(cli, "call_sync", call)
     assert cli.main(["status", "-v"]) == 0
-    lines = {m.group(1): m.group(2) for m in re.finditer(r"^(ao-r-\w)\s+(\w+)", capsys.readouterr().out, re.M)}
-    assert list(lines) == ["ao-r-b", "ao-r-c", "ao-r-a", "ao-r-d"], lines
-    assert lines == {"ao-r-b": "working", "ao-r-c": "working", "ao-r-a": "idle", "ao-r-d": "idle"}
+    out = capsys.readouterr().out
+    lines = {m.group(1): m.group(2) for m in re.finditer(r"^(ao-r-\w)\s+(\w+)", out, re.M)}
+    assert list(lines) == ["ao-r-b", "ao-r-c", "ao-r-d", "ao-r-a"], lines
+    assert lines == {"ao-r-b": "working", "ao-r-c": "working", "ao-r-a": "idle", "ao-r-d": "working"}
+    assert "TD-222" in out.split("ao-r-d", 1)[1], "the wait is still printed under -v"
