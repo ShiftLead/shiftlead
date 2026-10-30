@@ -4,7 +4,8 @@ Run from the repo root (headless Chromium, docs/claude-memory/headless-screensho
 
     PYTHONPATH=~/ao-shots/pwlib ~/.local/share/shiftlead-venv/bin/python docs/mockups/reviews/td1190-src/td1190_shots.py
 
-Writes docs/mockups/reviews/2026-10-28-td1190-add-entry-{wide,taken,phone}.png. Every mockup class is
+Writes docs/mockups/reviews/2026-10-28-td1190-add-entry-{wide,taken,phone}.png; the -before.png beside them is the
+form as built on 2026-10-28, shot from a scratch home, not made here. Every mockup class is
 prefixed `ae-` (app.css defines the short generic names); the rest are the app's own classes.
 """
 
@@ -39,7 +40,7 @@ body { background: var(--bg); padding: 16px; }
 .ae-name { width: auto; flex: 1 1 0; min-width: 0; max-width: 180px; box-sizing: border-box; height: 30px; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
 .ae-name.ae-bad { border-color: #dc2626; }
 .ae-bad-line { color: #b91c1c; }
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   .ae-ways { grid-template-columns: minmax(0, 1fr); row-gap: 14px; }
   .ae-way + .ae-way { border-left: 0; padding-left: 0; border-top: 1px solid var(--border); padding-top: 14px; }
   .ae-way:first-child { padding-right: 0; }
