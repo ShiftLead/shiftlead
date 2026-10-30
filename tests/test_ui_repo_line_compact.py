@@ -92,3 +92,13 @@ def test_the_compact_form_carries_the_repos_lanes_i_one_line_per_team(tmp_path, 
     tip = c[c.index('class="tipmark"') :]
     assert "in alpha&#39;s lanes" in tip.split(">")[0] and "in beta&#39;s lanes" in tip.split(">")[0]
     assert c.index('class="tipmark"') < c.index("data-addentry")  # the lanes *i*, then Add entry…
+
+
+def test_a_red_pr_is_counted_in_red_with_the_facets_hover(tmp_path, monkeypatch):
+    r = reading("redrepo")
+    r["prs"] = {
+        "open": [{"number": 9, "created": "2026-10-16T08:00:00Z", "checks": "red", "red_since": "2026-10-16T09:00:00Z"}]
+    }
+    c = compact(line_html(r, tmp_path, monkeypatch))
+    assert 'class="cfig prred" href="/repo/redrepo#prs" title="#9 · red' in c and "· 1 red</a>" in c
+    assert "CI never ran" not in c
