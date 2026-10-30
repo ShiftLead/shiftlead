@@ -466,10 +466,10 @@ const block = js.slice(js.indexOf('if (action === "ledger_start") {'), js.indexO
 const press = new Function("b", "row", "fetch", "navigator", "location", "AO", "pressed", "say",
   "return (async () => { const action = 'ledger_start'; " + block + " })();");
 (async () => {
-  const out = {};
-  for (const [name, focus, item, refuse] of [
+  const out = {}, posted = {};
+  for (const [name, focus, item, refuse, card = "s#TD-20"] of [
     ["copied", "ao-p", "m-41", false], ["refused", "ao-p", "m-41", true], ["started", "", "m-41", false],
-    ["entry", "ao-p", "", false],
+    ["entry", "ao-p", "", false], ["bare", "ao-p", "", false, ""],
   ]) {
     const seen = [], loc = { href: "/queue" };
     const clip = { writeText: async (t) => {
@@ -479,12 +479,12 @@ const press = new Function("b", "row", "fetch", "navigator", "location", "AO", "
     const ao = { poppedId: "", unPend: () => seen.push("unpend"),
       toast: (t, bad, to) => seen.push(`toast ${t} → ${to}`) };
     const got = { ok: true, json: async () => (focus ? { ok: true, focus } : { ok: true, id: "ao-n", name: "td-9" }) };
-    const b = { dataset: { repo: "s", ref: "TD-9", card: "s#TD-20", ...(item ? { item } : {}) } };
-    await press(b, { isConnected: true }, async () => got, { clipboard: clip }, loc, ao, () => {},
-      (t) => seen.push(`say ${t}`));
+    const b = { dataset: { repo: "s", ref: "TD-9", ...(card ? { card } : {}), ...(item ? { item } : {}) } };
+    const post = async (url, opts) => { posted[name] = [url, JSON.parse(opts.body)]; return got; };
+    await press(b, { isConnected: true }, post, { clipboard: clip }, loc, ao, () => {}, (t) => seen.push(`say ${t}`));
     out[name] = [...seen, `href ${loc.href}`];
   }
-  console.log(JSON.stringify(out));
+  console.log(JSON.stringify({ out, posted }));
 })().catch((e) => { console.error(e); process.exit(1); });
 """
 
@@ -493,7 +493,8 @@ const press = new Function("b", "row", "fetch", "navigator", "location", "AO", "
 def test_an_items_open_session_copies_its_id_and_the_toast_shows_it_where_refused():
     """TD-1257: the `ledger_start` press, run as itself under node with a stub clipboard and `location` — an item's
     **Open session** copies its id before it leaves for the session; refused, the toast shows the id and the page
-    stays; a start, or a press with no item, copies nothing."""
+    stays; a start, or a press with no item, copies nothing. The request names the entry, and the card and the item
+    where the button has them (TD-1274)."""
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the press is JavaScript, and nothing else runs it")
@@ -502,7 +503,8 @@ def test_an_items_open_session_copies_its_id_and_the_toast_shows_it_where_refuse
     js = Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js"
     out = subprocess.run([node, str(probe), str(js)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
-    assert json.loads(out.stdout) == {
+    got = json.loads(out.stdout)
+    assert got["out"] == {
         "copied": ["clip m-41 at /queue", "say m-41 copied — paste it into your session", "href /focus/ao-p"],
         "refused": [
             "clip m-41 at /queue",
@@ -512,7 +514,13 @@ def test_an_items_open_session_copies_its_id_and_the_toast_shows_it_where_refuse
         ],
         "started": ["say started td-9 on m-41", "href /focus/ao-n"],
         "entry": ["href /focus/ao-p"],
+        "bare": ["href /focus/ao-p"],
     }
+    # the item's press names its item and card, so the prompt names the item and the road checks the card's start
+    item = {"repo": "s", "id": "TD-9", "card": "s#TD-20", "item": "m-41"}
+    assert got["posted"]["copied"] == got["posted"]["started"] == ["/api/ledger/start", item]
+    assert got["posted"]["entry"] == ["/api/ledger/start", {"repo": "s", "id": "TD-9", "card": "s#TD-20"}]
+    assert got["posted"]["bare"] == ["/api/ledger/start", {"repo": "s", "id": "TD-9"}]
 
 
 def test_the_queue_page_draws_an_asks_start_session_on_its_card_and_none_in_the_header(tmp_path, monkeypatch):
