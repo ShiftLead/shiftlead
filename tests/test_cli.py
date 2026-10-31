@@ -502,6 +502,38 @@ def test_until_parses_the_shapes_a_person_types_and_refuses_the_rest():
             stop_time(bad)
 
 
+@pytest.mark.parametrize(
+    ("zone", "now", "want"),
+    [
+        ("America/Denver", "2026-10-31T08:42:00", "2026-11-01T13:00:00Z"),  # MDT today, MST tomorrow
+        ("America/Denver", "2026-03-07T08:42:00", "2026-03-08T12:00:00Z"),  # MST today, MDT tomorrow
+        ("America/Denver", "2026-10-31T05:00:00", "2026-10-31T12:00:00Z"),  # still ahead today
+    ],
+)
+def test_until_a_time_of_day_takes_that_days_offset_across_a_dst_change(monkeypatch, zone, now, want):
+    """TD-1290: `06:00` the evening before a DST change is 06:00 on tomorrow's clock. Today's offset
+    carried to tomorrow made it 05:00 (or 07:00), and the time-of-day test failed on that one day."""
+    if not hasattr(time, "tzset"):
+        pytest.skip("no tzset on this platform")
+    import shiftlead.cli as cli
+
+    monkeypatch.setenv("TZ", zone)
+    time.tzset()
+    try:
+        fixed = datetime.datetime.fromisoformat(now).astimezone()
+
+        class Clock(datetime.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return fixed if tz is None else fixed.astimezone(tz)
+
+        monkeypatch.setattr(cli, "datetime", Clock)
+        assert cli.stop_time("06:00") == want
+    finally:
+        monkeypatch.undo()
+        time.tzset()
+
+
 def test_new_until_needs_unattended_and_carries_the_wrap_up_words(tmp_path, monkeypatch, capsys):
     """A stop time is a policy and policies leave interactive sessions alone (§4.2), so `--until`
     without `--unattended` is refused rather than stored where nothing will act on it. The wrap-up

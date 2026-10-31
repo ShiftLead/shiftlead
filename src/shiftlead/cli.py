@@ -15,6 +15,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Mapping
 from datetime import UTC, date, datetime, timedelta
+from datetime import time as dt_time
 from importlib import resources
 from typing import Any
 
@@ -649,8 +650,10 @@ def stop_time(when: str, flag: str = "--until") -> str:
         hour, minute = int(m[1]), int(m[2])
         if hour > 23 or minute > 59:
             raise AgentError(f"{flag}: not a time of day: {text}")
-        at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        return _utc(at if at > now else at + timedelta(days=1))  # today if it is still ahead
+        # the wall time is localized per day, so tomorrow's 06:00 takes tomorrow's offset across a DST change
+        wall = datetime.combine(now.date(), dt_time(hour, minute))
+        at = wall.astimezone()
+        return _utc(at if at > now else (wall + timedelta(days=1)).astimezone())  # today if it is still ahead
     try:
         parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError as exc:
