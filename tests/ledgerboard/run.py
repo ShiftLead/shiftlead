@@ -27,6 +27,13 @@ Fixtures, each an invented input and its expected JSON:
   consequence — ``item_record()``'s ``consequences`` and ``decided_line()``'s marked label (v1.3).
 - ``ledger/parts.md`` (v2.1): ``Part of`` — a parent with open and with archived parts, the order,
   and each check; ``components()`` of it joins through the field.
+- ``ledger_edit/cases.json`` (+ the entry files it names) → ``ledger_edit/expected.json`` (v2.2): one
+  entry's writers — ``canonical()`` of each input (and whether a second pass changes it) and
+  ``entry_text()`` of each new entry, and ``edit_entry()`` of each case's steps run in order, or why
+  each is refused; and ``check()``'s Part of flags of a ledger before and after an archive
+  (``check/``), ``archive-open-parts`` among them.
+- ``ledger/escaped.md`` (v2.2): ``Escaped from`` is the format's own field — a ledger with a
+  ``Fields:`` line flags an undeclared field beside it, never it.
 """
 
 from __future__ import annotations
@@ -167,6 +174,43 @@ def edit_cases(L, spec: dict, root: Path = HERE) -> dict:
     return out
 
 
+def ledger_edit_cases(L, spec: dict, root: Path = HERE) -> dict:
+    """The entry writers' cases (v2.2): an input is an entry file beside ``cases.json`` or inline
+    ``text`` (a CRLF case must be inline: a text read here has its line endings translated)."""
+    d = root / "ledger_edit"
+    missing = [n for n in ("canonical", "entry_text", "edit_entry") if not hasattr(L, n)]
+    if missing:  # a module older than v2.2: this case fails, the others still run
+        return {"missing": f"the module has no {', '.join(missing)} — older than v2.2"}
+
+    def text(c):
+        return c["text"] if "text" in c else (d / c["file"]).read_text(encoding="utf-8")
+
+    def canon(c):
+        got = _refused(lambda: L.canonical(text(c)))
+        if "ok" in got:
+            got["idempotent"] = L.canonical(got["ok"]) == got["ok"]
+        return got
+    def edits(c):
+        def run():
+            out = text(c)
+            for st in c["steps"]:
+                dated = st["action"] in ("note", "archive", "reopen")  # the others take no date
+                args = {"today": c.get("today", spec["today"])} if dated else {}
+                out = L.edit_entry(out, st["action"], **{**args, **st["args"]})
+            return out
+        return _refused(run)
+    return {"canonical": {c["name"]: canon(c) for c in spec["canonical"]},
+            "edit_entry": {c["name"]: edits(c) for c in spec["edit_entry"]},
+            "check": {c["name"]: [r for r in L.check(text({"file": c["ledger"]}), text({"file": c["archive"]}) if c["archive"] else "",
+                                                     old=text({"file": c["old"]}) if c.get("old") else None)
+                                  if r["kind"] in ("archive-open-parts", "part-of-archived", "part-of-unknown")]
+                      for c in spec["check"]},
+            "entry_text": {c["name"]: _refused(lambda c=c: L.entry_text(
+                c["id"], c["title"], c["fields"],
+                c["sections"] if isinstance(c["sections"], dict) else [tuple(x) for x in c["sections"]]))
+                for c in spec["entry_text"]}}
+
+
 def v2_case(L, md: Path) -> dict:
     """A v1 case's v2 twin, ``<case>.v2/``: ``split()`` of the v1 texts must write it file for file,
     and ``load()`` of it must give the v1 case's expected JSON, its summary rows aside (none in v2)."""
@@ -195,6 +239,8 @@ def cases(L, root: Path):
         yield md.with_suffix(".json"), board_case(L, md)
     spec = json.loads((root / "edit" / "cases.json").read_text(encoding="utf-8"))
     yield root / "edit" / "expected.json", edit_cases(L, spec, root)
+    spec = json.loads((root / "ledger_edit" / "cases.json").read_text(encoding="utf-8"))
+    yield root / "ledger_edit" / "expected.json", ledger_edit_cases(L, spec, root)
 
 
 def main(argv: list[str] | None = None) -> int:

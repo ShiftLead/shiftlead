@@ -1,5 +1,5 @@
-# ledgerboard v2.1 sha256:8cb3403afd795c75d3cec4d86791192f81ae81032d09d2e8507799bed06ba776
-# SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard.py (vendored by dev-cadence as files/scripts/ledgerboard.py)
+# ledgerboard v2.2 sha256:068bf1019da08e2077d54af447c571d353310c4bac53d17d4bc9638d87938cb9
+# SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard.py (vendored by agent-cadence as files/scripts/ledgerboard.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
 
@@ -11,13 +11,14 @@ trailing ``Due:``/``Answers:``/``Decided:`` fields, reply tails and a detail blo
 
 Everything here is a pure function over text: no git, no network, no file system, no roster.
 What a caller needs from outside the text is passed in — the cross-repo resolver of
-``pickable()``, today's date. Two consumers vendor this file (dev-cadence's scripts, ShiftLead);
+``pickable()``, today's date. Two consumers vendor this file (agent-cadence's scripts, ShiftLead);
 neither keeps a second parser of either format.
 
 Sections: the ledger (entries, ``Fields:``, ``Blocked by``, ``Part of``, derived pickable, ``check``); the rank
 (cards, keys, the rank file, the pick order); the board
 (items, the item record, keys and refs); the ledger as a directory (``load``, ``split``); edits (``edit_line``, composing an item, the commit
-subject of a write and its parser); line predicates for diff walkers; the format version.
+subject of a write and its parser); line predicates for diff walkers; ledger entries and their writers
+(``canonical``, ``entry_text``, ``edit_entry``, v2.2); the format version.
 """
 
 from __future__ import annotations
@@ -40,7 +41,8 @@ SECTION_RE = re.compile(r"^## ", re.MULTILINE)
 ROW_RE = re.compile(r"^\|\s*(TD-(\d+))\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|", re.MULTILINE)
 FIELD_RE = re.compile(r"^\*\*([A-Za-z][^*:\n]*?):\*\*[ \t]*(.*?)[ \t]*$")  # one line, one field
 FIELDS_DECL_RE = re.compile(r"^Fields:[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # the preamble's declaration
-CADENCE_FIELDS = ("priority", "type", "added", "status", "blocked by", "location", "part of")  # the spec's own fields
+CADENCE_FIELDS = ("priority", "type", "added", "status", "blocked by", "location", "part of",
+                  "escaped from", "id take")  # the spec's own fields
 PRIORITY_RE = re.compile(r"^\*\*Priority:\*\*\s*(\w+)", re.MULTILINE)
 BLOCKED_RE = re.compile(r"^\*\*Blocked by:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # one line only
 PART_OF_RE = re.compile(r"^\*\*Part of:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # one parent, same ledger (v2.1)
@@ -462,7 +464,9 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
     an edit (None: every ⚠ is an error and nothing is standing). With it, a flag on an entry whose
     header block is unchanged — or a Fields: flag under an unchanged declaration — is standing:
     information, whatever it was. On a changed or new entry, EDIT_ERRORS are errors too. ``rank_text``
-    adds the rank file's flags (never standing: the file is a tool's)."""
+    adds the rank file's flags (never standing: the file is a tool's). Also with ``old`` (v2.2): an
+    entry that left the ledger while an open entry is still Part of it is an error,
+    ``archive-open-parts``, naming the parts — never standing, since only this edit made it."""
     recs = [dict(r, standing=False)
             for r in pickable(ledger, archive, resolve, undeclared=True, rank_text=rank_text)["flag_recs"]]
     if old is None:
@@ -477,7 +481,27 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
         elif r["kind"] in EDIT_ERRORS:
             r["level"] = "error"
         r["text"] = ("⚠" if r["level"] == "error" else "ℹ") + r["text"][1:]
-    return recs
+    return recs + _left_with_open_parts(old, ledger)
+
+
+def _left_with_open_parts(old: str, ledger: str) -> list[dict]:
+    """``archive-open-parts`` (v2.2): each id in ``old`` and not in ``ledger`` (by number) that an open
+    entry of ``ledger`` is still Part of — the parent archived, or renumbered, ahead of its parts."""
+    live = entries(ledger)
+    now = {_num(e["id"]) for e in live}
+    left = {}
+    for e in entries(old):
+        if _num(e["id"]) not in now:
+            left.setdefault(_num(e["id"]), e["id"])
+    parts: dict[int, list[str]] = {}
+    for e in live:
+        par = parse_part_of(e["part_of_raw"])[0]
+        if par and _num(par) in left:
+            parts.setdefault(_num(par), []).append(e["id"])
+    return [{"level": "error", "id": left[n], "field": "part of", "kind": "archive-open-parts", "standing": False,
+             "text": f"⚠ {left[n]}: left the ledger while {', '.join(ps)} {'is' if len(ps) == 1 else 'are'} still "
+                     "Part of it — archive its parts first, or point their Part of at its new id or another parent"}
+            for n, ps in sorted(parts.items())]
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1511,6 +1535,415 @@ def _dict_ls(files: Mapping[str, str]) -> Ls:
             return None
         return sorted(names)
     return ls
+
+
+# ---------------------------------------------------------------------------------------------
+# Ledger entries and their writers (v2.2): one entry's text, in canonical form
+# ---------------------------------------------------------------------------------------------
+
+# The canonical header order (SPEC *Ledger entries and their edits*), spelled as written there; any
+# other field follows in the file's order. A place here is a rendering rule, not a declaration:
+# Owner, Kind, Taken by and Waits are not CADENCE_FIELDS.
+ENTRY_ORDER = ("Priority", "Type", "Added", "Owner", "Kind", "Status", "Taken by", "Id take",
+               "Blocked by", "Waits", "Part of", "Location")
+LEAD_RE = re.compile(r"^\*\*(?P<lead>[^*\n]+?)\*\*")  # a section's lead: its first paragraph's bold opening
+FENCE_RE = re.compile(r"^ {0,3}(?P<fence>`{3,}(?=[^`]*$)|~{3,})(?P<info>.*)$")  # a code fence's line: no lead inside one
+
+
+def _entry_problem(text: str) -> str | None:
+    """Why ``text`` is not one entry a writer may render, or None: it opens with its one
+    `## TD-n:` heading, the only one outside its HTML comments, and every comment is closed."""
+    heads = HEADING_RE.findall(COMMENT_RE.sub("", text))
+    if not HEADING_RE.match(text) or len(heads) != 1:
+        return (f"not one entry: an entry's text opens with its one `## TD-n:` heading (found "
+                f"{', '.join(h[0] for h in heads) or 'none'}) — a v1 ledger: split first")
+    if text.count("<!--") != len(COMMENT_RE.findall(text)):
+        return "an HTML comment is not closed in the entry — close it first"
+    return None
+
+
+def _entry_parts(text: str) -> tuple[re.Match, list[tuple[str, str]], str]:
+    """(the heading's match, the header block as [(name as written, value)], the body with no
+    leading or trailing blank lines) of one entry, line endings normalised; raises Refused for an
+    entry ``canonical()`` refuses: not one entry, a header line that is not a field, a repeated
+    field, or a field below the header block that ``entries()`` would lift."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    why = _entry_problem(text)
+    if why:
+        raise Refused(why)
+    lines = text.split("\n")
+    i = 1
+    while i < len(lines) and not lines[i].strip():
+        i += 1
+    header, seen = [], set()
+    while i < len(lines) and lines[i].strip():
+        m = FIELD_RE.match(lines[i])
+        if not m and not header:
+            raise Refused(f"the paragraph after its heading is its header block, and {lines[i]!r} is not a "
+                          "field — an entry with a body needs its fields first; add them by hand")
+        if not m:
+            raise Refused(f"its header block holds a line that is not a field: {lines[i]!r} — "
+                          "join it to its field's line, or move it below the header block, by hand")
+        if field_key(m.group(1)) in seen:
+            raise Refused(f"its header block names {m.group(1).strip()!r} twice — keep one, by hand")
+        seen.add(field_key(m.group(1)))
+        header.append((m.group(1), m.group(2)))
+        i += 1
+    below = entries(text)[0]["below"]
+    if below:
+        raise Refused(f"its {', '.join(k.capitalize() for k in below)} line is below the header block, "
+                      "where the reader still lifts it — move it into the header block, by hand")
+    j = len(lines)
+    while j > i and not lines[j - 1].strip():
+        j -= 1
+    while i < j and not lines[i].strip():
+        i += 1
+    return HEADING_RE.match(text), header, "\n".join(lines[i:j])
+
+
+def _render(tid: str, title: str, header: list[tuple[str, str]], body: str) -> str:
+    """One entry in canonical form: heading, blank, the header in ENTRY_ORDER (the ordered fields
+    spelled as it spells them, any other as given, in the given order), blank, the body."""
+    place = {field_key(n): k for k, n in enumerate(ENTRY_ORDER)}
+    ordered = sorted(enumerate(header), key=lambda x: (place.get(field_key(x[1][0]), len(ENTRY_ORDER)), x[0]))
+    out = [f"## {tid}: {title.strip()}".rstrip()]
+    fields = [f"**{ENTRY_ORDER[place[field_key(n)]] if field_key(n) in place else n}:** {v}".rstrip()
+              for _, (n, v) in ordered]
+    if fields:
+        out += ["", *fields]
+    if body:
+        out += ["", body]
+    return "\n".join(out) + "\n"
+
+
+def _readback(text: str) -> tuple[str, str, dict[str, str], str]:
+    """What the reader reads of an entry: (id, title, fields as ``entries()`` reads them, body)."""
+    e = entries(text)[0]
+    return e["id"], e["title"], e["fields"], _entry_parts(text)[2]
+
+
+def canonical(text: str) -> str:
+    """One entry's text (a v2 ledger's ``TD-NNN.md``) in canonical form (SPEC *Ledger entries and
+    their edits*): line endings normalised to ``\\n``, the heading, a blank line, the header block in
+    ENTRY_ORDER and then any other field in the file's order, a blank line, the body byte for byte,
+    one trailing newline. Idempotent. Raises Refused for text that is not one entry, and for a header
+    block whose rendering would lose or duplicate a line — a line that is not a field, a repeated
+    field, a field below the header block that ``entries()`` would lift — which a person fixes; and
+    whenever the result would not read back the same id, title, fields and body."""
+    m, header, body = _entry_parts(text)
+    out = _render(m.group(1), m.group(3), header, body)
+    norm = text.replace("\r\n", "\n").replace("\r", "\n")
+    if _readback(out) != _readback(norm):
+        raise Refused("the canonical form would not read back the entry's fields and body unchanged — "
+                      "nothing was written")
+    return out
+
+
+def _entry_sections(body: str) -> list[tuple[str | None, str]]:
+    """The body's sections, in order: (the lead as written — the bold run's text, ``Why:`` or
+    ``Done when`` — or None for the text before the first lead; the section's text). A section is
+    a paragraph opening with a bold run and every paragraph after it up to the next that does; a
+    paragraph inside a code fence never opens one. Each text runs to the next lead, its trailing
+    blank lines trimmed."""
+    out: list[tuple[str | None, list[str]]] = []
+    fence, prev_blank = "", True  # the open fence's run (``` or ~~~, its length), or ""
+    for line in body.split("\n"):
+        m = LEAD_RE.match(line) if prev_blank and not fence else None
+        if m or not out:
+            out.append((m.group("lead") if m else None, []))
+        out[-1][1].append(line)
+        f = FENCE_RE.match(line)
+        if f and not fence:
+            fence = f.group("fence")
+        elif f and f.group("fence")[0] == fence[0] and len(f.group("fence")) >= len(fence) \
+                and not f.group("info").strip():
+            fence = ""  # closed by a bare run of its own character, at least as long
+        prev_blank = not line.strip()
+    found = []
+    for lead, ls in out:
+        while ls and not ls[-1].strip():
+            ls = ls[:-1]
+        if lead is not None or ls:
+            found.append((lead, "\n".join(ls)))
+    return found
+
+
+def _section_key(lead: str) -> str:
+    """A section's name for matching: its lead's ``field_key`` with a trailing colon dropped, so
+    ``Done when`` and ``Done when:`` are one name; a qualified lead (``Fix (to design):``) keeps its
+    whole text and so matches only itself."""
+    return field_key(lead.strip().rstrip(":"))
+
+
+def entry_text(tid: str, title: str, fields, sections) -> str:
+    """A new entry in canonical form: ``## <tid>: <title>``, its ``fields`` ({name: value} or (name,
+    value) pairs, one line each; an empty value is left out), then ``sections`` — (name, text) pairs or a {name: text}
+    mapping, each written ``**<name>:** <text>``, a whitespace-only line emptied (in a code block
+    too); a first pair with no name is the unnamed lead, written as given. Raises Refused for an id that is not ``TD-n``, an empty or multi-line title, a
+    field that is not one ``**Name:** value`` line, a field named twice, and sections that would not
+    read back as given (a paragraph of a section's text that opens in bold would start another)."""
+    if not ID_ITEM_RE.match(str(tid)):
+        raise Refused(f"an entry's id is TD-n, not {tid!r}")
+    title = str(title or "")
+    if not title.strip() or "\n" in title.strip():
+        raise Refused("an entry needs its title, on one line")
+    header, seen = [], set()
+    for name, value in (fields.items() if isinstance(fields, Mapping) else fields or ()):
+        name, value = str(name).strip(), str(value or "").strip()
+        if not value:
+            continue
+        if "\n" in value or "\r" in value:
+            raise Refused(f"the {name} field is one line (cadence.md §2.12)")
+        m = FIELD_RE.match(f"**{name}:** {value}")
+        if not m or m.group(1) != name or m.group(2) != value:
+            raise Refused(f"{name!r}: {value!r} would not read back as one field")
+        if field_key(name) in seen:
+            raise Refused(f"the field {name!r} is named twice")
+        seen.add(field_key(name))
+        header.append((name, value))
+    pairs = list(sections.items()) if isinstance(sections, Mapping) else list(sections or ())
+    if pairs and not header:
+        raise Refused("an entry with sections needs at least one field: the paragraph after the heading "
+                      "is the header block")
+    parts, want = [], []
+    for k, (name, words) in enumerate(pairs):
+        words = "\n".join(ln.rstrip() if not ln.strip() else ln
+                          for ln in str(words or "").replace("\r\n", "\n").split("\n")).strip("\n")
+        if not words.strip():
+            raise Refused(f"the section {name or '(unnamed)'!r} is empty")
+        if not name:
+            if k:
+                raise Refused("only the first section may have no name — the text before the first lead")
+            parts.append(words)
+            want.append((None, words))
+            continue
+        lead = f"{str(name).strip()}:"
+        parts.append(f"**{lead}** {words}")
+        want.append((_section_key(lead), parts[-1]))
+    out = canonical(_render(str(tid), title, header, "\n\n".join(parts)))
+    got = [(_section_key(lead) if lead is not None else None, t)
+           for lead, t in _entry_sections(_entry_parts(out)[2])]
+    if got != want or _readback(out)[2] != {field_key(n): v for n, v in header}:
+        raise Refused("the entry would not read back with these fields and sections — a paragraph "
+                      "opening in bold starts a section of its own; rephrase it")
+    return out
+
+
+ENTRY_ACTIONS = ("set", "note", "edit", "archive", "reopen", "renumber", "rename_ref")
+_ENTRY_ARGS = {"set": {"fields"}, "note": {"words"}, "edit": {"section", "words"},
+               "archive": {"why", "pr", "pointer", "as_is", "superseded_by"}, "reopen": {"why"},
+               "renumber": {"new"}, "rename_ref": {"old", "new"}}  # each action's keyword arguments
+_DATED_ACTIONS = ("note", "archive", "reopen")  # the actions that write today's date
+PR_IN_TEXT_RE = re.compile(r"#\d+")  # a consumer reads the first `#<digits>` of a Resolved line as its PR
+ISO_DAY_RE = re.compile(r"\d{4}-\d{2}-\d{2}")  # the one form a date is written in
+
+
+def _is_id(x: object, other_repo: bool = False) -> bool:
+    """``x`` is ``TD-n`` (or, ``other_repo``, also ``<repo>#TD-n``) and nothing more, not even a newline."""
+    return isinstance(x, str) and bool(ID_ITEM_RE.fullmatch(x) or (other_repo and XREPO_ITEM_RE.fullmatch(x)))
+
+
+def _one_line(what: str, words: str | None) -> str:
+    """``words`` collapsed to one line, or Refused: a field, and the line written into one, is one line."""
+    if words is not None and ("\n" in str(words).strip() or "\r" in str(words).strip()):
+        raise Refused(f"{what} is one line (cadence.md §2.12)")
+    said = " ".join(str(words or "").split())
+    if not said:
+        raise Refused(f"{what} needs its words")
+    return said
+
+
+def _value(header: list[tuple[str, str]], key: str) -> str | None:
+    return next((v for n, v in header if field_key(n) == key), None)
+
+
+def _with(header: list[tuple[str, str]], name: str, value: str | None) -> list[tuple[str, str]]:
+    """``header`` with the field ``name`` set to ``value`` (in its place, or last), or removed for None."""
+    key, out, done = field_key(name), [], False
+    for n, v in header:
+        if field_key(n) != key:
+            out.append((n, v))
+        elif value is not None and not done:
+            out.append((n, value))
+            done = True
+    return out if done or value is None else [*out, (name, value)]
+
+
+def _keyed(sections: list[tuple[str | None, str]], key: str) -> list[int]:
+    return [i for i, (lead, _) in enumerate(sections) if lead is not None and _section_key(lead) == key]
+
+
+def _rename(value: str, old: str, new: str) -> str:
+    """``value`` with each id item ``old`` written ``new``; a local id matches by number (``TD-7`` is ``TD-007``)."""
+    m = ID_ITEM_RE.match(old)
+    if m:
+        rx = re.compile(rf"(?<![\w#/.-])TD-0*{int(m.group(1))}(?!\d)")
+    else:
+        repo, tid = XREPO_ITEM_RE.match(old).groups()
+        rx = re.compile(rf"(?<![\w/.-]){re.escape(repo)}#TD-0*{_num(tid)}(?!\d)", re.IGNORECASE)
+    return rx.sub(new, value)
+
+
+def edit_entry(text: str, action: str, *, today: date | str | None = None, fields: Mapping[str, str] | None = None,
+               words: str | None = None, section: str | None = None, why: str | None = None,
+               pr: int | None = None, pointer: str | None = None, as_is: bool = False,
+               superseded_by: str | None = None, new: str | None = None, old: str | None = None) -> str:
+    """One entry's text after ``action`` (``ENTRY_ACTIONS``), in canonical form; raises Refused. The
+    edits (SPEC *Ledger entries and their edits*):
+
+    - ``set`` (``fields``: {name: value}; an empty value removes the field);
+    - ``note`` (``words``): `` <today>: <words>`` appended to Status, whose first word must not change;
+      with no Status, ``**Status:** <today>: <words>``;
+    - ``edit`` (``section``, ``words``): that named section's paragraphs replaced by ``words``, its lead
+      kept; a section the body lacks is added after the first Why, else before the first Done when or
+      Related, else at the end;
+    - ``archive`` (``why``; ``pr``, an int or None; ``pointer``; ``as_is``; or ``superseded_by``): the
+      archived form — Status ``Resolved <today>: <why>`` and Fix replaced by ``**Resolved:** <today>
+      (PR #<pr>) — <pointer>`` (after the whole Fix with ``as_is``; at the end of the body when no
+      section is named exactly Fix), any earlier ``**Resolved:**`` section and header ``Resolved``
+      removed; or Status ``Superseded <today> by <id>: <why>`` with the rest kept;
+    - ``reopen`` (``why``): Status ``Open <today>: <why> — was: <old Status>``; a header ``Resolved``
+      moves to a ``**Resolved:**`` section at the end of the body; refused when the entry has both;
+    - ``renumber`` (``new``): the heading's id; ``rename_ref`` (``old``, ``new``): that id rewritten in
+      Blocked by and Part of.
+
+    ``today`` is the caller's date, taken by note, archive and reopen only (none is read here). Every edit is refused for an entry
+    ``canonical()`` refuses, and unless the result reads back exactly the change meant — the id,
+    title, fields (as ``entries()`` reads them) and sections — and nothing else. Validity (a
+    vocabulary, a Blocked by item, a cycle) is ``check()``'s, which the caller runs on the result."""
+    if action not in ENTRY_ACTIONS:
+        raise Refused(f"unknown action {action}")
+    given = {k for k, v in (("fields", fields), ("words", words), ("section", section), ("why", why),
+                            ("pr", pr), ("pointer", pointer), ("as_is", as_is or None),
+                            ("superseded_by", superseded_by), ("new", new), ("old", old)) if v is not None}
+    stray = sorted(given - _ENTRY_ARGS[action]) + (["today"] if today is not None and action not in _DATED_ACTIONS else [])
+    if stray:
+        raise Refused(f"{action} takes no {', '.join(stray)}")
+    day = ""
+    if action in _DATED_ACTIONS:
+        if isinstance(today, datetime):
+            today = today.date()  # a civil date: a time never reaches the file
+        try:
+            if not isinstance(today, date) and not (isinstance(today, str) and ISO_DAY_RE.fullmatch(today)):
+                raise ValueError
+            day = (today if isinstance(today, date) else date.fromisoformat(today)).isoformat()
+        except ValueError:
+            raise Refused(f"{action} needs today's date as YYYY-MM-DD, not {today!r}") from None
+    m, header, body = _entry_parts(canonical(text))
+    tid, title = m.group(1), m.group(3).strip()
+    title_read = entries(canonical(text))[0]["title"]  # as the reader reads it: an HTML comment dropped
+    sections = _entry_sections(body)
+    body_changed = False
+
+    if action == "set":
+        if not fields:
+            raise Refused("set needs the fields to set")
+        keys = [field_key(str(n)) for n in fields]
+        if len(set(keys)) != len(keys):
+            raise Refused("set names one field twice")
+        for name, value in fields.items():
+            name = str(name).strip()
+            if not value or not str(value).strip():
+                header = _with(header, name, None)
+                continue
+            value = _one_line(f"the {name} field", value)
+            fm = FIELD_RE.match(f"**{name}:** {value}")
+            if not fm or fm.group(1) != name or fm.group(2) != value:
+                raise Refused(f"{name!r}: {value!r} would not read back as one field")
+            header = _with(header, name, value)
+    elif action == "note":
+        said = _one_line("a note", words)
+        was = _value(header, "status")
+        now = f"{was} {day}: {said}" if was and was.strip() else f"{day}: {said}"
+        if was and was.strip() and first_word(now) != first_word(was):
+            raise Refused(f"the note would change the Status's first word ({first_word(was)!r}) — say it in other words")
+        header = _with(header, "Status", now)
+    elif action == "edit":
+        name = _one_line("the section's name", section).rstrip(":").strip()
+        if not name:
+            raise Refused("edit needs the section's name")
+        said = "\n".join(ln.rstrip() if not ln.strip() else ln
+                         for ln in str(words or "").replace("\r\n", "\n").split("\n")).strip("\n")
+        if not said.strip():
+            raise Refused(f"the section {name!r} needs its words")
+        at = _keyed(sections, _section_key(name))
+        if len(at) > 1:
+            raise Refused(f"the body has {len(at)} sections named {name!r} — edit it by hand")
+        if at:
+            sections[at[0]] = (sections[at[0]][0], f"**{sections[at[0]][0]}** {said}")
+        else:
+            why_at = _keyed(sections, "why")
+            ends = sorted(_keyed(sections, "done when") + _keyed(sections, "related"))
+            pos = why_at[0] + 1 if why_at else ends[0] if ends else len(sections)
+            sections.insert(pos, (f"{name}:", f"**{name}:** {said}"))
+        body_changed = True
+    elif action == "archive":
+        said = _one_line("the archive's why", why)
+        if superseded_by is not None:
+            if pr is not None or pointer is not None or as_is:
+                raise Refused("a superseded entry keeps its Why and Fix: no pr, pointer or as_is")
+            if not _is_id(superseded_by) or _num(superseded_by) == _num(tid):
+                raise Refused(f"superseded by another entry's TD-n, not {superseded_by!r}")
+            header = _with(header, "Status", f"Superseded {day} by {superseded_by}: {said}")
+        else:
+            if pr is not None and (isinstance(pr, bool) or not isinstance(pr, int) or pr < 1):
+                raise Refused(f"a PR is the forge's number, not {pr!r}")
+            ptr = _one_line("the pointer", pointer) if pointer is not None else ""
+            if pr is None and PR_IN_TEXT_RE.search(ptr):
+                raise Refused("with no PR, the pointer may not hold #<digits>: a reader would take it for the PR")
+            line = f"**Resolved:** {day}{f' (PR #{pr})' if pr is not None else ''}{f' — {ptr}' if ptr else ''}"
+            header = _with(_with(header, "Status", f"Resolved {day}: {said}"), "Resolved", None)
+            sections = [s for i, s in enumerate(sections) if i not in _keyed(sections, "resolved")]
+            fix = _keyed(sections, "fix")
+            if len(fix) > 1:
+                raise Refused(f"the body has {len(fix)} sections named Fix — archive it by hand")
+            if not fix:
+                sections.append(("Resolved:", line))
+            elif as_is:
+                sections.insert(fix[0] + 1, ("Resolved:", line))
+            else:
+                sections[fix[0]] = ("Resolved:", line)
+            body_changed = True
+    elif action == "reopen":
+        said = _one_line("the reopen's why", why)
+        was = _value(header, "status")
+        header = _with(header, "Status", f"Open {day}: {said}" + (f" — was: {was}" if was and was.strip() else ""))
+        held = _value(header, "resolved")
+        if held is not None:
+            if _keyed(sections, "resolved"):
+                raise Refused("it has both a Resolved field and a **Resolved:** section — merge them by hand, then reopen")
+            header = _with(header, "Resolved", None)
+            sections.append(("Resolved:", f"**Resolved:** {held}".rstrip()))
+            body_changed = True
+    elif action == "renumber":
+        if not _is_id(new):
+            raise Refused(f"renumber needs the new TD-n, not {new!r}")
+        if _num(new) == _num(tid):
+            raise Refused(f"{tid} is numbered {_num(tid)} already — a renumber gives it another number")
+        tid = new
+    else:  # rename_ref
+        for x in (old, new):
+            if not _is_id(x, other_repo=True):
+                raise Refused(f"rename_ref names entry ids (TD-n or <repo>#TD-n), not {x!r}")
+        for key in ("blocked by", "part of"):
+            v = _value(header, key)
+            if v is not None:
+                header = [(n, _rename(x, old, new) if field_key(n) == key else x) for n, x in header]
+
+    if body_changed and any(re.search(r"\n[ \t]*\n", c.group(0)) for c in COMMENT_RE.finditer(body)):
+        raise Refused("an HTML comment in the body spans paragraphs, so a section's edit could land inside "
+                      "it — edit by hand")
+    new_body = "\n\n".join(t for _, t in sections) if body_changed else body
+    out = canonical(_render(tid, title, header, new_body))
+    want = (tid, title_read, {field_key(n): v for n, v in header},
+            [(_section_key(lead) if lead is not None else None, t) for lead, t in sections])
+    e = entries(out)[0]
+    got = (e["id"], e["title"], e["fields"],
+           [(_section_key(lead) if lead is not None else None, t) for lead, t in _entry_sections(_entry_parts(out)[2])])
+    if got != want:
+        raise Refused(f"after the {action} the entry would not read back as meant, with the rest unchanged — "
+                      "rephrase it, or edit by hand")
+    return out
 
 
 # ---------------------------------------------------------------------------------------------

@@ -162,7 +162,7 @@ async def test_count_gives_ids_in_a_row_and_the_record_keeps_who(home, gh, tmp_p
     got = await home.rpc_td_next(repo="shiftlead", count=3, caller="ao-w")
     assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-005", "TD-006", "TD-007"],
                    "unread": [], "reserved": True, "why": "", "warnings": [], "taken_by": None,
-                   "taken_by_line": None}  # fmt: skip
+                   "taken_by_line": None, "question": None}  # fmt: skip
     rec = json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]
     assert rec["last"] == 7 and [(g["id"], g["by"]) for g in rec["given"]] == [
         ("TD-005", "ao-w"), ("TD-006", "ao-w"), ("TD-007", "ao-w")
@@ -390,7 +390,7 @@ def test_the_cli_sends_a_symlinked_checkouts_registered_name(tmp_path, monkeypat
     assert json.loads(capsys.readouterr().out) == {"repo": "shiftlead", "ids": ["TD-001", "TD-002"],
                                                    "unread": ["open PR #3 not read: x"], "reserved": True,
                                                    "why": "", "warnings": [], "taken_by": None,
-                                                   "taken_by_line": None}  # fmt: skip
+                                                   "taken_by_line": None, "question": None}  # fmt: skip
 
 
 @pytest.mark.unit
@@ -508,10 +508,10 @@ def test_the_cli_sends_held_and_says_so_in_json(tmp_path, monkeypatch, capsys):
 
 
 def _stub(root: Path, rc: int = 0, ids=("TD-050",), why: str = "", unread=(), warnings=(), out=None, sleep=0.0,
-          where: str = "scripts", taken_by=None, branch: bool = False) -> Path:  # fmt: skip
+          where: str = "scripts", taken_by=None, branch: bool = False, err_last: str = "") -> Path:  # fmt: skip
     """A stand-in `ledger_next_id.py` in the checkout's working tree: it records its argv, cwd, race budget and
     pid (and a `sleep` child's, in its group) to `<root>.stub.json`, then prints `out` (the script's JSON by
-    default) and exits `rc`."""
+    default) and exits `rc`; `err_last`, where given, is its last line on standard error."""
     log = root.with_suffix(".stub.json")
     body = (
         out
@@ -531,7 +531,8 @@ def _stub(root: Path, rc: int = 0, ids=("TD-050",), why: str = "", unread=(), wa
         f"time.sleep({sleep!r})\n"
         f"print({body!r})\n"
         "print('stub stderr line', file=sys.stderr)\n"
-        f"sys.exit({rc})\n"
+        + (f"print({err_last!r}, file=sys.stderr)\n" if err_last else "")
+        + f"sys.exit({rc})\n"
     )
     return log
 
@@ -552,7 +553,7 @@ async def test_the_script_road_passes_the_floor_by_count_and_ledger_and_records_
     got = await home.rpc_td_next(repo="shiftlead", count=2, caller="ao-w")
     assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-041", "TD-042"], "unread": [],
                    "reserved": True, "why": "", "warnings": [], "taken_by": None,
-                   "taken_by_line": None}  # fmt: skip
+                   "taken_by_line": None, "question": None}  # fmt: skip
     seen = json.loads(log.read_text())
     assert seen["argv"] == ["--count", "2", "--by", "ao-w", "--floor", "40", "--ledger", LEDGER, "--archive", ARCHIVE,
                             "--json"]  # fmt: skip
@@ -800,6 +801,55 @@ async def test_the_homes_own_road_drops_the_branch_and_answers_both_null(home, g
     _one(tmp_path, gh)
     got = await home.rpc_td_next(repo="shiftlead", branch="td1089-td-next")
     assert got["ids"] == ["TD-003"] and (got["taken_by"], got["taken_by_line"]) == (None, None)
+
+
+# -- TD-1282: the filing question review-outcomes asks (§4.4 *Its answer*, *The filing question*) -----------------
+
+QUESTION = (
+    "ledger_next_id: if this entry is a defect, did a design miss it? then "
+    "`**Escaped from:** <design TD>` (cadence §2.13)"
+)
+
+
+@pytest.mark.integration
+async def test_the_scripts_filing_question_is_carried_only_when_it_ends_its_stderr(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    _stub(root, err_last=QUESTION)
+    assert (await home.rpc_td_next(repo="shiftlead"))["question"] == QUESTION
+    _stub(root, rc=3, ids=("TD-051",), why="no push rights", err_last=QUESTION)
+    assert (await home.rpc_td_next(repo="shiftlead"))["question"] == QUESTION, "the fallback asks it too"
+    _stub(root, ids=("TD-052",))  # review-outcomes off: the script asks nothing
+    assert (await home.rpc_td_next(repo="shiftlead"))["question"] is None
+    _stub(root, ids=("TD-053",), err_last="ledger_next_id: some other line")
+    assert (await home.rpc_td_next(repo="shiftlead"))["question"] is None
+
+
+@pytest.mark.integration
+async def test_the_homes_own_road_asks_no_question(home, gh, tmp_path):
+    _one(tmp_path, gh)
+    assert (await home.rpc_td_next(repo="shiftlead"))["question"] is None
+
+
+@pytest.mark.unit
+def test_the_cli_prints_the_question_after_the_ids_and_nothing_without_one(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    reply = {"repo": "shiftlead", "ids": ["TD-005"], "unread": [], "reserved": True, "why": "", "warnings": [],
+             "taken_by": None, "taken_by_line": None, "question": QUESTION}  # fmt: skip
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: reply)
+    monkeypatch.chdir(tmp_path)
+    for verb, ids in (("reserve", "reserved TD-005\n"), ("next", "TD-005\n")):
+        assert cli.main(["td", verb, "--repo", "ShiftLead/shiftlead"]) == 0
+        out, err = capsys.readouterr()
+        assert out == ids and err.strip().splitlines()[-1] == QUESTION, verb
+    assert cli.main(["--json", "td", "reserve", "--repo", "ShiftLead/shiftlead"]) == 0
+    assert json.loads(capsys.readouterr().out)["question"] == QUESTION
+    reply = {**reply, "question": None}
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead"]) == 0
+    assert "Escaped from" not in capsys.readouterr().err
+    del reply["question"]  # an older home answers no question
+    assert cli.main(["td", "reserve", "--repo", "ShiftLead/shiftlead"]) == 0
+    assert "Escaped from" not in capsys.readouterr().err
 
 
 FIELDS = "# Ledger\n\nFields: Owner = designer | grinder | paul\n\n## TD-001: one\n\nbody\n"
