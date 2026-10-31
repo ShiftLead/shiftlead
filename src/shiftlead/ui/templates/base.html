@@ -11,8 +11,10 @@
 <script>(function () { var t; try { t = JSON.parse(localStorage.getItem("ao.theme")); } catch (e) {} if (t !== "dark" && t !== "light") { try { t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } catch (e) { t = "dark"; } } document.documentElement.dataset.theme = t; })();</script>
 {#- design §4.5 screen 12 *Filters* (TD-829): the Queue's remembered picks are put in a bare `/queue`'s URL here,
     and the lists are held back (`data-qpend`) until `app.js` has applied them and the remembered window, so a
-    load never draws the server's *All* and *day* first. Three seconds on, they are shown whatever the script did. -#}
-<script>(function () { if (location.pathname !== "/queue") return; var d = document.documentElement, w, p; try { w = JSON.parse(localStorage.getItem("ao.qwin")); p = JSON.parse(localStorage.getItem("ao.qpicks")); } catch (e) {} if (w && w !== "day") d.dataset.qpend = "1"; if (!location.search && typeof p === "string" && p.charAt(0) === "?") { history.replaceState(null, "", "/queue" + p + location.hash); d.dataset.qpend = "1"; } if (d.dataset.qpend) setTimeout(function () { delete d.dataset.qpend; }, 3000); })();</script>
+    load never draws the server's *All* and *day* first. Three seconds on, they are shown whatever the script did.
+    A remembered pick the row no longer has (`repo`, `kind`, `filter=steering`, TD-1287) is dropped as it is
+    restored, and a memory left empty writes no URL. -#}
+<script>(function () { if (location.pathname !== "/queue") return; var d = document.documentElement, w, p; try { w = JSON.parse(localStorage.getItem("ao.qwin")); p = JSON.parse(localStorage.getItem("ao.qpicks")); } catch (e) {} if (w && w !== "day") d.dataset.qpend = "1"; if (!location.search && typeof p === "string" && p.charAt(0) === "?") { p = p.slice(1).split("&").filter(function (x) { var k = x.split("=")[0]; return x && k !== "repo" && k !== "kind" && x !== "filter=steering"; }).join("&"); if (p) { history.replaceState(null, "", "/queue?" + p + location.hash); d.dataset.qpend = "1"; } } if (d.dataset.qpend) setTimeout(function () { delete d.dataset.qpend; }, 3000); })();</script>
 <link rel="stylesheet" href="{{ static_url('app.css') }}">
 {#- design §4.5 *A tab's icon* (TD-1155): each page its own tile, Focus its state's, kept current by `AO.focusIcon` -#}
 {% set icon_name %}{% block icon %}page-sessions{% endblock %}{% endset %}

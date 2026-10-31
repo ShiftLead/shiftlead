@@ -4178,8 +4178,7 @@
   // §4.5a *Queue page: filters, find*; TD-829): `qPicks` is `queue_picks`, `qQuery` `picks_query`, `qWord` and
   // `qFinds` `_find_word` and `_finds`, `qRefs` the home's `refs`, and `qPass` the test `apply_picks` makes of a
   // card, a completed line or an *other work* line. A press answers with these and no request.
-  const Q_FILTERS = ["needs-you", "steering"];
-  const Q_KINDS = ["decide", "do", "held-person"];
+  const Q_FILTERS = ["needs-you"];
   AO.qRefs = (text) => {
     const seen = [];
     for (const m of String(text || "").matchAll(/(?<![\w-])(?:([\w.-]+)#)?TD-(\d+)\b/g)) {
@@ -4206,18 +4205,19 @@
     };
     const last = (k) => p.getAll(k).pop() || "";  // a repeated key reads as the server's does: the last
     const f = last("filter");
-    return { filter: Q_FILTERS.includes(f) ? f : "", team: many("team"), repo: many("repo"),
-      kind: many("kind").filter((k) => Q_KINDS.includes(k)), find: last("find").split(/\s+/).filter(Boolean).join(" ") };
+    // the old `repo` and `kind` picks and `filter=steering` read as not picked (TD-1287)
+    return { filter: Q_FILTERS.includes(f) ? f : "", team: many("team"), find: last("find").split(/\s+/).filter(Boolean).join(" ") };
   };
   AO.qQuery = (picks, change) => {
-    const p = { filter: picks.filter || "", team: [...(picks.team || [])], repo: [...(picks.repo || [])], kind: [...(picks.kind || [])], find: picks.find || "" };
+    const p = { filter: picks.filter || "", team: [...(picks.team || [])], find: picks.find || "" };
     Object.entries(change || {}).forEach(([k, v]) => {
-      if (k === "team" || k === "repo" || k === "kind") p[k] = p[k].includes(v) ? p[k].filter((x) => x !== v) : [...p[k], v];
+      if (k === "team" && Array.isArray(v)) p.team = [...v];  // a list replaces: `team: []` is **All**
+      else if (k === "team") p.team = p.team.includes(v) ? p.team.filter((x) => x !== v) : [...p.team, v];
       else if (k === "filter") p.filter = p.filter === v ? "" : v;
       else p[k] = v;
     });
     const parts = p.filter ? [`filter=${p.filter}`] : [];
-    ["team", "repo", "kind"].forEach((k) => { if (p[k].length) parts.push(`${k}=${encodeURIComponent(p[k].join(","))}`); });
+    if (p.team.length) parts.push(`team=${encodeURIComponent(p.team.join(","))}`);
     if (p.find) parts.push(`find=${encodeURIComponent(p.find)}`);
     return "/queue" + (parts.length ? "?" + parts.join("&") : "");
   };
@@ -4244,27 +4244,23 @@
   };
   AO.qCardRows = (card) => $$(".qhead[data-qid], .qrows > .qrow[data-qid]", card)
     .map((el) => ({ qid: el.dataset.qid, title: ($(".qtitle", el) || {}).textContent || "" }));
-  AO.qFiltered = (picks) => !!(picks.filter || picks.team.length || picks.repo.length || picks.kind.length || picks.find.split(/\s+/).filter(Boolean).length);
-  // `item`: {kind: "card" | "line" | "other", status, kinds, repos, find}; `teams`: a team's name → its repo
+  AO.qFiltered = (picks) => !!(picks.filter || picks.team.length || picks.find.split(/\s+/).filter(Boolean).length);
+  // `item`: {kind: "card" | "line" | "other", status, repos, find}; `teams`: a team's name → its repo, and a
+  // name no team holds is a repo — a repo chip's pick (TD-1287)
   AO.qPass = (item, picks, teams) => {
     let repos = null;
     if (picks.team.length) {
-      repos = new Set(picks.team.map((t) => (teams || {})[t] || "").filter(Boolean));
-      if (!repos.size) repos = new Set(["\0"]);  // a team with no repo holds no card
-    }
-    if (picks.repo.length) {
-      repos = repos ? new Set(picks.repo.filter((r) => repos.has(r))) : new Set(picks.repo);
+      const own = (t) => Object.prototype.hasOwnProperty.call(teams || {}, t);
+      repos = new Set(picks.team.map((t) => (own(t) ? teams[t] : t)).filter(Boolean));
       if (!repos.size) repos = new Set(["\0"]);
     }
     const words = picks.find.split(/\s+/).filter(Boolean).map(AO.qWord);
-    const statusPick = !!(picks.filter || picks.kind.length);
+    const statusPick = !!picks.filter;
     if (item.kind === "other") return !(statusPick || !!repos || words.length > 0);
     const byRepoFind = !(repos && !(item.repos || []).some((r) => repos.has(r))) && words.every((w) => AO.qFinds(w, item.find || ""));
     if (item.kind === "line") return !statusPick && byRepoFind;
     let ok = byRepoFind;
     if (picks.filter === "needs-you") ok = ok && item.status === "needs you";
-    else if (picks.filter === "steering") ok = ok && (item.status === "steer" || (item.kinds || []).includes("steering"));
-    if (picks.kind.length) ok = ok && picks.kind.some((k) => (item.kinds || []).includes(k));
     return ok;
   };
 
@@ -4336,13 +4332,13 @@
     let teams = {};
     try { teams = JSON.parse((filters && filters.dataset.teams) || "{}") || {}; } catch (err) { teams = {}; }
     const remember = () => store.set("qpicks", AO.qQuery({ ...picks, find: "" }).slice("/queue".length));
-    if (picks.filter || picks.team.length || picks.repo.length || picks.kind.length) remember();
+    if (picks.filter || picks.team.length) remember();
     // each card's find text, built once per card drawn: at load, and for the cards a re-read swaps in (TD-892)
     const finds = new WeakMap();
     const cardFind = (el) => { if (!finds.has(el)) finds.set(el, AO.qFindText(AO.qCardRows(el))); return finds.get(el); };
     function applyPicks() {
       const filtered = AO.qFiltered(picks);
-      const card = (el) => ({ kind: "card", status: el.dataset.status || "", kinds: (el.dataset.kinds || "").split(" ").filter(Boolean),
+      const card = (el) => ({ kind: "card", status: el.dataset.status || "",
         repos: (el.dataset.repos || "").split(" ").filter(Boolean), find: cardFind(el) });
       $$(".qgroup .qcard", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass(card(el), picks, teams)));
       $$(".qdline", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass({ kind: "line", repos: [el.dataset.repo || ""], find: el.dataset.find || "" }, picks, teams)));
@@ -4364,9 +4360,9 @@
       const miss = $("#qfindmiss", lists); if (miss) miss.hidden = (miss.dataset.for || "") !== picks.find;
       if (filters) $$("a.qf[data-k]", filters).forEach((a) => {
         const k = a.dataset.k, v = a.dataset.v;
-        const on = k === "all" ? !filtered : k === "filter" ? picks.filter === v : (picks[k] || []).includes(v);
-        a.setAttribute("aria-pressed", on ? "true" : "false");
-        a.setAttribute("href", k === "all" ? "/queue" : AO.qQuery(picks, { [k]: v }));
+        const on = k === "all" ? !picks.team.length : k === "filter" ? picks.filter === v : (picks[k] || []).includes(v);
+        a.setAttribute(k === "filter" ? "aria-checked" : "aria-pressed", on ? "true" : "false");  // the switch is checked
+        a.setAttribute("href", AO.qQuery(picks, k === "all" ? { team: [] } : { [k]: v }));
       });
     }
     function setPicks(next, push) {
@@ -4446,10 +4442,8 @@
       const f = e.target.closest("#qfilters a.qf[data-k]");
       if (f && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1)) {
         e.preventDefault();
-        if (f.dataset.k === "all") {
-          if (findbox) findbox.value = "";
-          setPicks(AO.qPicks(""), true); return store.set("qpicks", "");
-        }
+        // **All** clears the chips alone: the switch and the find keep their state (TD-1287)
+        if (f.dataset.k === "all") { setPicks({ ...picks, team: [] }, true); return remember(); }
         setPicks(AO.qPicks(AO.qQuery(picks, { [f.dataset.k]: f.dataset.v }).slice("/queue".length)), true);
         return remember();
       }
@@ -4475,12 +4469,14 @@
       const key = (e.key === "Enter" || e.key === " ") && e.target.matches;
       if (key && e.target.matches(".qghead")) { e.preventDefault(); return toggleGroup(e.target.closest(".qgroup")); }
       const head = key && e.target.matches(".qdline.opens > .qdhead");
-      if (head) { e.preventDefault(); openLine(e.target.parentElement); }
+      if (head) { e.preventDefault(); return openLine(e.target.parentElement); }
+      // Space toggles the Needs you switch as Enter does (a link answers Enter alone; TD-1287)
+      if (e.key === " " && e.target.matches && e.target.matches("#qfilters .qswitch")) { e.preventDefault(); e.target.click(); }
     });
     window.addEventListener("hashchange", showHash);
     window.addEventListener("popstate", () => {
       picks = AO.qPicks(location.search); if (findbox) findbox.value = picks.find;
-      if (picks.filter || picks.team.length || picks.repo.length || picks.kind.length) remember(); else store.set("qpicks", "");
+      if (picks.filter || picks.team.length) remember(); else store.set("qpicks", "");
       apply();
     });
     let typing = null;

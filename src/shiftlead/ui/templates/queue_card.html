@@ -17,7 +17,7 @@
 {% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
 {%- set w = c.wants or {} %}{% set n = w.n or {} %}
 {%- set body = c.rows or w.read or w.held %}
-<div class="qcard edge-{{ c.edge or 'ended' }} g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if n.decide or n.do %} wants{% endif %}{% if body %} hasrows{% endif %}{% if c.off %} qoff{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %} data-status="{{ c.status or '' }}" data-kinds="{{ (c.kinds or []) | join(' ') }}" data-repos="{{ (c.repos or []) | join(' ') }}">
+<div class="qcard edge-{{ c.edge or 'ended' }} g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if n.decide or n.do %} wants{% endif %}{% if body %} hasrows{% endif %}{% if c.off %} qoff{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %} data-status="{{ c.status or '' }}" data-repos="{{ (c.repos or []) | join(' ') }}">
   <div class="qhead"{% if t.anchor %} id="{{ t.anchor }}"{% endif %} data-qid="{{ t.qid }}"{% if body %} role="button" tabindex="0" aria-expanded="true" title="fold or open the card"{% endif %}>
     <span class="qgrip"{% if up %} draggable="true" title="drag to move it in the order"{% endif %}>{% if up %}⋮⋮{% endif %}</span>
     {%- set mine = (c.places or []) | selectattr('repo', 'equalto', repo) | list if repo else [] %}

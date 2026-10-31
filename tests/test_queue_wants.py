@@ -91,7 +91,7 @@ def test_a_held_entry_is_no_want_and_draws_the_held_row():
     v = queue_view(queue(), NOW, got)
     two = v["up_next"][1]
     assert two["status"] == "ready" and two["wants"]["n"] == {"decide": 0, "do": 0, "read": 0}
-    assert len(two["wants"]["held"]) == 1 and two["kinds"] == []
+    assert len(two["wants"]["held"]) == 1
     assert drawn[0]["kind"] == "ledger · held" and drawn[0]["claimed"] and drawn[0]["answers"] == []
 
 

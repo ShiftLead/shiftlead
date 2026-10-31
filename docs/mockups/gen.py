@@ -2134,10 +2134,11 @@ def queue_page():
              moves + '<span class="meta" style="font-size: 12px;">after contractmatch#TD-055</span>' + word("blocked", "#9ca3af")),
     ])
     filters = ('<div style="display: flex; gap: 6px 8px; flex-wrap: wrap; align-items: center; margin-top: 10px;">'
-               + chip("All", True) + chip("Needs you (2)")
-               + '<span class="meta" style="font-size: 12px;"><a href="#">+ 1 in the Inbox</a></span>'
-               + chip("Steering") + chip("ao-grind") + '<span class="meta" style="font-size: 12px; margin-left: 6px;">kind</span>'
-               + "".join(chip(k) for k in ("questions", "steering", "board lines", "yours to do", "held until", "held (person)"))
+               # TD-1287: the teams (a chip per team, then per repo no team services, muted), the switch apart, the find
+               + '<span class="meta" style="font-size: 12px;">teams</span>'
+               + chip("All", True) + chip("ao-grind") + chip("design") + chip('<i style="color: #8a94a3;" title="no team services this repo">ledgerboard</i>')
+               + '<span style="margin-left: 14px; font-size: 12px;" title="only the cards that need you — it narrows the teams picked, it picks none; '
+                 'the completed lines are hidden while it is on">☐ Needs you (2)</span>'
                + '<span style="flex: 1;"></span><span style="border: 1px solid #d0d5dc; border-radius: 4px; padding: 3px 8px; min-width: 16em; '
                  'font-size: 12px; color: #8a94a3; background: #fff;">find an id or a title</span></div>')
     note = ('<div class="note" style="margin-top: 18px;">Design notes, not page text. The top bar\'s one number stays the Inbox\'s (it counts the '

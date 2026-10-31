@@ -1,20 +1,20 @@
-{# The filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): each a toggle carried in the
-   URL; what it hides is marked `qoff`, never dropped, so a move's neighbours stay the whole Up next order. A
-   press answers in the browser (TD-829): `app.js` reads each link's `data-k`/`data-v` and the cards' `data-`
-   attributes, and the `href` stays for a page without its script. It
+{# The filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*; TD-1287): the team chips, the
+   **Needs you** switch and the find box, each carried in the URL; what they hide is marked `qoff`, never
+   dropped, so a move's neighbours stay the whole Up next order. A press answers in the browser (TD-829):
+   `app.js` reads each link's `data-k`/`data-v` and the cards' `data-` attributes, and the `href` stays for a
+   page without its script. A repo chip is a `team` pick naming no team, read as the repo on both sides. It
    stands outside the lists the page re-reads, so words typed in the find box and its focus survive a re-read;
    its number is copied from the lists' `#qcounts` #}
 {% set fp = picks.filter %}
 <div class="qfilters" id="qfilters" role="group" aria-label="filters" data-teams='{{ team_repos | tojson }}'>
-  <a class="qf" data-k="all" href="/queue" aria-pressed="{{ 'false' if q.filtered else 'true' }}">All</a>
-  <a class="qf" id="qfneeds" data-k="filter" data-v="needs-you" href="{{ pq(picks, filter='needs-you') }}" aria-pressed="{{ 'true' if fp == 'needs-you' else 'false' }}" title="cards whose status is needs you, in rank order">Needs you (<span id="qfneedsn">{{ q.n.needs_you }}</span>)</a>
-  <a class="qf" data-k="filter" data-v="steering" href="{{ pq(picks, filter='steering') }}" aria-pressed="{{ 'true' if fp == 'steering' else 'false' }}" title="cards with a steer running">Steering</a>
-  {% for t in teams %}<a class="qf qfteam" data-k="team" data-v="{{ t }}" href="{{ pq(picks, team=t) }}" aria-pressed="{{ 'true' if t in picks.team else 'false' }}" title="the cards of {{ t }}'s repo">{{ t }}</a>{% endfor %}
-  {% if q.repos | length > 1 %}{% for r in q.repos %}<a class="qf" data-k="repo" data-v="{{ r }}" href="{{ pq(picks, repo=r) }}" aria-pressed="{{ 'true' if r in picks.repo else 'false' }}" title="the cards of {{ r }}">{{ r }}</a>{% endfor %}{% endif %}
-  <span class="qkinds"><span class="qsub">kind</span>{% for k, label in kinds.items() %}<a class="qf" data-k="kind" data-v="{{ k }}" href="{{ pq(picks, kind=k) }}" aria-pressed="{{ 'true' if k in picks.kind else 'false' }}">{{ label }}</a>{% endfor %}</span>
+  <span class="qsub">teams</span>
+  <a class="qf" data-k="all" href="{{ pq(picks, team=[]) }}" aria-pressed="{{ 'false' if picks.team else 'true' }}">All</a>
+  {% for t in chips.team %}<a class="qf qfteam" data-k="team" data-v="{{ t }}" href="{{ pq(picks, team=t) }}" aria-pressed="{{ 'true' if t in picks.team else 'false' }}" title="the cards of {{ t }}'s repo">{{ t }}</a>{% endfor %}
+  {% for r in chips.repo %}<a class="qf qfrepo" data-k="team" data-v="{{ r }}" href="{{ pq(picks, team=r) }}" aria-pressed="{{ 'true' if r in picks.team else 'false' }}" title="no team services this repo">{{ r }}</a>{% endfor %}
+  <a class="qf qswitch" id="qfneeds" role="switch" data-k="filter" data-v="needs-you" href="{{ pq(picks, filter='needs-you') }}" aria-checked="{{ 'true' if fp == 'needs-you' else 'false' }}" title="only the cards that need you — it narrows the teams picked, it picks none; the completed lines are hidden while it is on">Needs you (<span id="qfneedsn">{{ q.n.needs_you }}</span>)</a>
   <form class="qfind" method="get" action="/queue" role="search">
     {% if fp %}<input type="hidden" name="filter" value="{{ fp }}">{% endif %}
-    {% for k in ('team', 'repo', 'kind') %}{% if picks[k] %}<input type="hidden" name="{{ k }}" value="{{ picks[k] | join(',') }}">{% endif %}{% endfor %}
+    {% if picks.team %}<input type="hidden" name="team" value="{{ picks.team | join(',') }}">{% endif %}
     <input type="search" name="find" id="qfindbox" value="{{ picks.find }}" placeholder="find an id or a title" aria-label="find an id or words of a title">
   </form>
 </div>
