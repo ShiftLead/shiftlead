@@ -544,7 +544,10 @@ def red_prs(
 
     A draft (the reading's `draft`) that `is_sync_order` does not order is no order and no note, however
     long it is red (design §4.4 *A draft is no work order*, TD-745); its spell's memory is kept, so a PR
-    marked ready red past `after` is an order at once and a holder told before the draft is not told again."""
+    marked ready red past `after` is an order at once and a holder told before the draft is not told again.
+
+    A fork's PR (the reading's `fork`) is no order and no note either (design §4.4 *A fork's PR is no work
+    order*, TD-1285): its fix is its author's, and running its code here is the person's call."""
     orders: list[dict[str, Any]] = []
     kept: dict[str, dict[str, str]] = {}
     notes: list[tuple[str, dict[str, Any]]] = []
@@ -568,6 +571,8 @@ def red_prs(
             kept[key] = was  # this red spell's memory stays while it lasts
         if pr.get("draft") and not sync:
             continue  # a draft is no order and no note, its memory kept for when it is ready (TD-745)
+        if pr.get("fork") and not sync:
+            continue  # a fork's PR is no order and no note: its precheck is the person's (TD-1285)
         holders = [r for r in records if holds_pr(r, pr)]
         if not holders and sync:
             orders.append(pr_order(pr))

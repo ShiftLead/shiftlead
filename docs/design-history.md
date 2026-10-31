@@ -366,6 +366,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-04 (TD-283 part 2 slice 2, grinder-ao-2): the page is built. `/api/entry/session` hands `entry.md`'s filled lines to `create` as `start_context`, and answers the person's words alone as the composer's text. `entry.md`'s first line says *their first message is their words for it*, where it said *their words follow these lines*. Focus draws **Told at start** above Session, its heading the count of non-blank lines.
 
 ## 4.4 Host agent
+- 2026-10-31 (TD-1285 slice 1, grinder-ao-2; Paul, 2026-10-30, the same decision as agent-cadence TD-192): *A fork's PR is no work order* — no `pr:<n>` order, no note, no Inbox row for a PR whose reading carries `fork`; `ci.yml` runs on a fork's PR in the forge's sandbox, and its precheck is the person's, with `--fork-ok`, once that is green. The person's view of that line is the entry's next slice.
 - 2026-10-31 (TD-1282, grinder-ao-2; agent-cadence TD-204's ShiftLead build 3): *Its answer* gains *The filing question* — where a repo sets `review-outcomes` on, the id script ends its standard error with the question whether a design missed the entry, and `ao td reserve`, which pipes that stream, now carries the line as `question` and reprints it after the ids. The home passes the script's own line through rather than reading the key itself, so the script stays the key's one reader. The same PR bumps the pin to agent-cadence 3739b0c and vendors ledgerboard v2.2, which makes `Escaped from:` a format field.
 - 2026-10-29 (TD-1239's review, round 5, Fable, NO FINDINGS): the loop closes, Sonnet READY in round 4 and Fable with nothing in round 5.
 - 2026-10-29 (TD-1239's review, round 4, Sonnet, READY, 0 findings): verified the `pushurl` case in scratch repos (fetch ignores it; the worktree's push fails with no `remote: error:` or `! [` line) and the hook's output under `git push -q`.
@@ -1329,6 +1330,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-31 (TD-1285 slice 1, grinder-ao-2): `ao pr wait` judges a fork's PR on the forge's checks alone and says no precheck line for it.
 - 2026-10-28 (TD-1200's review, round 4, Sonnet, READY): the loop ends — Sonnet READY, and Fable's round 3 a follow-on only.
 - 2026-10-28 (TD-1200's review, round 3, Fable, 1 finding, a follow-on of round 2, adopted): §4.7's `--json` keys and TD-1201's help line name `held`, true with `--held`.
 - 2026-10-28 (TD-1200's review, round 2, Sonnet, 6 findings, all adopted): the alias's standard-error line is said with `--json` or without, after the other lines, never on a refusal, and its `--json` output is `reserve`'s; the RPC and functions keep `td_next`; the alias goes once nothing but its own §4.7 sentences names it, the ledger's entries not counted; TD-1201 names `test_sweep_seat.py`'s brief assertion and quotes the `--json` keys.
@@ -1468,6 +1470,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-03 (TD-292 slice 2, grinder-ao-1): `ao msg --shot` built. A path to a file in the sender's checkout is sent repo-relative (`$PWD/docs/mockups/reviews/x.png` and the repo-relative form send the same), since the page reads the file on origin's default; any other path goes as typed and the host agent refuses its shape.
 
 ## 4.8 Capabilities, report channels, and role presets
+- 2026-10-31 (TD-1285 slice 1, grinder-ao-2): a `done` or an `ask` naming a fork's PR is not asked for `cadence/precheck` and is never told its line.
 - 2026-10-30 (TD-1066, the designer): the `thread` read is person-only but for an own end (`mail.own_end`, whatever its controllers), which reads the mail item it was started on from a Queue card (§4.5 screen 12 *Start session*).
 - 2026-10-29 (TD-1119's review, round 9, Fable, 0 findings): the loop closes — Sonnet READY in round 8, Fable with no finding on rounds 7–8.
 - 2026-10-29 (TD-1119's review, round 8, Sonnet, READY, 1 finding, adopted): TD-1226 keys on the record's `seat.trigger`, not a top-level `trigger`.

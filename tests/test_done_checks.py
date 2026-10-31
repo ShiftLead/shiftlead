@@ -312,6 +312,21 @@ async def test_where_the_repo_sets_precheck_a_head_without_it_refuses_the_done_w
         await w.call("progress", id=sid, ref="TD-3", status="done", pr=843, slice=True)
 
 
+async def test_a_forks_pr_is_judged_on_the_forges_ci_and_never_given_the_precheck_line(worker):
+    """TD-1285: where the repo sets `precheck`, a fork's PR is not asked for `cadence/precheck` and its
+    `done` is never told the line — running a fork's code here is the person's call, after its CI."""
+    w, sid, rec, views = worker
+    await w.call("progress", id=sid, ref="TD-1")
+    views[PRECHECK] = ("pdm run test", None)
+    views[842] = {**_view(_run("test", "IN_PROGRESS", "")), "isCrossRepository": True}
+    with pytest.raises(AgentError) as e:
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert "still running on 9c1e0f2: test" in str(e.value) and "precheck" not in str(e.value)
+    views[842] = {**_view(_run("test")), "isCrossRepository": True}
+    got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert got["checks_said"] == "PR #842: checks green on 9c1e0f2"
+
+
 async def test_a_cadence_toml_not_read_is_no_precheck_and_the_fold_runs_as_before(worker):
     """A rev that is not there, or a read that timed out, is not *unknown* (TD-1036): only a file that
     does not parse is."""
