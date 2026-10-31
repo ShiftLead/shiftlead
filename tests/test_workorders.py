@@ -493,6 +493,18 @@ def test_a_red_draft_is_no_order_held_or_not_and_an_order_once_ready():
 
 
 @pytest.mark.unit
+def test_a_red_forks_pr_is_no_order_and_no_note_held_or_not():
+    """TD-1285, design §4.4 *A fork's PR is no work order*: a stranger's code is never handed to a
+    session to run, so a fork's PR red past the bound is no order, and its idle holder is not told."""
+    fork = _red(fork=True)
+    assert workorders.red_prs([fork], [], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+    holder = _rec(git={"branch": "b1573"})
+    assert workorders.red_prs([fork], [holder], T0 + HOUR, {}, HOUR) == ([], {}, [])
+    assert workorders.red_prs([fork], [holder], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+    assert [o["id"] for o in workorders.red_prs([_red(fork=False)], [], T0 + 3 * HOUR, {}, HOUR)[0]] == ["pr:1573"]
+
+
+@pytest.mark.unit
 def test_a_holder_told_before_a_draft_is_not_told_again_once_it_is_ready():
     """The memory of an earlier non-draft spell survives the draft (TD-745): readied within `after` of the
     tell, no second note and no order yet; readied past it, an order at once and still no second note."""

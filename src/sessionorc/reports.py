@@ -304,6 +304,8 @@ def prechecked(rollup: Any) -> bool:
     return any(isinstance(c, dict) and c.get("context") == PRECHECK_CONTEXT for c in rollup or [])
 
 
+# what a `done` reads of one PR (TD-637); `isCrossRepository`, whether it is a fork's (TD-1285)
+PR_VIEW_FIELDS = "state,mergedAt,headRefOid,baseRefName,statusCheckRollup,isCrossRepository"
 OPEN_PR_FIELDS = (
     f"{PR_FIELDS},statusCheckRollup,mergeStateStatus,baseRefName,isCrossRepository"  # the open read alone (TD-613)
 )
@@ -606,7 +608,7 @@ def pr_view(directory: Path | str, pr: int, timeout: float = 30.0) -> dict[str, 
     """`gh pr view <pr>` with the fields `at_done` reads, or why it could not be read (TD-637)."""
     try:
         cp = subprocess.run(
-            ["gh", "pr", "view", str(pr), "--json", "state,mergedAt,headRefOid,baseRefName,statusCheckRollup"],
+            ["gh", "pr", "view", str(pr), "--json", PR_VIEW_FIELDS],
             capture_output=True, text=True, timeout=timeout, cwd=str(directory),
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired) as e:

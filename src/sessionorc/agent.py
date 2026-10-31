@@ -1047,7 +1047,7 @@ class HostAgent(
                     break
                 ours = got is not None and str(got.get("head") or "").lower().startswith(want_head)
                 if ours and (word := reports.pr_wait_word(got)) != "pending":
-                    if word == "green" and line and got.get("prechecked") is False:
+                    if word == "green" and line and got.get("prechecked") is False and not got.get("fork"):
                         word = "none"  # nothing else will check it (§4.7, TD-1036)
                     break
             if loop.time() >= deadline:
@@ -1055,6 +1055,7 @@ class HostAgent(
                 break
             await asyncio.sleep(min(self.PR_WAIT_STEP, max(deadline - loop.time(), 0.0)))
         row = row or {}
+        fork = bool(row.get("fork"))
         return {
             "pr": int(pr),
             "word": word,
@@ -1068,7 +1069,8 @@ class HostAgent(
             # the last read failed (`gh` offline, a lapsed token): the reading is the one before it
             "read_error": str(prs.get("error") or "") or None,
             # the line to run where the repo sets `precheck` and the head carries none (TD-1036)
-            "precheck": line if word == "none" and row.get("prechecked") is not True else None,
+            # never for a fork's PR, judged on the forge's CI alone: its precheck is the person's (TD-1285)
+            "precheck": line if word == "none" and row.get("prechecked") is not True and not fork else None,
         }
 
     async def rpc_queue(self, omit: list[str] | None = None) -> dict[str, Any]:
@@ -3516,7 +3518,9 @@ class HostAgent(
         if isinstance(view, str):
             return {"word": "unknown", "why": view}
         line, why = None, None
-        if str(view.get("state") or "").upper() == "OPEN" and not view.get("mergedAt"):
+        # a fork's PR is gated on the forge's CI alone: its precheck is the person's (TD-1285)
+        open_ = str(view.get("state") or "").upper() == "OPEN" and not view.get("mergedAt")
+        if open_ and not view.get("isCrossRepository"):
             line, why = await asyncio.to_thread(self._precheck_line, root, pr)
         if why:  # the PR read open: a slice on it is refused still (TD-1036)
             return {"word": "unknown", "why": why, "open": True}

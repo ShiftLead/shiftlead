@@ -1,13 +1,21 @@
 name: ci
 
-# Run by hand only (TD-1035): Actions stopped on the shared account (TD-1033), and PRs and main are
-# gated on the local `precheck` in docs/cadence.toml instead. The matrix still keeps the 3.12 floor.
+# PRs and main are gated on the local `precheck` in docs/cadence.toml (TD-1033, TD-1035). This workflow
+# runs on a PR from a fork, and by hand (TD-1285, as agent-cadence TD-192): a fork's PR gets lint and the
+# suite in GitHub's sandbox before anyone runs its code on a machine, and its precheck is the person's
+# (`precheck.py --pr N --fork-ok`) once this is green. A PR from this repo skips the job: the precheck
+# runs the same suite, and with no required check, a second run would gate it anyway. It is not a
+# required check. The matrix still keeps the 3.12 floor.
 on:
+  pull_request:
   workflow_dispatch:
 
 jobs:
   test:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     # The suite takes under two minutes. Without this a hung test holds the job for GitHub's six
     # hours and a PR with it (TD-063: test (3.12) sat in the Test step for 26 min on 2026-09-17).
     timeout-minutes: 15
