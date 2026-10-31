@@ -935,6 +935,52 @@ async def test_a_task_stop_ends_the_stopped_subagents_permission(agent, hookstub
         assert rec["state"] != "needs-you" and rec["subagents"] == 1  # accepted: no id to match
 
 
+async def test_a_task_stop_drops_the_stopped_subagents_open_calls(agent, hookstub, tmp_path):
+    """TD-1288: a `TaskStop` of a subagent drops its thread's open calls, so a later permission from that id
+    with the same `call_sig` is matched to no call of the stopped run; another thread's calls stay."""
+    bash = {"tool_name": "Bash", "tool_input": {"command": "ls"}}
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="o", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        for a in ("a1", "a2"):
+            await _hook(sid, hook_event_name="SubagentStart", agent_id=a)
+            await _hook(sid, hook_event_name="PreToolUse", agent_id=a, tool_use_id=f"toolu_{a}", **bash)
+        sig = call_sig(bash)
+        assert agent._open_calls[sid]["a1"] == [("toolu_a1", sig)]
+        await _hook(sid, **_task_stop("a1"))
+        assert "a1" not in agent._open_calls[sid] and agent._take_call(sid, "a1", sig) is None
+        assert agent._take_call(sid, "a2", sig) == "toolu_a2"
+
+
+async def test_a_queued_task_stop_still_ends_the_stopped_subagents_prompt(agent, hookstub, tmp_path):
+    """TD-1288: a `TaskStop` drained from the offline queue (`queued`, older than the live state) still ends
+    the stopped subagent's waiter and entry — the end runs before the `queued` gate, whatever its age."""
+    ask = {"hook_event_name": "PermissionRequest", "tool_name": "Bash", "tool_input": {"command": "ls"}}
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="u", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        for a in ("a1", "a2"):  # a2 stays counted, so no zero branch ends a1's prompt in the stop's place
+            await _hook(sid, hook_event_name="SubagentStart", agent_id=a)
+        task = await _feed(agent, c, sid, [translate({**ask, "agent_id": "a1"})], wait=60)
+        assert (await c.call("get", id=sid))["pending"]["subagent"] == "a1"
+        agent._apply_event(sid, {**translate(_task_stop("a1")), "at": 0.0}, queued=True)
+        assert await asyncio.wait_for(task, 5) is None and not agent._permission_waiting(sid)
+        rec = await c.call("get", id=sid)
+        assert rec["state"] != "needs-you" and not rec.get("pendings") and rec["subagent_ids"] == ["a2"]
+
+
+async def test_a_task_stop_that_ends_an_entry_is_a_sure_end(agent, hookstub, tmp_path):
+    """TD-1288: the entry a `TaskStop` ends is a sure end (`_sure_end`), so the tool's late
+    `permission_prompt` notice for the dialog it closed is dropped rather than read as a new prompt."""
+    q = {"questions": [{"question": "Which one?", "options": [{"label": "x"}, {"label": "y"}]}]}
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="e", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await _hook(sid, hook_event_name="SubagentStart", agent_id="a1")
+        await _hook(sid, hook_event_name="PreToolUse", tool_name="AskUserQuestion", tool_input=q, agent_id="a1")
+        assert (await c.call("get", id=sid))["state"] == "needs-you"
+        agent._sure_end.pop(sid, None)
+        await _hook(sid, **_task_stop("a1"))
+        assert sid in agent._sure_end and agent._notice_dropped(agent.sessions[sid])
+
+
 def test_a_process_exit_forgets_the_subagent_ids(tmp_path):
     """TD-961: no subagent outlives its process, so an exit clears `subagent_ids` with the count."""
     s = Session(id="ao-x", name="x", kind="interactive", adapter="hookstub", dir=str(tmp_path))
