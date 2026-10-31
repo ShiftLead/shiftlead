@@ -414,7 +414,7 @@ def reading(
     def row(q: str) -> dict[str, Any]:
         if q in open_:
             e = open_[q]
-            st, needs = _state(e, held.get(q, []), prs.get(q), recs, set(waiting), now)
+            st, needs, mine = _state(e, held.get(q, []), prs.get(q), recs, set(waiting), now)
             claim = held.get(q)
             return {
                 "qid": q,
@@ -425,7 +425,9 @@ def reading(
                 "state": st,
                 "needs": needs,
                 "pr": (prs.get(q) or {}).get("number"),
-                "holder": _holder(claim[0][0]) if claim else None,
+                # the person's own session holding their entry is its holder whatever else claims it (TD-1281)
+                "holder": mine or (_holder(claim[0][0]) if claim else None),
+                "with_you": mine["name"] if mine else None,
                 "held": _held(e.get("held"), pressers),  # {at, by, why?, words?} (TD-905, TD-1127)
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
@@ -450,6 +452,7 @@ def reading(
             "needs": None,
             "pr": pr,
             "holder": None,
+            "with_you": None,
             "held": None,
             "page": "",
             "after": [],
@@ -502,39 +505,60 @@ def _state(
     recs: list[Any],
     waiting: set[str],
     now: datetime,
-) -> tuple[str, str | None]:
-    """A row's one state word, the first that applies (§4.4 *A row's state*), and what it needs of the
-    person — `owner` (`Owner: paul`) or `decision` (`decision (paul)`) — when it waits on them, which
-    draws no word."""
+) -> tuple[str, str | None, dict[str, Any] | None]:
+    """A row's one state word, the first that applies (§4.4 *A row's state*), what it needs of the person —
+    `owner` (`Owner: paul`) or `decision` (`decision (paul)`) — when it waits on them, which draws no word, and
+    the person's own session where one holds such an entry: the first by id of its claims' records with
+    `unattended: false`, whose name the word *with you in <name>* carries (TD-1281). The row keeps its need."""
     if e.get("held"):
-        return "held (person)", None
-    if str(e.get("owner") or "").lower() == PERSON:
-        return "", "owner"
-    if ledger_mod.decided_by(dict(e), PERSON):
-        return "", "decision"
+        return "held (person)", None, None
+    need = (
+        "owner"
+        if str(e.get("owner") or "").lower() == PERSON
+        else "decision"
+        if ledger_mod.decided_by(dict(e), PERSON)
+        else None
+    )
+    if need:
+        own = sorted((rec for rec, _ in claims if not getattr(rec, "unattended", False)), key=lambda r: str(r.id))
+        if own:
+            return f"with you in {own[0].name}", need, _holder(own[0])
+        return "", need, None
+    return _state_word(e, claims, pr, recs, waiting, now), None, None
+
+
+def _state_word(
+    e: Mapping[str, Any],
+    claims: list[tuple[Any, Any]],
+    pr: Mapping[str, Any] | None,
+    recs: list[Any],
+    waiting: set[str],
+    now: datetime,
+) -> str:
+    """The state word of a row that needs nothing of the person, the first that applies (§4.4)."""
     red = pr is not None and (pr.get("conflicting") or pr.get("checks") == "red" or pr.get("failing"))
     if any(_holder_stuck(rec, waiting, now) for rec, _ in claims):
-        return "stalled", None
+        return "stalled"
     if red and not claims:
         since = _when(pr.get("red_since"))
         if since and now - since >= QUEUE_STALL_AFTER and not any(workorders.holds_pr(r, dict(pr)) for r in recs):
-            return "stalled", None
+            return "stalled"
     if red:
         word = f"#{pr['number']} conflicting" if pr.get("conflicting") else f"#{pr['number']} failing"
-        return word + (" · being fixed" if claims else ""), None
+        return word + (" · being fixed" if claims else "")
     if pr is not None:
-        return f"in review #{pr['number']}", None
+        return f"in review #{pr['number']}"
     if claims:
-        return f"held by {claims[0][0].name}", None
+        return f"held by {claims[0][0].name}"
     if e.get("settling"):
-        return "settling", None
+        return "settling"
     w = e.get("waiting")
     if isinstance(w, Mapping):
-        return (f"waits until {w.get('until')}" if w.get("on") == "until" else "waits on an event"), None
+        return f"waits until {w.get('until')}" if w.get("on") == "until" else "waits on an event"
     opened = [b for b in e.get("blocked_by") or [] if re.fullmatch(r"(?:[\w./-]+#)?TD-\d+", b)]
     if opened or e.get("parts_open"):  # an open blocker or an open part; the row's `after` names the blockers
-        return "waiting", None
-    return "ready", None
+        return "waiting"
+    return "ready"
 
 
 def _card(
@@ -652,7 +676,8 @@ def _start(members: list[str], open_: Mapping[str, Mapping[str, Any]], keyed: Ma
 def card_entries(card: Mapping[str, Any]) -> tuple[list[str], list[str]]:
     """A card's open entries as **Start session**'s prompt names them (§4.5 screen 12 *Three verbs: Start
     session*, TD-912): *waits on me*, its Decide and Do ledger entries (a row whose `needs` is set; a held one
-    is no want), and *the rest*, every other open member — each a `<repo>#TD-n`, in key order."""
+    is no want, and a `needs` row with `with_you` is no want though it is listed here, TD-1281), and *the
+    rest*, every other open member — each a `<repo>#TD-n`, in key order."""
     rows = [r for r in [card.get("top"), *(card.get("rows") or [])] if isinstance(r, Mapping) and not r.get("archived")]
     rows.sort(key=lambda r: _key_sort(str(r.get("key") or ""), str(r.get("qid") or "")))
     mine = [str(r["qid"]) for r in rows if r.get("needs")]
@@ -663,8 +688,9 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
     """The ledger's part of a card's status (§4.4 *The card's status*): *needs you* > *stalled* > *held
     (person)* > *blocked* > *waiting* > *ready*; *steer*, and a question's *needs you*, are the mail's. A
     *held (person)* row is no need (TD-918): the card reads *held (person)* when at least one open member is
-    held and every other one waits by this function's own test, or there is no other."""
-    if any(r["needs"] for r in rows):
+    held and every other one waits by this function's own test, or there is no other. Nor is a row the
+    person's own session holds (`with_you`, TD-1281), which keeps its `needs`."""
+    if any(r["needs"] and not r.get("with_you") for r in rows):
         return "needs you"
     if any(r["state"] == "stalled" for r in rows):
         return "stalled"

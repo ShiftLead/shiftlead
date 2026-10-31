@@ -7,7 +7,7 @@
 
 {% macro needs_word(r) %}{% if r.needs == 'owner' %}yours to do{% elif r.needs == 'decision' %}your decision{% endif %}{% endmacro %}
 
-{% macro state(r) %}{% if r.needs %}<span class="qstate needs">{{ needs_word(r) }}</span>{% elif r.state %}<span class="qstate s-{{ r.state.split(' ')[0] | replace('#', 'pr') }}{% if r.archived %} done{% endif %}"{% if r.state == 'held (person)' and r.held and r.held.words %} title="held by {{ r.held.words }}"{% endif %}>{{ r.state }}{% if r.state == 'held (person)' and r.held and r.held.why %} — {{ r.held.why }}{% endif %}</span>{% endif %}{% endmacro %}
+{% macro state(r) %}{% if r.with_you %}<span class="qstate s-with">{{ r.state }}</span>{% elif r.needs %}<span class="qstate needs">{{ needs_word(r) }}</span>{% elif r.state %}<span class="qstate s-{{ r.state.split(' ')[0] | replace('#', 'pr') }}{% if r.archived %} done{% endif %}"{% if r.state == 'held (person)' and r.held and r.held.words %} title="held by {{ r.held.words }}"{% endif %}>{{ r.state }}{% if r.state == 'held (person)' and r.held and r.held.why %} — {{ r.held.why }}{% endif %}</span>{% endif %}{% endmacro %}
 
 {# the row's controls, defined once (design §4.5 screen 12 *any open row*, §4.5a *Queue card: what needs the
    person*; TD-900, built by TD-905): drawn on a Queue card's open rows and imported by the Inbox's ledger row, so
@@ -96,6 +96,10 @@
 
 {# the entries on a card the person holds: no want while held (§4.5 screen 12 *Three wants*) — the held row,
    *held (person) — <why>* with **Release**, uncounted and not amber #}
+{# an entry the person's own session holds (§4.5 screen 12 *Three wants*, TD-1281): no want, grey, after Decide and Do
+   in the header, in no count; each item's line and foot say *with you in <name>* #}
+{% macro with_you(c) %}{% set ms = (c.wants or {}).get('with_you') or [] %}{% if ms %}<div class="qsec qwith" data-sec="with_you">{{ items(ms) }}</div>{% endif %}{% endmacro %}
+
 {% macro held(c) %}{% set ms = (c.wants or {}).get('held') or [] %}{% if ms %}<div class="qsec qheld" data-sec="held">{{ items(ms) }}</div>{% endif %}{% endmacro %}
 
 {# the card's pill (§4.5 screen 12 *A card*): its Decide and Do counts, amber, in every group where it has one #}
@@ -114,10 +118,10 @@
    left edge in its branch's colour, `r.rails` one per level, its ancestors' then its own, "" where a level is a
    loose row's and draws none; a parent's parts meter beside its word #}
 {% macro row(r, repo='') %}
-  <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
+  <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs and not r.with_you %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
     {%- for b in r.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}
     <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}</span>
-    <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r) }}{{ afters(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
+    <span class="qright">{{ extras(r.ext, repo) }}{{ meter(r.meter) }}{{ state(r) }}{{ afters(r) }}{% if not (r.state or '').startswith('held by') and not r.with_you %}{{ holder(r.holder) }}{% endif %}{% if not r.ext %}{{ menu(r) }}{% endif %}</span>
     {{ builds(r.ext) }}
     {{ mentioned(r) }}
   </div>

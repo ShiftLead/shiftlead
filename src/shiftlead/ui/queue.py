@@ -195,7 +195,9 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
     paused, a `decide` or `look` board line, a `decision (paul)` entry; `do` — an `act` board line (TD-1066: Done
     its answer), an `Owner: paul` entry, a red PR nobody holds, and what else needs the person (a blocked
     outcome); `read` — what is answered,
-    waits on others or is for reading; `held` — an entry the person holds, which is no want while held."""
+    waits on others or is for reading; `held` — an entry the person holds, which is no want while held. A fifth,
+    `with_you` — the person's entry their own session holds, no want either (TD-1281) — is `attach`'s, read from
+    the card, never from the row."""
     if sec in READ_LINES:
         return "read"
     row = e.get("row")
@@ -240,7 +242,9 @@ def waits_on_me(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
     return out
 
 
-def attach(sections: Mapping[str, Any], drawn: Any, later: Any = (), start: Any = None) -> dict[str, Any]:
+def attach(
+    sections: Mapping[str, Any], drawn: Any, later: Any = (), start: Any = None, with_of: Any = None
+) -> dict[str, Any]:
     """The Inbox's rows the Queue draws (`home: queue`, §4.5 screen 6 *Where a row is drawn*), by the card each
     is attached to and the card's section it is in (§4.5 screen 12 *What is attached to a card*, TD-828):
     `cards`, each card's `{section: [item]}`, every item `{section, id, item, html, kind, on_row}` with the row
@@ -250,7 +254,9 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = (), start: Any 
     the Inbox's alone: no Snooze on the Queue. `later` is `split_later`'s rows, all under *Needs you* whatever their
     `Due:`: a ledger row the person's, drawn first, and a board line not yet due after the questions, drawn with
     its due date. `start(card id, item id)` is a Decide or Do item's `item_start`, which its renderer draws as the
-    item's own **Start session** (TD-1246); without it no item draws one."""
+    item's own **Start session** (TD-1246); without it no item draws one. `with_of(card id, ref)` names the person's
+    own session holding a ledger item's entry on its card, where one does: the item's want is then `with_you`, no
+    kind, drawn *with you in <name>* with its Open session (§4.5 screen 12 *Three wants*, TD-1281)."""
     cards: dict[str, dict[str, list[Any]]] = {}
     mentioned: dict[str, dict[str, str]] = {}
 
@@ -259,14 +265,17 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = (), start: Any 
         if want == "held":  # the held row, never the for-you row (§4.5a *Inbox row: held entry*)
             e = {**e, "kind": "ledger · held", "claimed": True, "answers": [], "default": ""}
         card, ref = str(e.get("on_card") or ""), item_ref(e)
-        go = start(card, ref) if start is not None and want in WANTS and e.get("row") != "red_pr" else {}
+        mine = with_of(card, ref) if with_of is not None and e.get("row") == "ledger" and want in WANTS else None
+        if mine:
+            want, kind = "with_you", ""
+        go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and e.get("row") != "red_pr" else {}
         cards.setdefault(card, {}).setdefault(sec, []).append(
             {
                 "section": sec,
                 "id": str(mid or ""),
                 "item": ref,
                 # its renderer's `card` mode reads the want, and draws the item's Start session from `start`
-                "html": drawn({**e, "want": want, "start": go}, drawn_as),
+                "html": drawn({**e, "want": want, "start": go, **({"with_you": mine} if mine else {})}, drawn_as),
                 "kind": kind,
                 "want": want,
                 "red": e.get("row") == "red_pr",
@@ -296,10 +305,11 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = (), start: Any 
 def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) -> dict[str, Any]:
     """A card's attached items as its three wants draw them (§4.5 screen 12 *Three wants*): `decide` and `do`,
     each item in the Inbox's order; `read`, `{line: [item]}` for each of `READ_LINES` with any; `held`, the
-    entries the person holds, no want; and `n`, the counts — `decide`, `do` (the pill's, a red PR in it) and
-    `read`. Each item carries `on` — the row it is about, written as the page writes ids, where that is not the
-    top entry (*on TD-n*, a link to the row)."""
-    out: dict[str, Any] = {"decide": [], "do": [], "read": {}, "held": []}
+    entries the person holds, no want; `with_you`, the person's entries their own session holds, no want and in no
+    count (TD-1281); and `n`, the counts — `decide`, `do` (the pill's, a red PR in it) and `read`. Each item
+    carries `on` — the row it is about, written as the page writes ids, where that is not the top entry (*on
+    TD-n*, a link to the row)."""
+    out: dict[str, Any] = {"decide": [], "do": [], "read": {}, "held": [], "with_you": []}
     for sec in CARD_SECTIONS:
         for m in (got or {}).get(sec) or ():
             m = {**m, "on": "" if m.get("on_row") == top else _show(str(m.get("on_row") or ""), one_repo)}
@@ -325,12 +335,15 @@ def _item_kind(e: Mapping[str, Any], sec: str) -> str:
 
 def _card_kinds(rows: list[Mapping[str, Any]], secs: Mapping[str, Any] | None = None) -> list[str]:
     """The kinds of what needs the person on a card (the kind pick, §4.5a *Queue page: filters, find*): its
-    rows' own needs — *yours to do* a Do, *held until* a Decide, *held (person)* — and its attached items' wants."""
+    rows' own needs — *yours to do* a Do, *held until* a Decide, *held (person)* — and its attached items' wants. A
+    row the person's own session holds (`with_you`, TD-1281) adds no Do or Decide."""
     got: set[str] = set()
     for r in rows:
         if r.get("archived"):
             continue
-        if r.get("needs") == "owner":
+        if r.get("with_you"):
+            pass
+        elif r.get("needs") == "owner":
             got.add("do")
         elif r.get("needs") == "decision":
             got.add("decide")
@@ -463,11 +476,12 @@ def card_edge(group: str, status: str, wants: Mapping[str, Any]) -> str:
 def branch(r: Mapping[str, Any]) -> str:
     """A row's colour in the card's tree (§4.5 screen 12 *A card*, TD-915): `done` (green) an archived row,
     `needs` (amber) the person's — *yours to do*, *your decision*, *held (person)* — `waiting` (teal) one that
-    waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling* — else `open` (grey)."""
+    waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling* — else `open` (grey), *with you in
+    <name>* among them (TD-1281)."""
     state = str(r.get("state") or "")
     if r.get("archived"):
         return "done"
-    if r.get("needs") or state == "held (person)":
+    if (r.get("needs") and not r.get("with_you")) or state == "held (person)":
         return "needs"
     if state.startswith("waits ") or state in ("waiting", "settling"):
         return "waiting"
@@ -477,7 +491,11 @@ def branch(r: Mapping[str, Any]) -> str:
 def _seg(r: Mapping[str, Any]) -> dict[str, str]:
     """A part's segment in its parent's meter: `branch()`'s colour, and its id and state word in its title, so
     *in review* keeps its word in a grey segment (§4.5 screen 12 *A card*, TD-1131)."""
-    word = {"owner": "yours to do", "decision": "your decision"}.get(str(r.get("needs") or ""), "")
+    word = (
+        ""
+        if r.get("with_you")
+        else {"owner": "yours to do", "decision": "your decision"}.get(str(r.get("needs") or ""), "")
+    )
     return {"b": branch(r), "title": f"{r.get('show') or r.get('qid')}: {word or r.get('state') or 'open'}"}
 
 
@@ -610,8 +628,10 @@ def queue_view(
                 "kinds": _card_kinds([top, *rows], wants),
                 "find": _find_text([top, *rows]),
                 "session": card_session(c, fleet),
-                # a Decide or Do item but a red PR draws its own Start session, the header then none (TD-1246)
-                "items_start": any(not m.get("red") for w in WANTS for m in wants.get(w) or ()),
+                # a Decide or Do item but a red PR draws its own Start session, the header then none (TD-1246);
+                # so does an item *with you in <name>*, with its Open session (TD-1281)
+                "items_start": any(not m.get("red") for w in WANTS for m in wants.get(w) or ())
+                or bool(wants.get("with_you")),
             }
         )
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]

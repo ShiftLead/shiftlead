@@ -3917,8 +3917,18 @@ async def card_mail(
             lambda e, sec: drawn(e, sec, choices) if drawn else "",
             later,
             (lambda c, item: item_start(by_id[c], item, fleet) if c in by_id else {}) if by_id else None,
+            (lambda c, item: _with_you(by_id.get(c), item)) if by_id else None,
         )
     return sections, mail
+
+
+def _with_you(card: Any, item: str) -> str | None:
+    """The person's own session holding a card's entry `item` (`<repo>#TD-n`), by name, where the card's reading
+    says one does (its row's `with_you`, §4.4 *A row's state*, TD-1281); else None."""
+    rows = [card.get("top"), *(card.get("rows") or [])] if isinstance(card, dict) else []
+    return next(
+        (r["with_you"] for r in rows if isinstance(r, dict) and r.get("qid") == item and r.get("with_you")), None
+    )
 
 
 def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:

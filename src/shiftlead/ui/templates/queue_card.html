@@ -13,7 +13,7 @@
    no grip and no arrows, its wait phrase as its status; an In progress one *d/m done* where the status would be. Each card is its own box, its 4 px left edge `c.edge` (amber for a Decide or Do item, else
    teal Waiting, else green In progress, else grey; TD-915). Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
-{% from "queue_row.html" import row, fold, meter, pbadge, state, holder, extras, builds, mentioned, want, read, held, pill, menu %}
+{% from "queue_row.html" import row, fold, meter, pbadge, state, holder, extras, builds, mentioned, want, read, held, with_you, pill, menu %}
 {% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
 {%- set w = c.wants or {} %}{% set n = w.n or {} %}
 {%- set body = c.rows or w.read or w.held %}
@@ -66,7 +66,7 @@
     {% for f in c.passed_over or [] %}<div class="qnote">passed over by {{ f.name }}{% if f.why %}: {{ f.why }}{% endif %}</div>{% endfor %}
     {{ mentioned(t) }}
     {#- the card's Decide and Do are drawn in the header, so a folded card still shows them (§4.5 screen 12) #}
-    {{ want(c, 'decide') }}{{ want(c, 'do') }}
+    {{ want(c, 'decide') }}{{ want(c, 'do') }}{{ with_you(c) }}
     </div>
   </div>
   {% if body %}<div class="qrows">{{ held(c) }}{% for ln in c.lines or [] %}{% if ln.fold %}{{ fold(ln, repo) }}{% else %}{{ row(ln.row, repo) }}{% endif %}{% else %}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}{% endfor %}{{ read(c) }}</div>{% endif %}
