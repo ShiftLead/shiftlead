@@ -116,6 +116,8 @@ def test_ready_to_precheck_is_a_green_unprechecked_fork_with_a_line():
         {"fork": False},
         {"sync": True},
         {"precheck_line": None},
+        {"state": "closed"},  # an open row alone is ready (TD-1294)
+        {"state": "merged"},
     ):
         assert not teamrun.ready_to_precheck(fork_row(**kw)), kw
     gitlab = fork_row()
@@ -214,7 +216,9 @@ def test_fork_pr_rows_in_a_serviced_and_an_unserviced_repo_one_per_checkout():
 
 def test_the_inbox_draws_the_fork_row_counted_with_copy_open_and_snooze(tmp_path, monkeypatch):
     root = str(tmp_path / "samscrape")
-    row = fork_row(title="no entry named here", precheck_line="cd x && agent-cadence run precheck.py --pr 901 --fork-ok")
+    row = fork_row(
+        title="no entry named here", precheck_line="cd x && agent-cadence run precheck.py --pr 901 --fork-ok"
+    )
     c = client(monkeypatch, tmp_path, fake({root: reading(root, row)}, [rec("g1", root)]))
     html = c.get("/inbox").text
     assert "samscrape #901 · fork · CI green · stranger" in html
@@ -256,3 +260,25 @@ def test_the_queue_places_a_fork_row_by_its_title_as_a_do_item_with_no_ref_and_n
     out = attach(secs, lambda x, sec: "", start=lambda card, ref: called.append(ref) or {"x": 1})
     (item,) = out["cards"]["s#TD-10"]["needs"]
     assert item["fork"] and not item["red"] and item["want"] == "do" and called == []
+
+
+def test_a_card_of_fork_items_alone_counts_no_do_and_draws_no_items_start():
+    """A fork's PR item starts no session (TD-1292): the page header's Do count leaves it out, and a card whose
+    only items are forks keeps its header's Start session (`items_start` False), as a red PR's card does (TD-1294)."""
+    from datetime import UTC, datetime
+
+    from shiftlead.ui.queue import attach, queue_view
+
+    q = "s#TD-010"
+    top = {"qid": q, "id": "TD-10", "repo": "s", "title": "a fix", "priority": "Medium", "needs": "", "state": ""}
+    card = {"id": q, "group": "in_progress", "status": "ready", "top": top, "rows": [], "order": [q], "start": q}
+    e = {"row": "fork_pr", "id": "fork_pr:s:901", "title": "TD-10 slice 2: a stranger's fix", "branch": "td-30",
+         "home": "queue", "on_card": q, "on_row": q}  # fmt: skip
+    got = attach({"needs": [e]}, lambda x, sec: "", start=lambda c, i: {"x": 1})
+    now = datetime(2026, 10, 31, 12, tzinfo=UTC)
+    v = queue_view({"at": now.isoformat(), "cards": [card]}, now, got)
+    (c,) = v["in_progress"]
+    (item,) = c["wants"]["do"]
+    assert item["fork"], "the item is the fork's Do item"
+    assert v["n"]["do"] == 0, "a fork's item is in no Do count: it starts no session"
+    assert c["items_start"] is False, "no item draws a Start session, so the card's header keeps its own"
