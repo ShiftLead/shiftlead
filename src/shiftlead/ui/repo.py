@@ -222,6 +222,7 @@ def pr_rows(
     now: datetime,
     fleet: Collection[dict[str, Any]] = (),
     teams: list[list[dict[str, Any]]] | None = None,
+    home: str = "",
 ) -> list[dict[str, Any]]:
     """**Open PRs** (§4.5 screen 11): every open PR, newest last, with its author — the member whose
     branch it is, else the GitHub login — its age, *draft*, its standing with the techlead
@@ -229,7 +230,10 @@ def pr_rows(
     conflicting — its word, how long, and past `ORPHAN_AFTER` whose it is among `fleet`'s records
     (`teamrun.red_prs`, TD-613); `not_run` for one whose CI never started (TD-686), drawn *CI never ran*;
     `unasked` for a held PR nobody asked, in the standing's place (§4.4, TD-790): `teams` the servicing
-    teams' members in the Org's order, whose reader the tag names (`review.unasked`)."""
+    teams' members in the Org's order, whose reader the tag names (`review.unasked`); `fork` for a fork's PR,
+    its tag's title (TD-1285), and `fork_line` while it is ready to precheck (`teamrun.ready_to_precheck`):
+    `{line, diff, title}`, the person's `--fork-ok` line, the PR's diff and *type it in a terminal on
+    <home>, where <root> is* (`home` the home's host name, TD-1292)."""
     by_branch = {str((m.get("git") or {}).get("branch") or ""): m for m in members if isinstance(m.get("git"), dict)}
     reds = {x["number"]: {**x, "age": _age(x["red_since"], now)} for x in teamrun.red_prs(r, fleet, now)}
     rows = []
@@ -259,9 +263,42 @@ def pr_rows(
                 "red": reds.get(p["number"]),
                 # CI that never started is the person's, drawn apart from red (§4.4, TD-686)
                 "not_run": p.get("not_run") if p.get("checks") == "not_run" else None,
+                # a fork's PR is in no lane; its precheck is the person's (§4.5 screen 11 *Review*, TD-1292)
+                "fork": {"title": fork_title(p)} if p.get("fork") else None,
+                "fork_line": {
+                    "line": str(p["precheck_line"]),
+                    "diff": f"{str(p.get('url') or '').rstrip('/')}/files",
+                    "title": line_title(home, str(r.get("root") or "")),
+                }
+                if teamrun.ready_to_precheck(p)
+                else None,
             }
         )
     return rows
+
+
+def line_title(home: str, root: str) -> str:
+    """The `--fork-ok` line's title (§4.5 screen 11 *Review*, TD-1292): where to type it — the home's host,
+    where the checkout is, since every reading is the home's."""
+    return f"type it in a terminal on {home or 'the home'}, where {root or 'its checkout'} is"
+
+
+FORK_TITLE = (
+    "a fork's PR: its CI runs in the forge's sandbox, and its precheck runs its code here, "
+    "so the precheck is yours alone, after reading the diff"
+)
+
+
+def fork_title(p: Mapping[str, Any]) -> str:
+    """The **fork** tag's title (§4.5 screen 11 *Review*, TD-1285): what a fork's PR is, and, with `checks`
+    *none*, that no CI ran on its head yet, or, with *red* or `not_run`, that a first-time contributor's run
+    may wait for the person's approval on the forge."""
+    checks = p.get("checks")
+    if checks == "none":
+        return f"{FORK_TITLE}; no CI on this head yet"
+    if checks in ("red", "not_run"):
+        return f"{FORK_TITLE}; a first-time contributor's run may be waiting for your approval on the forge"
+    return FORK_TITLE
 
 
 COMPLETED_FOLD = 8  # Recently completed folds past this many rows, with *+n more* (§4.5 screen 11, TD-604)

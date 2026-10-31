@@ -314,7 +314,7 @@ def test_a_question_about_a_td_is_on_its_card_and_still_counted():
     got = attach(secs, lambda e, sec: f"<{e['id']}>")
     # TD-828: by card and section, not by row — TD-21 is a row of TD-20's card
     assert got["cards"]["s#TD-20"]["needs"] == [
-        {"section": "needs", "id": "m1", "item": "", "html": "<m1>", "kind": "decide", "want": "decide", "red": False,
+        {"section": "needs", "id": "m1", "item": "", "html": "<m1>", "kind": "decide", "want": "decide", "red": False, "fork": False,
          "running": False, "on_row": "s#TD-21"}
     ]  # fmt: skip
     assert got["cards"]["s#TD-20"]["steering"][0]["on_row"] == "s#TD-20"
@@ -476,7 +476,7 @@ def test_a_board_line_not_yet_due_is_under_its_cards_needs_you_and_leaves_later(
     got = attach({}, lambda e, sec: f"<{e['id']}:{sec}>", moved)
     assert got["cards"]["s#TD-20"] == {
         "needs": [{"section": "needs", "id": "b1", "item": "", "html": "<b1:coming>", "kind": "decide", "want": "decide",
-                   "red": False, "running": False, "on_row": "s#TD-21"}]
+                   "red": False, "fork": False, "running": False, "on_row": "s#TD-21"}]
     }  # fmt: skip
     v = queue_view(queue(), NOW, got)
     c20 = next(c for c in v["up_next"] if c["id"] == "s#TD-20")

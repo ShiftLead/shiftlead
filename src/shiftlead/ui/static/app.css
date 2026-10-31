@@ -898,6 +898,9 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .tag.wait { border-color: var(--needs); color: var(--needs-fg); background: var(--needs-bg); }
 .repopage .tag.red { border-color: var(--stalled); color: var(--stalled-fg); background: var(--stalled-bg); }  /* a red or conflicting PR (TD-613) */
 .repopage .tag.notrun { border-color: var(--alarm); color: var(--alarm-fg); background: var(--alarm-bg); cursor: help; }  /* CI never ran: the person's (TD-686) */
+.repopage .tag.fork { cursor: help; }  /* a fork's PR: in no lane, its precheck the person's (TD-1292) */
+.repopage .forkline { gap: 8px; padding-left: 16px; flex-wrap: wrap; }  /* its --fork-ok line, Copy and diff (TD-1292) */
+.forkline code { overflow-wrap: anywhere; min-width: 0; }  /* the --fork-ok line, on the Repo page and the Inbox (TD-1292) */
 .repopage .rrow .p-high { color: var(--stalled-fg); }
 .repopage .rrow.buildsline { border-top: 0; padding: 0 14px 8px 76px; margin-top: -6px; font-size: var(--t-small); }  /* a design's builds line, under its row (TD-693) */
 .repopage .rrow.buildsline > .meta { white-space: normal; flex: 1 1 auto; min-width: 0; }

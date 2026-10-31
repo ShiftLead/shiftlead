@@ -1042,6 +1042,41 @@
 </div>
 {%- endmacro %}
 
+{# ── design §4.5a **Inbox row: fork's PR** (§4.4 *A fork's PR is no work order*, TD-1285, built by TD-1292) ──
+   A fork's PR ready to precheck, in any repo: no session may run its line, so it is the person's. Its line
+   under the text with **Copy**; **Open** is the PR's diff, read first; **Snooze ▾** by time alone, keyed
+   `fork_pr:<repo>:<n>`. On a Queue card it is a Do item, *#n fork — CI green, yours to precheck*, with
+   no Start session and no ⋯. It leaves once the PR is no longer ready. #}
+{% macro fork_pr_row(e, section) -%}
+<div class="row gap wrap mhead">
+  <span class="ref" title="{{ e.repo }}: a fork's PR is no session's to precheck, so its line is yours (design §4.4)">{{ e.repo }}</span>
+  <span class="badge kindmark k-promote">fork's PR</span>
+  <span class="grow"></span>
+  {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="opened">{{ e.age or '' }}</span>{% endif %}
+</div>
+{{ subj(e) }}
+<div class="body">{% if drawn_on_queue %}#{{ e.pr }} fork — CI green, yours to precheck{% else %}{{ e.text }}{% endif %}{% if e.title %} — {{ e.title }}{% endif %}</div>
+<div class="body forkline"><span class="meta">yours, after reading the diff:</span> <code class="mono" title="{{ e.line_title }}">{{ e.line }}</code></div>
+<div class="row gap wrap mfoot">
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
+  <span class="grow"></span>
+  {%- if not drawn_on_queue %}
+  <details class="more"><summary class="btn sm ghost" title="set this row aside until a day you pick; the PR is untouched">Snooze ▾</summary>
+    <div class="menu">
+      {%- if e.snoozed_until %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="fork_pr" data-when="now" title="clear the snooze: back in its section">now</button>
+      {%- endif %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="fork_pr" data-when="1d">+1 day</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="fork_pr" data-when="1w">+1 week</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="fork_pr" data-when="pick">pick a date…</button>
+    </div>
+  </details>
+  {%- endif %}
+  <button class="btn sm ghost" type="button" data-copy="{{ e.line }}" title="puts the line on the clipboard; nothing is run">Copy</button>
+  {%- if e.url %}<a class="btn sm primary" href="{{ e.url }}" target="_blank" rel="noopener" title="the PR's diff, on its forge: read it before you run the line">Open</a>{% endif %}
+</div>
+{%- endmacro %}
+
 {# ── design §4.5a **Inbox row: CI not starting** (§4.4 *CI that never started is the person's*, TD-687) ──
    One row per account whose CI never starts, for the home's spell's life: its PRs and default
    branches, each PR a link. **Open** is the account's billing page; **Re-run** the person's own,
@@ -1245,6 +1280,7 @@
 {%- if e.row == 'promote' %}{{ promote_row(e, section) }}
 {%- elif e.row in ('work', 'lanes') %}{{ work_row(e, section) }}
 {%- elif e.row == 'red_pr' %}{{ red_pr_row(e, section) }}
+{%- elif e.row == 'fork_pr' %}{{ fork_pr_row(e, section) }}
 {%- elif e.row == 'ci_not_run' %}{{ ci_not_run_row(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 <div class="st rowerr" role="alert" hidden></div>

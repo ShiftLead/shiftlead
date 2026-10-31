@@ -59,6 +59,8 @@ def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None)
         refs = _refs(m.group(1)) if m else []
     elif kind == "red_pr":
         refs = _refs(f"{e.get('branch') or ''} {e.get('title') or ''}")
+    elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
+        refs = _refs(str(e.get("title") or ""))
     elif kind and not e.get("handed_row"):
         return inbox  # a state row, an alarm, a promote, a team start, the trail: no entry's
     else:
@@ -196,7 +198,7 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
     row = e.get("row")
     if row == "ledger":
         return "held" if e.get("release") else ("do" if e.get("why") == "yours" else "decide")
-    if row == "red_pr":
+    if row in ("red_pr", "fork_pr"):
         return "do"
     if row == "board":
         kind = str(e.get("kind") or "").lower()
@@ -261,7 +263,8 @@ def attach(
         mine = with_of(card, ref) if with_of is not None and e.get("row") == "ledger" and want in WANTS else None
         if mine:
             want, kind = "with_you", ""
-        go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and e.get("row") != "red_pr" else {}
+        pr_row = e.get("row") in ("red_pr", "fork_pr")  # a PR's row starts no session (TD-1246, TD-1292)
+        go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and not pr_row else {}
         cards.setdefault(card, {}).setdefault(sec, []).append(
             {
                 "section": sec,
@@ -272,6 +275,7 @@ def attach(
                 "kind": kind,
                 "want": want,
                 "red": e.get("row") == "red_pr",
+                "fork": e.get("row") == "fork_pr",  # a fork's PR: no Start session, as a red PR's (TD-1292)
                 "running": sec == "steering",
                 "on_row": e["on_row"],
             }
@@ -600,7 +604,7 @@ def queue_view(
                 "session": card_session(c, fleet),
                 # a Decide or Do item but a red PR draws its own Start session, the header then none (TD-1246);
                 # so does an item *with you in <name>*, with its Open session (TD-1281)
-                "items_start": any(not m.get("red") for w in WANTS for m in wants.get(w) or ())
+                "items_start": any(not (m.get("red") or m.get("fork")) for w in WANTS for m in wants.get(w) or ())
                 or bool(wants.get("with_you")),
             }
         )
@@ -709,7 +713,7 @@ def queue_view(
             # the page header's *Decide n · Do n*: items, not cards, display only — in no top-bar or rail
             # number; a red PR is counted on its card's pill alone (§4.5 screen 12 *Three wants*)
             "decide": sum(c["wants"]["n"]["decide"] for c in shaped),
-            "do": sum(sum(1 for m in c["wants"]["do"] if not m.get("red")) for c in shaped),
+            "do": sum(sum(1 for m in c["wants"]["do"] if not (m.get("red") or m.get("fork"))) for c in shaped),
         },
         "one_repo": one_repo,
         "repos": sorted(repos - {""}),

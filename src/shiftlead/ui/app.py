@@ -291,6 +291,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     ci_not_run_rows,
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
+    fork_pr_rows,
     handed_rows,  # noqa: F401
     held_mark,  # noqa: F401
     horizon_left,
@@ -1191,6 +1192,8 @@ class Readings:
             + lanes_rows(teams, await self.team_lanes(teams, fleet), records=fleet)
             # §4.5a *Inbox row: red PR* (TD-613): a repo no team services, from the repo readings
             + red_pr_rows(repos, fleet)
+            # §4.5a *Inbox row: fork's PR* (TD-1292): ready to precheck, in any repo; the line's host the home's
+            + fork_pr_rows(repos, fleet, str(home.get("home") or hosts.home_name()))
             # §4.5a *Inbox row: CI not starting* (TD-687): the home's spells, Open's billing page off the loop
             + await asyncio.to_thread(ci_not_run_kinds, ci_not_run_rows(home.get("ci_spells")))
         )
@@ -1704,6 +1707,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             work, {r["name"]: r["wound_down"] for r in strip["teams"] if r.get("wound_down")}, records=sessions
         )
         promos += red_pr_rows(repos, sessions)  # …and a red PR of a repo no team services (§4.5a, TD-613)
+        # …and a fork's PR ready to precheck, in any repo (§4.5a *Inbox row: fork's PR*, TD-1292)
+        promos += fork_pr_rows(repos, sessions, str((info or {}).get("home") or hosts.home_name()))
         # …and an account whose CI never starts (§4.5a *Inbox row: CI not starting*, TD-687)
         promos += ci_not_run_rows(None if agent_down else (info or {}).get("ci_spells"))
         h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no *asked you* line (TD-354)
@@ -1926,7 +1931,15 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "groups": items,  # the Org's items, drawn by its partials (TD-740)
                 "facet": facet,
                 "teams": teams,
-                "prs": pr_rows(r, members, standing, now, sessions, [g["members"] for g in serving]),
+                "prs": pr_rows(
+                    r,
+                    members,
+                    standing,
+                    now,
+                    sessions,
+                    [g["members"] for g in serving],
+                    str(info.get("home") or hosts.home_name()),
+                ),
                 "lists": lists,
                 # the board: For you, the flows' worker stages, Review, Merged (§4.5 screen 11, TD-903)
                 "bd": bd,

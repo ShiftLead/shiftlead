@@ -279,6 +279,20 @@ def precheck_typed(root: Path | str, pr: int) -> str:
     return f"python3 {'files/' if is_source(root) else ''}scripts/{PRECHECK_SCRIPT} --pr {pr}"
 
 
+def precheck_person(root: Path | str, pr: int) -> str | None:
+    """The `precheck.py --pr <pr> --fork-ok` line the person types for a fork's PR in `root` (design §4.5
+    screen 11 *Review*, TD-1292), never a session's: `cd <root> && ` and, in a pinned repo, the console
+    script `agent-cadence run …`, which resolves the pin from the checkout it runs in; else the layout's own
+    copy, None where that file is not on disk. It never resolves the tree, which can block for minutes."""
+    lead = f"cd {shlex.quote(str(root))} && "
+    if pinned(root):
+        return lead + shlex.join(["agent-cadence", "run", PRECHECK_SCRIPT, "--pr", str(pr), "--fork-ok"])
+    rel = f"{'files/' if is_source(root) else ''}scripts/{PRECHECK_SCRIPT}"
+    if not (Path(root) / rel).is_file():
+        return None
+    return lead + f"python3 {rel} --pr {pr} --fork-ok"
+
+
 STATES = ("open", "merged", "closed")
 
 

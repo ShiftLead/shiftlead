@@ -257,6 +257,7 @@ class InboxMixin:
         # `cadence:<pr>` (§4.5a *Inbox row: cadence check failed*, TD-258): a record's row and one a
         # PR, so the key carries the PR's number
         # `red_pr` (§4.5a *Inbox row: red PR*, TD-613): keyed `red_pr:<repo>:<n>`, a PR and not a record
+        # `fork_pr` (§4.5a *Inbox row: fork's PR*, TD-1292): keyed `fork_pr:<repo>:<n>`, the same way
         cadence = (
             kind.startswith("cadence:") and kind[8:].isascii() and kind[8:].isdigit() and kind[8:] == str(int(kind[8:]))
         )
@@ -270,13 +271,14 @@ class InboxMixin:
             "work",
             "lanes",
             "red_pr",
+            "fork_pr",
             "ci_not_run",
         )
         if not cadence and kind not in rows:
             raise RpcError(
                 f"unknown row kind {kind!r}; the state rows are: "
                 f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, cadence:<pr>, promote, work, "
-                "lanes, red_pr, ci_not_run"
+                "lanes, red_pr, fork_pr, ci_not_run"
             )
         key = f"{self._addr(id)}|{kind}"
         if until:
