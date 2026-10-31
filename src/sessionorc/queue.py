@@ -524,8 +524,7 @@ def _state(
         if own:
             return f"with you in {own[0].name}", need, _holder(own[0])
         return "", need, None
-    word, _ = _state_word(e, claims, pr, recs, waiting, now)
-    return word, None, None
+    return _state_word(e, claims, pr, recs, waiting, now), None, None
 
 
 def _state_word(
@@ -535,31 +534,31 @@ def _state_word(
     recs: list[Any],
     waiting: set[str],
     now: datetime,
-) -> tuple[str, None]:
+) -> str:
     """The state word of a row that needs nothing of the person, the first that applies (§4.4)."""
     red = pr is not None and (pr.get("conflicting") or pr.get("checks") == "red" or pr.get("failing"))
     if any(_holder_stuck(rec, waiting, now) for rec, _ in claims):
-        return "stalled", None
+        return "stalled"
     if red and not claims:
         since = _when(pr.get("red_since"))
         if since and now - since >= QUEUE_STALL_AFTER and not any(workorders.holds_pr(r, dict(pr)) for r in recs):
-            return "stalled", None
+            return "stalled"
     if red:
         word = f"#{pr['number']} conflicting" if pr.get("conflicting") else f"#{pr['number']} failing"
-        return word + (" · being fixed" if claims else ""), None
+        return word + (" · being fixed" if claims else "")
     if pr is not None:
-        return f"in review #{pr['number']}", None
+        return f"in review #{pr['number']}"
     if claims:
-        return f"held by {claims[0][0].name}", None
+        return f"held by {claims[0][0].name}"
     if e.get("settling"):
-        return "settling", None
+        return "settling"
     w = e.get("waiting")
     if isinstance(w, Mapping):
-        return (f"waits until {w.get('until')}" if w.get("on") == "until" else "waits on an event"), None
+        return f"waits until {w.get('until')}" if w.get("on") == "until" else "waits on an event"
     opened = [b for b in e.get("blocked_by") or [] if re.fullmatch(r"(?:[\w./-]+#)?TD-\d+", b)]
     if opened or e.get("parts_open"):  # an open blocker or an open part; the row's `after` names the blockers
-        return "waiting", None
-    return "ready", None
+        return "waiting"
+    return "ready"
 
 
 def _card(
