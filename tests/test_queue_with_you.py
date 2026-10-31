@@ -82,7 +82,6 @@ def test_a_non_top_row_with_you_is_grey_on_its_spine_and_in_its_parents_meter(tm
     v = queue_view(q, NOW, {"cards": {}, "mentioned": {}})
     (shaped,) = v["in_progress"]
     assert shaped["top"]["meter"]["segs"] == [{"b": "open", "title": "TD-002: with you in p"}]
-    assert shaped["kinds"] == ["do"], "the parent's Do alone: the part adds no Decide"
     html = templates.env.get_template("queue_row.html").module.row(shaped["rows"][0])
     assert '<span class="qstate s-with">with you in p</span>' in html
     assert "needsyou" not in html and "qpill" not in html, "no amber, and no holder pill beside the word"
@@ -132,7 +131,7 @@ def test_the_item_is_no_want_counted_nowhere_and_draws_open_session(tmp_path, mo
     v, drawn, card, fleet = _world(tmp_path, monkeypatch)
     (c,) = v["in_progress"]
     assert c["wants"]["n"] == {"decide": 0, "do": 0, "read": 0} and len(c["wants"]["with_you"]) == 1
-    assert c["status"] == "ready" and c["edge"] == "working" and c["kinds"] == []
+    assert c["status"] == "ready" and c["edge"] == "working"
     assert (v["n"]["decide"], v["n"]["do"], v["n"]["needs_you"]) == (0, 0, 0)
     assert c["items_start"] is True, "the item draws its Open session: the header none"
     (e,) = drawn
@@ -141,9 +140,8 @@ def test_the_item_is_no_want_counted_nowhere_and_draws_open_session(tmp_path, mo
     # the start road accepts a press on it: the entry is still under *waits on me*
     assert item_start(card, "samscrape#TD-060", fleet)["ref"] == "TD-060"
     assert card_edge("in_progress", "ready", c["wants"]) == "working"
-    # out of the Needs you filter and the kind pick's Decide and Do
-    for picks in ({"filter": "needs-you"}, {"kind": ["decide"]}, {"kind": ["do"]}):
-        assert apply_picks(v, picks, {})["in_progress"][0]["off"], picks
+    # out of the Needs you switch
+    assert apply_picks(v, {"filter": "needs-you"}, {})["in_progress"][0]["off"]
     from shiftlead.ui.app import templates
 
     head = templates.env.get_template("queue_card.html").module.card(c).split('<div class="qrows">')[0]

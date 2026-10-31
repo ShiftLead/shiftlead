@@ -401,7 +401,6 @@ from .pty_bridge import (
     watch_clients,
 )
 from .queue import (
-    KINDS,
     WINDOW_LABEL,
     WINDOW_WORD,
     apply_picks,
@@ -409,6 +408,7 @@ from .queue import (
     card_index,
     card_session,
     card_wants,
+    filter_chips,
     item_start,
     picks_query,
     queue_picks,
@@ -3993,8 +3993,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "q": view,
             "picks": picks,
             "pq": picks_query,
-            "kinds": KINDS,
-            "teams": sorted(n for n, r in teams.items() if r in view["repos"] or n in picks["team"]),
+            "chips": filter_chips(teams, view["repos"], picks["team"]),
             "team_repos": teams,  # a team chip's repo, which the browser's apply reads as the server's does (TD-829)
             "labels": WINDOW_LABEL,
             "words": WINDOW_WORD,

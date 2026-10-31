@@ -77,7 +77,6 @@ def test_a_decide_line_on_the_same_card_stays_decide_and_the_card_counts_the_act
     v = queue_view(queue(), NOW, got)
     two = v["up_next"][1]
     assert two["wants"]["n"]["do"] == 1 and two["wants"]["n"]["decide"] == 1 and v["n"]["do"] == 1
-    assert "do" in two["kinds"] and "decide" in two["kinds"]
     pill = templates.env.get_template("queue_card.html").module.card(two)
     assert ">Decide 1 · Do 1</span>" in pill
 

@@ -38,16 +38,9 @@ WINDOW_WORD = {
 }
 DATE_ONLY = re.compile(r"\d{4}-\d{2}-\d{2}")
 CONTEXT = re.compile(r"\bContext:\s*(.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)", re.S)
-# the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): the status toggles, and the
-# kind pick's words in its order — the kinds of what needs the person on a card
-FILTERS = {"needs-you": "Needs you", "steering": "Steering"}
-# the kind pick (§4.5a *Queue page: filters, find*, TD-911): the two wants that need the person, and a card the
-# person holds
-KINDS = {
-    "decide": "Decide",
-    "do": "Do",
-    "held-person": "held (person)",
-}
+# the filter row's one status pick (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): the
+# **Needs you** switch, beside the team chips and the find box (TD-1287)
+FILTERS = {"needs-you": "Needs you"}
 
 
 def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None) -> dict[str, Any]:
@@ -327,32 +320,10 @@ def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) ->
 
 
 def _item_kind(e: Mapping[str, Any], sec: str) -> str:
-    """The kind pick's word for an attached item (`KINDS`): its want where that is Decide or Do; '' for what
-    waits on nobody (Read, a held entry)."""
+    """An attached item's kind: its want where that is Decide or Do; '' for what waits on nobody (Read, a held
+    entry)."""
     want = want_of(e, sec)
     return want if want in WANTS else ""
-
-
-def _card_kinds(rows: list[Mapping[str, Any]], secs: Mapping[str, Any] | None = None) -> list[str]:
-    """The kinds of what needs the person on a card (the kind pick, §4.5a *Queue page: filters, find*): its
-    rows' own needs — *yours to do* a Do, *held until* a Decide, *held (person)* — and its attached items' wants. A
-    row the person's own session holds (`with_you`, TD-1281) adds no Do or Decide."""
-    got: set[str] = set()
-    for r in rows:
-        if r.get("archived"):
-            continue
-        if r.get("with_you"):
-            pass
-        elif r.get("needs") == "owner":
-            got.add("do")
-        elif r.get("needs") == "decision":
-            got.add("decide")
-        if str(r.get("state") or "") == "held (person)":
-            got.add("held-person")
-    got |= {w for w in WANTS if (secs or {}).get(w)}
-    # a running `steer` is Decide, and `steering` besides: what the Steering filter reads (§4.5 screen 12 *Filters*)
-    steering = any(m.get("running") for m in (secs or {}).get("decide") or ())
-    return [k for k in KINDS if k in got] + (["steering"] if steering else [])
 
 
 def _find_text(rows: list[Mapping[str, Any]]) -> str:
@@ -625,7 +596,6 @@ def queue_view(
                 "ids": list(c.get("order") or [c["id"]]),
                 # the number per repo, each with its chip, where the home reads more than one (TD-901)
                 "chips": not one_repo,
-                "kinds": _card_kinds([top, *rows], wants),
                 "find": _find_text([top, *rows]),
                 "session": card_session(c, fleet),
                 # a Decide or Do item but a red PR draws its own Start session, the header then none (TD-1246);
@@ -766,9 +736,10 @@ def send_window(view: dict[str, Any], win: str) -> dict[str, Any]:
 
 
 def queue_picks(params: Any) -> dict[str, Any]:
-    """The filter row's picks from the URL (§4.5a *Queue page: filters, find*): `filter` (*All* when absent,
-    `needs-you`, `steering`), `team`, `repo` and `kind` each a list, comma-separated or repeated, and
-    `find`. An unknown filter or kind is dropped, so a stale link reads as *All*."""
+    """The filter row's picks from the URL (§4.5a *Queue page: filters, find*): `filter` (off when absent, or
+    `needs-you`, the switch), `team` a list, comma-separated or repeated, and `find`. An unknown filter is
+    dropped, and so are the old `repo` and `kind` picks and `filter=steering` (TD-1287), so a stale link reads
+    as not picked, never an error."""
 
     def many(key: str) -> list[str]:
         raw = params.getlist(key) if hasattr(params, "getlist") else [params.get(key) or ""]
@@ -781,46 +752,57 @@ def queue_picks(params: Any) -> dict[str, Any]:
     return {
         "filter": f if f in FILTERS else "",
         "team": many("team"),
-        "repo": many("repo"),
-        "kind": [k for k in many("kind") if k in KINDS],
         "find": " ".join(str(params.get("find") or "").split()),
     }
 
 
 def picks_query(picks: Mapping[str, Any], **change: Any) -> str:
-    """The page's address with `change` applied to `picks` — a toggle's link: a list value is toggled in its
-    list, `filter` replaced (its own value again is *All*, as is `filter=""`), `find` set."""
+    """The page's address with `change` applied to `picks` — a toggle's link: a `team` string is toggled in its
+    list and a `team` list replaces it (`team=[]` is **All**: the chips cleared, the rest kept), `filter`
+    replaced (its own value again is off, as is `filter=""`), `find` set."""
     p = {k: (list(v) if isinstance(v, list) else v) for k, v in picks.items()}
     for k, v in change.items():
-        if k in ("team", "repo", "kind"):
+        if k == "team" and isinstance(v, list):
+            p[k] = list(v)
+        elif k == "team":
             p[k] = [x for x in p.get(k) or [] if x != v] if v in (p.get(k) or []) else [*(p.get(k) or []), v]
         elif k == "filter":
             p[k] = "" if p.get(k) == v else v
         else:
             p[k] = v
     parts = [f"filter={p['filter']}"] if p.get("filter") else []
-    parts += [f"{k}={quote(','.join(p[k]))}" for k in ("team", "repo", "kind") if p.get(k)]
+    if p.get("team"):
+        parts.append(f"team={quote(','.join(p['team']))}")
     if p.get("find"):
         parts.append(f"find={quote(p['find'])}")
     return "/queue" + ("?" + "&".join(parts) if parts else "")
 
 
+def filter_chips(teams: Mapping[str, str], repos: Any, picked: Any) -> dict[str, list[str]]:
+    """The filter row's chips (§4.5 screen 12 *Filters*, TD-1287): `team` — each team whose repo the Queue
+    reads, or that is picked, by name; `repo` — each repo it reads that no team's repo names and no team with
+    a repo (`teams`: name → repo) is named like, and each picked name no team holds, so it can be pressed off,
+    by name. A repo chip's pick is a `team` name that names no team, which `apply_picks` reads as the repo."""
+    read, picked = set(repos or ()), list(picked or ())
+    named = set(teams.values()) | set(teams)
+    return {
+        "team": sorted(n for n, r in teams.items() if r in read or n in picked),
+        "repo": sorted((read - named) | {t for t in picked if t not in teams}),
+    }
+
+
 def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[str, str]) -> dict[str, Any]:
     """Mark what the picks hide (`off`), never drop it: a move's neighbours are the whole Up next order,
-    whatever a filter hides (§4.4 *A move lands*). A card passes when its status fits `filter` (*needs you*;
-    *steer*, or a steering item on it), one of its repos is a picked team's (`teams`: name → repo) or a
-    picked repo, one of its kinds is picked, and every word of `find` is in its ids and titles. A completed
-    line passes by the repo and find picks, and by none while a status or kind is picked: nothing on it
-    needs the person. `find_miss` is an id the find names that no open card holds, with the Repo page's
+    whatever a filter hides (§4.4 *A move lands*). A card passes when its status fits `filter` (*needs you*,
+    the switch), one of its repos is a picked chip's — a team's repo (`teams`: name → repo), and a name no
+    team holds is a repo, which is what a repo chip is (TD-1287) — and every word of `find` is in its ids and
+    titles. A completed line passes by the chips and the find, and by none while the switch is on: nothing on
+    it needs the person. `find_miss` is an id the find names that no open card holds, with the Repo page's
     address for it in the archive (one per repo where the id names none)."""
     repos: set[str] = set()
     if picks.get("team"):
-        repos = {teams.get(t, "") for t in picks["team"]} - {""} or {"\0"}  # a team with no repo holds no card
-    if picks.get("repo"):
-        repos = (repos & set(picks["repo"])) if picks.get("team") else set(picks["repo"])
-        repos = repos or {"\0"}
+        repos = {teams.get(t, t) for t in picks["team"]} - {""} or {"\0"}
     words = [_find_word(w) for w in str(picks.get("find") or "").split()]
-    kinds = set(picks.get("kind") or ())
 
     def by_repo_find(card_repos: Any, text: str) -> bool:
         if repos and not repos & set(card_repos or ()):
@@ -832,12 +814,8 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
         ok = by_repo_find(c.get("repos"), str(c.get("find") or ""))
         if picks.get("filter") == "needs-you":
             ok = ok and c.get("status") == "needs you"
-        elif picks.get("filter") == "steering":
-            ok = ok and (c.get("status") == "steer" or "steering" in (c.get("kinds") or ()))
-        if kinds:
-            ok = ok and bool(kinds & set(c.get("kinds") or ()))
         c["off"] = not ok
-    status_pick = bool(picks.get("filter") or kinds)
+    status_pick = bool(picks.get("filter"))
     for ln in (view.get("completed") or {}).get("lines") or ():
         ln["off"] = status_pick or not by_repo_find([ln.get("repo")], str(ln.get("find") or ""))
     for o in view.get("other") or ():
@@ -861,5 +839,5 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
         "up_next": sum(1 for c in view.get("up_next") or () if not c["off"]),
         "completed": {w: sum(ln["n"] for ln in done if w in ln["wins"] and not ln["off"]) for w in WINDOWS},
     }
-    view["filtered"] = bool(picks.get("filter") or picks.get("team") or picks.get("repo") or kinds or words)
+    view["filtered"] = bool(picks.get("filter") or picks.get("team") or words)
     return view

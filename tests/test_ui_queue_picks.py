@@ -4,7 +4,7 @@ Each card, completed line and *other work* line carries what the picks read as `
 `queue_picks`, `picks_query` and `apply_picks` do on the server — run in node against the same reading. A card
 sends no `data-find`: `AO.qFindText` builds it from the ids and titles the card draws, by `_find_text`'s rule
 (§4.5 *Page loads*: *Nothing the page does not read*, TD-892). A bare `/queue` takes the remembered picks
-(`ao.qpicks`) and window (`ao.qwin`) in `base.html`'s head."""
+(`ao.qpicks`) and window (`ao.qwin`) in `base.html`'s head, which drops a key the row no longer has (TD-1287)."""
 
 from __future__ import annotations
 
@@ -63,6 +63,12 @@ SEARCHES = [
     "?repo=s",
     "?repo=s,db&kind=held-person",
     "?kind=questions,nonsense",
+    "?team=s",  # a repo chip: a name no team holds is a repo (TD-1287)
+    "?team=dbteam,s",
+    "?team=nowhere",  # an unknown name: a repo the home does not read, so no card
+    "?team=nowhere&filter=needs-you",
+    "?team=",  # the chips cleared
+    "?team=,&find=TD-21",
     "?find=td-21",
     "?find=TD-021",
     "?find=TD-2",
@@ -78,7 +84,7 @@ SEARCHES = [
 
 def _items(view: dict) -> list[dict]:
     cards = [
-        {"kind": "card", "status": c.get("status") or "", "kinds": c.get("kinds") or [], "repos": c.get("repos") or []}
+        {"kind": "card", "status": c.get("status") or "", "repos": c.get("repos") or []}
         | {"rows": [{"qid": r["qid"], "title": r["title"]} for r in [c["top"], *c["rows"]]]}  # built in the browser
         for c in [*view["in_progress"], *view["up_next"]]
     ]
@@ -170,9 +176,11 @@ def test_the_url_after_a_press_is_the_servers_link_for_it_and_loads_the_same_pic
         ("", {"filter": "needs-you"}),
         ("?filter=needs-you", {"filter": "needs-you"}),  # pressed again: All
         ("?filter=needs-you&team=a,b", {"team": "a"}),
-        ("?kind=yours&find=the%20queue", {"kind": "board"}),
-        ("?repo=s", {"repo": "db"}),
+        ("?kind=yours&find=the%20queue", {"team": "s"}),
         ("?repo=s", {"find": "TD-5"}),
+        # a list replaces the chips (**All** is `team: []`), keeping the switch and the find
+        ("?filter=needs-you&team=a,b&find=the%20queue", {"team": []}),
+        ("?team=a", {"team": ["b", "c"]}),
     ]
     got = _node([{"search": s, "change": ch, "items": [], "teams": {}} for s, ch in presses])
     for (s, ch), js in zip(presses, got, strict=True):
@@ -188,7 +196,7 @@ def test_the_url_after_a_press_is_the_servers_link_for_it_and_loads_the_same_pic
 def test_each_card_and_line_carries_what_the_picks_read(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(queue(), []))
     html = c.get("/queue").text
-    card = 'data-card="s#TD-30" data-ids="s#TD-30" data-up="1" data-status="needs you" data-kinds="held-person"'
+    card = 'data-card="s#TD-30" data-ids="s#TD-30" data-up="1" data-status="needs you"'
     assert card + ' data-repos="s"' in html
     # a card sends no find text (TD-892); a completed line keeps its own, its entries' titles being folded
     assert 'data-find="s#td-30' not in html and html.count("data-find=") == html.count('class="qdline')
@@ -198,9 +206,13 @@ def test_each_card_and_line_carries_what_the_picks_read(tmp_path, monkeypatch):
     assert '<span class="qwinword" data-wv="month" hidden> in the last month</span></div>' in html
     row = html[html.index('id="qfilters"') : html.index('id="qcompleted"')]
     assert "data-teams='{}'" in row and 'data-k="all" href="/queue"' in row
-    assert row.count('data-k="kind"') == 3 and 'data-k="filter" data-v="steering"' in row
+    assert 'data-k="kind"' not in row and 'data-v="steering"' not in row and "data-kinds" not in html
     js = c.get("/static/app.js").text
     assert 'history[push ? "pushState" : "replaceState"]' in js and 'store.set("qpicks", "")' in js
+    # **All** clears the chips alone and rewrites the memory, the switch kept in it (TD-1287)
+    assert 'if (f.dataset.k === "all") { setPicks({ ...picks, team: [] }, true); return remember(); }' in js
+    # Space toggles the switch as Enter does
+    assert 'if (e.key === " " && e.target.matches && e.target.matches("#qfilters .qswitch"))' in js
     assert "setTimeout(() => { typing = null; setPicks(typed(), false); }, 150)" in js
 
 
@@ -213,6 +225,59 @@ def test_a_bare_queue_restores_the_remembered_picks_and_window_before_the_first_
     assert head.index("ao.qpicks") < head.index("app.css")  # before the stylesheet, as the theme's read is
     css = c.get("/static/app.css").text
     assert "html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }" in css
+
+
+HEAD_PROBE = """
+const fs = require("fs");
+const script = fs.readFileSync(process.argv[2], "utf8");
+const cases = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+console.log(JSON.stringify(cases.map((mem) => {
+  const out = { url: null, pend: false };
+  const store = { "ao.qpicks": mem === null ? null : JSON.stringify(mem) };
+  const ctx = {
+    localStorage: { getItem: (k) => (k in store ? store[k] : null) },
+    history: { replaceState: (s, t, url) => { out.url = url; } },
+    location: { pathname: "/queue", search: "", hash: "" },
+    document: { documentElement: { dataset: {} } },
+    setTimeout: () => {},
+  };
+  new Function(...Object.keys(ctx), script)(...Object.values(ctx));
+  out.pend = "qpend" in ctx.document.documentElement.dataset;
+  return out;
+})));
+"""
+
+
+def test_the_head_drops_a_remembered_pick_the_row_no_longer_has(tmp_path, monkeypatch):
+    """TD-1287: a memory holding `kind=`, `repo=` or `filter=steering` restores as if it held none of them; a
+    memory left empty by that writes no URL and holds nothing back."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the head's restore is JavaScript, and nothing else runs it")
+    head = client(monkeypatch, tmp_path, fake(queue(), [])).get("/queue").text.split("</head>", 1)[0]
+    at = head.index('<script>(function () { if (location.pathname !== "/queue")')
+    script = head[at + len("<script>") : head.index("</script>", at)]
+    cases = ["?kind=do", "?filter=steering&repo=x", "?filter=steering&team=a&repo=x,y&kind=do", "?filter=needs-you",
+             "?team=a&filter=needs-you", "", None]  # fmt: skip
+    (tmp_path / "head.js").write_text(script)
+    (tmp_path / "probe.js").write_text(HEAD_PROBE)
+    (tmp_path / "cases.json").write_text(json.dumps(cases))
+    out = subprocess.run(
+        [node, str(tmp_path / "probe.js"), str(tmp_path / "head.js"), str(tmp_path / "cases.json")],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == [
+        {"url": None, "pend": False},
+        {"url": None, "pend": False},
+        {"url": "/queue?team=a", "pend": True},
+        {"url": "/queue?filter=needs-you", "pend": True},
+        {"url": "/queue?team=a&filter=needs-you", "pend": True},
+        {"url": None, "pend": False},
+        {"url": None, "pend": False},
+    ]
 
 
 WINDOW_PROBE = """

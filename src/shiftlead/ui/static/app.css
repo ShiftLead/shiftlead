@@ -1195,7 +1195,12 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .qf { border: 1px solid var(--border); border-radius: 5px; padding: 2px 9px; font-size: var(--t-small); color: var(--fg); text-decoration: none; }
 .qf:hover { background: var(--hover); }
 .qf[aria-pressed="true"] { background: var(--hover); color: var(--strong); font-weight: 600; }
-.qkinds { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.qf.qfrepo { color: var(--muted); font-style: italic; }  /* a repo no team services (TD-1287) */
+/* the Needs you switch: its mark and words, apart from the chips, never drawn as one (TD-1287) */
+.qf.qswitch { border-color: transparent; margin-left: 14px; padding-left: 4px; }
+.qf.qswitch::before { content: "☐"; margin-right: 5px; }
+.qf.qswitch[aria-checked="true"] { color: var(--strong); font-weight: 600; }
+.qf.qswitch[aria-checked="true"]::before { content: "☑"; }
 .qfind { margin-left: auto; }
 .qfind input { font: inherit; font-size: var(--t-small); padding: 3px 8px; min-width: 16em; }
 .qfilters + .qnote, .qfindmiss { padding-left: 0; margin-top: 6px; }

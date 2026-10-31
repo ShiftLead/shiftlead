@@ -19,6 +19,7 @@ from shiftlead.ui.queue import (
     apply_picks,
     attach,
     card_index,
+    filter_chips,
     item_home,
     picks_query,
     queue_picks,
@@ -479,7 +480,7 @@ def test_a_board_line_not_yet_due_is_under_its_cards_needs_you_and_leaves_later(
     }  # fmt: skip
     v = queue_view(queue(), NOW, got)
     c20 = next(c for c in v["up_next"] if c["id"] == "s#TD-20")
-    assert c20["status"] == "needs you" and c20["kinds"] == ["decide"] and v["n"]["needs_you"] == 2
+    assert c20["status"] == "needs you" and v["n"]["needs_you"] == 2
     assert c20["wants"]["decide"][0]["on"] == "TD-21"  # about a lower row: *on TD-21*
 
 
@@ -585,40 +586,48 @@ def shown(v: dict) -> list[str]:
 
 
 def test_the_picks_read_from_the_url_and_toggle_back():
-    p = queue_picks({"filter": "needs-you", "team": "a,b", "kind": "do,yours", "find": "  the   queue "})
-    assert p == {"filter": "needs-you", "team": ["a", "b"], "repo": [], "kind": ["do"], "find": "the queue"}
-    assert queue_picks({"filter": "bogus"})["filter"] == ""  # a stale link reads as All
-    assert picks_query(p, filter="needs-you") == "/queue?team=a%2Cb&kind=do&find=the%20queue"  # pressed again: All
-    assert picks_query(p, team="a") == "/queue?filter=needs-you&team=b&kind=do&find=the%20queue"
-    assert picks_query(queue_picks({}), repo="s") == "/queue?repo=s"
+    p = queue_picks({"filter": "needs-you", "team": "a,b", "kind": "do,yours", "repo": "s", "find": "  the   queue "})
+    assert p == {"filter": "needs-you", "team": ["a", "b"], "find": "the queue"}  # no repo or kind pick (TD-1287)
+    assert queue_picks({"filter": "bogus"})["filter"] == ""  # a stale link reads as not picked
+    assert queue_picks({"filter": "steering"})["filter"] == ""  # the Steering pick is gone: not picked, no error
+    assert picks_query(p, filter="needs-you") == "/queue?team=a%2Cb&find=the%20queue"  # pressed again: off
+    assert picks_query(p, team="a") == "/queue?filter=needs-you&team=b&find=the%20queue"
+    # a list replaces the chips: `team=[]` is **All**, which keeps the switch and the find
+    assert picks_query(p, team=[]) == "/queue?filter=needs-you&find=the%20queue"
+    assert picks_query(p, team=["c"]) == "/queue?filter=needs-you&team=c&find=the%20queue"
 
 
-def test_needs_you_and_steering_filter_the_cards_and_hide_the_completed():
+def test_the_needs_you_switch_filters_the_cards_and_hides_the_completed():
     v = apply_picks(queue_view(queue(), NOW), queue_picks({"filter": "needs-you"}), {})
     assert shown(v) == ["s#TD-30"] and v["shown"] == 1 and v["filtered"]
     assert all(ln["off"] for ln in v["completed"]["lines"]) and all(o["off"] for o in v["other"])
-    # a running steer about TD-21 makes its card *steer*: the Steering filter's
+    # a running steer about TD-21 makes its card *steer*, outside the switch; `filter=steering` picks nothing
     secs = inbox_sections([mail("m3", "TD-21 steer", kind="steer", bound=at(-1))], now=NOW, cards=card_index(queue()))
     v = apply_picks(queue_view(queue(), NOW, attach(secs, lambda e, sec: "")), queue_picks({"filter": "steering"}), {})
-    assert shown(v) == ["s#TD-20"]
+    assert len(shown(v)) == 3 and not v["filtered"]
     # a running steer is Decide, on the pill, and leaves the status *steer* (§4.5 screen 12 *Three wants*)
     c20 = queue_view(queue(), NOW, attach(secs, lambda e, sec: ""))["up_next"][0]
-    assert c20["kinds"] == ["decide", "steering"] and c20["status"] == "steer" and c20["wants"]["n"]["decide"] == 1
+    assert c20["status"] == "steer" and c20["wants"]["n"]["decide"] == 1 and "kinds" not in c20
+    v = apply_picks(queue_view(queue(), NOW, attach(secs, lambda e, sec: "")), queue_picks({"filter": "needs-you"}), {})
+    assert "s#TD-20" not in shown(v)
 
 
-def test_the_kind_pick_narrows_to_the_needs_of_that_kind():
-    v = apply_picks(queue_view(queue(), NOW), queue_picks({"kind": "held-person"}), {})
-    assert shown(v) == ["s#TD-30"]
-    assert apply_picks(queue_view(queue(), NOW), queue_picks({"kind": "decide"}), {})["shown"] == 0
+def test_an_old_repo_or_kind_pick_draws_the_page_unpicked():
+    for old in ({"kind": "held-person"}, {"kind": "decide"}, {"repo": "s"}, {"repo": "nowhere"}):
+        v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks(old), {})
+        assert len(shown(v)) == 4 and not v["filtered"], old
 
 
-def test_a_team_chip_and_the_repo_pick_read_the_cards_repos():
+def test_a_team_chip_and_a_repo_chip_read_the_cards_repos():
     v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "dbteam"}), {"dbteam": "db"})
     assert shown(v) == ["db#TD-5"]
     assert [ln["off"] for ln in v["completed"]["lines"]] == [True] * len(v["completed"]["lines"])  # all repo s
-    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"repo": "s"}), {})
+    # a repo chip is a `team` pick naming no team: it narrows to that repo
+    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "s"}), {"dbteam": "db"})
     assert "db#TD-5" not in shown(v) and len(shown(v)) == 3
-    # a team whose repo the home does not read holds no card
+    assert not any(ln["off"] for ln in v["completed"]["lines"])  # a completed line answers the chips
+    assert all(o["off"] for o in v["other"])  # an *other work* line is hidden while a chip is picked
+    # a picked name no team holds and no repo the home reads names holds no card
     assert apply_picks(queue_view(queue(), NOW), queue_picks({"team": "ghost"}), {})["shown"] == 0
 
 
@@ -634,11 +643,29 @@ def test_find_matches_an_id_or_a_title_and_falls_through_to_the_archive():
     assert find("TD-9")["find_miss"]["id"] == "TD-009" and shown(find("TD-9")) == ["s#TD-10"]
 
 
-def test_a_team_and_a_repo_pick_together_keep_only_the_repos_both_name():
-    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "dbteam", "repo": "s"}), {"dbteam": "db"})
-    assert shown(v) == [] and v["shown"] == 0  # the team's db and the repo pick's s disagree: no card
-    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "dbteam", "repo": "db"}), {"dbteam": "db"})
+def test_the_chips_add_up_and_the_switch_and_find_narrow_them():
+    teams = {"dbteam": "db"}
+    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "dbteam,s"}), teams)
+    assert len(shown(v)) == 4  # a team chip and a repo chip OR'd
+    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "dbteam,s", "filter": "needs-you"}), teams)
+    assert shown(v) == ["s#TD-30"]  # ANDed with the switch
+    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "dbteam,s", "find": "TD-21"}), teams)
+    assert shown(v) == ["s#TD-20"]  # and with the find
+    # a team named like a repo is the team: its chip narrows to the team's repo, not the repo of its name
+    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "s"}), {"s": "db"})
     assert shown(v) == ["db#TD-5"]
+
+
+def test_the_chips_are_a_team_each_then_a_repo_no_team_names():
+    assert filter_chips({"dbteam": "db"}, ["db", "s"], []) == {"team": ["dbteam"], "repo": ["s"]}
+    assert filter_chips({}, ["s"], []) == {"team": [], "repo": ["s"]}  # a one-repo home with no team draws it too
+    # a repo named like a team with a repo draws no chip, whatever repo that team services
+    assert filter_chips({"s": "db"}, ["db", "s"], []) == {"team": ["s"], "repo": []}
+    # a team whose repo the Queue does not read is drawn only while picked; a picked unknown name, as a repo chip
+    assert filter_chips({"dbteam": "db", "far": "x"}, ["db", "s"], ["far", "gone"]) == {
+        "team": ["dbteam", "far"],
+        "repo": ["gone", "s"],
+    }
 
 
 def test_a_find_naming_an_id_an_open_card_holds_offers_no_archive():
@@ -646,22 +673,20 @@ def test_a_find_naming_an_id_an_open_card_holds_offers_no_archive():
     assert shown(v) == ["s#TD-20"] and v["find_miss"] is None
 
 
-def test_steering_shows_a_card_with_a_steering_item_whatever_its_status():
-    # a running steer about TD-30: its card stays *needs you* (held by the person) and carries the steering kind
+def test_a_card_with_a_steering_item_keeps_its_status_and_is_under_the_switch():
+    # a running steer about TD-30: its card stays *needs you* (held by the person), so the switch keeps it
     secs = inbox_sections([mail("m3", "TD-30 steer", kind="steer", bound=at(-1))], now=NOW, cards=card_index(queue()))
     v = queue_view(queue(), NOW, attach(secs, lambda e, sec: ""))
-    assert [(c["status"], c["kinds"]) for c in v["up_next"] if c["id"] == "s#TD-30"] == [
-        ("needs you", ["decide", "held-person", "steering"])
-    ]
-    assert shown(apply_picks(v, queue_picks({"filter": "steering"}), {})) == ["s#TD-30"]
+    assert [c["status"] for c in v["up_next"] if c["id"] == "s#TD-30"] == ["needs you"]
+    assert shown(apply_picks(v, queue_picks({"filter": "needs-you"}), {})) == ["s#TD-30"]
 
 
-def test_an_archived_rows_need_is_no_kind_of_its_card():
+def test_an_archived_rows_need_is_no_need_of_its_card():
     q = queue()
     q["cards"][0]["rows"][0]["needs"] = "owner"  # TD-10's archived TD-9: its owner need was met when it closed
     v = queue_view(q, NOW)
-    assert v["in_progress"][0]["kinds"] == []
-    assert shown(apply_picks(v, queue_picks({"kind": "do"}), {})) == []
+    assert v["in_progress"][0]["status"] == "ready"
+    assert "s#TD-10" not in shown(apply_picks(v, queue_picks({"filter": "needs-you"}), {}))
 
 
 def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, monkeypatch):
@@ -669,12 +694,29 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     html = c.get("/queue").text
     row = html[html.index('id="qfilters"') : html.index('id="qcompleted"')]
     assert 'aria-pressed="true">All</a>' in row and 'Needs you (<span id="qfneedsn">1</span>)' in row
-    assert "Steering" in row and "qininbox" not in row  # the question about nothing is the Inbox tab's number (TD-932)
-    assert 'name="find"' in row and "held (person)</a>" in row
+    assert "qininbox" not in row  # the question about nothing is the Inbox tab's number (TD-932)
+    # the teams, the switch and the find, and nothing else (TD-1287): no Steering, no repo or kind pick
+    assert 'name="find"' in row and "Steering" not in row and "held (person)</a>" not in row
+    assert 'data-k="repo"' not in row and 'data-k="kind"' not in row and "qkinds" not in row
+    assert '<span class="qsub">teams</span>' in row and row.index("qsub") < row.index(">All</a>") < row.index("qswitch")
+    assert re.search(
+        r'id="qfneeds" role="switch" data-k="filter" data-v="needs-you" href="[^"]*" aria-checked="false"', row
+    )
+    # one repo the home reads and no team on it: its chip is drawn, muted, on a one-repo home too
+    assert re.search(
+        r'class="qf qfrepo" data-k="team" data-v="s" href="/queue\?team=s" aria-pressed="false" title="no team services this repo"',
+        row,
+    )
     html = c.get("/queue?filter=needs-you").text
     assert re.search(
-        r'id="qfneeds" data-k="filter" data-v="needs-you" href="/queue" aria-pressed="true"', html
-    )  # again: All
+        r'id="qfneeds" role="switch" data-k="filter" data-v="needs-you" href="/queue" aria-checked="true"', html
+    )  # again: off
+    # **All** is pressed with the switch on and no chip, and its link keeps the switch
+    assert 'data-k="all" href="/queue?filter=needs-you" aria-pressed="true">All</a>' in html
+    for old in ("filter=steering", "repo=x", "kind=do"):
+        got = c.get(f"/queue?{old}")
+        assert got.status_code == 200 and 'data-k="all" href="/queue" aria-pressed="true">All</a>' in got.text, old
+        assert 'aria-checked="false"' in got.text and " qoff" not in got.text[got.text.index('id="queuelists"') :], old
     upnext = html[html.index('id="qupnext"') :]
     # what a pick hides is hidden, never dropped: the whole Up next order is still on the page
     assert re.search(r'class="qcard edge-ended g-up_next st-ready hasrows qoff" data-card="s#TD-20"', upnext)
