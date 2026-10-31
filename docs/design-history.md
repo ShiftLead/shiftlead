@@ -1337,6 +1337,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-31 (TD-1291, grinder-ao-2; auditing #2756): `ao td reserve`'s paragraph names the `question` key in `--json` and the filing-question line, said last on standard error, which TD-1282 added and wrote in §4.4 alone.
 - 2026-10-31 (TD-1285 slice 1, grinder-ao-2): `ao pr wait` judges a fork's PR on the forge's checks alone and says no precheck line for it.
 - 2026-10-28 (TD-1200's review, round 4, Sonnet, READY): the loop ends — Sonnet READY, and Fable's round 3 a follow-on only.
 - 2026-10-28 (TD-1200's review, round 3, Fable, 1 finding, a follow-on of round 2, adopted): §4.7's `--json` keys and TD-1201's help line name `held`, true with `--held`.
