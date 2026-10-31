@@ -425,6 +425,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     ENTRY_PREFIX,
     ENTRY_SLUG_WHY,
     ENTRY_TRIES,
+    FORK_TITLE,  # noqa: F401
     LEDGER_FLAG,  # noqa: F401
     LEDGER_FLAGS,  # noqa: F401
     LEDGER_FOLD,  # noqa: F401
@@ -445,7 +446,9 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     entry_role,
     entry_teams,
     flow_head,  # noqa: F401
+    fork_title,  # noqa: F401
     ledger_lists,  # noqa: F401
+    line_title,  # noqa: F401
     missing_seams,
     org_layout,
     pr_rows,  # noqa: F401
