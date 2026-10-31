@@ -752,6 +752,57 @@ def red_pr_rows(
     return out
 
 
+def fork_pr_rows(
+    repos: Mapping[str, Any] | None,
+    records: Collection[Mapping[str, Any]],
+    home: str = "",
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """design §4.5a **Inbox row: fork's PR** (§4.4 *A fork's PR is no work order*, TD-1285, built by TD-1292):
+    one row per fork's PR ready to precheck (`teamrun.ready_to_precheck`) in every repo, serviced or not, since
+    no session may run its line — one per checkout, as `red_pr_rows` gives, each with its own root's line —
+    under *Needs you*, counted: *`<repo>` #<n> · fork · CI green · <author>*, its age the PR's own, then the
+    reading's `precheck_line`, titled *type it in a terminal on <home>, where <root> is* (`home` the home's host
+    name). **Open** is the PR's diff, **Snooze ▾** by time alone, keyed `fork_pr:<repo>:<n>`. It leaves when the
+    PR is no longer ready. `records` is unread: a fork's PR is no lane's, so who services the repo does not
+    matter; it is taken for the callers' symmetry with `red_pr_rows`."""
+    del records
+    at = now or datetime.now(UTC)
+    out: list[dict[str, Any]] = []
+    for root, r in sorted((repos or {}).items()):
+        if not isinstance(r, dict):
+            continue
+        repo = str(r.get("name") or Path(str(root)).name)
+        where = str(r.get("root") or root)
+        for p in ((r.get("prs") or {}).get("open")) or []:
+            if not teamrun.ready_to_precheck(p):
+                continue
+            n = p["number"]
+            since = str(p.get("created") or "")
+            text = " · ".join(x for x in (f"{repo} #{n}", "fork", "CI green", str(p.get("author") or "")) if x)
+            out.append(
+                {
+                    "row": "fork_pr",
+                    "sid": f"fork_pr:{repo}:{n}",
+                    "id": f"fork_pr:{repo}:{n}",
+                    "name": repo,
+                    "repo": repo,
+                    "pr": n,
+                    "url": f"{str(p.get('url') or '').rstrip('/')}/files",
+                    "title": str(p.get("title") or ""),
+                    "subject": kind_subject("fork's PR", f"{repo} #{n}"),
+                    "team": "",
+                    "at": since,
+                    "age": _age(since, at),
+                    "text": text,
+                    "line": str(p["precheck_line"]),
+                    "line_title": f"type it in a terminal on {home or 'the home'}, where {where} is",
+                    "find": " ".join(x for x in (repo, f"#{n}", "fork's PR", str(p.get("title") or ""), text) if x),
+                }
+            )
+    return out
+
+
 CI_BILLING_REASON = "billing or spending limit"  # §4.5a *Inbox row: CI not starting*: a `billing` kind's words
 ORG_BILLING = "https://github.com/organizations/{owner}/settings/billing"
 USER_BILLING = "https://github.com/settings/billing"

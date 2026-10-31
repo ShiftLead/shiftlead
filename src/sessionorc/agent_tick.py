@@ -3621,6 +3621,26 @@ class TickMixin:
         return out
 
     @staticmethod
+    def _fork_lines(root: str, prs: Any) -> Any:
+        """The PR reading as `root`'s checkout gives it (design §4.5 screen 11 *Review*, TD-1292): each
+        fork's PR row carries `precheck_line`, the person's `--fork-ok` line led by `cd <root>`
+        (`cadence.precheck_person`), for this checkout's own root. The reading is shared by every checkout
+        of one remote (`by_remote`), so the rows are copied, never written in place; a GitLab reading's
+        rows, which carry no `prechecked`, get none."""
+        rows = prs.get("open") if isinstance(prs, dict) else None
+        if not isinstance(rows, list):
+            return prs
+        out: list[Any] = []
+        for p in rows:
+            if isinstance(p, dict) and (p.get("fork") or "precheck_line" in p):
+                p = {k: v for k, v in p.items() if k != "precheck_line"}
+                line = cadence_mod.precheck_person(root, p["number"]) if p.get("fork") and "prechecked" in p else None
+                if line:
+                    p["precheck_line"] = line
+            out.append(p)
+        return {**prs, "open": out}
+
+    @staticmethod
     def _read_repo(
         root: str,
         old: dict[str, Any],
@@ -3661,6 +3681,7 @@ class TickMixin:
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs
+            prs = TickMixin._fork_lines(root, prs)  # this checkout's own copy (§4.5 screen 11, TD-1292)
         seams = old.get("seams")
         if due or seams is None:  # §4.4 *The seams*: on the repo reading's own cadence
             try:

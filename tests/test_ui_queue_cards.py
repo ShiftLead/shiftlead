@@ -316,11 +316,11 @@ def test_no_subject_or_answer_draws_a_title_repeating_its_text(tmp_path, monkeyp
 
 
 def test_every_snooze_in_the_row_renderer_is_the_inboxs_alone():
-    """Each of the row renderer's Snooze menus (an ask, a state row, a board line, a promote, a red PR, CI
-    not run, work waiting) is drawn only off the Queue, so a kind added later is caught here too."""
+    """Each of the row renderer's Snooze menus (an ask, a state row, a board line, a promote, a red PR, a fork's
+    PR, CI not run, work waiting) is drawn only off the Queue, so a kind added later is caught here too."""
     src = (TEMPLATES / "inbox_row.html").read_text()
     menus = [m.start() for m in re.finditer(r"<summary[^>]*>Snooze", src)]
-    assert len(menus) == 7
+    assert len(menus) == 8
     for at in menus:
         assert src[:at].rstrip().rsplit("\n", 2)[-2].strip() == "{%- if not drawn_on_queue %}", src[at - 200 : at]
     assert "{% set drawn_on_queue = true %}" in (TEMPLATES / "queue_mail.html").read_text()

@@ -1029,7 +1029,12 @@
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy]");
     if (!b) return;
-    if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast(b.dataset.copied || "copied", true)); return; }
+    // a write that rejects or throws (no clipboard outside a secure context) is refused aloud, as copyWith's (TD-1292)
+    if (b.dataset.copy) {
+      Promise.resolve().then(() => navigator.clipboard.writeText(b.dataset.copy)).then(
+        () => AO.toast(b.dataset.copied || "copied", true), () => AO.toast("clipboard blocked (needs https or localhost)", false));
+      return;
+    }
     const id = b.dataset.id, action = b.dataset.act;
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the

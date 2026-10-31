@@ -1441,6 +1441,27 @@ def serviced(root: str | Path, sessions: Collection[Mapping[str, Any]]) -> bool:
 
 
 DRAFT_WHOSE = "no order while a draft"  # §4.4 *A draft is no work order*, TD-745
+FORK_WHOSE = "its author's"  # §4.4 *A fork's PR is no work order*, TD-1285
+
+
+def ready_to_precheck(p: Mapping[str, Any] | None) -> bool:
+    """Whether an open PR row is a fork's PR ready to precheck (design §4.5 screen 11 *Review*, §4.5a *Inbox
+    row: fork's PR*, TD-1292): open, a fork's, not a draft, not conflicting, its checks green, no
+    `cadence/precheck` status on its head (`prechecked` False, which a GitLab row never carries) and a
+    `precheck_line` the reading gave it. A sync PR is never ready. One test, read by the Inbox, the Queue
+    and the Repo page."""
+    if not isinstance(p, Mapping):
+        return False
+    return bool(
+        p.get("state", "open") == "open"
+        and p.get("fork")
+        and not p.get("draft")
+        and not p.get("conflicting")
+        and not p.get("sync")
+        and p.get("checks") == "green"
+        and p.get("prechecked") is False
+        and p.get("precheck_line")
+    )
 
 
 def red_prs(
@@ -1452,7 +1473,8 @@ def red_prs(
     — past `ORPHAN_AFTER`, *nobody's — the grinders' order* for one the reading lists as an order
     (*nobody's* where no team services the repo: its row is the Inbox's), *held by <names>* for one a
     live record of the repo holds, as the reading names them (`pr_orders.held`, TD-652), *no order while
-    a draft* for a draft (not a sync PR) nobody holds (TD-745); before it, ''.
+    a draft* for a draft (not a sync PR) nobody holds (TD-745), *its author's* for a fork's PR nobody holds, a draft
+    included (TD-1292); before it, ''.
     `sessions` the records, or the pages' views."""
     r = r or {}
     mine = in_repo(sessions, str(r.get("root") or "")) if r.get("root") else []
@@ -1473,7 +1495,9 @@ def red_prs(
         if now - since >= ORPHAN_AFTER:
             held = [str(x) for x in holders.get(str(p["number"])) or []]
             whose = nobody if p["number"] in orders else f"held by {', '.join(held)}" if held else ""
-            if not whose and p.get("draft") and not p.get("sync"):
+            if not whose and p.get("fork"):
+                whose = FORK_WHOSE  # a fork's PR is no order: its cure is its author's (TD-1285, TD-1292)
+            elif not whose and p.get("draft") and not p.get("sync"):
                 whose = DRAFT_WHOSE  # a draft is no order (TD-745); a sync draft waits as any sync PR does
         out.append(
             {
