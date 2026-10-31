@@ -132,7 +132,8 @@ Whatever the item's kind, the person does one of three things, and the words are
   person's session holds that entry while it lives — the claim is in the reading's `held`, the claims map, which is what
   the lanes read — the card is In progress, and the row carries the session's pill, reading *held by
   td-<n>* where it has a state word; a row of the person's keeps its need and a held row its *held
-  (person)*, `_state`'s order. On a card with nothing of the person's the held entry is the top entry, taken
+  (person)*, `_state`'s order (superseded 2026-10-30 by TD-1281: a row of the person's that their own
+  session claims reads *with you in <name>* and is no want, design §4.4 *The card's status*). On a card with nothing of the person's the held entry is the top entry, taken
   from the lanes for as long as the session runs, which is the person's call. The opening prompt is **one template, `briefs/work.md`, reshaped**: its first sentence
   by `why_key` — *yours* and *decision* keep today's words, with *from the Queue* in place of *from the
   Inbox* when pressed on a card (the Inbox row keeps *Inbox*, and the §4.5a row's quoted text changes with
