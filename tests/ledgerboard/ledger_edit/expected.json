@@ -1,0 +1,251 @@
+{
+ "canonical": {
+  "already": {
+   "idempotent": true,
+   "ok": "## TD-041: An entry already in canonical form\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-11\n**Owner:** designer\n**Kind:** design-first\n**Status:** Open\n**Taken by:** a-session\n**Id take:** 0123456789abcdef0123456789abcdef\n**Blocked by:** TD-012, decision (the owner)\n**Waits:** the next run\n**Part of:** TD-030\n**Location:** `docs/x.md`\n**Escaped from:** other-repo#TD-007\n**Resolved:** kept where the file has it\n\n**Why:** a reason.\n"
+  },
+  "crlf": {
+   "idempotent": true,
+   "ok": "## TD-049: Written with CRLF line endings\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** a reason.\n\n- a bullet\n"
+  },
+  "heading_only": {
+   "idempotent": true,
+   "ok": "## TD-042: Nothing but a heading\n"
+  },
+  "refused_lifted": {
+   "refused": "its Blocked by line is below the header block, where the reader still lifts it — move it into the header block, by hand"
+  },
+  "refused_no_header": {
+   "refused": "the paragraph after its heading is its header block, and 'some words' is not a field — an entry with a body needs its fields first; add them by hand"
+  },
+  "refused_open_comment": {
+   "refused": "an HTML comment is not closed in the entry — close it first"
+  },
+  "refused_repeated": {
+   "refused": "its header block names 'status' twice — keep one, by hand"
+  },
+  "refused_two_entries": {
+   "refused": "not one entry: an entry's text opens with its one `## TD-n:` heading (found TD-046, TD-047) — a v1 ledger: split first"
+  },
+  "refused_wrapped": {
+   "refused": "its header block holds a line that is not a field: '`src/c.py`' — join it to its field's line, or move it below the header block, by hand"
+  },
+  "reordered": {
+   "idempotent": true,
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  }
+ },
+ "check": {
+  "no_old_no_rule": [
+   {
+    "field": "part of",
+    "id": "TD-021",
+    "kind": "part-of-archived",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-021: Part of TD-020, which is archived — read as an open part of a finished parent"
+   },
+   {
+    "field": "part of",
+    "id": "TD-022",
+    "kind": "part-of-archived",
+    "level": "info",
+    "standing": false,
+    "text": "ℹ TD-022: Part of TD-20, which is archived — read as an open part of a finished parent"
+   }
+  ],
+  "nothing_left": [],
+  "parent_archived_ahead_of_its_parts": [
+   {
+    "field": "part of",
+    "id": "TD-021",
+    "kind": "part-of-archived",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-021: Part of TD-020, which is archived — read as an open part of a finished parent"
+   },
+   {
+    "field": "part of",
+    "id": "TD-022",
+    "kind": "part-of-archived",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-022: Part of TD-20, which is archived — read as an open part of a finished parent"
+   },
+   {
+    "field": "part of",
+    "id": "TD-020",
+    "kind": "archive-open-parts",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-020: left the ledger while TD-021, TD-022 are still Part of it — archive its parts first, or point their Part of at its new id or another parent"
+   }
+  ]
+ },
+ "edit_entry": {
+  "archive": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20: built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Resolved:** 2026-01-20 (PR #12) — `src/thing.py` and its test\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "archive_after_reopen": {
+   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Resolved 2026-01-20: fixed\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #17)\n"
+  },
+  "archive_as_is": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20: built as it says\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Resolved:** 2026-01-20 (PR #12)\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "archive_header_resolved": {
+   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Resolved 2026-01-20: built again\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #16)\n"
+  },
+  "archive_no_fix": {
+   "ok": "## TD-060: A decision with no Fix section\n\n**Priority:** Medium\n**Kind:** decision\n**Status:** Resolved 2026-01-20: decided\n\n**Why:** a choice to make.\n\n**Ask:** which way?\n\n**Done when** it is decided.\n\n**Related:** TD-012.\n\n**Resolved:** 2026-01-20 (PR #14)\n"
+  },
+  "archive_no_pr": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20: done by hand\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Resolved:** 2026-01-20 — `docs/thing.md`\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "archive_qualified_fix_only_no_status": {
+   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** Resolved 2026-01-20: designed\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n\n**Resolved:** 2026-01-20 (PR #15)\n"
+  },
+  "archive_refused_pointer_hash": {
+   "refused": "with no PR, the pointer may not hold #<digits>: a reader would take it for the PR"
+  },
+  "archive_refused_pr_text": {
+   "refused": "a PR is the forge's number, not '#12'"
+  },
+  "archive_refused_superseded_with_pr": {
+   "refused": "a superseded entry keeps its Why and Fix: no pr, pointer or as_is"
+  },
+  "archive_superseded": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Superseded 2026-01-20 by TD-070: TD-070 does it all\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "crlf_note": {
+   "ok": "## TD-067: CRLF\n\n**Priority:** Low\n**Status:** Open 2026-01-20: read through CRLF\n\n**Why:** w\n"
+  },
+  "edit_adds_after_why": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Ask:** which way?\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "edit_adds_after_why_beside_a_qualified_fix": {
+   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n\n**Why:** a reason.\n\n**Fix:** choose, then build.\n\n**Fix (to design):** the shape first.\n"
+  },
+  "edit_adds_before_done_when_no_why": {
+   "ok": "## TD-066: No Why\n\n**Priority:** Low\n\n**Fix:** steps.\n\n**Done when** done.\n\n**Related:** TD-012.\n"
+  },
+  "edit_done_when_without_colon": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** all three are done.\n\n**Related:** TD-012.\n"
+  },
+  "edit_fix_after_reopen": {
+   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Open 2026-01-20: it broke — was: Resolved 2026-01-05: built\n\n**Why:** a reason.\n\n**Fix:** fix it again.\n\n**Resolved:** 2026-01-05 (PR #7) — `docs/thing.md`\n"
+  },
+  "edit_refused_bold_paragraph": {
+   "refused": "after the edit the entry would not read back as meant, with the rest unchanged — rephrase it, or edit by hand"
+  },
+  "edit_refused_two_named": {
+   "refused": "the body has 2 sections named 'Note' — edit it by hand"
+  },
+  "edit_why": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** a new reason.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "note": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built 2026-01-20: the second half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "note_no_status": {
+   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** 2026-01-20: first words\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n"
+  },
+  "note_refused_two_lines": {
+   "refused": "a note is one line (cadence.md §2.12)"
+  },
+  "note_title_with_comment": {
+   "ok": "## TD-069: A title <!-- with a comment -->\n\n**Priority:** Low\n**Status:** Open 2026-01-20: read past the comment\n"
+  },
+  "refused_bad_today": {
+   "refused": "note needs today's date as YYYY-MM-DD, not 'soon'"
+  },
+  "refused_comment_spans_sections": {
+   "refused": "an HTML comment in the body spans paragraphs, so a section's edit could land inside it — edit by hand"
+  },
+  "refused_not_canonical": {
+   "refused": "its header block holds a line that is not a field: '`src/c.py`' — join it to its field's line, or move it below the header block, by hand"
+  },
+  "refused_stray_argument": {
+   "refused": "note takes no pr"
+  },
+  "refused_today_not_iso": {
+   "refused": "note needs today's date as YYYY-MM-DD, not '20260120'"
+  },
+  "refused_today_on_an_undated_action": {
+   "refused": "set takes no today"
+  },
+  "refused_unknown_action": {
+   "refused": "unknown action close"
+  },
+  "refused_v1": {
+   "refused": "not one entry: an entry's text opens with its one `## TD-n:` heading (found TD-046, TD-047) — a v1 ledger: split first"
+  },
+  "rename_ref_by_number": {
+   "ok": "## TD-065: Two sections of one name\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** TD-107, other-repo#TD-007, decision (the owner)\n**Part of:** TD-030 (its build)\n\n**Note:** the first.\n\n**Note:** the second.\n"
+  },
+  "rename_ref_other_repo": {
+   "ok": "## TD-065: Two sections of one name\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** TD-7, other-repo#TD-8, decision (the owner)\n**Part of:** TD-030 (its build)\n\n**Note:** the first.\n\n**Note:** the second.\n"
+  },
+  "rename_ref_parent": {
+   "ok": "## TD-065: Two sections of one name\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** TD-7, other-repo#TD-007, decision (the owner)\n**Part of:** TD-031 (its build)\n\n**Note:** the first.\n\n**Note:** the second.\n"
+  },
+  "renumber": {
+   "ok": "## TD-140: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "renumber_refused": {
+   "refused": "renumber needs the new TD-n, not '140'"
+  },
+  "renumber_refused_same_number": {
+   "refused": "TD-040 is numbered 40 already — a renumber gives it another number"
+  },
+  "reopen": {
+   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Open 2026-01-20: it broke — was: Resolved 2026-01-05: built\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-05 (PR #7) — `docs/thing.md`\n"
+  },
+  "reopen_header_resolved": {
+   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Open 2026-01-20: it broke — was: Resolved 2026-01-06: built\n\n**Why:** a reason.\n\n**Fix:** the steps.\n\n**Resolved:** 2026-01-06 (PR #8) — `src/old.py`\n"
+  },
+  "reopen_no_status": {
+   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** Open 2026-01-20: not done\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n"
+  },
+  "reopen_refused_both_resolved": {
+   "refused": "it has both a Resolved field and a **Resolved:** section — merge them by hand, then reopen"
+  },
+  "set_fields": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** High\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Waits:** the next run\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "set_refused_field_twice": {
+   "refused": "set names one field twice"
+  },
+  "set_refused_two_lines": {
+   "refused": "the Location field is one line (cadence.md §2.12)"
+  }
+ },
+ "entry_text": {
+  "mapping": {
+   "ok": "## TD-051: Sections as a mapping\n\n**Priority:** Low\n\n**Why:** a reason.\n\n**Related:** TD-050.\n"
+  },
+  "new": {
+   "ok": "## TD-050: A new entry\n\n**Priority:** Medium\n**Added:** 2026-01-15\n**Status:** Open\n**Id take:** 0123456789abcdef0123456789abcdef\n\nWords before the first lead.\n\n**Why:** the reason.\n\n**Fix:** the steps:\n- one\n- two\n\n**Done when:** both are done.\n"
+  },
+  "refused_bold_paragraph": {
+   "refused": "the entry would not read back with these fields and sections — a paragraph opening in bold starts a section of its own; rephrase it"
+  },
+  "refused_field_lines": {
+   "refused": "the Location field is one line (cadence.md §2.12)"
+  },
+  "refused_field_twice": {
+   "refused": "the field 'owner' is named twice"
+  },
+  "refused_id": {
+   "refused": "an entry's id is TD-n, not '51'"
+  },
+  "refused_no_fields": {
+   "refused": "an entry with sections needs at least one field: the paragraph after the heading is the header block"
+  },
+  "refused_title": {
+   "refused": "an entry needs its title, on one line"
+  },
+  "refused_unnamed_later": {
+   "refused": "only the first section may have no name — the text before the first lead"
+  }
+ }
+}

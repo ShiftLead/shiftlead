@@ -3469,7 +3469,8 @@ def cmd_td_next(args: argparse.Namespace) -> int:
     home could not read is said on standard error, and so are an id not reserved on origin's counter and each of the
     script's warnings (TD-970), the exit still 0. The branch of the directory it runs in goes with the call when that
     directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Taken by:**` line, where
-    the home gives one, is said on standard error."""
+    the home gives one, is said on standard error, and so, last, is the script's filing question where the repo sets
+    `review-outcomes` on (TD-1282)."""
     if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
         try:
             _td_repo(args.repo)
@@ -3524,6 +3525,7 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
         "warnings": got.get("warnings") or [],
         "taken_by": got.get("taken_by") or None,
         "taken_by_line": taken_line,
+        "question": got.get("question") or None,  # an older home answers no question
     }
     if got.get("held"):
         out["held"] = True
@@ -3532,10 +3534,13 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
         if out["ids"]:
             gave = "reserved" if reserved else "handed out"
             print(f"ao td next is now ao td reserve — it {gave} {', '.join(out['ids'])}", file=sys.stderr)
-        return code
-    if reserved:
-        return emit(args, out, lambda: print("\n".join(f"reserved {i}" for i in out["ids"])))
-    return emit(args, out, lambda: print("\n".join(f"{i} (not reserved on origin's counter)" for i in out["ids"])))
+    elif reserved:
+        code = emit(args, out, lambda: print("\n".join(f"reserved {i}" for i in out["ids"])))
+    else:
+        code = emit(args, out, lambda: print("\n".join(f"{i} (not reserved on origin's counter)" for i in out["ids"])))
+    if out["question"]:  # review-outcomes on (§4.4 *The filing question*, TD-1282): after the ids, as the script does
+        print(out["question"], file=sys.stderr)
+    return code
 
 
 def cmd_td_hold(args: argparse.Namespace) -> int:

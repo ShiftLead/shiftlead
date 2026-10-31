@@ -1,0 +1,787 @@
+{
+ "canonical": [
+  {
+   "name": "reordered",
+   "file": "reordered.md"
+  },
+  {
+   "name": "already",
+   "file": "already.md"
+  },
+  {
+   "name": "heading_only",
+   "file": "heading_only.md"
+  },
+  {
+   "name": "crlf",
+   "text": "## TD-049: Written with CRLF line endings\r\n\r\n**Status:** Open\r\n**Priority:** Low\r\n\r\n**Why:** a reason.\r\n\r\n- a bullet\r\n"
+  },
+  {
+   "name": "refused_wrapped",
+   "file": "wrapped.md"
+  },
+  {
+   "name": "refused_repeated",
+   "file": "repeated.md"
+  },
+  {
+   "name": "refused_lifted",
+   "file": "lifted.md"
+  },
+  {
+   "name": "refused_two_entries",
+   "file": "two_entries.md"
+  },
+  {
+   "name": "refused_open_comment",
+   "file": "open_comment.md"
+  },
+  {
+   "name": "refused_no_header",
+   "text": "## TD-057: A body with no fields before it\n\nsome words\n"
+  }
+ ],
+ "entry_text": [
+  {
+   "name": "new",
+   "id": "TD-050",
+   "title": "A new entry",
+   "fields": {
+    "Status": "Open",
+    "Priority": "Medium",
+    "Added": "2026-01-15",
+    "Taken by": "",
+    "Id take": "0123456789abcdef0123456789abcdef"
+   },
+   "sections": [
+    [
+     null,
+     "Words before the first lead."
+    ],
+    [
+     "Why",
+     "the reason."
+    ],
+    [
+     "Fix",
+     "the steps:\n- one\n- two"
+    ],
+    [
+     "Done when",
+     "both are done."
+    ]
+   ]
+  },
+  {
+   "name": "mapping",
+   "id": "TD-051",
+   "title": "Sections as a mapping",
+   "fields": {
+    "Priority": "Low"
+   },
+   "sections": {
+    "Why": "a reason.",
+    "Related": "TD-050."
+   }
+  },
+  {
+   "name": "refused_id",
+   "id": "51",
+   "title": "x",
+   "fields": {},
+   "sections": []
+  },
+  {
+   "name": "refused_title",
+   "id": "TD-052",
+   "title": "two\nlines",
+   "fields": {},
+   "sections": []
+  },
+  {
+   "name": "refused_field_lines",
+   "id": "TD-053",
+   "title": "x",
+   "fields": {
+    "Location": "a\nb"
+   },
+   "sections": []
+  },
+  {
+   "name": "refused_field_twice",
+   "id": "TD-054",
+   "title": "x",
+   "fields": {
+    "Owner": "builder",
+    "owner": "designer"
+   },
+   "sections": []
+  },
+  {
+   "name": "refused_bold_paragraph",
+   "id": "TD-055",
+   "title": "x",
+   "fields": {
+    "Priority": "Low"
+   },
+   "sections": [
+    [
+     "Why",
+     "a reason.\n\n**Bold** opens a paragraph"
+    ]
+   ]
+  },
+  {
+   "name": "refused_unnamed_later",
+   "id": "TD-056",
+   "title": "x",
+   "fields": {
+    "Priority": "Low"
+   },
+   "sections": [
+    [
+     "Why",
+     "a reason."
+    ],
+    [
+     null,
+     "loose words"
+    ]
+   ]
+  },
+  {
+   "name": "refused_no_fields",
+   "id": "TD-058",
+   "title": "x",
+   "fields": {},
+   "sections": [
+    [
+     "Why",
+     "a reason."
+    ]
+   ]
+  }
+ ],
+ "today": "2026-01-20",
+ "edit_entry": [
+  {
+   "name": "set_fields",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Priority": "High",
+       "Pickable": "",
+       "Waits": "the next run"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_two_lines",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Location": "a\nb"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "note",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "the second half built"
+     }
+    }
+   ]
+  },
+  {
+   "name": "note_no_status",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "first words"
+     }
+    }
+   ]
+  },
+  {
+   "name": "note_refused_two_lines",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "one\ntwo"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_why",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Why",
+      "words": "a new reason."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_done_when_without_colon",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Done when:",
+      "words": "all three are done."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_adds_after_why",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "which way?"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_adds_after_why_beside_a_qualified_fix",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Fix",
+      "words": "choose, then build."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_adds_before_done_when_no_why",
+   "text": "## TD-066: No Why\n\n**Priority:** Low\n\n**Done when** done.\n\n**Related:** TD-012.\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Fix",
+      "words": "steps."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_refused_two_named",
+   "file": "two_notes.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Note",
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_refused_bold_paragraph",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Why",
+      "words": "a.\n\n**Bold** opens a section"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "built",
+      "pr": 12,
+      "pointer": "`src/thing.py` and its test"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_as_is",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "built as it says",
+      "pr": 12,
+      "as_is": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_no_pr",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "done by hand",
+      "pointer": "`docs/thing.md`"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_refused_pointer_hash",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "done",
+      "pointer": "see #12"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_refused_pr_text",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "done",
+      "pr": "#12"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_no_fix",
+   "file": "no_fix.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "decided",
+      "pr": 14
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_qualified_fix_only_no_status",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "designed",
+      "pr": 15
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_header_resolved",
+   "file": "header_resolved.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "built again",
+      "pr": 16
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_superseded",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "TD-070 does it all",
+      "superseded_by": "TD-070"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_refused_superseded_with_pr",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "x",
+      "superseded_by": "TD-070",
+      "pr": 3
+     }
+    }
+   ]
+  },
+  {
+   "name": "reopen",
+   "file": "archived.md",
+   "steps": [
+    {
+     "action": "reopen",
+     "args": {
+      "why": "it broke"
+     }
+    }
+   ]
+  },
+  {
+   "name": "reopen_no_status",
+   "file": "no_status.md",
+   "steps": [
+    {
+     "action": "reopen",
+     "args": {
+      "why": "not done"
+     }
+    }
+   ]
+  },
+  {
+   "name": "reopen_header_resolved",
+   "file": "header_resolved.md",
+   "steps": [
+    {
+     "action": "reopen",
+     "args": {
+      "why": "it broke"
+     }
+    }
+   ]
+  },
+  {
+   "name": "reopen_refused_both_resolved",
+   "file": "both_resolved.md",
+   "steps": [
+    {
+     "action": "reopen",
+     "args": {
+      "why": "it broke"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_after_reopen",
+   "file": "archived.md",
+   "steps": [
+    {
+     "action": "reopen",
+     "args": {
+      "why": "it broke"
+     }
+    },
+    {
+     "action": "edit",
+     "args": {
+      "section": "Fix",
+      "words": "fix it again."
+     }
+    },
+    {
+     "action": "archive",
+     "args": {
+      "why": "fixed",
+      "pr": 17
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_fix_after_reopen",
+   "file": "archived.md",
+   "steps": [
+    {
+     "action": "reopen",
+     "args": {
+      "why": "it broke"
+     }
+    },
+    {
+     "action": "edit",
+     "args": {
+      "section": "Fix",
+      "words": "fix it again."
+     }
+    }
+   ]
+  },
+  {
+   "name": "renumber",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "renumber",
+     "args": {
+      "new": "TD-140"
+     }
+    }
+   ]
+  },
+  {
+   "name": "renumber_refused",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "renumber",
+     "args": {
+      "new": "140"
+     }
+    }
+   ]
+  },
+  {
+   "name": "rename_ref_by_number",
+   "file": "two_notes.md",
+   "steps": [
+    {
+     "action": "rename_ref",
+     "args": {
+      "old": "TD-007",
+      "new": "TD-107"
+     }
+    }
+   ]
+  },
+  {
+   "name": "rename_ref_other_repo",
+   "file": "two_notes.md",
+   "steps": [
+    {
+     "action": "rename_ref",
+     "args": {
+      "old": "other-repo#TD-7",
+      "new": "other-repo#TD-8"
+     }
+    }
+   ]
+  },
+  {
+   "name": "rename_ref_parent",
+   "file": "two_notes.md",
+   "steps": [
+    {
+     "action": "rename_ref",
+     "args": {
+      "old": "TD-30",
+      "new": "TD-031"
+     }
+    }
+   ]
+  },
+  {
+   "name": "crlf_note",
+   "text": "## TD-067: CRLF\r\n\r\n**Priority:** Low\r\n**Status:** Open\r\n\r\n**Why:** w\r\n",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "read through CRLF"
+     }
+    }
+   ]
+  },
+  {
+   "name": "refused_v1",
+   "file": "two_entries.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "refused_not_canonical",
+   "file": "wrapped.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Priority": "High"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "refused_unknown_action",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "close",
+     "args": {}
+    }
+   ]
+  },
+  {
+   "name": "refused_stray_argument",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "x",
+      "pr": 3
+     }
+    }
+   ]
+  },
+  {
+   "name": "refused_bad_today",
+   "file": "reordered.md",
+   "today": "soon",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "refused_today_not_iso",
+   "file": "reordered.md",
+   "today": "20260120",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "refused_comment_spans_sections",
+   "text": "## TD-068: A comment across sections\n\n**Priority:** Low\n\n**Why:** w <!-- a note\n\n**Fix:** x\n\n**Done when:** it ends -->\n",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "done",
+      "pr": 1
+     }
+    }
+   ]
+  },
+  {
+   "name": "renumber_refused_same_number",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "renumber",
+     "args": {
+      "new": "TD-40"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_field_twice",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Owner": "a",
+       "owner": "b"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "note_title_with_comment",
+   "text": "## TD-069: A title <!-- with a comment -->\n\n**Priority:** Low\n**Status:** Open\n",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "read past the comment"
+     }
+    }
+   ]
+  },
+  {
+   "name": "refused_today_on_an_undated_action",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Priority": "High"
+      },
+      "today": "2026-01-20"
+     }
+    }
+   ]
+  }
+ ],
+ "check": [
+  {
+   "name": "parent_archived_ahead_of_its_parts",
+   "ledger": "check/after.md",
+   "archive": "check/after.archive.md",
+   "old": "check/before.md"
+  },
+  {
+   "name": "no_old_no_rule",
+   "ledger": "check/after.md",
+   "archive": "check/after.archive.md"
+  },
+  {
+   "name": "nothing_left",
+   "ledger": "check/before.md",
+   "archive": "",
+   "old": "check/before.md"
+  }
+ ]
+}

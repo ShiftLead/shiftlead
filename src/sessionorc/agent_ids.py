@@ -38,6 +38,9 @@ PR_READERS = 4  # PRs read at once
 GIVEN_KEEP = 200
 COUNT_MAX = 10
 WHY_CHARS = 200  # a hold's words and a drop notice's, one line (TD-905)
+# the start of the id script's filing question (agent-cadence TD-204): its stderr's last line where the repo sets
+# `review-outcomes` on; parity with its `FILING_QUESTION` (cadence.md §7.9)
+FILING_QUESTION = "ledger_next_id: if this entry is a defect, did a design miss it?"
 ADDED = re.compile(r"^\+## TD-(\d+):", re.M)
 SCRIPTS = ("scripts/ledger_next_id.py", "files/scripts/ledger_next_id.py")  # a syncing repo's; agent-cadence's own
 IDS_SCRIPT = "ledger_next_id.py"  # as a pinned tree's `files/scripts/` holds it
@@ -437,8 +440,9 @@ class IdsMixin:
         origin, ids, unread}` — and `held: true` with `held` — `unread` the lines naming the open PRs that
         could not be read, and `reserved`, `why`, `warnings` and `taken_by` the script's, `taken_by_line` the
         header line to write where the ledger accepts it (on the home's own road `reserved` is true, `why`
-        empty, `warnings` none and both null). `branch` is the caller's directory's (§4.4 *The branch*),
-        checked and passed to a script that takes it; the home's own road drops it."""
+        empty, `warnings` none and both null), and `question` the script's filing question where the repo sets
+        `review-outcomes` on (§4.4 *The filing question*, TD-1282), else null. `branch` is the caller's directory's
+        (§4.4 *The branch*), checked and passed to a script that takes it; the home's own road drops it."""
         start = time.monotonic()
         if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= COUNT_MAX:
             raise RpcError(f"--count is 1 to {COUNT_MAX}, not {count!r}")
@@ -460,7 +464,7 @@ class IdsMixin:
             else:
                 ids, unread = await self._ids_give(root, key, count, start, caller)
                 got = {"ids": ids, "unread": unread, "reserved": True, "why": "", "warnings": []}
-                got |= {"taken_by": None, "taken_by_line": None}
+                got |= {"taken_by": None, "taken_by_line": None, "question": None}
         finally:
             lock.release()
         for line in [*got["unread"], *got["warnings"]] + ([] if got["reserved"] else [f"not reserved: {got['why']}"]):
@@ -576,6 +580,8 @@ class IdsMixin:
         refs = [str(r) for r in res.get("unread") or [] if str(r).strip()]
         taken_by = res.get("taken_by") if isinstance(res.get("taken_by"), str) and res["taken_by"] else None
         line = await asyncio.to_thread(taken_by_line, script, root, led, taken_by)
+        last = ((err or "").strip().splitlines() or [""])[-1].strip()
+        question = last if last.startswith(FILING_QUESTION) else None  # review-outcomes on: the script asked
         return {
             "ids": ids,
             "unread": [f"open PRs not read: {', '.join(refs)}"] if refs else [],
@@ -584,6 +590,7 @@ class IdsMixin:
             "warnings": [str(w) for w in res.get("warnings") or [] if str(w).strip()],
             "taken_by": taken_by,
             "taken_by_line": line,
+            "question": question,
         }
 
     async def _ids_v2_served(self, root: str, name: str) -> None:

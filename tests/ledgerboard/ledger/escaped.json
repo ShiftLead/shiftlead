@@ -1,0 +1,97 @@
+{
+ "blocked": [],
+ "check": [
+  {
+   "field": "area",
+   "id": "TD-004",
+   "kind": "undeclared-field",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-004: field 'area' has no vocabulary on the preamble's Fields: line — not validated; declare it (cadence.md §2.12)"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "area",
+   "id": "TD-004",
+   "kind": "undeclared-field",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-004: field 'area' has no vocabulary on the preamble's Fields: line — not validated; declare it (cadence.md §2.12)"
+  }
+ ],
+ "declared": {
+  "owner": [
+   "builder",
+   "designer"
+  ]
+ },
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "1|0|000002",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-10",
+    "escaped from": "TD-001 — its review read the happy path only",
+    "location": "`src/thing.py`",
+    "owner": "builder",
+    "priority": "High",
+    "status": "Open"
+   },
+   "id": "TD-002",
+   "key": "1|0|000002",
+   "part_of": null,
+   "parts_open": [],
+   "pickable": true,
+   "priority": "High",
+   "title": "A defect the design's review missed",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000003",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-11",
+    "escaped from": "other-repo#TD-040",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-003",
+   "key": "2|0|000003",
+   "part_of": null,
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "A defect another repo's design let through",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000004",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-12",
+    "area": "parser",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-004",
+   "key": "3|0|000004",
+   "part_of": null,
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "An entry with a field the ledger never declared",
+   "type": "debt"
+  }
+ ],
+ "flags": [],
+ "pickable": [
+  "TD-002",
+  "TD-003",
+  "TD-004"
+ ],
+ "rows": []
+}
