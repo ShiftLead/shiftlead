@@ -1147,8 +1147,10 @@
   <span class="ref" title="{{ e.name }}'s ledger">{{ e.name }}</span>
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-ledger">{{ e.kind }}</span>
-  {%- if e.held %} <span class="st">{{ 'claimed by' if e.claimed else 'held by' }} {{ e.held }}</span>{% endif %}
-  {%- if e.home == 'queue' %} <span class="st qneed"{% if e.claimed and e.hold_by %} title="held by {{ e.hold_by }}"{% endif %}>{% if e.claimed %}held (person){% if e.hold_why %} — {{ e.hold_why }}{% endif %}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
+  {#- an entry the person's own session holds (TD-1281): the word names the session, so no *held by* beside it #}
+  {%- set with_you = e.want == 'with_you' and e.with_you %}
+  {%- if e.held and not with_you %} <span class="st">{{ 'claimed by' if e.claimed else 'held by' }} {{ e.held }}</span>{% endif %}
+  {%- if e.home == 'queue' %} <span class="st qneed"{% if e.claimed and e.hold_by %} title="held by {{ e.hold_by }}"{% endif %}>{% if with_you %}with you in {{ e.with_you }}{% elif e.claimed %}held (person){% if e.hold_why %} — {{ e.hold_why }}{% endif %}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
   <span class="grow"></span>
   <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
 </div>
@@ -1173,7 +1175,11 @@
   <span class="st"{% if e.hold_by %} title="held by {{ e.hold_by }}"{% endif %}>held in {{ e.name }}'s ledger{% if e.hold_why %} ({{ e.hold_why }}){% endif %} — no lane takes it until you release it</span>
   <span class="grow"></span>
   {%- else %}
+  {%- if with_you %}
+  <span class="st">with you in {{ e.with_you }} — an answer here still writes the decided line on {{ e.name }}'s board</span>
+  {%- else %}
   <span class="st">in {{ e.name }}'s ledger — waits on you, with no date; an answer is written on {{ e.name }}'s board as a decided line, its session's work order</span>
+  {%- endif %}
   <span class="grow"></span>
   {%- if not whole %}
   <button class="btn sm ghost" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="your words written on {{ e.name }}'s board as your decision on {{ e.id }}, one line landed on origin by shiftlead's own pull request">Reply</button>
