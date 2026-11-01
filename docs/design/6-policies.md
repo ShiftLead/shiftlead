@@ -485,8 +485,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      work. For a supervised member, not a seat, carrying `out_of_work`, the tick keeps
      **`lane_seen: {at, ids}`** (home-owned) — written on the first tick after the declaration as
      the ids of the entries in its repo's ledger reading (§4.4 *Repo facts*) that **match its
-     lane**, and cleared with `out_of_work`. An entry that settles or is held (§4.4 *A new entry settles
-     before it is pickable*, TD-707) matches no lane until it has settled or been released, so it is
+     lane**, and cleared with `out_of_work`. An entry that settles (§4.4 *A new entry settles
+     before it is pickable*, TD-707) matches no lane until it has settled, so it is
      told when a member may take it, and rule 8's news, reading the same lanes, waits the same. An entry marked `waiting` (§4.4 *An entry says what it waits for*, TD-715) is withheld the same way, and told when its date comes or its `Waits:` line is edited away. **The first write is the ledger as it stood at the
      declaration**: the ledger (a file or a directory, §4.4 *Either layout*) as the last commit of `origin/<default>` before
      `out_of_work.at` held it, read from the checkout's history, so an entry merged between the
@@ -499,13 +499,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      find it there — the ledger read is the checkout's file; where the history cannot be read, the
      reading at that tick. **A lane word matches by the entry's header, never its prose**: with
      pickable derived (§4.4 *Repo facts*), `design-first` is a pickable entry with `Kind:
-     design-first` — and, pickable or not, an entry of any kind whose `Blocked by:` names
-     `decision (designer)`: the designer claims the entry as any reference, writes the decision
-     into the design, and the same PR drops the item from the entry's `Blocked by:`, so the next
-     reading finds the entry pickable and tells the grinder lane as it tells any lane news; for
-     that match the decision's holder stands as the entry's owner, so `[design-first,
-     owner:designer]` takes an entry whose `Owner:` is `grinder`, and a decision named for anyone
-     else — `decision (paul)` — matches no lane: the person's is *for you* (§4.4 *Repo facts*) —, and `free-pick` a
+     design-first` — a decision owed to the designer is that `Kind:`, never a `decision (designer)`
+     item (TD-1296), and a decision on an entry's `Blocked by:` matches no lane: the person's,
+     `decision (paul)`, is *for you* (§4.4 *Repo facts*) —, and `free-pick` a
      pickable entry whose kind is `build` or unwritten — or `live-check`, **once its build is
      live** (§4.9b *A live check is a grinder's once its build is live*) — and **every open
      decided line of the repo's board**, a work order `board:<key>` (§4.4 *Board write-back*),
