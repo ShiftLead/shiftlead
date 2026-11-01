@@ -1,4 +1,4 @@
-"""TD-912, design §4.4 *One owner* (`start`), *Hold*; §4.5 screen 12 *Three verbs: Start session*; §4.5a *Queue
+"""TD-912, design §4.4 *One owner* (`start`); §4.5 screen 12 *Three verbs: Start session*; §4.5a *Queue
 card: Start session / Open session*, *Inbox row: ledger entry: Start session*: once per card, the person's own
 session on the card's `start` entry — its one `Owner: paul` entry, else its first `decision (paul)` entry, else its
 top entry, by key alone — told the card's entries; **Open session** while the person's own session holds any of
@@ -52,9 +52,9 @@ def test_start_is_the_one_owned_entry_else_the_first_decision_else_the_top_by_ke
         # nothing of the person's: the top entry
         _entry(30, "top", Priority="High"),
         _entry(31, "a build", Priority="High", Blocked_by="TD-030"),
-        # a held decision is chosen all the same: a hold withholds from lanes only (§4.4 *Hold*)
+        # an old clock's `held` mark is read as nothing (TD-1297): the decision is chosen as any is
         _entry(40, "top", Priority="High"),
-        _entry(41, "a held decision", Priority="High", Blocked_by="TD-040, decision (paul)"),
+        _entry(41, "a decision", Priority="High", Blocked_by="TD-040, decision (paul)"),
     ], TD_041={"held": {"at": NOW.isoformat()}})  # fmt: skip
     start = {k: c["start"] for k, c in cards.items()}
     assert start == {
@@ -77,12 +77,12 @@ def test_the_cards_ids_are_its_decide_and_do_entries_then_the_rest_in_key_order(
         _entry(10, "top", Priority="High"),
         _entry(11, "a low decision", Priority="Low", Blocked_by="TD-010, decision (paul)"),
         _entry(12, "mine", Priority="High", Owner="paul", Blocked_by="TD-010"),
-        _entry(13, "held, mine", Priority="High", Owner="paul", Blocked_by="TD-010"),
+        _entry(13, "mine, an old clock mark", Priority="High", Owner="paul", Blocked_by="TD-010"),
         _entry(14, "a build", Priority="Medium", Blocked_by="TD-010"),
     ], TD_013={"held": {"at": NOW.isoformat()}})  # fmt: skip
     mine, rest = card_entries(cards["r#TD-010"])
-    assert mine == ["r#TD-012", "r#TD-011"], "a held entry is no want: it is among the rest"
-    assert rest == ["r#TD-010", "r#TD-013", "r#TD-014"]
+    assert mine == ["r#TD-012", "r#TD-013", "r#TD-011"], "a `held` mark is no state since TD-1297: TD-013 is a want"
+    assert rest == ["r#TD-010", "r#TD-014"]
 
 
 # -- who a card's press meets -------------------------------------------------------------------------------

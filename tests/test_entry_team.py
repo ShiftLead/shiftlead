@@ -110,15 +110,12 @@ def test_in_lanes_reads_each_lane_with_its_records_team_and_counts_a_marked_entr
     assert [m["ids"] for m in both["members"]] == [["TD-001"], ["TD-002"]]
 
 
-def test_a_settling_held_or_waiting_entry_that_needs_a_team_reads_as_that_first():
-    got = _read(_entry(1, extra=f"**Waits:** until {TOMORROW} — CI\n"), _entry(2), _entry(3))
+def test_a_settling_or_waiting_entry_that_needs_a_team_reads_as_that_first():
+    got = _read(_entry(1, extra=f"**Waits:** until {TOMORROW} — CI\n"), _entry(2))
     got["TD-002"]["settling"] = {"until": (NOW + timedelta(minutes=7)).isoformat()}
-    got["TD-003"]["held"] = {"at": "x"}
     assert all(e.get("needs_team") for e in got.values())
     assert settle.wait_refusal(got["TD-001"]).startswith(f"TD-001 waits until {TOMORROW}")
-    assert settle.words(got["TD-002"], NOW).startswith("settles") and settle.words(got["TD-003"], NOW).startswith(
-        "held"
-    )
+    assert settle.words(got["TD-002"], NOW).startswith("settles")
 
 
 def test_rule_six_reads_the_members_team():

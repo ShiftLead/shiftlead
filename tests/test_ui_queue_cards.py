@@ -2,7 +2,7 @@
 """TD-770, design §4.5 screen 11 item 2 and screen 12 *A card*, §4.5a *Repo page: Technical debt cards*
 and *Queue page, Up next: grip / ⤒ ↑ ↓*: the Repo page draws the repo's Queue cards in rank order, by
 the Queue's own partials, a move posts `rank_move` with the two neighbours of the whole Up next order,
-and a row keeps what the ledger row carried — its owner, *needs a team*, Hold or Release."""
+and a row keeps what the ledger row carried — its owner, *needs a team*, its settle mark."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def queue() -> dict:
                  row("samscrape", "TD-19", "an old step", state="done #77", pr=77, archived=True, depth=1, parent="samscrape#TD-20")],
                 place=1,
             ),
-            card(row("samscrape", "TD-30", "keep this one back", state="held (person)"), place=2, status="needs you"),
+            card(row("samscrape", "TD-30", "keep this one back", state="", needs="decision"), place=2, status="needs you"),
             card(row("db", "TD-5", "a db entry"), place=3),
             card(row("db", "TD-7", "the cross-repo top"), [row("samscrape", "TD-40", "samscrape's half", state="after db#TD-7", depth=1, parent="db#TD-7")], place=4),
         ],
@@ -71,7 +71,7 @@ def entries() -> list[dict]:
         {**e, "id": "TD-10", "title": "recover stuck notices"},
         {**e, "id": "TD-20", "title": "the queue's design", "for_page": "design", "owner": "designer"},
         {**e, "id": "TD-21", "title": "build the queue", "needs_team": True},
-        {**e, "id": "TD-30", "title": "keep this one back", "held": {"at": NOW.isoformat()}},
+        {**e, "id": "TD-30", "title": "keep this one back", "for_page": "for-you", "blocked_by": ["decision (paul)"]},
         {**e, "id": "TD-40", "title": "samscrape's half", "for_page": "blocked"},
         {**e, "id": "TD-50", "title": "filed since the reading"},
     ]
@@ -141,7 +141,7 @@ def test_the_board_draws_a_columns_rows_by_card_in_rank_order(tmp_path, monkeypa
     assert list(cards_of(html)) == ["samscrape#TD-10", "samscrape#TD-20", "samscrape#TD-50"]
     assert 'data-unfold="build:blocked" data-unsent>1 blocked' in column(html, "build")
     assert list(cards_of(html, "design")) == ["samscrape#TD-20"]
-    assert list(cards_of(html, "foryou")) == ["samscrape#TD-30"]  # the person's hold waits on them
+    assert list(cards_of(html, "foryou")) == ["samscrape#TD-30"]  # held by its decision (paul): waits on them
     assert 'id="debt-pickable"' not in html  # the kind lists are gone; the count line stays
     # the whole Up next order rides on each column, every repo's, for a move's neighbours
     up = re.search(r"data-upnext='([^']*)'", html).group(1)
@@ -170,7 +170,7 @@ def test_only_an_up_next_cards_first_row_in_a_column_moves(tmp_path, monkeypatch
     working = d["samscrape#TD-10"]  # In progress: no number and no grip
     assert "draggable" not in working and "data-move" not in working and "data-up" not in working
     assert "grinder-1" in working  # the holder's pill
-    held = cards_of(html, "foryou")["samscrape#TD-30"]  # a card the person holds is in Up next, and moves
+    held = cards_of(html, "foryou")["samscrape#TD-30"]  # a card on the person's decision is in Up next, and moves
     assert 'draggable="true"' in held and held.count("data-move=") == 3 and "moves TD-30's card" in held
     assert "data-move" not in d["samscrape#TD-50"]  # not on the Queue yet: nothing to move
     # one card's grip in each column it has a row in
@@ -182,11 +182,11 @@ def test_a_row_keeps_what_the_ledger_row_carried(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(repos(tmp_path), queue()))
     html = c.get("/repo/samscrape").text
     build = cards_of(html)["samscrape#TD-20"]
-    assert "· grinder" in build and "needs a team" in build and 'data-tdhold="TD-21"' in build
+    assert "· grinder" in build and "needs a team" in build and "data-tdhold" not in build  # no Hold (TD-1297)
     assert "· designer" in cards_of(html, "design")["samscrape#TD-20"]  # the design entry's owner
-    # For you's row is the Inbox's ledger row: a held entry's Release is the Inbox's
+    # For you's row is the Inbox's ledger row: a decision's answers, never a Release
     held = cards_of(html, "foryou")["samscrape#TD-30"]
-    assert 'data-act="ledger_release" data-id="person" data-repo="samscrape" data-ref="TD-30"' in held
+    assert 'data-act="ledger" data-id="person"' in held and "ledger_release" not in held and "Release" not in held
 
 
 def test_a_card_spanning_two_repos_is_drawn_on_both_pages(tmp_path, monkeypatch):
@@ -483,11 +483,10 @@ def test_the_repo_page_numbers_a_card_by_its_place_in_the_repo_and_sends_the_sco
     assert "AO.rankMoveScoped(before, own, card.dataset.card, how)" in body and "...(scope ? { scope } : {})" in body
 
 
-def test_the_repo_pages_held_row_names_who_pressed_in_its_title(tmp_path, monkeypatch):
-    """TD-1127 (§4.8 *The record names who pressed*): the Repo page draws an entry the person holds as the
-    ledger's held row, *held in <repo>'s ledger*, and its `title` carries the reading's `held.words`."""
+def test_the_repo_page_draws_no_held_row_for_an_old_clock_mark(tmp_path, monkeypatch):
+    """TD-1297: an old clock's `held` mark on an entry draws no *held in <repo>'s ledger* row."""
     rs = repos(tmp_path)
     held = {"at": NOW.isoformat(), "by": "s-1", "words": "the person's session paul-1"}
-    next(e for r in rs.values() for e in r["ledger"]["entries"] if e["id"] == "TD-30")["held"] = held
+    next(e for r in rs.values() for e in r["ledger"]["entries"] if e["id"] == "TD-10")["held"] = held
     html = client(monkeypatch, tmp_path, fake(rs, queue())).get("/repo/samscrape").text
-    assert """<span class="st" title="held by the person&#39;s session paul-1">held in samscrape's ledger""" in html
+    assert "held in samscrape's ledger" not in html and "the person&#39;s session paul-1" not in html

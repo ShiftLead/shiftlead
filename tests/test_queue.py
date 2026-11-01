@@ -132,7 +132,7 @@ def test_completed_cards_are_the_archives_untouched_components_in_the_window(tmp
 
 def test_each_row_state_word(tmp_path):
     root, r = _repo(tmp_path, "r", [
-        _entry(1, "held by the person", Priority="High"),
+        _entry(1, "an old clock mark", Priority="High"),
         _entry(2, "in review", Priority="High"),
         _entry(3, "conflicting", Priority="High"),
         _entry(4, "claimed", Priority="High"),
@@ -147,7 +147,7 @@ def test_each_row_state_word(tmp_path):
         _entry(13, "red nobody holds", Priority="High"),
     ])  # fmt: skip
     ents = {e["id"]: e for e in r["ledger"]["entries"]}
-    ents["TD-001"]["held"] = {"at": NOW.isoformat()}
+    ents["TD-001"]["held"] = {"at": NOW.isoformat()}  # a mark the clock no longer writes: read as nothing (TD-1297)
     ents["TD-005"]["settling"] = {"until": NOW.isoformat()}
     ents["TD-006"]["waiting"] = {"on": "until", "until": "2026-10-21"}
     ents["TD-007"]["waiting"] = {"on": "event", "until": ""}
@@ -164,7 +164,7 @@ def test_each_row_state_word(tmp_path):
             rows[x["id"]] = x
     got = {t: (x["state"], x["needs"]) for t, x in rows.items()}
     assert got == {
-        "TD-001": ("held (person)", None),
+        "TD-001": ("ready", None),
         "TD-002": ("in review #102", None),
         "TD-003": ("#103 conflicting · being fixed", None),
         "TD-004": ("held by w1", None),
@@ -184,7 +184,7 @@ def test_each_row_state_word(tmp_path):
     assert next(c for c in again if c["top"]["id"] == "TD-012")["top"]["state"] == "held by w2"
 
 
-def test_the_cards_status_by_need_and_a_designers_decision_reads_ready(tmp_path):
+def test_the_cards_status_by_need_and_a_designers_decision_item_reads_blocked(tmp_path):
     root, r = _repo(tmp_path, "r", [
         _entry(1, "the person's, beside a stalled one", Priority="High", Owner="paul"),
         _entry(2, "stalled", Priority="High", Blocked_by="TD-001"),
@@ -199,7 +199,8 @@ def test_the_cards_status_by_need_and_a_designers_decision_reads_ready(tmp_path)
     status = {
         c["top"]["id"]: c["status"] for c in _cards({root: r}, [_rec("w", root, "TD-002", state="idle")])["cards"]
     }
-    assert status == {"TD-001": "needs you", "TD-003": "blocked", "TD-004": "waiting", "TD-006": "ready",
+    # a decision owed to the designer is `Kind: design-first`: a `decision (designer)` item is past reach (TD-1297)
+    assert status == {"TD-001": "needs you", "TD-003": "blocked", "TD-004": "waiting", "TD-006": "blocked",
                       "TD-007": "blocked"}  # fmt: skip
     # without the person's member, the stalled one leads
     ents["TD-001"]["owner"] = "grinder"
@@ -281,9 +282,10 @@ async def test_the_home_serves_the_reading_and_pushes_it_when_it_changes(agent, 
     assert "completed" not in await agent.rpc_queue(omit=["completed"])
 
 
-def test_review_findings_designer_wait_archived_claim_person_hold_one_flag(tmp_path):
-    """#1933's review: a designer's decision beside an open id waits; a claim on an archived id is other
-    work; the person's hold is a row's word even on the person's own entry; one flag per worker."""
+def test_review_findings_designer_item_archived_claim_no_hold_one_flag(tmp_path):
+    """#1933's review: a claim on an archived id is other work; one flag per worker. Since TD-1297 a
+    `decision (designer)` item beside an open id is past reach, so its card is blocked, and a row carries
+    no `held`: the person's entry reads its need."""
     root, r = _repo(tmp_path, "r", [
         _entry(1, "open", Priority="High", Owner="grinder", Waits="event — a thing"),
         _entry(2, "after it and the designer", Priority="High", Blocked_by="TD-001, decision (designer)"),
@@ -294,14 +296,12 @@ def test_review_findings_designer_wait_archived_claim_person_hold_one_flag(tmp_p
     ], archive=[_entry(9, "archived", Resolved=f"{TODAY} — (PR #9).")])  # fmt: skip
     ents = {e["id"]: e for e in r["ledger"]["entries"]}
     ents["TD-001"]["waiting"] = {"on": "event", "until": ""}
-    ents["TD-003"]["held"] = {"at": NOW.isoformat(), "why": "after Friday"}
     w = _rec("w", root, "TD-005", "TD-006", "TD-009", lane=["free-pick"])
     q = _cards({root: r}, [w])
     cards = _by_id(q)
-    assert cards["r#TD-001"]["status"] == "waiting"
-    assert cards["r#TD-003"]["top"]["state"] == "held (person)", "the state word unchanged (TD-905)"
-    assert cards["r#TD-003"]["top"]["held"] == {"at": NOW.isoformat(), "why": "after Friday"}, "the hold's words"
-    assert cards["r#TD-004"]["top"]["held"] is None
+    assert cards["r#TD-001"]["status"] == "blocked"
+    assert (cards["r#TD-003"]["top"]["state"], cards["r#TD-003"]["top"]["needs"]) == ("", "owner")
+    assert "held" not in cards["r#TD-003"]["top"] and "held" not in cards["r#TD-004"]["top"]
     assert [f["by"] for f in cards["r#TD-004"]["passed_over"]] == ["w"]
     assert [o["ref"] for o in q["other_work"]] == ["TD-009"]
 

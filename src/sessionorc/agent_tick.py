@@ -3368,7 +3368,7 @@ class TickMixin:
                     if isinstance(a, dict) and a.get("from"):
                         waiting.add(naming.split_address(str(a["from"]))[0])
             doing = {t: list(r) for t, r in self.doing_log.rings.items()}
-            got = queue_mod.reading(self._repos, graph, now, waiting=waiting, doing=doing, pressers=self._presser_words)
+            got = queue_mod.reading(self._repos, graph, now, waiting=waiting, doing=doing)
         except Exception:  # noqa: BLE001 — the Queue is a reading: the last one stands, the next tick tries again
             log.exception("reading the queue failed")
             return
@@ -3383,31 +3383,12 @@ class TickMixin:
         v = self._repos.get(root)
         if v is None:
             return None
-        v = self._held_words(v)
         marks = {
             team: rec["balance"]
             for team, rec in (self._host_rec.get("teams") or {}).items()
             if isinstance(rec.get("balance"), dict) and rec["balance"].get("repo") == root
         }
         return {**v, "balance": marks} if marks else dict(v)
-
-    def _held_words(self, v: dict[str, Any]) -> dict[str, Any]:
-        """A reading whose held entries carry their presser in words beside `held.by` (`held.words`,
-        `mail.presser_words` over the graph now, §4.8 *The record names who pressed*, TD-1127), for the
-        *held (person)* mark's `title`; the stored reading is left as it is."""
-        led = v.get("ledger") or {}
-        entries = led.get("entries")
-        if not isinstance(entries, list) or not any(
-            isinstance(e, dict) and isinstance(e.get("held"), dict) for e in entries
-        ):
-            return v
-        out = [
-            {**e, "held": {**e["held"], "words": self._presser_words(str(e["held"].get("by") or ""))}}
-            if isinstance(e, dict) and isinstance(e.get("held"), dict)
-            else e
-            for e in entries
-        ]
-        return {**v, "ledger": {**led, "entries": out}}
 
     async def _balance_marks(self, now: datetime) -> None:
         """Design §6 *Balance* (TD-239): on every tick at the home, each team whose `teams.<team>.balance`

@@ -642,8 +642,8 @@ HELP: tuple[Help, ...] = (
         "⋯",
         "Queue card",
         (
-            "The team's controls for this card, row or item: hold or release it, send it back to design, close it, "
-            "open it on the Repo page, and an item's own — delete, pause, send to reviewer."
+            "The team's controls for this card, row or item: send it back to design, close it, open it on the Repo "
+            "page, and an item's own — delete, pause, send to reviewer."
         ),
     ),
     Help(
@@ -701,17 +701,6 @@ HELP: tuple[Help, ...] = (
             "session makes it a design-first entry for the designer. Press it when a build, a live check or an "
             "entry waiting on a sibling turns out to need its design settled again. It closes no PR — the build's"
             " open one stays named on the entry — and it is refused where no team's lane takes design-first."
-        ),
-    ),
-    Help(
-        "row-hold",
-        "Hold…",
-        "Queue card and Inbox: any open row",
-        (
-            "Keeps every lane off the entry until you release it, with one optional line of why, drawn after held"
-            " (person) on the row. Press it to pause work on an entry with nothing to decide, or to change the "
-            "words on one already held. It edits no ledger and asks nobody anything: a question a session waits "
-            "on is a decision (paul) on the ledger, not a hold."
         ),
     ),
 )
@@ -815,7 +804,6 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "live-mark",
             "row-done",
             "row-back-to-design",
-            "row-hold",
         ),
     ),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),

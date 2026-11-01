@@ -901,7 +901,7 @@ class InboxMixin:
         already names it. The ledger itself is never written. The repo's work orders are read again
         once the line lands, so the row leaves on the next poll. `road` is **Done…** (`done`) or **Back to
         design…** (`design`) on any open row (`_ledger_road`, TD-905). A person's session passes for a road
-        alone (`mail.PERSON_SESSION`, §4.8 *A person's session passes two of them*, TD-1117): the answer with
+        alone (`mail.PERSON_SESSION`, §4.8 *A person's session passes one of them*, TD-1117): the answer with
         no road was put to the person, and stays theirs."""
         agent_common.person_only(
             caller, "answer a ledger entry", "§4.5", self._graph(), session_ok=bool(str(road or ""))
@@ -966,10 +966,10 @@ class InboxMixin:
         self, root: str, name: str, view: dict[str, Any], id: str, road: str, words: str, caller: Any
     ) -> dict[str, Any]:
         """**Done…** and **Back to design…** on any open ledger row (design §4.5 screen 12 *any open row*,
-        §4.4 *Hold*, TD-905): the Reply road with the fixed words *done — <words>* or *back to design —
+        §4.4 *The tell*, TD-905): the Reply road with the fixed words *done — <words>* or *back to design —
         <words>* — one decided board line, `Context:` the id, the session's work order. First the entry's
-        unattended holders and its PR's reader are told (`td_hold`'s drop notice), and the whole press is
-        refused where one could not be; then a person's hold on it is cleared; then the line is written.
+        unattended holders and its PR's reader are told (`_tell_holders`), and the whole press is refused
+        where one could not be; then the line is written.
         Done is refused on *yours to do* (that row's own **Done** sends *done*), Back to design on a row that
         is not *pickable*, *live check* or blocked by an open id. Where the repo has no servicing team, or no
         stage's lane takes `design-first`, the page refuses before it calls (the home reads no `org.yml`)."""
@@ -986,7 +986,7 @@ class InboxMixin:
         graph = self._graph()
         mine = mail.as_person(caller, graph)
         if road == "done" and not mine and ledger_mod.decided_by(e, ledger_mod.PERSON_OWNER):
-            # Done here would close the person's question unanswered (§4.8 *A person's session passes two of them*)
+            # Done here would close the person's question unanswered (§4.8 *A person's session passes one of them*)
             raise RpcError(f"{id} waits on the person's decision: they answer it on the Inbox or the Queue")
         if road == "design" and not (
             page in ("pickable", "live-check")
@@ -1014,21 +1014,18 @@ class InboxMixin:
             line = board_mod.decided_line(str(e.get("title") or ""), id, [], None, said, today)
         except board_mod.Refused as err:
             raise RpcError(str(err)) from None
-        if not str(view.get("remote") or ""):
-            raise RpcError(f"{name}'s origin is not read yet: its clock is keyed by it, so ask again in a minute")
         rec = None if mine else graph.get(str(caller))
         session = "" if mine else rec.name if rec is not None else str(caller)  # the commit's: *n/a* for the person
         who = "the person" if mine else self._presser_words(str(caller))
         self._board_adding.add(key)
         try:
             tell = (f"is closed by {who}" if road == "done" else "goes back to design") + (f" — {w}" if w else "")
-            told, readers, untold = await self._hold_notice(id, tell)
+            told, readers, untold = await self._tell_holders(id, tell)
             if untold:
                 raise RpcError(
                     f"nothing was written: {'; '.join(untold)} — a worker would run on against "
-                    f"{id} (design §4.4 *Hold*)"
+                    f"{id} (design §4.4 *The tell*)"
                 )
-            await self._clear_hold(root, e, "person")  # any hold, whatever the reading says: the press decides it
             try:
                 done = await asyncio.to_thread(board_mod.add_decided, root, line, session=session)
             except board_mod.Refused as err:

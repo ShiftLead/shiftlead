@@ -1,7 +1,7 @@
 """TD-918, design §4.4 *Waiting*, *The card's status*, *A move lands*; §4.5 screen 12 *Waiting*, *Up next*;
 §4.5a *Queue page, Waiting: the wait column*; §4.7 `ao rank --list`: a card nobody can pick now and the person
 is not holding up is Waiting — unnumbered, unmoved, saying what it waits for from a leaf and where it would be
-in Up next — and a *held (person)* row is no need, its card reading *held (person)* by one rule."""
+in Up next."""
 
 from __future__ import annotations
 
@@ -135,31 +135,18 @@ def test_a_waiting_card_refuses_a_move_and_is_no_neighbour(tmp_path):
     assert rank.intent(cards, ["r#TD-003"], None, "r#TD-001", "person", NOW.isoformat()) is not None
 
 
-def test_held_person_beside_a_waiting_member_and_beside_a_ready_one(tmp_path):
+def test_an_old_clock_held_mark_is_no_status_and_no_need(tmp_path):
+    """TD-1297: the clock keeps no hold, so a `held` mark left on an entry is read as nothing — a card reads
+    by its members as they are; an entry held out of the lanes is a `decision (<person>)` row."""
     cards = _read(tmp_path, [
-        # a held member with a Waits: line beside a waiting one: held (person), and the card is Waiting
-        _entry(1, "held, waits", Priority="High", Waits="event — a"),
+        _entry(1, "marked, waits", Priority="High", Waits="event — a"),
         _entry(2, "waits", Priority="High", Waits="event — b", Blocked_by="TD-001"),
-        # a held member beside a ready one: ready, and Up next
-        _entry(11, "held", Priority="Medium", Blocked_by="TD-012"),
+        _entry(11, "marked", Priority="Medium", Blocked_by="TD-012"),
         _entry(12, "ready", Priority="Medium"),
     ], TD_001=HELD, TD_011=HELD)  # fmt: skip
-    assert (cards["r#TD-001"]["status"], cards["r#TD-001"]["group"]) == ("held (person)", "waiting")
-    assert cards["r#TD-001"]["wait"]["id"] == "r#TD-002", "the leaf is not the person's own"
+    assert (cards["r#TD-001"]["status"], cards["r#TD-001"]["group"]) == ("waiting", "waiting")
     assert (cards["r#TD-012"]["status"], cards["r#TD-012"]["group"]) == ("ready", "up_next")
-
-
-def test_a_held_top_with_a_child_blocked_by_it_alone_and_a_card_of_held_waits_read_held_person(tmp_path):
-    cards = _read(tmp_path, [
-        _entry(1, "held top", Priority="High"),
-        _entry(2, "blocked by it alone", Priority="High", Blocked_by="TD-001"),
-        _entry(11, "held, waits", Priority="Medium", Waits="event — c"),
-        _entry(12, "held, waits too", Priority="Medium", Waits="event — d", Blocked_by="TD-011"),
-    ], TD_001=HELD, TD_011=HELD, TD_012=HELD)  # fmt: skip
-    for k in ("r#TD-001", "r#TD-011"):
-        assert cards[k]["status"] == "held (person)", k
-        assert cards[k]["group"] == "up_next", "the rest of it does not wait, or there is no rest"
-    assert cards["r#TD-001"]["top"]["needs"] is None, "a held row is no need"
+    assert all(r["state"] != "held (person)" for c in cards.values() for r in [c["top"], *c["rows"]])
 
 
 def test_the_page_draws_waiting_between_in_progress_and_up_next_with_its_wait_column(tmp_path, monkeypatch):

@@ -57,11 +57,12 @@ def test_an_unattended_claim_keeps_needs_you_and_the_interactive_one_is_the_hold
     assert t["state"] == "with you in y-mine" and t["holder"]["id"] == "y-mine", "the first of the person's by id"
 
 
-def test_a_held_entry_the_persons_session_claims_reads_held(tmp_path):
+def test_an_old_held_mark_on_an_entry_the_persons_session_claims_reads_with_you(tmp_path):
+    """TD-1297: a `held` mark the clock no longer writes is read as nothing."""
     root, r = _one(tmp_path, Owner="paul")
     r["ledger"]["entries"][0]["held"] = {"at": NOW.isoformat(), "why": "after Friday"}
     t = _by_id(_cards({root: r}, [_mine("p", root, "TD-001")]))["r#TD-001"]["top"]
-    assert t["state"] == "held (person)" and t["with_you"] is None
+    assert t["state"] == "with you in p" and t["with_you"] == "p"
 
 
 def test_a_non_top_row_with_you_is_grey_on_its_spine_and_in_its_parents_meter(tmp_path):
@@ -155,7 +156,7 @@ def test_the_item_draws_with_you_in_its_line_and_foot_and_no_held_by(tmp_path, m
 
     _, drawn, _, _ = _world(tmp_path, monkeypatch)
     one = templates.get_template("queue_mail.html")
-    e = {**drawn[0], "held": "p", "claimed": False}  # the Inbox row names the claim's holder
+    e = {**drawn[0], "held": "p"}  # the Inbox row names the claim's holder
     html = one.render(e=e, section="needs")
     assert '<span class="st qneed">with you in p</span>' in html
     assert "with you in p — an answer here still writes the decided line on samscrape's board" in html

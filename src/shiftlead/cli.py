@@ -2051,10 +2051,6 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     # whose it is (TD-228): pickable reads no owner, so the line says the entry's
                     # `Owner:` and a lane's reader passes over what is not its own
                     owner = str(e.get("owner") or "") or "-"
-                    # a decision owed to the designer is design by it alone (§4.7, TD-367)
-                    designers = kind == "design" and e.get("kind") != "design-first"
-                    if designers and ledger_mod.decided_by(e, ledger_mod.DESIGNER_OWNER):
-                        owner += " decision"
                     # withheld by the home's settle clock (§4.4, TD-710): said after the owner
                     if settling := _settle_mark(e):
                         owner += f" {settling}"
@@ -3463,17 +3459,16 @@ def _origin_key(root: str) -> str:
 
 
 def cmd_td_next(args: argparse.Namespace) -> int:
-    """`ao td reserve [--repo <name>] [--count <n>] [--held]` (design §4.7 *Entries*, §4.4 *A ledger entry's id is
-    handed out by the home*; TD-696, TD-1200): the next free ledger id of the repo, or `n` in a row, from the home's
-    `td_next`, one a line, *reserved TD-n*. `ao td next` is its old name, kept as an alias: the bare ids on standard
-    output, and its new name on standard error after the call. Open to every session and the person; `--held` (§4.4 *An
-    entry can land held*, TD-731) lands each id held, the person's and an interactive session's. The repo goes by its
-    registered name, or by its origin's `owner/repo` when checkouts of different origins share that name; an open PR the
-    home could not read is said on standard error, and so are an id not reserved on origin's counter and each of the
-    script's warnings (TD-970), the exit still 0. The branch of the directory it runs in goes with the call when that
-    directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Taken by:**` line, where
-    the home gives one, is said on standard error, and so, last, is the script's filing question where the repo sets
-    `review-outcomes` on (TD-1282)."""
+    """`ao td reserve [--repo <name>] [--count <n>]` (design §4.7 *Entries*, §4.4 *A ledger entry's id is handed out
+    by the home*; TD-696, TD-1200): the next free ledger id of the repo, or `n` in a row, from the home's `td_next`,
+    one a line, *reserved TD-n*. `ao td next` is its old name, kept as an alias: the bare ids on standard output, and
+    its new name on standard error after the call. Open to every session and the person. The repo goes by its
+    registered name, or by its origin's `owner/repo` when checkouts of different origins share that name; an open PR
+    the home could not read is said on standard error, and so are an id not reserved on origin's counter and each of
+    the script's warnings (TD-970), the exit still 0. The branch of the directory it runs in goes with the call when
+    that directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Taken by:**` line,
+    where the home gives one, is said on standard error, and so, last, is the script's filing question where the repo
+    sets `review-outcomes` on (TD-1282)."""
     if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
         try:
             _td_repo(args.repo)
@@ -3505,7 +3500,7 @@ def _td_branch(key: str) -> str:
 
 
 def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
-    extra: dict[str, Any] = {"held": True} if getattr(args, "held", False) else {}
+    extra: dict[str, Any] = {}
     if branch:
         extra["branch"] = branch
     got = call_sync("td_next", repo=name, count=args.count, **extra)  # the home's 45 s budget is under the client's
@@ -3530,8 +3525,6 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
         "taken_by_line": taken_line,
         "question": got.get("question") or None,  # an older home answers no question
     }
-    if got.get("held"):
-        out["held"] = True
     if getattr(args, "td_alias", False):  # the old name (TD-1200): its bare ids, and its new name said once
         code = emit(args, out, lambda: print("\n".join(out["ids"])))
         if out["ids"]:
@@ -3546,41 +3539,12 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
     return code
 
 
-def cmd_td_hold(args: argparse.Namespace) -> int:
-    """`ao td hold <id> [--repo <name>] [--release] [--why "…"]` (design §4.7 *Entries*, §4.4 *Hold*; TD-710
-    slice 2, TD-731): the home's `td_hold` on the repo's main checkout, by path as `ao td add`'s — hold any
-    open entry, settling or settled, or release a held one; `--why` is the hold's words (TD-905), on the
-    record and the row, new words replacing old on a held entry. On a claimed entry, a line per holder and reader
-    the hold told (the reply's `told`) and per note it could not send (`untold`). A person's own: the host
-    agent refuses every session but the person's own shell."""
-    _, root = _td_repo(args.repo)
-    tid = str(args.entry).strip().upper()
-    why = " ".join(str(args.why or "").split())
-    if why and args.release:
-        print("ao td hold: --why is a hold's words; a release takes none", file=sys.stderr)
-        return 2
-    got = call_sync("td_hold", repo=root, id=tid, release=bool(args.release), **({"why": why} if why else {}))
-    if args.release:
-        lines = [f"{tid} released: pickable now"]
-    else:
-        said = str((got.get("held") or {}).get("why") or "") if isinstance(got.get("held"), dict) else why
-        lines = [f"{tid} held" + (f" ({said})" if said else "") + ": no lane takes it until you release it"]
-        readers = set(got.get("readers") or ())
-        for name in got.get("told") or ():
-            if name in readers:
-                lines.append(f"{name} reads its PR and is told to leave it unmerged")
-            else:
-                lines.append(f"{name} holds its claim and is told to drop it")
-        lines += [str(u) for u in got.get("untold") or ()]
-    return emit(args, got, lambda: print("\n".join(lines)))
-
-
 def cmd_td_road(args: argparse.Namespace) -> int:
     """`ao td done <id> [--repo <name>] ["<words>"]` and `ao td design <id> …` (design §4.7 *Entries*, §4.4
-    *Hold*; TD-1127): the Queue's and the Inbox's **Done…** and **Back to design…**, the home's
-    `ledger_decide {repo, id, road, words}` on the repo's main checkout, by path as `ao td hold`'s. Prints the
-    road's line and one per name its reply's `told` carries, a reader (`readers`) worded as `ao td hold`
-    words it. The person's and a person's session's (§4.8 *A person's session passes two of them*)."""
+    *The tell*; TD-1127): the Queue's and the Inbox's **Done…** and **Back to design…**, the home's
+    `ledger_decide {repo, id, road, words}` on the repo's main checkout, by path as `ao td add`'s. Prints the
+    road's line and one per name its reply's `told` carries, a reader (`readers`) told to leave its PR
+    unmerged. The person's and a person's session's (§4.8 *A person's session passes one of them*)."""
     _, root = _td_repo(args.repo)
     tid = str(args.entry).strip().upper()
     words = " ".join(str(args.words or "").split())
@@ -3713,7 +3677,7 @@ def _short(q: str | None, repo: str | None) -> str:
 
 def _settle_mark(e: dict[str, Any], now: datetime | None = None) -> str:
     """`ao repo`'s words after an entry's owner while the home's settle clock withholds it (design §4.7,
-    §4.4 *A new entry settles before it is pickable*, TD-710): *settles in 7m*, *held 2h*, else ''."""
+    §4.4 *A new entry settles before it is pickable*, TD-710): *settles in 7m*, else ''."""
     return settle_mod.words(e, now or datetime.now(UTC))
 
 
@@ -5133,7 +5097,7 @@ def build_parser() -> argparse.ArgumentParser:
         (
             "reserve",
             "reserve the next free ledger id, handed out by the home and recorded (§4.4); open to every session. "
-            "Every call spends the ids it prints, --held too: run it to file entries, and probe the home with "
+            "Every call spends the ids it prints: run it to file entries, and probe the home with "
             "ao repo or ao status",
         ),
         ("next", "the old name of ao td reserve: the same call, the bare ids, and its new name on standard error"),
@@ -5143,39 +5107,20 @@ def build_parser() -> argparse.ArgumentParser:
             "--json",
             action="store_true",
             default=argparse.SUPPRESS,
-            help="{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line}, and held true with --held",
+            help="{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line}",
         )
         q.add_argument(
             "--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)"
         )
         q.add_argument("--count", type=int, default=1, help="how many ids in a row, 1 to 10 (default: 1)")
-        q.add_argument(
-            "--held",
-            action="store_true",
-            help="land each id held until the person's Release (§4.4); the person's and an interactive session's",
-        )
         q.set_defaults(fn=cmd_td_next, td_alias=verb == "next")
-    q = dsub.add_parser(
-        "hold",
-        help="hold any open entry, settling or settled, or release a held one (§4.4); the person's own, and a "
-        "session the person started by hand (§4.8), which releases no hold the person pressed",
-    )
-    q.add_argument(
-        "--json",
-        action="store_true",
-        default=argparse.SUPPRESS,
-        help="{repo, id, held, settling, told, readers, untold}",
-    )
-    q.add_argument("entry", metavar="id", help="the entry's id, TD-NNN")  # `id` is resolved as a session's
-    q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
-    q.add_argument("--release", action="store_true", help="release a held entry: pickable at once")
-    q.add_argument("--why", help="the hold's words, on the record and the row; on a held entry they replace the old")
-    q.set_defaults(fn=cmd_td_hold)
     for road, what in (
         ("done", "Done…: the entry is done, a decided line on the board for its session"),
         ("design", "Back to design…: the entry goes back to its design, a decided line on the board"),
     ):
-        q = dsub.add_parser(road, help=f"{what} (§4.4 *Hold*); the person's, and a session the person started by hand")
+        q = dsub.add_parser(
+            road, help=f"{what} (§4.4 *The tell*); the person's, and a session the person started by hand"
+        )
         q.add_argument(
             "--json",
             action="store_true",

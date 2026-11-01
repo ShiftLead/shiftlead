@@ -3486,13 +3486,10 @@ class HostAgent(
         return out
 
     def _settle_refusal(self, s: Session, ref: str) -> str | None:
-        """Why a declared claim on a ledger entry is refused because it settles or the person holds it
-        (design §4.8 *A claim is a lease*, §4.4 *What settling withholds*, TD-710), read from the home's
-        reading of the claimer's repo; None for a reference that is no ledger id, or a repo not read."""
-        e = self._ledger_entry(s, ref)
-        held = e.get("held") if isinstance(e, dict) else None
-        by = self._presser_words(str(held.get("by") or "")) if isinstance(held, dict) else "the person"
-        return settle_mod.claim_refusal(e, datetime.now(UTC), by)  # the presser's words (TD-1117)
+        """Why a declared claim on a ledger entry is refused because it settles (design §4.8 *A claim is a
+        lease*, §4.4 *What settling withholds*, TD-710), read from the home's reading of the claimer's repo;
+        None for a reference that is no ledger id, or a repo not read."""
+        return settle_mod.claim_refusal(self._ledger_entry(s, ref), datetime.now(UTC))
 
     def _ledger_entry(self, s: Session, ref: str) -> dict[str, Any] | None:
         """Entry `ref` of the home's reading of the record's repo, marks and all; None for a reference

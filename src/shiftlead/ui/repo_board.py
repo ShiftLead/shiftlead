@@ -115,8 +115,8 @@ def place(e: Mapping[str, Any], cols: list[dict[str, Any]]) -> tuple[str, str]:
 
 
 def _waits_on_you(e: Mapping[str, Any]) -> bool:
-    """For you's rule (§4.4 *The card's status*): `Owner: paul`, `decision (paul)`, or the person's own hold."""
-    return e.get("for_page") == "for-you" or e.get("settle_mark") == "held"
+    """For you's rule (§4.4 *The card's status*): `Owner: paul` or `decision (paul)`."""
+    return e.get("for_page") == "for-you"
 
 
 def _people(roles: list[tuple[str, str]], members: Collection[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -141,9 +141,7 @@ def _people(roles: list[tuple[str, str]], members: Collection[Mapping[str, Any]]
 
 
 def _kind_word(e: Mapping[str, Any]) -> str:
-    """A row's word in its column's heading kinds (*build · live check*; *decide · paused*)."""
-    if e.get("settle_mark") == "held" and e.get("for_page") != "for-you":
-        return "paused"
+    """A row's word in its column's heading kinds (*build · live check*; *decide · yours*)."""
     k = str(e.get("for_page") or "")
     if k == "for-you":
         return "decide" if str(e.get("kind") or "") == "decision" else "yours"

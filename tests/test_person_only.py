@@ -61,7 +61,7 @@ def test_every_name_in_the_list_is_an_rpc_that_refuses_a_session_before_reading_
     `None` it is refused in the one shape — so nothing it reads is reached first. The agent is
     never constructed: a check that touched `self` before refusing would fail here too."""
     rpcs = _rpcs()
-    assert len(mail.PERSON_ONLY) == 34
+    assert len(mail.PERSON_ONLY) == 33
     assert set(rpcs) >= mail.PERSON_ONLY, sorted(mail.PERSON_ONLY - set(rpcs))
     bare = HostAgent.__new__(HostAgent)
     bare.sessions = {}  # the one thing the check reads: a caller this host does not hold is a session
@@ -79,9 +79,9 @@ def test_every_name_in_the_list_is_an_rpc_that_refuses_a_session_before_reading_
 
 
 def test_the_person_session_subset_is_in_the_list_and_its_rpcs_alone_set_session_ok():
-    """§4.8 *A person's session passes two of them* (TD-1117): the subset is two names of the list, and the
-    check passes `session_ok` in exactly those RPCs' first statements — read from the source."""
-    assert {"td_hold", "ledger_decide"} == mail.PERSON_SESSION and mail.PERSON_SESSION <= mail.PERSON_ONLY
+    """§4.8 *A person's session passes one of them* (TD-1117, TD-1297): the subset is one name of the list,
+    and the check passes `session_ok` in exactly that RPC's first statement — read from the source."""
+    assert {"ledger_decide"} == mail.PERSON_SESSION and mail.PERSON_SESSION <= mail.PERSON_ONLY
     rpcs = _rpcs()
     for name in sorted(mail.PERSON_ONLY):
         src = textwrap.dedent(inspect.getsource(rpcs[name]))

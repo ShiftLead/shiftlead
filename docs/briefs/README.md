@@ -56,7 +56,7 @@ restarted often; send the mail to tell it now, and write the direction where the
 | The direction | Where it lasts |
 |---|---|
 | a path to keep out of | a line in the team's brief here, by PR (a changed brief restarts its members, design §6 rule 7) |
-| an entry to wait or stop | a hold with `--why` (`ao td hold`), whose holders are told |
+| an entry to wait or stop | `**Blocked by:** decision (<person>)` with an `**Ask:**`, by a ledger PR (design §4.4 *Holding an entry is a decision on it*) |
 | a condition on an entry | the entry's **Status** or `**Blocked by:**` |
 | a path to cross only after a read | the repo's `held:` paths in `.shiftlead.yml` |
 

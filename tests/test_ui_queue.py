@@ -63,7 +63,7 @@ def at(hours: float) -> str:
 
 def queue(repo2: bool = False) -> dict:
     """In progress: s#TD-10 held by grinder-1, with an archived row closed 2h ago. Up next: s#TD-20 and its
-    build, s#TD-30 the person holds. Completed: a two-entry card 3h ago, one 30h ago, one 10 days ago, one
+    build, s#TD-30 on the person's decision. Completed: a two-entry card 3h ago, one 30h ago, one 10 days ago, one
     40 days ago (outside every window). Other work: a board line grinder-2 holds."""
     g1 = {"id": "g1", "name": "grinder-1", "state": "working"}
     cards = [
@@ -90,7 +90,7 @@ def queue(repo2: bool = False) -> dict:
             [row("s", "TD-21", "build the queue", state="waiting", depth=1, parent="s#TD-20", after=["s#TD-20"])],
             place=1,
         ),
-        card(row("s", "TD-30", "keep this one back", state="held (person)"), place=2, status="needs you"),
+        card(row("s", "TD-30", "keep this one back", state="", needs="decision"), place=2, status="needs you"),
     ]
     if repo2:
         cards.append(card(row("db", "TD-5", "a db entry"), place=3))
@@ -383,8 +383,9 @@ def test_with_nothing_on_the_queue_the_inbox_tab_holds_the_number(tmp_path, monk
 
 
 def ledger_repos() -> dict:
-    """The repo facts' *for you* and held entries of repo `s`: TD-21 yours to do (`Owner: paul`), TD-20 your
-    decision (`decision (paul)`), TD-30 held by the person; and TD-99, which no card holds."""
+    """The repo facts' *for you* entries of repo `s`: TD-21 yours to do (`Owner: paul`), TD-20 your
+    decision (`decision (paul)`); TD-30 with an old clock's `held` mark, no row since TD-1297; and TD-99,
+    which no card holds."""
     e = lambda i, **kw: {"id": i, "title": f"entry {i}", "priority": "medium", "for_page": "for-you", **kw}  # noqa: E731
     return {"/r/s": {"name": "s", "root": "/r/s", "ledger": {"entries": [
         e("TD-21", owner="paul"),
@@ -397,8 +398,8 @@ def ledger_repos() -> dict:
 def test_the_ledger_rows_leave_later_for_their_cards(tmp_path, monkeypatch):
     """§4.5 screen 6 *Where a row is drawn*, screen 12 *What needs the person* (TD-771 slice 3): a ledger row
     whose entry a card holds is drawn on that row — *yours to do* with Done, a decision with Lift the hold (Start
-    session is the card header's alone), *held (person)* with Release — and leaves the Inbox's *Later*; one no
-    card holds stays there."""
+    session is the card header's alone) — and leaves the Inbox's *Later*; one no card holds stays there. An old
+    clock's `held` mark draws nothing (TD-1297)."""
     c = client(monkeypatch, tmp_path, fake(queue(), [], ledger_repos()))
     html = c.get("/queue").text
     card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
@@ -408,7 +409,7 @@ def test_the_ledger_rows_leave_later_for_their_cards(tmp_path, monkeypatch):
     assert "yours to do" in card20 and 'data-words="done"' in card20 and ">Done</button>" in card20
     # no row draws Start session: it is the card's, once, in its header (TD-912, TD-914)
     assert card20.count('data-act="ledger_start"') == card20.count("qstart")
-    assert "held (person)" in card30 and 'data-act="ledger_release"' in card30
+    assert "held (person)" not in card30 and "ledger_release" not in card30 and "Release" not in card30
     assert "entry TD-99" not in html
     inbox = c.get("/inbox").text
     later = inbox[inbox.index('id="ledgerforyou"') :]
@@ -449,7 +450,7 @@ def test_lift_the_hold_and_done_send_the_ledger_rows_reply_road(tmp_path, monkey
     ]
 
 
-def test_a_held_person_card_reads_needs_you():
+def test_a_card_on_the_persons_decision_reads_needs_you():
     v = queue_view(queue(), NOW)
     (c30,) = [c for c in v["up_next"] if c["id"] == "s#TD-30"]
     assert c30["status"] == "needs you" and v["n"]["needs_you"] == 1

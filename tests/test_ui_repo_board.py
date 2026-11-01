@@ -111,7 +111,11 @@ def test_claimed_rows_first_then_queued_by_card_then_blocked_folded():
             card("r#TD-1", [design, build], places=[("r", 1)]),
             card("r#TD-3", [entry("TD-3"), entry("TD-4", "blocked")], places=[("r", 2)]),
             card("r#TD-5", [entry("TD-5", owner="paul", **{"for_page": "for-you"})], places=[("r", 3)]),
-            card("r#TD-6", [entry("TD-6", settle_mark="held")], places=[("r", 4)]),
+            card(
+                "r#TD-6",
+                [entry("TD-6", owner="paul", **{"for_page": "for-you", "kind": "decision"})],
+                places=[("r", 4)],
+            ),
         ],
         "upnext": ["r#TD-1", "r#TD-3", "r#TD-5", "r#TD-6"],
     }
@@ -126,8 +130,8 @@ def test_claimed_rows_first_then_queued_by_card_then_blocked_folded():
     assert bu["n_blocked"] == 1 and bu["blocked"] == [] and bu["n"] == 4
     opened = rb.board(cards, [], [("grind", TD)], [], "r", ["TD-4"])
     assert [r["id"] for r in opened["stages"][1]["blocked"]] == ["TD-4"]
-    # For you: what waits on the person — Owner: paul, and the person's hold — numbered and moved as a card
-    assert ids(b["foryou"]) == ["TD-5", "TD-6"] and b["foryou"]["kinds"] == ["yours", "paused"]
+    # For you: what waits on the person — Owner: paul or decision (paul) — numbered and moved as a card
+    assert ids(b["foryou"]) == ["TD-5", "TD-6"] and b["foryou"]["kinds"] == ["yours", "decide"]
 
 
 def test_an_in_progress_cards_rows_carry_no_number_and_no_grip():

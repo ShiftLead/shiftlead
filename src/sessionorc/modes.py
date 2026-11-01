@@ -34,7 +34,6 @@ from sessionorc.mail import as_person, self_decide_refusal
 # where the repos registry holds the repo and hands this half on (review of PR #1019).
 # **`ledger_decide`** (§4.5a *Inbox row: ledger entry*, TD-565): the entry is read from the home's repo
 # facts, which a node holds none of, and the line lands on the board of a checkout the home's registry names.
-# **`td_hold`** (§4.4 *Hold*, TD-710): the settle clock, `ledger_seen.json`, is the home's, beside `ids.json`.
 # **`set_settings`** (§4.4a *Settings, replicated*, TD-147): `settings.yml` is the home's, and a node
 # holds the replica the home last sent, which the next frame overwrites. **`set_reach`** (§4.7 `ao connect`,
 # TD-648) writes the same file's `reach:` key, and the route is the home's.
@@ -73,7 +72,6 @@ HOME_EDITS = frozenset(
         "entry_add",
         "board_reply_hand",
         "ledger_decide",
-        "td_hold",
         "clear_work",
         "work_start",
         "clear_mark",

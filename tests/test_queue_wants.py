@@ -1,6 +1,6 @@
 """TD-911, design §4.5 screen 12 *Three wants*, *A card*; §4.5a *Queue page: card*, *Queue card: Read n*: what
 is attached to a card is gathered into Decide and Do — in the header, amber, counted on the pill — and Read, under
-the rows, folded with its count; a held entry is no want; the page header counts Decide and Do in items."""
+the rows, folded with its count; the page header counts Decide and Do in items."""
 
 from datetime import UTC, datetime
 
@@ -41,7 +41,7 @@ def test_each_kind_lands_in_its_want():
     assert want_of({"row": "board", "kind": "watch"}, "needs") == "read"
     assert want_of({"row": "ledger", "why": "decision"}, "needs") == "decide"  # held until
     assert want_of({"row": "ledger", "why": "yours"}, "needs") == "do"  # yours to do
-    assert want_of({"row": "ledger", "why": "yours", "release": True}, "needs") == "held"  # no want while held
+    assert want_of({"row": "ledger", "why": "yours", "release": True}, "needs") == "do"  # no held want (TD-1297)
     assert want_of({"row": "red_pr"}, "needs") == "do"
     for sec in ("answered", "waiting", "fyi"):
         assert want_of({"kind": "ask"}, sec) == "read"
@@ -80,19 +80,20 @@ def test_the_page_headers_decide_counts_items_on_a_card_with_two():
     assert v["n"]["decide"] == 3
 
 
-def test_a_held_entry_is_no_want_and_draws_the_held_row():
+def test_a_ledger_row_is_always_a_want_and_no_card_has_a_held_line():
+    """TD-1297: no *held* want and no held row — an entry held out of the lanes is a `decision (<person>)`
+    row, a Decide like any."""
     later = [
         {"row": "ledger", "id": "TD-3", "row_id": "ledger:s:TD-3", "why": "yours", "release": True,
          "kind": "ledger · yours", "answers": ["a"], "home": "queue", "on_card": "s#TD-2", "on_row": "s#TD-3",
          "later_section": "later"},
     ]  # fmt: skip
     drawn = []
-    got = attach({}, lambda e, sec: drawn.append(e) or Markup("<held>"), later)
+    got = attach({}, lambda e, sec: drawn.append(e) or Markup("<row>"), later)
     v = queue_view(queue(), NOW, got)
     two = v["up_next"][1]
-    assert two["status"] == "ready" and two["wants"]["n"] == {"decide": 0, "do": 0, "read": 0}
-    assert len(two["wants"]["held"]) == 1
-    assert drawn[0]["kind"] == "ledger · held" and drawn[0]["claimed"] and drawn[0]["answers"] == []
+    assert two["wants"]["n"] == {"decide": 0, "do": 1, "read": 0} and "held" not in two["wants"]
+    assert drawn[0]["kind"] == "ledger · yours" and "claimed" not in drawn[0] and drawn[0]["answers"] == ["a"]
 
 
 def test_a_card_draws_decide_and_do_in_its_header_and_read_folded_under_its_rows():

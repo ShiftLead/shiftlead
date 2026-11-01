@@ -93,7 +93,7 @@ def test_a_ledger_item_answers_done_or_lift_the_hold_in_its_row_and_opens_behind
     # the Inbox's own ledger row keeps Reply, Go with it and its controls inline (§4.5a *Inbox row: ledger entry*)
     page = inbox({**row, "home": "inbox"})
     assert ">Reply</button>" in page and ">Go with it</button>" in page and "qdots" not in page
-    assert 'class="btn sm ghost" type="button" data-act="ledger_hold"' in page
+    assert 'data-road="done"' not in page and "Hold…" not in page and "ledger_hold" not in page  # yours: no Done…
 
 
 def test_a_board_line_answers_on_its_line_and_checks_off_behind_its_dots(tmp_path, monkeypatch):
@@ -167,10 +167,10 @@ def test_a_rows_dots_hold_its_controls_in_order_and_the_headers_act_on_the_top_e
     q = templates.get_template("queue_row.html").module
     r = {"id": "TD-5", "title": "t", "repo": "s", "page": "pickable", "state": "ready", "needs": ""}
     html = str(q.menu(r))
-    assert dots(html) == ["Hold…, Back to design…, Done…, Open"]
+    assert dots(html) == ["Back to design…, Done…, Open"]
     # bare at every width: its names in its title and label, never drawn beside it on hover (TD-926)
-    assert 'title="Hold… · Back to design… · Done… · Open"' in html
-    assert 'aria-label="the team\'s controls: Hold…, Back to design…, Done…, Open">⋯</summary>' in html
+    assert 'title="Back to design… · Done… · Open"' in html
+    assert 'aria-label="the team\'s controls: Back to design…, Done…, Open">⋯</summary>' in html
     assert "qdotsnames" not in html
     assert "qdotsnames" not in (UI / "static" / "app.css").read_text(encoding="utf-8")
     acts = re.findall(
@@ -179,16 +179,17 @@ def test_a_rows_dots_hold_its_controls_in_order_and_the_headers_act_on_the_top_e
         html,
     )
     assert [(a, road) if a else c for a, road, c in acts] == [
-        ("ledger_hold", ""),
         ("ledger", "design"),
         ("ledger", "done"),
         "/repo/s#TD-5",
     ]
     assert "btn sm ghost" not in html  # the menu's own items, not the inline buttons
-    held = str(q.menu({**r, "state": "held (person)"}))
-    assert dots(held) == ["Release, Back to design…, Done…, Open"] and 'data-act="ledger_release"' in held
+    # no Hold… and no Release (TD-1297): an entry held out of the lanes is a `decision (<person>)` row
+    design = str(q.menu({**r, "page": "design"}))
+    assert dots(design) == ["Done…, Open"] and 'title="Done… · Open"' in design
+    assert 'aria-label="the team\'s controls: Done…, Open"' in design and "ledger_release" not in design
     assert dots(str(q.menu({**r, "archived": True}))) == ["Open"]
-    assert dots(str(q.menu({**r, "needs": "owner", "page": "for-you"}))) == ["Hold…, Open"]  # its Done is an answer
+    assert dots(str(q.menu({**r, "needs": "owner", "page": "for-you"}))) == ["Open"]  # its Done is an answer
 
 
 def test_the_queue_page_draws_no_reply_word_and_the_headers_dots(tmp_path, monkeypatch):
@@ -223,7 +224,7 @@ global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const AO = window.AO;
 const focusable = (name) => { const o = { name, focus: () => { document.activeElement = o; } }; return o; };
-const mark = focusable("mark"), items = ["Hold", "Done", "Open"].map(focusable);
+const mark = focusable("mark"), items = ["Design", "Done", "Open"].map(focusable);
 const d = { open: false, querySelector: (s) => (s === "summary" ? mark : null), querySelectorAll: () => items };
 const at = (t) => ({ closest: (s) => (s === "details.qdots" ? d : null), ...t });
 const press = (key, target) => AO.qDots({ key, target: at(target || {}) });
@@ -251,7 +252,7 @@ def test_the_dots_keyboard_model_opens_moves_and_closes_back_on_the_mark(tmp_pat
     assert out == {
         "down": True,
         "opened": True,
-        "first": "Hold",
+        "first": "Design",
         "second": "Done",
         "wrapped": "Open",
         "esc": True,

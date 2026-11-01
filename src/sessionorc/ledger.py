@@ -261,8 +261,9 @@ class LiveReader:
         return self._seen[n]
 
 
-PERSON_OWNER = "paul"  # the person's owner word, as this ledger's `Fields:` line declares it (§4.4 *Repo facts*)
-DESIGNER_OWNER = "designer"
+# the person's owner word, as this ledger's `Fields:` line declares it (§4.4 *Repo facts*): the `<person>` of every
+# `decision (<person>)` the code writes or reads, held here once (§4.4 *Holding an entry is a decision on it*)
+PERSON_OWNER = "paul"
 
 
 def decided_by(entry: dict[str, Any], who: str) -> bool:
@@ -280,7 +281,7 @@ def kind_of(entry: dict[str, Any]) -> str:
     `decision (paul)`; *blocked* — `Blocked by:` holds any item other than a `decision (…)` (an open
     id, a cross-repo or unreadable one), whatever the Kind and whatever decision stands beside it;
     or some open entry names it in `Part of:` (`parts_open`, TD-1130);
-    *design* — `Kind: design-first`, or blocked by `decision (designer)` alone; *live check* —
+    *design* — `Kind: design-first` (a decision owed to the designer is that `Kind:`, TD-1296); *live check* —
     `Kind: live-check`, its build live or not; *pickable* — pickable, `Kind: build` or none;
     *evaluation* — `Kind: evaluation`, which no lane takes since the anchor seat is retired (§4.9b
     *No anchor seat*), so `flags` names each; else *other*, a residue that should be empty (`flags`),
@@ -289,7 +290,7 @@ def kind_of(entry: dict[str, Any]) -> str:
         return "for-you"
     if any(not b.startswith("decision (") for b in entry.get("blocked_by") or []) or entry.get("parts_open"):
         return "blocked"
-    if entry.get("kind") == "design-first" or decided_by(entry, DESIGNER_OWNER):
+    if entry.get("kind") == "design-first":
         return "design"
     if entry.get("kind") == "live-check":
         return "live-check"
@@ -326,25 +327,23 @@ def _buildlike(entry: dict[str, Any]) -> bool:
 
 def lane_matches(lane: list[str], entry: dict[str, Any], team: str | None = None) -> bool:
     """Whether an entry belongs to a lane (design §6 rule 6, TD-195), by its header and never its
-    prose. A word: `design-first` is a pickable entry with `Kind: design-first`, or any entry
-    blocked by `decision (designer)`; `free-pick` a
+    prose. A word: `design-first` is a pickable entry with `Kind: design-first`; `free-pick` a
     pickable one whose kind is `build` or unwritten (TD-228), or a live check whose build is live
     (§4.9b, TD-323), so a live check not yet live, an evaluation and a decision match no lane; a
     reference, or any other word, matches nothing until a role gives it a meaning here. **An
     `owner:<word>` narrows the rest** (TD-214, TD-227): with one or more, the entry's `Owner:` must
     be one named or absent, so `[free-pick, owner:grinder]` leaves the designer's entries out; it
-    matches nothing by itself. An entry blocked by `decision (designer)` is the designer's
-    (TD-367): `design-first` takes it pickable or not, and its owner reads `designer`. A **work
+    matches nothing by itself. A **work
     order** — a decided board line, `board:<key>` (§4.4 *Board write-back*, TD-384) — is in every
     `free-pick` lane, whatever `owner:` words stand beside it, and so is a red PR's, `pr:<n>` (TD-613):
     the grinders' pick list, since the anchor seat is retired (§4.9b *No anchor seat*, TD-757). **An
-    entry still settling, or held** (`settling`, `held`: the home's
-    marks, §4.4 *A new entry settles before it is pickable*, TD-710), **or waiting** (`waiting`, §4.4 *An
+    entry still settling** (`settling`: the home's mark, §4.4 *A new entry settles before it is pickable*,
+    TD-710), **or waiting** (`waiting`, §4.4 *An
     entry says what it waits for*, TD-716), matches no lane. **`team`** is the lane's record's (§4.4 *An
     entry names its team*, TD-730): an entry marked `needs_team` matches nothing; one with a `team`
     matches only a lane of that team, case-folded; a lane with no team ('' or None) narrows nothing;
     a work order carries no team and matches as its own rule says."""
-    if entry.get("settling") or entry.get("held") or entry.get("waiting"):
+    if entry.get("settling") or entry.get("waiting"):
         return False
     owners = {o for w in lane if (o := owner_word(w))}
     if not entry.get("work_order"):
@@ -357,7 +356,7 @@ def lane_matches(lane: list[str], entry: dict[str, Any], team: str | None = None
         # a decided board line has no owner, and `owner:<word>` never narrows one out (TD-384); nor a
         # red PR's (TD-613): both are on the grinders' pick list (§4.9b *No anchor seat*)
         return "free-pick" in lane and entry.get("pickable") == "yes"
-    mine = DESIGNER_OWNER if decided_by(entry, DESIGNER_OWNER) else str(entry.get("owner") or "").lower()
+    mine = str(entry.get("owner") or "").lower()
     if owners and mine and mine not in owners:
         return False
     return any(_word_matches(w, entry) for w in lane if owner_word(w) is None)
@@ -401,7 +400,7 @@ def in_lanes(
     by_owner: dict[str, list[str]] = {}
     ours = {t.casefold() for _, t in lanes if t}  # another team's entry is in its own team's rest, not this one's
     for e in open_:
-        withheld = e.get("settling") or e.get("held") or e.get("waiting") or e.get("needs_team")
+        withheld = e.get("settling") or e.get("waiting") or e.get("needs_team")
         if ours and str(e.get("team") or "") and str(e["team"]).casefold() not in ours:
             continue
         if e["for_page"] == "pickable" and e["id"] not in taken and not withheld:
@@ -453,8 +452,6 @@ def _unwaited(entry: dict[str, Any]) -> dict[str, Any]:
 
 
 def _word_matches(word: str, entry: dict[str, Any]) -> bool:
-    if word == "design-first" and decided_by(entry, DESIGNER_OWNER):
-        return True
     if entry.get("pickable") != "yes":
         return False
     if word == "design-first":
@@ -565,8 +562,7 @@ def entries(
         e["team"] = _word(fields.get("team", ""))
         if why := team_need(e, teams):
             e["needs_team"] = {"why": why}
-        # an Inbox row's reading (TD-565) on every open entry: a hold is marked after the parse, and a
-        # held row opens with its Why and Fix (§4.5 screen 6 *A held entry waits on the person too*, TD-736)
+        # an Inbox row's reading (TD-565) on every open entry, which opens with its Why and Fix
         added = DATE.search(fields.get("added", ""))
         e["added"] = added.group(0) if added else ""
         body = t[m.end() : nxt.start() if nxt else len(t)]
