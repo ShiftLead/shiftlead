@@ -5,6 +5,7 @@ checkout is not in a state to take that commit."""
 from __future__ import annotations
 
 import asyncio
+import json
 import subprocess
 from pathlib import Path
 
@@ -1243,10 +1244,11 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
 async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line(
     agent, repo, tmp_path, monkeypatch
 ):
-    """TD-905 (§4.5 screen 12 *any open row*, §4.4 *Hold*): `ledger_decide` with `road` — Done… on a row
+    """TD-905 (§4.5 screen 12 *any open row*, §4.4 *The tell*): `ledger_decide` with `road` — Done… on a row
     that is not *yours to do*, Back to design… on a pickable, live check or id-blocked one — tells the
-    entry's unattended holder first, clears a person's hold, then writes *done — <words>* or *back to design
-    — <words>* as one decided line; refused, writing nothing, where a holder could not be told."""
+    entry's unattended holder first, then writes *done — <words>* or *back to design — <words>* as one
+    decided line; refused, writing nothing, where a holder could not be told. The clock records no hold
+    for it to clear (TD-1297)."""
     import shutil
     from datetime import UTC, datetime
 
@@ -1269,7 +1271,7 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         {"id": "TD-21", "title": "a design", "for_page": "design"},
         {"id": "TD-22", "title": "mine", "for_page": "for-you", "owner": "paul"},
         {"id": "TD-23", "title": "after a sibling", "for_page": "blocked", "blocked_by": ["TD-20"]},
-        {"id": "TD-24", "title": "held build", "for_page": "pickable"},
+        {"id": "TD-24", "title": "another build", "for_page": "pickable"},
         {"id": "TD-25", "title": "after an archived one", "for_page": "blocked", "blocked_by": ["TD-9"]},
         {"id": "TD-26", "title": "a parent", "for_page": "blocked", "parts_open": ["TD-20"]},  # TD-1130
     ]
@@ -1314,12 +1316,11 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         )
         notes = [e.text for e in w.inbox if e.from_ == PERSON and e.about == "TD-20"]
         assert notes and notes[0].startswith("TD-20 goes back to design — split it: stop at the step in hand")
-        await me.call("td_hold", repo=root, id="TD-24", why="later")
         with pytest.raises(AgentError, match="may not carry"):
             await me.call("ledger_decide", repo=root, id="TD-24", road="done", words="Decided: x")
-        assert "held" in entries[4], "a refused press keeps the hold"
         got = await me.call("ledger_decide", repo=root, id="TD-24", road="done")
-        assert got["decided"] == "done" and got["told"] == [] and "held" not in entries[4], "the hold is cleared"
+        assert got["decided"] == "done" and got["told"] == []
+        assert "held" not in json.dumps(settle._load()), "the clock records no hold"
         got = await me.call("ledger_decide", repo=root, id="TD-23", road="design", words="w")
         assert got["decided"] == "back to design — w"
         with pytest.raises(AgentError, match="already decided"):
@@ -1498,10 +1499,10 @@ def test_of_two_open_lines_sharing_an_id_the_one_shown_word_for_word_is_found(ke
 async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_decision(
     agent, repo, tmp_path, monkeypatch
 ):
-    """TD-1127 (§4.8 *A person's session passes two of them*): a session the person started by hand presses
-    **Done…** and **Back to design…** — the commit names it, the holder's note names it once, a hold the
-    person pressed is cleared — and is refused Done on an entry that waits on the person's decision, which
-    the person's shell closes as the person, *n/a* in the commit and *the person* in the note."""
+    """TD-1127 (§4.8 *A person's session passes one of them*): a session the person started by hand presses
+    **Done…** and **Back to design…** — the commit names it, the holder's note names it once — and is
+    refused Done on an entry that waits on the person's decision, which the person's shell closes as the
+    person, *n/a* in the commit and *the person* in the note."""
     import shutil
     from datetime import UTC, datetime
 
@@ -1520,10 +1521,8 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
     entries = [
         {"id": "TD-30", "title": "a build", "for_page": "pickable"},
         {"id": "TD-31", "title": "the person's call", "for_page": "for-you", "blocked_by": ["decision (paul)"]},
-        {"id": "TD-32", "title": "held build", "for_page": "pickable"},
+        {"id": "TD-32", "title": "a third build", "for_page": "pickable"},
         {"id": "TD-33", "title": "another build", "for_page": "pickable"},
-        {"id": "TD-34", "title": "held unseen", "for_page": "pickable"},
-        {"id": "TD-35", "title": "seen held", "for_page": "pickable"},
     ]
     settle.observe(entries, "o/r", {}, datetime.now(UTC))
     agent._repos = {
@@ -1554,29 +1553,14 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
     got = await agent.rpc_ledger_decide(repo=root, id="TD-31", road="done", caller="ao-sh")
     assert got["message"].endswith("(session n/a)"), "the person's shell is the person"
     assert notes("TD-31")[0].startswith("TD-31 is closed by the person: stop"), notes("TD-31")
-    # a hold the person pressed: the session's Done clears it, the press being the decision
-    await agent.rpc_td_hold(repo=root, id="TD-32")
-    assert len(notes("TD-32")) == 1
-    with pytest.raises(RpcError, match="the person's own: they release it"):
-        await agent.rpc_td_hold(repo=root, id="TD-32", release=True, caller="ao-me")
     got = await agent.rpc_ledger_decide(repo=root, id="TD-32", road="done", caller="ao-me")
-    assert "held" not in entries[2] and "held" not in settle._load()["o/r"]["TD-32"], "the hold is cleared"
-    assert notes("TD-32")[1].startswith("TD-32 is closed by the person's session me: stop"), notes("TD-32")
+    assert notes("TD-32")[0].startswith("TD-32 is closed by the person's session me: stop"), notes("TD-32")
     got = await agent.rpc_ledger_decide(repo=root, id="TD-33", road="design", words="split it", caller="ao-me")
     assert got["decided"] == "back to design — split it" and got["message"].endswith("(session me)")
-    # a reading behind the store: the store's hold is cleared all the same; one ahead of it, nothing to do
-    await agent.rpc_td_hold(repo=root, id="TD-34")
-    entries[4].pop("held")
-    await agent.rpc_ledger_decide(repo=root, id="TD-34", road="done", caller="ao-me")
-    assert "held" not in settle._load()["o/r"]["TD-34"] and "held" not in entries[4]
-    entries[5]["held"] = {"at": "2026-10-28T00:00:00+00:00", "by": "person"}
-    await agent.rpc_ledger_decide(repo=root, id="TD-35", road="done", caller="ao-me")
-    assert "held" not in entries[5], "re-marked from the store"
     # a person's session on a node, by its id in the home's graph
     agent.remote = {
         "laptop": {"ao-me": Session(id="ao-me", name="lap", kind="interactive", adapter="claude-code", dir="")}
     }
-    await agent.rpc_td_hold(repo=root, id="TD-33", tell="x", caller="ao-me")  # nothing claimed: a no-op notice
     entries.append({"id": "TD-36", "title": "on a node", "for_page": "pickable"})
     settle.observe(entries, "o/r", {}, datetime.now(UTC))
     got = await agent.rpc_ledger_decide(repo=root, id="TD-36", road="done", caller="ao-me@laptop")

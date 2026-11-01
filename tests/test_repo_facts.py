@@ -4,7 +4,6 @@ failed read keeping the last reading with the error beside it, never zero."""
 
 from __future__ import annotations
 
-import argparse
 import json
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -663,33 +662,10 @@ def test_ao_repo_says_an_unserved_repo_first_and_carries_serve(repo, monkeypatch
     assert out.startswith("r  0 open PRs") and "pickable     TD-1" in out and "design       TD-2" in out
 
 
-def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monkeypatch, capsys):
-    """TD-368 slice 2 (design §4.7, TD-367): a build on `decision (designer)` is on the design list
-    and says *decision* after its owner; a `Kind: design-first` row does not."""
-    from shiftlead import cli
-
-    entries = [
-        {"id": "TD-151", "title": "metered", "for_page": "design", "priority": "low", "owner": "grinder",
-         "kind": "build", "blocked_by": ["decision (designer)"]},
-        {"id": "TD-230", "title": "a question", "for_page": "design", "priority": "high", "owner": "designer",
-         "kind": "design-first", "blocked_by": []},
-    ]  # fmt: skip
-    reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []}, "ledger": {"entries": entries}}}
-    monkeypatch.setattr(
-        cli,
-        "call_sync",
-        lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "queue": {}, "inbox": {}}[rpc],
-    )
-    monkeypatch.chdir(repo)
-    assert cli.main(["repo"]) == 0
-    out = capsys.readouterr().out
-    assert "design       TD-151  Low     grinder decision  metered" in out
-    assert "design       TD-230  High    designer     a question" in out
-
-
-def test_ao_repo_says_a_settling_or_held_entry_after_its_owner_and_counts_it_not_pickable(repo, monkeypatch, capsys):
-    """TD-710 slice 2 (design §4.7, §4.4 *A new entry settles before it is pickable*): *settles in 7m* or
-    *held 2h* after the owner, and the first line's pickable count leaves both out."""
+def test_ao_repo_says_a_settling_entry_after_its_owner_and_counts_it_not_pickable(repo, monkeypatch, capsys):
+    """TD-710 slice 2 (design §4.7, §4.4 *A new entry settles before it is pickable*): *settles in 7m* after
+    the owner, and the first line's pickable count leaves it out. An old clock's `held` mark says nothing and
+    withholds nothing (TD-1297)."""
     from datetime import UTC, datetime, timedelta
 
     from shiftlead import cli
@@ -712,64 +688,16 @@ def test_ao_repo_says_a_settling_or_held_entry_after_its_owner_and_counts_it_not
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
-    assert "3 open entries: 1 pickable," in out
+    assert "3 open entries: 2 pickable," in out
     assert "pickable     TD-001  Medium  grinder      a build" in out
     assert "pickable     TD-002  Medium  grinder settles in 7m  new" in out
-    assert "pickable     TD-003  Medium  grinder held 2h  held" in out
-
-
-def test_ao_td_hold_sends_the_main_checkout_and_says_what_it_did(repo, monkeypatch, capsys):
-    """TD-710 slice 2 (design §4.7 `ao td hold`): the repo's main checkout by path, the id upper-cased."""
-    from shiftlead import cli
-
-    sent = []
-    told = {"told": ["grinder-ao-2", "techlead"], "readers": ["techlead"], "untold": ["could not tell g3: full"]}
-    monkeypatch.setattr(cli, "_td_repo", lambda r: ("r", str(repo)))
-    monkeypatch.setattr(
-        cli,
-        "call_sync",
-        lambda rpc, **kw: sent.append((rpc, kw)) or {"id": kw["id"], **(told if not kw["release"] else {})},
-    )
-    assert cli.main(["td", "hold", "td-707"]) == 0
-    assert cli.main(["td", "hold", "TD-707", "--release"]) == 0
-    out = capsys.readouterr().out
-    assert sent == [("td_hold", {"repo": str(repo), "id": "TD-707", "release": False}),
-                    ("td_hold", {"repo": str(repo), "id": "TD-707", "release": True})]  # fmt: skip
-    assert out.splitlines() == [
-        "TD-707 held: no lane takes it until you release it",  # §4.7: a hold ends only at Release (TD-731)
-        "grinder-ao-2 holds its claim and is told to drop it",
-        "techlead reads its PR and is told to leave it unmerged",
-        "could not tell g3: full",
-        "TD-707 released: pickable now",
-    ]
-    td = next(a for a in cli.build_parser()._actions if isinstance(a, argparse._SubParsersAction)).choices["td"]
-    helps = {
-        c.dest: c.help for a in td._actions if isinstance(a, argparse._SubParsersAction) for c in a._choices_actions
-    }
-    assert helps["hold"].startswith("hold any open entry, settling or settled, or release a held one (§4.4)")
-
-
-def test_ao_td_hold_why_sends_the_holds_words_and_a_release_takes_none(repo, monkeypatch, capsys):
-    """TD-905 (design §4.7 `ao td hold --why`): the words, one line, on the call and the printed line."""
-    from shiftlead import cli
-
-    sent = []
-    monkeypatch.setattr(cli, "_td_repo", lambda r: ("r", str(repo)))
-    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: sent.append((rpc, kw)) or {"id": kw["id"]})
-    assert cli.main(["td", "hold", "TD-707", "--why", " after  Friday "]) == 0
-    assert sent == [("td_hold", {"repo": str(repo), "id": "TD-707", "release": False, "why": "after Friday"})]
-    assert capsys.readouterr().out.splitlines() == ["TD-707 held (after Friday): no lane takes it until you release it"]
-    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {"id": kw["id"], "held": {"at": "t", "why": "cut"}})
-    assert cli.main(["td", "hold", "TD-707", "--why", "cut and more"]) == 0
-    assert capsys.readouterr().out.splitlines() == ["TD-707 held (cut): no lane takes it until you release it"]
-    assert cli.main(["td", "hold", "TD-707", "--release", "--why", "x"]) == 2
-    assert len(sent) == 1 and "a release takes none" in capsys.readouterr().err
+    assert "pickable     TD-003  Medium  grinder      held" in out and "held 2h" not in out
 
 
 def test_ao_td_done_and_design_press_the_roads_and_say_whom_they_told(repo, monkeypatch, capsys):
     """TD-1127 (design §4.7 `ao td done` / `ao td design`): `ledger_decide` with the road, the main checkout by
-    path, the id upper-cased and the words one line, optional; a line per name told, a reader as `ao td hold`
-    words it."""
+    path, the id upper-cased and the words one line, optional; a line per name told, a reader told to leave
+    its PR unmerged."""
     from shiftlead import cli
 
     sent = []

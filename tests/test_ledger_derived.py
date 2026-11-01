@@ -234,14 +234,15 @@ def test_the_page_kinds_in_order():
     ):
         assert kind(block) == "blocked", block
     assert kind("**Kind:** design-first") == "design"
-    assert kind("**Kind:** build\n**Blocked by:** decision (designer)") == "design"
+    # a decision owed to the designer is `Kind: design-first`, never a `decision (designer)` item (TD-1296)
+    assert kind("**Kind:** build\n**Blocked by:** decision (designer)") == "other"
     assert kind("**Kind:** design-first\n**Blocked by:** decision (anchor)") == "design"
     assert kind("**Kind:** live-check #12") == "live-check"
     assert kind("**Kind:** live-check #12", live=lambda n: True) == "live-check"  # live or not
     assert kind("**Kind:** live-check #12\n**Blocked by:** decision (anchor)") == "live-check"
     assert kind("**Kind:** build") == "pickable" and kind("") == "pickable"
     assert kind("**Kind:** evaluation") == "evaluation"
-    # the residue, flagged: a decision owed to anyone but the person or the designer, and a `Kind:
+    # the residue, flagged: a decision owed to anyone but the person, and a `Kind:
     # decision` not the person's (§4.9b *No anchor seat*, TD-757)
     assert kind("**Kind:** build\n**Blocked by:** decision (anchor)") == "other"
     assert kind("**Owner:** anchor\n**Kind:** decision") == "other"
@@ -256,10 +257,10 @@ def test_the_page_kinds_in_order():
     assert ledger.KINDS == ("for-you", "blocked", "design", "live-check", "pickable", "evaluation", "other")
 
 
-def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_the_designers():
+def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_no_case_of_its_own():
     """TD-367/TD-368, design §4.4 *Repo facts* and §6 rule 6: *for you* is `Owner: paul` or a
-    `decision (paul)`, any case; an entry of any kind on `decision (designer)` is *design* and
-    in the designer's lane, pickable or not, though its `Owner:` is the grinder's; a `Kind: decision`
+    `decision (paul)`, any case; a decision owed to the designer is `Kind: design-first`, so a build on
+    `decision (designer)` is *other* like any decision not the person's (TD-1296); a `Kind: decision`
     that is not the person's and a build on `decision (anchor)` are *other* since the anchor seat is
     retired (TD-757), and in no grinder or designer lane."""
     text = (
@@ -274,14 +275,13 @@ def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_the_desi
     assert {i: e["for_page"] for i, e in got.items()} == {
         "TD-050": "for-you",
         "TD-051": "for-you",
-        "TD-052": "design",
+        "TD-052": "other",
         "TD-053": "other",
         "TD-054": "other",
     }
     designer, grinder = ["design-first", "owner:designer"], ["free-pick", "owner:grinder"]
-    assert [i for i, e in got.items() if ledger.lane_matches(designer, e)] == ["TD-052"]
+    assert [i for i, e in got.items() if ledger.lane_matches(designer, e)] == []
     assert [i for i, e in got.items() if ledger.lane_matches(grinder, e)] == []
-    assert not ledger.lane_matches(["design-first", "owner:grinder"], got["TD-052"]), "its owner reads designer"
     assert got["TD-052"]["pickable"] == "no"
 
 
@@ -311,9 +311,8 @@ def test_a_pass_that_rereads_one_repo_still_resolves_among_the_whole_registry(tm
 
 def test_a_for_you_entry_carries_added_answers_and_detail():
     """§4.4 *Repo facts* (TD-565, TD-736): every open entry's reading carries `added` (its `Added:` date)
-    and `detail` (its **Why** and **Fix** paragraphs, clipped at `MAX_DETAIL_LINES`), since a hold is
-    marked after the parse and a held row opens with them; a *for you* entry's carries `answers` and
-    `default` too (its `**Answers:**` line in cadence §3.5's form, `\\|` a literal bar, the one
+    and `detail` (its **Why** and **Fix** paragraphs, clipped at `MAX_DETAIL_LINES`); a *for you* entry's
+    carries `answers` and `default` too (its `**Answers:**` line in cadence §3.5's form, `\\|` a literal bar, the one
     ` (default)` marked — none when two are, as the board's reader gives it), and no other entry's."""
     fix = "\n".join(f"{n}. step" for n in range(1, 30))
     text = (

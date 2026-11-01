@@ -27,7 +27,6 @@ from sessionorc import ledgerboard as lb
 from sessionorc import mail as mail_mod
 from sessionorc import promote as promote_mod
 from sessionorc import settings as settings_mod
-from sessionorc import settle as settle_mod
 from sessionorc import shots as shots_mod
 from sessionorc import workorders as workorders_mod
 from sessionorc.agent_common import WRAPUP_GRACE
@@ -2435,14 +2434,9 @@ def ledger_for_you(
     open decided line's `Context:` names (the repo's work orders' `refs`) is left out; the team the
     rail's *Teams* picks filter by — the definitions' team for the repo (`named`, by resolved
     checkout), else the team most of its live records carry, else none; the link the Repo page
-    opened on the id. `n` is every row, counted under *Later* alone.
-    A held entry (its reading carries `held`, §4.5a **Inbox row: held entry**, TD-736) is a row too, in
-    the same order: `release` set, for **Release**; one not *for you* is of the kind *ledger · held*, its
-    `at` and `added` the hold's (*held 2h*), no answers — and `claimed` set, so its `held` reads
-    *claimed by*, since on this row *held by* would name the wrong hold."""
+    opened on the id. `n` is every row, counted under *Later* alone. An entry held out of the lanes is a
+    `decision (<person>)` row like any (§4.4 *Holding an entry is a decision on it*, TD-1297)."""
     from .repo import PRIORITY_RANK  # repo imports this module: read at call time
-
-    now = now or datetime.now(UTC)
 
     live = [s for s in fleet if s.get("state") not in ("exited", "closed") and s.get("repo")]
     groups: list[dict[str, Any]] = []
@@ -2462,8 +2456,7 @@ def ledger_for_you(
         entries = [
             e
             for e in ((r.get("ledger") or {}).get("entries") or [])
-            if isinstance(e, dict)
-            and ((e.get("for_page") == "for-you" and e.get("id") not in decided) or isinstance(e.get("held"), dict))
+            if isinstance(e, dict) and e.get("for_page") == "for-you" and e.get("id") not in decided
         ]
         if not entries:
             continue
@@ -2487,41 +2480,37 @@ def ledger_for_you(
                 )
             ]
             held = [str(s.get("name") or s.get("id")) for s in holders]
-            owner = str(e.get("owner") or "").lower() == "paul"
-            for_you = e.get("for_page") == "for-you" and e.get("id") not in decided  # else here for its hold
-            hold = e.get("held") if isinstance(e.get("held"), dict) else None
+            owner = str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER
             # the labels and, beside each, what it leads to (§4.10 *The answers' split*, TD-913): a card draws both
             got = e.get("consequences") if isinstance(e.get("consequences"), list) else []
             pairs = [(str(a), str(got[i]) if i < len(got) else "") for i, a in enumerate(e.get("answers") or ())]
-            pairs = [(a, c) for a, c in pairs if a.strip()] if for_you else []
+            pairs = [(a, c) for a, c in pairs if a.strip()]
             answers = [a for a, _ in pairs]
             d = e.get("default")
             ok = isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers)
-            added = str(e.get("added") or "") if for_you else str((hold or {}).get("at") or "")
+            added = str(e.get("added") or "")
             rows.append(
                 {
                     "row": "ledger",
                     "id": e["id"],
                     "row_id": f"ledger:{name}:{e['id']}",  # the row's `data-msg` and fold key: an id is per repo
-                    "kind": ("ledger · yours" if owner else "ledger · your decision") if for_you else "ledger · held",
+                    "kind": "ledger · yours" if owner else "ledger · your decision",
                     "name": name,
                     "title": e.get("title") or "",
                     "subject": mail_mod.clip_subject(str(e.get("title") or "")),  # §4.10 *A subject on every entry*
                     "pri": (str(e.get("priority") or "")[:1] or "?").upper(),
                     "held": ", ".join(held),
-                    "claimed": not for_you,  # a held row's claim reads *claimed by*
-                    "release": hold is not None,  # **Release** (§4.5a *Inbox row: held entry*)
                     "holder": str(holders[0].get("id") or "") if holders else "",  # **Open session** (TD-678)
                     "type": str(e.get("type") or ""),  # the role **Start session** takes, by `entries:`
                     "why": "yours" if owner else "decision",  # `repoconfig.WORK_OPENING`'s key
-                    "until": str(e.get("until") or "") if for_you else "",  # *held until <it>* (TD-795)
+                    "until": str(e.get("until") or ""),  # *held until <it>* (TD-795)
                     "team": team,
                     "at": added,
-                    "added": _added_words(added) if for_you else settle_mod.words({"held": hold}, now),
+                    "added": _added_words(added),
                     "detail": "\n".join(str(x) for x in e.get("detail") or () if isinstance(x, str)).strip("\n"),
                     "answers": answers,
                     "consequences": [c for _, c in pairs],
-                    "ask": str(e.get("ask") or "") if for_you else "",  # its one sentence on a card (§4.10)
+                    "ask": str(e.get("ask") or ""),  # its one sentence on a card (§4.10)
                     "default": answers[d] if ok else "",
                     "root": str(r.get("root") or root),  # the checkout `ledger_decide` names the repo by
                     # what the row's controls read, as a Queue row carries them (§4.5 screen 12 *any open row*, TD-905)
@@ -2529,8 +2518,6 @@ def ledger_for_you(
                     "blocked_open": any(str(b) in opened for b in e.get("blocked_by") or ())
                     or bool(e.get("parts_open")),  # an open part counts as an open blocker (TD-1130)
                     "builds_open": ledger_mod.builds_open(e),
-                    "hold_why": str((hold or {}).get("why") or ""),
-                    "hold_by": str((hold or {}).get("words") or ""),  # the mark's `title` (TD-1127)
                     "url": f"/repo/{quote(name)}#{quote(e['id'])}",
                 }
             )

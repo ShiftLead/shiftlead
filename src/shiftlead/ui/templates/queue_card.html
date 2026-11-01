@@ -4,7 +4,7 @@
    status — and a press on it folds or opens the card (no chevron; the page remembers which). What is attached
    to the card is its three wants (§4.5 screen 12 *Three wants*, TD-911): Decide and Do in the header, open and
    amber, so a folded card still shows them, their counts the pill; Read under the rows, folded with its count,
-   *Read n* on a folded card's header; a held entry no want. The header's right edge reads the move arrows,
+   *Read n* on a folded card's header. The header's right edge reads the move arrows,
    **Start session** (TD-912; only where no item draws its own, TD-1246), the **⋯** on the top entry (TD-914), a gap, then the
    count, *Read n* and the status last (§4.5 screen 12 *A card*). An Up next
    card carries its place, a grip and ⤒ ↑ ↓ — its place **per repo** (§4.5a *Queue page, Up next: the number*,
@@ -13,10 +13,10 @@
    no grip and no arrows, its wait phrase as its status; an In progress one *d/m done* where the status would be. Each card is its own box, its 4 px left edge `c.edge` (amber for a Decide or Do item, else
    teal Waiting, else green In progress, else grey; TD-915). Amber is spent on what needs the person alone. A card sends no `data-find`: the page
    builds its find text from the ids and titles it draws (`AO.qFindText`, §4.5 *Page loads*, TD-892). #}
-{% from "queue_row.html" import row, fold, meter, pbadge, state, holder, extras, builds, mentioned, want, read, held, with_you, pill, menu %}
+{% from "queue_row.html" import row, fold, meter, pbadge, state, holder, extras, builds, mentioned, want, read, with_you, pill, menu %}
 {% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
 {%- set w = c.wants or {} %}{% set n = w.n or {} %}
-{%- set body = c.rows or w.read or w.held %}
+{%- set body = c.rows or w.read %}
 <div class="qcard edge-{{ c.edge or 'ended' }} g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if n.decide or n.do %} wants{% endif %}{% if body %} hasrows{% endif %}{% if c.off %} qoff{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %} data-status="{{ c.status or '' }}" data-repos="{{ (c.repos or []) | join(' ') }}">
   <div class="qhead"{% if t.anchor %} id="{{ t.anchor }}"{% endif %} data-qid="{{ t.qid }}"{% if body %} role="button" tabindex="0" aria-expanded="true" title="fold or open the card"{% endif %}>
     <span class="qgrip"{% if up %} draggable="true" title="drag to move it in the order"{% endif %}>{% if up %}⋮⋮{% endif %}</span>
@@ -69,6 +69,6 @@
     {{ want(c, 'decide') }}{{ want(c, 'do') }}{{ with_you(c) }}
     </div>
   </div>
-  {% if body %}<div class="qrows">{{ held(c) }}{% for ln in c.lines or [] %}{% if ln.fold %}{{ fold(ln, repo) }}{% else %}{{ row(ln.row, repo) }}{% endif %}{% else %}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}{% endfor %}{{ read(c) }}</div>{% endif %}
+  {% if body %}<div class="qrows">{% for ln in c.lines or [] %}{% if ln.fold %}{{ fold(ln, repo) }}{% else %}{{ row(ln.row, repo) }}{% endif %}{% else %}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}{% endfor %}{{ read(c) }}</div>{% endif %}
 </div>
 {% endmacro %}

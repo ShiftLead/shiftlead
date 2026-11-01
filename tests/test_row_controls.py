@@ -1,8 +1,7 @@
-"""TD-905 (design §4.5 screen 12 *any open row*, §4.5a *Queue card: what needs the person*, *Repo page:
-Hold / Release on an entry*): the row's controls are one macro in `queue_row.html` — Done… on a row that is
-not *yours to do* and not a design with open builds, Back to design… on a pickable, live check or id-blocked
-row, Hold… where a lane takes the row or it is *for you*, never on a held one — and the page's road refuses
-where no team services the repo, or no lane takes design-first."""
+"""TD-905 (design §4.5 screen 12 *any open row*, §4.5a *Queue card: what needs the person*): the row's
+controls are one macro in `queue_row.html` — Done… on a row that is not *yours to do* and not a design with
+open builds, Back to design… on a pickable, live check or id-blocked row, and no Hold… or Release anywhere
+(TD-1297) — and the page's road refuses where no team services the repo, or no lane takes design-first."""
 
 from __future__ import annotations
 
@@ -17,24 +16,19 @@ def _controls(**r) -> str:
 
 def test_each_control_is_drawn_by_its_rule():
     got = _controls()
-    assert 'data-road="done"' in got and 'data-road="design"' in got and 'data-act="ledger_hold"' in got
-    assert 'data-repo="/c/r"' in got and "Done…" in got and "Back to design…" in got and "Hold…" in got
+    assert 'data-road="done"' in got and 'data-road="design"' in got
+    assert 'data-repo="/c/r"' in got and "Done…" in got and "Back to design…" in got
     mine = _controls(needs="owner", page="for-you")
-    assert 'data-road="done"' not in mine and 'data-road="design"' not in mine and "Hold…" in mine
+    assert 'data-road="done"' not in mine and 'data-road="design"' not in mine
     design = _controls(page="design", builds_open=True)
-    assert 'data-road="done"' not in design and 'data-road="design"' not in design and "Hold…" in design
+    assert 'data-road="done"' not in design and 'data-road="design"' not in design
     assert 'data-road="done"' in _controls(page="design")
     blocked = _controls(page="blocked", blocked_open=True)
-    assert 'data-road="design"' in blocked and "Hold…" not in blocked, "no lane takes a blocked row"
+    assert 'data-road="design"' in blocked
     assert 'data-road="design"' not in _controls(page="blocked")
-    assert "Hold…" not in _controls(state="held (person)")
+    for row in (got, mine, design, blocked, _controls(page="for-you", needs="decision")):
+        assert "Hold…" not in row and "ledger_hold" not in row and "Release" not in row, "TD-1297"
     assert _controls(archived=True) == ""
-
-
-def test_held_words_are_drawn_after_the_state_word():
-    tpl = ui.templates.env.from_string('{% import "queue_row.html" as q %}{{ q.state(r) }}')
-    got = tpl.render(r={"state": "held (person)", "held": {"at": "t", "why": "after Friday"}})
-    assert "held (person) — after Friday" in got
 
 
 def test_the_road_is_refused_where_nobody_would_read_the_line(tmp_path):
@@ -50,9 +44,7 @@ def test_a_cards_top_entry_draws_the_controls_in_its_head():
     top = {"id": "TD-7", "qid": "r#TD-7", "show": "TD-7", "title": "t", "repo": "r", "needs": None, "state": ""}
     tpl = ui.templates.env.from_string('{% import "queue_card.html" as c %}{{ c.card(card) }}')
     got = tpl.render(card={"id": "r#TD-7", "top": top | {"page": "pickable"}, "ids": ["r#TD-7"], "group": "up_next"})
-    assert got.count('data-road="done"') == 1 and 'data-road="design"' in got and "Hold…" in got
-    held = tpl.render(card={"id": "r#TD-7", "top": top | {"page": "pickable", "state": "held (person)"}, "ids": []})
-    assert "Hold…" not in held and 'data-road="done"' in held
+    assert got.count('data-road="done"') == 1 and 'data-road="design"' in got and "Hold…" not in got
 
 
 def test_back_to_design_is_refused_where_no_lane_takes_design_first(tmp_path):
@@ -136,13 +128,11 @@ def _route(tmp_path, monkeypatch, refusal=""):
     return TestClient(ui.create_app()), calls, seen
 
 
-def test_hold_words_reach_td_hold_through_the_route(tmp_path, monkeypatch):
-    """**Hold…**'s words go to the home's `td_hold` as `why`, spaces folded; none sends no `why` (TD-910)."""
+def test_the_hold_route_is_gone(tmp_path, monkeypatch):
+    """TD-1297: no `/api/ledger/hold`, so nothing reaches a `td_hold` the home no longer serves."""
     c, calls, _ = _route(tmp_path, monkeypatch)
-    assert c.post("/api/ledger/hold", json={"repo": "samscrape", "id": "TD-7", "why": " after\n Friday "}).json()["ok"]
-    assert calls[-1] == ("td_hold", {"repo": "samscrape", "id": "TD-7", "release": False, "why": "after Friday"})
-    c.post("/api/ledger/hold", json={"repo": "samscrape", "id": "TD-7"})
-    assert calls[-1] == ("td_hold", {"repo": "samscrape", "id": "TD-7", "release": False})
+    got = c.post("/api/ledger/hold", json={"repo": "samscrape", "id": "TD-7", "why": "after Friday"})
+    assert got.status_code in (404, 405) and [m for m, _ in calls if m == "td_hold"] == []
 
 
 def test_the_road_goes_to_ledger_decide_by_the_checkout_and_a_refusal_is_a_409(tmp_path, monkeypatch):
@@ -205,8 +195,9 @@ def test_the_queue_builds_the_keys_the_controls_read(tmp_path):
 
 
 def test_the_inbox_ledger_row_carries_the_keys_and_draws_the_controls_from_them(tmp_path):
-    """`ledger_for_you` gives its rows the page kind, an open blocker, a design's open builds and the hold's
-    words, and the Inbox's ledger row draws the controls and the words from that output (TD-910)."""
+    """`ledger_for_you` gives its rows the page kind, an open blocker and a design's open builds, and the
+    Inbox's ledger row draws the controls from that output (TD-910). An old clock's `held` mark adds no row
+    (TD-1297): the rows are the *for you* entries alone."""
     from markupsafe import Markup
     from test_queue import NOW
 
@@ -214,13 +205,16 @@ def test_the_inbox_ledger_row_carries_the_keys_and_draws_the_controls_from_them(
     by = {e["id"]: e for e in r["ledger"]["entries"]}
     by["TD-001"]["held"] = {"at": NOW.isoformat(), "why": "after Friday"}
     rows = {x["id"]: x for x in ui.ledger_for_you({root: r}, [], {}, NOW)["groups"][0]["rows"]}
-    assert sorted(rows) == ["TD-001", "TD-004"]
-    keys = {i: (x["page"], x["blocked_open"], x["builds_open"], x["hold_why"]) for i, x in rows.items()}
-    assert keys == {"TD-001": ("blocked", True, True, "after Friday"), "TD-004": ("for-you", True, False, "")}
+    assert sorted(rows) == ["TD-004"]
+    assert (rows["TD-004"]["page"], rows["TD-004"]["blocked_open"], rows["TD-004"]["builds_open"]) == (
+        "for-you",
+        True,
+        False,
+    )
     row = ui.templates.get_template("inbox_row.html").module.ledger
-    held = str(Markup(row(rows["TD-001"], "later")))
-    assert "(after Friday)" in held and 'data-road="done"' not in held, "a design with open builds"
-    assert 'data-road="done"' not in str(row(rows["TD-004"], "later")), "yours to do"
+    drawn = str(Markup(row(rows["TD-004"], "later")))
+    assert 'data-road="done"' not in drawn, "yours to do"
+    assert "Release" not in drawn and "held (person)" not in drawn and "ledger · held" not in drawn
 
 
 def test_a_parents_open_parts_keep_done_off_and_back_to_design_on(tmp_path):
@@ -254,104 +248,31 @@ def test_a_parents_open_parts_keep_done_off_and_back_to_design_on(tmp_path):
     drawn = _controls(**rows["TD-001"])
     assert 'data-road="done"' not in drawn and 'data-road="design"' in drawn
     assert 'data-road="done"' in _controls(**rows["TD-003"])
-    by = {e["id"]: e for e in r["ledger"]["entries"]}
-    by["TD-001"]["held"] = {"at": NOW.isoformat(), "why": "x"}
-    inbox = {x["id"]: x for x in ui.ledger_for_you({root: r}, [], {}, NOW)["groups"][0]["rows"]}
-    assert (inbox["TD-001"]["blocked_open"], inbox["TD-001"]["builds_open"]) == (True, True)
 
 
-def test_a_held_marks_title_names_its_presser_from_the_readings_words(tmp_path):
-    """TD-1127 (§4.8 *The record names who pressed*): the `queue` and `repos` readings carry a hold's presser
-    in words beside `held.by` — the queue's `pressers`, the home's `_held_words` — and the *held (person)*
-    mark, the Queue row's and the Queue card's held row's, draws them in its `title`; the word stays."""
-    from types import SimpleNamespace
+def test_no_reading_or_row_carries_a_hold_and_the_repo_row_settles_with_no_press(tmp_path):
+    """TD-1297: the Queue's rows carry no `held`, the Repo page's ledger rows no `held_words` or
+    `settle_mark`, and the Repo row draws *settles in 7m* with no Hold or Release beside it; an old clock's
+    `held` mark on the reading is read as nothing."""
+    from datetime import timedelta
 
-    from markupsafe import Markup
     from test_queue import NOW
 
     from sessionorc import queue
-    from sessionorc.agent_tick import TickMixin
-
-    root, r = _ledger(tmp_path)
-    by = {e["id"]: e for e in r["ledger"]["entries"]}
-    by["TD-002"]["held"] = {"at": NOW.isoformat(), "by": "s-1", "why": "after Friday"}
-    words = {"s-1": "the person's session paul-1"}.get
-    rows = lambda q: {x["id"]: x for c in q["cards"] for x in (c["top"], *c["rows"])}  # noqa: E731
-    held = rows(queue.reading({root: r}, [], NOW, pressers=lambda b: words(b) or b))["TD-002"]
-    assert held["state"] == "held (person)"
-    assert held["held"] == {
-        "at": NOW.isoformat(),
-        "by": "s-1",
-        "why": "after Friday",
-        "words": "the person's session paul-1",
-    }
-    assert "words" not in rows(queue.reading({root: r}, [], NOW))["TD-002"]["held"], "no graph, no words"
-    tpl = ui.templates.env.from_string('{% import "queue_row.html" as q %}{{ q.state(r) }}')
-    got = tpl.render(r=held)
-    assert 'title="held by the person&#39;s session paul-1"' in got and "held (person) — after Friday" in got
-    assert "title=" not in tpl.render(r={"state": "held (person)", "held": {"at": "t", "by": "person"}})
-    ext = ui.templates.env.from_string('{% import "queue_row.html" as q %}{{ q.extras(e, "/c/r") }}')
-    got = ext.render(e={"settle": "held 2h", "held_words": "the person's session paul-1", "settle_mark": "held"})
-    assert 'title="held by the person&#39;s session paul-1">· held 2h' in got, "the Repo row's settle mark"
-
-    home = SimpleNamespace(_presser_words=lambda b: words(b) or "the person")
-    view = TickMixin._held_words(home, r)  # type: ignore[arg-type]
-    assert {e["id"]: e["held"].get("words") for e in view["ledger"]["entries"] if e.get("held")} == {
-        "TD-002": "the person's session paul-1"
-    }
-    assert "words" not in by["TD-002"]["held"], "the stored reading is left as it is"
-    by["TD-002"].pop("held")
-    assert TickMixin._held_words(home, r) is r, "nothing held: the reading itself"
-    by["TD-002"]["held"] = next(e["held"] for e in view["ledger"]["entries"] if e["id"] == "TD-002")
-    row = next(x for x in ui.ledger_for_you({root: r}, [], {}, NOW)["groups"][0]["rows"] if x["id"] == "TD-002")
-    assert row["hold_by"] == "the person's session paul-1"
-    drawn = str(Markup(ui.templates.get_template("inbox_row.html").module.ledger({**row, "home": "queue"}, "later")))
-    assert 'title="held by the person&#39;s session paul-1"' in drawn
-
-
-async def test_the_tick_hands_a_holds_presser_to_the_queue_and_the_repo_view(agent, tmp_path, monkeypatch):
-    """TD-1180: the home's two call sites, not the functions alone — `_queue_pass` passes `pressers` to the
-    Queue's reading and `_repo_view` runs `_held_words`, so both live readings carry `held.words`."""
-    from conftest import park_ticks
-    from test_queue import NOW
-
-    await park_ticks(agent)
-    root, r = _ledger(tmp_path)
-    by = {e["id"]: e for e in r["ledger"]["entries"]}
-    by["TD-002"]["held"] = {"at": NOW.isoformat(), "by": "s-1", "why": "after Friday"}
-    agent._repos = {root: r}
-    monkeypatch.setattr(agent, "_presser_words", lambda b: "the person's session paul-1" if b == "s-1" else b)
-
-    async def push(ev: dict[str, object]) -> None:
-        pass
-
-    monkeypatch.setattr(agent, "_broadcast", push)
-    await agent._queue_pass(NOW)
-    q = await agent.rpc_queue()
-    rows = {x["id"]: x for c in q["cards"] for x in (c["top"], *c["rows"])}
-    assert rows["TD-002"]["held"]["words"] == "the person's session paul-1", "the queue's pass names the presser"
-    view = agent._repo_view(root)
-    held = {e["id"]: e["held"] for e in view["ledger"]["entries"] if e.get("held")}
-    assert held["TD-002"]["words"] == "the person's session paul-1", "the repos view names the presser"
-
-
-def test_the_repo_ledger_rows_settle_mark_titles_the_presser_from_the_reading(tmp_path):
-    """TD-1180: `ledger_lists` carries a reading's `held.words` onto its row as `held_words`, and the row it
-    returns, not one handed the key by hand, draws the settle mark with *held by <words>* in its `title`."""
-    from test_queue import NOW
-
     from shiftlead.ui import repo
 
     root, r = _ledger(tmp_path)
     by = {e["id"]: e for e in r["ledger"]["entries"]}
-    by["TD-002"]["held"] = {
-        "at": NOW.isoformat(),
-        "by": "s-1",
-        "why": "after Friday",
-        "words": "the person's session paul-1",
-    }
+    by["TD-002"]["held"] = {"at": NOW.isoformat(), "by": "s-1", "why": "after Friday"}
+    by["TD-005"]["settling"] = {"until": (NOW + timedelta(minutes=7, seconds=30)).isoformat()}
+    q = queue.reading({root: r}, [], NOW)
+    for c in q["cards"]:
+        for x in (c["top"], *c["rows"]):
+            assert "held" not in x and x["state"] != "held (person)", x["id"]
     rows = {e["id"]: e for lst in repo.ledger_lists(r, [], None, NOW) for e in lst["rows"]}
-    assert rows["TD-002"]["held_words"] == "the person's session paul-1"
-    assert rows["TD-005"]["held_words"] == "", "an entry nobody held has none"
+    assert all("held_words" not in e and "settle_mark" not in e for e in rows.values())
+    assert rows["TD-002"]["settle"] == "" and rows["TD-005"]["settle"] == "settles in 7m"
     ext = ui.templates.env.from_string('{% import "queue_row.html" as q %}{{ q.extras(e, "/c/r") }}')
-    assert 'title="held by the person&#39;s session paul-1">· held' in ext.render(e=rows["TD-002"])
+    got = ext.render(e=rows["TD-005"])
+    assert '<span class="meta settle">· settles in 7m</span>' in got
+    assert "<button" not in got and "data-tdhold" not in got and "Release" not in got

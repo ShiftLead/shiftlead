@@ -189,15 +189,13 @@ def want_of(e: Mapping[str, Any], sec: str) -> str:
     """An attached item's want (§4.5 screen 12 *Three wants*): `decide` — an `ask`, a `steer` running or
     paused, a `decide` or `look` board line, a `decision (paul)` entry; `do` — an `act` board line (TD-1066: Done
     its answer), an `Owner: paul` entry, a red PR nobody holds, and what else needs the person (a blocked
-    outcome); `read` — what is answered,
-    waits on others or is for reading; `held` — an entry the person holds, which is no want while held. A fifth,
-    `with_you` — the person's entry their own session holds, no want either (TD-1281) — is `attach`'s, read from
-    the card, never from the row."""
+    outcome); `read` — what is answered, waits on others or is for reading. A fourth, `with_you` — the person's
+    entry their own session holds, no want (TD-1281) — is `attach`'s, read from the card, never from the row."""
     if sec in READ_LINES:
         return "read"
     row = e.get("row")
     if row == "ledger":
-        return "held" if e.get("release") else ("do" if e.get("why") == "yours" else "decide")
+        return "do" if e.get("why") == "yours" else "decide"
     if row in ("red_pr", "fork_pr"):
         return "do"
     if row == "board":
@@ -257,8 +255,6 @@ def attach(
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
         want = want_of(e, sec)
-        if want == "held":  # the held row, never the for-you row (§4.5a *Inbox row: held entry*)
-            e = {**e, "kind": "ledger · held", "claimed": True, "answers": [], "default": ""}
         card, ref = str(e.get("on_card") or ""), item_ref(e)
         mine = with_of(card, ref) if with_of is not None and e.get("row") == "ledger" and want in WANTS else None
         if mine:
@@ -301,12 +297,11 @@ def attach(
 
 def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) -> dict[str, Any]:
     """A card's attached items as its three wants draw them (§4.5 screen 12 *Three wants*): `decide` and `do`,
-    each item in the Inbox's order; `read`, `{line: [item]}` for each of `READ_LINES` with any; `held`, the
-    entries the person holds, no want; `with_you`, the person's entries their own session holds, no want and in no
-    count (TD-1281); and `n`, the counts — `decide`, `do` (the pill's, a red PR in it) and `read`. Each item
-    carries `on` — the row it is about, written as the page writes ids, where that is not the top entry (*on
-    TD-n*, a link to the row)."""
-    out: dict[str, Any] = {"decide": [], "do": [], "read": {}, "held": [], "with_you": []}
+    each item in the Inbox's order; `read`, `{line: [item]}` for each of `READ_LINES` with any; `with_you`, the
+    person's entries their own session holds, no want and in no count (TD-1281); and `n`, the counts — `decide`,
+    `do` (the pill's, a red PR in it) and `read`. Each item carries `on` — the row it is about, written as the page
+    writes ids, where that is not the top entry (*on TD-n*, a link to the row)."""
+    out: dict[str, Any] = {"decide": [], "do": [], "read": {}, "with_you": []}
     for sec in CARD_SECTIONS:
         for m in (got or {}).get(sec) or ():
             m = {**m, "on": "" if m.get("on_row") == top else _show(str(m.get("on_row") or ""), one_repo)}
@@ -324,8 +319,7 @@ def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) ->
 
 
 def _item_kind(e: Mapping[str, Any], sec: str) -> str:
-    """An attached item's kind: its want where that is Decide or Do; '' for what waits on nobody (Read, a held
-    entry)."""
+    """An attached item's kind: its want where that is Decide or Do; '' for what waits on nobody (Read)."""
     want = want_of(e, sec)
     return want if want in WANTS else ""
 
@@ -430,8 +424,7 @@ def item_start(card: Mapping[str, Any], item: str, fleet: Iterable[Mapping[str, 
 def _mail_status(status: str, wants: Mapping[str, Any]) -> str:
     """The mail's part of a card's status (§4.4 *The card's status*: *needs you* > *steer* > the ledger's): a
     Decide or Do item — a question, a paused `steer`, a board line due or not, the person's ledger row, a red PR —
-    but a running `steer`, which is Decide and leaves the status *steer* (§4.5 screen 12 *Three wants*); a held
-    entry is no need."""
+    but a running `steer`, which is Decide and leaves the status *steer* (§4.5 screen 12 *Three wants*)."""
     items = [*(wants.get("decide") or ()), *(wants.get("do") or ())]
     if status == "needs you" or any(not m.get("running") for m in items):
         return "needs you"
@@ -450,13 +443,13 @@ def card_edge(group: str, status: str, wants: Mapping[str, Any]) -> str:
 
 def branch(r: Mapping[str, Any]) -> str:
     """A row's colour in the card's tree (§4.5 screen 12 *A card*, TD-915): `done` (green) an archived row,
-    `needs` (amber) the person's — *yours to do*, *your decision*, *held (person)* — `waiting` (teal) one that
+    `needs` (amber) the person's — *yours to do*, *your decision* — `waiting` (teal) one that
     waits — *waits until*, *waits on an event*, *waiting* (TD-1130), *settling* — else `open` (grey), *with you in
     <name>* among them (TD-1281)."""
     state = str(r.get("state") or "")
     if r.get("archived"):
         return "done"
-    if (r.get("needs") and not r.get("with_you")) or state == "held (person)":
+    if r.get("needs") and not r.get("with_you"):
         return "needs"
     if state.startswith("waits ") or state in ("waiting", "settling"):
         return "waiting"

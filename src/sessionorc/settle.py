@@ -1,10 +1,12 @@
 """A new ledger entry settles before it is pickable (design §4.4 *A new entry settles before it is
 pickable*, TD-707, built by TD-710). The clock is the home's: `ledger_seen.json` beside `ids.json`,
-`{<origin>: {<id>: {at, sig, held?}}}`, written beside each ledger reading, so the reader stays a
+`{<origin>: {<id>: {at, sig}}}`, written beside each ledger reading, so the reader stays a
 function of the checkout's text. `observe` records what a fresh reading holds and marks it; `mark`
 marks a reading the clock has already seen (a carried one, or rule 6's reading at a declaration) from
-the store as it stands. A marked entry — `settling: {until}`, or `held: {at}` — matches no lane
-(`ledger.lane_matches`), and its page kind is unchanged."""
+the store as it stands. A marked entry — `settling: {until}` — matches no lane (`ledger.lane_matches`),
+and its page kind is unchanged. The clock records settling only: an entry held out of the lanes is a
+`decision (<person>)` row (§4.4 *Holding an entry is a decision on it*, TD-1297), and a record's `held`
+written before that is ignored on load."""
 
 from __future__ import annotations
 
@@ -13,13 +15,12 @@ import re
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
 import yaml
 
 from sessionorc import paths
 from sessionorc import settings as settings_mod
-from sessionorc.models import PERSON
 from sessionorc.store import _atomic_write
 
 # The built-in layer under the install's `settle:` and the repo's (§5): a Kind no layer lists settles 0.
@@ -137,20 +138,14 @@ def team_refusal(entry: dict[str, Any] | None, team: str, who: str = "") -> str 
 
 
 def _marks(entries: list[dict[str, Any]], seen: dict[str, Any], spans: dict[str, int], now: datetime) -> None:
-    """Each entry's `settling` or `held` from its record, dropping a stale one: a held entry is held
-    whatever the clock says; an unsettled one settles at `at` plus its Kind's duration. Each entry's
+    """Each entry's `settling` from its record, dropping a stale one: an unsettled entry settles at `at`
+    plus its Kind's duration. A record's `held`, written before TD-1297, is ignored. Each entry's
     `waiting` too (`mark_waits`)."""
     mark_waits(entries, now)
     for e in entries:
         e.pop("settling", None)
-        e.pop("held", None)
         rec = seen.get(str(e.get("id")))
         if not isinstance(rec, dict):
-            continue
-        if isinstance(rec.get("held"), dict):
-            why = str(rec["held"].get("why") or "")
-            by = str(rec["held"].get("by") or PERSON)  # a hold written before `by` is the person's (TD-1117)
-            e["held"] = {"at": str(rec["held"].get("at") or ""), "by": by, **({"why": why} if why else {})}
             continue
         at = _when(rec.get("at"))
         if at is None:
@@ -171,20 +166,19 @@ def _load() -> dict[str, Any]:
 def observe(entries: list[dict[str, Any]], key: str, spans: dict[str, int], now: datetime) -> list[dict[str, Any]]:
     """Record a fresh reading of origin `key` and mark its entries in place (§4.4 *The clock*): an id
     first seen is recorded at `now`, except that **a repo's first reading records every id at the
-    epoch**, settled — the first being the first that finds no record with an `at` under the key, so an
-    id pre-held by `ao td reserve --held` (`prehold`) does not make every other id settle as new. An edit
-    (a changed `sig`) to an entry still settling restarts its window from `now`; one to a held entry
-    records the new `sig` and the entry stays held (TD-731), and one to a settled entry only records the
-    new `sig`. A pre-held id is held from its first reading, its `sig` recorded, and never settles. An
-    id the reading does not hold keeps its record — a partial reading, or a second checkout of the
-    origin behind the first, must not drop a hold or bring a settled entry back as new — so the record
-    grows by one line per id the ledger ever held. Returns `entries`."""
+    epoch**, settled — the first being the first that finds no record with an `at` under the key, so a
+    record written before TD-1297 by the retired `--held` (no `at`) does not make every other id settle
+    as new. An edit (a changed `sig`) to an entry still settling restarts its window from `now`, and one
+    to a settled entry only records the new `sig`. A record's old `held` is dropped as it is rewritten,
+    and one with no `at` reads as an id first seen. An id the reading does not hold keeps its record — a
+    partial reading, or a second checkout of the origin behind the first, must not bring a settled entry
+    back as new — so the record grows by one line per id the ledger ever held. Returns `entries`."""
     stamp = now.isoformat()
     with _STORE:
         store = _load()
         read = isinstance(store.get(key), dict)
         old: dict[str, Any] = store[key] if read else {}
-        # no reading yet, or only `prehold`'s records (an empty ledger's first reading leaves `{}`, a reading)
+        # no reading yet, or only records with no `at` (an empty ledger's first reading leaves `{}`, a reading)
         first = not read or (bool(old) and not any(isinstance(r, dict) and r.get("at") for r in old.values()))
         seen: dict[str, Any] = dict(old)
         for e in entries:
@@ -192,14 +186,11 @@ def observe(entries: list[dict[str, Any]], key: str, spans: dict[str, int], now:
             if not i:
                 continue
             rec = old.get(i) if isinstance(old.get(i), dict) else None
-            if rec is None:
+            if rec is None or not rec.get("at"):
                 seen[i] = {"at": EPOCH if first else stamp, "sig": sig}
                 continue
-            rec = dict(rec)
-            if isinstance(rec.get("held"), dict):
-                rec.setdefault("at", EPOCH if first else stamp)  # landed held (`prehold`): its first reading
-                rec["sig"] = sig  # an edit keeps the hold: only the person's Release ends it
-            elif rec.get("sig") != sig:
+            rec = {k: v for k, v in rec.items() if k != "held"}  # a hold recorded before TD-1297 is ignored
+            if rec.get("sig") != sig:
                 at = _when(rec.get("at"))
                 if at is None or at + timedelta(seconds=spans.get(_kind(e), 0)) > now:
                     rec = {"at": stamp, "sig": sig}  # the person still adding thoughts: the window again
@@ -223,101 +214,17 @@ def mark(entries: list[dict[str, Any]], key: str, spans: dict[str, int], now: da
     return entries
 
 
-class Refused(ValueError):
-    """A hold or a release the clock will not write, in the words the person reads."""
-
-
-class NotHeld(Refused):
-    """A release of an entry that is not held: a road's clear finds nothing to do (TD-1117)."""
-
-
-# who pressed a hold, by class (§4.8 *What a person's session releases*, TD-1117): the person (the page,
-# no caller), the person's shell (`mail.as_person`), or a person's session
-Presser = Literal["person", "shell", "session"]
-
-
-def hold(
-    key: str,
-    entry: dict[str, Any],
-    spans: dict[str, int],
-    now: datetime,
-    *,
-    by: str,
-    release: bool = False,
-    why: str = "",
-    presser: Presser = "person",
-) -> dict[str, Any]:
-    """The person's **Hold** or **Release** of one entry of origin `key` (design §4.4 *Hold*, TD-707,
-    built by TD-710 slice 2, TD-731): a hold writes `held: {at, by, why}` on the id's record, the home's
-    and not a ledger edit, so it holds at once, on any entry the clock holds, settling or settled; `why`
-    is the person's optional words (TD-905). Holding a held one changes nothing but its words: new words
-    replace `why`, and `by` with the new presser's (`at` kept), but that the person's shell keeps a
-    person's hold `person`. A release ends the hold and makes the entry pickable at once (its record
-    settled, at the epoch), so a later edit changes nothing. `presser` is the caller's class (§4.8 *What
-    a person's session releases*, TD-1117): a `session` — a person's session — is refused a release, new
-    words or a re-hold on a hold the person pressed (`by` `person`, or none), checked here under the
-    store's lock on the stored record. Returns the record as written; raises `Refused`."""
-    why = " ".join(str(why or "").split())
-    i = str(entry.get("id") or "")
-    with _STORE:
-        store = _load()
-        seen = store.get(key)
-        rec = seen.get(i) if isinstance(seen, dict) else None
-        if not isinstance(rec, dict):
-            raise Refused(f"{i} is not in the home's clock yet: the ledger's next reading records it")
-        held = isinstance(rec.get("held"), dict)
-        persons = held and str(rec["held"].get("by") or PERSON) == PERSON
-        if presser == "session" and persons:
-            act = "release" if release else "reword"
-            raise Refused(f"{i}'s hold is the person's own: they {act} it on the Repo page")
-        if release:
-            if not held:
-                raise NotHeld(f"{i} is not held: there is nothing to release")
-            rec = {"at": EPOCH, "sig": rec.get("sig") or ""}
-        elif held:
-            if not why or why == rec["held"].get("why"):
-                return dict(rec)
-            who = PERSON if presser == "shell" and persons else by
-            rec = {**rec, "held": {**rec["held"], "by": who, "why": why}}
-        else:
-            rec = {**rec, "held": {"at": now.isoformat(), "by": by, **({"why": why} if why else {})}}
-        seen[i] = rec
-        _atomic_write(paths.ledger_seen_file(), json.dumps(store, indent=1, sort_keys=True))
-    return dict(rec)
-
-
-def prehold(key: str, ids: list[str], by: str, now: datetime) -> None:
-    """`ao td reserve --held` (design §4.4 *An entry can land held*, TD-731): each id handed out is held on
-    origin `key`'s clock before any reading holds it — `{held: {at, by}}`, no `at` or `sig` yet — so its
-    entry is held from its first reading and never settles on its own. A record is not a reading: the
-    repo's first reading is still the first that finds a record with an `at` (`observe`)."""
-    with _STORE:
-        store = _load()
-        seen = store[key] if isinstance(store.get(key), dict) else {}
-        for i in ids:
-            rec = dict(seen[i]) if isinstance(seen.get(i), dict) else {}
-            rec.setdefault("held", {"at": now.isoformat(), "by": by})
-            seen[i] = rec
-        store[key] = seen
-        _atomic_write(paths.ledger_seen_file(), json.dumps(store, indent=1, sort_keys=True))
-
-
-def claim_refusal(entry: dict[str, Any] | None, now: datetime, presser: str = "the person") -> str | None:
+def claim_refusal(entry: dict[str, Any] | None, now: datetime) -> str | None:
     """Why a declared claim on this entry of the home's reading is refused (design §4.8 *A claim is a
-    lease*, §4.4 *What settling withholds*), or None: it settles, or the person holds it. `--force`
-    does not pass it — the window is the person's, not another session's lease. `presser` is the
-    hold's presser in words, made by the home from `held.by` (TD-1117: *the person's session w1*)."""
+    lease*, §4.4 *What settling withholds*), or None: it settles. `--force` does not pass it — the
+    window is the person's, not another session's lease."""
     if not isinstance(entry, dict):
         return None
     i = str(entry.get("id") or "")
     tail = "(design §4.4 *A new entry settles before it is pickable*); --force does not pass it"
-    if isinstance(entry.get("held"), dict):
-        at = _when(entry["held"].get("at"))
-        since = f" since {at.astimezone():%H:%M}" if at else ""
-        return f"{i} is held by {presser}{since}: no lane takes it until they release it {tail}"
     until = _when((entry.get("settling") or {}).get("until")) if isinstance(entry.get("settling"), dict) else None
     if until is not None and until > now:
-        return f"{i} settles until {until.astimezone():%H:%M}: the person's window to change or hold it {tail}"
+        return f"{i} settles until {until.astimezone():%H:%M}: the person's window to change it {tail}"
     return None
 
 
@@ -332,10 +239,7 @@ def _span(secs: int) -> str:
 def words(entry: dict[str, Any], now: datetime) -> str:
     """What the settle clock's mark on a reading's entry says where the entry is drawn — after its owner
     in `ao repo` and on the Repo page's row (design §4.4 *Shown where it is read*, TD-710): *settles in
-    7m*, *held 2h*, else ''."""
-    if isinstance(entry.get("held"), dict):
-        at = _when(entry["held"].get("at"))
-        return f"held {_span(int((now - at).total_seconds()))}" if at else "held"
+    7m*, else ''."""
     until = _when((entry.get("settling") or {}).get("until")) if isinstance(entry.get("settling"), dict) else None
     left = int((until - now).total_seconds()) if until else 0
     return f"settles in {_span(left)}" if left > 0 else ""

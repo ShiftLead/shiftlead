@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Callable, Collection, Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -34,9 +34,8 @@ QUEUE_STALL_AFTER = timedelta(hours=24)
 COMPLETED_WINDOW = timedelta(days=30)
 # The card's status words, by need (§4.4 *The card's status*); the reading gives the ledger's part —
 # *needs you* and *steer* are raised from the mail by the page
-STATUSES = ("needs you", "steer", "stalled", "held (person)", "blocked", "waiting", "ready")
+STATUSES = ("needs you", "steer", "stalled", "blocked", "waiting", "ready")
 PERSON = ledger_mod.PERSON_OWNER
-DESIGNER = ledger_mod.DESIGNER_OWNER
 NO_LANE = ("evaluation", "other")  # the page kinds no lane takes (§4.4 *Repo facts*)
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 # an archived entry's `Resolved:` text as the page opens it (§4.5 screen 12 *Recently completed*), clipped
@@ -262,16 +261,13 @@ def reading(
     *,
     waiting: Collection[str] = (),
     doing: Mapping[str, list[Mapping[str, Any]]] | None = None,
-    pressers: Callable[[str], str] | None = None,
 ) -> dict[str, Any]:
     """The `queue` reading (§4.4 *The Queue*): `{cards, completed, other_work, at}`.
 
     `repos` are the home's repo readings by root; `records` the live graph's `Session`s (an ended one
     holds nothing); `waiting` the ids of sessions that wait on a question (the person's, or a reader
     holding their ask), which keeps an idle holder from reading *stalled*; `doing` the doing log by
-    team (`{team: [{id, text, at}]}`), whose first line after a claim is a passed-over flag's reason;
-    `pressers` a hold's `by` in words (`mail.presser_words` over the home's graph, TD-1127), which a held
-    row carries as `held.words` for its mark's `title`.
+    team (`{team: [{id, text, at}]}`), whose first line after a claim is a passed-over flag's reason.
 
     Each **card**: `id` (its top entry's `<repo>#TD-n`), `key` and `lined`, `top` and `rows` (each a row:
     `qid`, `repo`, `id`, `title`, `priority`, `state` — the one word of §4.4 *A row's state*, '' for a
@@ -349,13 +345,13 @@ def reading(
             touch[n].add(a_q)
             up[a_q] = n
 
-    # an open member blocked past the org's reach (§4.4 *Blocked*): a decision neither the person's nor
-    # the designer's, an id in no reading (an unknown id keeps its block), a `<repo>#TD-n` no reading
-    # holds open, or an item ledgerboard cannot read
+    # an open member blocked past the org's reach (§4.4 *Blocked*): a decision not the person's, an id in
+    # no reading (an unknown id keeps its block), a `<repo>#TD-n` no reading holds open, or an item
+    # ledgerboard cannot read
     for e in open_.values():
         for b in e.get("blocked_by") or []:
             if m := re.fullmatch(r"decision \((.+)\)", b):
-                far = m.group(1).strip().lower() not in (PERSON, DESIGNER)
+                far = m.group(1).strip().lower() != PERSON
             elif re.fullmatch(r"TD-\d+", b):
                 far = qid(e["repo"], b) not in open_
             elif "#" in b:
@@ -428,7 +424,6 @@ def reading(
                 # the person's own session holding their entry is its holder whatever else claims it (TD-1281)
                 "holder": mine or (_holder(claim[0][0]) if claim else None),
                 "with_you": mine["name"] if mine else None,
-                "held": _held(e.get("held"), pressers),  # {at, by, why?, words?} (TD-905, TD-1127)
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
                 "page": str(e.get("for_page") or ""),
@@ -453,7 +448,6 @@ def reading(
             "pr": pr,
             "holder": None,
             "with_you": None,
-            "held": None,
             "page": "",
             "after": [],
             "blocked_open": False,
@@ -487,13 +481,6 @@ def reading(
     }
 
 
-def _held(held: Any, pressers: Callable[[str], str] | None) -> dict[str, Any] | None:
-    """A row's `held`: the reading's mark, with its presser in words where the home gave `pressers`."""
-    if not isinstance(held, dict):
-        return None
-    return {**held, "words": pressers(str(held.get("by") or ""))} if pressers else dict(held)
-
-
 def _holder(rec: Any) -> dict[str, Any]:
     return {"id": rec.id, "name": rec.name, "state": rec.state}
 
@@ -510,8 +497,6 @@ def _state(
     `owner` (`Owner: paul`) or `decision` (`decision (paul)`) — when it waits on them, which draws no word, and
     the person's own session where one holds such an entry: the first by id of its claims' records with
     `unattended: false`, whose name the word *with you in <name>* carries (TD-1281). The row keeps its need."""
-    if e.get("held"):
-        return "held (person)", None, None
     need = (
         "owner"
         if str(e.get("owner") or "").lower() == PERSON
@@ -664,8 +649,8 @@ def _card(
 
 def _start(members: list[str], open_: Mapping[str, Mapping[str, Any]], keyed: Mapping[str, str], top: str) -> str:
     """The entry a **Start session** on the card starts on (§4.4 *One owner*, TD-912): its one `Owner: paul`
-    entry, else its first `decision (paul)` entry by key, else the top entry — by key alone, a held entry no
-    different and never by what is claimed, so two presses choose the same entry."""
+    entry, else its first `decision (paul)` entry by key, else the top entry — by key alone, never by what
+    is claimed, so two presses choose the same entry."""
     by_key = sorted(members, key=lambda q: _key_sort(keyed[q], q))
     owned = [q for q in by_key if str(open_[q].get("owner") or "").lower() == PERSON]
     if len(owned) == 1:
@@ -675,9 +660,9 @@ def _start(members: list[str], open_: Mapping[str, Mapping[str, Any]], keyed: Ma
 
 def card_entries(card: Mapping[str, Any]) -> tuple[list[str], list[str]]:
     """A card's open entries as **Start session**'s prompt names them (§4.5 screen 12 *Three verbs: Start
-    session*, TD-912): *waits on me*, its Decide and Do ledger entries (a row whose `needs` is set; a held one
-    is no want, and a `needs` row with `with_you` is no want though it is listed here, TD-1281), and *the
-    rest*, every other open member — each a `<repo>#TD-n`, in key order."""
+    session*, TD-912): *waits on me*, its Decide and Do ledger entries (a row whose `needs` is set; a
+    `needs` row with `with_you` is no want though it is listed here, TD-1281), and *the rest*, every
+    other open member — each a `<repo>#TD-n`, in key order."""
     rows = [r for r in [card.get("top"), *(card.get("rows") or [])] if isinstance(r, Mapping) and not r.get("archived")]
     rows.sort(key=lambda r: _key_sort(str(r.get("key") or ""), str(r.get("qid") or "")))
     mine = [str(r["qid"]) for r in rows if r.get("needs")]
@@ -685,11 +670,9 @@ def card_entries(card: Mapping[str, Any]) -> tuple[list[str], list[str]]:
 
 
 def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
-    """The ledger's part of a card's status (§4.4 *The card's status*): *needs you* > *stalled* > *held
-    (person)* > *blocked* > *waiting* > *ready*; *steer*, and a question's *needs you*, are the mail's. A
-    *held (person)* row is no need (TD-918): the card reads *held (person)* when at least one open member is
-    held and every other one waits by this function's own test, or there is no other. Nor is a row the
-    person's own session holds (`with_you`, TD-1281), which keeps its `needs`."""
+    """The ledger's part of a card's status (§4.4 *The card's status*): *needs you* > *stalled* > *blocked*
+    > *waiting* > *ready*; *steer*, and a question's *needs you*, are the mail's. A row the person's own
+    session holds (`with_you`, TD-1281), which keeps its `needs`, is no need."""
     if any(r["needs"] and not r.get("with_you") for r in rows):
         return "needs you"
     if any(r["state"] == "stalled" for r in rows):
@@ -700,13 +683,11 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
             return True
         if e.get("kind") == "live-check" and e.get("live") != "yes":
             return True
-        # blocked only by open ids: a designer's decision beside one is the designer's lane, not a wait
-        ids = [b for b in e.get("blocked_by") or [] if b.lower() != f"decision ({DESIGNER})"]
+        # blocked only by open ids
+        ids = list(e.get("blocked_by") or [])
         # an open part counts as an open id its parent is blocked by (TD-1130)
         return bool(ids or e.get("parts_open")) and all(not b.startswith("decision (") for b in ids)
 
-    if any(e.get("held") for e in ents) and all(waits(e) for e in ents if not e.get("held")):
-        return "held (person)"
     if any(e.get("unreachable") for e in ents) or all(e.get("for_page") in NO_LANE for e in ents):
         return "blocked"
     if all(waits(e) for e in ents):
@@ -715,8 +696,8 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
 
 
 def _own(e: Mapping[str, Any]) -> bool:
-    """The person's own member (§4.4 *Waiting*): `Owner: paul`, `Blocked by: decision (paul)`, or held."""
-    return bool(e.get("held")) or str(e.get("owner") or "").lower() == PERSON or ledger_mod.decided_by(dict(e), PERSON)
+    """The person's own member (§4.4 *Waiting*): `Owner: paul` or `Blocked by: decision (paul)`."""
+    return str(e.get("owner") or "").lower() == PERSON or ledger_mod.decided_by(dict(e), PERSON)
 
 
 def _wait(
@@ -812,7 +793,7 @@ def _passed_over(
 ) -> None:
     """**Passed over** (§4.4 *The rank is the pick order*): a worker holding a card ranked below an
     unclaimed pickable card in its own lane flags the card passed over, with the reason its claim's
-    first `ao doing` line gives; a settling, held or waiting entry never triggers it."""
+    first `ao doing` line gives; a settling or waiting entry never triggers it."""
     rank = sorted(cards, key=lambda c: _key_sort(c["key"], c["id"]))
     at = {c["id"]: i for i, c in enumerate(rank)}
     for q, claims in held.items():
@@ -828,7 +809,7 @@ def _passed_over(
                     m
                     for m in c["members"]
                     if open_[m].get("pickable") == "yes"
-                    and not (open_[m].get("settling") or open_[m].get("held") or open_[m].get("waiting"))
+                    and not (open_[m].get("settling") or open_[m].get("waiting"))
                     and home == open_[m]["repo"]
                     and ledger_mod.lane_matches(list(rec.lane), dict(open_[m]), rec.team or None)
                 ]

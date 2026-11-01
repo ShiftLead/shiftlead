@@ -33,9 +33,9 @@ class RankMixin:
         self._rank_task: asyncio.Task[None] | None = None
 
     def _rank_caller(self, caller: Any) -> str:
-        """A move is the person's and an interactive session's (§4.4 *A move lands*, as `ao td reserve --held`
-        is): the person, the person's own shell and a session whose record is not `unattended` pass; an
-        unattended one, and a caller the graph does not hold, are refused, since the rank is the person's."""
+        """A move is the person's and an interactive session's (§4.4 *A move lands*): the person, the
+        person's own shell and a session whose record is not `unattended` pass; an unattended one, and a
+        caller the graph does not hold, are refused, since the rank is the person's."""
         if mail.is_person(caller):
             return "person"
         r = self._graph().get(caller) if isinstance(caller, str) else None

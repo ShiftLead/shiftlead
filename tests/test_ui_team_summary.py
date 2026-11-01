@@ -315,7 +315,7 @@ def test_the_doing_feed_keeps_its_scroll_across_the_summary_swap():
     restore = js.index("AO.restoreScrolls(sum, scrollKept[sum.dataset.team])")
     assert restore > js.index("showSummary(sum);", sync) > sync  # the face is shown, then the box scrolled
     # …and the Repo page draws the same cards, swapped by the same deltas (TD-740): its re-read is the lists alone
-    repo = js[js.index("AO.repo = function") : js.index("AO.heldWords = function")]
+    repo = js[js.index("AO.repo = function") : js.index("AO.newSession = function")]
     assert "lists.innerHTML = await res.text();" in repo and "groupsEvent(ev, repo);" in repo
 
 

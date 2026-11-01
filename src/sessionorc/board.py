@@ -671,7 +671,7 @@ def add_decided(root: str | Path, line: str, session: str = "") -> dict[str, Any
     """The third add (design §4.4 *Board write-back*, TD-565): `line` (`decided_line`) at the top of
     the open items of the board on origin's head, by the second add's road, committed by the same
     `append` — its session *n/a*, the person's, or `session`'s name for a road a person's session
-    pressed (§4.8 *A person's session passes two of them*, TD-1117). Returns `{commit, message, pr, line}`."""
+    pressed (§4.8 *A person's session passes one of them*, TD-1117). Returns `{commit, message, pr, line}`."""
     text = ledgerboard.ITEM_RE.match(line.rstrip("\n"))["text"]
     return _insert(Path(root), line, message(text, "append", session=session))
 

@@ -210,7 +210,7 @@ profile and session names.
 `worktree_setup` (a command run in each new worktree; unset, agent-cadence's `hydrate_worktree.sh` where
 the checkout holds it, or the pinned tree's in a pinned repo, design §5 *The seams*), `board` (the person's board, from the repo's root; unset,
 agent-cadence's `user_attention.md` where the checkout holds it, design §5 *The seams*), `settle` (how long a new
-ledger entry of each Kind waits, holdable, before a lane may take it, `{design-first: 10m}`, design §4.4), `held` (the paths a flow's review stage waits for, design §4.9c),
+ledger entry of each Kind waits before a lane may take it, `{design-first: 10m}`, design §4.4), `held` (the paths a flow's review stage waits for, design §4.9c),
 `commands` (a mapping, `test: …` and `lint: …` filling the briefs' `{test}` and `{lint}`, design §5 *The seams*), and
 `unattended` and `ready_when`, which nothing reads yet — **never `projects`**, which is the org's (design §5).
 
@@ -236,7 +236,7 @@ One function reads the lane words against each entry's header lines (`lane_match
 `sessionorc/ledger.py`, design §6 rule 6). What it does, and what it leaves to a brief:
 
 - **`free-pick`** takes a pickable entry whose `Kind:` is `build` or unwritten; **`design-first`**
-  a pickable `Kind: design-first` entry, and any entry blocked by `decision (designer)`.
+  a pickable `Kind: design-first` entry (a decision owed to the designer is that `Kind:`).
 - **`owner:<word>` narrows the other words** and matches nothing alone: under
   `[free-pick, owner:grinder]` an entry's `Owner:` must be `grinder` **or absent** — an entry with
   no `Owner:` passes. To keep one out, give it an Owner the lane does not name: `paul` (step 0b),
@@ -251,9 +251,8 @@ One function reads the lane words against each entry's header lines (`lane_match
   touch (a private repo, a person's own area), **the briefs are the only fence** for those lines:
   say so under *The lane* in the worker's brief.
 - **An entry can sit in a lane and still not be taken**: one **settling** (new, inside its Kind's
-  `settle:` window — by default only `design-first`, 5m; a Kind no layer lists settles not at all)
-  or **held** there by the person (design §4.4 *A new entry settles before it is
-  pickable*), one **waiting** (a `**Waits:**` line naming a date or an event, §4.4 *An entry says
+  `settle:` window — by default only `design-first`, 5m; a Kind no layer lists settles not at all;
+  design §4.4 *A new entry settles before it is pickable*), one **waiting** (a `**Waits:**` line naming a date or an event, §4.4 *An entry says
   what it waits for*), and one that **needs a team** (`needs_team`: its `Team:` names no team the
   ledger's `Fields:` line declares, or it names none where that line declares two or more, §4.4
   *An entry names its team*) match no lane. `ao repo` says each, so a first start whose lane reads

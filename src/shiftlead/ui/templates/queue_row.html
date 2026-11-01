@@ -1,29 +1,26 @@
 {# A Queue card's row (design §4.5 screen 12 *A card*, §4.5a *Queue page: card*; TD-770): its id, Priority
    badge, title, one state word and the holder's pill, two letters in a level; *after TD-n* for each open
    blocker (its `afters`, TD-1130), a link that scrolls to and rings that row, lit on hover or focus (TD-1131). `r.ext` is what the Repo page's row carries beyond the Queue's (§4.5 screen 11 item 2):
-   its kind, its owner, *needs a team*, the settle mark with Hold / Release, a design's builds — absent on
+   its kind, its owner, *needs a team*, the settle mark, a design's builds — absent on
    the Queue page. No red anywhere: a state is a word with a small mark. #}
 {% macro pbadge(p) %}{% set p = (p or '') | lower %}<span class="qpri qp-{{ p or 'none' }}" title="{{ p | capitalize or 'no priority' }}">{{ (p[:1] or '?') | upper }}</span>{% endmacro %}
 
 {% macro needs_word(r) %}{% if r.needs == 'owner' %}yours to do{% elif r.needs == 'decision' %}your decision{% endif %}{% endmacro %}
 
-{% macro state(r) %}{% if r.with_you %}<span class="qstate s-with">{{ r.state }}</span>{% elif r.needs %}<span class="qstate needs">{{ needs_word(r) }}</span>{% elif r.state %}<span class="qstate s-{{ r.state.split(' ')[0] | replace('#', 'pr') }}{% if r.archived %} done{% endif %}"{% if r.state == 'held (person)' and r.held and r.held.words %} title="held by {{ r.held.words }}"{% endif %}>{{ r.state }}{% if r.state == 'held (person)' and r.held and r.held.why %} — {{ r.held.why }}{% endif %}</span>{% endif %}{% endmacro %}
+{% macro state(r) %}{% if r.with_you %}<span class="qstate s-with">{{ r.state }}</span>{% elif r.needs %}<span class="qstate needs">{{ needs_word(r) }}</span>{% elif r.state %}<span class="qstate s-{{ r.state.split(' ')[0] | replace('#', 'pr') }}{% if r.archived %} done{% endif %}">{{ r.state }}</span>{% endif %}{% endmacro %}
 
 {# the row's controls, defined once (design §4.5 screen 12 *any open row*, §4.5a *Queue card: what needs the
    person*; TD-900, built by TD-905): drawn on a Queue card's open rows and imported by the Inbox's ledger row, so
    the two say each thing one way. **Done…** on a row that is not *yours to do* (that row's own **Done** sends
    *done*), never on a design with open builds; **Back to design…** on a *pickable*, *live check* or id-blocked
    row; each a box for one line of words, then the ledger row's road (`ledger` with `road`): the home tells the
-   holders, clears a person's hold, writes the decided line. **Hold…** on a row not held, an optional line, the
-   record's `why`, where §4.5a *Repo page: Hold / Release on an entry* draws Hold (a kind a lane takes, *for you*, or
-   a row a member holds). `root` is the checkout the press names the repo by (a Queue row's repo is its name). #}
+   holders, then writes the decided line. `root` is the checkout the press names the repo by (a Queue row's repo is its name). #}
 {% macro controls(r, root='', in_menu=False) %}{% if r and not r.archived and r.id %}{% set b = 'role="menuitem"' | safe if in_menu else 'class="btn sm ghost"' | safe %}
   {%- set repo = root or r.repo %}{% set board = (r.repo or 'the repo') ~ "'s board" %}
   {%- set done %}{% if r.needs != 'owner' and not r.builds_open %}<button {{ b }} type="button" data-act="ledger" data-id="person" data-road="done" data-repo="{{ repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" data-name="{{ board }}" title="{{ help_title('row-done') }}">Done…</button>{% endif %}{% endset %}
   {%- set design %}{% if r.page in ('pickable', 'live-check') or (r.page == 'blocked' and r.blocked_open) %}<button {{ b }} type="button" data-act="ledger" data-id="person" data-road="design" data-repo="{{ repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" data-name="{{ board }}" title="{{ help_title('row-back-to-design') }}">Back to design…</button>{% endif %}{% endset %}
-  {%- set hold %}{% if r.state != 'held (person)' and (r.page in ('pickable', 'design', 'live-check', 'for-you') or r.holder) %}<button {{ b }} type="button" data-act="ledger_hold" data-id="person" data-repo="{{ r.repo }}" data-ref="{{ r.id }}" data-quote="{{ r.id }} {{ r.title }}" title="{{ help_title('row-hold') }}">Hold…</button>{% endif %}{% endset %}
-  {#- inline the Inbox's order; in the ⋯ the design's, Hold… first (§4.5 screen 12 *Three verbs: ⋯*) #}
-  {%- if in_menu %}{{ hold }}{{ design }}{{ done }}{% else %}<span class="qctl">{{ done }}{{ design }}{{ hold }}</span>{% endif %}
+  {#- inline the Inbox's order; in the ⋯ the design's (§4.5 screen 12 *Three verbs: ⋯*) #}
+  {%- if in_menu %}{{ design }}{{ done }}{% else %}<span class="qctl">{{ done }}{{ design }}</span>{% endif %}
 {%- endif %}{% endmacro %}
 
 {# the ⋯ (design §4.5 screen 12 *Three verbs: ⋯*, §4.5a *Queue card: ⋯*; TD-909, built by TD-914): the team's
@@ -33,18 +30,15 @@
 {% macro dots(names) %}<details class="more qdots"><summary class="qdotsbtn" role="button" aria-haspopup="menu" title="{{ names | join(' · ') }}" aria-label="the team's controls: {{ names | join(', ') }}">⋯</summary><div class="menu" role="menu" title="{{ help_title('card-dots') }}">{{ caller() }}</div></details>{% endmacro %}
 
 {# a Queue row's ⋯, and the card header's on its top entry (§4.5 screen 12 *Three verbs: ⋯*): the row's controls
-   (`controls`, the Inbox's ledger row draws them inline), **Release** on a row the person holds, and **Open**, the
-   Repo page on the id. An archived row has its Open alone. #}
+   (`controls`, the Inbox's ledger row draws them inline) and **Open**, the Repo page on the id. An archived row has its Open alone. #}
 {% macro menu(r) %}{% if r and r.id %}
   {%- set names = [] %}
   {%- if not r.archived %}
-    {%- if r.state == 'held (person)' %}{% set _ = names.append('Release') %}{% elif r.page in ('pickable', 'design', 'live-check', 'for-you') or r.holder %}{% set _ = names.append('Hold…') %}{% endif %}
     {%- if r.page in ('pickable', 'live-check') or (r.page == 'blocked' and r.blocked_open) %}{% set _ = names.append('Back to design…') %}{% endif %}
     {%- if r.needs != 'owner' and not r.builds_open %}{% set _ = names.append('Done…') %}{% endif %}
   {%- endif %}
   {%- set _ = names.append('Open') %}
   {%- call dots(names) %}
-    {%- if not r.archived and r.state == 'held (person)' %}<button type="button" data-act="ledger_release" data-id="person" data-repo="{{ r.repo }}" data-ref="{{ r.id }}" role="menuitem" title="make {{ r.id }} pickable now: a lane may take it at once (design §4.4)">Release</button>{% endif %}
     {{- controls(r, in_menu=True) }}
     <a href="/repo/{{ r.repo }}#{{ r.id }}" role="menuitem" title="{{ r.id }} on the {{ r.repo }} Repo page">Open</a>
   {%- endcall %}
@@ -52,9 +46,9 @@
 
 {% macro holder(h) %}{% if h %}<a class="qpill mono" href="/focus/{{ h.id }}" title="holds it: {{ h.name }}">{{ h.name }}</a>{% endif %}{% endmacro %}
 
-{# what the Repo page's row adds (§4.5 screen 11 item 2): drawn after the title, the Hold / Release at its end #}
+{# what the Repo page's row adds (§4.5 screen 11 item 2): drawn after the title, *settles in 7m* with no press #}
 {% macro extras(e, repo) %}{% if e %}
-  <span class="meta qkind">{{ e.kind_label }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.needs_team %}<span class="meta needsteam">· needs a team</span>{% endif %}{% if e.settle %}<span class="meta settle"{% if e.held_words %} title="held by {{ e.held_words }}"{% endif %}>· {{ e.settle }}</span>{% endif %}{% if e.wait %}<span class="meta waits" title="{{ e.wait_line }}">· {{ e.wait }}</span>{% endif %}{% for d in e.builds_of %}<span class="meta">· builds <a href="#{{ d }}">{{ d }}</a></span>{% endfor %}{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.flag %}<span class="meta flag">· {{ e.flag }}</span>{% endif %}{% if e.settle_mark %}<button class="btn sm ghost" type="button" data-tdhold="{{ e.id }}" data-repo="{{ repo }}"{% if e.settle_mark == 'held' %} data-release="1" title="make it pickable now: a lane may take it at once (design §4.4)">Release{% else %} title="keep every lane off it until you release it (design §4.4)">Hold{% endif %}</button>{% endif %}
+  <span class="meta qkind">{{ e.kind_label }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.needs_team %}<span class="meta needsteam">· needs a team</span>{% endif %}{% if e.settle %}<span class="meta settle">· {{ e.settle }}</span>{% endif %}{% if e.wait %}<span class="meta waits" title="{{ e.wait_line }}">· {{ e.wait }}</span>{% endif %}{% for d in e.builds_of %}<span class="meta">· builds <a href="#{{ d }}">{{ d }}</a></span>{% endfor %}{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.flag %}<span class="meta flag">· {{ e.flag }}</span>{% endif %}
 {% endif %}{% endmacro %}
 
 {# a design's builds line, under its row (§4.5a *Repo page: its builds line*, TD-693) #}
@@ -94,13 +88,9 @@
   </details>
 {% endif %}{% endmacro %}
 
-{# the entries on a card the person holds: no want while held (§4.5 screen 12 *Three wants*) — the held row,
-   *held (person) — <why>* with **Release**, uncounted and not amber #}
 {# an entry the person's own session holds (§4.5 screen 12 *Three wants*, TD-1281): no want, grey, after Decide and Do
    in the header, in no count; each item's line and foot say *with you in <name>* #}
 {% macro with_you(c) %}{% set ms = (c.wants or {}).get('with_you') or [] %}{% if ms %}<div class="qsec qwith" data-sec="with_you">{{ items(ms) }}</div>{% endif %}{% endmacro %}
-
-{% macro held(c) %}{% set ms = (c.wants or {}).get('held') or [] %}{% if ms %}<div class="qsec qheld" data-sec="held">{{ items(ms) }}</div>{% endif %}{% endmacro %}
 
 {# the card's pill (§4.5 screen 12 *A card*): its Decide and Do counts, amber, in every group where it has one #}
 {% macro pill(c) %}{% set n = (c.wants or {}).get('n') or {} %}{% if n.decide or n.do %}<span class="qstatus needsyou qwpill" title="what on this card waits on you: Decide and Do items">{% if n.decide %}Decide {{ n.decide }}{% endif %}{% if n.decide and n.do %} · {% endif %}{% if n.do %}Do {{ n.do }}{% endif %}</span>{% endif %}{% endmacro %}

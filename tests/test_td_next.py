@@ -16,7 +16,6 @@ from conftest import park_ticks, pinned_script
 from sessionorc import agent_ids, cadence, modes, paths, seams
 from sessionorc import ledgerboard as lb
 from sessionorc.agent_common import RpcError
-from sessionorc.models import Session
 from shiftlead import cli
 
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
@@ -459,49 +458,26 @@ def test_the_cli_passes_an_origins_owner_repo_through(tmp_path, monkeypatch):
     assert sent == {"repo": "ShiftLead/shiftlead", "count": 1}
 
 
-# -- TD-731: an entry can land held (§4.4 *An entry can land held*) ---------------------------------------
-
-
-@pytest.mark.integration
-async def test_held_lands_each_id_held_for_the_person_and_an_interactive_session(home, gh, tmp_path):
-    _one(tmp_path, gh)
-    home.sessions["ao-i"] = Session(id="ao-i", name="i", kind="agent", adapter="claude-code", dir="", unattended=False)
-    got = await home.rpc_td_next(repo="shiftlead", count=2, held=True, caller="ao-i")
-    assert got["ids"] == ["TD-003", "TD-004"] and got["held"] is True
-    seen = json.loads(paths.ledger_seen_file().read_text())["shiftlead/shiftlead"]
-    assert set(seen) == {"TD-003", "TD-004"} and seen["TD-003"]["held"]["by"] == "ao-i" and "at" not in seen["TD-003"]
-    got = await home.rpc_td_next(repo="shiftlead", held=True)
-    assert got["ids"] == ["TD-005"] and got["held"] is True
-    assert json.loads(paths.ledger_seen_file().read_text())["shiftlead/shiftlead"]["TD-005"]["held"]["by"] == "person"
-    plain = await home.rpc_td_next(repo="shiftlead", caller="ao-i")
-    assert (
-        "held" not in plain and "TD-006" not in json.loads(paths.ledger_seen_file().read_text())["shiftlead/shiftlead"]
-    )
-
-
-@pytest.mark.integration
-async def test_held_is_refused_to_an_unattended_caller_and_one_the_graph_does_not_hold(home, gh, tmp_path):
-    _one(tmp_path, gh)
-    home.sessions["ao-w"] = Session(id="ao-w", name="w", kind="agent", adapter="claude-code", dir="", unattended=True)
-    with pytest.raises(RpcError, match="--held is the person's and an interactive session's: ao-w is unattended"):
-        await home.rpc_td_next(repo="shiftlead", held=True, caller="ao-w")
-    with pytest.raises(RpcError, match="ao-gone is not a session this home holds"):
-        await home.rpc_td_next(repo="shiftlead", held=True, caller="ao-gone")
-    assert not paths.ledger_seen_file().exists() and not paths.ids_file().exists(), "nothing written, no id given"
+# -- TD-1297: no `--held`, no `ao td hold` (§4.4 *An entry can land held*: by its own text) ------------------
 
 
 @pytest.mark.unit
-def test_the_cli_sends_held_and_says_so_in_json(tmp_path, monkeypatch, capsys):
+def test_held_is_an_unknown_option_and_td_hold_is_no_command(tmp_path, monkeypatch, capsys):
+    """An entry lands held by its `decision (<person>)` gate, written in the ledger (TD-1296): `--held` is
+    argparse's own refusal under both names, and `ao td hold` is no command; neither reaches the home."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     _register()
-    sent = {}
-    monkeypatch.setattr(
-        cli, "call_sync", lambda m, **p: sent.update(p) or {"ids": ["TD-001"], "unread": [], "held": True}
-    )
     monkeypatch.chdir(tmp_path)
-    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead", "--held", "--json"]) == 0
-    assert sent == {"repo": "ShiftLead/shiftlead", "count": 1, "held": True}
-    assert json.loads(capsys.readouterr().out)["held"] is True
+    sent: list[dict] = []
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.append({"method": m, **p}) or {})
+    for verb in ("reserve", "next"):
+        with pytest.raises(SystemExit) as got:
+            cli.main(["td", verb, "--repo", "ShiftLead/shiftlead", "--held"])
+        assert got.value.code == 2 and "unrecognized arguments: --held" in capsys.readouterr().err
+    with pytest.raises(SystemExit) as got:
+        cli.main(["td", "hold", "TD-001"])
+    assert got.value.code == 2 and "invalid choice: 'hold'" in capsys.readouterr().err
+    assert sent == []
 
 
 # -- TD-970: the road over origin's counter (§4.4 *A ledger entry's id is handed out by the home*) ---------------
@@ -714,15 +690,6 @@ async def test_a_pin_that_does_not_resolve_refuses_in_the_launchers_words(home, 
     with pytest.raises(RpcError, match=r"shiftlead's pinned agent-cadence has no ledger_next_id.py: bump the pin"):
         await home.rpc_td_next(repo="shiftlead")  # a tree with no id script: never the home's own road
     assert not paths.ids_file().exists()
-
-
-@pytest.mark.integration
-async def test_held_holds_the_scripts_ids(home, gh, tmp_path):
-    root = _one(tmp_path, gh)
-    _stub(root, rc=3, ids=("TD-030",), why="no push")
-    got = await home.rpc_td_next(repo="shiftlead", held=True)
-    assert got["held"] is True and got["reserved"] is False
-    assert "TD-030" in json.loads(paths.ledger_seen_file().read_text())["shiftlead/shiftlead"]
 
 
 @pytest.mark.integration
@@ -1119,20 +1086,6 @@ def test_the_alias_says_nothing_more_on_a_refusal_or_a_reply_with_no_ids(tmp_pat
 
 
 @pytest.mark.unit
-def test_held_goes_through_both_names(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
-    _register()
-    monkeypatch.chdir(tmp_path)
-    sent: list[dict] = []
-    reply = {"ids": ["TD-001"], "unread": [], "held": True}
-    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.append(p) or reply)
-    for verb in ("reserve", "next"):
-        assert cli.main(["td", verb, "--repo", "ShiftLead/shiftlead", "--held", "--json"]) == 0
-        assert json.loads(capsys.readouterr().out)["held"] is True
-    assert [p.get("held") for p in sent] == [True, True]
-
-
-@pytest.mark.unit
 def test_the_help_says_reserve_spends_and_next_is_its_old_name(capsys):
     with pytest.raises(SystemExit):
         cli.main(["td", "--help"])
@@ -1142,4 +1095,4 @@ def test_the_help_says_reserve_spends_and_next_is_its_old_name(capsys):
     with pytest.raises(SystemExit):
         cli.main(["td", "reserve", "--help"])
     text = " ".join(capsys.readouterr().out.split())
-    assert "{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line}, and held true with --held" in text
+    assert "{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line}" in text and "--held" not in text

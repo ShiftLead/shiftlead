@@ -193,12 +193,12 @@ async def test_rule_six_tells_a_member_only_its_own_teams_entries(agent, tmp_pat
         await person.call("kill", id=sid)
 
 
-async def test_an_entry_on_the_designers_decision_is_told_to_the_designer_and_once_decided_to_the_grinder(
+async def test_an_entry_on_a_designer_decision_item_is_no_ones_news_until_decided_and_then_the_grinders(
     agent, tmp_path
 ):
-    """TD-368 (design §6 rule 6, TD-367): an entry blocked by `decision (designer)` is the designer's
-    lane news, though its `Owner:` is the grinder's; the PR that makes the decision drops the item,
-    and the grinder's lane is told of it then."""
+    """TD-1297 (design §6 rule 6, TD-1296): a decision owed to the designer is `Kind: design-first`, so an
+    entry blocked by `decision (designer)` is in no lane, the designer's included; the PR that drops the
+    item makes it the grinder's lane news."""
     await park_ticks(agent)
     now = datetime.now(UTC)
     held = {**_e("TD-151", pickable="no"), "blocked_by": ["decision (designer)"]}
@@ -209,13 +209,12 @@ async def test_an_entry_on_the_designers_decision_is_told_to_the_designer_and_on
         agent._repos[str(tmp_path)]["ledger"]["entries"] = [_e("TD-001"), held]
         for sid in (des, gri):
             await agent._lane_news(agent.sessions[sid], now)
-        assert len(_notes(agent, des)) == 1 and "TD-151" in _notes(agent, des)[0]
-        assert _notes(agent, gri) == []
+        assert _notes(agent, des) == [] and _notes(agent, gri) == []
         agent._repos[str(tmp_path)]["ledger"]["entries"] = [_e("TD-001"), _e("TD-151")]
         for sid in (des, gri):
             await agent._lane_news(agent.sessions[sid], now + timedelta(minutes=1))
         assert len(_notes(agent, gri)) == 1 and "TD-151" in _notes(agent, gri)[0]
-        assert len(_notes(agent, des)) == 1, "a decided entry is no longer the designer's"
+        assert _notes(agent, des) == [], "never the designer's"
         for sid in (des, gri):
             await person.call("kill", id=sid)
 
@@ -550,8 +549,8 @@ async def test_a_decided_line_a_live_sibling_holds_is_seen_untold_and_its_drop_i
 
 
 async def test_an_entry_still_settling_is_told_only_once_it_settles(agent, tmp_path):
-    """TD-710, §4.4 *A new entry settles before it is pickable*: the home marks an entry `settling` (or
-    `held`) in the reading, and rule 6 reads the mark as no lane's, so the news waits for it to settle."""
+    """TD-710, §4.4 *A new entry settles before it is pickable*: the home marks an entry `settling` in the
+    reading, and rule 6 reads the mark as no lane's, so the news waits for it to settle."""
     await park_ticks(agent)
     now = datetime.now(UTC)
     async with LocalClient() as person:

@@ -17,14 +17,12 @@ import signal
 import sys
 import threading
 import time
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import agent_common, cadence, hosts, ledgerboard, mail, paths
+from sessionorc import cadence, hosts, ledgerboard, mail, paths
 from sessionorc import ledger as ledger_mod
 from sessionorc import seams as seams_mod
-from sessionorc import settle as settle_mod
 from sessionorc.agent_common import RpcError, log
 from sessionorc.models import PERSON, now_iso
 from sessionorc.store import _atomic_write
@@ -37,7 +35,6 @@ FILES_CAP = 3000  # GitHub lists at most this many files of a PR: a listing that
 PR_READERS = 4  # PRs read at once
 GIVEN_KEEP = 200
 COUNT_MAX = 10
-WHY_CHARS = 200  # a hold's words and a drop notice's, one line (TD-905)
 # the start of the id script's filing question (agent-cadence TD-204): its stderr's last line where the repo sets
 # `review-outcomes` on; parity with its `FILING_QUESTION` (cadence.md §7.9)
 FILING_QUESTION = "ledger_next_id: if this entry is a defect, did a design miss it?"
@@ -240,146 +237,18 @@ _UNQUOTABLE = re.compile(r'["`$\\]')
 
 
 class IdsMixin:
-    async def rpc_td_hold(
-        self,
-        repo: str = "",
-        id: str = "",
-        release: bool = False,
-        why: str = "",
-        tell: str = "",
-        caller: Any = None,
-    ) -> dict[str, Any]:
-        """`ao td hold` and the Repo page's **Hold** / **Release** (design §4.4 *Hold*, §4.7 *Entries*,
-        TD-707, built by TD-710 slice 2, TD-731): the person holds any open entry, settling or settled, or
-        releases a held one, on the home's settle clock — no ledger edit. `repo` is a checkout the home
-        reads, by its path or its registered name. A person's own act (`mail.PERSON_ONLY`). The reading is
-        marked again at once, so a lane and the page read the hold now. A hold on a claimed entry tells
-        its unattended holders, and the readers of their PRs (`_hold_tell`). `why` is the hold's optional
-        words (TD-905), quoted in those notes; on a held entry new words replace them and nobody is told
-        again. **A drop notice** is `tell` (§4.4 *Hold*, TD-905): no hold is written, and the same
-        holders and readers are told the entry `<tell>` — **Done…** and **Back to design…** send it
-        before their line. A person's session passes too (`mail.PERSON_SESSION`, §4.8 *A person's session
-        passes two of them*, TD-1117): `held.by` is its id, the notes name it, its drop notice says *(told by
-        <it>)*, and it releases or rewords no hold the person pressed (`settle.hold`'s `presser`).
-        Returns `{repo, id, held, settling, told, readers, untold}`."""
-        agent_common.person_only(caller, "hold a ledger entry", "§4.4 *Hold*", self._graph(), session_ok=True)
-        why, tell = " ".join(str(why or "").split())[:WHY_CHARS], " ".join(str(tell or "").split())[:WHY_CHARS]
-        if tell and (release or why):
-            raise RpcError("a drop notice (tell) writes no hold: it takes neither release nor why (design §4.4 *Hold*)")
-        if release and why:
-            raise RpcError("a release takes no words: why is a hold's (design §4.4 *Hold*)")
-        want = str(repo or "").strip()
-        roots = [
-            r
-            for r, v in self._repos.items()
-            if want and (r == want or str(Path(r).resolve()) == str(Path(want).expanduser().resolve())
-                         or str((v or {}).get("name") or Path(r).name) == want)
-        ]  # fmt: skip
-        if not roots:
-            raise RpcError(f"{want or 'no repo'} is not a repo this home reads (its repos registry)")
-        root = roots[0]
-        view = self._repos.get(root) or {}
-        name = str(view.get("name") or Path(root).name)
-        tid = str(id or "").strip().upper()
-        entries = [e for e in ((view.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
-        entry = next((e for e in entries if e.get("id") == tid), None)
-        if entry is None:
-            raise RpcError(f"{tid or 'no id'} is not an open entry of {name}'s ledger as the home last read it")
-        remote = str(view.get("remote") or "")
-        if not remote:
-            raise RpcError(f"{name}'s origin is not read yet: its clock is keyed by it, so ask again in a minute")
-        presser = self._presser(caller)
-        if tell:
-            if presser == "session":
-                tell = f"{tell} (told by {self._presser_words(str(caller))})"
-            told, readers, untold = await self._hold_notice(tid, tell)
-            return {
-                "repo": name,
-                "id": tid,
-                "held": entry.get("held"),
-                "settling": entry.get("settling"),
-                "told": told,
-                "readers": readers,
-                "untold": untold,
-            }
-        told: list[str] = []
-        readers: list[str] = []
-        untold: list[str] = []
-        if release:
-            await self._clear_hold(root, entry, presser, road=False)
-        else:
-            key, spans = settle_key(root, remote), settle_mod.spans(root)
-            now = datetime.now(UTC)
-            by = PERSON if caller is None or mail.is_person(caller) else str(caller)
-            was_held = isinstance(entry.get("held"), dict)
-            try:
-                await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=by, why=why, presser=presser)
-            except settle_mod.Refused as e:
-                raise RpcError(str(e)) from None
-            settle_mod.mark(entries, key, spans, now)  # on the loop: the lanes and a claim read these dicts there
-            if not was_held:  # a hold on a held entry tells nobody again
-                who = self._presser_words(by) if presser == "session" else ""
-                told, readers, untold = await self._hold_tell(tid, why=why, presser=who)
-        return {
-            "repo": name,
-            "id": tid,
-            "held": entry.get("held"),
-            "settling": entry.get("settling"),
-            "told": told,
-            "readers": readers,
-            "untold": untold,
-        }
-
-    def _presser(self, caller: Any) -> settle_mod.Presser:
-        """The caller's class for `settle.hold` (§4.8 *What a person's session releases*, TD-1117): the
-        person (no caller), the person's shell (`mail.as_person`), or any other caller — which past
-        `person_only` is a person's session."""
-        if caller is None or mail.is_person(caller):
-            return "person"
-        return "shell" if mail.as_person(caller, self._graph()) else "session"
-
     def _presser_words(self, by: str) -> str:
-        """A hold's presser in words (`mail.presser_words`), read from the one graph now."""
+        """A caller in words (`mail.presser_words`), read from the one graph now: the road's *closed by …*."""
         return mail.presser_words(by, self._graph())
 
-    async def _clear_hold(
-        self, root: str, entry: dict[str, Any], presser: settle_mod.Presser, *, road: bool = True
-    ) -> None:
-        """A hold's end (§4.8 *What a person's session releases*, TD-1117): the store's release
-        (`settle.hold`, its protect check by `presser`) and the reading's re-mark, so lanes and the page
-        read the end at once. `td_hold --release` (`road=False`) passes its caller's class and is refused on
-        an entry not held; a road passes `person`, the press being the decision, and an entry not held —
-        whatever its reading said — is nothing to do."""
-        view = self._repos.get(root) or {}
-        remote = str(view.get("remote") or "")
-        entries = [e for e in ((view.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
-        key, spans, now = settle_key(root, remote), settle_mod.spans(root), datetime.now(UTC)
-        try:
-            await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=PERSON, release=True, presser=presser)
-        except settle_mod.NotHeld as e:
-            if not road:
-                raise RpcError(str(e)) from None
-        except settle_mod.Refused as e:
-            raise RpcError(str(e)) from None
-        settle_mod.mark(entries, key, spans, now)
-
-    async def _hold_notice(self, tid: str, tell: str) -> tuple[list[str], list[str], list[str]]:
-        """A drop notice (`_hold_tell` with `tell`): `rpc_td_hold`'s, its words already carrying *(told by
-        …)* for a session, and a road's, whose words name the presser themselves (TD-1117)."""
-        return await self._hold_tell(tid, tell=tell)
-
-    async def _hold_tell(
-        self, tid: str, why: str = "", tell: str = "", presser: str = ""
-    ) -> tuple[list[str], list[str], list[str]]:
-        """Tell a held entry's claimers (design §4.4 *A claimed entry is held all the same*, TD-731), the hold
-        already written: a `note` from the person, `about` the id, to each **unattended** live holder of a
-        declared lease (`_lease_holders`), and a second to each seat whose inbox holds an open `ask` carrying
-        a PR one of those holders' claims names (`pr` or `review_pr`) — once a seat, the person never, being
-        no record. A note that cannot be sent is a line of `untold` and never refuses the hold. `why` is the
-        hold's words, quoted; `tell` a drop notice's (TD-905), which says the entry `<tell>` in place of
-        *is held by the person*, with no Release to wait for, and is the holder's `--why`. `presser` is a
-        hold's presser in words where it is not the person (*the person's session w1*, TD-1117). Returns
-        `(told, readers, untold)`: every name mailed, the readers among them, and the lines not sent."""
+    async def _tell_holders(self, tid: str, tell: str) -> tuple[list[str], list[str], list[str]]:
+        """The tell, `_ledger_road`'s first step (design §4.4 *The tell*, TD-905, TD-1297): a `note` from the
+        person, `about` the id, to each **unattended** live holder of a declared lease (`_lease_holders`),
+        saying the entry `<tell>` (the road's words) and asking it to drop the entry with them as its
+        `--why`, and a second to each seat whose inbox holds an open `ask` carrying a PR one of those holders'
+        claims names (`pr` or `review_pr`) — once a seat, the person never, being no record. A note that
+        cannot be sent is a line of `untold`. Returns `(told, readers, untold)`: every name mailed, the
+        readers among them, and the lines not sent."""
         graph = self._graph()
         holders: list[str] = []
         prs: set[int] = set()
@@ -412,32 +281,25 @@ class IdsMixin:
             told.append(to)
             return True
 
-        who = presser or "the person"
-        said = f"{tid} {tell}" if tell else f"{tid} is held by {who}" + (f" (“{why}”)" if why else "")
+        said = f"{tid} {tell}"
         # the notice's words, without what would break or run inside the quoted `--why` (review of #2564)
-        drop = _UNQUOTABLE.sub("", tell.removeprefix("is ")) if tell else f"held by {who}"
+        drop = _UNQUOTABLE.sub("", tell.removeprefix("is "))
         for addr in holders:
             await tell_(
                 addr,
                 f"{said}: stop at the step in hand, push, leave its PR open and unmerged, and drop the entry: "
-                f'`ao progress drop {tid} --why "{drop}"`.' + ("" if tell else " A Release makes it pickable again."),
+                f'`ao progress drop {tid} --why "{drop}"`.',
             )
         for addr, pr in seats.items():
-            until = "" if tell else " until they release it"
-            if await tell_(addr, f"{said}: leave PR #{pr} unmerged{until}."):
+            if await tell_(addr, f"{said}: leave PR #{pr} unmerged."):
                 readers.append(addr)
         return told, readers, untold
 
-    async def rpc_td_next(
-        self, repo: str = "", count: int = 1, held: bool = False, branch: str = "", caller: Any = None
-    ) -> dict[str, Any]:
+    async def rpc_td_next(self, repo: str = "", count: int = 1, branch: str = "", caller: Any = None) -> dict[str, Any]:
         """`ao td reserve` (design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries*): the next
         `count` free ids of the repo named `repo` — its registered name, or its origin's `owner/repo` — and the
-        record of who was given them. `by` is the dispatcher's caller, never a parameter. With `held` (`ao td
-        next --held`, §4.4 *An entry can land held*, TD-731) each id is held on the settle clock before the
-        reply, so its entry lands held until the person's Release: the person's and an interactive
-        session's, refused to an unattended caller and to one the graph does not hold. Returns `{repo,
-        origin, ids, unread}` — and `held: true` with `held` — `unread` the lines naming the open PRs that
+        record of who was given them. `by` is the dispatcher's caller, never a parameter. Returns `{repo,
+        origin, ids, unread}`, `unread` the lines naming the open PRs that
         could not be read, and `reserved`, `why`, `warnings` and `taken_by` the script's, `taken_by_line` the
         header line to write where the ledger accepts it (on the home's own road `reserved` is true, `why`
         empty, `warnings` none and both null), and `question` the script's filing question where the repo sets
@@ -449,8 +311,6 @@ class IdsMixin:
         branch = branch if isinstance(branch, str) else ""
         if branch:
             await check_branch(branch, start + LOCK_BY - time.monotonic())
-        if held:
-            self._held_caller(caller)
         root, key, name = await self._ids_repo(str(repo or "").strip(), start + LOCK_BY)
         lock = self._ids_locks.setdefault(key, asyncio.Lock())
         try:
@@ -469,31 +329,7 @@ class IdsMixin:
             lock.release()
         for line in [*got["unread"], *got["warnings"]] + ([] if got["reserved"] else [f"not reserved: {got['why']}"]):
             log.info("td_next %s: %s", name, line)
-        out = {"repo": name, "origin": key, **got}
-        if held:  # the clock is keyed by the origin as `settle_key` keys a reading's (an origin is read here)
-            by = PERSON if mail.is_person(caller) else str(caller)
-            await asyncio.to_thread(settle_mod.prehold, key, got["ids"], by, datetime.now(UTC))
-            out["held"] = True
-        return out
-
-    def _held_caller(self, caller: Any) -> None:
-        """`--held` is the person's and an interactive session's (design §4.4 *An entry can land held*): the
-        person, the person's own shell and a session whose record is not `unattended` pass; an unattended
-        one, and a caller the graph does not hold, are refused in these words, not `person_only`'s."""
-        if mail.is_person(caller):
-            return
-        r = self._graph().get(caller) if isinstance(caller, str) else None
-        if r is None:
-            raise RpcError(
-                f"--held is the person's and an interactive session's: {caller} is not a session this home holds "
-                "(design §4.4 *An entry can land held*)"
-            )
-        if not r.unattended:  # the person's own shell is interactive too (`mail.person_shell`)
-            return
-        raise RpcError(
-            f"--held is the person's and an interactive session's: {caller} is unattended "
-            "(design §4.4 *An entry can land held*)"
-        )
+        return {"repo": name, "origin": key, **got}
 
     async def _ids_repo(self, want: str, by: float) -> tuple[str, str, str]:
         """`(root, origin key, name)` for a registered name or an `owner/repo`. A name registered checkouts

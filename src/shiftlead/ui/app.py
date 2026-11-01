@@ -459,7 +459,6 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     repo_window,
     seat_names,  # noqa: F401
     send_folds,
-    settle_mark,  # noqa: F401
     strip_group,  # noqa: F401
     team_groups,
     team_notes,
@@ -3132,23 +3131,6 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         text = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)
         return {"ok": True, "id": s["id"], "name": s.get("name") or plan["name"], "text": text}
 
-    @app.post("/api/ledger/hold")
-    async def api_ledger_hold(request: Request):
-        """§4.5a *Repo page: Hold / Release on an entry* and *Inbox row: held entry* (TD-707, built by
-        TD-710 slice 3 and TD-736): `{repo, id, release?, why?}` — the repo by its name, as the page names it —
-        to the home's `td_hold`, the person's own act on its settle clock, no ledger edit; the reply's
-        `told`, `readers` and `untold` are the Hold toast's. A refusal (*TD-707 has settled*) is
-        the toast's, a 400 in its words; the row's mark moves on the next repo reading's push."""
-        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
-        repo, ref = (str(body.get("repo") or ""), str(body.get("id") or "")) if isinstance(body, dict) else ("", "")
-        if not repo or not ref:
-            raise HTTPException(400, "send {repo, id, release?}")
-        # the home resolves the repo by the name its reading carries, the page's own (a refusal is the 400)
-        why = " ".join(str(body.get("why") or "").split())  # **Hold…**'s words (TD-905), new words replacing old
-        more = {"why": why} if why else {}
-        got = await call("td_hold", repo=repo, id=ref, release=bool(body.get("release")), **more)
-        return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
-
     @app.post("/api/rank/move")
     async def api_rank_move(request: Request):
         """§4.5a *Queue page, Up next: grip / ⤒ ↑ ↓* and *Repo page: Technical debt cards* (TD-770):
@@ -3283,9 +3265,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return {"ok": True, "focus": holder["id"]}
         type_ = str(entry.get("type") or "")
         type_ = type_ if type_ in orgmod.ENTRY_TYPES else orgmod.ENTRY_TYPES[0]
-        if str(entry.get("owner") or "").lower() == "paul":
+        if str(entry.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
             why_key = "yours"
-        elif ledger_mod.decided_by(entry, "paul") or not card_id:
+        elif ledger_mod.decided_by(entry, ledger_mod.PERSON_OWNER) or not card_id:
             why_key = "decision"
         else:
             why_key = "card"
@@ -4954,7 +4936,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             more: dict[str, Any] = {}
             if road := str(body.get("road") or ""):
                 # **Done…** / **Back to design…** (§4.5 screen 12 *any open row*, TD-905): refused here where
-                # nobody would read the line; the home tells, clears a hold and writes it
+                # nobody would read the line; the home tells and writes it
                 if not repo.startswith(("/", "~")):  # a Queue row names its repo: the registered checkout's name
                     repo = next((str(p) for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), repo)
                 org, _notes = await asyncio.to_thread(org_here)

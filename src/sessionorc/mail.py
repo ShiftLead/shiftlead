@@ -144,7 +144,6 @@ PERSON_ONLY = frozenset(
         "board_reply",
         "board_reply_hand",
         "ledger_decide",
-        "td_hold",
         "entry_add",
         "settings",
         "set_settings",
@@ -165,10 +164,10 @@ PERSON_ONLY = frozenset(
     }
 )
 
-# The two of them a person's session passes too (design §4.8 *A person's session passes two of them*,
-# TD-1117): `td_hold` (a hold, its Release, a drop notice) and `ledger_decide`'s roads, each passing
-# `session_ok` to `agent_common.person_only`; `tests/test_person_only.py` holds the subset to those calls.
-PERSON_SESSION = frozenset({"td_hold", "ledger_decide"})
+# The one of them a person's session passes too (design §4.8 *A person's session passes one of them*,
+# TD-1117, TD-1297): `ledger_decide`'s roads, passing `session_ok` to `agent_common.person_only`;
+# `tests/test_person_only.py` holds the subset to that call.
+PERSON_SESSION = frozenset({"ledger_decide"})
 
 
 # every control character read as a space, in one C pass rather than a generator per character (TD-739);
@@ -316,7 +315,7 @@ def _own(s: Session) -> list[str]:
 
 
 def person_session(record: Session | None, controllers: Controllers = _own) -> bool:
-    """A person's session (design §4.8 *A person's session passes two of them*, §4.10 *between the
+    """A person's session (design §4.8 *A person's session passes one of them*, §4.10 *between the
     person's own sessions*, TD-1116, TD-1117): an own end (`own_end`) with no `controllers` — started by
     hand, interactive, holding no seat, carrying no lead's word. Read from the record at each request, so
     a flip to `unattended`, a controller added or a seat end it on the next call. What `from_role` reads
@@ -325,8 +324,8 @@ def person_session(record: Session | None, controllers: Controllers = _own) -> b
 
 
 def presser_words(by: str, records: Mapping[str, Session]) -> str:
-    """A hold's presser (`held.by`) as the notes, the claim refusal and the mark's `title` say it (§4.8
-    *The record names who pressed*, TD-1117), read from `records` (the one graph) now: *the person* for
+    """Who pressed a ledger road (`ledger_decide`'s caller), as the tell's notes say it (§4.4 *The tell*,
+    TD-1117), read from `records` (the one graph) now: *the person* for
     `person`, none, or the person's shell (`as_person`); *the person's session <name>* for a person's
     session; the record's name for any other; the id for one gone."""
     if not by or by == PERSON or as_person(by, records):

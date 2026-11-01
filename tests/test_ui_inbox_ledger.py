@@ -196,10 +196,9 @@ def test_an_entry_an_open_decided_line_names_leaves_later(tmp_path):
     assert [r["id"] for r in rows] == ["TD-156", "TD-319"]
 
 
-def test_a_held_for_you_entry_an_open_decided_line_names_is_its_held_row(tmp_path):
-    """§4.5a **Inbox row: held entry** (TD-736, TD-755): a held *for you* entry that an open decided
-    line names is no longer *for you* — that line is its row — so it is here for its hold alone: one
-    row of the kind *ledger · held*, no answers, with **Release**."""
+def test_an_old_held_mark_on_an_entry_a_decided_line_names_draws_no_row(tmp_path):
+    """TD-1297: a *for you* entry an open decided line names is that line's row; an old clock's `held`
+    mark on it no longer brings it back as a *ledger · held* row."""
     from datetime import UTC, datetime, timedelta
 
     from shiftlead.ui.app import ledger_for_you
@@ -210,10 +209,9 @@ def test_a_held_for_you_entry_an_open_decided_line_names_is_its_held_row(tmp_pat
     by = {e["id"]: e for e in repos[a]["ledger"]["entries"]}
     by["TD-133"]["held"] = {"at": (now - timedelta(hours=2)).isoformat()}
     repos[a]["work_orders"] = {"orders": [{"id": "board:1", "refs": ["TD-133"]}]}
-    rows = [r for r in ledger_for_you(repos, [], {}, now)["groups"][0]["rows"] if r["id"] == "TD-133"]
-    assert len(rows) == 1
-    assert (rows[0]["kind"], rows[0]["answers"], rows[0]["release"]) == ("ledger · held", [], True)
-    assert (rows[0]["added"], rows[0]["claimed"]) == ("held 2h", True)
+    rows = ledger_for_you(repos, [], {}, now)["groups"][0]["rows"]
+    assert "TD-133" not in [r["id"] for r in rows]
+    assert all(r["kind"] in ("ledger · yours", "ledger · your decision") for r in rows)
 
 
 def test_the_route_hands_an_answer_go_with_it_or_words_to_ledger_decide(tmp_path, monkeypatch):
@@ -571,12 +569,9 @@ def test_the_row_draws_start_session_or_open_session_while_held(tmp_path, monkey
     )
 
 
-def test_a_held_entry_is_a_row_with_release_and_a_held_for_you_entry_one_row(tmp_path, monkeypatch):
-    """§4.5a **Inbox row: held entry** (TD-736, §4.5 screen 6 *A held entry waits on the person too*):
-    every open entry whose reading carries `held` is a row in the ledger rows' order, of the kind
-    *ledger · held*, its age the hold's, *claimed by* while a live claim stands, *details* its Why and
-    Fix, and **Release** and **Open** alone — no answers, **Reply** or **Start session**; a held *for you*
-    entry is one row, the *for you* row, with **Release** beside **Open**."""
+def test_an_old_held_mark_adds_no_row_and_no_release(tmp_path, monkeypatch):
+    """TD-1297 (§4.5 screen 6): the Inbox's ledger rows are the *for you* entries alone — no *Inbox row:
+    held entry*, no *ledger · held* kind, no **Release** — and an old clock's `held` mark changes none of it."""
     from datetime import UTC, datetime, timedelta
 
     from shiftlead.ui.app import ledger_for_you
@@ -585,30 +580,16 @@ def test_a_held_entry_is_a_row_with_release_and_a_held_for_you_entry_one_row(tmp
     repos = _repos(tmp_path)
     by = {e["id"]: e for e in repos[str(tmp_path / "agentorc")]["ledger"]["entries"]}
     held = {"at": (now - timedelta(hours=2)).isoformat()}
+    plain = [r["id"] for r in ledger_for_you(repos, _fleet(tmp_path), {}, now)["groups"][0]["rows"]]
     by["TD-010"].update(held=held, added="2026-10-01", detail=DETAIL)
     by["TD-133"]["held"] = held
-    fleet = _fleet(tmp_path)
-    fleet[0]["progress"] = [*fleet[0]["progress"], {"ref": "TD-010", "status": "claimed"}]
-    lf = ledger_for_you(repos, fleet, {}, now)
+    lf = ledger_for_you(repos, _fleet(tmp_path), {}, now)
     rows = lf["groups"][0]["rows"]
-    assert [r["id"] for r in rows] == ["TD-002", "TD-010", "TD-156", "TD-133", "TD-319"], "one order, priority then id"
-    assert lf["n"] == 6 and [r["id"] for r in rows].count("TD-133") == 1
-    t010 = next(r for r in rows if r["id"] == "TD-010")
-    assert (t010["kind"], t010["added"], t010["at"]) == ("ledger · held", "held 2h", held["at"])
-    assert t010["held"] == "grinder-ao-1"
-    assert (t010["claimed"], t010["release"], t010["answers"]) == (True, True, [])
+    assert [r["id"] for r in rows] == plain and "TD-010" not in plain
     t133 = next(r for r in rows if r["id"] == "TD-133")
     assert (t133["kind"], t133["added"]) == ("ledger · your decision", "added Oct 7")
-    assert (t133["release"], t133["claimed"]) == (True, False)
+    assert "release" not in t133 and "claimed" not in t133
     html = _render(lf, tmp_path, monkeypatch)
-    row = _row(html, "ledger:agentorc:TD-010")
-    assert ">ledger · held</span>" in row and "claimed by grinder-ao-1" in row and "held by" not in row
-    assert ">held 2h · M</span>" in row and "a team started by hand loses the hour." in row
-    assert "held in agentorc's ledger — no lane takes it until you release it" in row
-    assert 'data-act="ledger_release" data-id="person" data-repo="agentorc" data-ref="TD-010"' in row
-    assert ">Release</button>" in row and ">Open</a>" in row
-    for gone in (">Reply</button>", ">Start session</button>", ">Open session</button>", "its answers", "Go with it"):
-        assert gone not in row, gone
     row = _row(html, "ledger:agentorc:TD-133")
-    assert ">Release</button>" in row and ">Reply</button>" in row and "its answers" in row
-    assert ">Release</button>" not in _row(html, "ledger:agentorc:TD-156")
+    assert ">Release</button>" not in row and ">Reply</button>" in row and "its answers" in row
+    assert "ledger · held" not in html and "ledger_release" not in html and "held (person)" not in html
