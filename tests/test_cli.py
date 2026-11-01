@@ -554,7 +554,8 @@ def test_stop_note_reads_in_the_local_clock(monkeypatch):
     from shiftlead.cli import stop_note
 
     assert stop_note({}) == ""
-    when = datetime.datetime.now().astimezone() + datetime.timedelta(hours=2)
+    # two hours on in UTC, then the local clock: added to a local time, the offset stays today's across a DST change
+    when = (datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=2)).astimezone()
     iso = when.astimezone(datetime.UTC).isoformat().replace("+00:00", "Z")
     note = stop_note({"run_until": iso})
     assert note.startswith("stops ") and f"{when:%H:%M}" in note  # the reader's clock, not UTC
