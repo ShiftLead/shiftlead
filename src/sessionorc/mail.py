@@ -157,6 +157,8 @@ PERSON_ONLY = frozenset(
         "restart",
         "relaunch",
         "notify_test",
+        "push_subscribe",
+        "push_unsubscribe",
         "forget_host",
         "attach",
         "ci_rerun",

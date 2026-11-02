@@ -744,8 +744,10 @@ def parse_board_show(v: Any) -> str:
 
 # -- notify: telegram (§5 `notify:`, §4.10 *Told on Telegram when nobody is looking*, TD-319) ----------
 
-NOTIFY_KEYS = ("telegram",)
+NOTIFY_KEYS = ("telegram", "push")
 TELEGRAM_KEYS = ("on", "secrets", "link")
+PUSH_KEYS = ("on", "telegram", "secrets")  # §4.10 *Told on the home-screen app too* (TD-1302)
+PUSH_TELEGRAM = ("both", "fallback")
 _SECRETS = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 _LINK = re.compile(r"https?://[^\s/]+(/\S*)?")
 
@@ -773,15 +775,57 @@ def parse_telegram(value: Any, drop: bool = False) -> dict[str, Any]:
     return _each(_fields(value, TELEGRAM_KEYS, "telegram", drop), {"on": on, "secrets": secrets, "link": link}, drop)
 
 
+def parse_push(value: Any, drop: bool = False) -> dict[str, Any]:
+    """`notify.push` (§4.10 *Told on the home-screen app too*, TD-1302): `on` (true or false; absent, on),
+    `telegram` — `both` or `fallback` — and `secrets`, the Doppler `project/config` holding
+    `VAPID_PRIVATE_KEY`, a name and never a value. The devices are `push.json`'s, never here."""
+
+    def on(b: Any) -> bool:
+        if not isinstance(b, bool):
+            raise ValueError(f"push.on is true or false, not {b!r}")
+        return b
+
+    def telegram(t: Any) -> str:
+        if t not in PUSH_TELEGRAM:
+            raise ValueError(f"push.telegram is both or fallback, not {t!r}")
+        return str(t)
+
+    def secrets(s: Any) -> str:
+        if not isinstance(s, str) or not _SECRETS.fullmatch(s.strip()):
+            raise ValueError(f"push.secrets is a Doppler project/config like samscrape/prd, not {s!r}")
+        return s.strip()
+
+    return _each(_fields(value, PUSH_KEYS, "push", drop), {"on": on, "telegram": telegram, "secrets": secrets}, drop)
+
+
 def notify(doc: dict[str, Any]) -> dict[str, Any]:
-    """`notify:` as kept: `{telegram: {on?, secrets?, link?}}`, every field that is not valid dropped."""
+    """`notify:` as kept: `{telegram: {on?, secrets?, link?}, push: {on?, telegram?, secrets?}}`, every field
+    that is not valid dropped."""
     raw = doc.get("notify")
-    tg = raw.get("telegram") if isinstance(raw, dict) else None
-    try:
-        got = parse_telegram(tg, drop=True) if tg is not None else {}
-    except ValueError:
-        got = {}
-    return {"telegram": got} if got else {}
+    out: dict[str, Any] = {}
+    for name, parse in (("telegram", parse_telegram), ("push", parse_push)):
+        part = raw.get(name) if isinstance(raw, dict) else None
+        try:
+            got = parse(part, drop=True) if part is not None else {}
+        except ValueError:
+            got = {}
+        if got:
+            out[name] = got
+    return out
+
+
+def push(doc: dict[str, Any]) -> dict[str, Any]:
+    """`notify.push` as the tick reads it: `on` (absent, on), `telegram` (absent, both) and `secrets` — its
+    own, else Telegram's for sending (§4.10 *The key*), else None; `own_secrets` is its own alone, the one
+    config **Make key** writes to."""
+    p = notify(doc).get("push") or {}
+    tg = notify(doc).get("telegram") or {}
+    return {
+        "on": p.get("on") is not False,
+        "telegram": p.get("telegram") or "both",
+        "secrets": p.get("secrets") or tg.get("secrets"),
+        "own_secrets": p.get("secrets"),
+    }
 
 
 def telegram(doc: dict[str, Any]) -> dict[str, Any] | None:

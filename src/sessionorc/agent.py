@@ -1121,6 +1121,7 @@ class HostAgent(
             out["pulls"] = self._pulls_view()
             out["waiting"] = work.waiting_of(self.person_inbox)
             out["notify"] = self._notify_view()
+            out["push"] = self._push_view()  # the Push card's devices and key (§4.10, TD-1302); absent on a node
             out["ci_spells"] = self._ci_spells_view()  # the *CI not starting* rows' spells (§4.4, TD-687)
             out["work"] = {
                 team: dict(rec["work_waiting"])
