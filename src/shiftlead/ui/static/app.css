@@ -674,12 +674,19 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
    have none of; its height is `--softh` on the wrap, which the composer opened over the terminal stands above */
 .softkeys { display: none; }
 @media (max-width: 720px), (pointer: coarse) {
-  .softkeys { display: flex; gap: 6px; padding: 6px 0 0; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
-  .softkeys button { flex: none; min-width: 44px; height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px;
-    background: var(--card); color: var(--fg); font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono);
-    touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  /* the key bar (TD-1300): seven keys sharing the row's width, the pad and ⇧tab a little wider, never scrolling; the
+     digit page (`.digits`) the nine digits and ‹; ⌄ only on a phone while the keyboard is up for the terminal */
+  .softkeys { display: flex; gap: 5px; padding: 6px 0 0; max-width: 100%; }
+  .softkeys button { flex: 1 1 0; min-width: 0; height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--card); color: var(--fg); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: var(--t-mono);
+    white-space: nowrap; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: pointer; }
+  .softkeys button.wide { flex-grow: 1.3; } .softkeys button.pad { flex-grow: 1.5; letter-spacing: -.05em; }
   .softkeys button.down { background: var(--hover); border-color: var(--fg); }
+  .softkeys button.on { background: var(--hover); border-color: var(--fg); font-weight: 700; }
+  .softkeys button.on.lock { box-shadow: inset 0 -3px 0 var(--fg); }
   .softkeys.dim button { opacity: .45; }
+  .softkeys .skd, .softkeys.digits .skm, .softkeys .skblur { display: none; }
+  .softkeys.digits .skd { display: block; }
 }
 @media (pointer: coarse) and (min-width: 721px) {
   .composer.overlay { bottom: var(--softh, 0px); max-height: calc(100% - var(--softh, 0px)); }
@@ -729,6 +736,9 @@ html.phonefocus .fwatch { display: flex; flex: none; align-items: center; gap: 1
 /* the input bar · ⌨ (§4.5a *the input bar · ⌨*): a rounded field and ⌨; gone while the keyboard is up for the terminal */
 html.phonefocus .fibar { display: flex; flex: none; align-items: center; gap: 6px; padding: 6px 8px; background: var(--top); }
 html.phonefocus .page.focus.kbdup .fibar { display: none; }
+/* the key bar's 1–9 is ⌄ while the keyboard is up for the terminal (§4.5a *soft-key row*, TD-1300), on a phone only */
+html.phonefocus .page.focus.kbdup .softkeys:not(.digits) .sk19 { display: none; }
+html.phonefocus .page.focus.kbdup .softkeys:not(.digits) .skblur { display: block; }
 .fibar .fask { flex: 1; min-width: 0; height: 44px; border-radius: 22px; border: 1px solid var(--topline); background: var(--term); color: var(--topdim); font: inherit; text-align: left; padding: 0 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; }
 .fibar .fask.draft { color: var(--topfg); } .fibar .fask.off { cursor: default; }
 .fibar .fkbd { flex: none; width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--topline); background: var(--tab-on); color: var(--topfg); font-size: var(--t-title); cursor: pointer; }

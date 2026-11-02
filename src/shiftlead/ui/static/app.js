@@ -3114,7 +3114,60 @@
     const arrow = { Up: "A", Down: "B", Right: "C", Left: "D" }[name];
     if (arrow) return (appCursor ? "\x1bO" : "\x1b[") + arrow;
     if (/^[1-9]$/.test(name)) return name;
-    return { Tab: "\t", Esc: "\x1b", Enter: "\r" }[name] || null;
+    return { Tab: "\t", Esc: "\x1b", Enter: "\r", BackTab: "\x1b[Z" }[name] || null;  // ⇧tab: Claude Code's mode cycle
+  };
+  // **ctrl** (§4.5a *soft-key row*, TD-1300): latched for the next key — a key of the bar, or the first character of
+  // the next `onData` from the phone's keyboard, the rest sent as typed — which goes as its control byte (a letter
+  // `0x01`–`0x1a`, `[` Esc; anything else as it is) and clears the latch; a 500 ms press locks it until it is pressed
+  // again. `tap()` and `hold()` are the presses, `apply(data)` the next data. xterm.js's own replies on `onData` (a
+  // focus report, a cursor or device report) are no key and leave the latch. Pure, for a test.
+  // **1–9** turns the row to its digit page, `1`–`9` and `‹`, and `‹` turns it back: the page is the row's `digits` class
+  AO.softPage = (row, page) => row.classList.toggle("digits", page === "digits");
+  AO.CTRL_HOLD = 500;
+  AO.ctrlByte = (c) => (/^[a-z]$/i.test(c) ? String.fromCharCode(c.toUpperCase().charCodeAt(0) - 64) : c === "[" ? "\x1b" : c);
+  AO.ctrlLatch = function () {
+    let state = "off";  // off | latched | locked
+    return {
+      state: () => state,
+      tap() { state = state === "off" ? "latched" : "off"; },
+      hold() { state = state === "locked" ? "off" : "locked"; },
+      apply(data) {
+        const d = String(data);
+        if (state === "off" || !d || /^\x1b\[[?>]?[\d;]*[cnRIO]$/.test(d)) return d;
+        if (state === "latched") state = "off";
+        return AO.ctrlByte(d[0]) + d.slice(1);
+      },
+    };
+  };
+  // **The drag pad** (§4.5a *soft-key row*, TD-1300): a press sends nothing; a slide 16 px from where the finger went
+  // down sends the arrow of its main direction, and while the finger stays held away it repeats — every 150 ms, every
+  // 60 ms once 64 px out — until it lifts or comes back within 16 px (Termius's and iSH's arrow pad). `send(name)` is
+  // handed `Up`, `Down`, `Left` or `Right`; `timers` stands in for setTimeout. Pure, for a test.
+  AO.PAD_START = 16; AO.PAD_FAR = 64; AO.PAD_SLOW = 150; AO.PAD_FAST = 60;
+  AO.padStep = function (dx, dy) {
+    const d = Math.max(Math.abs(dx), Math.abs(dy));
+    if (d < AO.PAD_START) return null;
+    const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "Right" : "Left") : (dy > 0 ? "Down" : "Up");
+    return { dir, far: d >= AO.PAD_FAR };
+  };
+  AO.dragPad = function (send, timers) {
+    const t = timers || { set: (f, ms) => setTimeout(f, ms), clear: (h) => clearTimeout(h) };
+    let o = null, dir = null, far = false, timer = null;
+    const stop = () => { if (timer != null) t.clear(timer); timer = null; dir = null; };
+    const tick = () => { send(dir); timer = t.set(tick, far ? AO.PAD_FAST : AO.PAD_SLOW); };
+    return {
+      down(x, y) { stop(); o = { x, y }; },
+      move(x, y) {
+        if (!o) return;
+        const s = AO.padStep(x - o.x, y - o.y);
+        if (!s) { stop(); return; }
+        const quicker = s.far && !far;
+        far = s.far;
+        if (s.dir !== dir) { stop(); dir = s.dir; tick(); }
+        else if (quicker) { t.clear(timer); timer = t.set(tick, AO.PAD_FAST); }  // out past 64 px: the next in 60 ms
+      },
+      up() { o = null; stop(); },
+    };
   };
   // ...and whether it is drawn: where the terminal takes keys — neither ended nor unattended, the page
   // with a terminal (`paneGone` false). Its own state: never read from `readOnly`, which an attach resets
@@ -6271,11 +6324,16 @@
     }
     if (AO.paneIsGone(s)) { paneGone = true; term.write("\x1b[90m[shiftlead] this session's pane is gone (killed, closed, or the tmux server restarted).\x1b[0m\r\n"); }
     else openTerm();
+    // the key bar's **ctrl** (TD-1300): the next key — the bar's own, which `term.input` brings here, or the phone's
+    // keyboard's — goes as its control byte
+    const ctrl = AO.ctrlLatch();
+    let drawCtrl = () => {};
     term.onData((d) => {
       if (!ws || ws.readyState !== 1) return;
       // A read-only attach drops every key, server-side (the wheel is a scroll message, below);
       // the page only spares the round trip.
       if (readOnly) return;
+      if (ctrl.state() !== "off") { d = ctrl.apply(d); drawCtrl(); }
       ws.send(d);
     });
     // ...and says why nothing happened, on a key the person pressed: `onData` also carries xterm's
@@ -6411,27 +6469,60 @@
     // terminal, as xterm.js's own keys do (`onData`, the socket), and moves no focus, so the phone's keyboard
     // stays as it is. The pointer is captured, so its `pointerup` reaches the key whatever it is, and the key is
     // sent only when that `pointerup` is still over it; a pan of the row ends in `pointercancel` and sends nothing.
+    // **The key bar** (§4.5a *soft-key row*, TD-1300): esc, tab, ⇧tab and ↵ — and a digit on the digit page — are sent
+    // on `pointerup` while the finger is still on the key; **ctrl** latches on a tap and locks on a 500 ms press; **1–9**
+    // and **‹** flip the page; **⌄** blurs the terminal so the phone's keyboard goes; **the drag pad** keeps its pointer
+    // and sends arrows from its slide, with no test at `pointerup`. Nothing moves focus.
     if (softEl) {
-      const keyOf = (e) => e.target.closest && e.target.closest("button[data-key]");
+      const keyOf = (e) => e.target.closest && e.target.closest("button[data-key], button[data-ctrl], button[data-page], button[data-blur]");
+      const padEl = $("button[data-pad]", softEl), ctrlEl = $("button[data-ctrl]", softEl);
       const up = (k) => k && k.classList.remove("down");
+      drawCtrl = () => {
+        if (!ctrlEl) return;
+        const st = ctrl.state();
+        ctrlEl.classList.toggle("on", st !== "off"); ctrlEl.classList.toggle("lock", st === "locked");
+        ctrlEl.setAttribute("aria-pressed", st === "off" ? "false" : "true");
+      };
+      const typeKey = (name) => {
+        if (!live() || readOnly) return;  // read at the press: the dim is only what it looks like
+        const bytes = AO.softKey(name, !!term.modes.applicationCursorKeysMode);
+        if (bytes) term.input(bytes, true);
+      };
+      const pad = AO.dragPad(typeKey);
+      let held = null;  // ctrl's 500 ms
       softEl.addEventListener("pointerdown", (e) => {
-        const k = keyOf(e); if (!k) return;
+        const p = e.target.closest && e.target.closest("button[data-pad]");
+        const k = p || keyOf(e); if (!k) return;
         e.preventDefault();
         try { k.setPointerCapture(e.pointerId); } catch (_) { /* a pointer already gone */ }
         k.classList.add("down");
+        if (p) { pad.down(e.clientX, e.clientY); return; }
+        if (k === ctrlEl) { clearTimeout(held); held = setTimeout(() => { held = "fired"; ctrl.hold(); drawCtrl(); }, AO.CTRL_HOLD); }
       });
+      if (padEl) {
+        padEl.addEventListener("pointermove", (e) => pad.move(e.clientX, e.clientY));
+        const lift = () => { pad.up(); up(padEl); };
+        for (const k of ["pointerup", "pointercancel", "lostpointercapture"]) padEl.addEventListener(k, lift);
+      }
       // WebKit moves focus on the emulated mousedown a prevented pointerdown does not stop
-      softEl.addEventListener("mousedown", (e) => { if (keyOf(e)) e.preventDefault(); });
+      softEl.addEventListener("mousedown", (e) => { if (keyOf(e) || e.target.closest("button[data-pad]")) e.preventDefault(); });
       softEl.addEventListener("pointerup", (e) => {
         const k = keyOf(e); if (!k) return;
         up(k);
+        const fired = k === ctrlEl && held === "fired";
+        if (k === ctrlEl) { clearTimeout(held); held = null; }
         const at = document.elementFromPoint(e.clientX, e.clientY);
-        if (!at || at.closest("button[data-key]") !== k) return;
-        if (!live() || readOnly) return;  // read at the press: the dim is only what it looks like
-        const bytes = AO.softKey(k.dataset.key, !!term.modes.applicationCursorKeysMode);
-        if (bytes) term.input(bytes, true);
+        if (!at || at.closest("button") !== k) return;
+        if (k === ctrlEl) { if (!fired) { ctrl.tap(); drawCtrl(); } return; }
+        if (k.dataset.page) { AO.softPage(softEl, k.dataset.page); return; }
+        if ("blur" in k.dataset) return;  // ⌄ acts on its click, below
+        typeKey(k.dataset.key);
       });
-      softEl.addEventListener("pointercancel", (e) => up(keyOf(e)));
+      // ⌄ on its `click`, the touch's last event: blurred at `pointerup`, the bars move under the finger and the click
+      // that follows lands on ⌨, which focuses the terminal again
+      const blurEl = $("button[data-blur]", softEl);
+      if (blurEl) blurEl.addEventListener("click", () => term.blur());
+      softEl.addEventListener("pointercancel", (e) => { const k = keyOf(e); up(k); if (k === ctrlEl) { clearTimeout(held); held = null; } });
       softEl.addEventListener("lostpointercapture", (e) => up(keyOf(e)));
     }
     // Copy on select (§4.5a, TD-174): the person's, in settings.yml, on by default. A selection ended —

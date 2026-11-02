@@ -194,17 +194,24 @@
     {%- set folded = composer != 'open' %}
     <div class="termwrap{% if folded %} cfold{% endif %}" id="termwrap">
     <div id="term" class="termbox"></div>
-    {#- design §4.5a **Focus pane: soft-key row** (TD-986, built by TD-990): the keys a phone has none of, drawn
-        by the media query in app.css and typed through the terminal (`AO.softKey`); seeded hidden where the
-        terminal takes no keys — an unattended record (read-only) or an ended one — and shown and hidden by
-        `app.js` from then on -#}
+    {#- design §4.5a **Focus pane: soft-key row** (TD-986, built by TD-990), reshaped as **the key bar** (TD-003, built
+        by TD-1300): `esc tab ⇧tab ctrl ◂▴▾▸ ↵ 1–9`, one row that never scrolls, typed through the terminal
+        (`AO.softKey`); `1–9` turns it to its digit page, `1`–`9` and `‹`, and on a phone `⌄` stands in `1–9`'s place
+        while the keyboard is up for the terminal. Drawn by the media query in app.css; seeded hidden where the
+        terminal takes no keys — an unattended record (read-only) or an ended one — and shown and hidden by `app.js` -#}
     <div class="softkeys{% if s.unattended or s.state in ('exited', 'closed') %} hidden{% endif %}" id="softkeys" role="group" aria-label="terminal keys" title="{{ help_title('soft-key-row') }}">
-      {%- for key, label in [('Tab', 'Tab'), ('Esc', 'Esc'), ('Up', '↑'), ('Down', '↓'), ('Left', '←'), ('Right', '→'), ('Enter', 'Enter')] %}
-      <button type="button" tabindex="-1" data-key="{{ key }}">{{ label }}</button>
+      {%- for key, label, cls in [('Esc', 'esc', ''), ('Tab', 'tab', ''), ('BackTab', '⇧tab', ' wide')] %}
+      <button type="button" tabindex="-1" class="skm{{ cls }}" data-key="{{ key }}">{{ label }}</button>
       {%- endfor %}
+      <button type="button" tabindex="-1" class="skm" data-ctrl aria-pressed="false" title="ctrl for the next key; hold it to lock">ctrl</button>
+      <button type="button" tabindex="-1" class="skm pad" data-pad aria-label="arrows: slide from here" title="arrows: slide a finger off it, held to repeat">◂▴▾▸</button>
+      <button type="button" tabindex="-1" class="skm" data-key="Enter" aria-label="Enter">↵</button>
+      <button type="button" tabindex="-1" class="skm sk19" data-page="digits" aria-label="digits">1–9</button>
+      <button type="button" tabindex="-1" class="skm skblur" data-blur aria-label="put the keyboard away">⌄</button>
       {%- for n in range(1, 10) %}
-      <button type="button" tabindex="-1" data-key="{{ n }}">{{ n }}</button>
+      <button type="button" tabindex="-1" class="skd" data-key="{{ n }}">{{ n }}</button>
       {%- endfor %}
+      <button type="button" tabindex="-1" class="skd" data-page="main" aria-label="back to the keys">‹</button>
     </div>
     <div class="card composer{% if folded %} overlay folded{% endif %}{% if s.unattended %} hidden{% endif %}" id="composer">
       {#- on a phone the composer is a sheet over the terminal (§4.5a *the input bar · ⌨*, TD-1299): its name and ✕,
