@@ -35,7 +35,15 @@ def test_the_checks_name_the_field():
     for ep, field in (("http://push.example/x", "https"), ("https://127.0.0.1/x", "loopback"),
                       ("https://localhost/x", "loopback"), ("https://10.1.2.3/x", "private"),
                       ("https://192.168.0.9/x", "private"), ("https://169.254.1.1/x", "link-local"),
-                      ("https://[::1]/x", "loopback"), ("", "endpoint")):  # fmt: skip
+                      ("https://[::1]/x", "loopback"), ("", "endpoint"), ("https://127.1/x", "internal"),
+                      ("https://2130706433/x", "internal"), ("https://0x7f.0.0.1/x", "internal"),
+                      ("https://017700000001/x", "internal"), ("https://0/x", "internal"),
+                      ("https://0.0.0.0/x", "internal"), ("https://[::]/x", "internal"),
+                      ("https://localhost./x", "internal"), ("https://127.0.0.1./x", "internal"),
+                      ("https://100.64.0.1/x", "internal"), ("https://224.0.0.1/x", "internal"),
+                      ("https://[::ffff:127.0.0.1]/x", "internal"), ("https://intranet/x", "internal"),
+                      ("https://foo.local/x", "internal"), ("https://metadata.google.internal/x", "internal"),
+                      ("https://push.example.com:abc/x", "endpoint")):  # fmt: skip
         with pytest.raises(ValueError, match=field):
             push_mod.check(ep, KEYS)
     with pytest.raises(ValueError, match=r"keys.p256dh: 64 bytes, not 65"):
@@ -44,6 +52,9 @@ def test_the_checks_name_the_field():
         push_mod.check(EP, {**KEYS, "auth": b64(b"x" * 12)})
     with pytest.raises(ValueError, match="keys.auth: not a base64url"):
         push_mod.check(EP, {**KEYS, "auth": "!!"})
+    with pytest.raises(ValueError, match="keys.auth: not a base64url"):
+        push_mod.check(EP, {**KEYS, "auth": KEYS["auth"].replace("Y", "+")})  # standard base64, not url-safe
+    assert push_mod.check("https://8.8.8.8:443/x", KEYS)[0] == "https://8.8.8.8:443/x"  # a global literal passes
     assert push_mod.device_id(EP) == __import__("hashlib").sha256(EP.encode()).hexdigest()[:16]
     assert push_mod.same_key(PUBLIC, b64(b"\x04" + b"k" * 64, pad=True)), "compared as decoded bytes"
 

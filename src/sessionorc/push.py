@@ -13,6 +13,7 @@ import contextlib
 import hashlib
 import ipaddress
 import json
+import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -57,11 +58,16 @@ def device_id(endpoint: str) -> str:
     return hashlib.sha256(endpoint.encode()).hexdigest()[:16]
 
 
+_B64URL = re.compile(r"[A-Za-z0-9_-]+={0,2}")
+
+
 def b64url(s: Any) -> bytes:
     """A base64url value, padded or not, as bytes; ValueError when it is not one."""
     if not isinstance(s, str) or not s.strip():
         raise ValueError("empty")
     t = s.strip()
+    if not _B64URL.fullmatch(t):
+        raise ValueError("not base64url")
     try:
         return base64.b64decode(t + "=" * (-len(t) % 4), altchars=b"-_", validate=True)
     except (binascii.Error, ValueError) as e:
@@ -76,15 +82,25 @@ def same_key(a: Any, b: Any) -> bool:
         return False
 
 
+_NUMERIC = re.compile(r"0x[0-9a-f]*|[0-9]+")  # a label a resolver reads as a number: 127.1, 2130706433, 0x7f
+_INTERNAL = (".local", ".localhost", ".internal", ".lan", ".home", ".localdomain", ".home.arpa")
+
+
 def _public_host(host: str) -> bool:
-    h = host.strip("[]").lower()
-    if not h or h == "localhost" or h.endswith(".localhost"):
+    """A host the home may post to: a global IP literal, or a dotted name whose last label is not a number and
+    that is not internal on its face. Non-canonical IPv4 (`127.1`, `0x7f.0.0.1`, `2130706433`), a trailing
+    dot, CGNAT and mapped IPv6 are refused here; a name that resolves to a private address is the sender's to
+    refuse at the post (slice 2)."""
+    h = host.strip("[]").lower().rstrip(".")
+    if not h or h == "localhost" or h.endswith(_INTERNAL):
         return False
     try:
         ip = ipaddress.ip_address(h)
     except ValueError:
-        return True  # a name: the push services' are public, and the page subscribes through the browser's
-    return not (ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_unspecified or ip.is_reserved)
+        return "." in h and not _NUMERIC.fullmatch(h.rsplit(".", 1)[1])
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return ip.is_global and not ip.is_multicast
 
 
 def check(endpoint: Any, keys: Any) -> tuple[str, dict[str, str]]:
@@ -96,12 +112,13 @@ def check(endpoint: Any, keys: Any) -> tuple[str, dict[str, str]]:
     try:
         u = urlsplit(ep)
         host = u.hostname or ""
+        _ = u.port  # a port that is not a number is refused here, not at the send
     except ValueError:
         raise ValueError("endpoint: not an address") from None
     if u.scheme != "https":
         raise ValueError("endpoint: must be https://")
     if not _public_host(host):
-        raise ValueError(f"endpoint: {host or 'no host'} is a loopback, private or link-local address")
+        raise ValueError(f"endpoint: {host or 'no host'} is a loopback, private, link-local or internal address")
     if not isinstance(keys, dict):
         raise ValueError("keys: {p256dh, auth} is required")
     out: dict[str, str] = {}
@@ -137,7 +154,8 @@ def subscribe(
     same = next((d for d in devices if d.get("id") == new), None)
     if old is not None:
         devices = [d for d in devices if d is not old and d is not same]
-        devices.append({**old, "id": new, "endpoint": ep, "keys": ks})
+        # a new subscription, so its delivery is its own: the old one's last result is not carried onto it
+        devices.append({**old, "id": new, "endpoint": ep, "keys": ks, "last_ok": None, "last_error": None})
     elif same is not None:
         same.update(endpoint=ep, keys=ks)
     else:
