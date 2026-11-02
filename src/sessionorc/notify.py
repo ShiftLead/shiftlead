@@ -230,7 +230,8 @@ def reading() -> tuple[dict[str, str], Any]:
 
 def _global(host: str, port: int) -> str | None:
     """None when every address `host` resolves to is a global one, else why not: the home's check reads the
-    name alone, and a name can resolve inward (§4.10 *On and off, per device*)."""
+    name alone, and a name can resolve inward (§4.10 *On and off, per device*). The post resolves the name
+    again, so a name that answers differently a moment later (DNS rebinding) is not caught here."""
     import ipaddress
     import socket
 
@@ -262,6 +263,7 @@ def _post(device: dict[str, Any], data: str, key: Any, sub: str) -> int | str:
         return why
     session = Session()
     session.max_redirects = 0  # a redirect is never followed: the post goes where the home checked, or nowhere
+    session.trust_env = False  # no proxy from the environment: the post goes to the address checked above
     try:
         r = webpush(
             {"endpoint": device["endpoint"], "keys": device.get("keys") or {}},

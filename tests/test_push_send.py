@@ -316,6 +316,34 @@ async def test_push_key_writes_only_to_its_own_config_and_keeps_a_refusals_readi
         push_mod.save({"key": push_mod.NO_KEY, "devices": []})
         got = await person.call("push_key")
         assert got["public_key"] == PUBLIC and push_mod.load()["key"] == "key"
+        # devices listed under a deleted key cannot be reached with the new one: dropped, and said
+        _store(EP1, key=push_mod.NO_KEY, public=OTHER)
+        await person.call("push_key")
+        doc = push_mod.load()
+        assert doc["devices"] == [] and doc["last_line"] == push_mod.KEY_CHANGED
+
+
+async def test_a_child_that_fails_after_its_reading_says_why_and_a_push_begun_before_a_save_is_discarded(
+    agent, child, monkeypatch
+):
+    _settings()
+    _store(EP1)
+
+    async def no_pywebpush(secrets, mode, stdin=""):
+        return [{"key": "key", "public_key": PUBLIC}], "pywebpush: not installed", False
+
+    monkeypatch.setattr(agent, "_push_run", no_pywebpush)
+    taken, statuses, _ = await agent._push_send("home/push", [{"body": "x", "path": "/inbox", "tag": "t"}])
+    assert taken == set() and push_mod.load()["devices"][0]["last_error"]["reason"] == "pywebpush: not installed"
+
+    async def slow(secrets, mode, stdin=""):
+        agent._push_secrets_moved()  # a Save moved `secrets` while the child ran
+        return [{"key": "key", "public_key": OTHER}], None, False
+
+    _store(EP1)
+    monkeypatch.setattr(agent, "_push_run", slow)
+    _, _, why = await agent._push_send("home/push", [{"body": "x", "path": "/inbox", "tag": "t"}])
+    assert why and len(push_mod.load()["devices"]) == 1, "the old config's key never drops the devices"
 
 
 async def test_the_push_test_reaches_one_device_and_is_refused_while_paused(agent, child):

@@ -286,12 +286,21 @@ class NotifyMixin:
             return
         payloads = [self._push_payload(item) for item in items]
         if tg is None:
-            await self._push_send(pcfg["secrets"], payloads)
+            await self._push_safely(pcfg["secrets"], payloads)
         elif pcfg["telegram"] == "fallback":
-            taken, _, _ = await self._push_send(pcfg["secrets"], payloads)
+            taken = await self._push_safely(pcfg["secrets"], payloads)
             await self._notify_send(tg["secrets"], [t for i, t in enumerate(texts) if i not in taken])
         else:
-            await asyncio.gather(self._notify_send(tg["secrets"], texts), self._push_send(pcfg["secrets"], payloads))
+            await asyncio.gather(self._notify_send(tg["secrets"], texts), self._push_safely(pcfg["secrets"], payloads))
+
+    async def _push_safely(self, secrets: str, payloads: list[dict[str, str]]) -> set[int]:
+        """`_push_send` for the pass: a failure of the home's own (a write of `push.json`) is logged and reads as
+        no device having taken anything, so under `fallback` Telegram still carries every row."""
+        try:
+            return (await self._push_send(secrets, payloads))[0]
+        except Exception:  # noqa: BLE001 — logged; a told row must not be lost to it
+            log.exception("push send failed")
+            return set()
 
     def _notify_watching(self, now: datetime) -> None:
         """A person's `inbox` read from a visible page (§4.10 *Looking*): kept in memory only."""
@@ -448,8 +457,10 @@ class NotifyMixin:
         own = settings_mod.push(settings_mod.load())["own_secrets"]
         if not own:
             raise RpcError("push_key: set notify.push.secrets — the key is written only there (design §4.10)")
-        lines, why, _ = await self._push_run(own, ("--key", own))
+        async with self._push_key_lock:
+            lines, why, _ = await self._push_run(own, ("--key", own))
         first = lines[0] if lines else None
+        self._push_gen += 1  # a reading or send begun before this answer is of the old key
         pdoc = push_mod.load()
         if push_mod.reading_of(first) is not None:
             push_mod.apply_reading(pdoc, first)
@@ -513,13 +524,18 @@ class NotifyMixin:
             "payloads": payloads,
             "devices": [{k: d.get(k) for k in ("id", "endpoint", "keys")} for d in devices],
         }
+        gen = self._push_gen
         lines, why, timed_out = await self._push_run(secrets, ("--push",), json.dumps(job))
         at = now_iso()
+        if gen != self._push_gen:
+            return set(), {}, "the key's config changed while the push ran"  # its reading is of the old config
         first = lines[0] if lines else None
         pdoc = push_mod.load()  # afresh: a subscribe may have landed while the child ran
         if push_mod.reading_of(first) is None:
             if timed_out:
-                first = {"key": pdoc.get("key"), "public_key": pdoc.get("public_key")}  # nothing said: no reading
+                if pdoc.get("key") != push_mod.KEY:
+                    return set(), {}, why
+                first = {"key": push_mod.KEY, "public_key": pdoc.get("public_key")}  # nothing said: kept reading
             else:
                 pdoc["key"] = f"unreadable: {why or 'no answer'}"
                 push_mod.paused(pdoc)
@@ -531,9 +547,7 @@ class NotifyMixin:
             push_mod.save(pdoc)
             return set(), {}, pdoc.get("last_line") or str(pdoc.get("key"))
         statuses: dict[tuple[str, int], Any] = {
-            (str(d["id"]), i): (why if timed_out else None) or push_mod.NO_ANSWER
-            for d in devices
-            for i in range(len(payloads))
+            (str(d["id"]), i): why or push_mod.NO_ANSWER for d in devices for i in range(len(payloads))
         }
         for ln in lines[1:]:
             with contextlib.suppress(KeyError, TypeError, ValueError):
