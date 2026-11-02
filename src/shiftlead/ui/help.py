@@ -255,10 +255,12 @@ HELP: tuple[Help, ...] = (
         "soft-key row",
         "Focus pane",
         (
-            "Keys under the terminal — Tab, Esc, the arrows, Enter and 1–9 — that type into the session as a "
-            "keyboard would. Press one on a phone or a tablet, which has no such keys: Tab accepts Claude Code's "
-            "suggestion, an arrow or a digit picks from a menu. It moves no focus, so the phone's keyboard stays "
-            "as it is, and it is not there while the terminal is read-only."
+            "Keys under the terminal — esc, tab, ⇧tab, ctrl, the drag pad ◂▴▾▸, ↵ and 1–9 — that type into the "
+            "session as a keyboard would. Press one on a phone or a tablet, which has no such keys: tab accepts"
+            " Claude Code's suggestion, ⇧tab cycles its mode, 1–9 then a digit picks from a menu, ctrl then a "
+            "letter sends that control key (hold ctrl to lock it), and a slide from the pad sends arrows for as"
+            " long as it is held away. It moves no focus, so the phone's keyboard stays as it is — while it is "
+            "up, ⌄ in 1–9's place puts it away — and it is not there while the terminal is read-only."
         ),
     ),
     Help(
