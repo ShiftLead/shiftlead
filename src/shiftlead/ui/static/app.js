@@ -330,14 +330,19 @@
   // cell; at the lift — its default prevented on a phone, so no emulated mouse event, focus or click follows — the
   // recorded link is opened through its reader's own open with an event carrying `ctrlKey` (the held press *is*
   // the modifier), from the lift, a gesture of the person's, never from a timer. `leave()` ends the hover.
-  AO.linkTouch = function (rec, { hover, leave, narrow, now }) {
+  // A pane with any-event mouse tracking on (DECSET 1003, `mouseTrackingMode === "any"`) would hear the hover's
+  // `mousemove` as typed escape sequences: there the press hovers nothing and so opens nothing (1000 and 1002
+  // report no motion without a button).
+  AO.linkTouch = function (rec, { hover, leave, narrow, now, tracking }) {
     let id = null;
     const at = (e) => Array.from(e.targetTouches || []).find((x) => x.identifier === id);
     return {
       start(e) {
         if ((e.targetTouches || []).length !== 1) { rec.cancel(); id = null; return; }
         const t = e.targetTouches[0];
-        id = t.identifier; rec.down(t.clientX, t.clientY, now());
+        id = t.identifier;
+        if (tracking && tracking()) { rec.cancel(); return; }
+        rec.down(t.clientX, t.clientY, now());
         hover(t.clientX, t.clientY);
       },
       move(e) { const t = at(e); if (t) rec.move(t.clientX, t.clientY); },
@@ -5920,7 +5925,7 @@
       const n = AO.narrowNext(narrow, !!(mq && mq.matches), !!popped || body.classList.contains("popped"), editing());
       if (n === narrow) return;
       narrow = n; root.classList.toggle("phonefocus", n);
-      if (!n) close(true);
+      if (!n) close();  // not quiet: the composer's sheet folds the composer back (its `closed` hook) on a crossing
       viewport();
       hooks.relaid.forEach((f) => f(n));
     };
@@ -6365,6 +6370,7 @@
       hover: (x, y) => { const sc = screenOf(); if (sc) sc.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y, bubbles: true })); },
       leave: () => { const sc = screenOf(); if (sc) sc.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false })); },
       narrow: () => phone.narrow(), now: () => Date.now(),
+      tracking: () => !!(term.modes && term.modes.mouseTrackingMode === "any"),
     });
     // the fingers counted are the terminal's (`targetTouches`): one resting elsewhere on the page is not a
     // second finger, and its lift, which the terminal never hears, cannot leave the touch inert

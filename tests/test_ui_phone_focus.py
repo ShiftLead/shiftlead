@@ -180,7 +180,16 @@ def test_focus_carries_its_own_viewport_and_the_query_before_the_first_paint(tmp
     assert "{% if not popped %}<script>try { if (matchMedia(" in src
     # other pages keep base.html's
     base = (UI / "templates" / "base.html").read_text()
-    assert "{% block viewport %}width=device-width, initial-scale=1{% endblock %}" in base
+    assert "{% block viewport %}width=device-width, initial-scale=1, viewport-fit=cover{% endblock %}" in base
+    # …and every page pads the insets the black-translucent status bar leaves it (env() is 0 on a desktop)
+    css = (UI / "static" / "app.css").read_text()
+    for rule in (
+        "body { padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }",
+        "body.popped { padding-top: env(safe-area-inset-top); }",
+        ".topbar { border-top: env(safe-area-inset-top) solid var(--top); }",
+        "html.phonefocus body { padding: 0; }",
+    ):
+        assert rule in css, rule
 
 
 def test_the_home_screen_manifest_and_the_touch_icon():
@@ -243,13 +252,13 @@ const hovers = [], leaves = [];
 const touch = (x, y, id = 1) => ({ identifier: id, clientX: x, clientY: y });
 const ev = (type, touches) => ({ type, targetTouches: touches, cancelable: true, prevented: false,
   preventDefault() { this.prevented = true; } });
-function run(script) {
+function run(script, mode) {
   const rec = AO.linkPress();
   const el = { title: "" };
   const handler = AO.paneLinkHandler(el, rec);  // the OSC 8 reader: its own hover, the recorder inside
   const web = AO.webLinkOptions(rec);           // the web-links addon's options
   const press = AO.linkTouch(rec, { hover: (x, y) => hovers.push([x, y]), leave: () => leaves.push(1),
-    narrow: () => narrow, now: () => clock });
+    narrow: () => narrow, now: () => clock, tracking: () => mode === "any" });
   const before = opened.length, ends = [];
   for (const step of script) {
     if (step.down) { clock = step.at || 0; press.start(ev("touchstart", [touch(...step.down)])); }
@@ -275,6 +284,13 @@ const out = {
   mouse: run([{ hover: url }, { down: [10, 10] }, { up: 900 }]),
   hovers: hovers.length, leaves: leaves.length,
 };
+// a pane tracking every motion (DECSET 1003) would take the hover's mousemove as typing: no hover, no open; the
+// button-only modes report no motion, so the press works there
+const h0 = hovers.length;
+out.any = run([{ down: [10, 10] }, { hover: url }, { up: 900 }], "any");
+out.anyHovers = hovers.length - h0;
+out.vt200 = run([{ down: [10, 10] }, { hover: url }, { up: 900 }], "vt200");
+out.drag = run([{ down: [10, 10] }, { hover: url }, { up: 900 }], "drag");
 narrow = false;
 out.wideTap = run([{ down: [10, 10] }, { up: 100 }]);
 // a press's event: a modifier, `AO.paneLink`'s first read
@@ -334,6 +350,27 @@ def test_the_held_press_opens_the_recorded_link_on_the_lift_and_nothing_else_doe
     # at each press the page gave its point a hover, and each lift ended it
     assert got["hovers"] >= 10 and got["leaves"] >= 10
     assert got["event"] == {"ctrlKey": True, "metaKey": False, "type": "touchend"}
+
+
+def test_a_pane_tracking_every_motion_gets_no_hover_and_opens_nothing():
+    got = _probe()
+    assert got["any"]["opened"] == [] and got["anyHovers"] == 0
+    assert got["any"]["ends"] == [True]  # the lift still focuses nothing on a phone
+    assert got["vt200"]["opened"] == ["https://example.com/pr/1"] and got["drag"]["opened"] == [
+        "https://example.com/pr/1"
+    ]
+    js = (UI / "static" / "app.js").read_text()
+    assert 'tracking: () => !!(term.modes && term.modes.mouseTrackingMode === "any"),' in js
+
+
+def test_a_crossing_to_the_desktop_page_closes_the_sheet_with_its_hooks():
+    js = (UI / "static" / "app.js").read_text()
+    phone = js[js.index("AO.phoneFocus = function") :]
+    relay = phone[phone.index("const relay = () => {") :]
+    relay = relay[: relay.index("\n    };\n")]
+    assert "if (!n) close();" in relay and "close(true)" not in relay
+    # the composer's sheet folds the composer back in its `closed` hook
+    assert "phone.closed((el) => { if (el !== composerEl) return; if (cbar && !cbar.folded()) cbar.fold();" in js
 
 
 def test_the_query_is_latched_while_typing_and_a_popped_window_is_never_narrow():

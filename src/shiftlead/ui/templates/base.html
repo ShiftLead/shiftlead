@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-{#- design §4.5 *Phone layout* (TD-1299): Focus's own viewport adds `interactive-widget` and `viewport-fit`; the rest keep this -#}
-<meta name="viewport" content="{% block viewport %}width=device-width, initial-scale=1{% endblock %}">
+{#- design §4.5 *Phone layout* (TD-1299): Focus's own viewport adds `interactive-widget`; every page is `viewport-fit=cover`,
+    since a home-screen page's status bar is `black-translucent` (below), and pads the safe-area insets (app.css) -#}
+<meta name="viewport" content="{% block viewport %}width=device-width, initial-scale=1, viewport-fit=cover{% endblock %}">
 {#- design §4.5 *On the home screen* (TD-1299): the manifest, and iOS's own three, which it reads instead -#}
 <link rel="manifest" href="/static/manifest.webmanifest">
 <meta name="theme-color" content="#0b0e12">

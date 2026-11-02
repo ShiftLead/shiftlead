@@ -86,6 +86,13 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 html { scroll-padding-top: calc(var(--barh) + 8px); }
 html:has(.topbar.away) { scroll-padding-top: 8px; }
 html:has(body.popped) { --barh: 0px; }
+/* §4.5 *On the home screen* (TD-1299): every page is `viewport-fit=cover` under a `black-translucent` status bar, so
+   each pads the safe-area insets — the top bar's top as a border in its own colour (held at the top when scrolled),
+   a popped Focus's body, the sides and foot; env() is 0 on a desktop. The phone's Focus pads its own screen. */
+body { padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+body.popped { padding-top: env(safe-area-inset-top); }
+.topbar { border-top: env(safe-area-inset-top) solid var(--top); }
+html.phonefocus body { padding: 0; }
 /* the bar wraps rather than widening the page, and the usage chip keeps its width rather than being
    squeezed to nothing, which made `fitUsage` hide every account behind a bare `+n` (TD-296 #9) */
 .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: var(--t-title); color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
