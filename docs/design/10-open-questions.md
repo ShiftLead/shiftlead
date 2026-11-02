@@ -184,9 +184,11 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       off until set; read by the home's tick; and the rule acts where work is taken, at the
       claim, because a manager hands out nothing — its members choose for themselves (§4.8
       *Choosing in a free-pick lane*). The manager is told and logs it.
-- [ ] Phone answers for *questions*: the narrow Focus with a soft-key row is the current
-      answer (the row is built ahead of the narrow mode by TD-990, §4.5a **soft-key row**); revisit
-      after phase 2 if it is too fiddly one-handed.
+- [x] Phone answers for *questions* (2026-11-01): **in the terminal** — Paul: reproducing the
+      terminal's questions elsewhere has proved problematic, so a question is answered in the pane with
+      the narrow Focus's key bar (`1–9`, the drag pad, `↵`, `esc`), and nothing redraws it as buttons
+      (§4.5 *Phone layout*, §4.5a **soft-key row**; TD-003). A held permission stays the hook's, the tray's
+      Allow / Deny.
 - [x] **Rename the Herd page?** (2026-09-13): **yes, to Team** — "Herd" reads too close to
       herdr (§3, prior art, not renamed).
 - [x] **Does a team wind down when it runs out of work?** (2026-09-14): it did not — every
