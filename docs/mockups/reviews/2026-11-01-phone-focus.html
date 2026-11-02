@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone Focus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Phone Focus, design round 2026-11-01 (TD-003). House tokens from app.css's dark theme. */
+:root {
+  --bg: #e9ebef; --fg: #1c2128; --muted: #6b7280; --line: #d4d8de; --card: #fff;
+  --pbg: #0f1216; --pfg: #e6e9ee; --pmuted: #8b95a3; --pline: #2a313a; --pcard: #171b21; --phover: #232a33; --pborder: #3a424d;
+  --term: #0f1419; --termfg: #d5dbe3; --top: #1c2128;
+  --needs: #f59e0b; --needs-bg: #3d2a05; --needs-fg: #fcd34d;
+  --working: #22c55e; --idle: #3b82f6; --waiting: #14b8a6; --ended: #9ca3af; --stalled: #ef4444;
+  --primary: #e6e9ee; --primary-fg: #0f1216;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0b0d10; --fg: #e6e9ee; --muted: #8b95a3; --line: #2a313a; --card: #14181d; } }
+:root[data-theme="dark"] { --bg: #0b0d10; --fg: #e6e9ee; --muted: #8b95a3; --line: #2a313a; --card: #14181d; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 "IBM Plex Sans", system-ui, sans-serif; }
+main { max-width: 1680px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 24px; font-weight: 600; margin: 0 0 6px; }
+h2 { font-size: 18px; font-weight: 600; margin: 40px 0 4px; }
+p.lead { max-width: 72ch; color: var(--muted); margin: 0 0 8px; }
+.frames { display: flex; flex-wrap: wrap; gap: 28px 24px; margin-top: 18px; }
+figure { margin: 0; width: 375px; max-width: 100%; }
+figcaption { font-size: 13px; color: var(--muted); margin-top: 8px; max-width: 375px; }
+figcaption b { color: var(--fg); font-weight: 600; }
+
+/* ---- the phone ---- */
+.phone { position: relative; width: 375px; height: 700px; max-width: 100%; overflow: hidden; border-radius: 22px;
+  background: var(--pbg); color: var(--pfg); display: flex; flex-direction: column; box-shadow: 0 0 0 1px #000, 0 10px 30px rgba(0,0,0,.25); }
+.phone .sb { height: 20px; flex: none; font: 600 11px/20px "IBM Plex Sans"; padding: 0 18px; display: flex; justify-content: space-between; color: #cfd5dd; background: var(--top); }
+
+/* the strip: everything about the session in one 44px line */
+.strip { height: 44px; flex: none; display: flex; align-items: center; gap: 2px; background: var(--top); padding: 0 4px; border-bottom: 1px solid #000; }
+.ib { width: 44px; height: 44px; border: 0; background: none; color: var(--pfg); font-size: 20px; display: grid; place-items: center; border-radius: 8px; position: relative; }
+.who { flex: 1; min-width: 0; height: 44px; border: 0; background: none; color: var(--pfg); display: flex; align-items: center; gap: 8px; padding: 0 6px; text-align: left; font: inherit; }
+.who .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.who .nm { font: 500 14px/1.2 "JetBrains Mono", monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who .st { font-size: 12px; color: var(--pmuted); white-space: nowrap; }
+.who .car { color: var(--pmuted); font-size: 11px; }
+.needpill { height: 28px; padding: 0 9px; border-radius: 14px; background: var(--needs-bg); color: var(--needs-fg); border: 1px solid #7c5a10; font: 600 12px/26px "IBM Plex Sans"; white-space: nowrap; }
+.markdot::after { content: ""; position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--needs); }
+
+/* the terminal */
+.term { flex: 1; min-height: 0; background: var(--term); color: var(--termfg); font: 12px/1.32 "JetBrains Mono", monospace; padding: 6px 6px 0; white-space: pre; overflow: hidden; position: relative; }
+.term .g { color: #22c55e; } .term .d { color: #6b7685; } .term .y { color: #e5b567; } .term .b { color: #7aa7ff; } .term .r { color: #f87171; } .term .w { color: #fff; font-weight: 700; }
+.term .cur { background: var(--termfg); color: var(--term); }
+.tobottom { position: absolute; right: 10px; bottom: 10px; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(35,42,51,.92); color: var(--pfg); border: 1px solid var(--pborder); font: 500 12px/30px "IBM Plex Sans"; }
+.toast { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); background: rgba(35,42,51,.95); border: 1px solid var(--pborder); color: var(--pfg); border-radius: 16px; padding: 4px 12px; font: 500 12px/1.5 "IBM Plex Sans"; }
+
+/* the key bar: what the phone's keyboard lacks, one row */
+.keys { height: 48px; flex: none; display: flex; gap: 5px; padding: 5px 6px; background: #1a1f26; border-top: 1px solid #000; }
+.k { flex: 1; min-width: 0; height: 38px; border: 1px solid var(--pborder); border-radius: 7px; background: #262d36; color: var(--pfg); font: 500 12.5px/36px "JetBrains Mono", monospace; text-align: center; padding: 0; }
+.k.on { background: #3b4552; border-color: #9aa5b3; }
+.k.pad { flex: 1.5; font-size: 15px; letter-spacing: -1px; }
+.k.wide { flex: 1.3; }
+.keys .pages { position: absolute; }
+
+/* the bottom bar */
+.bar { flex: none; display: flex; gap: 6px; align-items: center; padding: 6px 8px 22px; background: var(--top); }
+.ask { flex: 1; height: 44px; border-radius: 22px; border: 1px solid var(--pborder); background: #11151a; color: var(--pmuted); font: 14px "IBM Plex Sans"; text-align: left; padding: 0 8px 0 16px; display: flex; align-items: center; gap: 6px; }
+.ask span { flex: 1; }
+.ask .mic { width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; color: var(--pfg); font-size: 15px; }
+.round { width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--pborder); background: #1d232b; color: var(--pfg); font-size: 17px; display: grid; place-items: center; }
+
+/* a drawn phone keyboard */
+.kb { flex: none; height: 216px; background: #2b2f35; padding: 8px 3px 30px; display: grid; grid-template-rows: repeat(4, 1fr); gap: 9px; }
+.kb div { display: flex; gap: 5px; justify-content: center; }
+.kb i { font-style: normal; flex: 0 0 31px; background: #5a5f66; border-radius: 5px; color: #fff; font: 17px/38px system-ui; text-align: center; }
+.kb i.w { flex: 0 0 44px; background: #3c4047; font-size: 13px; } .kb i.sp { flex: 0 0 170px; }
+.kb i.ret { flex: 0 0 82px; background: #3c4047; font-size: 13px; }
+
+/* sheets */
+.scrim { position: absolute; inset: 0; background: rgba(0,0,0,.5); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; background: var(--pcard); border-radius: 16px 16px 0 0; border-top: 1px solid var(--pborder); padding: 6px 0 24px; max-height: 88%; overflow: hidden; }
+.grab { width: 36px; height: 5px; border-radius: 3px; background: #4a525d; margin: 2px auto 8px; }
+.sh-head { padding: 0 16px 10px; border-bottom: 1px solid var(--pline); }
+.sh-head .t { font: 600 15px "IBM Plex Sans"; } .sh-head .s { font-size: 12.5px; color: var(--pmuted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { font: 500 12px/24px "IBM Plex Sans"; padding: 0 9px; border-radius: 12px; border: 1px solid var(--pborder); color: var(--pfg); background: #1d232b; }
+.chip.amber { border-color: #7c5a10; background: var(--needs-bg); color: var(--needs-fg); }
+.acts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 12px 10px 8px; }
+.act { height: 68px; border: 0; border-radius: 10px; background: none; color: var(--pfg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; font: 12px "IBM Plex Sans"; }
+.act .ic { width: 38px; height: 38px; border-radius: 19px; background: #232a33; display: grid; place-items: center; font-size: 16px; }
+.act.next .ic { background: var(--primary); color: var(--primary-fg); }
+.rows { border-top: 1px solid var(--pline); }
+.rowi { height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--pline); font-size: 14.5px; }
+.rowi .m { margin-left: auto; color: var(--pmuted); font-size: 12.5px; font-family: "JetBrains Mono", monospace; }
+.rowi .gl { width: 18px; text-align: center; color: var(--pmuted); }
+.rowi.red { color: #f87171; } .rowi.red .gl { color: #f87171; }
+.rowi .n { min-width: 20px; height: 20px; border-radius: 10px; background: var(--idle); color: #fff; font: 600 11px/20px "IBM Plex Sans"; text-align: center; margin-left: 6px; }
+
+/* compose */
+.compose { position: absolute; left: 0; right: 0; bottom: 0; top: 64px; background: var(--pcard); border-radius: 16px 16px 0 0; display: flex; flex-direction: column; border-top: 1px solid var(--pborder); }
+.compose .top { display: flex; align-items: center; padding: 6px 8px 6px 16px; gap: 8px; border-bottom: 1px solid var(--pline); }
+.compose .top .t { font: 600 15px "IBM Plex Sans"; flex: 1; }
+.ta { flex: 1; padding: 12px 16px; font: 16px/1.5 "IBM Plex Sans"; color: var(--pfg); }
+.ta .caret { display: inline-block; width: 2px; height: 19px; background: #7aa7ff; vertical-align: -4px; }
+.pchips { display: flex; gap: 6px; overflow: hidden; padding: 8px 10px; border-top: 1px solid var(--pline); }
+.pchip { flex: none; height: 36px; padding: 0 13px; border-radius: 18px; border: 1px solid var(--pborder); background: #1d232b; color: var(--pfg); font: 500 13px/34px "IBM Plex Sans"; }
+.ctools { display: flex; align-items: center; gap: 8px; padding: 6px 10px 8px; }
+.send { height: 40px; padding: 0 18px; border-radius: 20px; border: 0; background: var(--primary); color: var(--primary-fg); font: 600 14px "IBM Plex Sans"; margin-left: auto; }
+
+/* the Watching line: an unattended record's Take over, in the key bar's place */
+.watchline { flex: none; padding: 10px 12px; background: #11202a; border-top: 1px solid #23485a; display: flex; align-items: center; gap: 10px; }
+.watchline .q { color: #9fd3e8; flex: 1; margin: 0; font-weight: 500; font-size: 13px; }
+.watchline button { height: 40px; padding: 0 16px; border-radius: 20px; border: 0; background: #e6e9ee; color: #0f1216; font: 600 14px "IBM Plex Sans"; }
+
+/* switcher */
+.srow { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 58px; border-bottom: 1px solid var(--pline); }
+.srow .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.srow .nm { font: 500 13.5px "JetBrains Mono", monospace; }
+.srow .sub { font-size: 12px; color: var(--pmuted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow .grow { flex: 1; min-width: 0; }
+.srow .age { font-size: 12px; color: var(--pmuted); }
+.srow.here { background: #1d232b; }
+.sgroup { font-size: 12px; color: var(--pmuted); padding: 10px 16px 4px; }
+
+/* ---- B: the unconstrained pass ---- */
+.phone.b { background: #050607; }
+.b .term { padding-top: 34px; font-size: 12px; }
+.b .float-top { position: absolute; top: 20px; left: 0; right: 0; height: 36px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: linear-gradient(#050607 40%, rgba(5,6,7,0)); }
+.b .float-top .nm { font: 500 13px "JetBrains Mono", monospace; color: #cfd5dd; }
+.b .float-top .seg { margin-left: auto; display: flex; border: 1px solid #2c333c; border-radius: 15px; overflow: hidden; }
+.b .float-top .seg span { font: 500 11.5px/26px "IBM Plex Sans"; padding: 0 10px; color: #8b95a3; } .b .float-top .seg span.on { background: #2c333c; color: #fff; }
+.dock { position: absolute; left: 10px; right: 10px; bottom: 22px; border-radius: 24px; background: rgba(28,33,40,.86); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(255,255,255,.08); padding: 8px; display: grid; grid-template-columns: 1fr 96px 1fr; gap: 8px; align-items: center; }
+.dock .col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dock .col .k { height: 40px; line-height: 38px; }
+.trackpad { width: 96px; height: 96px; border-radius: 48px; background: radial-gradient(circle at 50% 45%, #39424e, #232a33 70%); border: 1px solid #4a535f; position: relative; display: grid; place-items: center; color: #9aa5b3; font: 11px "IBM Plex Sans"; }
+.trackpad::before { content: "↑"; position: absolute; top: 6px; } .trackpad::after { content: "↓"; position: absolute; bottom: 6px; }
+.trackpad .l { position: absolute; left: 9px; } .trackpad .r { position: absolute; right: 9px; }
+.trackpad .c { width: 40px; height: 40px; border-radius: 20px; background: #e6e9ee; color: #0f1216; display: grid; place-items: center; font: 600 15px "JetBrains Mono"; }
+.dock .askline { grid-column: 1 / -1; height: 42px; border-radius: 21px; background: rgba(0,0,0,.35); color: #8b95a3; display: flex; align-items: center; padding: 0 6px 0 16px; font-size: 14px; }
+.dock .askline span { flex: 1; }
+.answers { position: absolute; left: 10px; right: 10px; bottom: 186px; display: flex; flex-direction: column; gap: 6px; }
+.answers .lbl { font-size: 12px; color: #8b95a3; padding-left: 4px; }
+.answers button { height: 46px; border-radius: 14px; border: 1px solid #3a424d; background: rgba(28,33,40,.94); color: #e6e9ee; text-align: left; padding: 0 14px; font: 14px "IBM Plex Sans"; display: flex; gap: 10px; align-items: center; }
+.answers button b { font: 600 13px "JetBrains Mono"; color: #8b95a3; width: 14px; }
+.answers button.first { border-color: #e6e9ee; }
+
+table.cmp { border-collapse: collapse; margin-top: 12px; font-size: 14px; max-width: 980px; width: 100%; }
+table.cmp th, table.cmp td { border-bottom: 1px solid var(--line); text-align: left; padding: 8px 10px 8px 0; vertical-align: top; }
+table.cmp th { font-weight: 600; }
+@media (max-width: 420px) { .phone { width: 100%; } figure { width: 100%; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Phone Focus: the terminal takes the screen</h1>
+<p class="lead">Design round for TD-003, 2026-11-01. Today a phone gets the desktop page stacked into one column: two rows of top bar, the identity and acts lines, a terminal at half the screen, sixteen soft keys that scroll sideways, an open composer, then every side panel. These frames give the terminal everything from the session strip down to one key bar and one input bar. Every other control moves into sheets.</p>
+<p class="lead">Each frame is a 375 × 700 viewport, a small phone with the browser's own bars already gone (the page added to the home screen). Terminal text is 12 px, which is 50 columns at that width.</p>
+
+<h2>A. House style</h2>
+<div class="frames">
+
+<!-- A1 default -->
+<figure>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span>●●● 5G 82%</span></div>
+  <div class="strip">
+    <button class="ib">‹</button>
+    <button class="who"><span class="dot" style="background:var(--working)"></span><span class="nm">phone-view</span><span class="st">working 4m</span><span class="car">▾</span></button>
+    <button class="needpill">▲ 2</button>
+    <button class="ib markdot">⋯</button>
+  </div>
+<div class="term"><span class="g">●</span> Read <span class="w">src/shiftlead/ui/static/app.css</span>
+  <span class="d">⎿  Read 1296 lines</span>
+
+<span class="g">●</span> The soft-key row is TD-990's. The narrow
+  layout still stacks every side panel under
+  the terminal, so I'll fold them into one
+  sheet behind ⋯ and give the terminal the
+  height they took.
+
+<span class="g">●</span> <span class="w">Update</span>(src/shiftlead/ui/static/app.css)
+  <span class="d">⎿  Updated with </span><span class="g">14 additions</span><span class="d">, </span><span class="r">3 removals</span>
+     <span class="d">639</span>  @media (max-width: 720px) {
+     <span class="d">640</span> <span class="g">+  .focus .strip { height: 44px; }</span>
+     <span class="d">641</span> <span class="g">+  .focus .side { display: none; }</span>
+     <span class="d">642</span> <span class="r">-  .termbox { height: 50vh; }</span>
+
+<span class="g">●</span> <span class="w">Bash</span>(pdm run test -k focus)
+  <span class="d">⎿  </span><span class="g">212 passed</span><span class="d"> in 41.3s</span>
+
+<span class="y">✻ Brewing… </span><span class="d">(38s · ↑ 2.1k tokens · esc to</span>
+<span class="d">  interrupt)</span>
+
+<span class="d">╭────────────────────────────────────────────────╮</span>
+<span class="d">│</span> &gt; <span class="cur"> </span>                                             <span class="d">│</span>
+<span class="d">╰────────────────────────────────────────────────╯</span>
+<span class="d">  ⏵⏵ accept edits on (shift+tab to cycle)</span></div>
+  <div class="keys">
+    <button class="k">esc</button><button class="k">tab</button><button class="k wide">⇧tab</button><button class="k">ctrl</button><button class="k pad">◂▴▾▸</button><button class="k">↵</button><button class="k">1–9</button>
+  </div>
+  <div class="bar">
+    <button class="ask"><span>✎ Compose a prompt…</span></button>
+    <button class="round">⌨</button>
+  </div>
+</div>
+<figcaption><b>1. At rest.</b> One 44 px strip: back, the session (tap for the switcher), <b>▲ 2</b> for other sessions that need you, <b>⋯</b> for everything else, with a dot when a mark is set. The terminal runs to the key bar. <b>◂▴▾▸</b> is a drag pad: slide a finger off it to send arrows, which repeat while held. <b>1–9</b> flips the row to digits. <b>✎ Compose a prompt…</b> (the composer's folded bar) opens the composer, and <b>⌨</b> raises the keyboard straight into the terminal; a tap on the terminal does not.</figcaption>
+</figure>
+
+<!-- A2 keyboard up -->
+<figure>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span>●●● 5G 82%</span></div>
+  <div class="strip">
+    <button class="ib">‹</button>
+    <button class="who"><span class="dot" style="background:var(--idle)"></span><span class="nm">phone-view</span><span class="st">idle</span><span class="car">▾</span></button>
+    <button class="ib">⋯</button>
+  </div>
+<div class="term"><span class="g">●</span> <span class="w">Bash</span>(pdm run test -k focus)
+  <span class="d">⎿  </span><span class="g">212 passed</span><span class="d"> in 41.3s</span>
+
+<span class="g">●</span> Done. Want me to open the PR?
+
+<span class="d">╭────────────────────────────────────────────────╮</span>
+<span class="d">│</span> &gt; yes, open it as a draft<span class="cur"> </span>                     <span class="d">│</span>
+<span class="d">╰────────────────────────────────────────────────╯</span>
+<span class="d">  ⏵⏵ accept edits on (shift+tab to cycle)</span></div>
+  <div class="keys">
+    <button class="k">esc</button><button class="k">tab</button><button class="k wide">⇧tab</button><button class="k on">ctrl</button><button class="k pad">◂▴▾▸</button><button class="k">↵</button><button class="k">⌄</button>
+  </div>
+  <div class="kb">
+    <div><i>q</i><i>w</i><i>e</i><i>r</i><i>t</i><i>y</i><i>u</i><i>i</i><i>o</i><i>p</i></div>
+    <div><i>a</i><i>s</i><i>d</i><i>f</i><i>g</i><i>h</i><i>j</i><i>k</i><i>l</i></div>
+    <div><i class="w">⇧</i><i>z</i><i>x</i><i>c</i><i>v</i><i>b</i><i>n</i><i>m</i><i class="w">⌫</i></div>
+    <div><i class="w">123</i><i class="sp">space</i><i class="ret">return</i></div>
+  </div>
+</div>
+<figcaption><b>2. Typing straight into the terminal.</b> The keyboard comes up, the bottom bar goes, and the key bar rides on the keyboard (<code>visualViewport</code> on iOS, <code>interactive-widget=resizes-content</code> on Android). The terminal loses rows, not columns. <b>ctrl</b> is latched for one key, and a long press locks it. <b>⌄</b> puts the keyboard away. For a menu, a short reply or a Ctrl-C.</figcaption>
+</figure>
+
+<!-- A3 compose -->
+<figure>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span>●●● 5G 82%</span></div>
+  <div class="strip">
+    <button class="ib">‹</button>
+    <button class="who"><span class="dot" style="background:var(--working)"></span><span class="nm">phone-view</span><span class="st">working 6m</span><span class="car">▾</span></button>
+    <button class="ib">⋯</button>
+  </div>
+<div class="term"><span class="g">●</span> <span class="w">Update</span>(src/shiftlead/ui/static/app.css)
+  <span class="d">⎿  Updated with </span><span class="g">14 additions</span></div>
+  <div class="scrim" style="top:64px"></div>
+  <div class="compose">
+    <div class="top"><span class="t">Steer phone-view</span><button class="ib" style="font-size:16px">✕</button></div>
+    <div class="ta">Before the PR: keep the strip's ▲ count to sessions that need me, not every idle one. And try it at 360 wide<span class="caret"></span></div>
+    <div class="pchips"><button class="pchip">continue</button><button class="pchip">run the tests</button><button class="pchip">wrap up</button><button class="pchip">open a PR</button></div>
+    <div class="ctools">
+      <button class="round" style="width:40px;height:40px">📎</button>
+      <span style="font-size:12px;color:var(--pmuted)">steers the turn in flight</span>
+      <button class="send">Steer</button>
+    </div>
+    <div class="kb" style="height:190px">
+      <div><i>q</i><i>w</i><i>e</i><i>r</i><i>t</i><i>y</i><i>u</i><i>i</i><i>o</i><i>p</i></div>
+      <div><i>a</i><i>s</i><i>d</i><i>f</i><i>g</i><i>h</i><i>j</i><i>k</i><i>l</i></div>
+      <div><i class="w">⇧</i><i>z</i><i>x</i><i>c</i><i>v</i><i>b</i><i>n</i><i>m</i><i class="w">⌫</i></div>
+      <div><i class="w">123</i><i class="sp">space</i><i class="ret">return</i></div>
+    </div>
+  </div>
+</div>
+<figcaption><b>3. Composing.</b> A sheet over the terminal, never a resize of it, so the pane does not repaint. The text box gets the phone's own autocorrect, paste and dictation (the keyboard's own mic), which typing into xterm.js handles badly (Gboard's composition bug). The prompt chips sit one thumb above the keyboard. <b>Send</b> reads <b>Steer</b> while a turn runs, as it does on the desktop.</figcaption>
+</figure>
+
+<!-- A4 permission -->
+<figure>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span>●●● 5G 82%</span></div>
+  <div class="strip">
+    <button class="ib">‹</button>
+    <button class="who"><span class="dot" style="background:var(--needs)"></span><span class="nm">grinder-ao-2</span><span class="st">needs you</span><span class="car">▾</span></button>
+    <button class="needpill">▲ 1</button>
+    <button class="ib">⋯</button>
+  </div>
+<div class="term"><span class="g">●</span> I'll check the branch is clean before the
+  rebase.
+
+<span class="g">●</span> <span class="w">Bash</span>(git status --porcelain &amp;&amp; git fetch -q)
+  <span class="d">⎿  (no output)</span>
+
+<span class="g">●</span> Clean. Rebasing onto main and running the
+  ledger checks.
+
+<span class="d">╭──────────────────────────────────────────</span>
+<span class="d">│</span> <span class="w">Bash command</span>
+<span class="d">│</span>   git rebase origin/main &amp;&amp; agent-cadence
+<span class="d">│</span>   run ledger.py --check
+<span class="d">│</span> Do you want to proceed?
+<span class="d">│</span> <span class="b">❯ 1. Yes</span>
+<span class="d">│</span>   2. Yes, and don't ask again for git
+<span class="d">│</span>      rebase commands in this project
+<span class="d">│</span>   3. No, and tell Claude what to do
+<span class="d">│</span>      differently <span class="d">(esc)</span></div>
+  <div class="keys">
+    <button class="k">esc</button><button class="k">tab</button><button class="k wide">⇧tab</button><button class="k">ctrl</button><button class="k pad">◂▴▾▸</button><button class="k">↵</button><button class="k">1–9</button>
+  </div>
+  <div class="bar">
+    <button class="ask"><span>✎ Compose a prompt…</span></button>
+    <button class="round">⌨</button>
+  </div>
+</div>
+<figcaption><b>4. It needs you.</b> Claude Code's own permission dialog, in the pane, answered as on a desktop: <b>1–9</b> then a digit, or <b>↵</b> on the highlighted line. Nothing is read off the screen or redrawn as buttons (Paul, 2026-11-02: <i>we should just leave questions in the terminal as-is</i>). Another session needing you raises <b>▲ 1</b>, and a tap goes straight to it.</figcaption>
+</figure>
+
+<!-- A5 more sheet -->
+<figure>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span>●●● 5G 82%</span></div>
+  <div class="strip">
+    <button class="ib">‹</button>
+    <button class="who"><span class="dot" style="background:var(--idle)"></span><span class="nm">phone-view</span><span class="st">idle</span><span class="car">▾</span></button>
+    <button class="ib markdot">⋯</button>
+  </div>
+<div class="term"><span class="g">●</span> Done. Want me to open the PR?</div>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="sh-head"><div class="t">phone-view</div><div class="s">kmaster · shiftlead · claude-code · interactive</div>
+      <div class="chips"><span class="chip amber">brief changed</span><span class="chip">ready to close ✓</span></div></div>
+    <div class="acts">
+      <button class="act next"><span class="ic">✓</span>Close</button>
+      <button class="act"><span class="ic">✉</span>Message</button>
+      <button class="act"><span class="ic">⏎</span>Wrap up</button>
+      <button class="act"><span class="ic">☰</span>Transcript</button>
+      <button class="act"><span class="ic">⌘</span>Shell here</button>
+      <button class="act"><span class="ic">⧉</span>Copy</button>
+      <button class="act"><span class="ic">⎘</span>Paste</button>
+      <button class="act"><span class="ic">⇄</span>Unattended</button>
+    </div>
+    <div class="rows">
+      <div class="rowi"><span class="gl">⎇</span>Git<span class="m">phone-view · 2 unpushed</span></div>
+      <div class="rowi"><span class="gl">✓</span>Reports<span class="m">1 in review</span></div>
+      <div class="rowi"><span class="gl">✉</span>Inbox<span class="n">1</span></div>
+      <div class="rowi"><span class="gl">❯</span>Prompts<span class="m">6</span></div>
+      <div class="rowi"><span class="gl">☐</span>Ready to close<span class="m">7 of 7</span></div>
+      <div class="rowi"><span class="gl">ⓘ</span>Session<span class="m">opus · 41% context</span></div>
+      <div class="rowi red"><span class="gl">✕</span>Kill</div>
+    </div>
+  </div>
+</div>
+<figcaption><b>5. ⋯ holds the rest.</b> One sheet: the marks that used to wrap the identity line, the acts (the next act filled, as on the desktop), then one row per side panel with its summary. Each row opens that panel as a full-height sheet. Kill comes last, red, and asks first. Nothing on the desktop is lost, only moved.</figcaption>
+</figure>
+
+<!-- A6 switcher -->
+<figure>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span>●●● 5G 82%</span></div>
+  <div class="strip">
+    <button class="ib">‹</button>
+    <button class="who"><span class="dot" style="background:var(--idle)"></span><span class="nm">phone-view</span><span class="st">idle</span><span class="car">▴</span></button>
+    <button class="needpill">▲ 2</button>
+    <button class="ib">⋯</button>
+  </div>
+<div class="term"><span class="g">●</span> Done. Want me to open the PR?</div>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="sgroup">Needs you</div>
+    <div class="srow"><span class="dot" style="background:var(--needs)"></span><div class="grow"><div class="nm">grinder-ao-2</div><div class="sub">Allow Bash? git rebase origin/main &amp;&amp; …</div></div><span class="age">1m</span></div>
+    <div class="srow"><span class="dot" style="background:var(--needs)"></span><div class="grow"><div class="nm">designer-ao-1</div><div class="sub">asks: TD-1296's build — split it in two?</div></div><span class="age">12m</span></div>
+    <div class="sgroup">Working</div>
+    <div class="srow"><span class="dot" style="background:var(--working)"></span><div class="grow"><div class="nm">led-tds-ledger</div><div class="sub">TD-1295 · host-log events</div></div><span class="age">4m</span></div>
+    <div class="sgroup">Idle</div>
+    <div class="srow here"><span class="dot" style="background:var(--idle)"></span><div class="grow"><div class="nm">phone-view</div><div class="sub">here</div></div><span class="age">now</span></div>
+    <div class="srow"><span class="dot" style="background:var(--idle)"></span><div class="grow"><div class="nm">ao-paul</div><div class="sub">shiftlead</div></div><span class="age">4d</span></div>
+    <div class="srow"><span class="dot" style="background:var(--idle)"></span><div class="grow"><div class="nm">security</div><div class="sub">shiftlead</div></div><span class="age">4d</span></div>
+  </div>
+</div>
+<figcaption><b>6. Switching.</b> A tap on the name lists every session, needs-you first, each with what it is waiting on. A sideways swipe on the strip moves to the next or previous one in this order without opening the list (not from the screen's edge, which is Safari's back and forward). <b>‹</b> goes back to the Sessions cards.</figcaption>
+</figure>
+
+<!-- A7 watching -->
+<figure>
+<div class="phone">
+  <div class="sb"><span>9:41</span><span>●●● 5G 82%</span></div>
+  <div class="strip">
+    <button class="ib">‹</button>
+    <button class="who"><span class="dot" style="background:var(--working)"></span><span class="nm">grinder-ao-1</span><span class="st">working 22m</span><span class="car">▾</span></button>
+    <button class="ib">⋯</button>
+  </div>
+<div class="term"><span class="g">●</span> <span class="w">Read</span>(docs/ledger/TD-1297.md)
+  <span class="d">⎿  Read 41 lines</span>
+
+<span class="g">●</span> TD-1297 removes Hold. Three call sites
+  left: td_hold in the host agent, the --held
+  flag, and the ⋯ menu's Hold… item.
+
+<span class="g">●</span> <span class="w">Search</span>(pattern: "td_hold")
+  <span class="d">⎿  Found 7 files</span>
+
+<span class="g">●</span> <span class="w">Update</span>(src/sessionorc/agent_serve.py)
+  <span class="d">⎿  Updated with </span><span class="g">2 additions</span><span class="d">, </span><span class="r">31 removals</span>
+
+<span class="y">✻ Hatching… </span><span class="d">(3m 12s · ↓ 8.4k tokens)</span>
+<button class="tobottom">↓ live</button><span class="toast">13 px · 46 columns</span></div>
+  <div class="watchline"><span class="q">Watching. This session runs unattended.</span><button>Take over</button></div>
+  <div class="bar">
+    <button class="ask"><span>Message grinder-ao-1…</span></button>
+  </div>
+</div>
+<figcaption><b>7. Watching an unattended session.</b> No key bar, since the attach takes no keys. One line says why, with <b>Take over</b> beside it. The input bar sends mail, not keystrokes. Also drawn here: a finger's scroll back through history, with <b>↓ live</b> to return, and the toast a pinch leaves (font size and the columns it gives).</figcaption>
+</figure>
+</div>
+
+<h2>B. The unconstrained pass (not chosen)</h2>
+<p class="lead">The frontend-design skill's own pick, without the house style: the terminal runs under everything, the chrome floats over it as one dock, and a round trackpad sits where the thumb rests. It also draws the feature that most changes the phone: a question read from the screen and offered as buttons.</p>
+<div class="frames">
+<figure>
+<div class="phone b">
+  <div class="sb" style="background:#050607"><span>9:41</span><span>●●● 5G 82%</span></div>
+<div class="term"><span class="g">●</span> Read <span class="w">src/shiftlead/ui/static/app.css</span>
+  <span class="d">⎿  Read 1296 lines</span>
+
+<span class="g">●</span> The soft-key row is TD-990's. The narrow
+  layout still stacks every side panel under
+  the terminal, so I'll fold them into one
+  sheet behind ⋯ and give the terminal the
+  height they took.
+
+<span class="g">●</span> <span class="w">Update</span>(src/shiftlead/ui/static/app.css)
+  <span class="d">⎿  Updated with </span><span class="g">14 additions</span><span class="d">, </span><span class="r">3 removals</span>
+
+<span class="g">●</span> <span class="w">Bash</span>(pdm run test -k focus)
+  <span class="d">⎿  </span><span class="g">212 passed</span><span class="d"> in 41.3s</span>
+
+<span class="y">✻ Brewing… </span><span class="d">(38s · esc to interrupt)</span>
+
+<span class="d">╭────────────────────────────────────────────────╮</span>
+<span class="d">│</span> &gt; <span class="cur"> </span>                                             <span class="d">│</span>
+<span class="d">╰────────────────────────────────────────────────╯</span></div>
+  <div class="float-top"><span class="dot" style="width:8px;height:8px;border-radius:4px;background:var(--working)"></span><span class="nm">phone-view</span><div class="seg"><span class="on">Terminal</span><span>Read</span></div><span style="color:#cfd5dd;font-size:18px;padding-left:4px">⋯</span></div>
+  <div class="dock">
+    <div class="col"><button class="k">esc</button><button class="k">tab</button><button class="k">ctrl</button><button class="k">⇧tab</button></div>
+    <div class="trackpad"><span class="l">←</span><span class="r">→</span><span class="c">↵</span></div>
+    <div class="col"><button class="k">1</button><button class="k">2</button><button class="k">3</button><button class="k">⌨</button></div>
+    <div class="askline"><span>Ask or steer…</span></div>
+  </div>
+</div>
+<figcaption><b>B1. Floating dock.</b> The terminal runs under the status bar and the dock. The top line fades out as the history scrolls. <b>Terminal / Read</b> switches to the transcript, drawn for reading. The dock costs about 30 more px than A's two bars but needs one thumb. The trade-off: the terminal's last rows sit under glass unless the pane is told it has fewer rows than it shows.</figcaption>
+</figure>
+
+<figure>
+<div class="phone b">
+  <div class="sb" style="background:#050607"><span>9:41</span><span>●●● 5G 82%</span></div>
+<div class="term"><span class="g">●</span> Two ways to split TD-1296's build:
+
+  1. One PR: remove Hold and its tests
+     together (~600 lines).
+  2. Two PRs: the host agent first, then
+     the UI and CLI.
+
+<span class="d">╭────────────────────────────────────────────────╮</span>
+<span class="d">│</span> <span class="w">How should I split the build?</span>                  <span class="d">│</span>
+<span class="d">│</span>                                                <span class="d">│</span>
+<span class="d">│</span> <span class="b">❯ 1. One PR</span>                                    <span class="d">│</span>
+<span class="d">│</span>   2. Two PRs                                   <span class="d">│</span>
+<span class="d">│</span>   3. Type something                            <span class="d">│</span>
+<span class="d">╰────────────────────────────────────────────────╯</span></div>
+  <div class="float-top"><span class="dot" style="width:8px;height:8px;border-radius:4px;background:var(--needs)"></span><span class="nm">designer-ao-1</span><div class="seg"><span class="on">Terminal</span><span>Read</span></div><span style="color:#cfd5dd;font-size:18px;padding-left:4px">⋯</span></div>
+  <div class="answers">
+    <span class="lbl">How should I split the build?</span>
+    <button class="first"><b>1</b>One PR</button>
+    <button><b>2</b>Two PRs</button>
+    <button><b>3</b>Type something…</button>
+  </div>
+  <div class="dock">
+    <div class="col"><button class="k">esc</button><button class="k">tab</button><button class="k">ctrl</button><button class="k">⇧tab</button></div>
+    <div class="trackpad"><span class="l">←</span><span class="r">→</span><span class="c">↵</span></div>
+    <div class="col"><button class="k">1</button><button class="k">2</button><button class="k">3</button><button class="k">⌨</button></div>
+    <div class="askline"><span>Ask or steer…</span></div>
+  </div>
+</div>
+<figcaption><b>B2. A question as buttons. Not taken (Paul, 2026-11-01): we have found it to be problematic to reproduce questions from the terminal, so a question stays in the terminal and is answered there with the key bar.</b> When the adapter recognises a numbered menu on screen, its options float above the dock as buttons. A tap types the digit through the terminal, the same keystroke the 1–9 keys send (invariant 6), so nothing is answered behind the terminal's back. This is design §10's open question, <i>Phone answers for questions</i>. It needs a screen reader in the Claude Code adapter, so it is a later step whichever style wins.</figcaption>
+</figure>
+</div>
+
+<h2>What was decided (Paul, 2026-11-01)</h2>
+<table class="cmp">
+<tr><th>Question</th><th>Decision</th><th>Why</th></tr>
+<tr><td>A or B for the chrome</td><td>A. B's question buttons are not taken; questions stay in the terminal</td><td>A never covers terminal rows, so tmux's grid is exactly what shows. B's glass hides the input box Claude Code keeps on its last rows, and reading questions off the screen has proved unreliable.</td></tr>
+<tr><td>Permissions on the phone</td><td>In the terminal too: Claude Code's own dialog, no Allow / Deny tray</td><td>Paul, 2026-11-02: <i>we should just leave questions in the terminal as-is to avoid the parsing hassle</i>. The hook still holds the call; the pane's answer resolves it.</td></tr>
+<tr><td>Who owns the pane's width</td><td>The phone, as today, while it is the last to type</td><td>tmux's <code>window-size latest</code> already lets the last active client set the size. 50 columns is tight but Claude Code reflows to it. Pinch and landscape (about 95 columns) give more. Shrinking text to fit the desktop's 120 columns is unreadable.</td></tr>
+<tr><td>Keyboard up resizes the pane?</td><td>Yes, rows only, once it settles (the existing 150 ms resize rule)</td><td>Claude Code's input box sits on its last rows. If the pane kept its height, the keyboard would cover the line being typed.</td></tr>
+<tr><td>Default way to type</td><td>The composer, with <b>⌨</b> for direct keys</td><td>The phone's keyboard, autocorrect and dictation work in a real text box. Typing into xterm.js on Android garbles composed text (xterm.js #3600).</td></tr>
+<tr><td>Add to Home Screen</td><td>Yes: a web app manifest and standalone display</td><td>Gives back the ~90 px the browser's bars take, and a stable icon. TD-003 already asks for it. Web Push to that icon for <i>needs you</i> is the next lever, and a separate entry.</td></tr>
+</table>
+</main>
+</body>
+</html>
