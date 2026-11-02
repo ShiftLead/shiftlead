@@ -1,15 +1,12 @@
 {% import "queue_card.html" as qc %}
 {% from "queue_row.html" import pbadge, holder %}
 {# The Queue page's lists (design §4.5 screen 12; TD-771), re-read whole with `?part=1` #}
-<div class="row gap qtitlebar"><span class="h1">Queue</span>
-  {% if q.served %}<span class="qsub">{{ q.n.cards }} card{{ '' if q.n.cards == 1 else 's' }}: {{ q.n.in_progress }} in progress, {% if q.n.waiting %}{{ q.n.waiting }} waiting, {% endif %}{{ q.n.up_next }} up next.{% if q.n.decide or q.n.do %} <span class="qwantsn" title="what on the cards waits on you, counted in items, not cards — display only: it is not the top bar's number, which counts the Inbox">{% if q.n.decide %}Decide {{ q.n.decide }}{% endif %}{% if q.n.decide and q.n.do %} · {% endif %}{% if q.n.do %}Do {{ q.n.do }}{% endif %}</span>.{% endif %}{% if q.n.needs_you %} <b class="needsword">{{ q.n.needs_you }} need{{ 's' if q.n.needs_you == 1 else '' }} you.</b>{% endif %}</span>{% endif %}
-</div>
 {% if agent_down %}<div class="warn">the host agent is not answering — nothing to draw</div>
 {% elif not q.served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>
 {% else %}
 
-{# the filter row's numbers, which the page copies into the row it keeps outside these lists (TD-771) #}
-<span id="qcounts" hidden data-needs="{{ q.n.needs_you }}"></span>
+{# the top section's numbers, from which the page redraws the section it keeps outside these lists (TD-771, TD-1293) #}
+<span id="qcounts" hidden data-needs="{{ q.n.needs_you }}" data-cards="{{ q.n.cards }}" data-inprogress="{{ q.n.in_progress }}" data-waiting="{{ q.n.waiting }}" data-upnext="{{ q.n.up_next }}" data-decide="{{ q.n.decide }}" data-do="{{ q.n.do }}"></span>
 {% if q.find_miss %}<div class="qnote qfindmiss" id="qfindmiss" data-for="{{ q.picks.find if q.picks else '' }}">{{ q.find_miss.id }} is on no open card{% if q.find_miss.repos %} — in the archive: {% for r in q.find_miss.repos %}{% if not loop.first %} · {% endif %}<a href="{{ r.url }}">{{ q.find_miss.id }} on {{ r.name }}'s Repo page</a>{% endfor %}{% endif %}</div>{% endif %}
 <div class="qnote" id="qnone"{% if not (q.filtered and not q.shown) %} hidden{% endif %}>no open card fits these picks</div>
 

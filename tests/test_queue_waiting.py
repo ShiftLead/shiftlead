@@ -5,6 +5,7 @@ in Up next."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -166,7 +167,13 @@ def test_the_page_draws_waiting_between_in_progress_and_up_next_with_its_wait_co
     assert '<span class="qstatus s-waits"' in waits and ">waits until Oct 30</span>" in waits
     assert "qmove" not in waits and "draggable" not in waits, "no grip and no ⤒ ↑ ↓"
     assert 'data-card="s#TD-40"' not in html[html.index('id="qupnext"') :]
-    assert "4 cards: 1 in progress, 1 waiting, 2 up next." in html
+    leg = html[html.index('class="qsleg"') : html.index('class="qhend')]
+    assert re.findall(r"<b>(\d+)</b>([a-z ]+)</span>", leg) == [
+        ("1", "in progress"),
+        ("1", "waiting"),
+        ("2", "up next"),
+    ]
+    assert "· 4 cards" in leg
 
 
 def test_the_repo_boards_gutter_draws_a_waiting_cards_wait_column_and_no_grip():

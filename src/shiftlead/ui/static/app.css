@@ -1280,8 +1280,6 @@ details.qdots { display: inline-block; }
 /* The Queue page (design §4.5 screen 12, TD-771): the Inbox's centred column, its three groups a panel
    each; Recently completed one line a card, opening to what was done, under the window picker */
 .queuepage { max-width: 1100px; width: 100%; margin: 0 auto; }
-.queuepage .qtitlebar { align-items: baseline; }
-.queuepage .needsword { color: var(--needs-fg); }
 .queuepage .qsub { color: var(--muted); font-size: var(--t-small); }  /* words in the sans face: mono is for ids alone */
 .qdres .qsub { display: block; overflow-wrap: anywhere; }
 .qdbody[hidden], .qdline[hidden] { display: none; }
@@ -1303,19 +1301,42 @@ details.qdots { display: inline-block; }
 /* the filter row (§4.5a *Queue page: filters, find*, TD-771): toggles carried in the URL; what they hide is `qoff` */
 html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; } /* until the browser's apply (TD-829) */
 .qoff { display: none !important; }
-.qfilters { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-top: 10px; }
+/* the top section, one block (§4.5 screen 12 *The page's top section is one block*, TD-1293): the heading line —
+   Queue, the summary bar and its legend, then at the right the switch, *Decide · Do* and find — the teams row, a rule */
+.qfilters { margin-top: 2px; }
+.qhline { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.qhline .h1 { margin: 0; }
+.qserved[hidden] { display: none !important; }
+.qsum { display: inline-flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 220px; max-width: 420px; }
+.qsbar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; }
+.qsbar[hidden] { display: none; }
+.qsbar > span { display: block; }
+.qsleg { display: flex; gap: 4px 14px; flex-wrap: wrap; font-size: var(--t-small); color: var(--muted); }
+.qsleg b { color: var(--fg); font-weight: 600; margin-right: 3px; font-variant-numeric: tabular-nums; }
+.qsleg i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+.qhend { margin-left: auto; display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.qhend .qwantsn { font-weight: 400; font-size: var(--t-small); }
+.qwantsn[hidden] { display: none; }
+.qteams { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.qteams > .qsub:first-child { margin-right: 4px; }
+.qtdiv { width: 1px; align-self: stretch; background: var(--border); margin: 0 6px 0 8px; }
+.qnoteam { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .qf { border: 1px solid var(--border); border-radius: 5px; padding: 2px 9px; font-size: var(--t-small); color: var(--fg); text-decoration: none; }
-.qf:hover { background: var(--hover); }
+.qf:hover { background: var(--hover); text-decoration: none; }
 .qf[aria-pressed="true"] { background: var(--hover); color: var(--strong); font-weight: 600; }
 .qf.qfrepo { color: var(--muted); font-style: italic; }  /* a repo no team services (TD-1287) */
-/* the Needs you switch: its mark and words, apart from the chips, never drawn as one (TD-1287) */
-.qf.qswitch { border-color: transparent; margin-left: 14px; padding-left: 4px; }
-.qf.qswitch::before { content: "☐"; margin-right: 5px; }
-.qf.qswitch[aria-checked="true"] { color: var(--strong); font-weight: 600; }
-.qf.qswitch[aria-checked="true"]::before { content: "☑"; }
-.qfind { margin-left: auto; }
-.qfind input { font: inherit; font-size: var(--t-small); padding: 3px 8px; min-width: 16em; }
-.qfilters + .qnote, .qfindmiss { padding-left: 0; margin-top: 6px; }
+/* the Needs you switch, *☐ Needs you 156* in its border: a mark drawn by CSS, its words, its number bold in the
+   needs colour; on, a check in the mark and the border in the needs colour (TD-1287, TD-1293) */
+.qf.qswitch { display: inline-flex; align-items: center; gap: 7px; padding: 2px 10px 2px 8px; }
+.qf.qswitch b { color: var(--needs-fg); font-weight: 600; }
+.qbox { width: 11px; height: 11px; box-sizing: border-box; border: 1.5px solid var(--muted); border-radius: 2px; position: relative; flex: none; }
+.qf.qswitch[aria-checked="true"] { border-color: var(--needs-fg); color: var(--strong); }
+.qf.qswitch[aria-checked="true"] .qbox { border-color: var(--needs-fg); }
+.qf.qswitch[aria-checked="true"] .qbox::after { content: ""; position: absolute; left: 2.5px; top: -0.5px; width: 3px; height: 6px;
+  border: solid var(--needs-fg); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.qfind input { font: inherit; font-size: var(--t-small); padding: 4px 9px; width: 18em; }
+.qfindmiss { padding-left: 0; margin-top: 6px; }
 .qring { outline: 2px solid var(--needs-fg); outline-offset: 2px; border-radius: 4px; }
 .qother { display: flex; gap: 10px; align-items: baseline; padding: 8px 14px 8px 17px; border-top: 1px solid var(--line); font-size: var(--t-small); }
 @media (max-width: 720px) {
@@ -1329,8 +1350,13 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   /* a card's items take the card's width, as the notes do: no desktop indent under the number (TD-985) */
   .qsech, .qmail, .qrows > .qsec .qsech, .qrows > .qsec .qmail, .qread > summary.qsech,
   .qread .qsec .qsech, .qread .qsec .qmail { padding-left: 0; }
-  .qfind { margin-left: 0; flex-basis: 100%; }
-  .qfind input { width: 100%; min-width: 0; }
+  /* the top section at phone width (TD-1293): the heading alone; the switch and *Decide · Do*; find across the
+     width; the summary across the width; the chips wrapping, no divider, *no team* and its repos as one unit */
+  .qhend { margin-left: 0; flex-basis: 100%; }
+  .qsum { flex-basis: 100%; max-width: none; order: 3; }
+  .qfind { flex-basis: 100%; }
+  .qfind input { width: 100%; min-width: 0; box-sizing: border-box; }
+  .qtdiv { display: none; }
   .qrow { padding-left: calc(2.6em + var(--qd, 1) * 1ch); }
   .qrail { left: calc(2.6em + var(--ql, 1) * 1ch - .6ch); }
 }
