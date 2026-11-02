@@ -53,6 +53,32 @@ mem["ao.term.pinch"] = '"x"'; AO.setTermLook({ size: 15 }); out.junk = size();
 AO.pinchKeep(20); out.keptHigh = mem["ao.term.pinch"];
 AO.pinchKeep(8.6); out.keptLow = mem["ao.term.pinch"];
 out.clamp = [AO.pinchClamp(12.4), AO.pinchClamp(12.6), AO.pinchClamp(100), AO.pinchClamp(-1)];
+// no size from what is not a finite number: never NaN on the terminal, nothing kept
+out.notANumber = [AO.pinchClamp(NaN), AO.pinchClamp(Infinity), AO.pinchClamp("x"), AO.pinchClamp(undefined)];
+mem["ao.term.pinch"] = "12"; AO.pinchKeep(NaN); out.keptAfterNaN = mem["ao.term.pinch"];
+// the strip's finger: one alone, found by its identifier at the lift; a gesture a second finger joined is none
+const T = (id, x, y) => ({ identifier: id, clientX: x, clientY: y });
+const E = (touches, changed) => ({ touches, changedTouches: changed || [] });
+const track = (steps) => {
+  const k = AO.swipeTrack(); let got;
+  for (const [kind, ...a] of steps) got = k[kind](E(...a));
+  return got;
+};
+out.track = {
+  one: track([["start", [T(1, 200, 20)]], ["move", [T(1, 150, 22)]], ["end", [], [T(1, 140, 24)]]]),
+  second: track([["start", [T(1, 200, 20)]], ["start", [T(1, 200, 20), T(2, 100, 20)]],
+    ["end", [T(2, 100, 20)], [T(1, 140, 20)]]]),
+  secondThenLift: track([["start", [T(1, 200, 20)]], ["start", [T(1, 200, 20), T(2, 100, 20)]],
+    ["end", [T(2, 100, 20)], [T(1, 140, 20)]], ["end", [], [T(2, 30, 20)]]]),
+  seenInMove: track([["start", [T(1, 200, 20)]], ["move", [T(1, 180, 20), T(2, 90, 20)]],
+    ["end", [], [T(1, 140, 20)]]]),
+  otherFinger: track([["start", [T(1, 200, 20)]], ["end", [], [T(7, 100, 20)]]]),
+  fresh: (() => {
+    const k = AO.swipeTrack();
+    k.start(E([T(1, 200, 20)])); k.start(E([T(1, 200, 20), T(2, 100, 20)])); k.end(E([], [T(1, 1, 1), T(2, 1, 1)]));
+    k.start(E([T(3, 300, 20)])); return k.end(E([], [T(3, 250, 20)]));
+  })(),
+};
 // the swipe: the switcher's order, the screen's edge, mostly sideways
 const rows = [
   { id: "i", name: "idle-one", state: "idle" }, { id: "w", name: "work", state: "working" },
@@ -93,6 +119,15 @@ def test_the_kept_size_is_clamped_to_9_to_16_px():
     assert got["high"] == 16 and got["low"] == 9 and got["junk"] == 15  # junk is no size: the setting
     assert got["keptHigh"] == "16" and got["keptLow"] == "9"
     assert got["clamp"] == [12, 13, 16, 9]
+    assert got["notANumber"] == [None, None, None, None] and got["keptAfterNaN"] == "12"
+
+
+def test_the_strips_swipe_reads_one_finger_by_its_identifier_and_no_gesture_a_second_finger_joined():
+    t = _probe()["track"]
+    assert t["one"] == {"dx": -60, "dy": 4, "x0": 200}
+    assert t["second"] is None and t["secondThenLift"] is None and t["seenInMove"] is None
+    assert t["otherFinger"] is None  # the lift of a finger that is not the one that went down
+    assert t["fresh"] == {"dx": -50, "dy": 0, "x0": 300}  # once every finger lifted, the next one swipes again
 
 
 def test_the_swipe_walks_the_switchers_order_and_never_from_the_edge():
@@ -121,4 +156,10 @@ def test_the_pinch_is_the_terminals_on_a_phone_and_sends_one_grid_when_the_finge
     assert "pinchNote(`${size} px · ${term.cols} columns`);" in pinch
     assert "new ResizeObserver(() => { if (!phone.opened() && !pinch) fit.fit(); })" in focus
     # a crossing of the narrow query draws the size its layout reads
-    assert "phone.relaid(() => { fill(); AO.setTermLook(AO.termLook); });" in focus
+    relaid = focus[focus.index("    phone.relaid(() => {") :]
+    relaid = relaid[: relaid.index("\n    });\n")]
+    # only this terminal's size, and no grid under a sheet (its close refits)
+    assert "AO.TERM_OPTS.fontSize = size; term.options.fontSize = size;" in relaid
+    assert "if (!phone.opened()) fit.fit();" in relaid and "AO.setTermLook" not in relaid
+    # the pinch's move sets no size it could not read
+    assert "if (size != null && size !== pinch.size)" in focus

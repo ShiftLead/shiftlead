@@ -71,7 +71,11 @@
   // browser in place of `person.terminal.size` on its narrow screen alone — read only while the narrow query holds,
   // so the same browser's desktop page keeps the setting. Pure but for the storage, for a test.
   AO.PINCH_MIN = 9; AO.PINCH_MAX = 16;
-  AO.pinchClamp = (n) => Math.min(AO.PINCH_MAX, Math.max(AO.PINCH_MIN, Math.round(Number(n))));
+  // a size, clamped; null for anything that is not a finite number, which no caller sets
+  AO.pinchClamp = (n) => {
+    const v = Number(n);
+    return Number.isFinite(v) ? Math.min(AO.PINCH_MAX, Math.max(AO.PINCH_MIN, Math.round(v))) : null;
+  };
   AO.pinchKept = function () {
     // read off the page itself: this runs at load, before the phone's helpers below are defined
     const c = document.documentElement && document.documentElement.classList;
@@ -79,7 +83,7 @@
     const v = store.get("term.pinch", null);
     return typeof v === "number" && isFinite(v) ? AO.pinchClamp(v) : null;
   };
-  AO.pinchKeep = (n) => store.set("term.pinch", AO.pinchClamp(n));
+  AO.pinchKeep = (n) => { const v = AO.pinchClamp(n); if (v != null) store.set("term.pinch", v); };
   // the size a terminal is drawn at: the kept pinch first, then the setting (a Save's broadcast included), else 13
   AO.termSize = function (look) {
     const kept = AO.pinchKept();
@@ -324,6 +328,27 @@
     const i = order.indexOf(here);
     if (i < 0) return null;
     return order[dx < 0 ? i + 1 : i - 1] || null;
+  };
+  // …the one finger it reads: the touch that went down alone, found again by its `identifier` at its lift; a gesture
+  // a second finger joined is no swipe until every finger has lifted. `end` answers `{dx, dy, x0}` or null.
+  AO.swipeTrack = function () {
+    let from = null, multi = false;
+    return {
+      start(e) {
+        if (e.touches.length > 1) { multi = true; from = null; return; }
+        const t = e.touches[0];
+        multi = false; from = { id: t.identifier, x: t.clientX, y: t.clientY };
+      },
+      move(e) { if (e.touches.length > 1) { multi = true; from = null; } },
+      cancel() { from = null; multi = false; },
+      end(e) {
+        const f = from, t = f && Array.from(e.changedTouches || []).find((x) => x.identifier === f.id);
+        if (e.touches.length === 0) { from = null; if (multi) { multi = false; return null; } }
+        if (!f || multi || !t) return null;
+        from = null;
+        return { dx: t.clientX - f.x, dy: t.clientY - f.y, x0: f.x };
+      },
+    };
   };
   AO.stateClass = (state) => ({ "needs-you": "needs", "stalled?": "stalled" }[state] || state || "");
   // The switcher's groups (§4.5a *the switcher*): the Sessions page's order — *Needs you*, *Working*, *Idle*, then
@@ -6134,15 +6159,14 @@
     // a sideways swipe on the strip walks the switcher's order (TD-1301); its lift's click is the swipe's, not a press
     const strip = $("#fstrip");
     if (strip) {
-      let sw = null;
-      strip.addEventListener("touchstart", (e) => {
-        sw = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
-      }, { passive: true });
+      const sw = AO.swipeTrack();
+      strip.addEventListener("touchstart", (e) => sw.start(e), { passive: true });
+      strip.addEventListener("touchmove", (e) => sw.move(e), { passive: true });
+      strip.addEventListener("touchcancel", () => sw.cancel(), { passive: true });
       strip.addEventListener("touchend", (e) => {
-        const t = e.changedTouches && e.changedTouches[0], from = sw;
-        sw = null;
-        if (!from || !t || !narrow) return;
-        const to = AO.swipeTarget(rows, s.id, t.clientX - from.x, t.clientY - from.y, from.x, window.innerWidth);
+        const g = sw.end(e);
+        if (!g || !narrow) return;
+        const to = AO.swipeTarget(rows, s.id, g.dx, g.dy, g.x0, window.innerWidth);
         if (!to) return;
         if (e.cancelable) e.preventDefault();
         location.href = `/focus/${encodeURIComponent(to)}`;
@@ -6535,7 +6559,7 @@
       e.preventDefault();
       if (e.targetTouches.length < 2) return;
       const size = AO.pinchClamp(pinch.size0 * span(e) / pinch.d0);
-      if (size !== pinch.size) { pinch.size = size; term.options.fontSize = size; AO.TERM_OPTS.fontSize = size; }
+      if (size != null && size !== pinch.size) { pinch.size = size; term.options.fontSize = size; AO.TERM_OPTS.fontSize = size; }
     }, { capture: true, passive: false });
     const pinchEnd = (e) => {
       if (!pinch || e.targetTouches.length >= 2) return;
@@ -6737,7 +6761,12 @@
       fill();
     }
     // a crossing draws the terminal at the size its layout reads: the kept pinch on the phone, the setting off it
-    phone.relaid(() => { fill(); AO.setTermLook(AO.termLook); });
+    phone.relaid(() => {
+      fill();
+      const size = AO.termSize(AO.termLook);
+      AO.TERM_OPTS.fontSize = size; term.options.fontSize = size;  // this terminal only; no other is this layout's
+      if (!phone.opened()) fit.fit();  // under a sheet no grid is sent: its close refits
+    });
     // the soft-key row's height is one variable (`--softh` on the wrap, 0 while it is hidden), which `fill()`
     // adds to the bar's and the composer and a popped-out terminal read; registered folded or not
     if (softEl && wrap) new ResizeObserver(() => { wrap.style.setProperty("--softh", `${softEl.offsetHeight}px`); fill(); }).observe(softEl);
