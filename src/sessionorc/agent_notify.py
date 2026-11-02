@@ -308,8 +308,7 @@ class NotifyMixin:
         endpoint and keys — the seam the Settings page's Push card draws from."""
         return push_mod.view(push_mod.load())
 
-    def _push_home(self, caller: Any, act: str) -> None:
-        agent_common.person_only(caller, act, "§4.10", self._graph())
+    def _push_home(self, act: str) -> None:
         if self.mode != "home":
             raise RpcError(f"{act} runs at the home (design §4.10 *Only the home sends*): this host is a node")
 
@@ -327,7 +326,8 @@ class NotifyMixin:
         not the home's, an endpoint that is not `https` to a public host, or keys of the wrong size, and while
         the key reads anything but *key*. A person's own, at the home alone (it is not in `modes.HOME_EDITS`:
         a tap opens the origin the worker was registered on)."""
-        self._push_home(caller, "turn push on for a device")
+        agent_common.person_only(caller, "turn push on for a device", "§4.10", self._graph())
+        self._push_home("push_subscribe")
         doc = push_mod.load()
         try:
             got = push_mod.subscribe(doc, endpoint, keys, label, key, now_iso(), replaces)
@@ -339,7 +339,8 @@ class NotifyMixin:
     async def rpc_push_unsubscribe(self, id: Any = None, caller: Any = None) -> dict[str, Any]:
         """**tell me on this device** off, or a device's **Remove** (§4.5a **You**: **Push**): drop the device
         `id` from `push.json`. A person's own, at the home alone. `{removed}`: false when it was not listed."""
-        self._push_home(caller, "turn push off for a device")
+        agent_common.person_only(caller, "turn push off for a device", "§4.10", self._graph())
+        self._push_home("push_unsubscribe")
         if not isinstance(id, str) or not id:
             raise RpcError("push_unsubscribe: id is the device's id (design §4.10)")
         doc = push_mod.load()
