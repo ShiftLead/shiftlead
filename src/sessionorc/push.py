@@ -181,3 +181,105 @@ def view(doc: dict[str, Any]) -> dict[str, Any]:
         {k: d.get(k) for k in DEVICE_FIELDS if k not in ("endpoint", "keys")} for d in doc.get("devices") or []
     ]
     return out
+
+
+# -- the home's reading of a child's answer (§4.10 *The key*, *The key's reading*; TD-1304 slice 2) ---------
+
+PAUSED = "push is paused: {}"
+KEY_CHANGED = "the key changed: turn this on again on each device"
+ENDED = "a device was removed: its subscription ended {}"
+NO_ANSWER = "no answer"
+
+
+def hhmm(at: str) -> str:
+    """An ISO time as the person's clock reads it: *14:02*."""
+    from datetime import datetime
+
+    try:
+        return datetime.fromisoformat(at.replace("Z", "+00:00")).astimezone().strftime("%H:%M")
+    except ValueError:
+        return at
+
+
+def reading_of(line: Any) -> str | None:
+    """The reading a child's first line carries — *key*, *no key* or *unreadable: <why>* — or None."""
+    got = line.get("key") if isinstance(line, dict) else None
+    if got == KEY:
+        return KEY if isinstance(line.get("public_key"), str) and line["public_key"] else None
+    return got if isinstance(got, str) and (got == NO_KEY or got.startswith("unreadable: ")) else None
+
+
+def apply_reading(doc: dict[str, Any], line: Any) -> bool:
+    """Keep the reading a child answered (`--public`, `--key`'s refusal, or a send's first line): `key`, and on
+    *key* the `public_key` it derived. True when that key differs from the kept one — every device dropped,
+    `last_line` *the key changed: …*, in this one write — so the send's statuses are discarded. A reading back
+    to *key* clears *push is paused*; the public key is kept while paused, so a key put back resumes."""
+    got = reading_of(line)
+    if got is None:
+        return False
+    doc["key"] = got
+    if got != KEY:
+        return False
+    if (doc.get("last_line") or "").startswith(PAUSED.format("")):
+        doc.pop("last_line", None)
+    new, kept = line["public_key"], doc.get("public_key")
+    doc["public_key"] = new
+    if kept and not same_key(new, kept):
+        if doc.get("devices"):
+            doc["last_line"] = KEY_CHANGED
+        doc["devices"] = []
+        return True
+    return False
+
+
+def paused(doc: dict[str, Any]) -> bool:
+    """Set `last_line` *push is paused: <reading>* while the key reads *no key* or *unreadable* with devices
+    listed; whether it changed."""
+    reading = doc.get("key")
+    if not doc.get("devices") or reading in (None, KEY):
+        return False
+    line = PAUSED.format(reading)
+    if doc.get("last_line") == line:
+        return False
+    doc["last_line"] = line
+    return True
+
+
+def words(status: Any) -> str:
+    """A failed status as the device's `last_error` reads it."""
+    if status in (401, 403):
+        return f"the push service refused the key's sender ({status})"
+    if isinstance(status, int):
+        return f"the push service answered {status}"
+    return str(status or NO_ANSWER)
+
+
+def ok(status: Any) -> bool:
+    return isinstance(status, int) and 200 <= status < 300
+
+
+def apply_statuses(doc: dict[str, Any], statuses: dict[tuple[str, int], Any], at: str) -> set[int]:
+    """A send's statuses laid on the devices it was sent to (`statuses` keyed `(device id, payload index)`;
+    *no answer* for each the child never printed): a 2xx sets `last_ok` and clears `last_error`, a 404 or 410
+    drops the device with `last_line` *a device was removed: …*, anything else is its `last_error` `{at,
+    reason}`. Answers the indices some device's push service accepted."""
+    taken: set[int] = set()
+    by_device: dict[str, list[tuple[int, Any]]] = {}
+    for (dev, i), status in statuses.items():
+        by_device.setdefault(dev, []).append((i, status))
+    kept = []
+    for d in doc.get("devices") or []:
+        got = sorted(by_device.get(str(d.get("id")), []), key=lambda x: x[0])
+        if any(s in (404, 410) for _, s in got):
+            doc["last_line"] = ENDED.format(hhmm(at))
+            continue
+        for i, status in got:
+            if ok(status):
+                taken.add(i)
+                d["last_ok"], d["last_error"] = at, None
+        failed = [s for _, s in got if not ok(s)]
+        if failed:
+            d["last_error"] = {"at": at, "reason": words(failed[-1])}
+        kept.append(d)
+    doc["devices"] = kept
+    return taken

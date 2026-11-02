@@ -12,10 +12,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import os
 import signal
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from sessionorc import agent_common, notify
@@ -26,6 +27,8 @@ from sessionorc import work as work_mod
 from sessionorc.agent_common import RpcError, _parse, log
 from sessionorc.mail import PERSON
 from sessionorc.models import now_iso, reference_of
+
+PUSH_RETRY = timedelta(minutes=10)  # a key that could not be read, or is missing with devices listed, read again
 
 
 @dataclass(frozen=True)
@@ -178,9 +181,10 @@ class NotifyMixin:
         return False
 
     def _notify_pass(self, now: datetime) -> None:
-        """Once a tick, at the home: what to tell. A told row's key is kept in `notified` until its row
-        ends, so it is told once; a row that ends and begins again is a new row. Nothing is sent with
-        the switch off or on a node, and nothing here waits: each send is a detached child."""
+        """Once a tick, at the home: what to tell, while either channel is on (§4.10 *Told on the home-screen app
+        too*). A told row's key is kept in `notified` until its row ends, so it is told once whichever channels
+        carry it; a row that ends and begins again is a new row. Nothing is sent with both channels off or on a
+        node, and nothing here waits: each send is a detached child."""
         store = self.attention_store
         if self.mode != "home":
             return
@@ -188,14 +192,24 @@ class NotifyMixin:
         gone = [k for k in store.notified if k not in rows]
         for k in gone:
             del store.notified[k]
-        tg = settings_mod.telegram(settings_mod.load())
-        due: list[tuple[str, str]] = []
+        doc = settings_mod.load()
+        tg = settings_mod.telegram(doc)
+        pcfg = settings_mod.push(doc)
+        pdoc = push_mod.load()
+        self._push_keep_reading(pcfg, pdoc, now)
+        # push is wanted while it is on and a device is listed; it sends only while the key reads *key* — paused
+        # (*no key*, *unreadable*, or no reading yet) no child runs and every row is one no device took
+        push_wanted = pcfg["on"] and bool(pdoc["devices"])
+        push_sends = push_wanted and pdoc.get("key") == push_mod.KEY
+        if push_wanted and push_mod.paused(pdoc):
+            push_mod.save(pdoc)
+        due: list[tuple[str, _Row]] = []
         due_seen = False
         for key, row in rows.items():
             if row.snooze_is_seen and key not in store.notified and self._notify_snoozed(row, now):
-                store.notified[key] = now_iso()  # seen, as if told, Telegram on or off: never told in this life
+                store.notified[key] = now_iso()  # seen, as if told, either channel on or off: never told in this life
                 due_seen = True
-        if tg is not None:
+        if tg is not None or push_wanted:
             for key, row in sorted(rows.items(), key=lambda kv: kv[1].began):
                 if key in store.notified:
                     continue
@@ -205,18 +219,12 @@ class NotifyMixin:
                     continue
                 if stood < notify.HOLD or stood > notify.HOLD + notify.LATE or self._notify_snoozed(row, now):
                     continue  # not yet; or a backlog, never told (§4.10 *newly*); or the person's *not now*
-                if row.card is not None:
-                    link = notify.queue_link(tg["link"], *row.card, row.link)
-                elif row.mail:
-                    link = notify.mail_link(tg["link"], row.link)
-                else:
-                    link = notify.row_link(tg["link"], row.link)
-                due.append((key, notify.message(row.line, link)))
+                due.append((key, row))
         watched = self._notify_watched_at is not None and now - self._notify_watched_at <= notify.WATCHED
-        texts: list[str] = []
+        items: list[tuple[str, _Row] | None] = []  # None is *and more need you*
         stamp = now_iso()
-        for key, text in due:
-            # told, or on a visible page, or held back by the burst: in each case never told afterwards
+        for key, row in due:
+            # told, or on a visible page, or held back by the burst, or paused: in each case never told afterwards
             store.notified[key] = stamp
             if watched:
                 continue  # it was on a screen, where the top bar's count rose (§4.10 *Looking*)
@@ -224,31 +232,84 @@ class NotifyMixin:
             if self._notify_quiet_until is not None and now < self._notify_quiet_until:
                 continue
             if len(self._notify_sent) < notify.BURST:
-                texts.append(text)
+                items.append((key, row))
             else:
                 # the seventh is *and more*, and nothing more until ten minutes have passed with nothing sent
-                texts.append(notify.MORE)
+                items.append(None)
                 self._notify_quiet_until = now + notify.BURST_WINDOW
             self._notify_sent.append(now)
         if gone or due or due_seen:
             store.save(self.trail, self.attention_snoozed)
-        if texts and tg is not None:
-            task = asyncio.create_task(self._notify_send(tg["secrets"], texts))
+        if items and (tg is not None or push_sends):
+            task = asyncio.create_task(self._notify_deliver(tg, pcfg if push_sends else None, items))
             self._bg.add(task)
             task.add_done_callback(self._bg.discard)
+
+    @staticmethod
+    def _notify_text(tg: dict[str, Any], item: tuple[str, _Row] | None) -> str:
+        """A row's Telegram message: its line and its address under the person's `link`."""
+        if item is None:
+            return notify.MORE
+        _, row = item
+        if row.card is not None:
+            link = notify.queue_link(tg["link"], *row.card, row.link)
+        elif row.mail:
+            link = notify.mail_link(tg["link"], row.link)
+        else:
+            link = notify.row_link(tg["link"], row.link)
+        return notify.message(row.line, link)
+
+    @staticmethod
+    def _push_payload(item: tuple[str, _Row] | None) -> dict[str, str]:
+        """A row's push (§4.10 *What a push carries*): `{body, path, tag}` — the line after *shiftlead ·*, the
+        page's path alone, and the row's key (`more` for *and more need you*)."""
+        if item is None:
+            return {"body": notify.body(notify.MORE), "path": "/inbox", "tag": "more"}
+        key, row = item
+        if row.card is not None:
+            path = notify.queue_path(*row.card, row.link)
+        elif row.mail:
+            path = notify.mail_path(row.link)
+        else:
+            path = notify.row_path(row.link)
+        return {"body": notify.body(row.line), "path": path, "tag": key}
+
+    async def _notify_deliver(
+        self, tg: dict[str, Any] | None, pcfg: dict[str, Any] | None, items: list[tuple[str, _Row] | None]
+    ) -> None:
+        """The pass's send task (§4.10 *with Telegram*): push to every device and Telegram side by side under
+        `both`; under `fallback` the push child first, then Telegram for each row no push service accepted."""
+        texts = [self._notify_text(tg, item) for item in items] if tg is not None else []
+        if pcfg is None:
+            if tg is not None:
+                await self._notify_send(tg["secrets"], texts)
+            return
+        payloads = [self._push_payload(item) for item in items]
+        if tg is None:
+            await self._push_send(pcfg["secrets"], payloads)
+        elif pcfg["telegram"] == "fallback":
+            taken, _, _ = await self._push_send(pcfg["secrets"], payloads)
+            await self._notify_send(tg["secrets"], [t for i, t in enumerate(texts) if i not in taken])
+        else:
+            await asyncio.gather(self._notify_send(tg["secrets"], texts), self._push_send(pcfg["secrets"], payloads))
 
     def _notify_watching(self, now: datetime) -> None:
         """A person's `inbox` read from a visible page (§4.10 *Looking*): kept in memory only."""
         self._notify_watched_at = now
 
-    async def rpc_notify_test(self, caller: Any = None) -> dict[str, Any]:
+    async def rpc_notify_test(self, channel: Any = None, device: Any = None, caller: Any = None) -> dict[str, Any]:
         """**Send a test** (§4.5a **You**: **Telegram**, §4.10): one message now with the saved
         secrets and link, whatever `on` says — *shiftlead · a test from <home>* and the Inbox's
-        address — answering the send's result in words. A person's own (`mail.PERSON_ONLY`), at the
-        home alone (`modes.HOME_EDITS` forwards it from a node)."""
-        agent_common.person_only(caller, "send a Telegram test", "§4.10", self._graph())
+        address — answering the send's result in words. `channel: push` with a `device` id is **Send a
+        test to this device** (§4.10 *Told on the home-screen app too*). A person's own
+        (`mail.PERSON_ONLY`), at the home alone (`modes.HOME_EDITS` forwards it from a node)."""
+        agent_common.person_only(caller, "send a test", "§4.10", self._graph())
         if self.mode != "home":
             raise RpcError("notify_test runs at the home (design §4.10): this host is a node")
+        if channel == "push":
+            return await self._push_test(device)
+        if channel not in (None, "", "telegram"):
+            raise RpcError(f"notify_test: channel is telegram or push, not {channel!r} (design §4.10)")
         doc = settings_mod.load()
         tg = settings_mod.notify(doc).get("telegram") or {}
         if not tg.get("secrets"):
@@ -264,6 +325,34 @@ class NotifyMixin:
             return {"sent": True, "at": at, "result": f"sent at {at}"}
         self._notify_last["last_error"] = {"at": at, "reason": why}
         return {"sent": False, "at": at, "result": f"the send failed: {why}"}
+
+    async def _push_test(self, device: Any) -> dict[str, Any]:
+        """*shiftlead · a test from <home>* to one device, whatever `notify.push.on` says; refused while the key
+        is paused (its reading in words) or not yet read. *delivered to <label> 14:02* on a 2xx; a 404 or 410
+        drops the device and says so; any other failure in `last_error`'s words."""
+        secrets = settings_mod.push(settings_mod.load())["secrets"]
+        if not secrets:
+            raise RpcError("notify_test: set notify.push.secrets (or Telegram's) first (design §4.10)")
+        pdoc = push_mod.load()
+        reading = pdoc.get("key")
+        if reading is None:
+            raise RpcError("notify_test: reading the key — try again shortly (design §4.10)")
+        if reading != push_mod.KEY:
+            raise RpcError(f"notify_test: {push_mod.PAUSED.format(reading)} (design §4.10)")
+        dev = next((d for d in pdoc["devices"] if isinstance(device, str) and d.get("id") == device), None)
+        if dev is None:
+            raise RpcError(f"notify_test: no device {device!r} is listed (design §4.10)")
+        payload = {"body": notify.body(notify.test_line(self.home or self.host)), "path": "/inbox", "tag": "test"}
+        _, statuses, why = await self._push_send(secrets, [payload], only=device)
+        at = now_iso()
+        status = statuses.get((device, 0), why or push_mod.NO_ANSWER)
+        if push_mod.ok(status):
+            return {"sent": True, "at": at, "result": f"delivered to {dev.get('label')} {push_mod.hhmm(at)}"}
+        if status in (404, 410):
+            result = f"the push service answered {status} — this device's subscription ended"
+        else:
+            result = push_mod.words(status)
+        return {"sent": False, "at": at, "result": result}
 
     async def _notify_send(self, secrets: str, texts: list[str]) -> None:
         """The messages, one child each, in order; the last result kept for the `host` read. A failure
@@ -348,6 +437,159 @@ class NotifyMixin:
         if removed:
             push_mod.save(doc)
         return {"removed": removed}
+
+    async def rpc_push_key(self, caller: Any = None) -> dict[str, Any]:
+        """**Make key** (§4.5a **You**: **Push**, §4.10 *The key's reading*): a child under `notify.push.secrets`
+        alone (`--key`) makes a P-256 pair and writes its private half there — refused when that field is unset,
+        when a key is there (its reading kept), or as Doppler refused the write, in words. On success the home
+        keeps `key` *key* and the public key it answered. A person's own, at the home alone."""
+        agent_common.person_only(caller, "make the push key", "§4.10", self._graph())
+        self._push_home("push_key")
+        own = settings_mod.push(settings_mod.load())["own_secrets"]
+        if not own:
+            raise RpcError("push_key: set notify.push.secrets — the key is written only there (design §4.10)")
+        lines, why, _ = await self._push_run(own, ("--key", own))
+        first = lines[0] if lines else None
+        pdoc = push_mod.load()
+        if push_mod.reading_of(first) is not None:
+            push_mod.apply_reading(pdoc, first)
+            push_mod.save(pdoc)
+        if why is None and push_mod.reading_of(first) == push_mod.KEY:
+            return {"public_key": pdoc["public_key"], "result": "the key is made: turn this on on each device"}
+        raise RpcError(f"push_key: {why or 'no key was made'} (design §4.10)")
+
+    def _push_secrets_moved(self) -> None:
+        """A Save that moved `notify.push.secrets` (or Telegram's, which push reads when its own is unset): the
+        kept reading is of another config, so there is none until the next background read answers."""
+        if self.mode != "home":
+            return
+        self._push_gen += 1
+        self._push_read_at = None
+        pdoc = push_mod.load()
+        if pdoc.pop("key", None) is not None:
+            push_mod.save(pdoc)
+
+    def _push_keep_reading(self, pcfg: dict[str, Any], pdoc: dict[str, Any], now: datetime) -> None:
+        """Start the key's `--public` read in the background (§4.10 *The key's reading*) — never inside a read —
+        when a secrets config is set and there is no reading, and every `PUSH_RETRY` while it reads
+        *unreadable*, or *no key* with devices listed. With no config set there is no reading to keep."""
+        if not pcfg["secrets"] or (self._push_reading is not None and not self._push_reading.done()):
+            return
+        reading = pdoc.get("key")
+        if reading is not None:
+            stale = reading.startswith("unreadable") or (reading == push_mod.NO_KEY and pdoc["devices"])
+            if not stale or (self._push_read_at is not None and now - self._push_read_at < PUSH_RETRY):
+                return
+        self._push_read_at = now
+        self._push_reading = asyncio.create_task(self._push_read(pcfg["secrets"], self._push_gen))
+        self._bg.add(self._push_reading)
+        self._push_reading.add_done_callback(self._bg.discard)
+
+    async def _push_read(self, secrets: str, gen: int) -> None:
+        lines, why, _ = await self._push_run(secrets, ("--public",))
+        if gen != self._push_gen:
+            return  # a Save moved `secrets` meanwhile: this is the old config's reading
+        first = lines[0] if lines else None
+        pdoc = push_mod.load()
+        if push_mod.reading_of(first) is not None:
+            push_mod.apply_reading(pdoc, first)
+        else:
+            pdoc["key"] = f"unreadable: {why or 'no answer'}"
+        push_mod.save(pdoc)
+
+    async def _push_send(
+        self, secrets: str, payloads: list[dict[str, str]], only: str | None = None
+    ) -> tuple[set[int], dict[tuple[str, int], Any], str | None]:
+        """One push child to every device (or `only` that one): `(taken, statuses, why)` — the payload indices
+        some push service accepted, each `(device, index)`'s status, and why no status was applied (a reading
+        that is not *key*, or a changed key). The derived-key check runs first; a 404 or 410 drops a device."""
+        pdoc = push_mod.load()
+        devices = [d for d in pdoc["devices"] if only is None or d.get("id") == only]
+        if not devices or not payloads:
+            return set(), {}, None
+        url = (settings_mod.reach(settings_mod.load()) or {}).get("url") or ""
+        job = {
+            "sub": url if url.startswith("https://") else notify.PUSH_SUB,
+            "payloads": payloads,
+            "devices": [{k: d.get(k) for k in ("id", "endpoint", "keys")} for d in devices],
+        }
+        lines, why, timed_out = await self._push_run(secrets, ("--push",), json.dumps(job))
+        at = now_iso()
+        first = lines[0] if lines else None
+        pdoc = push_mod.load()  # afresh: a subscribe may have landed while the child ran
+        if push_mod.reading_of(first) is None:
+            if timed_out:
+                first = {"key": pdoc.get("key"), "public_key": pdoc.get("public_key")}  # nothing said: no reading
+            else:
+                pdoc["key"] = f"unreadable: {why or 'no answer'}"
+                push_mod.paused(pdoc)
+                push_mod.save(pdoc)
+                log.warning("push send failed: %s", why)
+                return set(), {}, pdoc["key"]
+        if push_mod.apply_reading(pdoc, first) or pdoc.get("key") != push_mod.KEY:
+            push_mod.paused(pdoc)
+            push_mod.save(pdoc)
+            return set(), {}, pdoc.get("last_line") or str(pdoc.get("key"))
+        statuses: dict[tuple[str, int], Any] = {
+            (str(d["id"]), i): (why if timed_out else None) or push_mod.NO_ANSWER
+            for d in devices
+            for i in range(len(payloads))
+        }
+        for ln in lines[1:]:
+            with contextlib.suppress(KeyError, TypeError, ValueError):
+                k = (str(ln["device"]), int(ln["i"]))
+                if k in statuses:
+                    statuses[k] = ln["status"]
+        taken = push_mod.apply_statuses(pdoc, statuses, at)
+        push_mod.save(pdoc)
+        if failed := sum(1 for v in statuses.values() if not push_mod.ok(v)):
+            log.warning("push: %d of %d sends not accepted", failed, len(statuses))  # never an endpoint
+        return taken, statuses, None
+
+    async def _push_run(
+        self, secrets: str, mode: tuple[str, ...], stdin: str = ""
+    ) -> tuple[list[Any], str | None, bool]:
+        """One push child under Doppler (`--push`, `--public`, `--key`), given `CHILD_SECONDS` plus
+        `REQUEST_SECONDS`: `(lines, why, timed_out)` — each JSON line it printed, kept on a timeout too; None
+        when it exited 0, else its reason in one line. Replaced by a fake in the tests."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *notify.argv(secrets, *mode),
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                start_new_session=True,  # its own group: a timeout ends Doppler's child, which holds the key, too
+            )
+        except FileNotFoundError:
+            return [], "doppler: not installed", False
+        except OSError as e:
+            return [], f"doppler could not be run: {type(e).__name__}", False
+        lines: list[Any] = []
+
+        async def talk() -> bytes:
+            assert proc.stdin and proc.stdout and proc.stderr
+            with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+                proc.stdin.write(stdin.encode())
+                await proc.stdin.drain()
+                proc.stdin.close()
+            err = asyncio.ensure_future(proc.stderr.read())
+            async for raw in proc.stdout:
+                with contextlib.suppress(ValueError):
+                    lines.append(json.loads(raw))
+            await proc.wait()
+            return await err
+
+        bound = notify.CHILD_SECONDS + notify.REQUEST_SECONDS
+        try:
+            err = await asyncio.wait_for(talk(), bound)
+        except TimeoutError:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(proc.pid, signal.SIGKILL)
+            await proc.wait()
+            return lines, f"no answer in {bound:g} s", True
+        if proc.returncode == 0:
+            return lines, None, False
+        return lines, notify.reason(err.decode(errors="replace")) or f"exit {proc.returncode}", False
 
     def _notify_view(self) -> dict[str, Any]:
         """`notify: {last_ok, last_error}` for the `host` read (§4.10): the last send's result."""

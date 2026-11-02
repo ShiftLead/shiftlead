@@ -545,6 +545,9 @@ class HostAgent(
         self._notify_last: dict[str, Any] = {}
         self._notify_quiet_until: datetime | None = None  # after the burst's *and more*, nothing until then
         self._notify_watched_at: datetime | None = None  # the last person's read from a visible page
+        self._push_reading: asyncio.Task | None = None  # the key's background `--public` read (§4.10, TD-1304)
+        self._push_read_at: datetime | None = None  # when it last started: a failed reading is retried in ten minutes
+        self._push_gen = 0  # bumped by a Save that moves `secrets`: a reading begun before it is discarded
         self.identity_alarms: list[dict[str, Any]] = self.identity_store.load()
         self._id_host_dirty = False  # counts moved since the last write; the tick writes them
         self.identity_tally: dict[str, int] = defaultdict(int)

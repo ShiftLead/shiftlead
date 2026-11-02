@@ -159,6 +159,7 @@ PERSON_ONLY = frozenset(
         "notify_test",
         "push_subscribe",
         "push_unsubscribe",
+        "push_key",
         "forget_host",
         "attach",
         "ci_rerun",

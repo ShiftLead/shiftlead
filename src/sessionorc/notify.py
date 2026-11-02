@@ -23,6 +23,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import timedelta
+from typing import Any
 
 HOLD = timedelta(seconds=60)  # NOTIFY_HOLD: a row is told once it has stood this long and is still there
 # A row whose hold ended longer ago than this is not told: it was standing before the switch was turned
@@ -91,29 +92,48 @@ def alarm_line(name: str, team: str) -> str:
 
 def row_link(link: str, key: str) -> str:
     """The Inbox with that row scrolled to and marked: `<link>/inbox?row=<key>`."""
-    return f"{link}/inbox?row={urllib.parse.quote(key, safe='')}" if link else ""
+    return f"{link}{row_path(key)}" if link else ""
 
 
 def mail_link(link: str, mid: str) -> str:
     """The message page for a question (§4.5 screen 6 *The message page*): `<link>/inbox/<id>`."""
-    return f"{link}/inbox/{urllib.parse.quote(mid, safe='')}" if link else ""
+    return f"{link}{mail_path(mid)}" if link else ""
 
 
 def queue_link(link: str, card: str, row: str, mid: str) -> str:
     """A question drawn on the Queue (§4.10 *What a message says*, §4.5 screen 12 *Addresses*, TD-795): its
     card, `<link>/queue?card=<top id>&row=<TD-n>&item=<entry id>`, which opens it and rings the item."""
-    query = urllib.parse.urlencode({"card": card, "row": row, "item": mid})
-    return f"{link}/queue?{query}" if link else ""
+    return f"{link}{queue_path(card, row, mid)}" if link else ""
 
 
 def message(line: str, link: str) -> str:
     return f"{line}\n{link}" if link else line
 
 
-def argv(secrets: str) -> list[str]:
-    """The child's command: Doppler puts the two values in its environment, and nowhere else."""
+def row_path(key: str) -> str:
+    """A row's page path alone, as a push carries it (§4.10 *What a push carries*): `/inbox?row=<key>`."""
+    return f"/inbox?row={urllib.parse.quote(key, safe='')}"
+
+
+def mail_path(mid: str) -> str:
+    return f"/inbox/{urllib.parse.quote(mid, safe='')}"
+
+
+def queue_path(card: str, row: str, mid: str) -> str:
+    return "/queue?" + urllib.parse.urlencode({"card": card, "row": row, "item": mid})
+
+
+def body(line: str) -> str:
+    """A push's `body`: the Telegram line after *shiftlead ·*."""
+    return line.removeprefix(f"{PREFIX} · ")
+
+
+def argv(secrets: str, *mode: str) -> list[str]:
+    """The child's command: Doppler puts the values in its environment, and nowhere else. `mode` is empty for
+    Telegram's send, `--push`, `--public`, or `--key <project/config>`."""
     project, config = secrets.split("/", 1)
-    return ["doppler", "run", "--project", project, "--config", config, "--", sys.executable, "-m", "sessionorc.notify"]
+    return ["doppler", "run", "--project", project, "--config", config, "--", sys.executable, "-m",
+            "sessionorc.notify", *mode]  # fmt: skip
 
 
 _TOKENISH = re.compile(r"bot[0-9]+:[A-Za-z0-9_-]+")
@@ -141,7 +161,212 @@ def send(text: str, token: str, chat: str) -> str | None:
         return f"the send failed: {type(e).__name__}"
 
 
+# -- push (design §4.10 *Told on the home-screen app too*, TD-1302, built by TD-1304) ---------------------
+
+PUSH_SUB = "https://github.com/ShiftLead/shiftlead"  # VAPID `sub` when `reach.url` is not https
+PUSH_TTL = 3600  # a row the phone could not be reached for within the hour is not delivered stale
+NO_KEY = "no key"
+KEY_REFUSED = "the push service refused the key's sender ({})"
+_PUSH_MISSING = "pywebpush: not installed"
+
+
+def _b64(raw: bytes) -> str:
+    import base64
+
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def private_key(text: str) -> Any:
+    """`VAPID_PRIVATE_KEY` as a P-256 private key: `py_vapid`'s base64url raw scalar, or a PEM. ValueError
+    with words that never hold the key."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+    t = text.strip()
+    if t.startswith("-----BEGIN"):
+        try:
+            key = load_pem_private_key(t.encode(), password=None)
+        except (ValueError, TypeError):
+            raise ValueError("VAPID_PRIVATE_KEY is a PEM that does not read as a private key") from None
+        if not isinstance(key, ec.EllipticCurvePrivateKey) or not isinstance(key.curve, ec.SECP256R1):
+            raise ValueError("VAPID_PRIVATE_KEY is not a P-256 key")
+        return key
+    import base64
+    import binascii
+
+    try:
+        raw = base64.urlsafe_b64decode(t + "=" * (-len(t) % 4))
+    except (binascii.Error, ValueError):
+        raw = b""
+    if len(raw) != 32:
+        raise ValueError("VAPID_PRIVATE_KEY is neither a base64url P-256 scalar nor a PEM")
+    try:
+        return ec.derive_private_key(int.from_bytes(raw, "big"), ec.SECP256R1())
+    except ValueError:
+        raise ValueError("VAPID_PRIVATE_KEY is not a valid P-256 scalar") from None
+
+
+def public_key(key: Any) -> str:
+    """The public half as the page subscribes with it: the uncompressed point, base64url without padding."""
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    return _b64(key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint))
+
+
+def reading() -> tuple[dict[str, str], Any]:
+    """The key's reading from this child's environment, as the line the home keeps, and the key: `{key:
+    "key", public_key}`, `{key: "no key"}` or `{key: "unreadable: <why>"}`."""
+    text = os.environ.get("VAPID_PRIVATE_KEY", "")
+    if not text.strip():
+        return {"key": NO_KEY}, None
+    try:
+        key = private_key(text)
+    except ImportError:
+        return {"key": f"unreadable: {_PUSH_MISSING}"}, None
+    except ValueError as e:
+        return {"key": f"unreadable: {e}"}, None
+    return {"key": "key", "public_key": public_key(key)}, key
+
+
+def _global(host: str, port: int) -> str | None:
+    """None when every address `host` resolves to is a global one, else why not: the home's check reads the
+    name alone, and a name can resolve inward (§4.10 *On and off, per device*)."""
+    import ipaddress
+    import socket
+
+    try:
+        infos = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError as e:
+        return f"the push service's name did not resolve: {type(e).__name__}"
+    for info in infos:
+        ip = ipaddress.ip_address(str(info[4][0]).split("%", 1)[0])
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
+        if not ip.is_global or ip.is_multicast:
+            return "the push service's name resolves to a private address"
+    return None
+
+
+def _post(device: dict[str, Any], data: str, key: Any, sub: str) -> int | str:
+    """One push to one device: the push service's status, or the words of why there is none — never the
+    endpoint, which is a capability."""
+    from py_vapid import Vapid02
+    from pywebpush import WebPushException, webpush
+    from requests import Session
+
+    u = urllib.parse.urlsplit(str(device.get("endpoint") or ""))
+    if u.scheme != "https" or not u.hostname:
+        return "the endpoint is not an https address"
+    why = _global(u.hostname, u.port or 443)
+    if why:
+        return why
+    session = Session()
+    session.max_redirects = 0  # a redirect is never followed: the post goes where the home checked, or nowhere
+    try:
+        r = webpush(
+            {"endpoint": device["endpoint"], "keys": device.get("keys") or {}},
+            data=data,
+            vapid_private_key=Vapid02(private_key=key),
+            vapid_claims={"sub": sub},
+            ttl=PUSH_TTL,
+            timeout=REQUEST_SECONDS,
+            headers={"Urgency": "high"},
+            requests_session=session,
+        )
+        return int(getattr(r, "status_code", 0)) or "no status"
+    except WebPushException as e:
+        code = getattr(e.response, "status_code", None)
+        return int(code) if isinstance(code, int) else type(e).__name__
+    except Exception as e:  # noqa: BLE001 — the class alone: its message may carry the endpoint
+        return type(e).__name__
+    finally:
+        session.close()
+
+
+def _say(obj: dict[str, Any]) -> None:
+    print(json.dumps(obj), flush=True)
+
+
+def push_main(stdin: str) -> int:
+    """`--push`: stdin `{sub, payloads: [{body, path, tag}], devices: [{id, endpoint, keys}]}`. The first stdout
+    line is the key's reading with the public key it derived; then one line a device and payload, `{device,
+    i, status}`, as each answers — so a timeout keeps those already printed. Never the private key, never an
+    endpoint."""
+    line, key = reading()
+    _say(line)
+    if key is None:
+        return 0
+    try:
+        import pywebpush  # noqa: F401
+    except ImportError:
+        print(_PUSH_MISSING, file=sys.stderr)
+        return 1
+    try:
+        job = json.loads(stdin or "{}")
+    except ValueError:
+        print("the send's input is not JSON", file=sys.stderr)
+        return 1
+    payloads = [json.dumps(p) for p in job.get("payloads") or []]
+    devices = [d for d in job.get("devices") or [] if isinstance(d, dict) and d.get("id")]
+    sub = str(job.get("sub") or PUSH_SUB)
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    with ThreadPoolExecutor(max_workers=min(8, max(1, len(devices) * len(payloads)))) as pool:
+        jobs = [(d, i, data) for d in devices for i, data in enumerate(payloads)]
+        futures = {pool.submit(_post, d, data, key, sub): (d["id"], i) for d, i, data in jobs}
+        for f in as_completed(futures):
+            dev, i = futures[f]
+            _say({"device": dev, "i": i, "status": f.result()})
+    return 0
+
+
+def key_main(secrets: str) -> int:
+    """`--key <project/config>` (**Make key**): read the config's key first and refuse when one is there — its
+    reading on stdout, so the home keeps it — else make a P-256 pair, write the private half with `doppler
+    secrets set VAPID_PRIVATE_KEY` from stdin into that config alone, and print the public half."""
+    line, _ = reading()
+    if line["key"] != NO_KEY:
+        _say(line)
+        print("a key is there: replacing it would end every device's subscription", file=sys.stderr)
+        return 2
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec
+    except ImportError:
+        print(_PUSH_MISSING, file=sys.stderr)
+        return 1
+    import subprocess
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    scalar = _b64(key.private_numbers().private_value.to_bytes(32, "big"))
+    project, config = secrets.split("/", 1)
+    try:
+        done = subprocess.run(
+            ["doppler", "secrets", "set", "VAPID_PRIVATE_KEY", "--project", project, "--config", config, "--silent"],
+            input=scalar.encode(),
+            capture_output=True,
+            timeout=REQUEST_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f"Doppler refused the write: {type(e).__name__}", file=sys.stderr)
+        return 1
+    if done.returncode != 0:
+        why = reason(done.stderr.decode(errors="replace")).replace(scalar, "…") or f"exit {done.returncode}"
+        print(f"Doppler refused the write: {why}", file=sys.stderr)
+        return 1
+    _say({"key": "key", "public_key": public_key(key)})
+    return 0
+
+
 def main() -> int:
+    args = sys.argv[1:]
+    if args[:1] == ["--public"]:
+        _say(reading()[0])
+        return 0
+    if args[:1] == ["--push"]:
+        return push_main(sys.stdin.read())
+    if args[:1] == ["--key"] and len(args) == 2 and "/" in args[1]:
+        return key_main(args[1])
     text = sys.stdin.read().strip()
     token, chat = os.environ.get("TELEGRAM_BOT_TOKEN", ""), os.environ.get("TELEGRAM_CHAT_ID", "")
     if not token or not chat:

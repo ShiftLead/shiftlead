@@ -340,6 +340,7 @@ class SettingsMixin:
                     raise RpcError(f"usage.max_age: {e}") from None
             doc["usage"] = kept
             out["usage"] = {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)}
+        push_secrets = settings_mod.push(doc)["secrets"]
         if notify is not None:
             doc["notify"] = self._notify_change(doc.get("notify"), notify)
             out["notify"] = settings_mod.notify(doc)
@@ -362,6 +363,8 @@ class SettingsMixin:
             if key in doc and not doc[key]:
                 doc.pop(key)
         settings_mod.save(doc)
+        if settings_mod.push(doc)["secrets"] != push_secrets:
+            self._push_secrets_moved()  # a Save that moves either `secrets` reads the key afresh (§4.10, TD-1304)
         if teams is not None:
             after = settings_mod.teams(doc)
             for name in teams:
