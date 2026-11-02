@@ -37,6 +37,8 @@
      large or too small, `--t-body` is the one number to move. The card's heights follow the scale
      so a card stays six rows of one height (§4.5 *The card's anatomy*). */
   --t-body: 15px; --t-small: 12px; --t-cap: 11px; --t-title: 16px; --t-mono: 13px; --t-mono-s: 12.5px; --t-btn: 13px;
+  /* a text box a phone focuses (§4.5 *Phone layout*, TD-1299): 16 px, under which iOS zooms the page to it */
+  --t-field: 16px;
   /* the team card's summary (design §4.5a *team card: summary*, TD-176): priority is one hue
      darkened by rank; the kinds and the phases each their own; *opened* and *closed* blocks */
   --p-high: #1e3a8a; --p-medium: #2563eb; --p-low: #93c5fd;
@@ -84,6 +86,13 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 html { scroll-padding-top: calc(var(--barh) + 8px); }
 html:has(.topbar.away) { scroll-padding-top: 8px; }
 html:has(body.popped) { --barh: 0px; }
+/* §4.5 *On the home screen* (TD-1299): every page is `viewport-fit=cover` under a `black-translucent` status bar, so
+   each pads the safe-area insets — the top bar's top as a border in its own colour (held at the top when scrolled),
+   a popped Focus's body, the sides and foot; env() is 0 on a desktop. The phone's Focus pads its own screen. */
+body { padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+body.popped { padding-top: env(safe-area-inset-top); }
+.topbar { border-top: env(safe-area-inset-top) solid var(--top); }
+html.phonefocus body { padding: 0; }
 /* the bar wraps rather than widening the page, and the usage chip keeps its width rather than being
    squeezed to nothing, which made `fitUsage` hide every account behind a bare `+n` (TD-296 #9) */
 .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: var(--t-title); color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
@@ -640,23 +649,18 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   /* §4.5 screen 6 *Narrow* (TD-137): one column; the rail leaves the page for the sheet, a chip row
      stands under the title, and a row's controls are 44 px high as the phone's Org cards' are */
   .inboxwrap { grid-template-columns: minmax(0, 1fr); } .inboxwrap > .rail { display: none; }
-  /* the Focus composer's prompt chips (§4.5a, TD-170): one wrapping row above the text box */
-  .composer { display: flex; flex-direction: column; gap: 6px; } .composer > .row { display: contents; }
-  .composer .promptchips { order: -1; } .composer .promptchips .chip { min-height: 44px; }
-  /* the narrow mode keeps its composer open under the terminal, at the terminal's own height (TD-500) */
-  .composerbar, .cfoldhint { display: none !important; } .termwrap.cfold .termbox { height: 50vh; }
-  .composer.overlay, .composer.overlay.folded { position: static; display: flex; box-shadow: none; max-height: none; }
   .railchips { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; }
   .railchips .filterschip { position: sticky; left: 0; z-index: 1; background: var(--card); }
   .railchips .chipteams { display: flex; gap: 6px; }
   .railsheet[open] { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; margin: 0; padding: 16px; }
   .railchips .chip, .railsheet .btn, .railsheet .railline, .railsheet .input { min-height: 44px; }
   .inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }
-  /* a column whose items take its width: at flex-start the main column took its content's, and the
-     terminal's grid, once fit, held the page wider than the phone (TD-521) */
+  /* a popped-out Focus below 720 px keeps the desktop page (§4.5 *Phone layout*): one column whose items take its
+     width — at flex-start the terminal's grid, once fit, held the page wider than the window (TD-521) */
   .page.focus { flex-direction: column; align-items: stretch; } .focus .side { width: 100%; }
-  /* put away on a phone, the rail is one row under the composer, 44px targets (TD-412) */
-  .focus .side.rail { width: 100%; } .focus .siderail { flex-direction: row; flex-wrap: wrap; } .focus .railbtn { width: 44px; height: 44px; } .termbox { height: 50vh; } .topbar { gap: 6px 8px; padding: 8px 10px; } #hostchip { display: none; }
+  /* put away there, the rail is one row, 44px targets (TD-412) */
+  .focus .side.rail { width: 100%; } .focus .siderail { flex-direction: row; flex-wrap: wrap; } .focus .railbtn { width: 44px; height: 44px; }
+  .topbar { gap: 6px 8px; padding: 8px 10px; } #hostchip { display: none; }
   /* a phone (TD-296 #9; §4.5a *the bar's three groups*, TD-932): the readings are a row of their own, full width,
      the tools stay at the right of the tabs' row, and the host is left off (above) */
   .barend { display: contents; } .readings { order: 1; flex-basis: 100%; } #usagechip { flex-shrink: 1; max-width: none; }
@@ -680,6 +684,96 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 @media (pointer: coarse) and (min-width: 721px) {
   .composer.overlay { bottom: var(--softh, 0px); max-height: calc(100% - var(--softh, 0px)); }
 }
+
+/* ---- design §4.5 *Phone layout* (TD-003, built by TD-1299): Focus on a phone is one screen that never scrolls ----
+   `html.phonefocus` is the narrow query, `(max-width: 720px), (pointer: coarse) and (max-height: 500px)`
+   (`AO.NARROW_Q`), read by `focus.html` before the first paint and kept by `app.js` — a popped-out window never,
+   and never while something editable has focus (the latch). The screen is pinned to the visual viewport
+   (`--vvh` / `--vvt`, from `visualViewport` on iOS; `100dvh` until then), the safe-area insets its padding; the
+   strip, the terminal, the key bar and the bars under it are its one column, and everything else is a sheet. */
+.fstrip, .fwatch, .fibar, .nsheet, .nscrim, .csheethead { display: none; }
+html.phonefocus, html.phonefocus body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+html.phonefocus body { background: var(--term); }
+html.phonefocus .topbar { display: none; }
+html.phonefocus .page.focus { position: fixed; left: 0; right: 0; top: var(--vvt, 0px); height: var(--vvh, 100dvh);
+  display: flex; flex-direction: column; gap: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--top); overflow: hidden; }
+html.phonefocus .focus .main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; }
+html.phonefocus #side, html.phonefocus #fhead, html.phonefocus #facts, html.phonefocus #help-focus,
+html.phonefocus .focus .termro, html.phonefocus .composerbar, html.phonefocus .cfoldhint { display: none !important; }
+html.phonefocus .focus .inline-banner, html.phonefocus .focus .dropcard { margin: 0; border-radius: 0; flex: none; }
+html.phonefocus .termwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--term); }
+html.phonefocus .termwrap .termbox, html.phonefocus .termwrap.cfold .termbox { flex: 1; min-height: 0; height: auto; border-radius: 0; padding: 4px 4px 0; }
+/* a touch selects nothing and a long press is the link's (§4.6): no selection handles, no iOS callout; the helper text
+   box at 16 px, so iOS does not zoom the page when ⌨ focuses it; two fingers are the terminal's (TD-1301's pinch) */
+html.phonefocus .termbox, html.phonefocus .termbox * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+html.phonefocus .termbox .xterm-helper-textarea { font-size: var(--t-field); }
+html.phonefocus .softkeys { flex: none; padding: 5px 6px; background: var(--top); }
+/* the strip (§4.5a *the strip*): 44 px, the top bar's colour; ‹, ▲ n and ⋯ are 44 × 44, the session takes the rest */
+html.phonefocus .fstrip { display: flex; flex: none; align-items: center; gap: 2px; height: 44px; padding: 0 4px; background: var(--top); color: var(--topfg); border-bottom: 1px solid var(--topline); }
+.fstrip .sib, .cshead .sib { width: 44px; height: 44px; flex: none; border: 0; background: none; color: inherit; font-size: var(--t-title); display: inline-grid; place-items: center; border-radius: 8px; position: relative; cursor: pointer; text-decoration: none; }
+.fstrip .sib:hover { text-decoration: none; background: var(--tab-on); }
+.fstrip .swho { flex: 1; min-width: 0; height: 44px; border: 0; background: none; color: inherit; display: flex; align-items: center; gap: 8px; padding: 0 6px; font: inherit; text-align: left; cursor: pointer; }
+.fstrip .swho .nm { font-size: var(--t-mono); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.fstrip .swho .st { font-size: var(--t-small); color: var(--topdim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fstrip .swho .car { font-size: var(--t-cap); color: var(--topdim); }
+.fstrip .needpill { flex: none; height: 28px; padding: 0 9px; border-radius: 14px; border: 1px solid var(--needs); background: var(--needs-bg); color: var(--needs-fg); font: inherit; font-size: var(--t-small); font-weight: 600; white-space: nowrap; cursor: pointer; }
+.fstrip #fmore.dotted::after { content: ""; position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--needs); }
+.sdot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--ended); }
+.sdot.s-needs { background: var(--needs); } .sdot.s-working { background: var(--working); } .sdot.s-idle { background: var(--idle); }
+.sdot.s-waiting { background: var(--waiting); } .sdot.s-stalled { background: var(--stalled); } .sdot.s-limited { background: var(--limited); }
+/* the Watching line (§4.5a *the Watching line*): in the key bar's place, an unattended record's alone */
+html.phonefocus .fwatch { display: flex; flex: none; align-items: center; gap: 10px; padding: 8px 12px; background: var(--idle-bg); color: var(--idle-fg); border-top: 1px solid var(--idle); }
+.fwatch .q { flex: 1; min-width: 0; font-weight: 500; font-size: var(--t-small); }
+.fwatch .btn { min-height: 40px; border-radius: 20px; padding: 0 16px; font-weight: 600; }
+/* the input bar · ⌨ (§4.5a *the input bar · ⌨*): a rounded field and ⌨; gone while the keyboard is up for the terminal */
+html.phonefocus .fibar { display: flex; flex: none; align-items: center; gap: 6px; padding: 6px 8px; background: var(--top); }
+html.phonefocus .page.focus.kbdup .fibar { display: none; }
+.fibar .fask { flex: 1; min-width: 0; height: 44px; border-radius: 22px; border: 1px solid var(--topline); background: var(--term); color: var(--topdim); font: inherit; text-align: left; padding: 0 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: text; }
+.fibar .fask.draft { color: var(--topfg); } .fibar .fask.off { cursor: default; }
+.fibar .fkbd { flex: none; width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--topline); background: var(--tab-on); color: var(--topfg); font-size: var(--t-title); cursor: pointer; }
+/* the sheets (§4.5a *the sheet*, *the switcher*): from the screen's foot over a dimmed Focus; each scrolls inside
+   itself, so iOS's rubber band never drags the pinned screen; nothing in them sends a grid (`AO.focus`) */
+html.phonefocus .nscrim.open { display: block; position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 41; }
+html.phonefocus .nsheet.open { display: flex; flex-direction: column; position: fixed; left: 0; right: 0; bottom: 0; max-height: 88%; z-index: 42;
+  background: var(--card); color: var(--fg); border-radius: 16px 16px 0 0; border-top: 1px solid var(--border); padding: 6px 0 env(safe-area-inset-bottom);
+  overflow-y: auto; overscroll-behavior: contain; box-shadow: 0 -10px 30px rgba(0, 0, 0, .35); }
+html.phonefocus .nsheet.full.open { top: calc(var(--vvt, 0px) + env(safe-area-inset-top)); max-height: none; border-radius: 0; }
+.nsheet .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--border); margin: 2px auto 8px; flex: none; touch-action: none; }
+.nsheet .shhead { padding: 0 16px 10px; border-bottom: 1px solid var(--line); }
+.nsheet .shhead .t { font-weight: 600; } .nsheet .shhead .s { font-size: var(--t-small); color: var(--muted); overflow-wrap: anywhere; }
+.nsheet .shchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; } .nsheet .shchips:empty { display: none; }
+.nsheet .shacts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; padding: 12px 10px 8px; }
+.nsheet .act { min-height: 68px; border: 0; border-radius: 10px; background: none; color: var(--fg); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 5px; font: inherit; font-size: var(--t-small); cursor: pointer; padding: 6px 2px 0; }
+.nsheet .act .ic { width: 38px; height: 38px; border-radius: 19px; background: var(--hover); display: grid; place-items: center; font-size: var(--t-title); }
+.nsheet .act .al { max-width: 100%; overflow: hidden; text-align: center; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.nsheet .act.next .ic { background: var(--primary); color: var(--primary-fg); }
+.nsheet .act:disabled { opacity: .45; cursor: default; }
+.nsheet .shrows { border-top: 1px solid var(--line); }
+.nsheet .shrow { width: 100%; height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.nsheet .shrow .gl { width: 18px; text-align: center; color: var(--muted); flex: none; }
+.nsheet .shrow .m { margin-left: auto; min-width: 0; color: var(--muted); font-size: var(--t-small); font-family: "JetBrains Mono", ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nsheet .shrow.red, .nsheet .shrow.red .gl { color: var(--stalled-fg); }
+.nsheet .cshead { display: flex; align-items: center; gap: 4px; padding: 0 8px 6px; border-bottom: 1px solid var(--line); flex: none; }
+.nsheet .csbody { padding: 0 12px 12px; } .nsheet .csbody > details.side { width: auto; border: 0; box-shadow: none; padding: 8px 4px; }
+.nsheet .csbody > details.side > summary { pointer-events: none; } .nsheet .csbody > details.side > summary button { pointer-events: auto; }
+.nsheet .sgroup { font-size: var(--t-small); color: var(--muted); padding: 10px 16px 4px; }
+.nsheet .srow { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 58px; border-bottom: 1px solid var(--line); color: var(--fg); text-decoration: none; }
+.nsheet .srow:hover { text-decoration: none; background: var(--hover); } .nsheet .srow.here { background: var(--hover); }
+.nsheet .srow .grow { min-width: 0; } .nsheet .srow .nm { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: var(--t-mono); }
+.nsheet .srow .sub { font-size: var(--t-small); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nsheet .srow .age { font-size: var(--t-small); color: var(--muted); flex: none; }
+/* the composer as a sheet (§4.5a *the input bar · ⌨*): from under the strip down, over the terminal and the key bar,
+   its box at 16 px, its prompt chips in one row above Attach and Send / Steer; closed, it is not drawn */
+html.phonefocus .composer:not(.nopen) { display: none !important; }
+html.phonefocus .composer.nopen { display: flex; flex-direction: column; gap: 8px; position: fixed; left: 0; right: 0; bottom: 0; top: calc(var(--vvt, 0px) + env(safe-area-inset-top) + 44px);
+  max-height: none; z-index: 42; border-radius: 16px 16px 0 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, .35); padding: 8px 10px env(safe-area-inset-bottom); overflow-y: auto; overscroll-behavior: contain; }
+html.phonefocus .composer.nopen .csheethead { display: flex; align-items: center; gap: 8px; flex: none; }
+html.phonefocus .composer.nopen textarea { flex: 1; min-height: 96px; height: auto; resize: none; font-size: var(--t-field); }
+html.phonefocus .composer.nopen > .row { flex-wrap: wrap; }
+html.phonefocus .composer.nopen .promptchips { order: -1; flex-basis: 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+html.phonefocus .composer.nopen .promptchips .chip { min-height: 36px; flex: none; border-radius: 18px; }
+html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; margin-left: auto; }
 
 /* ---- the team-first Org (design §4.5 screen 1, §4.5a *team card: summary*, TD-176 slice 3) ---- */
 /* each facet drawn keeps its own share, Repo 1 : TDs in motion 1.15 : Doing 1.05, so two split the row by

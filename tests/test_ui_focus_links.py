@@ -84,7 +84,8 @@ def test_focus_loads_the_addon_with_the_handler_on_every_focus():
     assert html.index("vendor/xterm.js") < html.index("vendor/addon-web-links.js") < html.index("AO.focus(")
     js = (UI / "static" / "app.js").read_text()
     focus = js[js.index("AO.focus = function") :]
-    made = "const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri));"
+    # the held press's recorder in the addon's options (TD-1299)
+    made = "const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri), AO.webLinkOptions(rec));"
     load = "term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });"
     assert made in focus and load in focus
     # beside the fit addon, before the attach decides read-only: no condition on the mode

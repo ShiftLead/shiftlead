@@ -277,6 +277,86 @@
   // The folded Focus's terminal height: from its top to the bar (and the page's foot under it), never
   // under the 360px floor. `top` is the terminal's top in the document, `below` what stands under it.
   AO.termFill = (viewport, top, below) => Math.max(360, Math.floor(viewport - top - below));
+  // ---- the phone's Focus (design §4.5 *Phone layout*, TD-003, built by TD-1299) ----
+  // **The narrow query**, the one `focus.html` reads before the first paint and app.css's `html.phonefocus` stands
+  // for: a phone upright (720 px and below), or on its side (a coarse pointer under 500 px of height).
+  AO.NARROW_Q = "(max-width: 720px), (pointer: coarse) and (max-height: 500px)";
+  AO.isNarrow = () => { const c = document.documentElement && document.documentElement.classList; return !!(c && c.contains("phonefocus")); };
+  // The query read with no keyboard up: while anything editable has focus the layout stays as it was (a landscape
+  // tablet's keyboard shrinks the viewport under `interactive-widget`), and a popped-out window never is narrow.
+  AO.narrowNext = (was, matches, popped, editing) => (editing ? !!was : !!matches && !popped);
+  // The strip's ▲ n (§4.5a *the strip*): the other records that need you, and the one that has waited longest.
+  AO.needsOf = function (rows, here) {
+    const need = (rows || []).filter((r) => r && r.id !== here && r.state === "needs-you");
+    const t = (r) => { const x = Date.parse(r.since || ""); return isNaN(x) ? Infinity : x; };
+    const first = need.slice().sort((a, b) => t(a) - t(b))[0];
+    return { n: need.length, first: first ? first.id : null };
+  };
+  AO.stateClass = (state) => ({ "needs-you": "needs", "stalled?": "stalled" }[state] || state || "");
+  // The switcher's groups (§4.5a *the switcher*): the Sessions page's order — *Needs you*, *Working*, *Idle*, then
+  // the rest under their own words — each by name. Pure, for a test.
+  AO.SWITCH_GROUPS = [["Needs you", ["needs-you"]], ["Working", ["working", "stalled?"]], ["Idle", ["idle"]],
+    ["limited", ["limited"]], ["unreachable", ["unreachable"]], ["scheduled", ["scheduled"]], ["exited", ["exited"]], ["closed", ["closed"]]];
+  AO.switchGroups = function (rows) {
+    const known = new Set(AO.SWITCH_GROUPS.flatMap(([, states]) => states));
+    const groups = AO.SWITCH_GROUPS.map(([label, states]) => ({ label, rows: (rows || []).filter((r) => states.includes(r.state)) }));
+    groups.push({ label: "other", rows: (rows || []).filter((r) => !known.has(r.state)) });
+    for (const g of groups) g.rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return groups.filter((g) => g.rows.length);
+  };
+  // **A link in the pane, on a phone** (§4.5 *Typing*, §4.6, TD-1299): the touch screen's held modifier. A press
+  // held still `LINK_HOLD` ms and lifted opens the link a reader's `hover` recorded while it was held; 10 px of
+  // travel (`AO.TOUCH_SLOP`) or a second finger ends it, a sooner lift is a tap, and nothing recorded opens
+  // nothing. `record` and `clear` are the readers' `hover` / `leave` callbacks: outside a held press they record
+  // nothing, so a mouse's hover never arms a lift. `up` answers the link to open, or null. Pure, for a test.
+  AO.LINK_HOLD = 500;
+  AO.linkPress = function () {
+    let press = null, link = null;
+    return {
+      down(x, y, t) { press = { x, y, t, dead: false }; link = null; },
+      move(x, y) { if (press && Math.hypot(x - press.x, y - press.y) >= AO.TOUCH_SLOP) { press.dead = true; link = null; } },
+      cancel() { if (press) press.dead = true; link = null; },
+      record(l) { if (press && !press.dead) link = l; },
+      clear(l) { if (!l || !link || link.uri === l.uri) link = null; },
+      up(t) {
+        const p = press, l = link;
+        press = null; link = null;
+        return p && !p.dead && l && t - p.t >= AO.LINK_HOLD ? l : null;
+      },
+    };
+  };
+  // …and the touches that drive it, the TD-986 listeners' events handed in: at the press the page gives its point
+  // the `mousemove` a pointer would (`hover(x, y)`, never a button), so the terminal's own link readers hover the
+  // cell; at the lift — its default prevented on a phone, so no emulated mouse event, focus or click follows — the
+  // recorded link is opened through its reader's own open with an event carrying `ctrlKey` (the held press *is*
+  // the modifier), from the lift, a gesture of the person's, never from a timer. `leave()` ends the hover.
+  // A pane with any-event mouse tracking on (DECSET 1003, `mouseTrackingMode === "any"`) would hear the hover's
+  // `mousemove` as typed escape sequences: there the press hovers nothing and so opens nothing (1000 and 1002
+  // report no motion without a button).
+  AO.linkTouch = function (rec, { hover, leave, narrow, now, tracking }) {
+    let id = null;
+    const at = (e) => Array.from(e.targetTouches || []).find((x) => x.identifier === id);
+    return {
+      start(e) {
+        if ((e.targetTouches || []).length !== 1) { rec.cancel(); id = null; return; }
+        const t = e.targetTouches[0];
+        id = t.identifier;
+        if (tracking && tracking()) { rec.cancel(); return; }
+        rec.down(t.clientX, t.clientY, now());
+        hover(t.clientX, t.clientY);
+      },
+      move(e) { const t = at(e); if (t) rec.move(t.clientX, t.clientY); },
+      end(e) {
+        const l = rec.up(now());
+        id = null;
+        if ((l || narrow()) && e.cancelable) e.preventDefault();  // a phone's tap focuses nothing (§4.6)
+        if (l) l.open({ ctrlKey: true, metaKey: false, type: e.type });
+        leave();
+        return l;
+      },
+      cancel() { rec.cancel(); id = null; leave(); },
+    };
+  };
   // The grid tmux is told (TD-794): one `{resize}` per gesture, the last grid once the box has been still
   // for `wait` ms, and none when it is the grid tmux already has. A drag of the panel's edge or a put away
   // fires the observer once a frame, and each resize makes the tool repaint over lines tmux keeps.
@@ -297,7 +377,7 @@
   // The bar's wiring, its elements handed in so it runs under node (TD-500). Opening unfolds the overlay
   // and focuses the box; folding hides it, keeps the draft, redraws the bar and gives the terminal the
   // focus. Neither touches the terminal's box: a resize would make the tool repaint (TD-474).
-  AO.wireComposerBar = function ({ bar, text, send, composer, compose, sendBtn, hint, term }) {
+  AO.wireComposerBar = function ({ bar, text, send, composer, compose, sendBtn, hint, term, toTerm }) {
     const folded = () => composer.classList.contains("folded");
     const redraw = () => {
       const off = !!compose.disabled;
@@ -308,7 +388,8 @@
       send.textContent = sendBtn.textContent;
     };
     const open = () => { composer.classList.remove("folded"); bar.classList.add("under"); compose.focus(); };
-    const fold = () => { composer.classList.add("folded"); bar.classList.remove("under"); redraw(); term.focus(); };
+    // on a phone the fold raises no keyboard: the terminal takes focus only from ⌨ (§4.5 *Phone layout*)
+    const fold = () => { composer.classList.add("folded"); bar.classList.remove("under"); redraw(); (toTerm || (() => term.focus()))(); };
     text.addEventListener("click", open);
     send.addEventListener("click", () => { if (compose.value.trim()) sendBtn.click(); else open(); });
     // a paste on the bar: text into the box, opened; a file takes the Attach road, which opens it
@@ -674,7 +755,7 @@
       return !!(menu && menu.open);
     };
     const decide = () => {
-      if (!phone.matches) return;
+      if (!phone.matches || AO.isNarrow()) return;  // a phone's Focus draws no bar: the strip is its top (TD-1299)
       const got = AO.barAway(anchorY, clampedY(), bar.offsetHeight, away, held());
       away = got.away; anchorY = got.anchorY;
       bar.classList.toggle("away", away);
@@ -1855,7 +1936,7 @@
     window.addEventListener("pageshow", () => { leaving = false; });
     // the one thing the page says on its stream: whether it is visible, which the counts keeper
     // hands the home as Looking (§4.10 *Told on Telegram*, TD-616)
-    let sock = null, up = false;
+    let sock = null, up = false, retry = null;
     const say = () => { if (sock && sock.readyState === 1) sock.send(JSON.stringify({ visible: document.visibilityState === "visible" })); };
     document.addEventListener("visibilitychange", say);
     const params = new URLSearchParams(query || "");
@@ -1881,10 +1962,18 @@
       };
       // a close the page caused by leaving is no outage (TD-372); the reconnect stays, so a page
       // restored from the back-forward cache reconnects and reloads as after any other close
-      ws.onclose = () => { if (!leaving) setDown(true); if (up) { up = false; streamsUp--; } reconnected = true; setTimeout(open, delay); delay = Math.min(delay * 2, 10000); };
+      ws.onclose = () => { if (!leaving) setDown(true); if (up) { up = false; streamsUp--; } reconnected = true; retry = setTimeout(open, delay); delay = Math.min(delay * 2, 10000); };
       ws.onerror = () => ws.close();
     }
     open();
+    // iOS drops the stream whenever it suspends the page (§4.5 *On the home screen*, TD-1299): back in view, or back
+    // online, a closed stream dials at once rather than wait out its backoff
+    const revive = () => {
+      if (document.visibilityState === "hidden" || !sock || sock.readyState !== 3) return;
+      clearTimeout(retry); retry = null; delay = 500; open();
+    };
+    document.addEventListener("visibilitychange", revive);
+    window.addEventListener("online", revive);
   }
   AO.connectEvents = connectEvents;  // node's probes (tests) drive it with a fake socket
   // ---- usage chip: one span per account, its **worst** window, the rest on hover (TD-001, TD-073, TD-122) ----
@@ -5213,13 +5302,19 @@
   // range) as its `open`; hover shows the target, since the label does not. The provider itself
   // drops any target that is not http or https (`allowNonHttpProtocols` stays unset), and
   // `AO.paneLink` checks again.
-  AO.paneLinkHandler = function (el) {
+  // On a phone (TD-1299) its `hover` also records the link for the held press (`AO.linkPress`), and `leave` clears it.
+  AO.paneLinkHandler = function (el, rec) {
     return {
       activate: (e, uri) => AO.paneLink(e, uri),
-      hover: (e, uri) => { el.title = uri; },
-      leave: () => { el.title = ""; },
+      hover: (e, uri) => { el.title = uri; if (rec) rec.record({ uri, open: (ev) => AO.paneLink(ev, uri) }); },
+      leave: (e, uri) => { el.title = ""; if (rec) rec.clear({ uri }); },
     };
   };
+  // The web-links addon's options (TD-1299): the same recorder, its open the addon's own handler
+  AO.webLinkOptions = (rec) => ({
+    hover: (e, uri) => rec.record({ uri, open: (ev) => AO.paneLink(ev, uri) }),
+    leave: (e, uri) => rec.clear({ uri }),
+  });
   // **a path is a link** (§4.6 *A path in the pane is a link*, §4.5a, TD-501): the runs one row of
   // the pane names that could be a file — a run with a `/` in it, relative, `./`, `~/` or absolute,
   // with an optional `:line` or `:line:col`, the bracket or sentence stop at its tail cut off; a run
@@ -5625,7 +5720,7 @@
   // rows; the runs of the row alone are asked beside them, so a joined row that runs two words together
   // takes no link a row had before.
   AO.PATH_JOIN = 2048;
-  AO.pathProvider = function (term, id, editor, fetchPaths) {
+  AO.pathProvider = function (term, id, editor, fetchPaths, rec) {
     const known = new Map();
     let era = 0;  // an answer that lands after a `clear` belongs to the attach before it
     const ask = fetchPaths || ((runs) => fetch(`/api/sessions/${encodeURIComponent(id)}/paths`, {
@@ -5674,6 +5769,11 @@
           text: r.run,
           decorations: { underline: true, pointerCursor: true },
           activate: (event) => AO.pathLink(event, editor, paths[r.path], r.line, r.col),
+          // the held press on a phone (TD-1299): the hover records the link, its open this link's own
+          ...(rec ? {
+            hover: () => rec.record({ uri: r.run, open: (ev) => AO.pathLink(ev, editor, paths[r.path], r.line, r.col) }),
+            leave: () => rec.clear({ uri: r.run }),
+          } : {}),
         }));
         const key = `${off}|${text}`;
         if (known.has(key)) { const l = links(known.get(key)); callback(l.length ? l : undefined); return; }
@@ -5797,7 +5897,180 @@
     const age = AO.fmtShortAge(list[0].at);
     return age ? `${list.length} · last ${age} ago` : String(list.length);
   };
+  // ---- the phone's one screen (design §4.5 *Phone layout*, §4.5a *the strip*, *the sheet*, *the switcher*; TD-1299) ----
+  // The narrow query kept with its latch, the visual viewport the screen is pinned to, the strip, and the sheets
+  // over the terminal — one open at a time, the dim under it. A crossing relays the page out in place: the CSS
+  // follows `html.phonefocus`, and `relaid` tells the page so it refits once. Drawn on a scheduled record too,
+  // which has no terminal. `opened()` is what the grid reads: while a sheet is open none is sent.
+  const SHEET_MARKS = ["#fready", "#fsuspended", "#fstop", "#foow", "#fwait", "#frw", "#fbc", "#frestarted", "#fgated", "#fbrief"];
+  AO.phoneFocus = function (s, popped) {
+    const root = document.documentElement, body = document.body;
+    const mq = window.matchMedia ? window.matchMedia(AO.NARROW_Q) : null;
+    const hooks = { relaid: [], closed: [] };
+    const editing = () => {
+      const a = document.activeElement;
+      return !!a && (a.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(a.tagName));
+    };
+    let narrow = AO.isNarrow(), open = null, openCls = "open", card = null;
+    const vv = window.visualViewport;
+    // iOS shrinks neither `dvh` nor the layout for its keyboard and scrolls the page to a focused field: the
+    // screen takes the visual viewport's height and offset instead, read on its `resize` and `scroll`
+    const viewport = () => {
+      if (!vv || !narrow) { root.style.removeProperty("--vvh"); root.style.removeProperty("--vvt"); return; }
+      root.style.setProperty("--vvh", `${Math.round(vv.height)}px`);
+      root.style.setProperty("--vvt", `${Math.max(0, Math.round(vv.offsetTop))}px`);
+    };
+    if (vv) { vv.addEventListener("resize", viewport); vv.addEventListener("scroll", viewport); }
+    const relay = () => {
+      const n = AO.narrowNext(narrow, !!(mq && mq.matches), !!popped || body.classList.contains("popped"), editing());
+      if (n === narrow) return;
+      narrow = n; root.classList.toggle("phonefocus", n);
+      if (!n) close();  // not quiet: the composer's sheet folds the composer back (its `closed` hook) on a crossing
+      viewport();
+      hooks.relaid.forEach((f) => f(n));
+    };
+    if (mq && mq.addEventListener) mq.addEventListener("change", relay);
+    // read again on blur: a frame later, once the focus has landed wherever it goes
+    document.addEventListener("focusout", () => setTimeout(relay, 0));
+    relay(); viewport();
+    // the sheets: one open at a time over a dimmed Focus; closing one gives the terminal its refit
+    const scrim = $("#fscrim");
+    const putBack = () => {
+      if (!card) return;
+      const { el, mark, was } = card; card = null;
+      if (mark.parentNode) { mark.parentNode.insertBefore(el, mark); mark.remove(); }
+      el.open = was;
+    };
+    function close(quiet) {
+      if (!open) return;
+      const el = open; open = null;
+      el.classList.remove(openCls);
+      if (scrim) scrim.classList.remove("open");
+      putBack();
+      if (!quiet) hooks.closed.forEach((f) => f(el));
+    }
+    function show(el, cls) {
+      if (!el || !narrow) return;
+      if (open && open !== el) close();
+      open = el; openCls = cls || "open";
+      el.classList.add(openCls);
+      if (scrim && openCls === "open") scrim.classList.add("open");
+    }
+    if (scrim) scrim.addEventListener("click", () => close());
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open && openCls === "open") { e.preventDefault(); close(); } });
+    // a downward drag closes a sheet that is scrolled to its top
+    $$(".nsheet").forEach((sh) => {
+      let y0 = null;
+      sh.addEventListener("touchstart", (e) => { y0 = sh.scrollTop <= 0 && e.touches.length === 1 ? e.touches[0].clientY : null; }, { passive: true });
+      sh.addEventListener("touchend", (e) => {
+        const t = e.changedTouches && e.changedTouches[0];
+        if (y0 != null && t && t.clientY - y0 > 60 && sh.scrollTop <= 0) close();
+        y0 = null;
+      }, { passive: true });
+    });
+    // **the strip**: its session, its ▲ n, its ⋯'s dot; kept from the delta as the identity line is
+    let rows = [];
+    const swEl = $("#fswitch");
+    try { rows = JSON.parse((swEl && swEl.dataset.rows) || "[]") || []; } catch (e) { rows = []; }
+    const drawNeeds = () => {
+      const nb = $("#fneeds"); if (!nb) return;
+      const got = AO.needsOf(rows, s.id);
+      nb.classList.toggle("hidden", !got.n);
+      $("#fneedsn").textContent = String(got.n);
+      nb.dataset.to = got.first || "";
+    };
+    const nb = $("#fneeds");
+    if (nb) nb.addEventListener("click", () => { if (nb.dataset.to) location.href = `/focus/${encodeURIComponent(nb.dataset.to)}`; });
+    drawNeeds();
+    const shown = (el) => !!el && !el.classList.contains("hidden") && !el.hidden;
+    // **the sheet**: the marks as chips, the acts as their own controls are drawn, the cards' rows and summaries
+    const fill = () => {
+      const chips = $("#fsheetchips");
+      if (chips) chips.replaceChildren(...SHEET_MARKS.map((sel) => $(sel)).filter(shown).map((m) => {
+        const c = m.cloneNode(true); c.removeAttribute("id"); return c;
+      }));
+      $$("#fsheet [data-for]").forEach((b) => {
+        const src = document.getElementById(b.dataset.for);
+        b.classList.toggle("hidden", !shown(src));
+        b.disabled = !!(src && src.disabled);
+        const al = $(".al", b);
+        if (al && src && /^fmode/.test(src.id)) al.textContent = src.textContent.trim();
+      });
+      const text = (sel) => { const e = $(sel); return e ? e.textContent.trim() : ""; };
+      const checks = $$("#checks > div");
+      const sums = {
+        working: text("#workingtext"), prompts: text("#promptscount"), git: text("#gitline"), reports: text("#reportscount"),
+        inbox: text("#inboxcount"), members: text("#memberscount"),
+        ready: checks.length ? `${checks.filter((c) => c.classList.contains("ok")).length} of ${checks.length}` : "",
+        session: text('details.side[data-side="session"] > summary .meta'),
+      };
+      $$("#fsheet [data-card]").forEach((b) => {
+        const c = $(`details.side[data-side="${b.dataset.card}"]`);
+        b.classList.toggle("hidden", !c || c.classList.contains("hidden"));
+        const m = $(".m", b); if (m) m.textContent = sums[b.dataset.card] || "";
+      });
+    };
+    const more = $("#fmore");
+    const dot = () => { if (more) more.classList.toggle("dotted", SHEET_MARKS.some((sel) => shown($(sel)))); };
+    if (more) more.addEventListener("click", () => { fill(); show($("#fsheet")); });
+    const sheet = $("#fsheet");
+    if (sheet) sheet.addEventListener("click", (e) => {
+      const act = e.target.closest("[data-for]");
+      if (act) { const src = document.getElementById(act.dataset.for); close(); if (src && !src.disabled) src.click(); return; }
+      const row = e.target.closest("[data-card]");
+      if (!row) return;
+      // the side panel's very card, moved into a sheet of its own while it is open, and put back after
+      const el = $(`details.side[data-side="${row.dataset.card}"]`); if (!el) return;
+      close(true);
+      const mark = document.createComment("card");
+      el.parentNode.insertBefore(mark, el);
+      card = { el, mark, was: el.open };
+      $("#fcardbody").appendChild(el); el.open = true;
+      $("#fcardtitle").textContent = $("span:not(.gl):not(.m)", row).textContent;
+      show($("#fcardsheet"));
+    });
+    const back = $("#fcardback");
+    if (back) back.addEventListener("click", () => { close(true); fill(); show($("#fsheet")); });
+    // **the switcher**: every record in the Sessions page's order, this one *here*; a press opens its Focus here
+    const drawSwitch = () => {
+      const list = $("#fswitchlist"); if (!list) return;
+      list.innerHTML = AO.switchGroups(rows).map((g) => `<div class="sgroup">${esc(g.label)}</div>` + g.rows.map((r) =>
+        `<a class="srow${r.here ? " here" : ""}" href="/focus/${encodeURIComponent(r.id)}"><span class="sdot s-${esc(AO.stateClass(r.state))}"></span>`
+        + `<span class="grow"><div class="nm">${esc(r.name)}</div><div class="sub">${esc(r.here ? `here${r.sub ? ` · ${r.sub}` : ""}` : r.sub)}</div></span>`
+        + `<span class="age">${esc(AO.fmtShortAge(r.since))}</span></a>`).join("")).join("");
+    };
+    const who = $("#fwho");
+    if (who) who.addEventListener("click", () => { drawSwitch(); show(swEl); });
+    return {
+      narrow: () => narrow,
+      opened: () => !!open,
+      show, close,
+      relaid: (f) => hooks.relaid.push(f),
+      closed: (f) => hooks.closed.push(f),
+      render(v) {
+        const d = $("#fwhodot"); if (d) d.className = `sdot s-${v.state_class || AO.stateClass(v.state)}`;
+        const st = $("#fwhost"); if (st) st.textContent = `${v.state_label || v.state || ""}${v.age ? ` ${v.age}` : ""}`;
+        const md = $("#fsheetmode"); if (md) md.textContent = v.unattended ? "unattended" : "interactive";
+        const mine = rows.find((r) => r.id === s.id);
+        if (mine && v.state && mine.state !== v.state) { mine.state = v.state; mine.since = new Date().toISOString(); }
+        dot();
+        if (open === sheet) fill();
+      },
+      // another record moved (the light stream's `state`, `SHAPE_KEYS`) or went
+      state(id, state) {
+        const r = rows.find((x) => x.id === id);
+        if (r) { if (r.state !== state) { r.state = state; r.since = new Date().toISOString(); } }
+        else rows.push({ id, name: id, state, sub: "", since: new Date().toISOString(), here: false });
+        drawNeeds();
+        if (open === swEl) drawSwitch();
+      },
+      gone(id) { rows = rows.filter((x) => x.id !== id); drawNeeds(); if (open === swEl) drawSwitch(); },
+    };
+  };
   AO.focus = function (s, popped) {
+    const phone = AO.phoneFocus(s, popped);
+    // the terminal takes focus from ⌨ alone on a phone, so nothing raises the keyboard unasked (§4.5 *Phone layout*)
+    const toTerm = () => { if (!phone.narrow()) term.focus(); };
     const id = s.id;
     // §4.5a *Git card: the pick · ↑ · ↓* (TD-856, built by TD-862): read through the page's `git_files` route
     const gitPick = $("#gitpicksel") ? AO.gitPick(
@@ -5837,18 +6110,20 @@
       setInterval(() => { if (!busy()) location.reload(); }, 20000);
       return;
     }
-    const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0, linkHandler: AO.paneLinkHandler($("#term")) });
+    // the held press's recorder (TD-1299): each of the terminal's link readers is given its `hover` / `leave`
+    const rec = AO.linkPress();
+    const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0, linkHandler: AO.paneLinkHandler($("#term"), rec) });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
-    const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri));  // on a read-only Focus too
+    const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri), AO.webLinkOptions(rec));  // on a read-only Focus too
     term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });
     // **a path is a link** (TD-501): only where the Session card draws its editor button
-    const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor) : null;
+    const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor, undefined, rec) : null;
     if (pathLinks) term.registerLinkProvider(pathLinks);
     term.open($("#term")); fit.fit();
     AO.termRenderer(term);
     AO.termFont(term, fit);
     AO.terms.push({ term, fit });
-    let ws, delay = 500, paneGone = false;
+    let ws, delay = 500, paneGone = false, retry = null;
     const sendGrid = AO.resizeSender((grid) => !!(ws && ws.readyState === 1) && (ws.send(JSON.stringify({ resize: grid })), true));
     // The terminal mark's state (`AO.termMark`, above), redrawn each second and on each change
     const mk = { retryAt: null, clients: 0, window: null, grid: null, open: false, state: s.state, lastByte: null };
@@ -5869,7 +6144,8 @@
       const c = AO.dropCard(AO.dropHeld(id), id, s.team || "", Date.now());
       const node = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
       const head = node("div", "dchead");
-      head.append(node("b", "", "Disconnected — reconnecting"), node("span", "dim", "the spend this page last held"));
+      // §4.5 *On the home screen* (TD-1299): a phone's first suspect, said first
+      head.append(node("b", "", "Is Tailscale on? Disconnected — reconnecting"), node("span", "dim", "the spend this page last held"));
       const kids = [head];
       const fig = (says, word) => {
         const span = node("span", "dcfig");
@@ -5974,9 +6250,17 @@
         if (v.final) { endTerm(v.why); return; }
         term.write(`\r\n\x1b[90m[shiftlead] terminal ${v.why} — retrying in ${Math.round(delay / 1000) || 1}s\x1b[0m\r\n`);
         if (mk.retryAt == null) mk.retryAt = Date.now();  // held across retries until a pane byte
-        setTimeout(openTerm, delay); delay = v.delay;
+        retry = setTimeout(openTerm, delay); delay = v.delay;
       };
     }
+    // iOS drops the socket whenever it suspends the page (§4.5 *On the home screen*, TD-1299): back in view, or back
+    // online, a closed attach dials at once rather than wait out its backoff; one still open or closing is left be
+    const revive = () => {
+      if (paneGone || document.visibilityState === "hidden" || (ws && ws.readyState !== 3)) return;
+      clearTimeout(retry); retry = null; delay = 500; openTerm();
+    };
+    document.addEventListener("visibilitychange", revive);
+    window.addEventListener("online", revive);
     // A mode change seen in the feed: end this attach without the retry path and open a new one,
     // which reads the mode afresh (§4.6).
     function reattach() {
@@ -6079,9 +6363,19 @@
     // together are the browser's (a pinch); a second finger joining a scroll ends it, and the touch is inert
     // (`dead`) until every finger lifts. `touch-action: pinch-zoom` (app.css) keeps the page from scrolling.
     const termEl = $("#term");
+    // the held link press (TD-1299), read by these same listeners: the hover is a `mousemove` on xterm.js's screen
+    // element at the finger's point — never a button, so no focus, selection or mouse report
+    const screenOf = () => termEl.querySelector(".xterm-screen");
+    const press = AO.linkTouch(rec, {
+      hover: (x, y) => { const sc = screenOf(); if (sc) sc.dispatchEvent(new MouseEvent("mousemove", { clientX: x, clientY: y, bubbles: true })); },
+      leave: () => { const sc = screenOf(); if (sc) sc.dispatchEvent(new MouseEvent("mouseleave", { bubbles: false })); },
+      narrow: () => phone.narrow(), now: () => Date.now(),
+      tracking: () => !!(term.modes && term.modes.mouseTrackingMode === "any"),
+    });
     // the fingers counted are the terminal's (`targetTouches`): one resting elsewhere on the page is not a
     // second finger, and its lift, which the terminal never hears, cannot leave the touch inert
     termEl.addEventListener("touchstart", (e) => {
+      press.start(e);
       if (touch && touch.dead && e.targetTouches.length > 1) { if (touch.scrolled) e.preventDefault(); return; }
       if (e.targetTouches.length !== 1) {
         if (touch && touch.scrolling) { touchTake(); scrollFrame(); e.preventDefault(); }
@@ -6092,6 +6386,7 @@
       touch = { id: t.identifier, y0: t.clientY, total: 0, sent: 0, scrolling: false, dead: false };
     }, { capture: true, passive: false });
     termEl.addEventListener("touchmove", (e) => {
+      press.move(e);
       if (!touch) return;
       if (touch.dead) { if (touch.scrolled) e.preventDefault(); return; }
       const t = Array.from(e.targetTouches).find((x) => x.identifier === touch.id);
@@ -6103,6 +6398,7 @@
       scrollFrame();
     }, { capture: true, passive: false });
     const touchEnd = (e) => {
+      if (e.type === "touchcancel") press.cancel(); else if (e.targetTouches.length === 0) press.end(e);
       if (!touch) return;
       if ((touch.scrolling || touch.scrolled) && e.cancelable) e.preventDefault();
       if (!touch.dead && touch.scrolling) { touchTake(); scrollFrame(); }
@@ -6181,18 +6477,57 @@
     // face and size from Settings (`AO.setTermLook`, which refits) — TD-288: the second resized the
     // grid here and left the pane drawing at the old width; one send per gesture (`AO.resizeSender`, TD-794)
     term.onResize(({ cols, rows }) => sendGrid(cols, rows));
-    new ResizeObserver(() => fit.fit()).observe($("#term"));
-    term.focus();
+    // every sheet lies over the terminal and changes nothing: while one is open no grid is sent, and the terminal
+    // refits once it closes (§4.5 *What the terminal's grid does*); a crossing of the narrow query refits it once
+    new ResizeObserver(() => { if (!phone.opened()) fit.fit(); }).observe($("#term"));
+    phone.closed(() => fit.fit());
+    toTerm();
+    // *The keyboard is up for the terminal* is the terminal's focus, never a guess from the viewport: the input bar
+    // goes while it has it (TD-1299)
+    const pageEl = $(".page.focus");
+    if (term.textarea) {
+      term.textarea.addEventListener("focusin", () => pageEl.classList.add("kbdup"));
+      term.textarea.addEventListener("focusout", () => pageEl.classList.remove("kbdup"));
+    }
 
     const compose = $("#compose");
     // design §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): folded, the composer opens over
     // the terminal's foot and folds back on Esc and on Send; `open` (person.composer) has no bar
     const cbar = $("#composerbar") ? AO.wireComposerBar({
       bar: $("#composerbar"), text: $("#cbtext"), send: $("#cbsend"), composer: $("#composer"), compose,
-      sendBtn: $("#send"), hint: $("#composehint"), term,
+      sendBtn: $("#send"), hint: $("#composehint"), term, toTerm,
     }) : null;
+    // **the composer as a sheet** on a phone (§4.5a *the input bar · ⌨*, TD-1299): from under the strip down, over
+    // the terminal; ✕, Esc and a Send that empties it close it with its draft kept, and give no focus to the terminal
+    const composerEl = $("#composer");
+    const openSheetComposer = () => {
+      phone.show(composerEl, "nopen");  // drawn first: a box that is not drawn takes no focus
+      if (cbar) cbar.open(); else compose.focus();
+    };
+    const closeComposer = () => { if (composerEl.classList.contains("nopen")) phone.close(); else if (cbar) cbar.fold(); else toTerm(); };
+    phone.closed((el) => { if (el !== composerEl) return; if (cbar && !cbar.folded()) cbar.fold(); compose.blur(); });
+    const csx = $("#csheetx"); if (csx) csx.addEventListener("click", closeComposer);
+    const cbt = $("#cbtext"); if (cbt) cbt.addEventListener("click", () => { if (phone.narrow()) openSheetComposer(); });
+    // **the input bar**: its field opens the composer's sheet (Message on an unattended record); ⌨ focuses the terminal
+    const ask = $("#fask");
+    if (ask) ask.addEventListener("click", () => {
+      if (ask.dataset.mode === "message") { const m = $("#fmessage"); if (m) m.click(); return; }
+      openSheetComposer();
+    });
+    const kbd = $("#fkbd");
+    if (kbd) kbd.addEventListener("click", () => term.focus());
+    const drawAsk = (v) => {
+      if (!ask) return;
+      const msg = !!(v && v.unattended), off = !msg && !!compose.disabled;
+      ask.dataset.mode = msg ? "message" : "";
+      ask.textContent = msg ? ask.dataset.message : AO.barText(compose.value, off ? $("#composehint").textContent || "nothing can be sent now" : "", ask.dataset.invite);
+      ask.classList.toggle("draft", !msg && !off && !!compose.value.trim());
+      ask.classList.toggle("off", off);
+    };
+    let lastV = s;
+    compose.addEventListener("input", () => drawAsk(lastV));
     compose.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") { if (cbar) cbar.fold(); else term.focus(); }
+      if (e.key === "Escape") closeComposer();
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) $("#send").click();
     });
     // The terminal filled to the bar (§4.5a **the bar**): the header's bottom to the bar's top, the 360px
@@ -6203,7 +6538,8 @@
       if (!wrap || !wrap.classList.contains("cfold")) return;
       const bar = $("#composerbar"), barH = bar && !bar.classList.contains("hidden") ? bar.offsetHeight + 10 : 0;
       wrap.style.setProperty("--cbarh", `${barH}px`);  // the open composer takes the bar's place
-      if (document.body.classList.contains("popped") || matchMedia("(max-width: 720px)").matches) { wrap.style.removeProperty("--termh"); return; }
+      // the popped-out window keeps its own height, and the phone's one screen gives the terminal its column (TD-1299)
+      if (document.body.classList.contains("popped") || phone.narrow()) { wrap.style.removeProperty("--termh"); return; }
       const softH = parseFloat(wrap.style.getPropertyValue("--softh")) || 0;  // the soft-key row's, unset as 0
       wrap.style.setProperty("--termh", `${AO.termFill(window.innerHeight, $("#term").getBoundingClientRect().top + window.scrollY, barH + softH + 16)}px`);
     };
@@ -6214,6 +6550,7 @@
       window.addEventListener("resize", fill);
       fill();
     }
+    phone.relaid(() => { fill(); if (!phone.opened()) fit.fit(); });
     // the soft-key row's height is one variable (`--softh` on the wrap, 0 while it is hidden), which `fill()`
     // adds to the bar's and the composer and a popped-out terminal read; registered folded or not
     if (softEl && wrap) new ResizeObserver(() => { wrap.style.setProperty("--softh", `${softEl.offsetHeight}px`); fill(); }).observe(softEl);
@@ -6234,7 +6571,7 @@
       sendBtn: $("#send"), compose, hint: $("#composehint"),
       post: (body) => act(id, "send", body),
       draft: (v) => { try { if (v) localStorage.setItem(AO.draftKey(id), v); else localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ } },
-      sent: (empty) => { if (empty) { if (cbar) cbar.fold(); else term.focus(); } },
+      sent: (empty) => { if (empty) closeComposer(); },
       fail: (e) => banner(`Send failed: ${e.message}`),
       redraw: () => { if (cbar) cbar.redraw(); },
     });
@@ -6244,7 +6581,7 @@
     // on the chip, never a session's words. Each press carries its own key, and the chip is disabled
     // until its send answers; the composer's box is not touched (TD-806).
     $$("#promptchips .chip").forEach((b) => AO.wireChip(b, {
-      compose, post: (body) => act(id, "send", body), sent: () => term.focus(),
+      compose, post: (body) => act(id, "send", body), sent: () => { if (phone.narrow()) closeComposer(); else term.focus(); },
       closed: () => banner($("#composehint").textContent || "nothing can be sent now"),
       fail: (err) => banner(`Send failed: ${err.message}`),
     }));
@@ -6259,7 +6596,7 @@
       button: $("#attach"), input: $("#attachfile"), composer: $("#composer"), compose,
       targets: [$("#term"), compose, ...($("#composerbar") ? [$("#composerbar")] : [])],
       fail: banner, cancel: $("#attachcancel"),
-      unfold: cbar ? cbar.open : null, mirror: cbar ? { button: $("#cbattach"), cancel: $("#cbcancel") } : null,
+      unfold: cbar ? (() => (phone.narrow() ? openSheetComposer() : cbar.open())) : null, mirror: cbar ? { button: $("#cbattach"), cancel: $("#cbcancel") } : null,
       upload: AO.attachUpload(id, Number($("#attach").dataset.piece)),
     });
 
@@ -6500,6 +6837,13 @@
       // the soft-key row (§4.5a, TD-990): gone with the ending, back on its other side while the page has a
       // terminal, and with the record's mode — Hand back hides it before its re-attach, Take over shows it
       if (softEl) softEl.classList.toggle("hidden", !AO.softShown(v, paneGone));
+      // the phone's bars (TD-1299): the Watching line on an unattended record, the input bar on any live one, ⌨ where
+      // the terminal takes keys; on an ended record neither bar
+      const ended = v.state === "exited" || v.state === "closed";
+      const fw = $("#fwatch"); if (fw) fw.classList.toggle("hidden", !v.unattended || ended);
+      const fb = $("#fibar"); if (fb) fb.classList.toggle("hidden", ended);
+      const fk = $("#fkbd"); if (fk) fk.classList.toggle("hidden", !!v.unattended);
+      lastV = v; drawAsk(v);
       const aid = $("#adapter_id"); if (aid) aid.textContent = v.adapter_id || "—";
       const tr = $("#ftranscript");
       if (tr) tr.classList.toggle("hidden", !v.adapter_id);
@@ -6728,17 +7072,20 @@
       d.addEventListener("toggle", () => store.set(key, d.open));
     });
     document.addEventListener("click", (e) => { if (e.target.closest("details.side > summary button")) e.preventDefault(); });
-    render(s);
+    render(s); phone.render(s);
     const looked = AO.unseenLook(document, () => act(id, "seen", {}).catch(() => {}));
     looked(s);
     connectEvents((ev) => {
+      // another record moved or went (the light stream): the strip's ▲ n and the switcher (TD-1299)
+      if (ev.event === "session" && ev.id !== id && ev.state) phone.state(ev.id, ev.state);
+      if (ev.event === "gone" && ev.id !== id) phone.gone(ev.id);
       if (ev.event === "session" && ev.id === id) {
         // The pushed delta is authoritative and arrives before any reconnect (TD-029): a closed or
         // pane-less session ends the terminal here, rather than letting it discover it by retrying.
         if (!paneGone && AO.paneIsGone(ev.session)) {
           endTerm("this session's pane is gone (see the banner).");
         }
-        render(ev.session);
+        render(ev.session); phone.render(ev.session);
         if (ev.session.state && ev.session.state !== mk.state) {
           // silence is counted from when the session began working, not from a quiet idle before it
           if (ev.session.state === "working" && mk.lastByte != null) mk.lastByte = Date.now();

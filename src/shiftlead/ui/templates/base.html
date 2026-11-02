@@ -2,7 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+{#- design §4.5 *Phone layout* (TD-1299): Focus's own viewport adds `interactive-widget`; every page is `viewport-fit=cover`,
+    since a home-screen page's status bar is `black-translucent` (below), and pads the safe-area insets (app.css) -#}
+<meta name="viewport" content="{% block viewport %}width=device-width, initial-scale=1, viewport-fit=cover{% endblock %}">
+{#- design §4.5 *On the home screen* (TD-1299): the manifest, and iOS's own three, which it reads instead -#}
+<link rel="manifest" href="/static/manifest.webmanifest">
+<meta name="theme-color" content="#0b0e12">
+<link rel="apple-touch-icon" href="/static/icons/app-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ShiftLead">
 <title>{% block title %}ShiftLead{% endblock %}</title>
 {#- design §4.5 *Browser mechanics* (TD-737): the theme is set here, before the stylesheet and the first
     paint, with `applyTheme`'s read in `app.js` — so a page change never paints the other theme first.

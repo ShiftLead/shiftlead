@@ -13,6 +13,7 @@ import functools
 import gzip
 import html
 import json
+import mimetypes
 import os
 import re
 import time
@@ -54,7 +55,7 @@ from shiftlead.cli import stop_time as clistop
 from . import cards as cards_mod
 from . import help as helpmod
 from . import inbox as inbox_mod
-from . import repo_board, timing, uiconf
+from . import phone, repo_board, timing, uiconf
 from . import settings_page as setmod
 from .cards import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     BRANCH_SHOWN,  # noqa: F401
@@ -839,6 +840,10 @@ class _Gzip:
             await send({"type": "http.response.body", "body": body, "more_body": False})
 
         await self.app(scope, receive, wrapped)
+
+
+# the home-screen manifest (§4.5 *On the home screen*, TD-1299): served as the type a browser installs from
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 
 class _Static(StaticFiles):
@@ -2000,6 +2005,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except HTTPException:  # the record we already have still renders; membership just empties
             fleet, known = [s], False  # …and Ready to close says it does not know, rather than pass
         repos = (await repo_facts())[0]  # the PR's mark on the report line (TD-193)
+        waits = await h.person_waits()
         v = view(
             s,
             fleet,
@@ -2007,7 +2013,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             icons=await role_icons([s]),
             seats=await seats_of([s]),
             repos=repos,
-            waits=await h.person_waits(),  # the header's *waiting* chip (§4.5a, TD-274)
+            waits=waits,  # the header's *waiting* chip (§4.5a, TD-274)
         )
         # §4.5a *Git card: changed files* (TD-628): the porcelain's paths are relative to the worktree's top
         # level, the directory or above it — read here, where the links are drawn (a record on this host)
@@ -2038,6 +2044,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "composer": uiconf.composer(),
                 # §4.5a *Focus side panel, Session card* **rounds** line (TD-191): display only
                 "rounds": rounds_lines(s, await _rounds_tail(call, s)),
+                # §4.5a *the switcher* and *the strip*'s ▲ n (TD-1299): every record, for the phone's screen
+                "switch_rows": phone.switch_rows(fleet, sid, waits),
             },
         )
 

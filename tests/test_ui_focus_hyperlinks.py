@@ -150,7 +150,7 @@ def test_focus_passes_the_handler_and_the_vendored_provider_keeps_its_http_check
     focus = js[js.index("AO.focus = function") :]
     made = focus[focus.index("const term = new Terminal(") :]
     made = made[: made.index("\n")]
-    assert 'linkHandler: AO.paneLinkHandler($("#term"))' in made
+    assert 'linkHandler: AO.paneLinkHandler($("#term"), rec)' in made  # the held press's recorder (TD-1299)
     assert "allowNonHttpProtocols" not in made and "allowNonHttpProtocols:" not in js
     # the drop of any other target is xterm's own: pin the vendored copy's check
     xterm = (UI / "static" / "vendor" / "xterm.js").read_text()

@@ -5,10 +5,27 @@
 {% block title %}{% if s.state == 'needs-you' %}▲ {% endif %}{{ s.name }} · {{ s.state_label }}{% if s.unseen %} · unseen{% endif %}{% endblock %}
 {% block icon %}state-{{ s.state_class }}{% endblock %}
 {% block icon_attrs %} data-icons='{{ state_icons()|tojson }}'{% endblock %}
-{% block head %}<link rel="stylesheet" href="/static/vendor/xterm.css">{% endblock %}
+{#- design §4.5 *Phone layout* (TD-1299): the keyboard resizes the page on Android, and the safe-area insets are
+    the screen's to pad; other pages keep `base.html`'s viewport -#}
+{% block viewport %}width=device-width, initial-scale=1, interactive-widget=resizes-content, viewport-fit=cover{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/xterm.css">
+{#- the narrow query (`AO.NARROW_Q`) read before the first paint, so a phone never draws the desktop page first; a
+    popped-out window keeps the desktop page at any width, and `app.js` reads it again from here on (its latch) -#}
+{% if not popped %}<script>try { if (matchMedia("(max-width: 720px), (pointer: coarse) and (max-height: 500px)").matches) document.documentElement.classList.add("phonefocus"); } catch (e) {}</script>{% endif %}
+{% endblock %}
 {% block body %}
 <div class="page focus" data-id="{{ s.id }}">
   <div class="main">
+    {#- design §4.5a **the strip** (§4.5 *Phone layout*, TD-1299): on a phone, one 44 px row in place of the top bar,
+        the identity line and the acts line — ‹, the session (a press opens the switcher), ▲ n while other records
+        need you, and ⋯ (the sheet), dotted while a mark of the identity line is on the record. Drawn by the
+        narrow query alone (`html.phonefocus`); kept current from the pushed delta as the identity line is -#}
+    <div class="fstrip" id="fstrip" role="toolbar" aria-label="this session">
+      <a class="sib" href="/" aria-label="the Sessions page" title="the Sessions page">‹</a>
+      <button type="button" class="swho" id="fwho" aria-haspopup="dialog" title="{{ help_title('strip') }}"><span class="sdot s-{{ s.state_class }}" id="fwhodot"></span><span class="mono nm">{{ s.name }}</span><span class="st" id="fwhost">{{ s.state_label }}{% if s.age %} {{ s.age }}{% endif %}</span><span class="car" aria-hidden="true">▾</span></button>
+      <button type="button" class="needpill hidden" id="fneeds" title="the session that has waited on you longest">▲ <span id="fneedsn">0</span></button>
+      <button type="button" class="sib" id="fmore" aria-haspopup="dialog" aria-label="more: everything else on this page" title="{{ help_title('sheet') }}">⋯</button>
+    </div>
     {# design §4.5 *The Focus screen's anatomy* (TD-156): the header is two lines. **The identity
        line** — what this session is: nothing on it is a button but the answer to a permission and
        the stops note. Until 2026-09-25 it was one wrapping row of twenty things, buttons included,
@@ -102,12 +119,12 @@
       {% if s.agent %}<button class="btn sm {{ 'link' if s.own and s.ready_ok else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
-      <button class="btn sm link" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">✉ Message</button>
+      <button class="btn sm link" id="fmessage" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">✉ Message</button>
       {# design §4.5a Focus **Wrap up** (TD-156, *What Wrap up promises*): a person's Wrap up is only
          the prompt; the hover and the press's toast say that the close is theirs #}
-      <button class="btn sm link" data-act="wrapup" data-id="{{ s.id }}"
+      <button class="btn sm link" id="fwrapup" data-act="wrapup" data-id="{{ s.id }}"
               title="{{ help_title('wrap-up') }}">Wrap up</button>{% endif %}
-      <button class="btn sm link" data-act="shell-here" data-id="{{ s.id }}" data-dir="{{ s.dir }}" title="a shell session in this session's directory, in a new tab (Shift: a window)">⌘ Open shell here</button>
+      <button class="btn sm link" id="fshell" data-act="shell-here" data-id="{{ s.id }}" data-dir="{{ s.dir }}" title="a shell session in this session's directory, in a new tab (Shift: a window)">⌘ Open shell here</button>
       {% endif %}
       {# design §4.5a Focus header **Transcript** (TD-166): the Transcript page in a new tab, on any
          state; only for a record holding a tool session id — a shell has nothing to read. Always in
@@ -142,7 +159,7 @@
           {#- …or, on the person's own session, past a shell's SHELL_WAIT with the shell its only failing row (TD-761) #}
           <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.shell_close or s.close_confirm }}"{% if not (close_now or (s.agent and (s.ready_ok or s.shell_close))) %} disabled{% endif %}
                   title="{{ help_title('close') }}">Close</button>
-          <button class="danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">✕ Kill</button>
+          <button class="danger" id="fkill" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">✕ Kill</button>
         </div>
       </details>
       {% endif %}
@@ -190,6 +207,9 @@
       {%- endfor %}
     </div>
     <div class="card composer{% if folded %} overlay folded{% endif %}{% if s.unattended %} hidden{% endif %}" id="composer">
+      {#- on a phone the composer is a sheet over the terminal (§4.5a *the input bar · ⌨*, TD-1299): its name and ✕,
+          which closes it with its draft kept; not drawn on the desktop page -#}
+      <div class="csheethead"><span class="h2 mono" id="csheettitle">{{ s.name }}</span><span class="grow"></span><button type="button" class="btn sm ghost" id="csheetx" aria-label="close the composer: the draft is kept" title="close: the draft is kept">✕</button></div>
       <textarea id="compose"{% if folded %} rows="6"{% endif %} placeholder="{% if s.agent %}Compose a prompt… multi-line, paste-friendly. The terminal above takes keys directly for menus and questions. Esc → terminal.{% else %}Type a command…{% endif %}"></textarea>
       <div class="row gap">
         {#- design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002):
@@ -227,6 +247,25 @@
       <button type="button" class="btn sm" id="cbattach" title="attach files: the composer opens with their paths in it"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
       <button type="button" class="btn sm hidden" id="cbcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
       <button type="button" class="btn primary" id="cbsend">→ Send</button>
+    </div>
+    {%- endif %}
+    {%- if s.state != 'scheduled' %}
+    {#- design §4.5a **the Watching line** (§4.5 *Phone layout*, TD-1299): on a phone, an unattended record's
+        read-only line with **Take over**, standing in the key bar's place — the key bar is not drawn on a
+        read-only attach. Shown and hidden by the record's mode and its ending, as the key bar is -#}
+    {%- set ended = s.state in ('exited', 'closed') %}
+    {% if s.agent %}<div class="fwatch{% if not s.unattended or ended %} hidden{% endif %}" id="fwatch" title="{{ help_title('watching-line') }}">
+      <span class="q">Watching. This session runs unattended.</span>
+      <button type="button" class="btn" data-act="mode" data-id="{{ s.id }}" data-unattended="1" id="fwatchgo">Take over</button>
+    </div>{% endif %}
+    {#- design §4.5a **the input bar · ⌨** (§4.5 *Phone layout*, TD-1299): on a phone, the composer's folded bar in its
+        own words, a press opening the composer as a sheet over the terminal; ⌨ gives the terminal focus, the one
+        way the phone's keyboard comes up for it. On an unattended record the field is **Message** and there is
+        no ⌨; on an ended record neither is drawn -#}
+    {%- set invite = ('Message ' ~ s.name ~ '…') if s.unattended else ('✎ Compose a prompt…' if s.agent else 'Type a command…') %}
+    <div class="fibar{% if ended %} hidden{% endif %}" id="fibar" title="{{ help_title('input-bar') }}">
+      <button type="button" class="fask" id="fask" data-invite="{{ '✎ Compose a prompt…' if s.agent else 'Type a command…' }}" data-message="Message {{ s.name }}…"{% if s.unattended %} data-mode="message"{% endif %}>{{ invite }}</button>
+      <button type="button" class="fkbd{% if s.unattended %} hidden{% endif %}" id="fkbd" aria-label="type into the terminal" title="type into the terminal: the keyboard comes up for it">⌨</button>
     </div>
     {%- endif %}
   </div>
@@ -369,6 +408,51 @@
         </span></dd>{% endif %}
       </dl>
     </details>
+  </div>
+  {#- design §4.5a **the sheet** (⋯) (§4.5 *Phone layout*, TD-1299): on a phone, the rest of Focus, nothing dropped —
+      the heading, the identity line's marks as chips (the script's, from the line), the acts as the acts line and
+      more ▾ draw them (each a press of that very control, shown and hidden as it is), one row per side-panel card
+      the record draws, each opening that card as a sheet, and Kill last. Not here: Pop out, ‹› VS Code, Copy tmux
+      command, Copy and copy on select (a touch selects nothing, §4.6) -#}
+  <div class="nscrim" id="fscrim"></div>
+  <div class="nsheet" id="fsheet" role="dialog" aria-modal="true" aria-label="{{ s.name }}: more">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="shhead"><div class="t mono">{{ s.name }}</div>
+      <div class="s">{{ s.host }} · {{ (s.repo or s.dir or '').rstrip('/').rsplit('/', 1)[-1] }} · {{ s.profile_line }} · <span id="fsheetmode">{{ 'unattended' if s.unattended else 'interactive' }}</span></div>
+      <div class="shchips" id="fsheetchips"></div></div>
+    {% if s.state != 'scheduled' %}<div class="shacts" id="fsheetacts">
+      {%- set acts = [('fclose', '✓', 'Close session'), ('fmodeact', '⇄', s.mode_act or 'Take over')] if s.agent else [('fclose', '✓', 'Close session')] %}
+      {%- if s.agent %}{% set acts = acts + [('fmessage', '✉', 'Message'), ('fwrapup', '⏎', 'Wrap up')] %}{% endif %}
+      {%- set acts = acts + [('ftranscript', '☰', 'Transcript'), ('fshell', '⌘', 'Open shell here'), ('tpaste', '⎘', 'Paste')] %}
+      {%- if s.agent %}{% set acts = acts + [('fmodemenu', '⇄', s.mode_act or 'Hand back')] %}{% endif %}
+      {%- for src, glyph, label in acts %}
+      <button type="button" class="act{% if src in ('fclose', 'fmodeact') %} next{% endif %}" data-for="{{ src }}"><span class="ic" aria-hidden="true">{{ glyph }}</span><span class="al">{{ label }}</span></button>
+      {%- endfor %}
+    </div>{% endif %}
+    <div class="shrows" id="fsheetrows">
+      {%- set rows = [] %}
+      {%- if s.agent %}{% set rows = rows + [('working', '✎', 'Working'), ('prompts', '❯', 'Prompts')] %}{% endif %}
+      {%- if not s.reaped %}{% set rows = rows + [('git', '⎇', 'Git')] %}{% endif %}
+      {%- if s.agent %}{% set rows = rows + [('reports', '✓', 'Reports'), ('inbox', '✉', 'Inbox')] %}{% endif %}
+      {%- if s.holds_control %}{% set rows = rows + [('members', '☷', 'Members')] %}{% endif %}
+      {%- if s.agent %}{% set rows = rows + [('ready', '☐', 'Ready to close')] %}{% endif %}
+      {%- set rows = rows + [('session', 'ⓘ', 'Session')] %}
+      {%- for card, glyph, label in rows %}
+      <button type="button" class="shrow" data-card="{{ card }}"><span class="gl" aria-hidden="true">{{ glyph }}</span><span>{{ label }}</span><span class="m" data-sum="{{ card }}"></span></button>
+      {%- endfor %}
+      {% if s.state != 'scheduled' %}<button type="button" class="shrow red" data-for="fkill"><span class="gl" aria-hidden="true">✕</span><span>Kill</span></button>{% endif %}
+    </div>
+  </div>
+  {#- a card of the sheet opened on its own (§4.5a *the sheet*): the side panel's very card, moved in while it is open -#}
+  <div class="nsheet full" id="fcardsheet" role="dialog" aria-modal="true" aria-label="a card">
+    <div class="cshead"><button type="button" class="sib" id="fcardback" aria-label="back to the sheet" title="back to the sheet">‹</button><span class="h2" id="fcardtitle"></span></div>
+    <div class="csbody" id="fcardbody"></div>
+  </div>
+  {#- design §4.5a **the switcher** (§4.5 *Phone layout*, TD-1299): every record in the Sessions page's order, grouped,
+      the open one marked *here*; seeded here and kept from the light stream's `state` deltas -#}
+  <div class="nsheet" id="fswitch" role="dialog" aria-modal="true" aria-label="switch session" title="{{ help_title('switcher') }}" data-rows='{{ (switch_rows or []) | tojson }}'>
+    <div class="grab" aria-hidden="true"></div>
+    <div id="fswitchlist"></div>
   </div>
 </div>
 {% endblock %}
