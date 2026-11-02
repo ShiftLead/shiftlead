@@ -262,6 +262,59 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "strip",
+        "the strip",
+        "Focus on a phone",
+        (
+            "The one row at the top of Focus on a phone: ‹ back to the Sessions page, this session's name and "
+            "state, ▲ with how many other sessions need you, and ⋯. Press the name to switch to another "
+            "session, ▲ to go to the one that has waited on you longest, ⋯ for everything else Focus holds. It "
+            "sends nothing to the session."
+        ),
+    ),
+    Help(
+        "watching-line",
+        "the Watching line",
+        "Focus on a phone",
+        (
+            "Under the terminal of a session that runs unattended: it says you are watching, with Take over "
+            "beside it. Press Take over when you want to type to the session yourself. While you watch, nothing"
+            " you press reaches the pane; a permission it asks for is answered from the Inbox."
+        ),
+    ),
+    Help(
+        "input-bar",
+        "the input bar",
+        "Focus on a phone",
+        (
+            "Under the terminal on a phone: its field opens the composer over the terminal, and ⌨ brings the "
+            "keyboard up typing straight into the terminal. Write a prompt in the composer, where autocorrect, "
+            "paste and dictation work; press ⌨ for a menu, a short reply or Ctrl-C. A tap on the terminal does "
+            "not bring the keyboard up: ⌨ does."
+        ),
+    ),
+    Help(
+        "sheet",
+        "the sheet",
+        "Focus on a phone, ⋯",
+        (
+            "Everything Focus holds that the phone's one screen leaves out: the session's marks, its acts — "
+            "Close session, Take over, Message, Wrap up, Transcript, Open shell here, Paste — one row per "
+            "side-panel card, and Kill last. Press ⋯ to reach any of them; a card's row opens that card on its "
+            "own. It holds no Copy: on a phone, copy text from the Transcript."
+        ),
+    ),
+    Help(
+        "switcher",
+        "the switcher",
+        "Focus on a phone",
+        (
+            "Every session, in the Sessions page's order — needs you first, then working, then idle — each with"
+            " what it waits on and its age, this one marked here. Press one to open its Focus in this tab. It "
+            "changes nothing on any session."
+        ),
+    ),
+    Help(
         "restart",
         "Restart",
         "the Inbox restart row, a card's *more ▾*",
@@ -765,6 +818,11 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "pane-path",
             "disconnect-card",
             "soft-key-row",
+            "strip",
+            "watching-line",
+            "input-bar",
+            "sheet",
+            "switcher",
         ),
     ),
     (

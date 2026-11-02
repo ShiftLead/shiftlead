@@ -364,7 +364,7 @@ def test_the_persons_file_link_turns_the_folder_off_and_sets_the_wait():
 def test_focus_registers_the_provider_only_where_the_header_draws_its_editor_button():
     js = (UI / "static" / "app.js").read_text()
     focus = js[js.index("AO.focus = function") :]
-    made = "const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor) : null;"
+    made = "const pathLinks = s.editor && s.editor.file ? AO.pathProvider(term, id, s.editor, undefined, rec) : null;"
     assert made in focus and "if (pathLinks) term.registerLinkProvider(pathLinks);" in focus
     # beside the web-links addon, before the attach decides read-only; a re-attach forgets the answers
     assert focus.index("new WebLinksAddon.WebLinksAddon") < focus.index(made) < focus.index("let readOnly = false")
