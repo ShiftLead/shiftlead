@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Any
 
 from sessionorc import agent_common, notify
+from sessionorc import push as push_mod
 from sessionorc import queue as queue_mod
 from sessionorc import settings as settings_mod
 from sessionorc import work as work_mod
@@ -301,6 +302,51 @@ class NotifyMixin:
         if proc.returncode == 0:
             return None
         return notify.reason(err.decode(errors="replace")) or f"exit {proc.returncode}"
+
+    def _push_view(self) -> dict[str, Any]:
+        """`push` for the `host` read (§4.10 *Told on the home-screen app too*): `push.json` less each device's
+        endpoint and keys — the seam the Settings page's Push card draws from."""
+        return push_mod.view(push_mod.load())
+
+    def _push_home(self, caller: Any, act: str) -> None:
+        agent_common.person_only(caller, act, "§4.10", self._graph())
+        if self.mode != "home":
+            raise RpcError(f"{act} runs at the home (design §4.10 *Only the home sends*): this host is a node")
+
+    async def rpc_push_subscribe(
+        self,
+        endpoint: Any = None,
+        keys: Any = None,
+        label: Any = None,
+        key: Any = None,
+        replaces: Any = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """**tell me on this device** (§4.5a **You**: **Push**, §4.10 *On and off, per device*): list this
+        browser's subscription in `push.json` and answer `{id}`; refused, naming the field, for a key that is
+        not the home's, an endpoint that is not `https` to a public host, or keys of the wrong size, and while
+        the key reads anything but *key*. A person's own, at the home alone (it is not in `modes.HOME_EDITS`:
+        a tap opens the origin the worker was registered on)."""
+        self._push_home(caller, "turn push on for a device")
+        doc = push_mod.load()
+        try:
+            got = push_mod.subscribe(doc, endpoint, keys, label, key, now_iso(), replaces)
+        except ValueError as e:
+            raise RpcError(f"push_subscribe: {e} (design §4.10)") from None
+        push_mod.save(doc)
+        return {"id": got}
+
+    async def rpc_push_unsubscribe(self, id: Any = None, caller: Any = None) -> dict[str, Any]:
+        """**tell me on this device** off, or a device's **Remove** (§4.5a **You**: **Push**): drop the device
+        `id` from `push.json`. A person's own, at the home alone. `{removed}`: false when it was not listed."""
+        self._push_home(caller, "turn push off for a device")
+        if not isinstance(id, str) or not id:
+            raise RpcError("push_unsubscribe: id is the device's id (design §4.10)")
+        doc = push_mod.load()
+        removed = push_mod.unsubscribe(doc, id)
+        if removed:
+            push_mod.save(doc)
+        return {"removed": removed}
 
     def _notify_view(self) -> dict[str, Any]:
         """`notify: {last_ok, last_error}` for the `host` read (§4.10): the last send's result."""

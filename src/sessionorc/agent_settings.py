@@ -445,38 +445,45 @@ class SettingsMixin:
 
     @staticmethod
     def _notify_change(current: Any, notify: Any) -> dict[str, Any]:
-        """`set_settings`'s `notify` half: `{telegram: {on?, secrets?, link?} | None}` laid over what
-        the file holds, each field checked, a None clearing it; the result refused when it is switched
-        on with no secrets to send with (§4.10, TD-319)."""
+        """`set_settings`'s `notify` half: `{telegram: {on?, secrets?, link?} | None, push: {on?, telegram?,
+        secrets?} | None}` laid over what the file holds, each field checked, a None clearing it; Telegram
+        refused when it is switched on with no secrets to send with (§4.10, TD-319, TD-1302)."""
         if not isinstance(notify, dict) or not notify:
-            raise RpcError("set_settings: notify is {telegram: {on, secrets, link}} (design §5 settings.yml)")
+            raise RpcError(
+                "set_settings: notify is {telegram: {on, secrets, link}, push: {on, telegram, secrets}} "
+                "(design §5 settings.yml)"
+            )
         if unknown := sorted(set(map(str, notify)) - set(settings_mod.NOTIFY_KEYS)):
             raise RpcError(f"notify: unknown key {', '.join(unknown)} (known: {', '.join(settings_mod.NOTIFY_KEYS)})")
         kept = dict(current) if isinstance(current, dict) else {}
-        fields = notify["telegram"]
-        if fields is None:
-            kept.pop("telegram", None)
-            return kept
-        if not isinstance(fields, dict):
-            raise RpcError("notify.telegram: a mapping of on, secrets, link, or null to remove it")
-        if unknown := sorted(set(map(str, fields)) - set(settings_mod.TELEGRAM_KEYS)):
-            known = ", ".join(settings_mod.TELEGRAM_KEYS)
-            raise RpcError(f"notify.telegram: unknown key {', '.join(unknown)} (known: {known})")
-        try:
-            parsed = settings_mod.parse_telegram({k: v for k, v in fields.items() if v is not None})
-        except ValueError as e:
-            raise RpcError(f"notify.{e}") from None
-        tg = settings_mod.notify({"notify": kept}).get("telegram", {})
-        tg = {**{k: v for k, v in tg.items() if fields.get(k, ...) is not None}, **parsed}
-        if tg.get("on") and not tg.get("secrets"):
-            raise RpcError(
-                "notify.telegram.secrets: switching Telegram on needs the Doppler project/config that holds "
-                "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (design §4.10)"
-            )
-        if tg:
-            kept["telegram"] = tg
-        else:
-            kept.pop("telegram", None)
+        parts = (("telegram", settings_mod.TELEGRAM_KEYS, settings_mod.parse_telegram),
+                 ("push", settings_mod.PUSH_KEYS, settings_mod.parse_push))  # fmt: skip
+        for name, known_keys, parse in parts:
+            if name not in notify:
+                continue
+            fields = notify[name]
+            if fields is None:
+                kept.pop(name, None)
+                continue
+            if not isinstance(fields, dict):
+                raise RpcError(f"notify.{name}: a mapping of {', '.join(known_keys)}, or null to remove it")
+            if unknown := sorted(set(map(str, fields)) - set(known_keys)):
+                raise RpcError(f"notify.{name}: unknown key {', '.join(unknown)} (known: {', '.join(known_keys)})")
+            try:
+                parsed = parse({k: v for k, v in fields.items() if v is not None})
+            except ValueError as e:
+                raise RpcError(f"notify.{e}") from None
+            got = settings_mod.notify({"notify": kept}).get(name, {})
+            got = {**{k: v for k, v in got.items() if fields.get(k, ...) is not None}, **parsed}
+            if name == "telegram" and got.get("on") and not got.get("secrets"):
+                raise RpcError(
+                    "notify.telegram.secrets: switching Telegram on needs the Doppler project/config that holds "
+                    "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (design §4.10)"
+                )
+            if got:
+                kept[name] = got
+            else:
+                kept.pop(name, None)
         return kept
 
     async def rpc_commit_defs(self, message: str = "", caller: Any = None) -> dict[str, Any]:
