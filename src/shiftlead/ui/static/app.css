@@ -715,6 +715,11 @@ html.phonefocus .termwrap .termbox, html.phonefocus .termwrap.cfold .termbox { f
    box at 16 px, so iOS does not zoom the page when ⌨ focuses it; two fingers are the terminal's (TD-1301's pinch) */
 html.phonefocus .termbox, html.phonefocus .termbox * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 html.phonefocus .termbox .xterm-helper-textarea { font-size: var(--t-field); }
+/* a pinch is the terminal's on a phone (§4.5a *a pinch*, TD-1301): `none` in place of §4.6's `pinch-zoom` (Chrome's
+   half; the handler prevents the two-finger touchmove for iOS), and its passing note over the terminal */
+html.phonefocus .termbox, html.phonefocus .termbox .xterm, html.phonefocus .termbox .xterm-viewport, html.phonefocus .termbox .xterm-screen { touch-action: none; }
+.pinchnote { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 6; padding: 4px 12px; border-radius: 16px;
+  background: var(--card); color: var(--fg); border: 1px solid var(--border); font-size: var(--t-small); font-weight: 500; pointer-events: none; white-space: nowrap; }
 html.phonefocus .softkeys { flex: none; padding: 5px 6px; background: var(--top); }
 /* the strip (§4.5a *the strip*): 44 px, the top bar's colour; ‹, ▲ n and ⋯ are 44 × 44, the session takes the rest */
 html.phonefocus .fstrip { display: flex; flex: none; align-items: center; gap: 2px; height: 44px; padding: 0 4px; background: var(--top); color: var(--topfg); border-bottom: 1px solid var(--topline); }

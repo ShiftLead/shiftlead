@@ -317,6 +317,28 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "pinch",
+        "a pinch",
+        "Focus on a phone",
+        (
+            "Two fingers on the terminal make its text larger or smaller, from 9 to 16 px, and a note says the "
+            "size and the columns it gives. Pinch when the lines are too small to read or too few fit across. "
+            "The size is this browser's, on its phone layout only: the Settings page's terminal size still sets"
+            " your other browsers and this one's desktop page, and the page itself does not zoom."
+        ),
+    ),
+    Help(
+        "strip-swipe",
+        "a swipe on the strip",
+        "Focus on a phone",
+        (
+            "A sideways swipe on the strip opens the next session, or the previous one, in the switcher's "
+            "order: to the left for the next, to the right for the one before. Swipe to walk the sessions that "
+            "need you without opening the switcher. A swipe that starts at the screen's edge is the browser's "
+            "back and forward, not this."
+        ),
+    ),
+    Help(
         "restart",
         "Restart",
         "the Inbox restart row, a card's *more ▾*",
@@ -825,6 +847,8 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "input-bar",
             "sheet",
             "switcher",
+            "pinch",
+            "strip-swipe",
         ),
     ),
     (

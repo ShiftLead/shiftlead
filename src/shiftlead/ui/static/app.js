@@ -67,9 +67,34 @@
   // ligatures stay off (xterm.js draws none without its addon, which is never loaded).
   AO.terms = [];
   AO.termFamily = (face) => (face ? `"${String(face).replace(/["\\]/g, "")}", monospace` : '"JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace');
+  // **A pinch** (§4.5a *a pinch*, TD-1301): on a phone two fingers set the terminal's font size, 9–16 px, kept in this
+  // browser in place of `person.terminal.size` on its narrow screen alone — read only while the narrow query holds,
+  // so the same browser's desktop page keeps the setting. Pure but for the storage, for a test.
+  AO.PINCH_MIN = 9; AO.PINCH_MAX = 16;
+  // a size, clamped; null for anything that is not a finite number, which no caller sets
+  AO.pinchClamp = (n) => {
+    const v = Number(n);
+    return Number.isFinite(v) ? Math.min(AO.PINCH_MAX, Math.max(AO.PINCH_MIN, Math.round(v))) : null;
+  };
+  AO.pinchKept = function () {
+    // read off the page itself: this runs at load, before the phone's helpers below are defined
+    const c = document.documentElement && document.documentElement.classList;
+    if (!(c && c.contains("phonefocus"))) return null;
+    const v = store.get("term.pinch", null);
+    return typeof v === "number" && isFinite(v) ? AO.pinchClamp(v) : null;
+  };
+  AO.pinchKeep = (n) => { const v = AO.pinchClamp(n); if (v != null) store.set("term.pinch", v); };
+  // the size a terminal is drawn at: the kept pinch first, then the setting (a Save's broadcast included), else 13
+  AO.termSize = function (look) {
+    const kept = AO.pinchKept();
+    if (kept != null) return kept;
+    const size = Number(look && look.size);
+    return size >= 8 && size <= 32 ? size : 13;
+  };
   AO.setTermLook = function (look) {
-    const size = Number(look && look.size), face = look && look.face ? String(look.face) : "";
-    AO.TERM_OPTS.fontSize = size >= 8 && size <= 32 ? size : 13;
+    AO.termLook = look || {};  // the setting as last heard: a crossing of the narrow query draws it again
+    const face = look && look.face ? String(look.face) : "";
+    AO.TERM_OPTS.fontSize = AO.termSize(look);
     AO.TERM_OPTS.fontFamily = AO.termFamily(face);
     AO.termFace = face ? `"${face.replace(/["\\]/g, "")}"` : "";
     AO.terms.forEach(({ term, fit }) => {
@@ -291,6 +316,39 @@
     const t = (r) => { const x = Date.parse(r.since || ""); return isNaN(x) ? Infinity : x; };
     const first = need.slice().sort((a, b) => t(a) - t(b))[0];
     return { n: need.length, first: first ? first.id : null };
+  };
+  // **The strip's swipe** (§4.5a *the strip*, TD-1301): 40 px, mostly sideways, opens the next record in the
+  // switcher's order (a swipe to the left) or the previous one (to the right); none that starts within `SWIPE_EDGE` of
+  // the screen's edge, which is the browser's back and forward. The id to open, or null. Pure, for a test.
+  AO.SWIPE_MIN = 40; AO.SWIPE_EDGE = 16;
+  AO.swipeTarget = function (rows, here, dx, dy, x0, width) {
+    if (x0 < AO.SWIPE_EDGE || x0 > width - AO.SWIPE_EDGE) return null;
+    if (Math.abs(dx) < AO.SWIPE_MIN || Math.abs(dx) < 2 * Math.abs(dy)) return null;
+    const order = AO.switchGroups(rows).flatMap((g) => g.rows.map((r) => r.id));
+    const i = order.indexOf(here);
+    if (i < 0) return null;
+    return order[dx < 0 ? i + 1 : i - 1] || null;
+  };
+  // …the one finger it reads: the touch that went down alone, found again by its `identifier` at its lift; a gesture
+  // a second finger joined is no swipe until every finger has lifted. `end` answers `{dx, dy, x0}` or null.
+  AO.swipeTrack = function () {
+    let from = null, multi = false;
+    return {
+      start(e) {
+        if (e.touches.length > 1) { multi = true; from = null; return; }
+        const t = e.touches[0];
+        multi = false; from = { id: t.identifier, x: t.clientX, y: t.clientY };
+      },
+      move(e) { if (e.touches.length > 1) { multi = true; from = null; } },
+      cancel() { from = null; multi = false; },
+      end(e) {
+        const f = from, t = f && Array.from(e.changedTouches || []).find((x) => x.identifier === f.id);
+        if (e.touches.length === 0) { from = null; if (multi) { multi = false; return null; } }
+        if (!f || multi || !t) return null;
+        from = null;
+        return { dx: t.clientX - f.x, dy: t.clientY - f.y, x0: f.x };
+      },
+    };
   };
   AO.stateClass = (state) => ({ "needs-you": "needs", "stalled?": "stalled" }[state] || state || "");
   // The switcher's groups (§4.5a *the switcher*): the Sessions page's order — *Needs you*, *Working*, *Idle*, then
@@ -6098,6 +6156,22 @@
     };
     const who = $("#fwho");
     if (who) who.addEventListener("click", () => { drawSwitch(); show(swEl); });
+    // a sideways swipe on the strip walks the switcher's order (TD-1301); its lift's click is the swipe's, not a press
+    const strip = $("#fstrip");
+    if (strip) {
+      const sw = AO.swipeTrack();
+      strip.addEventListener("touchstart", (e) => sw.start(e), { passive: true });
+      strip.addEventListener("touchmove", (e) => sw.move(e), { passive: true });
+      strip.addEventListener("touchcancel", () => sw.cancel(), { passive: true });
+      strip.addEventListener("touchend", (e) => {
+        const g = sw.end(e);
+        if (!g || !narrow) return;
+        const to = AO.swipeTarget(rows, s.id, g.dx, g.dy, g.x0, window.innerWidth);
+        if (!to) return;
+        if (e.cancelable) e.preventDefault();
+        location.href = `/focus/${encodeURIComponent(to)}`;
+      }, { passive: false });
+    }
     return {
       narrow: () => narrow,
       opened: () => !!open,
@@ -6469,6 +6543,42 @@
     };
     termEl.addEventListener("touchend", touchEnd, { capture: true, passive: false });
     termEl.addEventListener("touchcancel", touchEnd, { capture: true, passive: false });
+    // **A pinch** (§4.5a *a pinch*, TD-1301): on a phone two fingers on the terminal set its font size, drawn as they
+    // move and kept when they lift, when the grid is sent once (the fit, through `sendGrid`) with a passing note of the
+    // size and the columns it gives. Its own listeners beside TD-986's: a second finger already ends a scroll there.
+    // The two-finger `touchmove`'s default is prevented here, which is what stops iOS Safari zooming the page.
+    let pinch = null;
+    const span = (e) => { const [a, b] = e.targetTouches; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1; };
+    termEl.addEventListener("touchstart", (e) => {
+      if (!phone.narrow() || e.targetTouches.length !== 2) return;
+      pinch = { d0: span(e), size0: term.options.fontSize, size: term.options.fontSize };
+      e.preventDefault();
+    }, { capture: true, passive: false });
+    termEl.addEventListener("touchmove", (e) => {
+      if (!pinch) return;
+      e.preventDefault();
+      if (e.targetTouches.length < 2) return;
+      const size = AO.pinchClamp(pinch.size0 * span(e) / pinch.d0);
+      if (size != null && size !== pinch.size) { pinch.size = size; term.options.fontSize = size; AO.TERM_OPTS.fontSize = size; }
+    }, { capture: true, passive: false });
+    const pinchEnd = (e) => {
+      if (!pinch || e.targetTouches.length >= 2) return;
+      const { size } = pinch;
+      pinch = null;
+      AO.pinchKeep(size);
+      try { fit.fit(); } catch (_) { /* laid out on its next resize */ }
+      pinchNote(`${size} px · ${term.cols} columns`);
+    };
+    termEl.addEventListener("touchend", pinchEnd, { capture: true, passive: false });
+    termEl.addEventListener("touchcancel", pinchEnd, { capture: true, passive: false });
+    let noteTimer = null;
+    const pinchNote = (text) => {
+      const w = $("#termwrap"); if (!w) return;
+      let n = $(".pinchnote", w);
+      if (!n) { n = document.createElement("div"); n.className = "pinchnote"; n.setAttribute("role", "status"); w.appendChild(n); }
+      n.textContent = text; n.classList.remove("hidden");
+      clearTimeout(noteTimer); noteTimer = setTimeout(() => n.classList.add("hidden"), 1800);
+    };
     // The soft-key row (§4.5a **Focus pane: soft-key row**, TD-990): a press types the key's bytes through the
     // terminal, as xterm.js's own keys do (`onData`, the socket), and moves no focus, so the phone's keyboard
     // stays as it is. The pointer is captured, so its `pointerup` reaches the key whatever it is, and the key is
@@ -6579,7 +6689,7 @@
     term.onResize(({ cols, rows }) => sendGrid(cols, rows));
     // every sheet lies over the terminal and changes nothing: while one is open no grid is sent, and the terminal
     // refits once it closes (§4.5 *What the terminal's grid does*); a crossing of the narrow query refits it once
-    new ResizeObserver(() => { if (!phone.opened()) fit.fit(); }).observe($("#term"));
+    new ResizeObserver(() => { if (!phone.opened() && !pinch) fit.fit(); }).observe($("#term"));
     phone.closed(() => fit.fit());
     toTerm();
     // *The keyboard is up for the terminal* is the terminal's focus, never a guess from the viewport: the input bar
@@ -6650,7 +6760,13 @@
       window.addEventListener("resize", fill);
       fill();
     }
-    phone.relaid(() => { fill(); if (!phone.opened()) fit.fit(); });
+    // a crossing draws the terminal at the size its layout reads: the kept pinch on the phone, the setting off it
+    phone.relaid(() => {
+      fill();
+      const size = AO.termSize(AO.termLook);
+      AO.TERM_OPTS.fontSize = size; term.options.fontSize = size;  // this terminal only; no other is this layout's
+      if (!phone.opened()) fit.fit();  // under a sheet no grid is sent: its close refits
+    });
     // the soft-key row's height is one variable (`--softh` on the wrap, 0 while it is hidden), which `fill()`
     // adds to the bar's and the composer and a popped-out terminal read; registered folded or not
     if (softEl && wrap) new ResizeObserver(() => { wrap.style.setProperty("--softh", `${softEl.offsetHeight}px`); fill(); }).observe(softEl);
