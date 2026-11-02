@@ -3124,6 +3124,10 @@
   // **1–9** turns the row to its digit page, `1`–`9` and `‹`, and `‹` turns it back: the page is the row's `digits` class
   AO.softPage = (row, page) => row.classList.toggle("digits", page === "digits");
   AO.CTRL_HOLD = 500;
+  // what xterm.js says on `onData` of itself, never a key: a CSI reply whole (a focus report, a cursor, device or
+  // window report, DECRQM's `CSI ? Ps ; Pm $ y`), an OSC or a DCS one. xterm.js gives no hook that tells them from
+  // typing, so they are read by shape; a bar arrow (`CSI A`) is one too, and leaves the latch standing
+  AO.TERM_REPLY = /^\x1b(?:\[[?>=]?[\d;$]*[a-zA-Z]|[\]P][\s\S]*(?:\x07|\x1b\\))$/;
   AO.ctrlByte = (c) => (/^[a-z]$/i.test(c) ? String.fromCharCode(c.toUpperCase().charCodeAt(0) - 64) : c === "[" ? "\x1b" : c);
   AO.ctrlLatch = function () {
     let state = "off";  // off | latched | locked
@@ -3133,7 +3137,7 @@
       hold() { state = state === "locked" ? "off" : "locked"; },
       apply(data) {
         const d = String(data);
-        if (state === "off" || !d || /^\x1b\[[?>]?[\d;]*[cnRIO]$/.test(d)) return d;
+        if (state === "off" || !d || AO.TERM_REPLY.test(d)) return d;
         if (state === "latched") state = "off";
         return AO.ctrlByte(d[0]) + d.slice(1);
       },
@@ -6494,15 +6498,20 @@
         const p = e.target.closest && e.target.closest("button[data-pad]");
         const k = p || keyOf(e); if (!k) return;
         e.preventDefault();
-        try { k.setPointerCapture(e.pointerId); } catch (_) { /* a pointer already gone */ }
+        let captured = true;
+        try { k.setPointerCapture(e.pointerId); } catch (_) { captured = false; /* a pointer already gone */ }
+        // the pad repeats only while it holds its pointer: one it could not capture is never armed, since its lift
+        // could land elsewhere and never stop the repeat
+        if (p) { if (captured) { k.classList.add("down"); pad.down(e.clientX, e.clientY); } return; }
         k.classList.add("down");
-        if (p) { pad.down(e.clientX, e.clientY); return; }
         if (k === ctrlEl) { clearTimeout(held); held = setTimeout(() => { held = "fired"; ctrl.hold(); drawCtrl(); }, AO.CTRL_HOLD); }
       });
       if (padEl) {
         padEl.addEventListener("pointermove", (e) => pad.move(e.clientX, e.clientY));
         const lift = () => { pad.up(); up(padEl); };
         for (const k of ["pointerup", "pointercancel", "lostpointercapture"]) padEl.addEventListener(k, lift);
+        // …and any lift on the page stops it, whatever held the pointer
+        for (const k of ["pointerup", "pointercancel"]) document.addEventListener(k, () => pad.up(), true);
       }
       // WebKit moves focus on the emulated mousedown a prevented pointerdown does not stop
       softEl.addEventListener("mousedown", (e) => { if (keyOf(e) || e.target.closest("button[data-pad]")) e.preventDefault(); });

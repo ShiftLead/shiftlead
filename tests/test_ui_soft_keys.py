@@ -45,6 +45,10 @@ step("tap"); step("data", "hello");                            // the phone's wo
 step("tap"); step("tap"); step("data", "x");                    // a second tap lets the latch go
 step("hold"); step("data", "a"); step("data", "["); step("data", "Z"); step("tap"); step("data", "a");
 step("tap"); step("data", "\x1b[I"); step("data", "\t");          // a focus report is no key; the tab clears it
+// xterm.js's own replies to a program's probes — DECRQM (ink's), a window report, an OSC colour — leave the latch
+step("tap"); step("data", "\x1b[?2026;2$y"); step("data", "\x1b[8;24;80t");
+step("data", "\x1b]11;rgb:0b0b/0e0e/1212\x1b\\\\");
+step("data", "c");
 // the drag pad by a scripted pointer, the clock in our hand
 let now = 0; const timers = []; const sent = [];
 const tm = {
@@ -128,6 +132,9 @@ def test_ctrl_latches_for_one_key_and_a_hold_locks_it_over_a_letter():
         "locked", ("a", "\x01"), "locked", ("[", "\x1b"), "locked", ("Z", "\x1a"), "locked",  # locked: every key
         "off", ("a", "a"), "off",  # a press unlocks it
         "latched", ("\x1b[I", "\x1b[I"), "latched", ("\t", "\t"), "off",  # a focus report is no key; a bar key is
+        "latched", ("\x1b[?2026;2$y", "\x1b[?2026;2$y"), "latched", ("\x1b[8;24;80t", "\x1b[8;24;80t"), "latched",
+        ("\x1b]11;rgb:0b0b/0e0e/1212\x1b\\", "\x1b]11;rgb:0b0b/0e0e/1212\x1b\\"), "latched",
+        ("c", "\x03"), "off",  # the person's next c is still ^C
     ]  # fmt: skip
 
 
@@ -169,6 +176,11 @@ def test_the_row_never_scrolls_and_its_keys_take_no_pan():
     # the pad keeps its pointer, and the keys' test at pointerup is never the pad's
     assert 'padEl.addEventListener("pointermove", (e) => pad.move(e.clientX, e.clientY));' in focus
     assert "button[data-key], button[data-ctrl], button[data-page], button[data-blur]" in focus
+    # a pad whose pointer could not be captured is never armed, and any lift on the page stops its repeat
+    assert 'if (p) { if (captured) { k.classList.add("down"); pad.down(e.clientX, e.clientY); } return; }' in focus
+    assert (
+        'for (const k of ["pointerup", "pointercancel"]) document.addEventListener(k, () => pad.up(), true);' in focus
+    )
     # ctrl's next key is the bar's own (through `term.input`) or the keyboard's: both reach onData
     assert 'if (ctrl.state() !== "off") { d = ctrl.apply(d); drawCtrl(); }' in focus
 
