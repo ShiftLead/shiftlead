@@ -292,12 +292,16 @@ table.cmp th { font-weight: 600; }
 <span class="g">●</span> Clean. Rebasing onto main and running the
   ledger checks.
 
-<span class="y">✻ Waiting for permission…</span></div>
-  <div class="tray">
-    <div class="q">Allow Bash?</div>
-    <div class="cmd">git rebase origin/main &amp;&amp; agent-cadence run ledger.py --check</div>
-    <div class="btns"><button>Deny</button><button class="allow">Allow</button></div>
-  </div>
+<span class="d">╭──────────────────────────────────────────</span>
+<span class="d">│</span> <span class="w">Bash command</span>
+<span class="d">│</span>   git rebase origin/main &amp;&amp; agent-cadence
+<span class="d">│</span>   run ledger.py --check
+<span class="d">│</span> Do you want to proceed?
+<span class="d">│</span> <span class="b">❯ 1. Yes</span>
+<span class="d">│</span>   2. Yes, and don't ask again for git
+<span class="d">│</span>      rebase commands in this project
+<span class="d">│</span>   3. No, and tell Claude what to do
+<span class="d">│</span>      differently <span class="d">(esc)</span></div>
   <div class="keys">
     <button class="k">esc</button><button class="k">tab</button><button class="k wide">⇧tab</button><button class="k">ctrl</button><button class="k pad">◂▴▾▸</button><button class="k">↵</button><button class="k">1–9</button>
   </div>
@@ -306,7 +310,7 @@ table.cmp th { font-weight: 600; }
     <button class="round">⌨</button>
   </div>
 </div>
-<figcaption><b>4. It needs you.</b> A held permission (the hook channel) comes up as a tray over the key bar, with the command in full and two 46 px answers. The header's Allow / Deny, made big enough to hit. It lies over the terminal's foot, so it resizes nothing. Another session needing you raises <b>▲ 1</b>, and a tap goes straight to it.</figcaption>
+<figcaption><b>4. It needs you.</b> Claude Code's own permission dialog, in the pane, answered as on a desktop: <b>1–9</b> then a digit, or <b>↵</b> on the highlighted line. Nothing is read off the screen or redrawn as buttons (Paul, 2026-11-02: <i>we should just leave questions in the terminal as-is</i>). Another session needing you raises <b>▲ 1</b>, and a tap goes straight to it.</figcaption>
 </figure>
 
 <!-- A5 more sheet -->
@@ -485,6 +489,7 @@ table.cmp th { font-weight: 600; }
 <table class="cmp">
 <tr><th>Question</th><th>Decision</th><th>Why</th></tr>
 <tr><td>A or B for the chrome</td><td>A. B's question buttons are not taken; questions stay in the terminal</td><td>A never covers terminal rows, so tmux's grid is exactly what shows. B's glass hides the input box Claude Code keeps on its last rows, and reading questions off the screen has proved unreliable.</td></tr>
+<tr><td>Permissions on the phone</td><td>In the terminal too: Claude Code's own dialog, no Allow / Deny tray</td><td>Paul, 2026-11-02: <i>we should just leave questions in the terminal as-is to avoid the parsing hassle</i>. The hook still holds the call; the pane's answer resolves it.</td></tr>
 <tr><td>Who owns the pane's width</td><td>The phone, as today, while it is the last to type</td><td>tmux's <code>window-size latest</code> already lets the last active client set the size. 50 columns is tight but Claude Code reflows to it. Pinch and landscape (about 95 columns) give more. Shrinking text to fit the desktop's 120 columns is unreadable.</td></tr>
 <tr><td>Keyboard up resizes the pane?</td><td>Yes, rows only, once it settles (the existing 150 ms resize rule)</td><td>Claude Code's input box sits on its last rows. If the pane kept its height, the keyboard would cover the line being typed.</td></tr>
 <tr><td>Default way to type</td><td>The composer, with <b>⌨</b> for direct keys</td><td>The phone's keyboard, autocorrect and dictation work in a real text box. Typing into xterm.js on Android garbles composed text (xterm.js #3600).</td></tr>

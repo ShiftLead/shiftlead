@@ -187,8 +187,8 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
 - [x] Phone answers for *questions* (2026-11-01): **in the terminal** — Paul: *we have found it to be
       problematic to reproduce questions from the terminal*, so a question is answered in the pane with
       the narrow Focus's key bar (`1–9`, the drag pad, `↵`, `esc`), and nothing redraws it as buttons
-      (§4.5 *Phone layout*, §4.5a **soft-key row**; TD-003). A held permission stays the hook's, the tray's
-      Allow / Deny.
+      (§4.5 *Phone layout*, §4.5a **soft-key row**; TD-003). A permission too (Paul, 2026-11-02: *we should
+      just leave questions in the terminal as-is*): the phone's Focus draws no Allow / Deny.
 - [x] **Rename the Herd page?** (2026-09-13): **yes, to Team** — "Herd" reads too close to
       herdr (§3, prior art, not renamed).
 - [x] **Does a team wind down when it runs out of work?** (2026-09-14): it did not — every

@@ -624,6 +624,7 @@ decisions; this file points at them rather than repeating them.
 - Considered and rejected (undated, with the full reasoning): the UI host as a store-and-forward router was the least code but made the UI a second writer holding state and left unanswered which host gates a cross-host act; a mesh of host agents kept partial tallies and budgets that disagree after a partition, forced a sleeping laptop to accept inbound connections, and could not have a relay layered on it later; the relay as the bus now meant hosting the home elsewhere with a hosted service's login, tenancy and operations before there was a product. Prior art cited: Kubernetes control plane with node agents, NATS leaf nodes, IMAP over SMTP.
 
 ## 4.5 UI
+- 2026-11-02 (TD-003, phone-view; Paul, 2026-11-02, on frame 4: *we should just leave questions in the terminal as-is to avoid the parsing hassle*): the phone's Focus draws no permission tray and no Allow / Deny — a permission is answered in the pane with Claude Code's own dialog, as a question is, the hook channel still holding the call; a subagent's held-back dialog is answered from the Inbox until the hook's timeout draws it; item 4 is *the Watching line*, on an unattended record only.
 - 2026-11-01 (TD-003's review, round 6, Fable, READY, 1 finding and 3 nits, all adopted; round 5 checked as landed): the *prompt chips* row loses its pre-TD-003 sentence, so the chips stand above Attach and Send in the composer's sheet only. The loop ends — Sonnet READY in round 5, Fable READY in round 6.
 - 2026-11-01 (TD-003's review, round 5, Sonnet, READY, 1 finding and 4 nits, the finding and two nits adopted; round 4 checked as landed): §4.4's attachment list says the phone's road is the composer sheet's picker and no share-sheet target; the held bar's phone case says a phone's Focus has no bar. The *below 720 px* wording of other pages is left as it stands.
 - 2026-11-01 (TD-003's review, round 4, Fable, NOT READY, 4 findings and 6 nits, all adopted; round 3 checked as landed, the mechanism checked against the vendored xterm.js 5.5): the lift hands `AO.paneLink` an event carrying `ctrlKey`; the hover is asked at the press and the open needs 500 ms and a lift, read by the TD-986 touch listeners with `AO.TOUCH_SLOP`; the rows *Attach / drop / paste*, *a finger's drag*, *the bar* and *prompt chips* say the phone's case.
@@ -913,6 +914,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-05 (TD-144, grinder-ao-2; Paul's look of 2026-10-04 at the live page: *bigger*): `--t-body` raised from 14 px to 15 px and nothing else moved, as the *Type scale* says; the card's rows, slot and foot keep their pixel tokens, so every Org card is still one height (read headless at 1440 and 390 px on a scratch home).
 
 ## 4.5a Controls
+- 2026-11-02 (TD-003, phone-view): row *the tray* becomes *the Watching line* (an unattended record's Take over only); *Focus · Allow / Deny* is not drawn on a phone, where a permission is answered in the pane.
 - 2026-11-01 (TD-003, phone-view): the soft-key row is reshaped as the key bar — `esc tab ⇧tab ctrl ◂▴▾▸ ↵ 1–9`, seven keys that never scroll, ctrl latched or locked, the drag pad's arrows repeating while held, `1–9` a digit page and `⌄` while the keyboard is up; new rows *the strip*, *the tray*, *the input bar · ⌨*, *the sheet (⋯)*, *the switcher* and *a pinch*; *» put away* and the top bar are not drawn on a narrow Focus.
 - 2026-11-01 (TD-1297, grinder-ao-2): the help list loses **Hold…**, and the **⋯** line its *hold or release it*, with `help.py` (TD-1296's build).
 - 2026-10-29 (TD-1190; Paul, from the shots: *yes, with all four fixes*): the form's shape agreed, with the heading's ledger as the repo resolves it, **Close** at the heading's right on a phone, Type's and Priority's options on one row there, and the line under **Hand to the techlead** as a sentence, the on-call case in the form's own words; the Message composer keeps §4.10's.
@@ -2496,6 +2498,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-20: `restart_wanted` added to invariant 14 (TD-083, §4.9a); `suspended` added to invariant 15's home-owned list (§4.8a).
 
 ## 10. Open questions
+- 2026-11-02 (TD-003): *Phone answers for questions* covers permissions too — the phone's Focus draws no Allow / Deny (Paul).
 
 - 2026-11-01 (TD-003, phone-view): *Phone answers for questions* closed — in the terminal, with the key bar; Paul declined redrawing a question as buttons.
 - 2026-10-13 (TD-636, the designer): *Allow for this session* stays declined; the director and the rules are not it.
