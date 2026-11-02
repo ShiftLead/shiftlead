@@ -12,19 +12,25 @@ user manager: `shiftlead-watch.timer`, a system timer, runs this every `WATCH_EV
   started by it;
 - **asks the home's socket** one never-gated read (`ping`) bounded at `ASK_SECONDS`, and keeps
   `silent_since` and what it told in `~/.shiftlead/watch.json`;
-- **tells the person** through the Telegram child (`sessionorc.notify`, the switch read from
-  `settings.yml` directly, since no home answers): once when it started the manager, once when the
-  home has been silent `WATCH_SILENCE` with the manager running, and once when it answers again after
-  either. A failed send is a line in `~/.shiftlead/watch.log` and is not retried; with `on: false`
-  nothing is sent.
+- **tells the person** on the channels the home tells on (`settings.yml` and `push.json` read
+  directly, since no home answers): once when it started the manager, once when the home has been
+  silent `WATCH_SILENCE` with the manager running, and once when it answers again after either.
+  Push (§4.10 *Told on the home-screen app too*, TD-1304) goes to every device `push.json` lists, the
+  path `/inbox` and the `tag` `watch`, while `notify.push.on` is not false and the key reads *key*;
+  Telegram goes beside it under *both*, or under *fallback* only when no push service took the line
+  (a paused key took nothing). A failed send is a line in `~/.shiftlead/watch.log` and is not
+  retried; with every channel off nothing is sent. The watch never writes `push.json`: a 404 or 410
+  it meets is its log line, and the home's next send drops that device.
 
 `step` is the judgement, pure over a fake clock, socket and `systemctl`; `main` wires the real ones.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import signal
 import subprocess
 import time
 from collections.abc import Callable
@@ -147,9 +153,11 @@ def ask() -> bool:
 
 
 def tell(line: str, secrets: str, log: Callable[[str], None]) -> None:
-    """The Telegram child with the line on its stdin; a failure is a log line, not retried."""
+    """The Telegram child with the line (and its link, on the next line) on its stdin; a failure is a log
+    line, not retried."""
     from sessionorc import notify
 
+    first = line.split("\n", 1)[0]
     try:
         cp = subprocess.run(
             notify.argv(secrets), input=line, capture_output=True, text=True, timeout=notify.CHILD_SECONDS
@@ -160,7 +168,83 @@ def tell(line: str, secrets: str, log: Callable[[str], None]) -> None:
     if cp.returncode != 0:
         log(f"send failed: {notify.reason(cp.stderr) or f'exit {cp.returncode}'}")
     else:
-        log(f"told: {line}")
+        log(f"told: {first}")
+
+
+Child = Callable[[list[str], str, float], tuple[int | None, str, str]]
+
+
+def _child(argv: list[str], stdin: str, bound: float) -> tuple[int | None, str, str]:
+    """One child in its own process group, given `bound` seconds: `(returncode, stdout, stderr)`, the
+    return code None when the bound ended it — the whole group, so Doppler's child, which holds the key,
+    ends too. What it printed before then is kept."""
+    proc = subprocess.Popen(
+        argv,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        out, err = proc.communicate(stdin, timeout=bound)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(proc.pid, signal.SIGKILL)
+        out, err = proc.communicate()
+        return None, out or "", err or ""
+    return proc.returncode, out or "", err or ""
+
+
+def push_tell(line: str, push: dict[str, Any], log: Callable[[str], None], child: Child = _child) -> bool:
+    """The push child (`--push`) with the line to every device `push` lists: whether some push service
+    took it (a 2xx). Each failure is a log line in the words a device's `last_error` uses, never an
+    endpoint; a key that does not read *key* in the child sends nothing."""
+    from sessionorc import notify
+    from sessionorc import push as push_mod
+
+    devices = push["devices"]
+    job = {
+        "sub": push["sub"],
+        "payloads": [{"body": notify.body(line), "path": "/inbox", "tag": "watch"}],
+        "devices": [{k: d.get(k) for k in ("id", "endpoint", "keys")} for d in devices],
+    }
+    try:
+        rc, out, err = child(
+            notify.argv(push["secrets"], "--push"), json.dumps(job), notify.CHILD_SECONDS + notify.REQUEST_SECONDS
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        log(f"push failed: {type(e).__name__}")
+        return False
+    lines: list[Any] = []
+    for raw in out.splitlines():
+        try:
+            lines.append(json.loads(raw))
+        except ValueError:
+            continue
+    reading = push_mod.reading_of(lines[0]) if lines else None
+    if reading is not None and reading != push_mod.KEY:
+        log(f"push not sent: {push_mod.PAUSED.format(reading)}")
+        return False
+    statuses = {str(d["id"]): None for d in devices}
+    for ln in lines[1:]:
+        if isinstance(ln, dict) and str(ln.get("device")) in statuses:
+            statuses[str(ln["device"])] = ln.get("status")
+    if rc is None:
+        why = f"no answer in {notify.CHILD_SECONDS + notify.REQUEST_SECONDS:g} s"
+    elif rc:
+        why = notify.reason(err) or f"exit {rc}"
+    else:
+        why = push_mod.NO_ANSWER
+    taken = sum(1 for v in statuses.values() if push_mod.ok(v))
+    for dev, status in statuses.items():
+        if status is None:
+            log(f"push failed on device {dev}: {why}")
+        elif not push_mod.ok(status):
+            log(f"push failed on device {dev}: {push_mod.words(status)}")
+    if taken:
+        log(f"pushed to {taken} of {len(statuses)} devices: {line}")
+    return bool(taken)
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -179,12 +263,22 @@ def run_once(
     started: bool,
     host: str,
     secrets: str | None,
+    link: str = "",
+    push: dict[str, Any] | None = None,
     send: Callable[[str, str, Callable[[str], None]], None] = tell,
+    push_send: Callable[[str, dict[str, Any], Callable[[str], None]], bool] | None = None,
 ) -> list[str]:
-    """One run against the files under `home`: the state read and written back, the lines sent when
-    the switch is on (`secrets` set), each a line in the log; returns the lines judged due."""
+    """One run against the files under `home`: the state read and written back, the lines sent on the
+    channels that are on — Telegram with `secrets` set (its message linking `<link>/inbox`), push with
+    `push` given (`{secrets, telegram, devices, key, sub}`: on, with devices listed) — each a line in the
+    log; returns the lines judged due. Push sends only while its key reads *key*; under *fallback*
+    Telegram carries a line no push service took."""
+    from sessionorc import notify
+    from sessionorc import push as push_mod
+
     path = home / "watch.json"
-    state, lines = step(_load(path), now=now, answered=answered, started=started, host=host, on=bool(secrets))
+    on = bool(secrets) or push is not None
+    state, lines = step(_load(path), now=now, answered=answered, started=started, host=host, on=on)
     home.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=1) + "\n")
@@ -195,16 +289,25 @@ def run_once(
             f.write(f"{now.isoformat(timespec='seconds')} {text}\n")
 
     for line in lines:
-        send(line, secrets or "", log)
+        taken = False
+        if push is not None:
+            if push.get("key") == push_mod.KEY:
+                taken = (push_send or push_tell)(line, push, log)
+            else:  # paused, or no reading yet: no child runs, and the line is one no device took
+                log(f"push not sent: {push_mod.PAUSED.format(push.get('key') or 'reading the key')}")
+        if secrets and not (taken and push is not None and push.get("telegram") == "fallback"):
+            send(notify.message(line, f"{link}/inbox" if link else ""), secrets, log)
     return lines
 
 
 def main() -> int:
     from sessionorc import hosts, paths, settings
+    from sessionorc import push as push_mod
 
     started = manager_started()
     answered = ask()
-    tg = settings.telegram(settings.load())
+    doc = settings.load()
+    tg = settings.telegram(doc)
     run_once(
         home=paths.home(),
         now=datetime.now(UTC),
@@ -212,8 +315,27 @@ def main() -> int:
         started=started,
         host=hosts.local_host().name,
         secrets=tg["secrets"] if tg else None,
+        link=tg["link"] if tg else "",
+        push=push_channel(settings.push(doc), push_mod.load(), (settings.reach(doc) or {}).get("url") or ""),
     )
     return 0
+
+
+def push_channel(pcfg: dict[str, Any], pdoc: dict[str, Any], url: str) -> dict[str, Any] | None:
+    """Push as the watch reads it: None while it is off, has no device listed or no secrets to send with —
+    the tick's reading (§4.10 *with Telegram*); else what `run_once` sends with. `push.json` is read, never
+    written."""
+    from sessionorc import notify
+
+    if not pcfg["on"] or not pdoc["devices"] or not pcfg["secrets"]:
+        return None
+    return {
+        "secrets": pcfg["secrets"],
+        "telegram": pcfg["telegram"],
+        "devices": pdoc["devices"],
+        "key": pdoc.get("key"),
+        "sub": url if url.startswith("https://") else notify.PUSH_SUB,
+    }
 
 
 if __name__ == "__main__":

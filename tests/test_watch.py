@@ -209,3 +209,152 @@ def test_a_switch_turned_on_mid_outage_tells_the_outage_before_its_recovery(home
         [watch.silent_line("kmaster", T0)],
         ["shiftlead · the host agent on kmaster answers again (silent 20 min)"],
     ]
+
+
+# -- push (design §4.10 *Told on the home-screen app too*, TD-1304) ------------------------------------------
+
+DEV = {"id": "a" * 16, "endpoint": "https://push.example.com/s/secret-capability", "keys": {"p256dh": "x", "auth": "y"}}
+
+
+def push_ch(telegram="both", key="key", devices=(DEV,)):
+    return {"secrets": "p/c", "telegram": telegram, "devices": list(devices), "key": key, "sub": "https://x.ts.net"}
+
+
+def run_push(home, *, secrets="t/c", push=None, took=True, link=""):
+    """One run whose silence is told (the manager started): what each channel was handed."""
+    tg: list[str] = []
+    pushed: list[str] = []
+
+    def push_send(line, ch, log):
+        pushed.append(line)
+        return took
+
+    watch.run_once(
+        home=home,
+        now=T0,
+        answered=False,
+        started=True,
+        host="kmaster",
+        secrets=secrets,
+        link=link,
+        push=push,
+        send=lambda text, s, log: tg.append(text),
+        push_send=push_send,
+    )
+    return tg, pushed
+
+
+def test_push_alone_tells_with_telegram_off(home):
+    tg, pushed = run_push(home, secrets=None, push=push_ch())
+    assert tg == [] and len(pushed) == 1 and pushed[0].startswith("shiftlead · kmaster's user manager")
+    assert json.loads((home / "watch.json").read_text())["told"] == ["manager"]
+
+
+def test_both_sends_on_both_channels_and_telegram_links_the_inbox(home):
+    tg, pushed = run_push(home, push=push_ch("both"), link="https://x.ts.net")
+    assert len(pushed) == 1 and len(tg) == 1
+    assert tg[0] == f"{pushed[0]}\nhttps://x.ts.net/inbox"
+
+
+def test_fallback_sends_telegram_only_when_no_push_service_took_the_line(home, tmp_path):
+    tg, pushed = run_push(home, push=push_ch("fallback"), took=True)
+    assert len(pushed) == 1 and tg == []
+    tg, pushed = run_push(tmp_path / "other", push=push_ch("fallback"), took=False)
+    assert len(pushed) == 1 and tg == pushed
+
+
+@pytest.mark.parametrize("key", ["no key", "unreadable: bad PEM", None])
+def test_a_paused_key_runs_no_child_and_falls_to_telegram(home, tmp_path, key):
+    tg, pushed = run_push(home, push=push_ch("fallback", key=key))
+    assert pushed == [] and len(tg) == 1
+    assert "push not sent: push is paused: " in (home / "watch.log").read_text()
+    tg, pushed = run_push(tmp_path / "off", secrets=None, push=push_ch("fallback", key=key))
+    assert pushed == [] and tg == []
+
+
+def test_the_push_channel_is_the_tick_s_reading():
+    pcfg = {"on": True, "telegram": "fallback", "secrets": "p/c"}
+    pdoc = {"devices": [DEV], "key": "key"}
+    ch = watch.push_channel(pcfg, pdoc, "https://x.ts.net")
+    assert ch == {"secrets": "p/c", "telegram": "fallback", "devices": [DEV], "key": "key", "sub": "https://x.ts.net"}
+    assert watch.push_channel(pcfg, pdoc, "http://10.0.0.2:8000")["sub"] == "https://github.com/ShiftLead/shiftlead"
+    assert watch.push_channel({**pcfg, "on": False}, pdoc, "") is None
+    assert watch.push_channel(pcfg, {"devices": []}, "") is None
+    assert watch.push_channel({**pcfg, "secrets": None}, pdoc, "") is None
+
+
+def fake_child(rc, *lines, err=""):
+    calls = []
+
+    def child(argv, stdin, bound):
+        calls.append((argv, json.loads(stdin), bound))
+        return rc, "".join(json.dumps(x) + "\n" for x in lines), err
+
+    return child, calls
+
+
+def test_push_tell_sends_the_line_to_every_device_tagged_watch():
+    other = {**DEV, "id": "b" * 16, "endpoint": "https://push.example.com/s/other"}
+    child, calls = fake_child(
+        0,
+        {"key": "key", "public_key": "P"},
+        {"device": "a" * 16, "i": 0, "status": 201},
+        {"device": "b" * 16, "i": 0, "status": 410},
+    )
+    logged: list[str] = []
+    assert watch.push_tell("shiftlead · a line", push_ch(devices=(DEV, other)), logged.append, child=child) is True
+    argv, job, bound = calls[0]
+    assert argv[:6] == ["doppler", "run", "--project", "p", "--config", "c"] and argv[-1] == "--push"
+    assert job["payloads"] == [{"body": "a line", "path": "/inbox", "tag": "watch"}]
+    assert job["sub"] == "https://x.ts.net" and [d["id"] for d in job["devices"]] == ["a" * 16, "b" * 16]
+    assert logged == [
+        f"push failed on device {'b' * 16}: the push service answered 410",
+        "pushed to 1 of 2 devices: shiftlead · a line",
+    ]
+    assert not any("push.example.com" in x for x in logged), "an endpoint is a capability: never in a log line"
+
+
+def test_push_tell_a_paused_reading_a_failed_child_and_a_timeout_take_nothing():
+    logged: list[str] = []
+    child, _ = fake_child(0, {"key": "no key"})
+    assert watch.push_tell("shiftlead · x", push_ch(), logged.append, child=child) is False
+    assert logged == ["push not sent: push is paused: no key"]
+    logged.clear()
+    child, _ = fake_child(1, err="Doppler Error: you must be logged in\n")
+    assert watch.push_tell("shiftlead · x", push_ch(), logged.append, child=child) is False
+    assert logged == [f"push failed on device {'a' * 16}: Doppler Error: you must be logged in"]
+    logged.clear()
+    child, _ = fake_child(None, {"key": "key", "public_key": "P"})
+    assert watch.push_tell("shiftlead · x", push_ch(), logged.append, child=child) is False
+    assert logged == [f"push failed on device {'a' * 16}: no answer in 50 s"]
+
+
+def test_the_child_s_bound_ends_its_whole_group_and_keeps_what_it_printed():
+    rc, out, _ = watch._child(["sh", "-c", "echo said; sleep 30"], "", 1.0)
+    assert rc is None and out == "said\n"
+    assert watch._child(["sh", "-c", "cat; exit 3"], "in", 5.0) == (3, "in", "")
+
+
+def test_main_tells_by_push_from_push_json_and_never_writes_it(monkeypatch, tmp_path):
+    from sessionorc import hosts, settings
+    from sessionorc import push as push_mod
+
+    home = tmp_path / "ao"
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+    home.mkdir()
+    pj = home / "push.json"
+    pj.write_text(json.dumps({"key": "key", "public_key": "P", "devices": [DEV]}))
+    before = (pj.read_bytes(), pj.stat().st_mtime_ns)
+    monkeypatch.setattr(watch, "manager_started", lambda: True)
+    monkeypatch.setattr(watch, "ask", lambda: False)
+    monkeypatch.setattr(settings, "load", lambda: {"notify": {"push": {"secrets": "p/c"}}})
+    monkeypatch.setattr(hosts, "local_host", lambda: hosts.Host(name="kmaster", vscode_host="kmaster"))
+    assert push_mod.path() == pj
+    got = []
+    monkeypatch.setattr(watch, "push_tell", lambda line, ch, log: got.append((line, ch)) or True)
+    sent = []
+    monkeypatch.setattr(watch.subprocess, "run", lambda argv, **kw: sent.append(argv))
+    assert watch.main() == 0
+    assert sent == [], "Telegram is off"
+    assert len(got) == 1 and got[0][1]["devices"] == [DEV] and got[0][1]["key"] == "key"
+    assert (pj.read_bytes(), pj.stat().st_mtime_ns) == before
