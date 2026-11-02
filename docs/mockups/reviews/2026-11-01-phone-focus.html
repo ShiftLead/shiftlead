@@ -105,16 +105,10 @@ figcaption b { color: var(--fg); font-weight: 600; }
 .ctools { display: flex; align-items: center; gap: 8px; padding: 6px 10px 8px; }
 .send { height: 40px; padding: 0 18px; border-radius: 20px; border: 0; background: var(--primary); color: var(--primary-fg); font: 600 14px "IBM Plex Sans"; margin-left: auto; }
 
-/* the tray: what needs the person, over the key bar */
-.tray { flex: none; background: #241b07; border-top: 1px solid #7c5a10; padding: 10px 12px 10px; }
-.tray .q { font-size: 13.5px; color: var(--needs-fg); margin-bottom: 2px; font-weight: 600; }
-.tray .cmd { font: 12.5px/1.4 "JetBrains Mono", monospace; color: var(--pfg); background: #0f1419; border-radius: 6px; padding: 7px 9px; margin: 6px 0 10px; white-space: pre-wrap; }
-.tray .btns { display: flex; gap: 8px; }
-.tray .btns button { flex: 1; height: 46px; border-radius: 10px; font: 600 15px "IBM Plex Sans"; border: 1px solid var(--pborder); background: #262d36; color: var(--pfg); }
-.tray .btns .allow { background: #e6e9ee; color: #0f1216; border: 0; }
-.tray.watch { background: #11202a; border-color: #23485a; display: flex; align-items: center; gap: 10px; }
-.tray.watch .q { color: #9fd3e8; flex: 1; margin: 0; font-weight: 500; font-size: 13px; }
-.tray.watch button { height: 40px; padding: 0 16px; border-radius: 20px; border: 0; background: #e6e9ee; color: #0f1216; font: 600 14px "IBM Plex Sans"; }
+/* the Watching line: an unattended record's Take over, in the key bar's place */
+.watchline { flex: none; padding: 10px 12px; background: #11202a; border-top: 1px solid #23485a; display: flex; align-items: center; gap: 10px; }
+.watchline .q { color: #9fd3e8; flex: 1; margin: 0; font-weight: 500; font-size: 13px; }
+.watchline button { height: 40px; padding: 0 16px; border-radius: 20px; border: 0; background: #e6e9ee; color: #0f1216; font: 600 14px "IBM Plex Sans"; }
 
 /* switcher */
 .srow { display: flex; align-items: center; gap: 10px; padding: 0 16px; height: 58px; border-bottom: 1px solid var(--pline); }
@@ -404,7 +398,7 @@ table.cmp th { font-weight: 600; }
 
 <span class="y">✻ Hatching… </span><span class="d">(3m 12s · ↓ 8.4k tokens)</span>
 <button class="tobottom">↓ live</button><span class="toast">13 px · 46 columns</span></div>
-  <div class="tray watch"><span class="q">Watching. This session runs unattended.</span><button>Take over</button></div>
+  <div class="watchline"><span class="q">Watching. This session runs unattended.</span><button>Take over</button></div>
   <div class="bar">
     <button class="ask"><span>Message grinder-ao-1…</span></button>
   </div>
