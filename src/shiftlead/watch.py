@@ -222,13 +222,21 @@ def push_tell(line: str, push: dict[str, Any], log: Callable[[str], None], child
             lines.append(json.loads(raw))
         except ValueError:
             continue
-    reading = push_mod.reading_of(lines[0]) if lines else None
+    first = next((ln for ln in lines if isinstance(ln, dict) and "key" in ln), None)
+    reading = push_mod.reading_of(first)
     if reading is not None and reading != push_mod.KEY:
         log(f"push not sent: {push_mod.PAUSED.format(reading)}")
         return False
+    if (
+        reading == push_mod.KEY
+        and push.get("public_key")
+        and not push_mod.same_key((first or {}).get("public_key"), push["public_key"])
+    ):  # the home's derived-key check: devices listed under the old key; the home's next send reads the change
+        log("push not sent: the key changed since the home last read it")
+        return False
     statuses = {str(d["id"]): None for d in devices}
-    for ln in lines[1:]:
-        if isinstance(ln, dict) and str(ln.get("device")) in statuses:
+    for ln in lines:
+        if isinstance(ln, dict) and "device" in ln and str(ln.get("device")) in statuses:
             statuses[str(ln["device"])] = ln.get("status")
     if rc is None:
         why = f"no answer in {notify.CHILD_SECONDS + notify.REQUEST_SECONDS:g} s"
@@ -334,6 +342,7 @@ def push_channel(pcfg: dict[str, Any], pdoc: dict[str, Any], url: str) -> dict[s
         "telegram": pcfg["telegram"],
         "devices": pdoc["devices"],
         "key": pdoc.get("key"),
+        "public_key": pdoc.get("public_key"),
         "sub": url if url.startswith("https://") else notify.PUSH_SUB,
     }
 

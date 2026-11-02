@@ -276,7 +276,14 @@ def test_the_push_channel_is_the_tick_s_reading():
     pcfg = {"on": True, "telegram": "fallback", "secrets": "p/c"}
     pdoc = {"devices": [DEV], "key": "key"}
     ch = watch.push_channel(pcfg, pdoc, "https://x.ts.net")
-    assert ch == {"secrets": "p/c", "telegram": "fallback", "devices": [DEV], "key": "key", "sub": "https://x.ts.net"}
+    assert ch == {
+        "secrets": "p/c",
+        "telegram": "fallback",
+        "devices": [DEV],
+        "key": "key",
+        "public_key": None,
+        "sub": "https://x.ts.net",
+    }
     assert watch.push_channel(pcfg, pdoc, "http://10.0.0.2:8000")["sub"] == "https://github.com/ShiftLead/shiftlead"
     assert watch.push_channel({**pcfg, "on": False}, pdoc, "") is None
     assert watch.push_channel(pcfg, {"devices": []}, "") is None
@@ -358,3 +365,17 @@ def test_main_tells_by_push_from_push_json_and_never_writes_it(monkeypatch, tmp_
     assert sent == [], "Telegram is off"
     assert len(got) == 1 and got[0][1]["devices"] == [DEV] and got[0][1]["key"] == "key"
     assert (pj.read_bytes(), pj.stat().st_mtime_ns) == before
+
+
+def test_push_tell_sends_nothing_under_a_key_the_home_has_not_read_and_finds_the_reading_by_its_field():
+    logged: list[str] = []
+    child, _ = fake_child(0, {"key": "key", "public_key": "NEW"}, {"device": "a" * 16, "i": 0, "status": 201})
+    ch = {**push_ch(), "public_key": "T0xE"}
+    assert watch.push_tell("shiftlead · x", ch, logged.append, child=child) is False
+    assert logged == ["push not sent: the key changed since the home last read it"]
+    logged.clear()
+    child, _ = fake_child(
+        0, {"stray": 1}, {"key": "key", "public_key": "T0xE"}, {"device": "a" * 16, "i": 0, "status": 201}
+    )
+    assert watch.push_tell("shiftlead · x", ch, logged.append, child=child) is True
+    assert logged == ["pushed to 1 of 1 devices: shiftlead · x"]
