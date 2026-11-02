@@ -238,7 +238,7 @@
       "x": 1540,
       "y": 12380,
       "w": 1440,
-      "h": 2320
+      "h": 2560
     },
     {
       "file": "SettingsDark.dc.html",
@@ -246,13 +246,13 @@
       "x": 3120,
       "y": 0,
       "w": 1440,
-      "h": 2320
+      "h": 2560
     },
     {
       "file": "FocusEndedDark.dc.html",
       "title": "Focus \u2014 ended, dark (TD-964)",
       "x": 3120,
-      "y": 2420,
+      "y": 2660,
       "w": 1440,
       "h": 940
     },
@@ -260,7 +260,7 @@
       "file": "FocusHeldDark.dc.html",
       "title": "Focus \u2014 taken over, dark (TD-964)",
       "x": 3120,
-      "y": 3460,
+      "y": 3700,
       "w": 1440,
       "h": 940
     },
@@ -268,7 +268,7 @@
       "file": "MainDark.dc.html",
       "title": "Sessions \u2014 dark",
       "x": 3120,
-      "y": 4500,
+      "y": 4740,
       "w": 1440,
       "h": 1560
     },
@@ -276,7 +276,7 @@
       "file": "OrgTeamFirst.dc.html",
       "title": "Sessions \u2014 team-first (the design, 2026-09-26; checked in from the canvas)",
       "x": 3120,
-      "y": 6160,
+      "y": 6400,
       "w": 1440,
       "h": 900
     },
@@ -284,7 +284,7 @@
       "file": "RepoFacet.dc.html",
       "title": "Team card \u2014 Repo facet: the lanes line (TD-357, 2026-10-06)",
       "x": 3120,
-      "y": 7160,
+      "y": 7400,
       "w": 1440,
       "h": 520
     },
@@ -292,7 +292,7 @@
       "file": "Type.dc.html",
       "title": "Type scale",
       "x": 3120,
-      "y": 7780,
+      "y": 8020,
       "w": 1440,
       "h": 760
     },
@@ -300,7 +300,7 @@
       "file": "TypeDark.dc.html",
       "title": "Type scale \u2014 dark",
       "x": 3120,
-      "y": 8640,
+      "y": 8880,
       "w": 1440,
       "h": 760
     }

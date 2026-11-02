@@ -1984,6 +1984,19 @@ def settings_page():
         '<div class="meta">after a minute, once, and never while a page is visible · no text a session wrote is sent</div>'
         '<div class="meta">last sent 14:02 · <span class="mono">shiftlead · grinder-ao-1 (ao-grind) needs you: permission</span></div>',
         b("Save", "primary") + b("Cancel") + b("Send a test") + gap + '<span class="muted" style="font-size: 12px;">settings.yml · notify · sent by the home</span>')
+    def dev(label, since, last, this=False, warn=False):
+        me = ' <span class="badge">this device</span>' if this else ""
+        col = "#a3561a" if warn else "inherit"
+        rm = "" if this else b("Remove", "ghost")
+        return f'<div style="display: flex; gap: 12px; align-items: center; padding: 4px 0;"><span style="font-size: 14px; width: 170px; flex: none;">{label}{me}</span><span class="muted" style="font-size: 12.5px; width: 120px;">since {since}</span><span style="font-size: 12.5px; color: {col}; flex-grow: 1;">{last}</span>{rm}</div>'
+    push = card("on this device", "Push · TD-1302",
+        '<div class="txt">' + field("tell me on this device", "on", "this iPhone, on its home screen · lands at once, no Save", 50) + '</div>'
+        + dev("iPhone · Safari", "Nov 2", "last told 14:02", this=True)
+        + dev("Linux · Firefox", "Oct 30", "last failed 13:40: 503", warn=True)
+        + '<div class="txt">' + field("on all devices", "on", "off stops every push and keeps the devices", 50) + field("with Telegram", "both ▾", "or: only when push fails", 110) + field("secrets", '<span class="muted">samscrape/prd</span>', "Telegram’s when empty · holds VAPID_PRIVATE_KEY · Make key needs it set", 130) + '</div>'
+        '<div class="meta">the same rows and words as Telegram · a tap opens the row in the app · no text a session wrote is sent</div>'
+        '<div class="meta">a device was removed: its subscription ended 11:20</div>',
+        b("Save", "primary") + b("Cancel") + b("Send a test to this device") + gap + '<span class="muted" style="font-size: 12px;">settings.yml · notify.push · the devices are kept by the home</span>')
     browser = card("this browser", "",
         ro("theme", "dark · the ◐ toggle in the top bar") + ro("mine", "off") + ro("Inbox folds", "FYI open · Answered open") + ro("shell directory", "~"),
         b("Reset this browser", "ghost danger") + gap + '<span class="muted" style="font-size: 12px;">remembered in this browser only</span>')
@@ -1996,7 +2009,7 @@ def settings_page():
     org = card("ao-grind", "team · projects: shiftlead",
         ro("manager", "manager-ao-1 · unattended · control") + ro("techlead", "techlead-ao-1") + ro("members", "grinder ×2 · designer ×1") + ro("host", "kmaster", dflt=True),
         gap + '<span class="muted" style="font-size: 12px;">org.yml · read per call by the clients, never the agent · by hand — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
-    return head("Settings") + f'''<div style="width: 1440px; min-height: 2320px; background: #f4f5f7; display: flex; flex-direction: column;">
+    return head("Settings") + f'''<div style="width: 1440px; min-height: 2560px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Settings")}
 <div style="padding: 16px 20px 28px;">
 <div class="inboxcol">
@@ -2007,8 +2020,8 @@ def settings_page():
   {teams}
   {sec("Repos", 1)}
   {repos}
-  {sec("You", 3)}
-  {you}{telegram}{browser}
+  {sec("You", 4)}
+  {you}{telegram}{push}{browser}
   {sec("Hosts", 1)}
   {hosts}
   {sec("Profiles", 2)}
