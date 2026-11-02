@@ -409,7 +409,7 @@ def test_focus_wires_the_screen_the_press_the_grid_and_the_reconnects():
         not in focus[focus.index("const press = AO.linkTouch") : focus.index("const press = AO.linkTouch") + 900]
     )
     # no grid while a sheet is open, a refit when it closes; the terminal focused only off the phone
-    assert "new ResizeObserver(() => { if (!phone.opened()) fit.fit(); })" in focus
+    assert "new ResizeObserver(() => { if (!phone.opened() && !pinch) fit.fit(); })" in focus  # nor mid-pinch (TD-1301)
     assert "phone.closed(() => fit.fit());" in focus and "toTerm();" in focus
     # the keyboard is the terminal's focus, read from xterm.js's helper text box
     assert 'term.textarea.addEventListener("focusin"' in focus and 'term.textarea.addEventListener("focusout"' in focus

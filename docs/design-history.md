@@ -914,6 +914,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-05 (TD-144, grinder-ao-2; Paul's look of 2026-10-04 at the live page: *bigger*): `--t-body` raised from 14 px to 15 px and nothing else moved, as the *Type scale* says; the card's rows, slot and foot keep their pixel tokens, so every Org card is still one height (read headless at 1440 and 390 px on a scratch home).
 
 ## 4.5a Controls
+- 2026-11-02 (TD-1301, grinder-ao-2): the help list gains **a pinch** and **a swipe on the strip**, with `help.py` (TD-003's third build).
 - 2026-11-02 (TD-1300, grinder-ao-2): the help list's **soft-key row** names the key bar's keys — esc, tab, ⇧tab, ctrl, the drag pad, ↵ and 1–9 — what ⇧tab, ctrl and the pad do, and ⌄, with `help.py` (TD-003's second build).
 - 2026-11-02 (TD-1299, grinder-ao-2): the help list gains **the strip**, **the Watching line**, **the input bar · ⌨**, **the sheet (⋯)** and **the switcher**, with `help.py` (TD-003's first build).
 - 2026-11-02 (TD-003, phone-view): row *the tray* becomes *the Watching line* (an unattended record's Take over only); *Focus · Allow / Deny* is not drawn on a phone, where a permission is answered in the pane.
