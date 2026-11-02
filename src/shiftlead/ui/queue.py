@@ -558,6 +558,7 @@ def queue_view(
     - `other`: the *other work* lines, each hold that names no open entry, with its holder;
     - `upnext`: the whole Up next order, each card's id (a move's neighbours, §4.4 *A move lands*);
     - `n`: the header's counts — cards, in progress, waiting, up next, and those whose status is *needs you*.
+    - `bar`: the heading line's summary, a segment per group with cards (`summary_bar`, TD-1293).
 
     `mail` is what is attached to each card (`attach`), gathered into its `wants` (`card_wants`): Decide and Do
     drawn in the header, Read in the body, raising the card's status to *needs you* or *steer*. `promotes` is the `host`
@@ -690,6 +691,17 @@ def queue_view(
         ref = str(o.get("ref") or "")
         other.append({"ref": ref, "pr": o.get("pr"), "holder": h if h.get("id") else None})
 
+    n = {
+        "cards": len(shaped),
+        "in_progress": len(in_progress),
+        "waiting": len(waiting),
+        "up_next": len(up_next),
+        "needs_you": sum(1 for c in shaped if c.get("status") == "needs you"),
+        # the page header's *Decide n · Do n*: items, not cards, display only — in no top-bar or rail
+        # number; a red PR is counted on its card's pill alone (§4.5 screen 12 *Three wants*)
+        "decide": sum(c["wants"]["n"]["decide"] for c in shaped),
+        "do": sum(sum(1 for m in c["wants"]["do"] if not (m.get("red") or m.get("fork"))) for c in shaped),
+    }
     return {
         "completed": {"lines": lines, "counts": counts},
         "in_progress": in_progress,
@@ -697,21 +709,34 @@ def queue_view(
         "up_next": up_next,
         "other": other,
         "upnext": [str(c["id"]) for c in up_next],
-        "n": {
-            "cards": len(shaped),
-            "in_progress": len(in_progress),
-            "waiting": len(waiting),
-            "up_next": len(up_next),
-            "needs_you": sum(1 for c in shaped if c.get("status") == "needs you"),
-            # the page header's *Decide n · Do n*: items, not cards, display only — in no top-bar or rail
-            # number; a red PR is counted on its card's pill alone (§4.5 screen 12 *Three wants*)
-            "decide": sum(c["wants"]["n"]["decide"] for c in shaped),
-            "do": sum(sum(1 for m in c["wants"]["do"] if not (m.get("red") or m.get("fork"))) for c in shaped),
-        },
+        "n": n,
+        "bar": summary_bar(n),
         "one_repo": one_repo,
         "repos": sorted(repos - {""}),
         "served": q.get("at") is not None or bool(cards),
     }
+
+
+# the summary bar's groups, in its order: the key in `n`, the legend's word, the colour token (TD-1293)
+SUMMARY_GROUPS = (("in_progress", "in progress", "--working"), ("waiting", "waiting", "--waiting"),
+                  ("up_next", "up next", "--ended"))  # fmt: skip
+
+
+def bar_flex(n: int, total: int) -> float:
+    """A segment's width, as `flex`: its count, never under a sliver of 1.2% of the bar — the same one line as
+    `AO.qBarFlex` in `app.js`, which redraws the bar on a re-read (§4.5 screen 12 *The page's top section*)."""
+    return max(n, total * 0.012)
+
+
+def summary_bar(n: Mapping[str, int]) -> list[dict[str, Any]]:
+    """The heading line's summary (§4.5 screen 12 *The page's top section is one block*, TD-1293): one segment and
+    one legend entry per group with cards, a group at 0 drawing neither; at 0 cards nothing."""
+    total = int(n.get("cards") or 0)
+    return [
+        {"key": k, "n": int(n.get(k) or 0), "word": w, "color": c, "flex": bar_flex(int(n.get(k) or 0), total)}
+        for k, w, c in SUMMARY_GROUPS
+        if n.get(k)
+    ]
 
 
 def queue_window(params: Any) -> str:

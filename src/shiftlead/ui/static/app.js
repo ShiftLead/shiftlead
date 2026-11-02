@@ -4425,6 +4425,32 @@
   };
   AO.qCardRows = (card) => $$(".qhead[data-qid], .qrows > .qrow[data-qid]", card)
     .map((el) => ({ qid: el.dataset.qid, title: ($(".qtitle", el) || {}).textContent || "" }));
+  // the heading line's summary bar (§4.5 screen 12 *The page's top section is one block*, TD-1293): a segment's
+  // flex is its count, never under a sliver — the same one line as `ui.queue.bar_flex`, which draws it first
+  AO.qBarFlex = (n, total) => Math.max(n, total * 0.012);
+  // the summary, the switch's number and *Decide · Do*, redrawn from a re-read's `#qcounts` (TD-1293)
+  AO.qDrawCounts = (top, d) => {
+    const num = (k) => Number(d[k] || 0), cards = num("cards");
+    const groups = [["inprogress", "in progress", "--working"], ["waiting", "waiting", "--waiting"], ["upnext", "up next", "--ended"]]
+      .filter(([k]) => num(k));
+    const bar = $(".qsbar", top), leg = $(".qsleg", top);
+    if (bar) {
+      bar.hidden = !cards;
+      bar.innerHTML = groups.map(([k, w, c]) =>
+        `<span style="flex: ${AO.qBarFlex(num(k), cards)}; background: var(${c})" title="${num(k)} ${w}"></span>`).join("");
+    }
+    if (leg) {
+      leg.innerHTML = groups.map(([k, w, c]) => `<span><i style="background: var(${c})"></i><b>${num(k)}</b>${w}</span>`).join("")
+        + `<span class="qscards">${cards ? "· " : ""}${cards} card${cards === 1 ? "" : "s"}</span>`;
+    }
+    const needs = $("#qfneedsn", top); if (needs) needs.textContent = String(num("needs"));
+    const wants = $(".qwantsn", top);
+    if (wants) {
+      const dec = num("decide"), dos = num("do");
+      wants.textContent = [dec ? `Decide ${dec}` : "", dos ? `Do ${dos}` : ""].filter(Boolean).join(" · ");
+      wants.hidden = !(dec || dos);
+    }
+  };
   AO.qFiltered = (picks) => !!(picks.filter || picks.team.length || picks.find.split(/\s+/).filter(Boolean).length);
   // `item`: {kind: "card" | "line" | "other", status, repos, find}; `teams`: a team's name → its repo, and a
   // name no team holds is a repo — a repo chip's pick (TD-1287)
@@ -4686,11 +4712,14 @@
           read = true;
           const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
           lists.innerHTML = await res.text();
-          // the filter row stands outside the lists, so typed find words and its focus survive: its numbers follow
+          // the top section stands outside the lists, so typed find words and its focus survive: its numbers
+          // follow, and its parts after the heading show while the Queue is served (TD-1293); a page loaded
+          // unserved has no chips, so the first served read reloads it
           const n = $("#qcounts", lists);
-          if (n) {
-            const a = $("#qfneedsn", box);
-            if (a) a.textContent = n.dataset.needs || "0";
+          if (filters) {
+            if (n && filters.dataset.served === "0") { location.reload(); return; }
+            $$(".qserved", filters).forEach((el) => (el.hidden = !n));
+            if (n) AO.qDrawCounts(filters, n.dataset);
           }
           opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
           AO.reopenFolds(lists);  // a row's *details* the person opened, filled from what was kept (TD-891)
