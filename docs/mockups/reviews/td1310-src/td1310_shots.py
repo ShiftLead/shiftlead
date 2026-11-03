@@ -1,7 +1,7 @@
 """TD-1310 mockups, read-only against the live UI: the Queue page with ao-grind picked, copied without
 scripts, its top line redrawn: now / A (recount, aligned, no needs mark) / B (recount, aligned, a needs
-sliver in each segment, 'items' named) / C (B without the heading line's Decide · Do) / D (C's bar and legend on their own line under one control row:
-Queue, the chips, the switch and find; Paul, 2026-11-02)."""
+sliver in each segment, 'items' named) / C (B without the heading line's Decide · Do) / D (C's bar and
+legend on their own line under one control row: Queue, the chips, the switch and find; Paul, 2026-11-02)."""
 import re, sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
