@@ -39,6 +39,8 @@ from sessionorc.containers import attach_argv_in, container_nodes
 from sessionorc.models import (
     GRANTS,
     PERSON,
+    clean_shots_at,
+    clean_shots_ref,
     has_control,
     permission_entry,
     start_note,
@@ -324,6 +326,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     row_find,  # noqa: F401
     row_subject,  # noqa: F401
     shot_bytes,  # noqa: F401
+    shot_read_from,
     shot_root,  # noqa: F401
     state_kind,  # noqa: F401
     state_rows,  # noqa: F401
@@ -1319,7 +1322,12 @@ class Readings:
                 sender = records.get(e["from"]) or {}
                 repo = str(sender.get("repo") or "")
                 e["look_shots"] = await asyncio.to_thread(
-                    look_shots, e["shots"], Path(repo).name if repo else "", str(sender.get("host") or "")
+                    look_shots,
+                    e["shots"],
+                    Path(repo).name if repo else "",
+                    str(sender.get("host") or ""),
+                    e.get("shots_at") or "",  # the look's commit and branch (TD-1307)
+                    e.get("shots_ref") or "",
                 )
                 # §4.5a **Send to reviewer** (TD-292 slice 4b): the seat is the sender's team's
                 # techlead as this page reads it from `org.yml`; a look already with one reads so
@@ -1788,24 +1796,40 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
     SHOT_READ_WAIT = 10.0  # seconds one image from another host may take (TD-300): a hung node is a 404
 
     @app.get("/repo/{name}/shot/{shot}")
-    async def repo_shot(name: str, shot: str, host: str = ""):
-        """A look's screenshot (design §4.5a **Inbox row: a look**, TD-292 slice 3): one `.png` of
-        `docs/mockups/reviews/` of a registered repo, as `origin/<default>` holds it, and nothing
-        else — any other name, repo or file is a 404. `host` names the host whose registry holds the
-        repo when it is not this one, and the image is read there (`host_shot`, TD-300)."""
+    async def repo_shot(name: str, shot: str, host: str = "", at: str = "", ref: str = ""):
+        """A look's screenshot (design §4.5a **Inbox row: a look**, §4.10 *A look's shots are the pushed
+        commit's*; TD-292 slice 3, TD-1307): one `.png` of `docs/mockups/reviews/` of a registered repo,
+        the first of the look's commit `at` (while an origin ref contains it), its branch `ref` and
+        `origin/<default>` that holds it, and nothing else — any other name, repo or file is a 404, and
+        so is a non-empty `at` or `ref` that does not match; an empty `ref` is no branch step, and a
+        lone `ref` is ignored. Never fetches: it reads what the checkout holds. `host` names the host
+        whose registry holds the repo when it is not this one, and the image is read there
+        (`host_shot`, TD-300); asked with `at`, a reply that does not echo it is a 404. A commit's file
+        is cached five minutes; a branch's or the default's can change under the same address."""
+        if (at and clean_shots_at(at) is None) or (ref and clean_shots_ref(ref) is None):
+            raise HTTPException(404, "no such screenshot")
+        ref = ref if at else ""
         data: bytes | None = None
+        src = ""
         if host and host != host_name():
             if SHOT_NAME.fullmatch(shot):
                 # unreachable, refused, slow past `SHOT_READ_WAIT`, or bad base64: a 404
                 with contextlib.suppress(HTTPException, ValueError, TimeoutError):
-                    got = await asyncio.wait_for(call("host_shot", host=host, repo=name, name=shot), SHOT_READ_WAIT)
-                    data = base64.b64decode(str((got or {}).get("png") or "")) or None
+                    got = await asyncio.wait_for(
+                        call("host_shot", host=host, repo=name, name=shot, at=at, ref=ref), SHOT_READ_WAIT
+                    )
+                    got = got if isinstance(got, dict) else {}
+                    if not at or got.get("at") == at:
+                        data = base64.b64decode(str(got.get("png") or "")) or None
+                        src = str(got.get("from") or "default")
         else:
             root = shot_root(name)
-            data = await asyncio.to_thread(shot_bytes, root, shot) if root is not None else None
+            if root is not None:
+                data, src = await asyncio.to_thread(shot_read_from, root, shot, at, ref)
         if data is None:
             raise HTTPException(404, "no such screenshot")
-        return Response(data, media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
+        cache = "private, max-age=300" if src == "commit" else "private, no-cache"
+        return Response(data, media_type="image/png", headers={"Cache-Control": cache})
 
     @app.get("/repo/{name}", response_class=HTMLResponse)
     async def repo_page(request: Request, name: str, part: str = ""):

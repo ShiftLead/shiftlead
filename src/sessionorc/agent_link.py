@@ -301,7 +301,16 @@ class LinkMixin:
             name = str(params.get("name") or "")
             if not mail.SHOT_NAME.fullmatch(name):
                 raise link.LinkError(f"{name!r} is not a screenshot a look can name")
-            return await asyncio.to_thread(shots.reading, str(params.get("repo") or ""), name, bool(params.get("head")))
+            # its commit and branch (TD-1307): the reply echoes `at` as asked, so the home can tell this
+            # node from one that predates it; only a `head` read fetches the branch
+            return await asyncio.to_thread(
+                shots.reading,
+                str(params.get("repo") or ""),
+                name,
+                params.get("at") or "",
+                params.get("ref") or "",
+                bool(params.get("head")),
+            )
         if method == "occupancy":  # the home's `host_occupancy` (§4.4a, TD-294)
             d = str(params.get("dir") or "")
             return await self.rpc_occupancy(d) if d.strip() else {"dir": "", "occupants": [], "git": False}

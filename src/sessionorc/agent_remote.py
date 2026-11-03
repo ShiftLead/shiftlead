@@ -298,27 +298,37 @@ class RemoteMixin:
             raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
         return {"host": host, **(got if isinstance(got, dict) else {"dir": dir, "files": {}})}
 
-    async def rpc_host_shot(self, host: str, repo: str, name: str, head: bool = False) -> dict[str, Any]:
+    async def rpc_host_shot(
+        self, host: str, repo: str, name: str, at: str = "", ref: str = "", head: bool = False
+    ) -> dict[str, Any]:
         """One screenshot of a look, read on the host whose registry holds its repo (design §4.5a
-        **Inbox row: a look**, TD-300): `docs/mockups/reviews/<name>` at `origin/<default>` of the
-        checkout named `repo` there (`shots.read`), over the link's `shot` for a node. `{host, repo,
-        name, exists, png}` — `png` the image in base64, empty with `head` (the row's address test)
-        or where origin does not hold it. A name of any other shape is refused in words; a repo
-        that host does not register reads as not there. A read, like `host_repos`: one file of the
-        one directory a look may name, never a path the caller chose."""
+        **Inbox row: a look**, §4.10 *A look's shots are the pushed commit's*; TD-300, TD-1307):
+        `docs/mockups/reviews/<name>` of the checkout named `repo` there, the first of the look's
+        commit `at` (while an origin ref contains it), `origin/<ref>`, and `origin/<default>` that holds
+        it (`shots.reading`), over the link's `shot` for a node. `{host, repo, name, at, from, exists,
+        png}` — `at` the reading's own echo, passed through and never filled from this request (a node
+        that predates it answers none); `from` the step that served it, `default` where a reply has
+        none; `png` the image in base64, empty with `head` (the row's address test, the one read that
+        may fetch the branch) or where none of the three holds it. A name of any other shape is
+        refused in words; a repo that host does not register reads as not there. A read, like
+        `host_repos`: one file of the one directory a look may name, never a path the caller chose."""
         if not mail.SHOT_NAME.fullmatch(str(name or "")):
             raise RpcError(f"{name!r} is not a screenshot a look can name: <name>.png under docs/mockups/reviews/")
+        at, ref = shots.where(at, ref)  # cleaned at this hop too: a malformed one is dropped, a lone `ref` ignored
         if host == self.host:
-            got = await asyncio.to_thread(shots.reading, str(repo or ""), name, bool(head))
+            got = await asyncio.to_thread(shots.reading, str(repo or ""), name, at, ref, bool(head))
         else:
-            got = await self._ask_node(host, "shot", repo=str(repo or ""), name=name, head=bool(head))
+            got = await self._ask_node(host, "shot", repo=str(repo or ""), name=name, at=at, ref=ref, head=bool(head))
             if not isinstance(got, dict):
                 raise RpcError(f"{host} answered the screenshot with nothing")
+        exists = bool(got.get("exists"))
         return {
             "host": host,
             "repo": repo,
             "name": name,
-            "exists": bool(got.get("exists")),
+            "at": got.get("at") if isinstance(got.get("at"), str) else None,
+            "from": str(got.get("from") or ("default" if exists else "")),
+            "exists": exists,
             "png": str(got.get("png") or ""),
         }
 

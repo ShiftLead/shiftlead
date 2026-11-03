@@ -222,6 +222,143 @@ def test_a_look_from_a_sender_on_another_host_is_addressed_and_served_through_th
         assert c.get("/repo/proj/shot/a.png?host=kmaster").content == PNG + b"a.png", "this host: read here"
 
 
+# -- a look's commit and branch (§4.10 *A look's shots are the pushed commit's*, TD-1307) ---------
+
+
+def _branch_look(tmp_path, monkeypatch):
+    """The registered checkout `proj`, and a sender's clone that pushed `a.png` (a new file) to the
+    branch `feat` after the checkout last fetched: `(root, sender, sha)`."""
+    from sessionorc import shots
+
+    root = checkout(tmp_path, monkeypatch, shots=("old.png",))
+    shots._forget()
+    sender = tmp_path / "sender"
+    git(tmp_path, "clone", "-q", str(tmp_path / "origin.git"), str(sender))
+    (sender / "docs/mockups/reviews/a.png").write_bytes(PNG + b"branch")
+    git(sender, "add", "-A")
+    git(sender, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "look")
+    git(sender, "push", "-q", "origin", "HEAD:refs/heads/feat")
+    sha = subprocess.run(["git", "-C", str(sender), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    return root, sender, sha
+
+
+@pytest.mark.integration
+def test_a_look_pushed_since_the_last_fetch_draws_its_name_then_its_image_on_the_next_poll(tmp_path, monkeypatch):
+    """The render never waits on the branch's fetch: the first poll draws the name alone, and the
+    fetch's end drops the cached answer, so the next poll — well inside `SHOT_TTL` — draws the image,
+    its address carrying the look's commit and branch."""
+    from sessionorc import shots
+    from shiftlead.ui import inbox
+
+    _root, _sender, sha = _branch_look(tmp_path, monkeypatch)
+    one = ["docs/mockups/reviews/a.png"]
+    assert inbox.look_shots(one, "proj", "", sha, "feat") == [{"name": "a.png", "url": ""}]
+    shots.wait_fetches()
+    assert inbox.look_shots(one, "proj", "", sha, "feat") == [
+        {"name": "a.png", "url": f"/repo/proj/shot/a.png?at={sha}&ref=feat"}
+    ]
+    # a lone ref, or a malformed commit, is read as no commit: origin/<default>, which lacks it
+    assert inbox.look_shots(one, "proj", "", "", "feat")[0]["url"] == ""
+    assert inbox.look_shots(["docs/mockups/reviews/old.png"], "proj", "", "x" * 40, "feat")[0]["url"] == (
+        "/repo/proj/shot/old.png"
+    )
+    shots._forget()
+
+
+@pytest.mark.integration
+def test_the_shot_route_reads_the_commit_never_fetches_and_caches_only_a_commits_file(tmp_path, monkeypatch):
+    from sessionorc import shots
+    from sessionorc.client import AgentUnavailable
+    from shiftlead.ui import app as uiapp
+
+    root, _sender, sha = _branch_look(tmp_path, monkeypatch)
+    fetched: list[str] = []
+    monkeypatch.setattr(shots, "_fetch_branch", lambda r, ref: fetched.append(ref))
+
+    class Down:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            raise AgentUnavailable("down")
+
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(uiapp, "LocalClient", Down)
+    with TestClient(uiapp.create_app()) as c:
+        assert c.get(f"/repo/proj/shot/a.png?at={sha}&ref=feat").status_code == 404, "not fetched: not held"
+        shots.wait_fetches()
+        assert fetched == [], "the image route never fetches"
+        git(root, "fetch", "-q", "origin")
+        shots._contained.clear()
+        r = c.get(f"/repo/proj/shot/a.png?at={sha}&ref=feat")
+        assert r.status_code == 200 and r.content == PNG + b"branch"
+        assert r.headers["cache-control"] == "private, max-age=300", "a commit's file is fixed"
+        r = c.get("/repo/proj/shot/old.png")
+        assert r.status_code == 200 and r.headers["cache-control"] == "private, no-cache"
+        assert c.get(f"/repo/proj/shot/old.png?at={sha}&ref=").status_code == 200, "an empty ref: no branch step"
+        for bad in (
+            f"?at={sha[:-1]}",
+            f"?at={sha.upper()}",
+            f"?at={sha}&ref=..x",
+            f"?at={sha}&ref=HEAD",
+            "?at=&ref=-x",
+        ):
+            assert c.get(f"/repo/proj/shot/old.png{bad}").status_code == 404, bad
+    shots._forget()
+
+
+@pytest.mark.integration
+def test_a_node_that_does_not_echo_the_commit_draws_the_name_alone(tmp_path, monkeypatch):
+    """A node not yet rebuilt ignores `at` and answers `origin/<default>`'s file: asked with `at`, a
+    reply without its echo is a node that cannot be asked — the name alone, and a 404 on the route —
+    never the default branch's file in the commit's place."""
+    import base64
+
+    checkout(tmp_path, monkeypatch)
+    from shiftlead.ui import app as uiapp
+    from shiftlead.ui import inbox
+
+    sha = "a" * 40
+    asked: list[dict] = []
+
+    def call_sync(method, **kw):
+        asked.append(kw)
+        return {"exists": True, "png": "", **({"at": kw["at"]} if kw["host"] == "new" else {})}
+
+    monkeypatch.setattr(inbox, "call_sync", call_sync)
+    one = ["docs/mockups/reviews/n.png"]
+    assert inbox.look_shots(one, "proj", "old", sha, "feat") == [{"name": "n.png", "url": ""}]
+    assert inbox.look_shots(one, "proj", "new", sha, "feat") == [
+        {"name": "n.png", "url": f"/repo/proj/shot/n.png?host=new&at={sha}&ref=feat"}
+    ]
+    assert (asked[0]["at"], asked[0]["ref"], asked[0]["head"]) == (sha, "feat", True)
+    assert inbox.look_shots(one, "proj", "old")[0]["url"] == "/repo/proj/shot/n.png?host=old", "no at: no echo needed"
+
+    class Client:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            png = base64.b64encode(PNG + b"node").decode()
+            return {"exists": True, "png": png, **({"at": kw["at"], "from": "commit"} if kw["host"] == "new" else {})}
+
+    monkeypatch.setattr(uiapp, "LocalClient", Client)
+    with TestClient(uiapp.create_app()) as c:
+        assert c.get(f"/repo/proj/shot/n.png?host=old&at={sha}").status_code == 404
+        r = c.get(f"/repo/proj/shot/n.png?host=new&at={sha}&ref=feat")
+        assert r.status_code == 200 and r.headers["cache-control"] == "private, max-age=300"
+        r = c.get("/repo/proj/shot/n.png?host=old")
+        assert r.status_code == 200 and r.headers["cache-control"] == "private, no-cache", "no from: default"
+
+
 # -- §4.5a **Send to reviewer** (§4.10 *A look*, TD-292 slice 4b) --------------------------------
 
 
