@@ -148,3 +148,28 @@ def test_the_facts_carry_each_entrys_written(tmp_path):
         os.utime(d / f"TD-00{n}.md", (t, t))
     got = {e["id"]: e["written"] for e in ledger.reading(tmp_path / "v2", NOW, with_history=False)["entries"]}
     assert got == {"TD-001": (NOW - timedelta(hours=1)).timestamp(), "TD-002": (NOW - timedelta(hours=2)).timestamp()}
+
+
+async def test_the_home_hands_its_person_inbox_to_the_reading_it_pushes(agent, tmp_path, monkeypatch):
+    """TD-1334: the tick's `_queue_pass` passes the home's person inbox as the reading's `questions`, so the
+    `queue` event it pushes draws an answered held entry as answered, and the same entry unanswered as needs you."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
+    agent._repos = {root: r}
+    agent.sessions["ao-r-designer"] = _asker()
+    sent: list[dict] = []
+
+    async def push(ev: dict) -> None:
+        sent.append(ev)
+
+    monkeypatch.setattr(agent, "_broadcast", push)
+    await agent._queue_pass(NOW)
+    assert _by_id(sent[-1]["queue"])["r#TD-001"]["status"] == "needs you"  # nothing in the inbox yet
+    agent.person_inbox.append(_q())
+    await agent._queue_pass(NOW + timedelta(seconds=2))
+    assert [e["event"] for e in sent] == ["queue", "queue"]
+    c = _by_id(sent[-1]["queue"])["r#TD-001"]
+    assert c["top"]["state"] == "answered — waiting on designer" and c["status"] != "needs you"
+    assert _by_id(await agent.rpc_queue())["r#TD-001"]["top"]["answered"]["mid"] == "m-1"
