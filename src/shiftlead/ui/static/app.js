@@ -1164,6 +1164,55 @@
     const age = row.querySelector("[data-was]");
     if (age) { age.textContent = age.dataset.was; if (age.dataset.wasSince) age.dataset.since = age.dataset.wasSince; delete age.dataset.was; delete age.dataset.wasSince; }
   };
+  // §4.5 screen 6 rule 4 (TD-1316, built by TD-1321): a press that writes origin draws its result on the press. A
+  // board line's decide keeps its row, not dimmed: its answers and Go with it give way to *decided: <answer> —
+  // landing on the board…*, its other controls off until the answer; a board Reply draws its words as the row's
+  // newest reply line. Each drawn node carries `data-drawn`, each node it hid `data-drawnhid`, so a refusal undoes
+  // exactly what was drawn, and a re-read's fresh row is drawn again from `AO.inflight` (`AO.redraw`)
+  AO.today = () => { const d = new Date(), p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+  AO.drawOff = function (row) {
+    row.querySelectorAll("button, .btn").forEach((x) => { if (!x.disabled && !x.closest("[data-drawnhid]")) { x.disabled = true; x.dataset.pressoff = "1"; } });
+  };
+  AO.drawOn = function (row) { row.querySelectorAll("[data-pressoff]").forEach((x) => { x.disabled = false; delete x.dataset.pressoff; }); };
+  // where a drawn line goes: after the row's reply lines, before what the template draws after them
+  const drawSlot = (row) => row.querySelector(".st.decided, .st.stale, .st.waitingon, .sugg, .mfoot");
+  AO.drawDecided = function (row, text) {
+    let line = row.querySelector(".st.decided[data-drawn]");
+    if (!line) {
+      line = document.createElement("div"); line.className = "st decided"; line.dataset.drawn = "1";
+      const at = drawSlot(row);
+      if (at) at.before(line); else row.querySelector(".rowerr")?.before(line);
+      row.querySelectorAll(".sugg, .boardgo").forEach((x) => { if (!x.hidden) { x.hidden = true; x.dataset.drawnhid = "1"; } });
+    }
+    line.textContent = text;
+  };
+  AO.drawReply = function (row, text) {
+    let line = row.querySelector(".st.boardreply[data-drawn]");
+    if (!line) {
+      line = document.createElement("div"); line.className = "st boardreply"; line.dataset.drawn = "1";
+      const last = [...row.querySelectorAll(".st.boardreply")].pop(), at = drawSlot(row);
+      if (last) last.after(line); else if (at) at.before(line); else row.querySelector(".rowerr")?.before(line);
+    }
+    line.textContent = text;  // the words as text: the server's own line renders them through md()
+  };
+  AO.unDraw = function (row) {  // a refusal: the row as it was, pressable
+    row.querySelectorAll("[data-drawn]").forEach((x) => x.remove());
+    row.querySelectorAll("[data-drawnhid]").forEach((x) => { x.hidden = false; delete x.dataset.drawnhid; });
+    AO.drawOn(row);
+  };
+  // a fresh row a re-read drew while a rule 4 press is out, or within its minute after the answer: drawn again,
+  // once — a row that already draws the result from the board is left as the board says (TD-1321)
+  AO.redraw = function (row, f) {
+    if (f.kind === "decided") {
+      if (row.querySelector(".st.decided:not([data-drawn])")) return false;
+      AO.drawDecided(row, f.text);
+    } else if (f.kind === "reply") {
+      if (row.querySelectorAll(".st.boardreply").length > f.replies) return false;
+      AO.drawReply(row, f.text);
+    } else return true;
+    if (f.out) AO.drawOff(row);
+    return true;
+  };
 
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy]");
@@ -1186,27 +1235,63 @@
     // answer; a press that asks first (a prompt, a composer) is marked once it is answered
     const row = b.closest(".mailrow");
     const key = AO.pressKey(action, b.dataset.boardAct);
-    const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add", "ledger", "ledger_reply"].includes(key);
-    const leaves = !!row && !keeps && (PRESS_LEAVES.includes(key) || !!staterow);
+    // §4.5 screen 6 rule 4 (TD-1321): a ledger entry's decide leaves with its row (Done… and Back to design… too,
+    // where they are its row's inline controls); a board line's decide and Reply stay, drawn (`drawn`)
+    const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);
+    const ledgerish = action === "ledger" || action === "ledger_reply";
+    const leaves = !!row && !keeps && (PRESS_LEAVES.includes(key) || !!staterow || ledgerish);
+    const drawn = !!row && ["board_decide", "board_notright", "board_reply"].includes(key);
+    // rule 4's words, from the road where there is one: what the waiting toast says, and what a refusal was not
+    const road = b.dataset.road;
+    const r4 = road === "done" ? ["done", "not done"] : road === "design" ? ["back to design", "not sent back to design"]
+      : key === "board_reply" ? ["replying", "not replied"] : ledgerish || drawn ? ["deciding", "not decided"] : null;
+    const msgOf = row && row.dataset.msg;
     let waiting = null, left = false;
     const say = (text, ok, href) => {
       if (!waiting) return AO.toast(text, ok, href);
       const w = waiting; waiting = null;
       return w.settle(text, ok, href);
     };
-    const pressed = () => {
+    // the row as the page draws it now: a re-read while the request was out has replaced the captured node
+    const fresh = () => (row && row.isConnected ? row : msgOf ? document.querySelector(`.mailrow[data-msg="${CSS.escape(msgOf)}"]`) : null);
+    const pressed = (text) => {
       if (!row || !row.isConnected) return;
       delete AO.pressErrs[row.dataset.msg];
       const err = row.querySelector(".rowerr"); if (err) { err.hidden = true; err.textContent = ""; }
       const verb = AO.pressVerb(key);
+      if (drawn) {
+        // drawn in the press's frame, the row kept and not dimmed (rule 4)
+        const reply = key === "board_reply";
+        const f = { leaves: false, verb, kind: reply ? "reply" : "decided", out: true, text: "" };
+        if (reply) { f.replies = row.querySelectorAll(".st.boardreply").length; f.text = `${text} — landing on the board…`; AO.drawReply(row, f.text); }
+        else { f.text = `decided: ${text} — landing on the board…`; AO.drawDecided(row, f.text); }
+        AO.drawOff(row);
+        if (row.dataset.msg) AO.inflight[row.dataset.msg] = f;
+        if (!row.contains(document.activeElement) || document.activeElement.disabled) row.focus({ preventScroll: true });
+        waiting = AO.toast(`${r4[0]} — landing on the board…`, true, null, true);
+        return;
+      }
       AO.markPending(row, verb);
-      if (row.dataset.msg) AO.inflight[row.dataset.msg] = { leaves, verb };
+      if (row.dataset.msg) AO.inflight[row.dataset.msg] = leaves && r4 ? { leaves, verb, kind: "left" } : { leaves, verb };
       if (!leaves) return;
       // the control goes with its row, and while it holds the focus the refresh would decline to redraw
       if (row.contains(document.activeElement)) document.activeElement.blur();
       AO.handRing(row); row.remove(); left = true;
       const what = verb.replace(/…$/, "");
-      waiting = AO.toast(action === "board" ? `${what} — landing on the board…` : `${what}…`, true, null, true);
+      waiting = AO.toast(r4 ? `${r4[0]} — writing on the board…` : action === "board" ? `${what} — landing on the board…` : `${what}…`, true, null, true);
+    };
+    // the answer (rule 4): the kept entry gets the answered words, for a minute's re-reads, and the row as the page
+    // draws it now is rewritten — never the captured node alone
+    const answered = (text) => {
+      const f = msgOf && AO.inflight[msgOf];
+      if (!f) return;
+      f.until = Date.now() + 60000; f.out = false;
+      if (text !== undefined) f.text = text;
+      const r = fresh();
+      if (!r) return;
+      if (f.kind === "decided") AO.drawDecided(r, f.text);
+      else if (f.kind === "reply") AO.drawReply(r, f.text);
+      if (f.kind !== "left") AO.drawOn(r);
     };
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
     if (action === "popout") { const m = b.closest("details.more"); if (m) m.open = false; AO.popOut(id); return; }
@@ -1386,10 +1471,11 @@
         if (!m) return;
         let refs = [];
         try { refs = JSON.parse(b.dataset.refs || "[]"); } catch (_) { refs = []; }
-        pressed();
+        pressed(m.text);
         const res = await act("person", "board", {
           action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: lineText(b), key: b.dataset.key || "", reply: m.text, refs,
         });
+        answered(m.text);  // the words without *landing…*: on the board now
         const to = (res.sent || []).map((x) => `${x.session} (holds ${x.ref})`).join(", ");
         say(to ? `written on the board · sent to ${to}` : res.note || "written on the board", true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
@@ -1406,11 +1492,12 @@
         const said = m.text.split(/\s+/).filter(Boolean).join(" ");
         // the prefix is the form's, whatever case it was retyped in
         const answer = `Not right: ${said.replace(/^not right\s*:?\s*/i, "")}`.trim();
-        pressed();
+        pressed(answer);
         await act("person", "board", {
           action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: lineText(b), key: b.dataset.key || "",
           answer, answers: JSON.parse(b.dataset.answers || "[]"),
         });
+        answered(`decided: ${answer} · ${AO.today()}`);  // the decided line on the decide's answer, the toast after both
         let handed = "", refused = false;
         try {
           const r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo: b.dataset.repo, type: "debt", words: `${b.dataset.head} — ${answer}` }) });
@@ -1426,7 +1513,7 @@
       }
       // design §4.5a **Inbox row: ledger entry** (TD-565): an answer sends its index, **Go with it** the
       // default, **Reply** the composer's words — each `ledger_decide`, one decided line written on the
-      // repo's board. The row stays, pending, until the reading lists that line and the refresh drops it.
+      // repo's board. The row leaves on the press, its toast waiting (§4.5 screen 6 rule 4, TD-1321).
       if (action === "ledger" || action === "ledger_reply") {
         const want = { repo: b.dataset.repo, id: b.dataset.ref };
         // **Done…** / **Back to design…** on any open row (§4.5 screen 12 *any open row*, TD-905): a box for
@@ -1438,6 +1525,7 @@
           want.road = b.dataset.road; want.words = m.text;
           pressed();
           const res = await act("person", "ledger", want);
+          answered();
           const told = (res.told || []).length ? ` · told ${res.told.join(", ")}` : "";
           say(`decided: ${res.decided || b.dataset.road} — written on the board on origin, ${b.dataset.ref}'s work order${told}`, true);
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
@@ -1452,6 +1540,7 @@
         else want.answer = Number(b.dataset.index);
         pressed();
         const res = await act("person", "ledger", want);
+        answered();
         say(`decided: ${res.decided || b.dataset.answer} — written on the board on origin, ${b.dataset.ref}'s work order`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
@@ -1513,8 +1602,9 @@
         location.href = `/focus/${r.id}${AO.poppedId ? "?window=1" : ""}`;
         return;
       }
-      pressed();
+      pressed(key === "board_decide" ? body.answer : undefined);
       const res = await act(id, action2 || action, body);
+      if (key === "board_decide") answered(`decided: ${body.answer} · ${AO.today()}`);
       if (action === "restart") {
         say(`restarted from its launch record, as it was started — ${res.unattended ? "unattended" : "attended"}`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
@@ -1582,6 +1672,20 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
+      // rule 4's refusal (TD-1321): the row as it was, pressable, its error line and the toast in the same words —
+      // *not decided: …*, *not replied: …*, *not done: …*, *not sent back to design: …* — never *<control> failed*,
+      // which cannot tell a board decide from a board Done; a row the press took away comes back on the refresh
+      if (r4 && row) {
+        const words = `${r4[1]}: ${e.message}`;
+        say(words);
+        if (msgOf) {
+          AO.pressErrs[msgOf] = words;
+          const r = fresh();
+          if (r && drawn) { AO.unDraw(r); const er = r.querySelector(".rowerr"); if (er) { er.textContent = words; er.hidden = false; } }
+        }
+        if ((staterow || left) && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
+        return;
+      }
       const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", "shell-here": "Open shell here" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
@@ -1595,7 +1699,9 @@
       if (row && row.dataset.msg && (left || writes)) AO.pressErrs[row.dataset.msg] = writes ? `not written: ${e.message}` : `not ${PRESS_NOT[key] || AO.pressVerb(key).replace(/…$/, "")}: ${e.message}`;
       if ((staterow || left) && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
     } finally {
-      if (row && row.dataset.msg) delete AO.inflight[row.dataset.msg];
+      // a rule 4 press that was answered keeps its entry a minute (`until`), so a lagging board reading does not draw
+      // the answers back; every other press, and a refusal, lets it go here
+      if (msgOf && AO.inflight[msgOf] && !AO.inflight[msgOf].until) delete AO.inflight[msgOf];
       if (waiting) say(PRESS_NOT[key] || "done", true);  // a press whose answer said nothing of its own
       if (row && !left && row.isConnected && row.classList.contains("pending")) AO.unPend(row);
     }
@@ -3477,9 +3583,14 @@
   };
   AO.restoreRowErrs = function (root, kept) {
     // a press still in flight: its row stays out, or stays pending, whatever the swap drew (TD-340)
+    // a rule 4 press (TD-1321): drawn again on the fresh row while it is out and for a minute after its answer,
+    // until a row draws the result from the board; an expired entry is let go
     if (root) root.querySelectorAll(".mailrow[data-msg]").forEach((r) => {
-      const f = AO.inflight[r.dataset.msg];
-      if (f && f.leaves) r.remove(); else if (f) AO.markPending(r, f.verb);
+      const m = r.dataset.msg, f = AO.inflight[m];
+      if (f && f.until && Date.now() > f.until) { delete AO.inflight[m]; return; }
+      if (!f) return;
+      if (f.kind === "decided" || f.kind === "reply") { if (!AO.redraw(r, f) && f.until) delete AO.inflight[m]; return; }
+      if (f.leaves) r.remove(); else AO.markPending(r, f.verb);
     });
     if (root) root.querySelectorAll(".mailrow[data-msg] .rowerr").forEach((el) => {
       const msg = el.closest(".mailrow").dataset.msg;
@@ -4767,7 +4878,14 @@
           read = true;
           const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
           const menus = AO.openMenus(lists);  // a ⋯ or Snooze the person has open, opened again after the swap
+          // a refused press's words and a press still out (§4.5 screen 6 rule 4, TD-1321) kept across the swap, as
+          // the Inbox's are, and a ringed row's ring put back on the same row
+          const errs = AO.rowErrs(lists), on = document.activeElement;
+          const ring = on && on.matches && on.matches(".mailrow[data-msg]") && lists.contains(on) ? on.dataset.msg : "";
           lists.innerHTML = await res.text();
+          AO.restoreRowErrs(lists, errs);
+          const back = ring && $(`.mailrow[data-msg="${CSS.escape(ring)}"]`, lists);
+          if (back) back.focus({ preventScroll: true });
           // the top section stands outside the lists, so typed find words and its focus survive: its parts after
           // the heading show while the Queue is served (TD-1293), and `apply` below recounts its numbers from the
           // cards (TD-1311); a page loaded unserved has no chips, so the first served read reloads it
@@ -4877,7 +4995,9 @@
         if (res.ok) {
           read = true;
           const kept = AO.denyWhys(lists), open = $$(".secinfo:not([hidden])", lists).map((el) => el.id);
+          const errs = AO.rowErrs(lists);  // as the Inbox's swap (rule 4, TD-1321)
           lists.innerHTML = await res.text();
+          AO.restoreRowErrs(lists, errs);
           // the title line and the seams come with the lists (`part=1`): swapped in place, above the cards
           const head = $("#repohead", lists), was = $("#repohead", box);
           if (head && was && was !== head) was.replaceWith(head);
@@ -4952,6 +5072,9 @@
     showHash();
     window.addEventListener("hashchange", showHash);
     setInterval(reread, 30000);  // the Inbox's poll; the events below are the fast path
+    // a press on a row here re-reads the lists (rule 4, TD-1321), as the Inbox's and the Queue's do; the 20 s tick
+    // calls this in place of the top bar's count, so it refreshes the count too
+    AO.refreshInboxPage = () => { reread(); AO.refreshInboxCount(); };
     // the Org's stream, whole: the cards and headers take its deltas (TD-740), and a burst of
     // deltas is one re-read of the lists, a second and a half after the last
     // Only this repo's news re-reads the lists: its `repos` push, a doing call or a delta of a card on the
