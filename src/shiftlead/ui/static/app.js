@@ -7758,7 +7758,7 @@
       // **Send a test** sends the saved values, so not while the card holds others (§4.5a **You**: **Telegram**)
       const test = $(".settgtest", f); if (test) { test.disabled = dirty; test.title = dirty ? "save first: a test sends the saved values" : test.dataset.title || test.title; }
       // **Make key** waits while the Push card holds changes not yet saved (§4.5a **You**: **Push**)
-      const make = $(".setpushmake", f); if (make) { make.disabled = dirty || make.dataset.nosecrets === "1"; make.title = dirty ? "save first" : ""; }
+      const make = $(".setpushmake", f); if (make) { make.disabled = dirty || !(f.elements.push_secrets && f.elements.push_secrets.defaultValue); make.title = dirty ? "save first" : ""; }
     };
     const drawn = (f) => {
       for (const el of f.elements) {
@@ -7947,7 +7947,12 @@
     };
     const current = async () => { const reg = await navigator.serviceWorker.getRegistration("/"); return reg ? reg.pushManager.getSubscription() : null; };
     // a press that lands: the page drawn again, unless another card holds edits a reload would throw away
-    const landed = (text) => { if (!anyDirty()) { location.reload(); return; } say(`${text} · reload to see the devices`); draw(); };
+    // the result in words outlives the reload: kept for the page drawn next, and said there (§4.5a **Make key**)
+    const landed = (text) => {
+      if (!anyDirty()) { try { sessionStorage.setItem("ao.pushsaid", text); } catch (e) { /* said only until the reload */ } location.reload(); return; }
+      say(`${text} · reload to see the devices`); draw();
+    };
+    try { const was = sessionStorage.getItem("ao.pushsaid"); if (was) { sessionStorage.removeItem("ao.pushsaid"); say(was); } } catch (e) { /* no storage: nothing kept */ }
     const draw = async () => {
       const b = AO.push.browserBlock(window, f.dataset.https);
       if (b) { me.disabled = true; me.checked = false; tell(b); test.hidden = true; return; }
@@ -7979,8 +7984,9 @@
           listed.add(got.id);
           landed("on");
         } else {
-          const sub = await current(); if (sub) await sub.unsubscribe();
+          // the home first: a failed post leaves the browser subscribed and listed, so the switch is pressed again
           if (mine) await post("push_unsubscribe", { id: mine });
+          const sub = await current(); if (sub) await sub.unsubscribe();
           listed.delete(mine);
           landed("off");
         }
@@ -8001,10 +8007,10 @@
     });
     const make = $(".setpushmake", f);
     if (make) {
-      make.dataset.nosecrets = f.elements.push_secrets.defaultValue ? "" : "1"; settle(f);
+      settle(f);
       make.addEventListener("click", async () => {
         make.disabled = true; say("making the key…");
-        try { const got = await post("push_key", {}); say(got.result || "the key is made"); landed(got.result || "the key is made"); }
+        try { const got = await post("push_key", {}); landed(got.result || "the key is made"); }
         catch (err) { say(err.message, true); make.disabled = false; }
       });
     }

@@ -7,12 +7,19 @@
 const KEY = new URL(self.location.href).searchParams.get("k") || "";
 const FALLBACK = { body: "something needs you", path: "/inbox", tag: "more" };
 
+// The app's own page for a path, or null: a path is kept only when it resolves on this origin (the URL parser drops
+// tabs and newlines, so `/\t/evil.example` would otherwise leave it).
+function inApp(path) {
+  if (typeof path !== "string" || !path.startsWith("/")) return null;
+  try { const u = new URL(path, self.location.origin); return u.origin === self.location.origin ? u.href : null; } catch (e) { return null; }
+}
+
 // A payload absent, not JSON, or missing a field is drawn as *something needs you* — a push is never dropped.
 function payloadOf(data) {
   let got = null;
   try { got = data ? data.json() : null; } catch (e) { got = null; }
   const ok = got && typeof got === "object" && ["body", "path", "tag"].every((k) => typeof got[k] === "string" && got[k]);
-  return ok ? { body: got.body, path: /^\/(?![\/\\])/.test(got.path) ? got.path : "/inbox", tag: got.tag } : FALLBACK;
+  return ok ? { body: got.body, path: inApp(got.path) ? got.path : "/inbox", tag: got.tag } : FALLBACK;
 }
 
 self.addEventListener("push", (event) => {
@@ -24,8 +31,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const path = (event.notification.data && event.notification.data.path) || "/inbox";
-  const url = new URL(path, self.location.origin).href;
+  const url = inApp(event.notification.data && event.notification.data.path) || inApp("/inbox");
   event.waitUntil((async () => {
     const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
     for (const w of wins) {

@@ -172,8 +172,13 @@ def test_the_card_saves_and_its_switch_lands_through_the_home(client, subprocess
         assert got["id"] == push_mod.device_id(ep)
         page = client.get("/settings").text
         assert f'data-id="{got["id"]}" data-label="Linux · Firefox"' in page and f'data-key="{PUB}"' in page
+        assert client.post("/api/settings/push", json={"secrets": "look/dev"}).json()["ok"]
         test = client.post("/api/settings/notify_test", json={"channel": "push", "device": "f" * 16})
-        assert test.status_code in (200, 400)  # the home's answer in words: a device it does not list is refused
+        # push's own refusals, never Telegram's: the device not listed, or the key being read again after the save
+        assert test.status_code == 400 and (
+            "no device 'ffffffffffffffff' is listed" in (why := test.json()["detail"]) or "reading the key" in why
+        )
+        assert client.post("/api/settings/push", json={"secrets": ""}).json()["ok"]
         removed = client.post("/api/settings/push_unsubscribe", json={"id": got["id"]}).json()
         assert removed["removed"] is True and push_mod.load(f)["devices"] == []
         made = client.post("/api/settings/push_key", json={})
@@ -274,6 +279,8 @@ const data = (v) => ({ json: () => (typeof v === "string" ? JSON.parse(v) : v) }
   await fire("push", { data: data({ body: "b", path: "https://evil.example/", tag: "t" }) });
   await fire("push", { data: data({ body: "b", path: "//evil.example/", tag: "t" }) });
   await fire("push", { data: data({ body: "b", path: "/\\\\evil.example/", tag: "t" }) });
+  await fire("push", { data: data({ body: "b", path: "/\\t/evil.example/", tag: "t" }) });
+  await fire("push", { data: data({ body: "b", path: "/\\n/evil.example/", tag: "t" }) });
   const click = (path) => ({ notification: { close: () => {}, data: { path } } });
   await fire("notificationclick", click("/inbox?row=x"));
   const nav = [];
@@ -306,7 +313,7 @@ def test_the_worker_draws_every_push_opens_its_row_and_subscribes_again():
     assert first["icon"].endswith("192.png") and (UI / "static" / first["icon"].removeprefix("/static/")).is_file()
     fallback = [(s["body"], s["tag"], s["data"]["path"]) for s in got["shown"][1:4]]
     assert fallback == [("something needs you", "more", "/inbox")] * 3
-    assert [s["data"]["path"] for s in got["shown"][4:7]] == ["/inbox"] * 3  # never a page off the app
+    assert [s["data"]["path"] for s in got["shown"][4:9]] == ["/inbox"] * 5  # never a page off the app
     assert got["opened"] == ["https://home.ts.net/inbox?row=x"]
     assert got["nav"] == ["focus", "https://home.ts.net/inbox?row=y"]
     (u1, b1), (u2, b2) = got["posted"]
@@ -316,3 +323,77 @@ def test_the_worker_draws_every_push_opens_its_row_and_subscribes_again():
     )
     assert b1["replaces"] == got["old"] == push_mod.device_id("https://fcm.googleapis.com/old")
     assert b2["endpoint"] == "https://fcm.googleapis.com/n2" and "replaces" not in b2
+
+
+CARD = """
+const fs = require("fs");
+const noop = () => {};
+const log = [];
+const store = {};
+const node = (extra) => {
+  const on = {};
+  return Object.assign({ dataset: {}, hidden: false, disabled: false, checked: false, textContent: "",
+    classList: { toggle: noop, add: noop, remove: noop, contains: () => false }, append: noop,
+    addEventListener: (k, f) => { on[k] = f; }, fire: (k, e) => on[k](e || {}),
+    querySelector: () => null, querySelectorAll: () => [] }, extra || {});
+};
+const ENDPOINT = "https://fcm.googleapis.com/fcm/send/mine";
+let sub = { endpoint: ENDPOINT, unsubscribe: async () => { log.push("browser unsubscribe"); return true; } };
+const parts = { ".setpushme": node(), ".setpushwhy": node({ textContent: "checking this browser…" }),
+  ".setpushtest": node(), ".setpushsaid": node(), ".setpushtgline": node() };
+const row = (id) => { const r = node({ dataset: { id, label: "Linux · Firefox", since: "Nov 1" } });
+  const t = node(), rm = node(); r.querySelector = (s) => (s === ".setpushthis" ? t : rm); return r; };
+global.window = {}; global.document = { documentElement: node(), body: node(), querySelector: () => null,
+  querySelectorAll: () => [], addEventListener: noop, createElement: node };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.sessionStorage = { getItem: (k) => store[k] || null, setItem: (k, v) => { store[k] = v; },
+  removeItem: (k) => { delete store[k]; } };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/settings", protocol: "http:", host: "x", reload: () => log.push("reload") };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+Object.assign(window, { isSecureContext: true, PushManager: noop, Notification: { permission: "granted" },
+  navigator: { userAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0", serviceWorker: {} } });
+Object.defineProperty(globalThis, "navigator", { value: { serviceWorker: { getRegistration: async () =>
+  ({ pushManager: { getSubscription: async () => sub } }) } }, configurable: true });
+const tick = () => new Promise((r) => setImmediate(r));
+(async () => {
+  const mine = await window.AO.push.deviceId(ENDPOINT);
+  const rows = [row(mine), row("0000000000000000")];
+  const form = node({ dataset: { key: "BPAq", block: "", https: "" },
+    elements: { push_tg: node({ value: "both", dataset: {} }), push_secrets: { defaultValue: "look/dev" } },
+    querySelector: (s) => parts[s] || null,
+    querySelectorAll: (s) => (s === ".setpushdev" ? rows : []) });
+  let fail = false;
+  const post = async (verb, body) => { log.push("post " + verb + " " + JSON.stringify(body));
+    if (fail) throw new Error("the home did not answer"); return {}; };
+  store["ao.pushsaid"] = "the key is made";
+  window.AO.pushCard(form, post, () => false, noop);
+  const said0 = parts[".setpushsaid"].textContent, kept0 = store["ao.pushsaid"] || null;
+  for (let i = 0; i < 5; i++) await tick();
+  const me = parts[".setpushme"];
+  const drawn = { checked: me.checked, disabled: me.disabled, test_hidden: parts[".setpushtest"].hidden };
+  fail = true; me.checked = false; me.fire("change");
+  for (let i = 0; i < 8; i++) await tick();
+  const failed = { log: log.slice(), said: parts[".setpushsaid"].textContent };
+  log.length = 0; fail = false; me.checked = false; me.fire("change");
+  for (let i = 0; i < 8; i++) await tick();
+  console.log(JSON.stringify({ said0, kept0, drawn, failed, off: log.slice(), kept: store["ao.pushsaid"] || null, mine }));
+})();
+"""
+
+
+@pytest.mark.unit
+def test_the_card_turns_off_at_the_home_first_and_says_its_result_after_the_reload():
+    """`AO.pushCard` under a stub DOM: a line kept for the reload is said once on the page drawn next; this
+    browser's listed subscription reads the switch on, with **Send a test**; off posts `push_unsubscribe` before
+    the browser drops its subscription, so a failed post leaves both standing and says why; a landed press keeps
+    its words for the reload (§4.5a **Push**: **Make key** *prints its result in words*)."""
+    got = _run(_node(), CARD, str(UI / "static" / "app.js"))
+    assert got["said0"] == "the key is made" and got["kept0"] is None
+    assert got["drawn"] == {"checked": True, "disabled": False, "test_hidden": False}
+    assert got["failed"]["log"] == [f'post push_unsubscribe {{"id":"{got["mine"]}"}}']  # the browser kept its own
+    assert got["failed"]["said"] == "the home did not answer"
+    assert got["off"] == [f'post push_unsubscribe {{"id":"{got["mine"]}"}}', "browser unsubscribe", "reload"]
+    assert got["kept"] == "off"
