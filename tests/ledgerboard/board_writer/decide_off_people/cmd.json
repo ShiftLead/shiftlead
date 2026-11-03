@@ -1,0 +1,20 @@
+{
+ "argv": [
+  "decide",
+  "--board",
+  "board.md",
+  "--line",
+  "9",
+  "--expect",
+  "decide 2026-01-11",
+  "--answer",
+  "Disk",
+  "--by",
+  "lee",
+  "--session",
+  "w-9",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

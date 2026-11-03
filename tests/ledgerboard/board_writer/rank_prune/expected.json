@@ -1,0 +1,10 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "rank",
+  "paths": [
+   "rank.yml"
+  ],
+  "subject": "queue: prune TD-2, TD-4 (ledgerboard)"
+ }
+}

@@ -1,0 +1,439 @@
+{
+  "item-line": {
+    "item-line": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [x] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
+        "  - [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
+        "- [ ] \tact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ]
+    },
+    "decide-item": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (session `w-1`) — Ship it? Context: TD-12. Due: 2026-01-20. Answers: Go (default) | Not yet."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (session `w-1`) — Ship it? Context: TD-12. Due: 2026-01-20. Answers: Go."
+      ]
+    },
+    "look-item": {
+      "accept": [
+        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right: <what>."
+      ],
+      "refuse": [
+        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Broken."
+      ]
+    },
+    "fyi-item": {
+      "accept": [
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none."
+      ],
+      "refuse": [
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. Due: 2026-01-20."
+      ]
+    },
+    "other-item": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
+        "- [ ] watch 2026-01-05 (n/a) — Recheck the job. Context: none. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7."
+      ]
+    },
+    "decided-item": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet. Decided: Go (by pat) (2026-01-05).",
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06)."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet."
+      ]
+    },
+    "head": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1`) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session w-1 on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ]
+    },
+    "any-head": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet. Decided: Go (by pat) (2026-01-05)."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (someone) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06)."
+      ]
+    },
+    "head-name": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w.1/x` on box_1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w;1`) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ]
+    },
+    "date": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-1-5 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ]
+    },
+    "digit": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-0x-20."
+      ]
+    },
+    "text": {
+      "accept": [
+        "- [ ] act 2026-01-05 (n/a) — Why now? Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key Context: TD-7. Due: 2026-01-20."
+      ]
+    },
+    "context": {
+      "accept": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7, PR #3 and branch `fix-1`. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7 Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: .. Due: 2026-01-20."
+      ]
+    },
+    "parts": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Go | Not yet."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15 TD-16. Due: 2026-01-20. Answers: Go | Not yet."
+      ]
+    },
+    "entry-id": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: TD-15, other#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: TD-15, td-16. Due: 2026-01-20. Answers: Go | Not yet."
+      ]
+    },
+    "repo": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: acme/tools#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: a/b/c#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
+      ]
+    },
+    "repo-part": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: my.repo_2#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: my repo#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
+      ]
+    },
+    "due": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20",
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. due: 2026-01-20."
+      ]
+    },
+    "hide": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Hide until: 2026-01-12."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Hide until: 2026-01-12"
+      ]
+    },
+    "reply": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. — Pat, 2026-01-06: later, see Due: 2026-02-01."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. — Pat, 2026-01-06 later."
+      ]
+    },
+    "fyi-reply": {
+      "accept": [
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: noted."
+      ],
+      "refuse": [
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: moved to Due: 2026-02-01."
+      ]
+    },
+    "undated": {
+      "accept": [
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: no date here.",
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: see Due: now."
+      ],
+      "refuse": [
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: due: 2026-02-01."
+      ]
+    },
+    "reply-name": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. — Pat Lee, 2026-01-06: later."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. — Pat, Lee, 2026-01-06: later."
+      ]
+    },
+    "choices": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A | B | C (default)."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A | B"
+      ]
+    },
+    "answers": {
+      "accept": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Answers: done. Decided: done (2026-01-06)."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Answers: done Decided: done (2026-01-06)."
+      ]
+    },
+    "look-answers": {
+      "accept": [
+        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works (default) | Not right: <what>."
+      ],
+      "refuse": [
+        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works | Not right.",
+        "- [ ] look 2026-01-05 (n/a) — Check the page. Context: PR #4. Due: 2026-01-20. Answers: Works (Default) | Not right: <what>."
+      ]
+    },
+    "answer": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep (default) — nothing changes | Drop — the entry is archived."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep | ."
+      ]
+    },
+    "label": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A \\| B | C."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A |  | C."
+      ]
+    },
+    "label-chars": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep it | Drop it."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep Context: it | Drop it."
+      ]
+    },
+    "label-char": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: x\\|y | z."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: x || z."
+      ]
+    },
+    "answer-sep": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A|B."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: A / B."
+      ]
+    },
+    "lifts": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on it? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Go with care | Not yet. Lifts: Go | Go with care."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Go on it? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Go with care | Not yet. Lifts: Go | Go with care"
+      ]
+    },
+    "decided": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (person) — Ship it. Context: TD-12. Due: 2026-01-05. Answers: Go | Not yet. Decided: Go (by pat) (2026-01-05).",
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06)",
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided:done (2026-01-06).",
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: do(2026-01-06)."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done.",
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20. Decided: done (2026-01-06) now."
+      ]
+    },
+    "words": {
+      "accept": [
+        "- [ ] act 2026-01-05 (n/a) — Read the context notes. Context: TD-7. Due: 2026-01-20.",
+        "- [ ] fyi 2026-01-05 (n/a) — The page moContext:ed. Context: noContext:ne."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Read it, Answers: soon. Context: TD-7. Due: 2026-01-20."
+      ]
+    },
+    "field-name": {
+      "accept": [
+        "- [ ] act 2026-01-05 (n/a) — Answer the mail. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate it. Context: TD-7 Closed: soon. Due: 2026-01-20."
+      ]
+    },
+    "due-name": {
+      "accept": [
+        "- [ ] act 2026-01-05 (n/a) — Fix the overdue job. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate it. Context: TD-7. DUE: 2026-01-20."
+      ]
+    },
+    "char": {
+      "accept": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key — all of it. Context: TD-7. Due: 2026-01-20.",
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key\rnow. Context: TD-7. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] act 2026-01-05 (n/a) — Rotate the key\nnow. Context: TD-7. Due: 2026-01-20."
+      ]
+    },
+    "label-start": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: \\|x | y."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: x |   | y."
+      ]
+    },
+    "field-at": {
+      "accept": [
+        "- [ ] watch 2026-01-05 (n/a) — Recheck theContext:job. Context: none. Due: 2026-01-20."
+      ],
+      "refuse": [
+        "- [ ] watch 2026-01-05 (n/a) — Recheck (Context: the job). Context: none. Due: 2026-01-20."
+      ]
+    },
+    "non-word": {
+      "accept": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep xLifts: it | Drop it."
+      ],
+      "refuse": [
+        "- [ ] decide 2026-01-05 (n/a) — Which one? Context: TD-12. Due: 2026-01-20. Answers: Keep (Lifts: it | Drop it."
+      ]
+    },
+    "dated-due": {
+      "accept": [
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: overdue: 2026-02-01."
+      ],
+      "refuse": [
+        "- [ ] fyi 2026-01-05 (n/a) — The page moved. Context: none. — sam, 2026-01-06: (Due:2026-02-01)."
+      ]
+    }
+  },
+  "rank-file": {
+    "rank-file": {
+      "accept": [
+        "# The rank (a comment).\nTD-3: 0h\nTD-1: 2|0|000001\n",
+        "",
+        "# only a comment"
+      ],
+      "refuse": [
+        "# The rank (a comment).\nTD-3: 0h\n\nTD-1: 2|0|000001\n"
+      ]
+    },
+    "comment-line": {
+      "accept": [
+        "# one\n# two\nTD-3: 0h\n"
+      ],
+      "refuse": [
+        "TD-3: 0h\n# below\n"
+      ]
+    },
+    "rank-line": {
+      "accept": [
+        "TD-3:\t0h \nTD-12: 0i\n"
+      ],
+      "refuse": [
+        "TD-3 0h\n",
+        "TD-3:0h\n"
+      ]
+    },
+    "key": {
+      "accept": [
+        "TD-3: a.b/c_d-e|f\n"
+      ],
+      "refuse": [
+        "TD-3: |a\n",
+        "TD-3: a:b\n"
+      ]
+    },
+    "eol": {
+      "accept": [
+        "TD-3: 0h\r\nTD-4: 0i\rTD-5: 0j\n"
+      ],
+      "refuse": [
+        "TD-3: 0h TD-4: 0i\n"
+      ]
+    },
+    "line-char": {
+      "accept": [
+        "# a comment, with: anything #\nTD-3: 0h\n"
+      ],
+      "refuse": [
+        "#\f\nTD-3: 0h\n"
+      ]
+    },
+    "comment": {
+      "accept": [
+        "# a\n# b"
+      ],
+      "refuse": [
+        "TD-3: 0h\n# b"
+      ]
+    },
+    "rank-entry": {
+      "accept": [
+        "TD-3: 0h\nTD-4: 0i"
+      ],
+      "refuse": [
+        "TD-3: 0h\nTD-4 0i"
+      ]
+    }
+  },
+  "person": {
+    "person": {
+      "accept": [
+        "pat",
+        "sam.lee",
+        "Sam_Lee-2"
+      ],
+      "refuse": [
+        "sam..lee",
+        "sam lee",
+        ".sam"
+      ]
+    },
+    "person-part": {
+      "accept": [
+        "a-b_c"
+      ],
+      "refuse": [
+        "a+b",
+        ""
+      ]
+    }
+  }
+}

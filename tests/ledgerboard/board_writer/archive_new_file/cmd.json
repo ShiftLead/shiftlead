@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "archive",
+  "--board",
+  "board.md",
+  "--archive",
+  "archive.md",
+  "--json"
+ ]
+}

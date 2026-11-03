@@ -1,0 +1,14 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "rank",
+  "paths": [
+   "ledger/rank.yml"
+  ],
+  "respaced": [
+   "TD-003",
+   "TD-004"
+  ],
+  "subject": "queue: respace TD-003, TD-004 (ledgerboard)"
+ }
+}

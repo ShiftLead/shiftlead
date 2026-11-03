@@ -1,0 +1,14 @@
+{
+ "argv": [
+  "done",
+  "--board",
+  "board.md",
+  "--line",
+  "12",
+  "--expect",
+  "act",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

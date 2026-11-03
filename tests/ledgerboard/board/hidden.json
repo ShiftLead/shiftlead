@@ -1,0 +1,541 @@
+{
+ "closed": [],
+ "items": [
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-05",
+   "due_error": null,
+   "due_tag": "10d overdue",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 5,
+   "overdue_days": 10,
+   "parts": [],
+   "refs": [
+    "TD-1"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "act 2026-01-01 (n/a) — Overdue by ten. Context: TD-1. Due: 2026-01-05.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-13",
+   "due_error": null,
+   "due_tag": "2d overdue",
+   "hidden": true,
+   "hide_until": "2026-01-20",
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 6,
+   "overdue_days": 2,
+   "parts": [],
+   "refs": [
+    "TD-2"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "act 2026-01-01 (n/a) — Overdue by two, hidden. Context: TD-2. Due: 2026-01-13. Hide until: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-13",
+   "due_error": null,
+   "due_tag": "2d overdue",
+   "hidden": false,
+   "hide_until": "2026-01-15",
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 7,
+   "overdue_days": 2,
+   "parts": [],
+   "refs": [
+    "TD-3"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "act 2026-01-01 (n/a) — Overdue by two, hide passed. Context: TD-3. Due: 2026-01-13. Hide until: 2026-01-15.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [
+    "a",
+    "b"
+   ],
+   "consequences": [
+    "",
+    ""
+   ],
+   "decided": {
+    "date": "2026-01-10",
+    "text": "a"
+   },
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-30",
+   "due_error": null,
+   "due_tag": "due 2026-01-30",
+   "hidden": false,
+   "hide_until": "2026-01-20",
+   "host": null,
+   "kind": "decide",
+   "lifts": null,
+   "line": 8,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-4"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "decide 2026-01-01 (n/a) — Decided, hidden but a work order. Context: TD-4. Due: 2026-01-30. Hide until: 2026-01-20. Answers: a | b. Decided: a (2026-01-10).",
+   "waiting_on": "session"
+  },
+  {
+   "answers": [
+    "a",
+    "b"
+   ],
+   "consequences": [
+    "",
+    ""
+   ],
+   "decided": {
+    "date": "2026-01-08",
+    "text": "b"
+   },
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-30",
+   "due_error": null,
+   "due_tag": "due 2026-01-30",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "decide",
+   "lifts": null,
+   "line": 9,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-5"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "decide 2026-01-01 (n/a) — Decided earlier. Context: TD-5. Due: 2026-01-30. Answers: a | b. Decided: b (2026-01-08).",
+   "waiting_on": "session"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-15",
+   "due_error": null,
+   "due_tag": "due today",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 10,
+   "overdue_days": 0,
+   "parts": [],
+   "refs": [
+    "TD-6"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "act 2026-01-01 (n/a) — Due today. Context: TD-6. Due: 2026-01-15.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-18",
+   "due_error": null,
+   "due_tag": "due 2026-01-18",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 11,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-7"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "act 2026-01-01 (n/a) — Due in three. Context: TD-7. Due: 2026-01-18.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": null,
+   "due_error": "2026-1-20",
+   "due_tag": "no due date",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 12,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-8"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "act 2026-01-01 (n/a) — Bad date. Context: TD-8. Due: 2026-1-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 13,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-9"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "act 2026-01-01 (n/a) — Undated. Context: TD-9.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-12",
+   "due_error": null,
+   "due_tag": "3d overdue",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "watch",
+   "lifts": null,
+   "line": 14,
+   "overdue_days": 3,
+   "parts": [],
+   "refs": [
+    "TD-10"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "watch 2026-01-01 (n/a) — Check the mirror. Context: TD-10. Due: 2026-01-12.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-25",
+   "due_error": null,
+   "due_tag": "due 2026-01-25",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "watch",
+   "lifts": null,
+   "line": 15,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-11"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "watch 2026-01-01 (n/a) — Check the cache. Context: TD-11. Due: 2026-01-25.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "hidden": false,
+   "hide_until": "2026-01-14",
+   "host": null,
+   "kind": "fyi",
+   "lifts": null,
+   "line": 16,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [],
+   "replies": [],
+   "session": null,
+   "text": "fyi 2026-01-01 (n/a) — The mirror moved. Context: none. Hide until: 2026-01-14.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "hidden": true,
+   "hide_until": "2026-02-01",
+   "host": null,
+   "kind": "fyi",
+   "lifts": null,
+   "line": 17,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [],
+   "replies": [],
+   "session": null,
+   "text": "fyi 2026-01-01 (n/a) — Hidden fyi. Context: none. Hide until: 2026-02-01.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "consequences": [],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-16",
+   "due_error": null,
+   "due_tag": "due 2026-01-16",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "act",
+   "lifts": null,
+   "line": 18,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-12"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "act 2026-01-01 (n/a) — Prose Hide until: 2026-02-01 is no field. Context: TD-12. Due: 2026-01-16.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [
+    "A (ok. Hide until: 2030-01-01)",
+    "B"
+   ],
+   "consequences": [
+    "",
+    ""
+   ],
+   "decided": null,
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "decide",
+   "lifts": null,
+   "line": 19,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-13"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "decide 2026-01-01 (n/a) — An answer is no hide. Context: TD-13. Due: 2026-01-20. Answers: A (ok. Hide until: 2030-01-01) | B.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [
+    "a",
+    "b"
+   ],
+   "consequences": [
+    "",
+    ""
+   ],
+   "decided": {
+    "date": "2026-01-10",
+    "text": "a. Hide until: 2030-01-01"
+   },
+   "decided_by": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-20",
+   "due_error": null,
+   "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
+   "host": null,
+   "kind": "decide",
+   "lifts": null,
+   "line": 20,
+   "overdue_days": null,
+   "parts": [],
+   "refs": [
+    "TD-14"
+   ],
+   "replies": [],
+   "session": null,
+   "text": "decide 2026-01-01 (n/a) — A decision is no hide. Context: TD-14. Due: 2026-01-20. Answers: a | b. Decided: a. Hide until: 2030-01-01 (2026-01-10).",
+   "waiting_on": "session"
+  }
+ ],
+ "keys": [
+  "- [ ] act 2026-01-01 (n/a) — Overdue by ten. Context: TD-1",
+  "- [ ] act 2026-01-01 (n/a) — Overdue by two, hidden. Context: TD-2",
+  "- [ ] act 2026-01-01 (n/a) — Overdue by two, hide passed. Context: TD-3",
+  "- [ ] decide 2026-01-01 (n/a) — Decided, hidden but a work order. Context: TD-4. Answers: a | b",
+  "- [ ] decide 2026-01-01 (n/a) — Decided earlier. Context: TD-5. Answers: a | b",
+  "- [ ] act 2026-01-01 (n/a) — Due today. Context: TD-6",
+  "- [ ] act 2026-01-01 (n/a) — Due in three. Context: TD-7",
+  "- [ ] act 2026-01-01 (n/a) — Bad date. Context: TD-8. Due: 2026-1-20",
+  "- [ ] act 2026-01-01 (n/a) — Undated. Context: TD-9",
+  "- [ ] watch 2026-01-01 (n/a) — Check the mirror. Context: TD-10",
+  "- [ ] watch 2026-01-01 (n/a) — Check the cache. Context: TD-11",
+  "- [ ] fyi 2026-01-01 (n/a) — The mirror moved. Context: none",
+  "- [ ] fyi 2026-01-01 (n/a) — Hidden fyi. Context: none",
+  "- [ ] act 2026-01-01 (n/a) — Prose is no field. Context: TD-12",
+  "- [ ] decide 2026-01-01 (n/a) — An answer is no hide. Context: TD-13. Answers: A (ok.) | B",
+  "- [ ] decide 2026-01-01 (n/a) — A decision is no hide. Context: TD-14. Answers: a | b"
+ ],
+ "needs_you": [
+  [
+   9,
+   "decided",
+   7
+  ],
+  [
+   8,
+   "decided",
+   5
+  ],
+  [
+   20,
+   "decided",
+   5
+  ],
+  [
+   5,
+   "overdue",
+   10
+  ],
+  [
+   7,
+   "overdue",
+   2
+  ],
+  [
+   10,
+   "due",
+   0
+  ],
+  [
+   18,
+   "due",
+   -1
+  ],
+  [
+   11,
+   "due",
+   -3
+  ],
+  [
+   19,
+   "due",
+   -5
+  ],
+  [
+   12,
+   "bad_due",
+   null
+  ],
+  [
+   13,
+   "undated",
+   null
+  ],
+  [
+   14,
+   "watch",
+   3
+  ],
+  [
+   15,
+   "watch",
+   -10
+  ],
+  [
+   16,
+   "fyi",
+   null
+  ]
+ ],
+ "people": null
+}

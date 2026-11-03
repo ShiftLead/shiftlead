@@ -1,0 +1,12 @@
+{
+ "argv": [
+  "rank",
+  "--rank",
+  "ledger/rank.yml",
+  "--action",
+  "respace",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}
