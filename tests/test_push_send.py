@@ -497,6 +497,41 @@ def test_a_full_burst_to_three_devices_ends_inside_the_bound_with_every_status(m
     assert {x["status"] for x in lines if x["device"] != "d1"} == {201}
 
 
+def test_the_posts_deadline_is_the_designs_forty_seconds_inside_the_homes_kill():
+    """TD-1332: design §4.10 — the posts end 40 s after posting began, the home's bound (`CHILD_SECONDS` +
+    `REQUEST_SECONDS`, where it kills the child) less ten seconds for doppler's start; every other test sets
+    `PUSH_SECONDS` by hand, so this one reads the real value."""
+    bound = notify.CHILD_SECONDS + notify.REQUEST_SECONDS
+    assert notify.PUSH_SECONDS == bound - 10.0 == 40.0
+    assert notify.PUSH_THREADS == 64
+
+
+def test_a_post_that_raises_ends_the_child_with_every_unanswered_line_printed(monkeypatch, capsys):
+    """TD-1332: a post that raises is caught as the deadline is — every line not yet printed reads *no answer*,
+    the raised one among them, and the child ends without joining the posts still running."""
+    import time
+
+    pytest.importorskip("pywebpush")
+    raw, _, _ = _pair()
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", raw)
+    left = []
+    monkeypatch.setattr(notify, "_abandon", lambda: left.append(True))
+
+    def post(d, data, key, sub):
+        if d["id"] == "boom":
+            raise RuntimeError("the post raised")
+        time.sleep(2.0)  # long enough that the raise is always the first answer
+        return 201
+
+    monkeypatch.setattr(notify, "_post", post)
+    devices = [{"id": "boom", "endpoint": EP1, "keys": KEYS}, {"id": "slow", "endpoint": EP2, "keys": KEYS}]
+    job = {"payloads": [{"body": "x", "path": "/inbox", "tag": "t"}], "devices": devices}
+    assert notify.push_main(json.dumps(job)) == 0
+    assert left == [True]
+    lines = {x["device"]: x["status"] for x in map(json.loads, capsys.readouterr().out.splitlines()[1:])}
+    assert lines == {"boom": push_mod.NO_ANSWER, "slow": push_mod.NO_ANSWER}
+
+
 def test_an_address_that_does_not_read_ends_only_its_own_post(monkeypatch, capsys):
     """TD-1322: `getaddrinfo` answering an address `ipaddress` cannot parse is that device's status, in words;
     the other devices' posts are printed as they answer."""
