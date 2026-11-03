@@ -1637,19 +1637,26 @@
   // a menu (`details.more`: a Queue card's ⋯, a row's Snooze) the person has open when a re-read swaps the HTML
   // under it is opened again on the fresh copy (TD-1315), as a session card's delta keeps its menu (TD-121): keyed by
   // the nearest row or card around it and its place among that one's menus, so a read is never held back for it
+  // and the key in it that held focus (its mark or a name) holds it again, so the ⋯'s keys (`AO.qDots`) still work
   const menuHome = (d) => d.closest && d.closest("[data-qid], [data-msg], [data-card]");
+  const menuKeys = (d) => [$("summary", d), ...$$('.menu [role="menuitem"]', d)];
   AO.openMenus = function (root) {
     return (root ? $$("details.more[open]", root) : []).map((d) => {
       const home = menuHome(d);
       if (!home) return null;
       const [k, v] = home.dataset.qid ? ["qid", home.dataset.qid] : home.dataset.msg ? ["msg", home.dataset.msg] : ["card", home.dataset.card];
-      return { k, v, i: $$("details.more", home).indexOf(d) };
+      return { k, v, i: $$("details.more", home).indexOf(d), f: menuKeys(d).indexOf(document.activeElement) };
     }).filter(Boolean);
   };
   AO.reopenMenus = function (root, keys) {
-    (keys || []).forEach(({ k, v, i }) => {
+    (keys || []).forEach(({ k, v, i, f }) => {
       const home = root && $(`[data-${k}="${CSS.escape(v)}"]`, root), d = home && $$("details.more", home)[i];
-      if (d && menuHome(d) === home) d.open = true;  // its `toggle` places it, as a press does
+      if (!d || menuHome(d) !== home) return;
+      // focus goes back after the page's own `toggle` capture (which places the menu, and would move a focused mark's
+      // focus to the first name), so the key the person was on is the one focused
+      const el = f >= 0 && menuKeys(d)[f];
+      if (el) d.addEventListener("toggle", () => el.focus({ preventScroll: true }), { once: true });
+      d.open = true;
     });
   };
   // design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): a fold a Queue card draws

@@ -549,7 +549,16 @@ global.CSS = { escape: (s) => s };
 const page = (open) => {
   const homes = [["qid", "s#TD-1"], ["msg", "m9"]].map(([k, v]) => {
     const h = { dataset: { [k]: v } };
-    h.menus = [0, 1].map((n) => ({ open: open.includes(`${v}/${n}`), closest: () => h }));
+    h.menus = [0, 1].map((n) => {
+      // a menu: its mark, two names; `toggle` handlers run when it is opened, as the browser's event does
+      const keys = [0, 1, 2].map((j) => ({ j, focus: () => { document.activeElement = keys[j]; } }));
+      const m = { closest: () => h, heard: [], addEventListener: (t, f) => m.heard.push(f),
+        querySelector: (sel) => (sel === "summary" ? keys[0] : null),
+        querySelectorAll: (sel) => (sel === '.menu [role="menuitem"]' ? keys.slice(1) : []), keys };
+      let o = open.includes(`${v}/${n}`);
+      Object.defineProperty(m, "open", { get: () => o, set: (x) => { o = x; if (x) m.heard.splice(0).forEach((f) => f()); } });
+      return m;
+    });
     h.querySelectorAll = (sel) => (sel === "details.more" ? h.menus : []);
     return h;
   });
@@ -558,10 +567,14 @@ const page = (open) => {
     querySelector: (sel) => homes.find((h) => Object.entries(h.dataset).some(([k, v]) => sel === `[data-${k}="${v}"]`)) || null };
 };
 const before = page(["s#TD-1/1", "m9/0"]);
+document.activeElement = before.homes[0].menus[1].keys[2];  // the person was on the ⋯'s second name
 const keys = AO.openMenus(before);
 const after = page([]);  // the swap draws every menu shut
+document.activeElement = null;
 AO.reopenMenus(after, keys);
-console.log(JSON.stringify({ keys, open: after.all().map((d) => d.open) }));
+const focused = document.activeElement;
+console.log(JSON.stringify({ keys, open: after.all().map((d) => d.open),
+  focus: focused === after.homes[0].menus[1].keys[2] }));
 """
 )
 
@@ -580,5 +593,6 @@ def test_a_reread_opens_again_the_menu_the_person_had_open(tmp_path):
     probe.write_text(MENUS_PROBE)
     got = subprocess.run(["node", str(probe), str(JS)], capture_output=True, text=True, timeout=60, check=True)
     out = json.loads(got.stdout.strip().splitlines()[-1])
-    assert out["keys"] == [{"k": "qid", "v": "s#TD-1", "i": 1}, {"k": "msg", "v": "m9", "i": 0}]
+    assert out["keys"] == [{"k": "qid", "v": "s#TD-1", "i": 1, "f": 2}, {"k": "msg", "v": "m9", "i": 0, "f": -1}]
     assert out["open"] == [False, True, True, False]
+    assert out["focus"]  # the name the person was on holds focus again, so the ⋯'s keys still work
