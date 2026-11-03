@@ -11,6 +11,7 @@ from conftest import park_ticks
 
 from sessionorc import paths
 from sessionorc import settings as settings_mod
+from sessionorc.agent_common import SCHEDULE_LATE
 from sessionorc.agent_tick import NOT_RESTARTS
 from sessionorc.models import Session
 
@@ -141,8 +142,10 @@ async def test_a_team_a_person_stopped_is_never_started_by_its_schedule(agent, m
     now = datetime.now(UTC)
     replays = await _setup(agent, monkeypatch, _rec("grinder-ao-1", out_of_work=None))  # closed with nothing declared
     _reading(agent, now - timedelta(minutes=1))
+    agent._host_rec.setdefault("teams", {})["g"] = {"work_waiting": {"at": "x", "members": {}, "stopped": True}}
     await agent._schedules(now)
-    assert replays.calls == []
+    assert replays.calls == [] and "schedule_fired" in _rec_of(agent), "the reset counts as fired"
+    assert "work_waiting" in _rec_of(agent), "nothing started: rule 8's mark (the card's Start row) stands"
 
 
 async def test_no_launch_record_starts_nothing(agent, monkeypatch):
@@ -167,3 +170,89 @@ async def test_a_cleared_schedule_forgets_its_upcoming_reset(agent, monkeypatch)
 
 def test_a_schedules_start_is_no_restart_of_rule_9():
     assert "schedule" in NOT_RESTARTS
+
+
+async def test_a_reset_found_late_is_counted_and_starts_nothing(agent, monkeypatch):
+    # a stale reading when the schedule is set, or an agent down across the reset: never an arbitrary hour
+    now = datetime.now(UTC)
+    replays = await _setup(agent, monkeypatch, _rec("grinder-ao-1"))
+    old = now - SCHEDULE_LATE - timedelta(minutes=5)
+    _reading(agent, old)
+    await agent._schedules(now)
+    assert replays.calls == [] and _rec_of(agent)["schedule_fired"] == _iso(old)
+
+
+async def test_a_stored_reset_fires_with_the_reading_gone_and_after_a_reload(agent, monkeypatch):
+    # the profile's reading is dropped once no session runs under it: the reset read while it ran still fires,
+    # from the host record as saved (an agent restart between the read and the reset)
+    now = datetime.now(UTC)
+    replays = await _setup(agent, monkeypatch, _rec("grinder-ao-1"))
+    reset = now + timedelta(minutes=30)
+    _reading(agent, reset)
+    await agent._schedules(now)
+    agent._usage.pop("grind")
+    agent._host_rec = agent.host_store.load()
+    await agent._schedules(reset + timedelta(minutes=2))
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1"]
+
+
+async def test_one_reset_spelled_two_ways_fires_once(agent, monkeypatch):
+    now = datetime.now(UTC)
+    replays = await _setup(agent, monkeypatch, _rec("grinder-ao-1"))
+    past = (now - timedelta(minutes=3)).replace(microsecond=0)
+    agent._usage["grind"] = {"windows": [{"label": "week", "pct": 1, "resets": _iso(past)}]}
+    await agent._schedules(now)
+    agent._usage["grind"] = {"windows": [{"label": "week", "pct": 1, "resets": past.isoformat()[:19] + ".400+00:00"}]}
+    await agent._schedules(now + timedelta(minutes=1))
+    assert len(replays.calls) == 1
+
+
+async def test_a_changed_window_forgets_the_old_ones_reset(agent, monkeypatch):
+    now = datetime.now(UTC)
+    replays = await _setup(agent, monkeypatch, _rec("grinder-ao-1"))
+    _reading(agent, now + timedelta(minutes=10))
+    await agent._schedules(now)
+    settings_mod.save({"teams": {"g": {"schedule": {**RULE, "window": "5h"}, "on_work": "off"}}})
+    agent._usage.pop("grind")
+    await agent._schedules(now + timedelta(minutes=20))
+    assert replays.calls == [], "the stored reset was read for the week, not for 5h"
+
+
+async def test_a_member_behind_a_down_link_holds_the_reset_to_the_next_tick(agent, monkeypatch):
+    now = datetime.now(UTC)
+    replays = await _setup(agent, monkeypatch, _rec("grinder-ao-1"))
+    far = agent.sessions["ao-t-grinder-ao-1"]
+    far.host = "far"
+    (paths.launch_dir() / f"{agent._address(far)}.json").write_text(json.dumps({"name": far.id}), encoding="utf-8")
+    past = now - timedelta(minutes=2)
+    _reading(agent, past + timedelta(days=7))  # the reading already rolled
+    agent._host_rec.setdefault("teams", {})["g"] = {
+        "schedule_next": {"profile": "grind", "window": "week", "at": _iso(past)}
+    }
+    await agent._schedules(now)
+    assert replays.calls == [] and "schedule_fired" not in _rec_of(agent)
+    assert _rec_of(agent)["schedule_next"]["at"] == _iso(past), "the same reset, tried again"
+    agent._link_muxes["far"] = object()
+    await agent._schedules(now + timedelta(minutes=1))
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1"] and _rec_of(agent)["schedule_fired"] == _iso(past)
+
+
+async def test_a_surprise_mid_pass_loses_no_reset(agent, monkeypatch):
+    now = datetime.now(UTC)
+    replays = await _setup(agent, monkeypatch, _rec("grinder-ao-1"))
+    past = now - timedelta(minutes=2)
+    _reading(agent, past + timedelta(days=7))
+    agent._host_rec.setdefault("teams", {})["g"] = {
+        "schedule_next": {"profile": "grind", "window": "week", "at": _iso(past)}
+    }
+
+    def boom(*a, **k):
+        raise RuntimeError("surprise")
+
+    real = agent._work_replays
+    monkeypatch.setattr(agent, "_work_replays", boom)
+    await agent._schedules(now)
+    assert _rec_of(agent)["schedule_next"]["at"] == _iso(past) and "schedule_fired" not in _rec_of(agent)
+    monkeypatch.setattr(agent, "_work_replays", real)
+    await agent._schedules(now + timedelta(minutes=1))
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1"]

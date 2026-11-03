@@ -1764,11 +1764,15 @@ teams:
   tick replays its launch record as rule 2 does for a wanted restart, `why: schedule`, under
   `RESTART_CEILING` as every restart is, the seats included (a replayed seat is on call again, its
   trigger standing: written held by rule 3's create, no pane, filled only for a cause), each entry
-  carrying the start's instant as `start` and `of`, as rule 8's do, and rule 8's `work_waiting` mark goes.
+  carrying the start's instant as `start` and `of`, as rule 8's do, and rule 8's `work_waiting` mark goes
+  (only with a start: a team left alone keeps it).
   **Once per reset**: the home keeps on its host record, under the team, `schedule_next` (the upcoming
   reset last read, with the profile and window it was read for) and `schedule_fired` (the reset last
   acted on), so a reading that has already rolled to the next week still fires the reset that passed,
-  and a restart of the agent never fires one twice; with no reading nothing fires. A member on a node
+  and a restart of the agent never fires one twice (instants compared parsed, so one reset spelled two
+  ways is one); with no reading nothing fires, said once in the log. A reset found more than
+  **`SCHEDULE_LATE`** (an hour) after it passed — a stale reading when the schedule is set, the agent
+  down across it — is counted and starts nothing: a team starts at a reset, never at an arbitrary hour. A member on a node
   whose link is down holds the start to the next tick, the same reset. A team with anything live at the
   reset is left alone, and so is one a person stopped (it did not end by its own ending); either way the
   reset counts as fired. One with no launch

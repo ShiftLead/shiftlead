@@ -125,6 +125,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     RESTART_WINDOW,  # noqa: F401
     RESUME_MIN,  # noqa: F401
     ROUND_LINE_CAP,  # noqa: F401
+    SCHEDULE_LATE,  # noqa: F401
     SEAT_IDLE_GRACE,  # noqa: F401
     SEAT_PR_WAIT,  # noqa: F401
     SEND_STALL_SECONDS,  # noqa: F401
@@ -846,6 +847,8 @@ class HostAgent(
         # rule 8 (§6, TD-227): (team, id) → when the home first read that id as new in a wound-down
         # team's lane; in memory, so a restart of the home starts the settle again
         self._work_first: dict[tuple[str, str], datetime] = {}
+        # §6 *Schedule* (TD-133): (team, profile, window) whose schedule has no reset to wait for, said once a run
+        self._schedule_quiet: set[tuple[str, str, str]] = set()
         self._question_ended = False  # rule 8: a lapse wrote a question's mark the sweep must push (TD-274)
         # rule 9 (§6, TD-241): team → when the home's reading of *finished* first held; in memory, and
         # dropped the tick it stops holding, so a restart of the home starts the settle again
