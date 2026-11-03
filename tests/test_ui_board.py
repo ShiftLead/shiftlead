@@ -1903,7 +1903,8 @@ def test_a_line_hidden_past_its_due_waits_in_the_snoozed_fold_counted_by_no_numb
     past, until = (t - timedelta(days=3)).isoformat(), t + timedelta(days=2)
     hz = _hidden_board(
         t,
-        f"decide 2026-10-01 (session `w-1` on kmaster) — **Pick one.** Due: {past}. Hide until: {until}. Answers: Keep | Drop.",
+        f"decide 2026-10-01 (session `w-1` on kmaster) — **Pick one.** Due: {past}. Hide until: {until}."
+        " Answers: Keep | Drop.",
         f"2026-10-01 (session `w-2` on kmaster) — **Due now.** Due: {past}.",
     )
     assert [r["head"] for r in hz["snoozed"]] == ["Pick one."]
