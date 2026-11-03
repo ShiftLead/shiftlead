@@ -1432,3 +1432,13 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .repopage .rrow.livewords { font-size: var(--t-small); padding: 5px 14px; }
 .queuepage .qlive { font-size: var(--t-small); color: var(--muted); white-space: nowrap; }
 .queuepage .qlive.notlive { color: var(--warn-fg); }
+/* **Push**'s devices (§4.5a **You**: **Push**, TD-1305): label, since, the last delivery, Remove in columns as the
+   mockup draws them; on a phone the label and Remove on one line, the two notes under the label */
+.setpushdev { display: grid; grid-template-columns: minmax(9em, 14em) minmax(6em, 9em) 1fr auto; align-items: baseline; gap: 2px 12px; padding: 4px 0; }
+.setpushdev .warnish { color: var(--warn-fg); }
+.setpushdev .setpushrm { grid-column: 4; grid-row: 1; }
+@media (max-width: 600px) {
+  .setpushdev { grid-template-columns: 1fr auto; }
+  .setpushdev > .note { grid-column: 1; }
+  .setpushdev .setpushrm { grid-column: 2; }
+}

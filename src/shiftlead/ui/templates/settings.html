@@ -344,7 +344,7 @@
         <span class="note setpushwhy">{{ push.block or "checking this browser…" }}{% if push.make and not push.secrets %} · set notify.push.secrets — the key is written only there{% endif %}</span></div>
       <div class="note warn setpushpaused"{% if not push.paused %} hidden{% endif %}>{{ push.paused }}</div>
       <div class="setpushdevs">{% for d in push.devices %}
-        <div class="row gap setpushdev" data-id="{{ d.id }}" data-label="{{ d.label }}" data-since="{{ d.since }}"><span class="setpushlabel">{{ d.label }} <span class="badge setpushthis" hidden>this device</span></span><span class="note">since {{ d.since }}</span><span class="note grow{% if d.failed %} warn{% endif %}">{{ d.last }}</span><button class="btn sm ghost setpushrm" type="button">Remove</button></div>
+        <div class="setpushdev" data-id="{{ d.id }}" data-label="{{ d.label }}" data-since="{{ d.since }}"><span class="setpushlabel">{{ d.label }} <span class="badge setpushthis" hidden>this device</span></span><span class="note">since {{ d.since }}</span><span class="note{% if d.failed %} warnish{% endif %}">{{ d.last }}</span><button class="btn sm ghost setpushrm" type="button">Remove</button></div>
       {%- endfor %}</div>
       <label class="setrow"><span class="setlabel">on all devices</span>
         <input type="checkbox" name="push_on"{% if push.on %} checked{% endif %}>
