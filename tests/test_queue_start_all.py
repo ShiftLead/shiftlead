@@ -120,6 +120,27 @@ def test_a_header_press_on_a_two_item_card_walks_them(tmp_path, monkeypatch):
     assert prompt == f"{walk}samscrape#TD-012, samscrape#TD-009, m-41, m-42; the rest — samscrape#TD-020. {TAIL}"
 
 
+def test_a_header_press_leaves_an_answered_entry_out_of_waits_on_me(tmp_path, monkeypatch):
+    """TD-1343: the road's own *waits on me* on the walk press leaves out an entry *answered — waiting on <asker>*
+    (`walk_mine` at the press, not only alone): this world's TD-12, answered at the press, beside TD-9 and two
+    asks, so three items still count and the press walks them, never naming TD-12 as one that waits on the person."""
+    import shiftlead.ui.app as app
+
+    wants = app.card_wants
+
+    def answered(*a):
+        w = wants(*a)
+        out = [m for m in w.get("decide") or () if m.get("item") == "samscrape#TD-012"]
+        assert out, "the world's card carries TD-12 as a Decide item"
+        return {**w, "decide": [m for m in w["decide"] if m not in out], "answered": out}
+
+    monkeypatch.setattr(app, "card_wants", answered)
+    _, prompt = _press(tmp_path, monkeypatch, _asks("m-41", "m-42"), card=CID)
+    assert prompt.startswith("I opened this session from the Queue to work through every item that waits on me")
+    assert "Its entries are: waits on me — samscrape#TD-009, m-41, m-42; the rest — " in prompt
+    assert "samscrape#TD-012" not in prompt.split("the rest — ")[0], "the answered entry waits on its asker"
+
+
 def test_with_one_left_at_the_press_the_why_key_sentence_stands(tmp_path, monkeypatch):
     """A page drawn with two, pressed once one of them is settled (TD-9 no longer a Do item at the press): the road
     counts one, so the `why_key` sentence; with the inbox unread it cannot count, and the same."""
