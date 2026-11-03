@@ -861,13 +861,15 @@
     return open.length > 0;
   };
   // `Esc` closes an open menu wherever focus is; focus goes back to its button when it was in the menu or on no
-  // control, and is left where it is (a composer, the terminal) otherwise, the key going on to it as well.
+  // control, and is left where it is (a composer, the terminal) otherwise, the key going on to it as well — to
+  // the element, never to a page's own `Esc` key (the keys table skips an event marked `aoMenuClosed`).
   AO.menuEsc = function (ev) {
     if (ev.key !== "Escape") return false;
     const open = $$("details.more[open]");
     if (!open.length) return false;
     const at = document.activeElement, home = !at || at === document.body || open.some((d) => d.contains(at));
     open.forEach((d) => { d.open = false; });
+    ev.aoMenuClosed = true;  // the page's own `Esc` (Back on a message page) is not also pressed
     const s = home && $("summary", open[0]);
     if (s && s.focus) s.focus();
     return home;
@@ -7773,6 +7775,7 @@
     if (document.querySelector("dialog[open]")) return;  // the mail composer: nothing behind it takes a key
     const page = AO.keyPage(location.pathname);
     if (ev.key === "Escape" && ev.target && ev.target.matches && ev.target.matches("#filter, #ifilter")) { ev.target.blur(); return; }
+    if (ev.aoMenuClosed) return;  // that `Esc` closed a pop-up menu, and does nothing else on the page (TD-1337)
     const name = AO.keyName(ev);
     if (name === null) return;
     if (gUntil) {

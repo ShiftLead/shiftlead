@@ -115,7 +115,8 @@ out.in_fold = [AO.menuPress(inFold), menu.open, fold.open];
 menu.open = true; document.activeElement = item;
 out.esc_in_menu = [AO.menuEsc({ key: "Escape" }), menu.open, document.activeElement === summary];
 menu.open = true; document.activeElement = composer;
-out.esc_in_composer = [AO.menuEsc({ key: "Escape" }), menu.open, document.activeElement === composer];
+const ev = { key: "Escape" };
+out.esc_in_composer = [AO.menuEsc(ev), menu.open, document.activeElement === composer, ev.aoMenuClosed === true];
 menu.open = true; document.activeElement = document.body;
 out.other_key = [AO.menuEsc({ key: "x" }), menu.open];
 out.esc_on_body = [AO.menuEsc({ key: "Escape" }), menu.open, document.activeElement === summary];
@@ -144,8 +145,18 @@ def test_a_press_outside_an_open_menu_or_esc_closes_it_and_a_fold_stays_open():
     assert got["outside"] == [True, False, True]
     assert got["in_fold"] == [True, False, True]
     assert got["esc_in_menu"] == [True, False, True]
-    assert got["esc_in_composer"] == [False, False, True]
+    assert got["esc_in_composer"] == [False, False, True, True]
     assert got["other_key"] == [False, True]
     assert got["esc_on_body"] == [True, False, True]
     assert got["esc_none_open"] is False
     assert got["pointerdown_capture"] is True
+
+
+@pytest.mark.unit
+def test_an_esc_that_closed_a_menu_presses_no_page_key():
+    """The message page's `Esc` is Back (§4.5a **keys**): an `Esc` that closed a *Snooze* menu there closes the
+    menu alone (TD-1337's review) — the keys table returns on the mark `AO.menuEsc` puts on the event."""
+    js = (UI / "static" / "app.js").read_text()
+    assert "ev.aoMenuClosed = true;" in js
+    keys = js[js.index('const page = AO.keyPage(location.pathname);') :]
+    assert keys.index("if (ev.aoMenuClosed) return;") < keys.index("const name = AO.keyName(ev);")
