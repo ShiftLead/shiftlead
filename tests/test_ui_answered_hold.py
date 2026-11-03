@@ -201,3 +201,68 @@ def test_on_a_card_it_is_drawn_whole_its_details_folded_and_with_you_wins(tmp_pa
     assert drawn[0]["want"] == "with_you"
     html = templates.get_template("queue_mail.html").render(e={**drawn[0], "with_you": "p"}, section="needs")
     assert "with you in p" in html and "answered — waiting on" not in html
+
+
+# ---- the routes (TD-1335): each hands the person inbox to `ledger_for_you`, so the row reads answered there too ----
+
+
+def _route_client(tmp_path, monkeypatch, *, inbox_fails=False, queue=None):
+    """A UI over a fake home: repo `r` holding TD-60 for the person, its asker live, the person inbox holding its
+    answered `ask` (or failing to read, `inbox_fails`), and `queue` as the home's Queue reading."""
+    from test_ui_queue import client
+
+    from sessionorc.client import AgentError
+
+    repos = _repos(tmp_path, "r")
+    for r in repos.values():
+        r["ledger"]["path"] = "docs/technical_debt.md"
+    fleet = [{**FLEET[0], "repo": str(tmp_path / "r")}]
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method == "inbox":
+                if inbox_fails:
+                    raise AgentError("the inbox could not be read")
+                return {"entries": [_ask()] if kw.get("id") in (None, "person") and not kw.get("sent") else []}
+            if method == "queue":
+                if queue is None:
+                    raise AgentError("unknown method: queue")
+                return queue
+            return {"repos": repos, "list": fleet, "host": {"name": "kmaster"}}.get(method, {})
+
+    return client(monkeypatch, tmp_path, Fake)
+
+
+WORD = "answered — waiting on designer"
+
+
+def test_the_inbox_page_and_its_poll_draw_the_answered_row(tmp_path, monkeypatch):
+    c = _route_client(tmp_path, monkeypatch)
+    assert WORD in c.get("/inbox").text
+    assert WORD in c.get("/api/person/inbox").json()["html"]["ledger"]
+
+
+def test_the_queue_cards_item_reads_answered(tmp_path, monkeypatch):
+    q = qid("r", "TD-60")
+    top = {"qid": q, "id": "TD-60", "repo": "r", "title": "held", "priority": "Medium", "needs": "decision",
+           "state": WORD, "with_you": None, "answered": {"mid": "m-1", "asker": "ao-r-designer"}}  # fmt: skip
+    card = {"id": q, "group": "up_next", "status": "", "top": top, "rows": [], "order": [q], "start": q}
+    html = _route_client(tmp_path, monkeypatch, queue={"at": NOW.isoformat(), "cards": [card]}).get("/queue").text
+    item = html[html.index(f'data-card="{q}"') :]
+    assert "you answered · in designer's ask" in item, "the card's item is the answered row, from card_mail"
+
+
+def test_the_repo_pages_for_you_reads_answered_and_an_unread_inbox_draws_it_as_before(tmp_path, monkeypatch):
+    html = _route_client(tmp_path, monkeypatch).get("/repo/r").text
+    assert WORD in html and "you answered · in designer's ask" in html
+    plain = _route_client(tmp_path, monkeypatch, inbox_fails=True).get("/repo/r")
+    assert plain.status_code == 200 and 'href="/repo/r#TD-60"' in plain.text and WORD not in plain.text
