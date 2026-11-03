@@ -102,10 +102,10 @@ filterwarnings = [
 line-length = 120
 target-version = "py312"
 # the vendored ledgerboard and its fixtures are read, never formatted: its release header hashes its
-# body and a test holds it byte-equal to the pinned agent-cadence tree's scripts/ledgerboard.py (ADR
+# body and a test holds it byte-equal to the pinned agent-cadence tree's scripts/ledgerboard/ (ADR
 # 2026-10-12, TD-585); agent-cadence's launcher is vendored frozen, its hash held by a test (§5 *How the
 # readers find agent-cadence*, TD-1014)
-extend-exclude = ["scripts", "docs", "src/sessionorc/ledgerboard.py", "src/sessionorc/agent_cadence.py", "tests/ledgerboard"]
+extend-exclude = ["scripts", "docs", "src/sessionorc/ledgerboard", "src/sessionorc/agent_cadence.py", "tests/ledgerboard"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
