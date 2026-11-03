@@ -1773,7 +1773,8 @@ teams:
   ways is one); with no reading nothing fires, said once in the log. A reset found more than
   **`SCHEDULE_LATE`** (an hour) after it passed — a stale reading when the schedule is set, the agent
   down across it — is counted and starts nothing: a team starts at a reset, never at an arbitrary hour. A member on a node
-  whose link is down holds the start to the next tick, the same reset. A team with anything live at the
+  whose link is down holds the start to the next tick, the same reset, however long the link stays
+  down (a held reset is never counted late). A team with anything live at the
   reset is left alone, and so is one a person stopped (it did not end by its own ending); either way the
   reset counts as fired. One with no launch
   records — never started by a person on this home, or its cards forgotten, which deletes them —

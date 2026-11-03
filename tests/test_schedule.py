@@ -232,8 +232,10 @@ async def test_a_member_behind_a_down_link_holds_the_reset_to_the_next_tick(agen
     await agent._schedules(now)
     assert replays.calls == [] and "schedule_fired" not in _rec_of(agent)
     assert _rec_of(agent)["schedule_next"]["at"] == _iso(past), "the same reset, tried again"
+    await agent._schedules(now + SCHEDULE_LATE + timedelta(minutes=5))
+    assert replays.calls == [] and "schedule_fired" not in _rec_of(agent), "a held reset is never counted late"
     agent._link_muxes["far"] = object()
-    await agent._schedules(now + timedelta(minutes=1))
+    await agent._schedules(now + SCHEDULE_LATE + timedelta(minutes=6))
     assert [c[0] for c in replays.calls] == ["grinder-ao-1"] and _rec_of(agent)["schedule_fired"] == _iso(past)
 
 

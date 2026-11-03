@@ -1989,13 +1989,15 @@ class TickMixin:
             rec.pop("schedule_next", None)  # acted on below; the next reading names the next reset
         if due is None or _instant(rec.get("schedule_fired")) == due:
             return
-        if now - due > SCHEDULE_LATE:
+        held = bool(nxt.get("held")) and due == upcoming  # a reset already held for a link is never late
+        if now - due > SCHEDULE_LATE and not held:
             log.info("schedule: %s's reset %s passed %s ago: counted, nothing started", team, _iso_of(due), now - due)
             rec["schedule_fired"] = _iso_of(due)
             return
         how = await self._schedule_start(team, records, now, _iso_of(due))
         if how == "wait":
-            rec["schedule_next"] = {**which, "at": _iso_of(due)}  # held for a link: the same reset, next tick
+            # held for a link: the same reset, next tick, however long the link stays down
+            rec["schedule_next"] = {**which, "at": _iso_of(due), "held": True}
             return
         rec["schedule_fired"] = _iso_of(due)
         if how == "started":
