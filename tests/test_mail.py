@@ -2779,6 +2779,43 @@ async def test_a_start_under_a_closed_members_name_keeps_its_mail_only_when_aske
 # -- a look (design §4.10 *A look*, TD-290; built TD-292 slice 2) -----------------------------------
 
 
+async def test_a_look_carries_its_commit_and_branch_cleaned_at_every_hop(agent, tmp_path):
+    """Design §4.10 *A look's shots are the pushed commit's* (TD-1303): `shots_at` (40 hex) and `shots_ref`
+    ride beside `shots`, taken as given and cleaned — a malformed one dropped, never refused — `ref` kept
+    only with `at`, and neither on a message without `shots`."""
+    sha = "0123456789abcdef0123456789abcdef01234567"
+    shot = ["docs/mockups/reviews/2026-11-02-td1307-row.png"]
+    async with LocalClient() as person:
+        builder = await _mk(person, tmp_path)("builder", unattended=True)
+        async with LocalClient(caller=builder) as c:
+
+            async def look(**kw):
+                return (await c.call("msg", to="person", kind="steer", default="Works", text="the row?", **kw))["entry"]
+
+            e = await look(shots=shot, shots_at=sha, shots_ref="td1307-shots-at")
+            assert (e["shots_at"], e["shots_ref"]) == (sha, "td1307-shots-at")
+            held = {x["id"]: x for x in (await person.call("inbox"))["entries"]}[e["id"]]
+            assert (held["shots_at"], held["shots_ref"]) == (sha, "td1307-shots-at")
+            assert agent.person_store.load()[-1].shots_at == sha, "kept across a restart"
+            for at, ref, want in (
+                (sha.upper(), "b", (None, None)),  # not lower hex: dropped, and the ref with it
+                (sha[:39], "b", (None, None)),
+                (sha, "HEAD", (sha, None)),
+                (sha, "a..b", (sha, None)),
+                (sha, "-b", (sha, None)),
+                (sha, "a b", (sha, None)),
+                (sha, "x" * 201, (sha, None)),
+                (sha, "", (sha, None)),
+                (None, "b", (None, None)),  # a lone ref is no branch step
+                (sha, "feature/a_b.c-1", (sha, "feature/a_b.c-1")),
+            ):
+                e = await look(shots=shot, shots_at=at, shots_ref=ref)
+                assert (e["shots_at"], e["shots_ref"]) == want, (at, ref)
+            e = await look(shots_at=sha, shots_ref="b")  # no shots: no look, no commit
+            assert (e["shots_at"], e["shots_ref"]) == (None, None)
+        await person.call("kill", id=builder)
+
+
 async def test_a_look_names_its_screenshots_on_a_steer_or_an_ask_to_the_person_and_nowhere_else(agent, tmp_path):
     """Design §4.10 *A look*: a `steer` or an `ask` to the person may carry `shots` — up to four
     paths, each a `.png` directly under `docs/mockups/reviews/` — refused on any other kind, to any

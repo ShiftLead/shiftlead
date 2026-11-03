@@ -120,6 +120,8 @@ class MailMixin:
         subject: str | None = None,
         team: str | None = None,
         repo: str | None = None,
+        shots_at: Any = None,
+        shots_ref: Any = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -180,6 +182,8 @@ class MailMixin:
                 shots,
                 verdict,
                 subject,
+                shots_at,
+                shots_ref,
             )
         except RpcError as e:
             if key:
@@ -385,6 +389,8 @@ class MailMixin:
         shots: Any = None,
         verdict: Any = None,
         subject: str | None = None,
+        shots_at: Any = None,
+        shots_ref: Any = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -769,6 +775,10 @@ class MailMixin:
         entry.pr = pr
         entry.verdict = verdict
         entry.shots = looks
+        # §4.10 *A look's shots are the pushed commit's* (TD-1303): taken as given, cleaned, no containment
+        # checked — the home does not hold the sender's checkout; `ref` is read only with `at`
+        entry.shots_at = mail.shots_at(shots_at) if looks else None
+        entry.shots_ref = mail.shots_ref(shots_ref) if entry.shots_at else None
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
         # §4.10 *A subject on every entry* (TD-561): a thread has one subject, so an answer, an outcome
         # and a follow-up carry their question's; mail the person reads is given one or warned, never

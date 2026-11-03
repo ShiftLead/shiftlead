@@ -365,6 +365,27 @@ def attention_kind(s: Session) -> str:
     return ""
 
 
+# A look's commit and branch (§4.10 *A look's shots are the pushed commit's*, TD-1303): `shots_at` one 40-hex
+# sha, `shots_ref` an origin branch's name; each matched whole at every hop, else dropped.
+SHOTS_AT_RE = re.compile(r"[0-9a-f]{40}")
+SHOTS_REF_RE = re.compile(r"[A-Za-z0-9._/-]{1,200}")
+
+
+def clean_shots_at(value: object) -> str | None:
+    """`shots_at` as every hop keeps it: a 40-hex sha, else None (dropped, never cleaned into one)."""
+    return value if isinstance(value, str) and SHOTS_AT_RE.fullmatch(value) else None
+
+
+def clean_shots_ref(value: object) -> str | None:
+    """`shots_ref` as every hop keeps it: `[A-Za-z0-9._/-]{1,200}` with no `..`, no leading `-`, never
+    `HEAD`, else None — an empty value is no branch."""
+    if not isinstance(value, str) or not SHOTS_REF_RE.fullmatch(value):
+        return None
+    if ".." in value or value.startswith("-") or value == "HEAD":
+        return None
+    return value
+
+
 @dataclass
 class MailEntry:
     """One message as it sits in an inbox — or, the same entry, in its sender's `outbox`
@@ -426,6 +447,11 @@ class MailEntry:
     # `steer` or an `ask` to the person carries them, and one that does is a look; drawn only as file
     # names and images, never parsed from the text.
     shots: list[str] = field(default_factory=list)
+    # The look's commit and its origin branch (design §4.10 *A look's shots are the pushed commit's*, TD-1303):
+    # `shots_at` the sender's 40-hex `HEAD`, `shots_ref` the branch it was pushed to (None on a detached `HEAD`
+    # or a look after the merge); each cleaned by `mail.shots_at` / `mail.shots_ref`, and only with `shots`.
+    shots_at: str | None = None
+    shots_ref: str | None = None
     # A `system` note whose wake is **uncharged** (§4.10: a lapse is the home's clock, not another
     # session's message). It is on the entry rather than in a set beside the records so that it
     # survives what the entry survives: a resume moves it with the note, and a host-agent restart
@@ -485,6 +511,8 @@ class MailEntry:
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
+        self.shots_at = clean_shots_at(self.shots_at)  # re-matched at every hop (§4.10, TD-1303)
+        self.shots_ref = clean_shots_ref(self.shots_ref) if self.shots_at else None
 
     @property
     def owes(self) -> bool:

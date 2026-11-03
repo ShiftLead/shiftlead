@@ -3937,6 +3937,15 @@ def cmd_msg(args: argparse.Namespace) -> int:
         # person reads is derived by the home and said in `warnings`
         "subject": args.subject,
     }
+    if args.shot:
+        # design §4.10 *A look's shots are the pushed commit's* (TD-1303): the sender's HEAD and its origin
+        # branch, once each shot is committed there and HEAD is pushed — else refused with its line
+        try:
+            at_ref = _shot_commit(args.shot)
+        except ValueError as e:
+            return fail(args, str(e), 1)
+        if at_ref is not None:
+            params["shots_at"], params["shots_ref"] = at_ref
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
     # design §4.10: a message the person reads — to `person`, or a `--source` reply, which the home
     # files to the person as *answered for you* — is checked for its shape once it has been sent
@@ -4589,6 +4598,68 @@ def _shot_path(value: str) -> str:
         return path.resolve().relative_to(pathlib.Path(top.stdout.strip()).resolve()).as_posix()
     except ValueError:
         return value
+
+
+def _git_out(top: pathlib.Path, *argv: str) -> str | None:
+    """One git command in `top`: its stdout stripped, or None when it failed or could not run."""
+    try:
+        cp = subprocess.run(["git", "-C", str(top), *argv], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return cp.stdout.strip() if cp.returncode == 0 else None
+
+
+def _shot_commit(values: list[str]) -> tuple[str, str] | None:
+    """`--shot`'s three checks (design §4.10 *A look's shots are the pushed commit's*, TD-1303): `(shots_at,
+    shots_ref)` — the sender's `HEAD` and its origin branch (the upstream's name where it is an `origin/*` ref,
+    else the local branch's; empty on a detached `HEAD`) — once every shot is committed at `HEAD`, its working
+    file the same, and some `refs/remotes/origin/*` contains `HEAD`. A `HEAD` no origin ref contains, whose
+    every shot `origin/<default>` holds as the same blob (a look after the squash), sends `origin/<default>`'s
+    sha with no branch. Raises ValueError with the refusal's line; None when no value is a file in a checkout
+    (the host agent refuses such a path as before)."""
+    files = [pathlib.Path(v).expanduser() for v in values]
+    files = [f for f in files if f.is_file()]
+    if not files:
+        return None
+    top_s = _git_out(files[0].resolve().parent, "rev-parse", "--show-toplevel")
+    if not top_s:
+        return None
+    top = pathlib.Path(top_s).resolve()
+    rels: list[str] = []
+    for f in files:
+        try:
+            rels.append(f.resolve().relative_to(top).as_posix())
+        except ValueError:
+            continue  # another checkout's file: the host agent's checks say what it refuses
+    head = _git_out(top, "rev-parse", "--verify", "-q", "HEAD")
+    if not rels or not head:
+        return None
+    for rel in rels:
+        name = pathlib.PurePosixPath(rel).name
+        if _git_out(top, "cat-file", "-e", f"HEAD:{rel}") is None:
+            raise ValueError(f"{name} is not committed at HEAD: commit it and push, then send")
+        if _git_out(top, "diff", "--quiet", "HEAD", "--", rel) is None:
+            raise ValueError(f"{name} differs from HEAD: commit it and push, then send")
+    upstream = _git_out(top, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}") or ""
+    branch = _git_out(top, "symbolic-ref", "-q", "--short", "HEAD") or ""
+    ref = upstream.removeprefix("origin/") if upstream.startswith("origin/") else branch
+    if _git_out(top, "for-each-ref", "--contains", head, "--format=%(refname)", "refs/remotes/origin"):
+        return head, ref if branch else ""
+    from sessionorc import ledger as ledger_mod
+
+    default = ledger_mod.default_ref(top)
+    if default is not None:
+        tip = _git_out(top, "rev-parse", "--verify", "-q", f"{default}^{{commit}}")
+        same = tip is not None and all(
+            (blob := _git_out(top, "rev-parse", "-q", "--verify", f"HEAD:{rel}")) is not None
+            and blob == _git_out(top, "rev-parse", "-q", "--verify", f"{default}:{rel}")
+            for rel in rels
+        )
+        if tip and same:
+            return tip, ""  # a look after the merge: what origin's default holds is what HEAD shows
+    if not branch:
+        raise ValueError("HEAD is not pushed: check out a branch and push it, then send")
+    raise ValueError(f"HEAD is not pushed: push {ref or branch}, or fetch if it was merged, then send")
 
 
 def _refs(value: str) -> list[str]:
