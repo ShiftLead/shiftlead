@@ -1007,6 +1007,27 @@ def stamp(root: Path | str) -> tuple[str, float] | None:
         return None
 
 
+def written(root: Path | str, rel: str, got: list[dict[str, Any]]) -> None:
+    """Each entry's `written` (§4.4 *Repo facts*, TD-1331): its own `TD-NNN.md`'s mtime in a v2 ledger, the
+    one file's in a v1 ledger, as epoch seconds; None where the file cannot be stat'd. What the Queue reads to
+    tell a held entry's file written after the person's answer (*The card's status*, TD-1316)."""
+    base = Path(root) / rel
+    one: float | None = None
+    if not base.is_dir():
+        try:
+            one = base.stat().st_mtime
+        except OSError:
+            one = None
+    for e in got:
+        if not base.is_dir():
+            e["written"] = one
+            continue
+        try:
+            e["written"] = (base / f"{_norm(e['id'])}.md").stat().st_mtime
+        except OSError:
+            e["written"] = None
+
+
 def entries_before(
     root: Path | str,
     rel: str,
@@ -1081,6 +1102,7 @@ def reading(
     done_parts = parts_of_open(archive, got)
     for e in got:
         e["parts_archived"] = list(done_parts.get(_norm(e["id"]), []))
+    written(root, rel, got)
     out: dict[str, Any] = {
         "path": rel,
         "entries": got,

@@ -3368,7 +3368,9 @@ class TickMixin:
                     if isinstance(a, dict) and a.get("from"):
                         waiting.add(naming.split_address(str(a["from"]))[0])
             doing = {t: list(r) for t, r in self.doing_log.rings.items()}
-            got = queue_mod.reading(self._repos, graph, now, waiting=waiting, doing=doing)
+            got = queue_mod.reading(
+                self._repos, graph, now, waiting=waiting, doing=doing, questions=list(self.person_inbox)
+            )
         except Exception:  # noqa: BLE001 — the Queue is a reading: the last one stands, the next tick tries again
             log.exception("reading the queue failed")
             return
