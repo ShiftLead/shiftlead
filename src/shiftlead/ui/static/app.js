@@ -1610,7 +1610,7 @@
   // the capture runs before the summary's own toggling, so `d.open` is the state being left.
   const foldsOpen = new Set(), foldsShut = new Set();
   document.addEventListener?.("click", (ev) => {
-    const s = ev.target && ev.target.closest && ev.target.closest("details.fold > summary, details.cardline > summary");
+    const s = ev.target && ev.target.closest && ev.target.closest("details.fold > summary, details.cardline > summary, details.qread > summary, details.qfold > summary");
     const d = s && s.parentElement;
     if (!d || !d.dataset.fold) return;
     const id = d.dataset.fold;
@@ -1626,12 +1626,38 @@
     if (d) { if (d.dataset.fold) { foldsShut.delete(d.dataset.fold); foldsOpen.add(d.dataset.fold); } d.open = true; d.scrollIntoView({ block: "nearest" }); }
   });
   AO.reopenFolds = function (root) {
-    (root ? $$("details.fold, details.cardline", root) : []).forEach((d) => {  // a card's Read line too (TD-911)
+    // a Queue card's Read and its ✓ n done folds too (TD-911, TD-1315): a re-read never opens or shuts one
+    (root ? $$("details.fold, details.cardline, details.qread, details.qfold", root) : []).forEach((d) => {
       if (foldsShut.has(d.dataset.fold)) d.open = false;
       else if (foldsOpen.has(d.dataset.fold)) { d.open = true; AO.fillFold(d); }
     });
     // a row a poll redrew keeps its links, from what its context knows, asking nothing (§4.6, TD-1108)
     (root ? $$(".mailrow[data-paths-ctx]", root) : []).forEach((row) => AO.linkItem(row, row, true));
+  };
+  // a menu (`details.more`: a Queue card's ⋯, a row's Snooze) the person has open when a re-read swaps the HTML
+  // under it is opened again on the fresh copy (TD-1315), as a session card's delta keeps its menu (TD-121): keyed by
+  // the nearest row or card around it and its place among that one's menus, so a read is never held back for it
+  // and the key in it that held focus (its mark or a name) holds it again, so the ⋯'s keys (`AO.qDots`) still work
+  const menuHome = (d) => d.closest && d.closest("[data-qid], [data-msg], [data-card]");
+  const menuKeys = (d) => [$("summary", d), ...$$('.menu [role="menuitem"]', d)];
+  AO.openMenus = function (root) {
+    return (root ? $$("details.more[open]", root) : []).map((d) => {
+      const home = menuHome(d);
+      if (!home) return null;
+      const [k, v] = home.dataset.qid ? ["qid", home.dataset.qid] : home.dataset.msg ? ["msg", home.dataset.msg] : ["card", home.dataset.card];
+      return { k, v, i: $$("details.more", home).indexOf(d), f: menuKeys(d).indexOf(document.activeElement) };
+    }).filter(Boolean);
+  };
+  AO.reopenMenus = function (root, keys) {
+    (keys || []).forEach(({ k, v, i, f }) => {
+      const home = root && $(`[data-${k}="${CSS.escape(v)}"]`, root), d = home && $$("details.more", home)[i];
+      if (!d || menuHome(d) !== home) return;
+      // focus goes back after the page's own `toggle` capture (which places the menu, and would move a focused mark's
+      // focus to the first name), so the key the person was on is the one focused
+      const el = f >= 0 && menuKeys(d)[f];
+      if (el) d.addEventListener("toggle", () => el.focus({ preventScroll: true }), { once: true });
+      d.open = true;
+    });
   };
   // design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): a fold a Queue card draws
   // closed comes as its summary alone (`data-lazy`); its first open reads its body, `GET /api/fold?key=`,
@@ -4711,6 +4737,7 @@
         if (res.ok) {
           read = true;
           const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
+          const menus = AO.openMenus(lists);  // a ⋯ or Snooze the person has open, opened again after the swap
           lists.innerHTML = await res.text();
           // the top section stands outside the lists, so typed find words and its focus survive: its numbers
           // follow, and its parts after the heading show while the Queue is served (TD-1293); a page loaded
@@ -4723,6 +4750,7 @@
           }
           opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
           AO.reopenFolds(lists);  // a row's *details* the person opened, filled from what was kept (TD-891)
+          AO.reopenMenus(lists, menus);
           apply();
           wire();
         }

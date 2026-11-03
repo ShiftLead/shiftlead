@@ -490,3 +490,109 @@ def test_the_repo_page_draws_no_held_row_for_an_old_clock_mark(tmp_path, monkeyp
     next(e for r in rs.values() for e in r["ledger"]["entries"] if e["id"] == "TD-10")["held"] = held
     html = client(monkeypatch, tmp_path, fake(rs, queue())).get("/repo/samscrape").text
     assert "held in samscrape's ledger" not in html and "the person&#39;s session paul-1" not in html
+
+
+FOLDS_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const heard = {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+const document = { documentElement: el(), body: el(), querySelector: () => null, querySelectorAll: () => [],
+  addEventListener: (type, f) => (heard[type] = heard[type] || []).push(f), createElement: el, activeElement: null };
+global.window = {}; global.document = document; global.Event = class { constructor(t) { this.type = t; } };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+// a fold as the card draws it: `cls` its details class, `key` its data-fold, drawn closed
+const fold = (cls, key, open) => ({ cls, open: !!open, dataset: { fold: key } });
+const press = (d) => {  // a press on its summary: the capture runs before the summary toggles it
+  const s = { parentElement: d };
+  const target = { closest: (sel) => (sel.split(",").some((x) => x.trim() === `details.${d.cls} > summary`) ? s : null) };
+  heard.click.forEach((f) => f({ target }));
+  d.open = !d.open;
+};
+const root = (folds) => ({ querySelectorAll: (sel) =>
+  folds.filter((d) => sel.split(",").some((x) => x.trim() === `details.${d.cls}`)) });
+const read = fold("qread", "s#TD-1:read"), done = fold("qfold", "s#TD-1:done:s#TD-1");
+const loose = fold("qfold", "s#TD-1:done:", true), other = fold("qread", "s#TD-2:read");
+press(read); press(done); press(loose);  // opened, opened, shut
+// the re-read swaps in fresh folds, each drawn closed but the loose one, drawn open
+const fresh = [fold("qread", "s#TD-1:read"), fold("qfold", "s#TD-1:done:s#TD-1"),
+  fold("qfold", "s#TD-1:done:", true), fold("qread", "s#TD-2:read"), fold("qfold", "s#TD-2:done:", true)];
+AO.reopenFolds(root(fresh));
+console.log(JSON.stringify(fresh.map((d) => d.open)));
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_reread_keeps_a_cards_read_and_done_folds_as_the_press_left_them(tmp_path):
+    # TD-1315: Paul opened a card's Read (5) and the next `queue`/`inbox` event shut it again
+    probe = tmp_path / "folds_probe.js"
+    probe.write_text(FOLDS_PROBE)
+    got = subprocess.run(["node", str(probe), str(JS)], capture_output=True, text=True, timeout=60, check=True)
+    # opened Read and ✓ n done stay open, the shut loose fold stays shut; folds nobody pressed are drawn as sent
+    assert json.loads(got.stdout.strip().splitlines()[-1]) == [True, True, False, False, True]
+
+
+MENUS_PROBE = (
+    FOLDS_PROBE[: FOLDS_PROBE.index("const AO = window.AO;")]
+    + """
+const AO = window.AO;
+global.CSS = { escape: (s) => s };
+// a page's homes (a row by data-qid, an Inbox row by data-msg), each with its menus in order
+const page = (open) => {
+  const homes = [["qid", "s#TD-1"], ["msg", "m9"]].map(([k, v]) => {
+    const h = { dataset: { [k]: v } };
+    h.menus = [0, 1].map((n) => {
+      // a menu: its mark, two names; `toggle` handlers run when it is opened, as the browser's event does
+      const keys = [0, 1, 2].map((j) => ({ j, focus: () => { document.activeElement = keys[j]; } }));
+      const m = { closest: () => h, heard: [], addEventListener: (t, f) => m.heard.push(f),
+        querySelector: (sel) => (sel === "summary" ? keys[0] : null),
+        querySelectorAll: (sel) => (sel === '.menu [role="menuitem"]' ? keys.slice(1) : []), keys };
+      let o = open.includes(`${v}/${n}`);
+      Object.defineProperty(m, "open", { get: () => o, set: (x) => { o = x; if (x) m.heard.splice(0).forEach((f) => f()); } });
+      return m;
+    });
+    h.querySelectorAll = (sel) => (sel === "details.more" ? h.menus : []);
+    return h;
+  });
+  const all = () => homes.flatMap((h) => h.menus);
+  return { homes, all, querySelectorAll: (sel) => (sel === "details.more[open]" ? all().filter((d) => d.open) : []),
+    querySelector: (sel) => homes.find((h) => Object.entries(h.dataset).some(([k, v]) => sel === `[data-${k}="${v}"]`)) || null };
+};
+const before = page(["s#TD-1/1", "m9/0"]);
+document.activeElement = before.homes[0].menus[1].keys[2];  // the person was on the ⋯'s second name
+const keys = AO.openMenus(before);
+const after = page([]);  // the swap draws every menu shut
+document.activeElement = null;
+AO.reopenMenus(after, keys);
+const focused = document.activeElement;
+console.log(JSON.stringify({ keys, open: after.all().map((d) => d.open),
+  focus: focused === after.homes[0].menus[1].keys[2] }));
+"""
+)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_reread_opens_again_the_menu_the_person_had_open(tmp_path):
+    # TD-1315: an open ⋯ or Snooze is shut by the swap; it is opened again on the fresh copy, never holding the read
+    js = JS.read_text()
+    q = js[js.index("AO.queue = function") :]
+    body = q[q.index("async function reread()") : q.index("wire();")]
+    assert (
+        body.index("AO.openMenus(lists)") < body.index("lists.innerHTML =") < body.index("AO.reopenMenus(lists, menus)")
+    )
+    assert "details.more[open]" not in body[: body.index("busy = true")]  # a menu never holds a read back
+    probe = tmp_path / "menus_probe.js"
+    probe.write_text(MENUS_PROBE)
+    got = subprocess.run(["node", str(probe), str(JS)], capture_output=True, text=True, timeout=60, check=True)
+    out = json.loads(got.stdout.strip().splitlines()[-1])
+    assert out["keys"] == [{"k": "qid", "v": "s#TD-1", "i": 1, "f": 2}, {"k": "msg", "v": "m9", "i": 0, "f": -1}]
+    assert out["open"] == [False, True, True, False]
+    assert out["focus"]  # the name the person was on holds focus again, so the ⋯'s keys still work
