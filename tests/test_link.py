@@ -2419,3 +2419,58 @@ async def test_a_looks_screenshot_is_read_on_the_node_whose_registry_holds_the_r
             assert (await at_node.call("host_shot", host="laptop", repo="proj", name="a.png", head=True))["exists"]
             with pytest.raises(AgentError, match="is a node of kmaster"):
                 await at_node.call("host_shot", host="kmaster", repo="proj", name="a.png")
+
+
+async def test_a_looks_shot_read_carries_its_branch_to_the_node_and_cleans_and_reads_the_reply_at_the_home(
+    home, tmp_path, monkeypatch
+):
+    """TD-1318, design §4.10 *A look's shots are the pushed commit's*: `host_shot` hands the node the
+    look's `ref` (a commit no origin ref holds is served from `origin/<ref>`, never the default); the
+    home cleans `at` and `ref` before the hop (a malformed `at` dropped, a lone `ref` ignored); and a
+    reply is read as documented — `at` the node's own echo, none from a node that predates it, and a
+    reply with no `from` reads `default`."""
+    from sessionorc import shots
+
+    root = _repo_with_shot(tmp_path)
+    run = lambda *a: subprocess.run(["git", "-C", str(root), *a], check=True, capture_output=True)  # noqa: E731
+    run("checkout", "-q", "-b", "feat")
+    (root / "docs" / "mockups" / "reviews" / "a.png").write_bytes(b"\x89PNG branch shot")
+    run("add", "docs/mockups/reviews/a.png")
+    run("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "branch shot")
+    run("push", "-q", "origin", "feat")
+    lost = "0" * 40  # a commit no origin ref contains: the read falls to `origin/<ref>`
+    asked: list[tuple] = []
+    real = shots.reading
+
+    def reading(repo, name, at="", ref="", head=False):
+        asked.append((at, ref))
+        return real(repo, name, at, ref, head)
+
+    monkeypatch.setattr(shots, "reading", reading)
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        roster = tmp_path / "laptop" / "repos.txt"
+        roster.write_text(f"{root}\n")
+        dial = home.dial_command()
+        (tmp_path / "laptop" / "hosts.yml").write_text(
+            f"home: kmaster\nlocal:\n  name: laptop\n  repos_registry: {roster}\nlink:\n  command: {dial!r}\n"
+        )
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            got = await person.call("host_shot", host="laptop", repo="proj", name="a.png", at=lost, ref="feat")
+            assert asked[-1] == (lost, "feat"), "the node is handed the look's branch"
+            assert (got["at"], got["from"], got["exists"]) == (lost, "ref", True)
+            assert base64.b64decode(got["png"]) == b"\x89PNG branch shot", "the branch's file, not the default's"
+            # cleaned at the home's hop: a malformed `at` is dropped, and the `ref` beside it with it
+            got = await person.call("host_shot", host="laptop", repo="proj", name="a.png", at="not-a-sha", ref="feat")
+            assert asked[-1] == ("", "") and (got["at"], got["from"]) == ("", "default")
+            got = await person.call("host_shot", host="laptop", repo="proj", name="a.png", ref="feat")
+            assert asked[-1] == ("", ""), "a lone `ref` is never sent on"
+            assert base64.b64decode(got["png"]) == b"\x89PNG node shot"
+            # a node that predates the echo: no `at` and no `from` in its reply
+            monkeypatch.setattr(shots, "reading", lambda *a, **k: {"exists": True, "png": "AAAA"})
+            got = await person.call("host_shot", host="laptop", repo="proj", name="a.png", at=lost, ref="feat")
+            assert got["at"] is None, "`at` is the reading's echo, never filled from the request"
+            assert (got["from"], got["exists"], got["png"]) == ("default", True, "AAAA")
+            monkeypatch.setattr(shots, "reading", lambda *a, **k: {"exists": False})
+            got = await person.call("host_shot", host="laptop", repo="proj", name="a.png")
+            assert (got["at"], got["from"], got["exists"]) == (None, "", False), "no `default` for a miss"
