@@ -157,3 +157,35 @@ async def test_set_settings_writes_notify_push_and_names_a_bad_field(agent):
             await person.call("set_settings", notify={"push": {"devices": []}})
         await person.call("set_settings", notify={"push": None})
         assert settings_mod.load()["notify"] == {"telegram": {"secrets": "t/prd"}}
+
+
+def test_subscribe_and_load_keep_what_the_store_says(tmp_path):
+    """TD-1309: a known endpoint's new keys are stored; `replaces` onto an endpoint already listed leaves
+    one device; a label is capped at 80; a hand-written `push.json` drops a device without an endpoint and
+    passes on no non-string key."""
+    doc = {"key": push_mod.KEY, "public_key": PUBLIC, "devices": []}
+    first = push_mod.subscribe(doc, EP, KEYS, "x" * 81, PUBLIC, "2026-11-02T00:00:00Z")
+    assert doc["devices"][0]["label"] == "x" * 80
+    fresh = {"p256dh": b64(b"\x04" + b"q" * 64), "auth": b64(b"b" * 16)}
+    assert push_mod.subscribe(doc, EP, fresh, "", PUBLIC, "2026-11-02T00:01:00Z") == first
+    assert [d["keys"] for d in doc["devices"]] == [fresh], "the same endpoint's new keys are stored"
+    other = "https://fcm.googleapis.com/fcm/send/other"
+    second = push_mod.subscribe(doc, other, KEYS, "phone", PUBLIC, "2026-11-02T00:02:00Z")
+    # the first device moves onto the endpoint the second already holds: one device remains under that id
+    assert push_mod.subscribe(doc, other, KEYS, "", PUBLIC, "2026-11-02T00:03:00Z", replaces=first) == second
+    assert [d["id"] for d in doc["devices"]] == [second]
+    assert doc["devices"][0]["label"] == "x" * 80, "the replaced device's label is kept"
+
+    where = tmp_path / "push.json"
+    where.write_text(
+        __import__("json").dumps(
+            {
+                "key": 7,
+                "public_key": "",
+                "last_line": "sent",
+                "devices": [{"id": "a", "endpoint": EP}, {"id": "b"}, {"endpoint": EP}, "c"],
+            }
+        )
+    )
+    got = push_mod.load(where)
+    assert got == {"devices": [{"id": "a", "endpoint": EP}], "last_line": "sent"}
