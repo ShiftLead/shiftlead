@@ -336,7 +336,7 @@ def push_main(stdin: str) -> int:
             dev, i = futures[f]
             _say({"device": dev, "i": i, "status": f.result()})
             told.add(f)
-    except Late:
+    except (Late, Exception):  # past the deadline, or a post that raised: never wait on the rest
         for f, (dev, i) in futures.items():
             if f not in told:
                 _say({"device": dev, "i": i, "status": NO_ANSWER})

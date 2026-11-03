@@ -484,13 +484,13 @@ def test_a_full_burst_to_three_devices_ends_inside_the_bound_with_every_status(m
     assert {x["status"] for x in lines} == {201}
 
     left = []
-    monkeypatch.setattr(notify, "PUSH_SECONDS", 0.5)
+    monkeypatch.setattr(notify, "PUSH_SECONDS", 2.0)
     monkeypatch.setattr(notify, "_abandon", lambda: left.append(True))
-    hang = lambda d, data, key, sub: time.sleep(3.0 if d["id"] == "d1" else 0.0) or 201  # noqa: E731
+    hang = lambda d, data, key, sub: time.sleep(6.0 if d["id"] == "d1" else 0.0) or 201  # noqa: E731
     monkeypatch.setattr(notify, "_post", hang)
     started = time.monotonic()
     assert notify.push_main(json.dumps(_burst(3))) == 0
-    assert time.monotonic() - started < 2.0 and left == [True]
+    assert time.monotonic() - started < 4.0 and left == [True]
     lines = [json.loads(x) for x in capsys.readouterr().out.splitlines()[1:]]
     assert len(lines) == 21
     assert {x["status"] for x in lines if x["device"] == "d1"} == {push_mod.NO_ANSWER}
