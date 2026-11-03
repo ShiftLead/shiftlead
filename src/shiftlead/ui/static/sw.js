@@ -12,7 +12,7 @@ function payloadOf(data) {
   let got = null;
   try { got = data ? data.json() : null; } catch (e) { got = null; }
   const ok = got && typeof got === "object" && ["body", "path", "tag"].every((k) => typeof got[k] === "string" && got[k]);
-  return ok ? { body: got.body, path: got.path.startsWith("/") ? got.path : "/inbox", tag: got.tag } : FALLBACK;
+  return ok ? { body: got.body, path: /^\/(?![\/\\])/.test(got.path) ? got.path : "/inbox", tag: got.tag } : FALLBACK;
 }
 
 self.addEventListener("push", (event) => {
