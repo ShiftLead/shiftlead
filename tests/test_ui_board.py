@@ -375,10 +375,12 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_page_reads_no_
             {"action": "delete", "board": board, "line": 4, "text": "x"},
             {"action": "done", "board": board, "line": "four", "text": "x"},
             {"action": "done", "board": "", "line": 4, "text": "x"},
-            {"action": "snooze", "board": board, "line": 4, "text": "x"},
         ):
             assert c.post("/api/person/board", json=bad).status_code == 400
         assert len(calls) == 2
+        # the fold's *now* (§4.5a, TD-1349): a snooze with no date is the agent's, which writes its own today
+        r = c.post("/api/person/board", json={"action": "snooze", "board": board, "line": 4, "text": "x"})
+        assert r.status_code == 200 and calls[-1][1]["due"] is None and calls[-1][1]["action"] == "snooze"
 
 
 @pytest.mark.unit
@@ -754,11 +756,11 @@ def test_the_rail_counts_coming_up_as_board_items_and_under_later():
 
 
 @pytest.mark.unit
-def test_a_row_coming_up_snoozes_from_its_own_date_and_show_draws_forty_days_out(tmp_path, monkeypatch):
+def test_a_row_coming_up_snoozes_from_today_and_show_draws_forty_days_out(tmp_path, monkeypatch):
     """§4.5 screen 6 *The board's horizon*, §4.5a *Due strip / Inbox board row* **Snooze ▾** (TD-220
-    slice 6): a row coming up carries Snooze with its own date, and +1 day / +1 week count from the
-    later of today and that date, so a Snooze moves it later, never nearer; under `7d` an item due in
-    forty days is in the closed fold, which **show** opens without a request — no setting is written."""
+    slice 6, TD-1349): a row coming up carries Snooze, and +1 day / +1 week count from today, never from
+    its own `Due:` — the menu sends no date of the row's; under `7d` an item due in forty days is in the
+    closed fold, which **show** opens without a request — no setting is written."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui import app as uiapp
     from shiftlead.ui import uiconf
@@ -795,20 +797,21 @@ def test_a_row_coming_up_snoozes_from_its_own_date_and_show_draws_forty_days_out
             page = c.get("/inbox").text
             coming = page[page.index('id="rows-coming"') : page.index("<summary>not shown (")]
         for when in ("1d", "1w", "pick"):
-            assert f'data-board-act="snooze" data-when="{when}" data-due="2026-10-04"' in coming
+            assert f'data-board-act="snooze" data-when="{when}" data-board=' in coming
+        assert "data-due=" not in coming and 'data-when="now"' not in coming  # *now* is the Snoozed fold's
         fold = page[page.index('<details class="fold boardfold"') :]
         fold = fold[: fold.index("</details>")]
         assert "forty days out" in fold and "next week's item" not in fold
-        assert "3 d" not in fold and 'data-due="2026-11-07"' in fold
+        assert "3 d" not in fold and 'data-board-act="snooze" data-when="1w"' in fold
         assert "1 not shown, the next due Nov 7 — " in page and 'class="boardshow"' in page
         assert "set_settings" not in calls
     finally:
         uiconf.set_read({"person": {}, "migrate": []})
     js = (pathlib.Path(uiapp.__file__).parent / "static" / "app.js").read_text()
-    assert "boardDue(b.dataset.when, b.dataset.due)" in js
-    body = js[js.index("function boardDue(when, from)") :]
+    assert "boardDue(b.dataset.when)" in js
+    body = js[js.index("function boardDue(when)") :]
     body = body[: body.index("\n  }\n")]
-    assert "if (own > d) d.setTime(own.getTime())" in body  # the later of today and its own date
+    assert "const d = new Date();" in body and "own" not in body  # from today, never the item's own date
     show = js[js.index('closest("a.boardshow")') :]
     show = show[: show.index("});")]
     assert "fetch" not in show and "settings" not in show  # show writes nothing
@@ -1868,3 +1871,102 @@ def test_a_row_after_a_board_row_is_not_inside_it_so_a_team_pick_leaves_it_shown
     p = _divs(templates.get_template("inbox_rows.html").render(rows=rows, section="needs"))
     assert set(p.inside) == {e["id"] for e in rows}
     assert {r: o for r, o in p.inside.items() if o} == {}
+
+
+# -- a hidden board line in the Snoozed fold (§4.5a *Inbox: Snoozed (n) fold*, TD-1345, built by TD-1349) --
+
+
+def _hidden_board(today, *lines):
+    """The Inbox's horizon over a board of `lines`, read by the real reader on `today`."""
+    from sessionorc import workorders
+    from shiftlead.ui.inbox import board_horizon, board_rows, with_standings
+
+    text = "# User attention\n\n## Needs the user\n\n" + "".join(f"- [ ] {ln}\n" for ln in lines)
+    items = workorders.board_items(text, today)
+    rows = board_rows({"today": today.isoformat(), "boards": [{"root": "/r", "board": "/r/b.md", "items": items}]})
+    return with_standings(board_horizon(rows, "all", today.isoformat()), [])
+
+
+@pytest.mark.unit
+def test_a_line_hidden_past_its_due_waits_in_the_snoozed_fold_counted_by_no_number():
+    """§4.5a *Inbox: Snoozed (n) fold* (TD-1349): a line hidden past its `Due:` is in the fold alone —
+    counted by `snoozed_n` and never by `overdue` or *Needs you*, in no other part of the horizon — its due
+    words the reader's overdue tag, its *snoozed until* the start of its `Hide until:` day here as a UTC
+    instant, and it sorts with the snoozed mail by that instant. Drawn as the board row is, with *now*
+    first in its Snooze menu and its answers, Reply and Done."""
+    from datetime import time as dtime
+
+    from shiftlead.ui import app as uiapp
+    from shiftlead.ui.inbox import inbox_sections
+
+    t = date.today()
+    past, until = (t - timedelta(days=3)).isoformat(), t + timedelta(days=2)
+    hz = _hidden_board(
+        t,
+        f"decide 2026-10-01 (session `w-1` on kmaster) — **Pick one.** Due: {past}. Hide until: {until}. Answers: Keep | Drop.",
+        f"2026-10-01 (session `w-2` on kmaster) — **Due now.** Due: {past}.",
+    )
+    assert [r["head"] for r in hz["snoozed"]] == ["Pick one."]
+    assert all("Pick one" not in r["text"] for k in ("due", "ahead", "hidden", "waiting") for r in hz[k])
+    instant = datetime.combine(until, dtime.min).astimezone(UTC)
+    soon = (datetime.now(UTC) + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    late = (instant + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    mail = [entry("m-late", "ask", snoozed_until=late), entry("m-soon", "ask", snoozed_until=soon)]
+    secs = inbox_sections(mail, boards=hz["due"] + hz["waiting"], snoozed=hz["snoozed"])
+    assert [e["id"] for e in secs["snoozed"]] == ["m-soon", hz["snoozed"][0]["id"], "m-late"]
+    fold = secs["snoozed"][1]
+    assert fold["snoozed_until"] == instant.strftime("%Y-%m-%dT%H:%M:%SZ") and fold["until_words"]
+    assert fold["ahead"] == "3d overdue" and fold["home"] == "inbox"
+    assert secs["count"] == 1 and secs["overdue_n"] == 1  # the due line alone
+    assert uiapp.counts_of(secs, None)["snoozed_n"] == 3
+    html = uiapp.templates.get_template("inbox_rows.html").render(rows=[fold], section="snoozed", origin="")
+    assert "3d overdue" in html and "snoozed until" in html
+    assert html.index('data-when="now"') < html.index('data-when="1d"') < html.index('data-when="1w"')
+    assert 'data-answer="Keep"' in html and ">Reply<" in html and 'data-board-act="done"' in html
+    assert "data-due=" not in html and "Snooze hides it until a date" in html
+
+
+@pytest.mark.unit
+def test_a_reply_on_a_hidden_line_leaves_it_in_the_fold_then_it_waits_on_them():
+    """§4.5a (TD-1349): the hide is read before *Waiting on them*'s answered-board rule — a hidden line
+    replied to stays in the fold, and once its hide ends it waits under *Waiting on them*."""
+    t = date.today()
+    until = t + timedelta(days=2)
+    line = (
+        f"2026-10-01 (session `w-1` on kmaster) — **Look at it.** Due: {t.isoformat()}. Hide until: {until}."
+        f" — Paul, {t.isoformat()}: rebase it first"
+    )
+    hz = _hidden_board(t, line)
+    assert len(hz["snoozed"]) == 1 and hz["waiting"] == [] and hz["snoozed"][0]["answered"] == "replied"
+    hz = _hidden_board(until, line)
+    assert hz["snoozed"] == [] and [r["head"] for r in hz["waiting"]] == ["Look at it."]
+
+
+@pytest.mark.unit
+def test_a_board_snooze_counts_from_today_and_now_sends_no_date(tmp_path):
+    """§4.5a *Due strip / Inbox board row* **Snooze ▾** (TD-1349): `boardDue` run as itself under node —
+    +1 day and +1 week from today, whatever the line's `Due:` (a line due in 3 days snoozed +1 week is
+    hidden until today + 7); the press sends *now* with no `due`, and its toast keys on the reply's `pr`,
+    never on the request's date."""
+    import json
+    import subprocess
+
+    from shiftlead.ui import app as uiapp
+
+    js = (pathlib.Path(uiapp.__file__).parent / "static" / "app.js").read_text()
+    body = js[js.index("  function boardDue(when) {") :]
+    body = body[: body.index("\n  }\n") + 4]
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: boardDue is JavaScript, and nothing else runs it")
+    probe = tmp_path / "probe.js"
+    probe.write_text(body + '\nconsole.log(JSON.stringify([boardDue("1d"), boardDue("1w")]));\n')
+    got = json.loads(subprocess.run([node, str(probe)], capture_output=True, text=True, timeout=30).stdout)
+    t = date.today()
+    assert got == [(t + timedelta(days=1)).isoformat(), (t + timedelta(days=7)).isoformat()]
+    press = js[js.index('if (action === "board") {') :]
+    press = press[: press.index("\n      }\n")]
+    assert 'body.action === "snooze" && b.dataset.when !== "now"' in press
+    toast = js[js.index('else if (action === "board" && body.action === "snooze" && !body.due)') :]
+    toast = toast[: toast.index("\n")]
+    assert "res.pr ?" in toast and "back in its section — the board already said so" in toast

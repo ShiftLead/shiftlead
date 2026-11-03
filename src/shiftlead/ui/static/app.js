@@ -1513,8 +1513,9 @@
       if (action === "board") {
         // …and its id (§4.4 *A board line's id*, TD-603), by which the agent finds the line first
         body = { action: b.dataset.boardAct, board: b.dataset.board, line: Number(b.dataset.line), text: lineText(b), key: b.dataset.key || "" };
-        if (body.action === "snooze") {
-          const due = boardDue(b.dataset.when, b.dataset.due);
+        // the fold's *now* (§4.5a, TD-1349) sends no date: the agent writes its own today, which shows the line
+        if (body.action === "snooze" && b.dataset.when !== "now") {
+          const due = boardDue(b.dataset.when);
           if (!due) return;
           body.due = due;
         }
@@ -1722,6 +1723,7 @@
       if (action === "clear_mark") say(!(res.cleared || []).length ? "nothing was standing any more" : res.kind === "held" ? "dismissed — the crossings stay on the record; the next one is a note again" : "dismissed — the read stays on the record; a later failing read is a row again", true);
       if (action === "suspend") say(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "board" && body.action === "decide") say(`decided: ${body.answer} — landed on the board on origin; the item stays, as its session's work order`, true);
+      else if (action === "board" && body.action === "snooze" && !body.due) say(res.pr ? "back in its section — landed on the board on origin" : "back in its section — the board already said so", true);
       else if (action === "board") say(body.action === "done" ? "checked off — landed on the board on origin" : `snoozed to ${body.due} — landed on the board on origin`, true);
       if (action === "dismiss") say(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze" && String(res.snoozed_until || "").startsWith("dismissed:")) say("dismissed — the mark stays on the record, and a new one comes back as a new row", true);
@@ -3167,14 +3169,13 @@
 
   // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
   // which is what the entry stores; the prompt is in the person's own clock.
-  // A board item's new `Due:` date (§4.5a Snooze ▾: +1 day · +1 week · a date), counted from the
-  // later of today and the item's own date (`from`, a row coming up, TD-220), on this browser's own
-  // calendar — the board's dates are civil dates, never instants — so a Snooze never brings a date nearer.
-  function boardDue(when, from) {
+  // A board item's `Hide until:` date (§4.5a Snooze ▾: +1 day · +1 week · a date), counted from today
+  // as a mail entry's snooze counts from now, never from the item's own `Due:` (TD-1349), on this
+  // browser's own calendar — the board's dates are civil dates, never instants. Put on the board's
+  // form takes its offered `Due:` from here too.
+  function boardDue(when) {
     const day = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     const d = new Date();
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(from || "");
-    if (m) { const own = new Date(+m[1], +m[2] - 1, +m[3]); if (own > d) d.setTime(own.getTime()); }
     if (when === "1d" || when === "1w") { d.setDate(d.getDate() + (when === "1d" ? 1 : 7)); return day(d); }
     const s = prompt("Snooze to… (YYYY-MM-DD)", (d.setDate(d.getDate() + 1), day(d)));
     if (!s) return null;

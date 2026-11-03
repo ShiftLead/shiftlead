@@ -298,10 +298,10 @@ def test_a_queue_cards_mail_rows_send_no_find_text_and_no_snooze(tmp_path, monke
     assert "data-find=" not in queue and inbox.count("data-find=") == 2
     assert ">Snooze" not in queue and 'data-act="snooze"' not in queue and 'data-board-act="snooze"' not in queue
     assert 'data-act="snooze"' in inbox and inbox.count('data-board-act="snooze"') == 3
-    # a card's board item has no *on the board —* footer (TD-1066); the Inbox's says Snooze moves its `Due:` date
-    assert "Snooze moves its" not in queue and "on the board —" not in queue
+    # a card's board item has no *on the board —* footer (TD-1066); the Inbox's says Snooze hides it (TD-1349)
+    assert "Snooze hides it" not in queue and "on the board —" not in queue
     assert "Reply writes" not in queue  # no Reply word on a card (TD-914)
-    assert "Snooze moves its <code>Due:</code> date" in inbox
+    assert "Snooze hides it until a date" in inbox
 
 
 def test_no_subject_or_answer_draws_a_title_repeating_its_text(tmp_path, monkeypatch):

@@ -553,11 +553,16 @@ def write_back(
     in the host agent's own tree for the repo of the checkout `root`, which is never written.
     `key` is the line's id (`board:<key>`, §4.4 *A board line's id*), tried before the line and
     its text, and refused in its own words when no open line holds it.
-    Returns `{commit, message, pr}` — `commit` origin's head after the merge; raises `Refused`
-    with nothing changed on origin."""
+    Returns `{commit, message, pr, line, text, due}` — `commit` origin's head after the merge, `due` the
+    date written; raises `Refused` with nothing changed on origin. A `snooze` sent with no date is the
+    Inbox fold's *now* (§4.4 *Board write-back*, TD-1349): the host agent's own today, computed once here,
+    is its `Hide until:` — the calendar its reader decides `hidden` by — and its commit subject's date. A
+    line that already said so is answered as done with origin's head, no commit and no `pr`."""
     root = Path(root)
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
+    if action == "snooze" and not due:
+        due = _day("").isoformat()
     with _EDIT:
         clock = _Clock()
         return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock, key))
@@ -605,11 +610,17 @@ def _write_back(
     )  # fmt: skip
     msg = message(text, action, due, answer=answer)
     _apply(plan)
+    if _read_lines(path)[at] == lines[at]:
+        # the edit changed nothing — a *now* whose date the line already holds (the day turned under an open
+        # page, so it was no longer hidden): nothing is landed, and the press is answered as done (TD-1349)
+        head = _git(t, "rev-parse", "--short", f"origin/{want}").stdout.strip()
+        _reset(t, want)
+        return {"commit": head, "message": msg, "line": at + 1, "text": text, "due": due}
 
     def still() -> bool:
         return _find(_read_origin(t, want, rel), None, text) is not None
 
-    return {**_land(root, t, want, msg, clock, still), "line": at + 1, "text": text}
+    return {**_land(root, t, want, msg, clock, still), "line": at + 1, "text": text, "due": due}
 
 
 def _ahead(root: Path, want: str, line: int | None, text: str) -> bool:

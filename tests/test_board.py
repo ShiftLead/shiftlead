@@ -318,6 +318,79 @@ async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, 
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
 
 
+def _key(root: Path) -> str:
+    """The id of origin's first item, the line ITEM is on (§4.4 *A board line's id*)."""
+    from datetime import date
+
+    from sessionorc import workorders
+
+    return workorders.board_items(origin_board(root), date.today())[0]["key"]
+
+
+def test_now_writes_the_host_agents_today_and_the_next_reading_draws_the_line(repo):
+    """The Snoozed fold's *now* (§4.4 *Board write-back*, §4.5a, TD-1349): a `snooze` with no date writes
+    the host agent's today as the line's `Hide until:`, in the line and its commit subject, and answers
+    the date written; the next reading draws the line, no longer hidden. A *now* on a line whose hide is
+    past writes today and commits too."""
+    from datetime import date, timedelta
+
+    from sessionorc import workorders
+
+    today = date.today()
+    later = (today + timedelta(days=5)).isoformat()
+    board.write_back(repo, 7, ITEM, "snooze", later)
+    [hidden] = [i for i in workorders.board_items(origin_board(repo), today) if i["line"] == 7]
+    assert hidden["needs"] is None and hidden["hidden"] and hidden["hide_until"] == later
+    got = board.write_back(repo, None, "", "snooze", key=_key(repo))
+    assert got["due"] == today.isoformat() and got["pr"]
+    assert got["message"].endswith(f"to {today.isoformat()} (session `grinder-ao-1`)")
+    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
+    assert f"Due: 2026-09-22. Hide until: {today.isoformat()}." in origin_board(repo)  # one field, rewritten
+    [shown] = [i for i in workorders.board_items(origin_board(repo), today) if i["line"] == 7]
+    assert shown["needs"] is not None and not shown["hidden"]
+    # a hide already past (a line hidden until a day gone): *now* writes today and lands it
+    board.write_back(repo, None, "", "snooze", "2026-01-05", key=_key(repo))
+    got = board.write_back(repo, None, "", "snooze", key=_key(repo))
+    assert got["pr"] and f"Hide until: {today.isoformat()}." in origin_board(repo)
+
+
+def test_now_on_a_line_that_already_says_today_lands_nothing(repo):
+    """§4.4 *Board write-back* (TD-1349): a *now* whose filled date already stands on the line — the day
+    turned under an open page — changes nothing: answered as done with origin's head, its subject and the
+    date, no `pr`, and no commit or branch on origin."""
+    from datetime import date
+
+    board.write_back(repo, 7, ITEM, "snooze", date.today().isoformat())
+    before = on_origin(repo, "rev-parse", "origin/main")
+    got = board.write_back(repo, None, "", "snooze", key=_key(repo))
+    assert "pr" not in got and got["due"] == date.today().isoformat() and got["line"] == 7
+    assert got["commit"] == on_origin(repo, "rev-parse", "--short", "origin/main")
+    assert on_origin(repo, "rev-parse", "origin/main") == before
+    assert got["message"].startswith("shiftlead: snooze Merged") and got["text"].startswith("2026-09-20")
+    assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
+    tree = board.tree_dir(repo)
+    assert git(tree, "status", "--porcelain") == ""  # the tree left at origin's head
+
+
+async def test_board_edit_answers_a_now_with_the_date_it_wrote(agent, repo, tmp_path):
+    """`board_edit` (§4.4, TD-1349): a snooze sent with no date is the fold's *now* — the RPC answers the
+    date the write-back wrote, never the request's, and a *now* that changed nothing is a success with
+    no PR opened."""
+    from datetime import date
+
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    path = str(repo / board.BOARD)
+    today = date.today().isoformat()
+    async with LocalClient() as me:
+        got = await me.call("board_edit", board=path, line=7, text=ITEM, action="snooze")
+        assert got["due"] == today and got["pr"]
+        again = await me.call("board_edit", board=path, line=7, text="", action="snooze", key=_key(repo))
+    assert again["due"] == today and "pr" not in again and again["action"] == "snooze"
+
+
 def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it(repo):
     """TD-140 (design §4.4, §4.5a): the one add — a line in the board's own format above the first
     item, committed with the message naming the entry, nothing else in the file touched."""
@@ -1573,14 +1646,15 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
     assert got["message"].endswith("(session lap)")
 
 
-def test_the_inbox_reads_needs_you_so_a_hidden_item_is_no_row():
+def test_the_inbox_reads_needs_you_so_a_hidden_item_is_the_snoozed_folds_alone():
     """TD-1330 (ledgerboard v2.3): a Snooze writes `Hide until:`; `board_items` carries each item's
-    `needs_you` class as `needs`, None while hidden, and the Inbox's `board_rows` draws no row for it —
-    until the date, when it is back with its Due: as it was."""
+    `needs_you` class as `needs`, None while hidden, and the Inbox's `board_rows` keeps it as a `hidden`
+    row (TD-1349), which `board_horizon` puts under `snoozed` alone — until the date, when it is back
+    with its Due: as it was."""
     from datetime import date
 
     from sessionorc import workorders
-    from shiftlead.ui.inbox import board_rows
+    from shiftlead.ui.inbox import board_horizon, board_rows
 
     hidden = board.edit_line(f"- [ ] {ITEM}\n", ITEM, "snooze", "2026-10-01")
     text = f"# User attention\n\n## Needs the user\n\n{hidden}- [ ] n/a — undated.\n"
@@ -1589,5 +1663,10 @@ def test_the_inbox_reads_needs_you_so_a_hidden_item_is_no_row():
         assert [i["needs"] is None for i in items] == [shown == 1, False]
         report = {"today": today.isoformat(), "boards": [{"root": "/r", "board": "/r/b.md", "items": items}]}
         rows = board_rows(report)
-        assert len(rows) == shown and rows[-1]["text"].startswith("n/a — undated")
+        assert [r["hidden"] for r in rows] == [shown == 1, False]
+        assert rows[0]["hide_until"] == ("2026-10-01" if shown == 1 else "")
+        hz = board_horizon(rows, "all")
+        drawn = hz["due"] + hz["ahead"] + hz["hidden"] + hz["waiting"]
+        assert len(drawn) == shown and drawn[-1]["text"].startswith("n/a — undated")
+        assert len(hz["snoozed"]) == 2 - shown
     assert "Due: 2026-09-22. Hide until: 2026-10-01." in hidden  # its deadline stands

@@ -809,7 +809,9 @@
    shown as text; nothing here is a control made from it (TD-071 item 8). Its two answers are §4.4's
    write-back, made by the host agent on origin's head and landed there by a pull request of its own
    (TD-264), the checkout never written: **Snooze ▾**
-   (+1 day · +1 week · a date) moves the item's `Due:` date, **Done** checks it off (confirms). Each
+   (+1 day · +1 week · a date, each from today) writes the item's `Hide until:`, its `Due:` left as it is,
+   and the row waits in the **Snoozed (n)** fold until that date, where its menu offers *now* first — the
+   same write-back with no date, the host agent's today (TD-1349); **Done** checks it off (confirms). Each
    hands back the board, the line and the text the reader gave, and the agent refuses the edit when
    that line no longer holds this item. **Reply** (TD-142) opens the mail composer with the line
    quoted and appends the person's words to the line itself — one commit, the line still due. #}
@@ -829,7 +831,7 @@
   {%- if e.card and e.card.in_repo %}<b class="inrepo" title="the line's Context names {{ e.card.in_repo }}: its task is there">in {{ e.card.in_repo }}</b>{% endif %}
   <span class="st">board line</span>
   <span class="grow"></span>
-  <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
+  <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown', 'snoozed') and e.ahead else e.due_tag }}</span>
 </div>
 {%- else %}
 {#- the board is the repo's (TD-722, built by TD-741): the row names its repo — *ContractMatch ·
@@ -848,7 +850,7 @@
   {#- §4.5a *board row: id* (§4.4 *A board line's id*, TD-603): the line's derived `board:<key>`
       before its due words; a click copies it, as Copy tmux command copies -#}
   {%- if e.key %}<button class="mono boardkey" type="button" data-copy="{{ e.key }}" data-copied="copied {{ e.key }}" title="the line's id: type it in chat or in ao board show; a click copies it">{{ e.key }}</button>{% endif %}
-  <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown') and e.ahead else e.due_tag }}</span>
+  <span class="st" data-slot title="Due: {{ e.due }}">{{ e.ahead if section in ('coming', 'unshown', 'snoozed') and e.ahead else e.due_tag }}</span>
 </div>
 {%- endif %}
 {#- §4.5a **Inbox board row: text** (TD-279): the line in the closed markdown subset as a message's
@@ -927,10 +929,11 @@
   {%- endcall %}
 </div>
 {%- else %}
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}  {#- the fold's line (§4.5a, TD-1349) #}
   {%- if waits or drawn_on_queue %}{# a waiting line, or the Queue, has no Snooze (screen 12) #}
   <span class="st">on the board — Reply writes on its line and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
   {%- else %}
-  <span class="st">on the board — Reply writes on its line, Snooze moves its <code>Due:</code> date and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
+  <span class="st">on the board — Reply writes on its line, Snooze hides it until a date and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
   {%- endif %}
   <span class="grow"></span>
   {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "btn sm ghost") }}{% endif %}
@@ -940,11 +943,15 @@
   {%- if gwi %}<button class="btn sm ghost boardgo" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision.">Go with it</button>{% endif %}
   {%- if not waits %}
   {%- if not drawn_on_queue %}
-  <details class="more"><summary class="btn sm ghost" title="move its Due: date on the board">Snooze</summary>
+  <details class="more"><summary class="btn sm ghost" title="hide it until a date: its Hide until: on the board, its Due: left as it is">Snooze</summary>
     <div class="menu">
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">+1 day</button>
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1w" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">+1 week</button>
-      <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">a date…</button>
+      {#- *now* first in the fold (§4.5a, TD-1349): the write-back with no date, which shows the line again -#}
+      {%- if section == 'snoozed' %}
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="now" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="show it again: its Hide until: set to today, back in its section">now</button>
+      {%- endif %}
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">+1 day</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1w" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">+1 week</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">a date…</button>
     </div>
   </details>
   {%- endif %}

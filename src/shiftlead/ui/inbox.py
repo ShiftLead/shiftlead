@@ -13,6 +13,7 @@ import subprocess
 import time
 from collections.abc import Callable, Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
+from datetime import time as dtime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -1635,7 +1636,8 @@ def with_standings(
     *not shown* fold — carry their `standing`; the answered rows under *Waiting on them* say
     *waiting on …* instead and are left as they are."""
     at = now or datetime.now(UTC)
-    return {**hz, **{k: board_standings(hz.get(k) or (), records, at) for k in ("due", "ahead", "hidden")}}
+    keys = ("due", "ahead", "hidden", "snoozed")
+    return {**hz, **{k: board_standings(hz.get(k) or (), records, at) for k in keys}}
 
 
 def board_detail(it: Mapping[str, Any]) -> str:
@@ -1681,8 +1683,12 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
         for it in b.get("items") or ():
             if not isinstance(it, dict) or not it.get("text"):
                 continue
-            if "needs" in it and it["needs"] is None:
-                continue  # ledgerboard's `needs_you` leaves it out: hidden until its `Hide until:` (TD-1330)
+            # ledgerboard's `needs_you` leaves out an item hidden until its `Hide until:` (TD-1330): kept as a
+            # `hidden` row, which `board_horizon` sets apart for the Snoozed fold alone (TD-1345, built by
+            # TD-1349); any other item it leaves out is no row
+            hidden = "needs" in it and it["needs"] is None
+            if hidden and not it.get("hidden"):
+                continue
             line, text, tag = it.get("line"), str(it["text"]), str(it.get("due_tag") or "")
             detail = board_detail(it)
             # **Open board** is a file link at the item's line, the checkout first (§4.6, TD-689)
@@ -1735,7 +1741,12 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                     "session": str(it.get("session") or ""),
                     "refs": [str(x) for x in it.get("refs") or () if str(x).strip()],
                     "due_error": bool(it.get("due_error")),
-                    "ahead": "" if board_due_now(it) else _ahead_words(str(it.get("due") or ""), today, tag),
+                    "ahead": ""
+                    if board_due_now(it) and not hidden
+                    else _ahead_words(str(it.get("due") or ""), today, tag),
+                    # §4.5a *Inbox: Snoozed (n) fold* (TD-1349): hidden today by its `Hide until:`, that date
+                    "hidden": hidden,
+                    "hide_until": str(it.get("hide_until") or "") if hidden else "",
                     "editor": url,
                     # §4.5 screen 6 *Boards are read against origin* (TD-221): whether the board was
                     # read from origin (the reader's `source`, non-null only then) and the reader's
@@ -1759,7 +1770,9 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
     `next:10` when it is unset or does not parse; `today` is the reader's (each row carries it),
     for the days a `<n>d` reaches. A row with no `due_now` is due: a row from before TD-220 was the `--due-only` read's.
     An answered row that is not stale (`board_waits`, TD-305) is in none of the three but `waiting`,
-    drawn under *Waiting on them* and taking no place.
+    drawn under *Waiting on them* and taking no place. A row hidden by its `Hide until:` (`hidden`,
+    TD-1349) is in none of them either, nor in `waiting` — the hide is read first — but `snoozed`, which
+    only the Inbox's **Snoozed (n)** fold draws (§4.5a): no count, the Repo page or the Queue reads it.
 
     - `next:<n>`: per repo, the n soonest open items of its board, the due ones among them, so
       what is due takes places first; a due row whose date could not be read takes none. A board is
@@ -1772,6 +1785,8 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
         mode = settings_mod.parse_board_show(mode)
     except ValueError:
         mode = settings_mod.BOARD_SHOW_DEFAULT
+    snoozed = [r for r in rows if r.get("hidden")]
+    rows = [r for r in rows if not r.get("hidden")]
     waiting = [r for r in rows if board_waits(r)]
     rows = [r for r in rows if not board_waits(r)]
     due = [r for r in rows if r.get("due_now", True)]
@@ -1810,6 +1825,7 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
         "ahead": ahead,
         "hidden": hidden,
         "waiting": waiting,
+        "snoozed": snoozed,
         "next_due": _next_due(hidden, now),
         "today": now,
     }
@@ -1840,7 +1856,7 @@ def horizon_of(h: Mapping[str, Any], root: str | Path) -> dict[str, Any]:
 
     hidden = mine(h.get("hidden") or ())
     out = {**h, "due": mine(h.get("due") or ()), "ahead": mine(h.get("ahead") or ()), "hidden": hidden,
-           "waiting": mine(h.get("waiting") or ()),
+           "waiting": mine(h.get("waiting") or ()), "snoozed": mine(h.get("snoozed") or ()),
            "next_due": _next_due(hidden, str(h.get("today") or ""))}  # fmt: skip
     if h.get("line") is not None:  # the line says this repo's hidden count and next date, not the Inbox's
         out["line"] = board_line(out)
@@ -2036,13 +2052,16 @@ def inbox_sections(
     handed: Collection[dict[str, Any]] = (),
     fleet: Collection[Mapping[str, Any]] = (),
     cards: Mapping[str, tuple[str, str]] | None = None,
+    snoozed: Collection[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
     into **Needs you** here rather than anywhere else. From step 3 the due **board items**
     (`boards`, from `board_rows`) join it the same way, counted: a due board item is waiting on a
     person by definition. They carry no snooze of the Inbox's own: a board row's Snooze is §4.4's
-    write-back, which writes its `Hide until:` on the board itself, and a hidden item is no row.
+    write-back, which writes its `Hide until:` on the board itself; a line hidden by it (`snoozed`, the
+    horizon's `snoozed` rows, TD-1349) is in the **Snoozed (n)** fold alone, its *snoozed until* the
+    start of its `Hide until:` day on this host's calendar, uncounted.
 
     - **Needs you** — the state rows, open `ask`s to the person and **paused** `steer`s; oldest first.
     - **Steering** — open `steer`s whose clock is running; soonest bound first, and a `steer`
@@ -2099,6 +2118,7 @@ def inbox_sections(
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
+    hidden_lines = list(snoozed or ())  # `snoozed` is taken by an entry's own below
     for r in states:
         raw = snoozed_rows.get(f"{r.get('sid') or ''}|{r.get('row') or ''}")
         if r.get("fyi") and not (r.get("auto_row") and _iso(raw) and _iso(raw) > at):
@@ -2156,6 +2176,12 @@ def inbox_sections(
     out["fyi"].extend(_trail_rows(trail or (), at))
     # the teams a *team start* row names (§6 rule 8): a decided line pickable by one says so (TD-384)
     starting = {str(x.get("team") or "") for x in states if x.get("row") == "work"}
+    for r in hidden_lines:
+        # §4.5a *Inbox: Snoozed (n) fold* (TD-1349): the start of its `Hide until:` day here, as `overdue`
+        # reads a civil date, as the UTC instant a mail entry's `snoozed_until` is, so the fold sorts as one
+        d = _civil(r.get("hide_until"))
+        until = datetime.combine(d, dtime.min).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ") if d else ""
+        out["snoozed"].append({**r, "snoozed_until": until, "until_words": _left(until, at)})
     for r in boards:
         if board_waits(r):
             # a copy: the board rows are the page's cache, read again by the next request
