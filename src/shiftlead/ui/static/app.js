@@ -856,7 +856,7 @@
   // `Esc` closes it and puts focus back on the mark. True where the key was the ⋯'s.
   AO.qDots = function (ev) {
     const d = ev.target && ev.target.closest && ev.target.closest("details.qdots");
-    if (!d) return false;
+    if (!d || $("summary", d).getAttribute("aria-disabled") === "true") return false;  // a ⋯ turned off while its press is out (TD-1321)
     const mark = $("summary", d), items = $$('.menu [role="menuitem"]', d), at = items.indexOf(document.activeElement);
     if (ev.key === "Escape" && d.open) { d.open = false; mark.focus(); return true; }
     if ((ev.key === "ArrowDown" || ev.key === "ArrowUp") && items.length) {
@@ -870,6 +870,8 @@
   document.addEventListener("keydown", (ev) => { if (AO.qDots(ev)) { ev.preventDefault(); ev.stopPropagation(); } }, true);
   document.addEventListener("toggle", (ev) => {
     const d = ev.target;
+    // Enter and Space toggle a `<summary>` natively: a ⋯ turned off while its press is out closes again (TD-1321)
+    if (d.matches && d.matches("details.qdots[open]") && $("summary", d).getAttribute("aria-disabled") === "true") { d.open = false; return; }
     if (!d.matches || !d.matches("details.qdots[open]") || document.activeElement !== $("summary", d)) return;
     const first = $('.menu [role="menuitem"]', d); if (first) first.focus();
   }, true);
@@ -1213,6 +1215,40 @@
     if (f.out) AO.drawOff(row);
     return true;
   };
+  // a Queue card's ⋯ (TD-1321 slice 2): **Done…** / **Back to design…** from a row's ⋯ (`.qrow[data-qid]`) or the
+  // header's (`.qhead[data-qid]`) has no `.mailrow`; its target's state cell says what the press is doing, a state
+  // word not dimmed — inserted just before the ⋯ where the target drew none — and its ⋯ is off until the answer
+  // the target's own ⋯, never an item's drawn in the header's Decide or Do (a `.mailrow`)
+  AO.qDotsOf = (t) => $$("details.qdots", t).find((d) => !d.closest(".mailrow") && d.closest(".qrow[data-qid], .qhead[data-qid]") === t);
+  AO.qDotsOff = function (d, off) {
+    const mark = $("summary", d);
+    if (off) { d.open = false; mark.setAttribute("aria-disabled", "true"); mark.tabIndex = -1; } else { mark.removeAttribute("aria-disabled"); mark.removeAttribute("tabindex"); }
+    $$('.menu [role="menuitem"]', d).forEach((x) => {
+      if (off) x.setAttribute("aria-disabled", "true"); else x.removeAttribute("aria-disabled");
+      if (x.tagName === "BUTTON") x.disabled = off;
+    });
+  };
+  AO.drawQState = function (t, text, off) {
+    const d = AO.qDotsOf(t);
+    if (!d) return;
+    let s = [...d.parentElement.children].find((x) => x.classList.contains("qstate"));
+    if (!s) { s = document.createElement("span"); s.dataset.drawn = "1"; d.before(s); }
+    else if (!s.dataset.drawn && s.dataset.was === undefined) { s.dataset.was = s.textContent; s.dataset.wascls = s.className; }
+    s.className = "qstate s-pressed"; s.textContent = text;
+    AO.qDotsOff(d, off);
+  };
+  AO.unDrawQState = function (t) {  // a refusal: the state cell as the page drew it, the ⋯ on
+    const d = AO.qDotsOf(t);
+    if (!d) return;
+    [...d.parentElement.children].filter((x) => x.classList.contains("qstate")).forEach((s) => {
+      if (s.dataset.drawn) s.remove();
+      else if (s.dataset.was !== undefined) { s.textContent = s.dataset.was; s.className = s.dataset.wascls; delete s.dataset.was; delete s.dataset.wascls; }
+    });
+    AO.qDotsOff(d, false);
+  };
+  // `qrow:<qid>` / `qhead:<qid>`, so a state kept for a row is never drawn on the header, nor the other way
+  AO.qKey = (t) => `${t.classList.contains("qhead") ? "qhead" : "qrow"}:${t.dataset.qid}`;
+  AO.qFind = (k) => { const i = k.indexOf(":"); return document.querySelector(`.${k.slice(0, i)}[data-qid="${CSS.escape(k.slice(i + 1))}"]`); };
 
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy]");
@@ -1246,6 +1282,9 @@
     const r4 = road === "done" ? ["done", "not done"] : road === "design" ? ["back to design", "not sent back to design"]
       : key === "board_reply" ? ["replying", "not replied"] : ledgerish || drawn ? ["deciding", "not decided"] : null;
     const msgOf = row && row.dataset.msg;
+    // a Queue card's ⋯ (TD-1321 slice 2): no row, so the press finds its target — a row's, else the header's
+    const qt = !row && road ? b.closest(".qrow[data-qid]") || b.closest(".qhead[data-qid]") : null;
+    const qkey = qt ? AO.qKey(qt) : "", qled = qt ? `ledger:${b.dataset.repo}:${b.dataset.ref}` : "";
     let waiting = null, left = false;
     const say = (text, ok, href) => {
       if (!waiting) return AO.toast(text, ok, href);
@@ -1281,6 +1320,22 @@
       AO.handRing(row); row.remove(); left = true;
       const what = verb.replace(/…$/, "");
       waiting = AO.toast(r4 ? `${r4[0]} — writing on the board…` : action === "board" ? `${what} — landing on the board…` : `${what}…`, true, null, true);
+    };
+    // the ⋯'s press: the target's state cell and its ⋯ off; the card's *ledger · your decision* row for the entry leaves
+    const qpressed = () => {
+      const text = `${r4[0]} — writing on the board…`;
+      AO.drawQState(qt, text, true);
+      AO.inflight[qkey] = { kind: "qrow", text };
+      delete AO.pressErrs[qled];
+      $$(`.mailrow[data-msg="${CSS.escape(qled)}"]`).forEach((r) => { AO.handRing(r); r.remove(); });
+      AO.inflight[qled] = { leaves: true, verb: AO.pressVerb(key), kind: "left" };
+      waiting = AO.toast(text, true, null, true);
+    };
+    const qanswered = () => {
+      const t = AO.qFind(qkey);
+      if (t) AO.drawQState(t, `${r4[0]} — written on the board`, false);
+      const f = AO.inflight[qled];
+      if (f) f.until = Date.now() + 60000;
     };
     // the answer (rule 4): the kept entry gets the answered words, for a minute's re-reads, and the row as the page
     // draws it now is rewritten — never the captured node alone
@@ -1525,9 +1580,9 @@
           const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote, empty: true });
           if (!m) return;
           want.road = b.dataset.road; want.words = m.text;
-          pressed();
+          if (qt) qpressed(); else pressed();
           const res = await act("person", "ledger", want);
-          answered();
+          if (qt) qanswered(); else answered();
           const told = (res.told || []).length ? ` · told ${res.told.join(", ")}` : "";
           say(`decided: ${res.decided || b.dataset.road} — written on the board on origin, ${b.dataset.ref}'s work order${told}`, true);
           if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
@@ -1674,6 +1729,16 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
+      // a ⋯'s refusal (TD-1321 slice 2): the state cell as it was, its ⋯ on, the card's ledger item back on the refresh
+      // with its error line
+      if (r4 && qt && !(AO.inflight[qled] && AO.inflight[qled].until)) {
+        const words = `${r4[1]}: ${e.message}`;
+        say(words);
+        const t = AO.qFind(qkey); if (t) AO.unDrawQState(t);
+        AO.pressErrs[qled] = words; delete AO.inflight[qled];
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       // rule 4's refusal (TD-1321): the row as it was, pressable, its error line and the toast in the same words —
       // *not decided: …*, *not replied: …*, *not done: …*, *not sent back to design: …* — never *<control> failed*,
       // which cannot tell a board decide from a board Done; a row the press took away comes back on the refresh
@@ -1705,6 +1770,8 @@
       // a rule 4 press that was answered keeps its entry a minute (`until`), so a lagging board reading does not draw
       // the answers back; every other press, and a refusal, lets it go here
       if (msgOf && AO.inflight[msgOf] && !AO.inflight[msgOf].until) delete AO.inflight[msgOf];
+      if (qkey) delete AO.inflight[qkey];  // a ⋯'s state cell is the re-read's once answered
+      if (qled && AO.inflight[qled] && !AO.inflight[qled].until) delete AO.inflight[qled];
       if (waiting) say(PRESS_NOT[key] || "done", true);  // a press whose answer said nothing of its own
       if (row && !left && row.isConnected && row.classList.contains("pending")) AO.unPend(row);
     }
@@ -3594,6 +3661,11 @@
       if (!f) return;
       if (f.kind === "decided" || f.kind === "reply") { if (!AO.redraw(r, f) && f.until) delete AO.inflight[m]; return; }
       if (f.leaves) r.remove(); else AO.markPending(r, f.verb);
+    });
+    // a Queue card's ⋯ press still out (TD-1321 slice 2): its state word and its ⋯ off, drawn again on the fresh row
+    if (root) root.querySelectorAll(".qrow[data-qid], .qhead[data-qid]").forEach((t) => {
+      const f = AO.inflight[AO.qKey(t)];
+      if (f && f.kind === "qrow") AO.drawQState(t, f.text, true);
     });
     if (root) root.querySelectorAll(".mailrow[data-msg] .rowerr").forEach((el) => {
       const msg = el.closest(".mailrow").dataset.msg;

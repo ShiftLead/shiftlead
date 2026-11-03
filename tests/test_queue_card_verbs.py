@@ -223,7 +223,10 @@ global.location = { pathname: "/", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const AO = window.AO;
-const focusable = (name) => { const o = { name, focus: () => { document.activeElement = o; } }; return o; };
+const focusable = (name) => {
+  const o = { name, attrs: {}, focus: () => { document.activeElement = o; }, getAttribute: (a) => o.attrs[a] ?? null };
+  return o;
+};
 const mark = focusable("mark"), items = ["Design", "Done", "Open"].map(focusable);
 const d = { open: false, querySelector: (s) => (s === "summary" ? mark : null), querySelectorAll: () => items };
 const at = (t) => ({ closest: (s) => (s === "details.qdots" ? d : null), ...t });
@@ -237,6 +240,9 @@ out.esc = press("Escape"); out.closed = !d.open; out.back = document.activeEleme
 out.esc_closed = press("Escape");
 out.other = press("x");
 out.outside = AO.qDots({ key: "ArrowDown", target: { closest: () => null } });
+// a ⋯ turned off while its press is out (TD-1321): its keys do nothing, the menu stays shut
+mark.attrs["aria-disabled"] = "true"; document.activeElement = mark;
+out.off = press("ArrowDown"); out.off_open = d.open;
 console.log(JSON.stringify(out));
 """
 
@@ -261,4 +267,6 @@ def test_the_dots_keyboard_model_opens_moves_and_closes_back_on_the_mark(tmp_pat
         "esc_closed": False,
         "other": False,
         "outside": False,
+        "off": False,
+        "off_open": False,
     }
