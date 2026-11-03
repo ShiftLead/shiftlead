@@ -74,6 +74,9 @@ OWED_NAMED = 3  # rule 4's owed clause names this many owed outcomes, then *and 
 # Rule 8 (§6, TD-227): a wound-down team's lanes' news is written as `work_waiting` once this long has
 # passed since the home first read the newest of its entries, so entries filed together are one event
 WORK_SETTLE = timedelta(minutes=10)
+# §6 *Schedule* (TD-133): a reset found later than this after it passed is counted and starts nothing —
+# a stale reading when the schedule is set, or an agent down across it — so a team starts at a reset
+SCHEDULE_LATE = timedelta(hours=1)
 # §4.10 *A lapsed cache is started again, not rung* (TD-459, built by TD-467): the tool's prompt-cache
 # lifetime, and the context (tokens) over which a start on the brief writes less than a ring that
 # re-writes the whole context (the ADR's break-even). Neither is a setting until a reading says one should be

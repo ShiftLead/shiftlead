@@ -76,7 +76,8 @@ def test_the_four_keys_read_what_is_valid_and_parse_refuses_the_rest(tmp_path):
     f = tmp_path / "settings.yml"
     f.write_text(
         "teams:\n"
-        "  ao-grind: {until: '2026-09-26T06:00:00-06:00', reserve: 10, schedule: {start: reset}}\n"
+        "  ao-grind: {until: '2026-09-26T06:00:00-06:00', reserve: 10,\n"
+        "    schedule: {start: reset, profile: grind, window: week}}\n"
         "  bad: {reserve: 130, until: tomorrow}\n"
         "  odd: {colour: red}\n"
         "  stray: {reserve: 5, colour: red}\n"
@@ -85,14 +86,26 @@ def test_the_four_keys_read_what_is_valid_and_parse_refuses_the_rest(tmp_path):
     )
     doc = settings.load(f)
     assert settings.teams(doc) == {
-        "ao-grind": {"until": "2026-09-26T12:00:00Z", "reserve": 10, "schedule": {"start": "reset"}},
+        "ao-grind": {
+            "until": "2026-09-26T12:00:00Z",
+            "reserve": 10,
+            "schedule": {"start": "reset", "profile": "grind", "window": "week"},
+        },
         "stray": {"reserve": 5},  # one stray key costs that key, not the team
     }
     assert settings.repos(doc) == {"shiftlead": {"promote": {"auto": False}}}
     assert settings.person(doc) == {"open_in": "none", "terminal": {"size": 13, "face": "JetBrains Mono"}}
     assert settings.team_extra(doc, "ao-grind") == 10 and settings.team_extra(doc, "") == 0
     assert settings.team_extra(doc, "bad") == 0
-    for bad in ({"reserve": 101}, {"until": "2026-09-26T06:00:00"}, {"schedule": "reset"}, {"colour": 1}, "x"):
+    for bad in (
+        {"reserve": 101},
+        {"until": "2026-09-26T06:00:00"},
+        {"schedule": "reset"},
+        {"schedule": {"start": "reset"}},
+        {"schedule": {"start": "noon", "profile": "p", "window": "w"}},
+        {"colour": 1},
+        "x",
+    ):
         with pytest.raises(ValueError):
             settings.parse_team(bad)
     for bad in ({"promote": {"auto": "yes"}}, {"promote": {"run": "x"}}, {"auto": True}):

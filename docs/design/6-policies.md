@@ -1742,8 +1742,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   runs nothing from the PR's head except bytes step 1 proved are agent-cadence's, and never moves a
   checkout. The pull (above) follows the
   merge on its next pass, and the promote follows main as it always does.
-- **Schedule: a team start at the reset** (not built; TD-133 builds it, unscheduled until the person
-  says): the one start the host agent makes that no person pressed at the time, and the general form
+- **Schedule: a team start at the reset** (the tick's rule built, TD-133 slice 1; `ao schedule` and the
+  card's note not yet): the one start the host agent makes that no person pressed at the time, and the general form
   the run window (below) reduces to. **A schedule is a person's standing press, kept in
   `settings.yml`** under the team's own key (§5 `teams.<team>.schedule`; read on every tick, written
   only by `set_settings`, so a session cannot set one):
@@ -1763,7 +1763,20 @@ teams:
   manager's own close after a wind-down (§4.9a) — not suspended and not at a restart ceiling, the
   tick replays its launch record as rule 2 does for a wanted restart, `why: schedule`, under
   `RESTART_CEILING` as every restart is, the seats included (a replayed seat is on call again, its
-  trigger standing: written held by rule 3's create, no pane, filled only for a cause). A team with anything live at the reset is left alone. One with no launch
+  trigger standing: written held by rule 3's create, no pane, filled only for a cause), each entry
+  carrying the start's instant as `start` and `of`, as rule 8's do, and rule 8's `work_waiting` mark goes
+  (only with a start: a team left alone keeps it).
+  **Once per reset**: the home keeps on its host record, under the team, `schedule_next` (the upcoming
+  reset last read, with the profile and window it was read for) and `schedule_fired` (the reset last
+  acted on), so a reading that has already rolled to the next week still fires the reset that passed,
+  and a restart of the agent never fires one twice (instants compared parsed, so one reset spelled two
+  ways is one); with no reading nothing fires, said once in the log. A reset found more than
+  **`SCHEDULE_LATE`** (an hour) after it passed — a stale reading when the schedule is set, the agent
+  down across it — is counted and starts nothing: a team starts at a reset, never at an arbitrary hour. A member on a node
+  whose link is down holds the start to the next tick, the same reset, however long the link stays
+  down (a held reset is never counted late). A team with anything live at the
+  reset is left alone, and so is one a person stopped (it did not end by its own ending); either way the
+  reset counts as fired. One with no launch
   records — never started by a person on this home, or its cards forgotten, which deletes them —
   starts nothing: **a schedule restarts a team a person once started and never invents one**, so the
   briefs a scheduled team runs are the ones its last person-pressed start read, and a brief change

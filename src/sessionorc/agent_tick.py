@@ -64,6 +64,7 @@ from sessionorc.agent_common import (
     RESTART_CEILING,
     RESTART_WINDOW,
     RESUME_MIN,
+    SCHEDULE_LATE,
     SEAT_IDLE_GRACE,
     SEAT_PR_WAIT,
     SETTLED,
@@ -125,7 +126,7 @@ def _asked(questions: list[Any], members: dict[str, list[str]] | None = None) ->
 FILLED_FOR = "[shiftlead] you are filled for: "
 # `restarts` entries that are not the tick's restarts, left out of rule 9's note (§4.9a, TD-468): a
 # person's Restart, and a team's start by a schedule or by rule 8
-NOT_RESTARTS = ("person", "start", "work")
+NOT_RESTARTS = ("person", "start", "schedule", "work")
 
 
 def filled_for(cause: dict[str, Any] | None) -> str | None:
@@ -319,6 +320,7 @@ class TickMixin:
         await self._retire_anchors()
         await self._keep_running(snapshot_at)
         await self._finished_pass(snapshot_at)
+        await self._schedules(snapshot_at)
         await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
@@ -1903,6 +1905,129 @@ class TickMixin:
                     out.add(e.ref)
         return out
 
+    async def _schedules(self, now: datetime) -> None:
+        """§6 *Schedule* (TD-133): a team start at a window's reset, the person's standing press kept as
+        `teams.<team>.schedule: {start: reset, profile, window}` in `settings.yml`. The instant is that
+        window's `resets` in the profile's account reading (`_gate_reading`; no reading, no fire). The
+        home keeps, on its host record under the team, `schedule_next` — the upcoming reset last read,
+        with the rule it was read for, so a reading that has already rolled to the next week still
+        fires the one that passed — and `schedule_fired`, the reset last acted on, so a restart of the
+        agent never fires one twice. At a reset the team's records are replayed as rule 8's start
+        replays them (`_work_replays`: ended by the team's own ending, none suspended or at its ceiling,
+        a launch record each, the lead first, a seat held), `why: schedule`, the start's instant and
+        `of` on each entry, and `work_waiting` goes. A team with anything live, a stopped one (a person's
+        stop is never undone) or one with no launch record is left alone and the reset counted as
+        fired; a member on a node whose link is down holds the start to the next tick. At the home only."""
+        if self.mode != "home":
+            return
+        try:
+            conf = settings_mod.teams(settings_mod.load())
+        except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
+            log.exception("reading the teams' settings for a schedule failed")
+            return
+        teams = self._host_rec.setdefault("teams", {})
+        by_team: dict[str, list[Session]] = {}
+        for r in self._graph().values():
+            if r.team:
+                by_team.setdefault(r.team, []).append(r)
+        dirty = False
+        for team in sorted(
+            set(conf) | {t for t, rec in teams.items() if isinstance(rec, dict) and "schedule_next" in rec}
+        ):
+            try:
+                before = teams.get(team) if isinstance(teams.get(team), dict) else {}
+                # worked on a copy and written back only when the pass ends, so a surprise mid-way loses no reset
+                rec = copy.deepcopy(before)
+                rule = (conf.get(team) or {}).get("schedule")
+                if not rule:
+                    rec.pop("schedule_next", None)  # cleared: nothing upcoming; `schedule_fired` stays, a fact
+                else:
+                    await self._schedule_team(team, rule, rec, by_team.get(team) or [], now)
+                if rec == before:
+                    continue
+                dirty = True
+                if rec:
+                    teams[team] = rec
+                else:
+                    teams.pop(team, None)
+            except Exception:  # noqa: BLE001 — one team's surprise is a log line, never another's
+                log.exception("reading %s's schedule failed", team)
+        if dirty:
+            try:
+                self.host_store.save(self._host_rec)
+            except OSError:
+                log.exception("writing the home's host record failed")
+            await self._push_changes()
+
+    async def _schedule_team(
+        self, team: str, rule: dict[str, Any], rec: dict[str, Any], records: list[Session], now: datetime
+    ) -> None:
+        """One team's schedule on one tick (`_schedules`): `rec` is a copy of its host record, written in
+        place. Instants are compared parsed and kept in one spelling, so a reading that spells the same
+        reset differently is the same reset. A reset found more than `SCHEDULE_LATE` after it passed — a
+        stale reading when the schedule is set, an agent down across it — is counted and starts nothing:
+        a team starts at a reset, never at an arbitrary hour after one."""
+        which = {"profile": rule["profile"], "window": rule["window"]}
+        resets: datetime | None = None
+        for w in self._gate_reading(rule["profile"]).get("windows") or []:
+            if isinstance(w, dict) and w.get("label") == rule["window"]:
+                resets = _instant(w.get("resets")) or resets
+        nxt = rec.get("schedule_next") if isinstance(rec.get("schedule_next"), dict) else {}
+        upcoming = _instant(nxt.get("at")) if {k: nxt.get(k) for k in which} == which else None
+        if upcoming is None and resets is None:
+            key = (team, which["profile"], which["window"])
+            if key not in self._schedule_quiet:  # said once a run: a window never reported, or no reading yet
+                self._schedule_quiet.add(key)
+                log.info("schedule: %s has no reset to wait for: no reading of %s's %s", team, *key[1:])
+            return
+        due = upcoming if upcoming is not None and upcoming <= now else None
+        if due is None and resets is not None and resets <= now:
+            due = resets  # a reading not yet rolled past its own reset
+        if resets is not None and resets > now:
+            rec["schedule_next"] = {**which, "at": _iso_of(resets)}
+        elif due is not None and due == upcoming:
+            rec.pop("schedule_next", None)  # acted on below; the next reading names the next reset
+        if due is None or _instant(rec.get("schedule_fired")) == due:
+            return
+        held = bool(nxt.get("held")) and due == upcoming  # a reset already held for a link is never late
+        if now - due > SCHEDULE_LATE and not held:
+            log.info("schedule: %s's reset %s passed %s ago: counted, nothing started", team, _iso_of(due), now - due)
+            rec["schedule_fired"] = _iso_of(due)
+            return
+        how = await self._schedule_start(team, records, now, _iso_of(due))
+        if how == "wait":
+            # held for a link: the same reset, next tick, however long the link stays down
+            rec["schedule_next"] = {**which, "at": _iso_of(due), "held": True}
+            return
+        rec["schedule_fired"] = _iso_of(due)
+        if how == "started":
+            rec.pop("work_waiting", None)  # a schedule's start clears rule 8's mark (§6 rule 8)
+
+    async def _schedule_start(self, team: str, records: list[Session], now: datetime, due: str) -> str:
+        """The start at a reset: `started` when records were replayed, `left` when there was nothing to
+        start (a live team, one a person stopped, no launch record), `wait` while a member's node link is
+        down (the reset is tried again on the next tick)."""
+        if work_mod.team_wound_down(records) is None:
+            log.info("schedule: %s at the reset %s is live or stopped: left alone", team, due)
+            return "left"
+        replays = self._work_replays(records, now)
+        if not replays:
+            log.info("schedule: %s at the reset %s has no record to replay: a schedule never invents a team", team, due)
+            return "left"
+        down = [r.host for r in replays if r.host != self.host and r.host not in self._link_muxes]
+        if down:
+            log.info("schedule: %s waits for the link to %s", team, ", ".join(dict.fromkeys(down)))
+            return "wait"
+        at = now_iso()
+        about = {"start": at, "of": len(replays)}
+        log.info("schedule: starting %s at the reset %s (%d records)", team, due, len(replays))
+        for r in replays:
+            try:
+                await self._replay(r, "schedule", mark=dict(about), keep_mail=True, held=bool(r.seat and r.unattended))
+            except Exception:  # noqa: BLE001 — one record's failure is never the team's start
+                log.exception("%s: a schedule's replay failed", self._address(r))
+        return "started"
+
     async def _work_marks(self, now: datetime) -> None:
         """Rule 8 (design §6 *Work for a team that wound down*, TD-227): on every tick at the home,
         each team read as **wound down** from its records (`work.team_wound_down`, the card's own
@@ -2740,7 +2865,11 @@ class TickMixin:
         the closed run's mail is the new record's, so a reply to its `ask` still has a thread (TD-352).
         Every entry, a failed one's too, carries `done` and `left` — what the run it replaces reported
         (`agent_common._reported`) — since the new record keeps none of the old one's `progress` (§4.9a, TD-245)."""
-        if why in ("start", "work"):  # a schedule's start and rule 8's: the team's, if none of it runs
+        if why in (
+            "start",
+            "schedule",
+            "work",
+        ):  # a start time's, a schedule's and rule 8's: the team's, if none of it runs
             self._mark_team_start(s.team, but=s)
         now = datetime.now(UTC)
         entry: dict[str, Any] = {
@@ -5390,3 +5519,19 @@ def _balance_hold(held: Any) -> dict[str, Any] | None:
         return held
     inner = held.get("balance")
     return inner if isinstance(inner, dict) and inner.get("why") == "balance" else None
+
+
+def _instant(value: Any) -> datetime | None:
+    """An ISO instant as a UTC `datetime`, or None for anything that is not one (§6 *Schedule*)."""
+    if not value:
+        return None
+    try:
+        t = _parse(str(value))
+    except (TypeError, ValueError):
+        return None
+    return t.replace(microsecond=0) if t.tzinfo is not None else None
+
+
+def _iso_of(t: datetime) -> str:
+    """`t` in the one spelling the schedule keeps: UTC, whole seconds, `…Z`."""
+    return t.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
