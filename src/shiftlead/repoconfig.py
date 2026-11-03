@@ -140,6 +140,13 @@ WORK_ITEM = (
     "I opened this session from the Queue about {item}, on the card around {id} of {repo}'s ledger ({ledger}). "
     "Read it first{read}, and walk me through its goal and what each answer leads to."
 )
+# The header's press on a card where two or more items wait on the person (design §4.5 screen 12 *Started from the
+# header on a card with items*, TD-1338, built by TD-1340): the walk sentence, in place of `WORK_OPENING`'s
+WORK_ALL = (
+    "I opened this session from the Queue to work through every item that waits on me on the card around {id} of "
+    "{repo}'s ledger ({ledger}), one at a time: for each, read it, tell me its goal and what each answer leads to, "
+    "and wait for my answer before the next."
+)
 WORK_ITEM_READ = {"board:": " with `ao board show {item}`", "m-": " with `ao inbox --thread {item}`"}
 # A template's shape for a seat on call (design §6 *What is left is judgement, and a seat holds it*,
 # TD-247): the manager's, which reads one `seat_due` and ends, where `manager.md` rounds on `ao wait`.
@@ -287,18 +294,22 @@ def work_text(
     mine: Iterable[str] = (),
     rest: Iterable[str] = (),
     item: str = "",
+    walk: bool = False,
 ) -> str:
     """`work.md` filled: the opening prompt **Start session** sends (TD-678, TD-912). `why` a key of
     `WORK_OPENING` — *yours* (`Owner: paul`), *decision* (`decision (paul)`), *card* (any other entry a
     card starts on) — `where` the page pressed on, *Inbox* or *Queue*; `mine` and `rest` the card's ids,
     *waits on me* its Decide and Do items and *the rest* its other entries, each group *none* when empty.
-    `item`, pressed on a Queue card's item (TD-1246), is named by `WORK_ITEM` in the first sentence's place."""
+    `item`, pressed on a Queue card's item (TD-1246), is named by `WORK_ITEM` in the first sentence's place;
+    `walk`, the header's press on a card with two or more items (TD-1340), puts `WORK_ALL` there."""
     text = resources.files("shiftlead").joinpath("briefs", WORK_TEMPLATE).read_text(encoding="utf-8")
     opening = WORK_OPENING[why]
     if item:
         read = next((r for k, r in WORK_ITEM_READ.items() if item.startswith(k)), "")
         read = read or (", in the ledger" if re.fullmatch(r"(?:[\w.-]+#)?TD-\d+", item) else "")
         opening = WORK_ITEM.replace("{read}", read).replace("{item}", item)
+    elif walk:
+        opening = WORK_ALL
     for slot, value in (("{where}", where), ("{id}", id_), ("{repo}", repo), ("{ledger}", ledger)):
         opening = opening.replace(slot, value)
     ids = [", ".join(mine) or "none", ", ".join(rest) or "none"]

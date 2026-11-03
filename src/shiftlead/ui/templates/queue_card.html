@@ -33,14 +33,15 @@
     <span class="qright">
       {#- the move arrows, Start session, then the ⋯ (TD-914), a gap, then the facts #}
       {% if up %}<span class="qmoves"><button type="button" class="qmove" data-move="top" title="to the top of Up next" aria-label="to the top">⤒</button><button type="button" class="qmove" data-move="up" title="up one card" aria-label="up one">↑</button><button type="button" class="qmove" data-move="down" title="down one card" aria-label="down one">↓</button></span>{% endif %}
-      {#- **Start session** in the header only on a card with no Decide or Do item but a red PR, each such item
-          drawing its own (§4.5a *Queue card: Start session / Open session*, TD-912, TD-1246): on the card's
-          `start`; **Open session** while the person's own session holds any of its entries; absent while
-          another holds `start`, the row saying *held by <name>* #}
+      {#- **Start session** in the header on a card with no Decide or Do item but a red PR, or with two or more
+          that count beside the items' own, its title then `card-start-all`; none where one counts, that item's
+          button doing the same (§4.5a *Queue card: Start session / Open session*, TD-912, TD-1246, TD-1340): on
+          the card's `start`; **Open session** while the person's own session holds any of its entries; absent
+          while another holds `start`, the row saying *held by <name>* #}
       {%- set ss = c.session or {} %}{% set sp = (ss.start or '').split('#') %}
-      {%- if c.items_start %}
+      {%- if c.items_n == 1 %}
       {%- elif ss.own %}<button class="btn sm ghost qstart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ sp[0] }}" data-ref="{{ sp[1] }}" data-card="{{ c.id }}" title="your session on this card: go to its Focus — nothing is started">Open session</button>
-      {%- elif ss.start and not ss.other %}<button class="btn sm ghost qstart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ sp[0] }}" data-ref="{{ sp[1] }}" data-card="{{ c.id }}" title="{{ help_title('card-start') }}">Start session</button>{% endif %}
+      {%- elif ss.start and not ss.other %}<button class="btn sm ghost qstart" type="button" data-act="ledger_start" data-id="person" data-repo="{{ sp[0] }}" data-ref="{{ sp[1] }}" data-card="{{ c.id }}" title="{% if c.items_n %}{{ help_title('card-start-all') }}{% else %}{{ help_title('card-start') }}{% endif %}">Start session</button>{% endif %}
       {# the top entry's state where the card's own words do not already say it: *ready* is the status's,
          a need the amber badge's, *held by X* the holder's pill, a Waiting card's leaf its wait phrase #}
       {{ extras(t.ext, repo) }}{{ meter(t.meter) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') and not (c.wait and c.wait.id == t.qid) %}{{ state(t) }}{% endif %}

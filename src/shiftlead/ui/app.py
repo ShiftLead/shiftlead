@@ -416,6 +416,7 @@ from .queue import (
     card_wants,
     filter_chips,
     item_start,
+    items_n,
     picks_query,
     queue_picks,
     queue_view,
@@ -424,6 +425,7 @@ from .queue import (
     send_window,
     split_later,
     waits_on_me,
+    walk_mine,
 )
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
@@ -3290,11 +3292,16 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 raise HTTPException(409, f"{ref} no longer waits on you in {repo}'s ledger — nothing was started")
             card = next((c for c in cards if qid(repo, ref) in sum(card_entries(c), [])), None)
         mine, rest = card_entries(card) if card is not None else ([qid(repo, ref)], [])
+        walk = False  # the header's press on a card where two or more items count (TD-1340)
         if card is not None:  # every Decide and Do item, by its id (§4.5 screen 12 *Started from an item*)
             with contextlib.suppress(Exception):  # unread, *waits on me* is the card's ledger entries
                 got = (await card_mail(h, records, card_index({"cards": cards})))[1]
                 wants = card_wants((got.get("cards") or {}).get(str(card.get("id"))), "", False)
                 mine = waits_on_me(mine, wants)
+                # counted afresh at the press, whatever the page drew: with two or more the walk sentence, and
+                # *waits on me* leaves out an entry *answered — waiting on <asker>*, which waits on its asker
+                if card_id and not item and items_n(wants) >= 2:
+                    walk, mine = True, walk_mine(mine, wants)
             if item and not TD_REF.fullmatch(item) and item not in mine:  # the item pressed, read or not
                 mine.append(item)
         name = ref.lower()  # cadence's work-branch shape: the tick derives the claim from it (§4.8)
@@ -3336,7 +3343,15 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except ValueError as e:
             cfg, cfg_why = None, str(e).strip('"')
         prompt = repoconfig.work_text(
-            ref, repo, ledger, why_key, where="Queue" if card_id else "Inbox", mine=mine, rest=rest, item=item
+            ref,
+            repo,
+            ledger,
+            why_key,
+            where="Queue" if card_id else "Inbox",
+            mine=mine,
+            rest=rest,
+            item=item,
+            walk=walk,
         )
         t = org.teams.get(team) if team else None
         if t is not None:
