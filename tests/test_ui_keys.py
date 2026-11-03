@@ -217,8 +217,7 @@ def test_the_digits_yield_to_a_row_with_answer_buttons_and_g_is_go_with_it():
     assert got["answers"] == [["first", "second"], []]
     assert "if (!k || (k.nth && !answers.length)) return;" in js
     assert (
-        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add", '
-        '"ledger", "ledger_reply"].includes(key);' in js
+        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);' in js
     )  # the row stays
     assert e["inbox_g"] == "Go with it"
     assert [k["keys"] for k in got["keys"] if k.get("nth")] == [["1", "2", "3", "4"]]

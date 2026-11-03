@@ -2421,10 +2421,10 @@ def test_suspend_is_offered_only_where_there_is_something_to_stop_and_leaves_the
         assert ctl not in rows("needs", [{**live, "state": dead}]), dead
 
     js = (UI / "static" / "app.js").read_text()
-    # with a board row's decide (TD-255), the one act on this page that does **not** take its row away
+    # with a board row's decide (TD-255), an act on this page that does **not** take its row away; a ledger
+    # decide does since rule 4 (TD-1321)
     assert (
-        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add", '
-        '"ledger", "ledger_reply"].includes(key);' in js
+        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);' in js
     )
     assert "AO.handRing(row); row.remove(); left = true;" in js  # a state row leaves on the press (TD-340)
     assert 'if (action === "suspend") body = { id: b.dataset.who || "" };' in js
@@ -3599,17 +3599,20 @@ def test_every_inbox_control_has_its_verb_under_way():
     assert macro.count('<div class="st rowerr" role="alert" hidden></div>') == 5  # each of the five row shapes
     assert row.count('class="st rowerr"') == 5  # and nowhere else, so a row has one
     # the frame of a press: marked before the request leaves, the row out first when the press takes it
-    assert "pressed();\n      const res = await act(id, action2 || action, body);" in js
     assert (
-        'waiting = AO.toast(action === "board" ? `${what} — landing on the board…` : `${what}…`, true, null, true);'
-        in js
+        'pressed(key === "board_decide" ? body.answer : undefined);\n'
+        "      const res = await act(id, action2 || action, body);" in js
+    )
+    assert (
+        'waiting = AO.toast(r4 ? `${r4[0]} — writing on the board…` : action === "board" ? '
+        "`${what} — landing on the board…` : `${what}…`, true, null, true);" in js
     )
     assert "const text = kept[msg] || AO.pressErrs[msg];" in js
     # `say` is the handler's own, declared partway down it: nothing above the declaration may call it
     handler = js[js.index('const b = ev.target.closest("[data-act], [data-copy]");') :]
     assert "say(" not in handler[: handler.index("const say = ")]
     # a poll's swap keeps a press in flight as it was: out, or pending (the review of #1144)
-    assert "if (f && f.leaves) r.remove(); else if (f) AO.markPending(r, f.verb);" in js
+    assert "if (f.leaves) r.remove(); else AO.markPending(r, f.verb);" in js
 
 
 @pytest.mark.unit
