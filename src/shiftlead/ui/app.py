@@ -1152,7 +1152,8 @@ class Readings:
         """The Inbox's **due** board rows and the note beside them: what is counted is what is due,
         under every mode (TD-220)."""
         rows, note = await self.board_all()
-        return [r for r in rows if r.get("due_now", True)], note
+        # a line hidden by its `Hide until:` is the Snoozed fold's alone, never counted (TD-1349)
+        return [r for r in rows if r.get("due_now", True) and not r.get("hidden")], note
 
     async def board_view(self, choices: list[dict[str, str]] | None = None) -> tuple[dict[str, Any], str]:
         """The board's horizon (§4.5 screen 6, TD-220) over every open row, sorted by the person's
@@ -1415,6 +1416,7 @@ class Readings:
             attention_snoozed=got.get("attention_snoozed"),
             handed=got.get("handed") or (),
             boards=hz["due"] + hz["waiting"],
+            snoozed=hz["snoozed"],
             fleet=fleet,
             cards=await self.queue_cards(),
         )
@@ -3974,6 +3976,7 @@ async def card_mail(
         attention_snoozed=inbox.get("attention_snoozed"),
         handed=inbox.get("handed") or (),
         boards=hz["due"] + hz["waiting"],
+        snoozed=hz["snoozed"],
         fleet=fleet,
         cards=index,
     )
@@ -4679,7 +4682,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # with the host agent down nothing is claimed as waiting — the Org's top bar and the poll say
         # the same — so the board is left unread rather than counted on this page alone (review of #472)
         hz, board_note = (
-            ({"due": [], "ahead": [], "hidden": [], "waiting": [], "line": None}, "")
+            ({"due": [], "ahead": [], "hidden": [], "waiting": [], "snoozed": [], "line": None}, "")
             if agent_down
             else await board_view(choices)
         )
@@ -4694,6 +4697,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # due rows, and the answered ones that wait on a session (TD-305), with the fleet for
             # the *waiting on …* words
             boards=hz["due"] + hz["waiting"],
+            snoozed=hz["snoozed"],
             fleet=fleet,
             cards=cards,
         )
@@ -4915,6 +4919,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 attention_snoozed=got.get("attention_snoozed"),
                 handed=got.get("handed") or (),
                 boards=hz["due"] + hz["waiting"],
+                snoozed=hz["snoozed"],
                 fleet=fleet,
                 cards=cards,
             )
@@ -5041,8 +5046,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not board or not text:
                 raise HTTPException(400, "a board row's act names the board and the item's text")
             due = str(body.get("due") or "").strip() or None
-            if what == "snooze" and not due:
-                raise HTTPException(400, "a snooze names the new date, YYYY-MM-DD")
+            # a snooze with no date is the fold's *now* (§4.5a, TD-1349): the agent writes its own today
             more: dict[str, Any] = {}
             if what == "decide":
                 # §4.5a **answers** / **Go with it** (§4.4 *Decide*, TD-255): the answer pressed and
