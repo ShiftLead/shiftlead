@@ -373,6 +373,7 @@ def test_the_seats_nudge_names_a_handed_entry_by_its_outcome(agent):
 
 
 SHOT = "docs/mockups/reviews/2026-10-03-td292-row.png"
+SHA = "0123456789abcdef0123456789abcdef01234567"
 
 
 async def _look(person, tmp_path, *, kind: str = "ask") -> tuple[str, str, str]:
@@ -387,9 +388,19 @@ async def _look(person, tmp_path, *, kind: str = "ask") -> tuple[str, str, str]:
     builder, seat = await mk("builder", unattended=True), await mk("tl", unattended=True, seat={"trigger": "asks"})
     extra = {"default": "Works"} if kind == "steer" else {"answers": ["Works", "Not right: x"]}
     async with LocalClient(caller=builder) as c:
-        look = (await c.call("msg", to="person", kind=kind, text="the row?", about="TD-292", shots=[SHOT], **extra))[
-            "entry"
-        ]["id"]
+        look = (
+            await c.call(
+                "msg",
+                to="person",
+                kind=kind,
+                text="the row?",
+                about="TD-292",
+                shots=[SHOT],
+                shots_at=SHA,
+                shots_ref="td1307-shots-at",
+                **extra,
+            )
+        )["entry"]["id"]
     return builder, seat, look
 
 
@@ -407,6 +418,7 @@ async def test_send_to_reviewer_hands_a_look_to_the_seat_and_its_outcome_brings_
         h = next(e for e in rec.inbox if e.id == got["handed"])
         assert (h.kind, h.from_, h.text, h.about) == ("ask", PERSON, "the row?", "TD-292")
         assert h.handed and h.shots == [SHOT] and h.look == look and h.bound is None
+        assert (h.shots_at, h.shots_ref) == (SHA, "td1307-shots-at"), "the look's commit and branch handed too"
         assert h.handed_entry and rec.asks_waiting() == 1, "it fills the seat"
         mine = next(e for e in agent.person_inbox if e.id == look)
         assert mine.snoozed_for == h.id and mine.open, "set aside, still the person's to answer"

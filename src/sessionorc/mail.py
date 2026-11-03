@@ -22,7 +22,17 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from sessionorc import adapters
-from sessionorc.models import GRANTS, PERSON, SYSTEM, MailEntry, Session, has_control, start_note
+from sessionorc.models import (
+    GRANTS,
+    PERSON,
+    SYSTEM,
+    MailEntry,
+    Session,
+    clean_shots_at,
+    clean_shots_ref,
+    has_control,
+    start_note,
+)
 
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
 RECIPIENT_CAP = 5  # addressees the *sender* names; automatic copies are exempt
@@ -72,6 +82,9 @@ _DEFAULT_MARK = re.compile(r"\s*\(default\)$", re.IGNORECASE)
 SHOTS_MAX = 4
 SHOT_NAME = re.compile(r"[A-Za-z0-9._-]+\.png")  # a screenshot's file name, as the page serves it
 SHOT_RE = re.compile(r"docs/mockups/reviews/" + SHOT_NAME.pattern)
+# A look's commit and branch (§4.10 *A look's shots are the pushed commit's*, TD-1303): kept in `models`,
+# since every `MailEntry` re-matches both when it is made or loaded — each hop
+shots_at, shots_ref = clean_shots_at, clean_shots_ref
 OPEN_ASK_ADVICE = 3  # open `ask`s to the person at which `ao msg` advises asking whether this one is a steer
 # Outcomes owed to the person before an `ask` or a `steer` to it is refused (design §4.10
 # *Outcomes*, TD-079). Ten, because the remedy is one line each and a worker with a long night of

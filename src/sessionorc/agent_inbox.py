@@ -171,7 +171,15 @@ class InboxMixin:
         # the debt, the look's screenshots and its id, and no bound: it ends by its outcome (§4.10). The
         # shots are written here, not sent: `--shot` rides only toward the person, and this is the
         # person's own look going the other way
-        self._mark(mid, handed=True, shots=list(e.shots), look=e.id, bound=None)
+        self._mark(
+            mid,
+            handed=True,
+            shots=list(e.shots),
+            shots_at=mail.shots_at(e.shots_at),
+            shots_ref=mail.shots_ref(e.shots_ref) if mail.shots_at(e.shots_at) else None,
+            look=e.id,
+            bound=None,
+        )
         self._mark(e.id, snoozed_for=mid, looked_by=None)  # an earlier reading is not this one's
         await self._push_changes()
         log.info("inbox_hand: look %s handed to %s as %s", e.id, to, mid)

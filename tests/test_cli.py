@@ -2690,3 +2690,81 @@ def test_status_v_ranks_own_work_with_the_working_whether_or_not_it_waits(monkey
     assert list(lines) == ["ao-r-b", "ao-r-c", "ao-r-d", "ao-r-a"], lines
     assert lines == {"ao-r-b": "working", "ao-r-c": "working", "ao-r-a": "idle", "ao-r-d": "working"}
     assert "TD-222" in out.split("ao-r-d", 1)[1], "the wait is still printed under -v"
+
+
+def _shot_repo(tmp_path):
+    """A checkout with a bare `origin`, `main` pushed, and a feature branch tracking `origin/feat`."""
+
+    def git(*a, cwd=None):
+        return subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main", *a],
+            cwd=cwd or work, check=True, capture_output=True, text=True,
+        ).stdout.strip()  # fmt: skip
+
+    bare, work = tmp_path / "origin.git", tmp_path / "work"
+    git("init", "--bare", str(bare), cwd=tmp_path)
+    git("clone", str(bare), str(work), cwd=tmp_path)
+    reviews = work / "docs" / "mockups" / "reviews"
+    reviews.mkdir(parents=True)
+    (reviews / "row.png").write_bytes(b"\x89PNG one")
+    git("add", "-A")
+    git("commit", "-m", "one")
+    git("push", "-q", "origin", "main")
+    git("checkout", "-q", "-b", "feat")
+    return git, work, reviews / "row.png"
+
+
+def test_a_shot_is_sent_with_the_pushed_head_and_its_branch(tmp_path):
+    """Design §4.10 *A look's shots are the pushed commit's* (TD-1303): `--shot` reads `HEAD` and its origin
+    branch, and refuses an uncommitted shot, one that differs from `HEAD`, and an unpushed `HEAD`."""
+    git, work, shot = _shot_repo(tmp_path)
+    new = shot.parent / "new.png"
+    new.write_bytes(b"\x89PNG new")
+    with pytest.raises(ValueError, match=r"^new.png is not committed at HEAD: commit it and push, then send$"):
+        cli._shot_commit([str(new)])
+    git("add", "-A")
+    git("commit", "-m", "two")
+    new.write_bytes(b"\x89PNG changed")
+    with pytest.raises(ValueError, match=r"^new.png differs from HEAD: commit it and push, then send$"):
+        cli._shot_commit([str(new)])
+    git("checkout", "--", str(new))
+    with pytest.raises(ValueError, match=r"^HEAD is not pushed: push feat, or fetch if it was merged, then send$"):
+        cli._shot_commit([str(new), str(shot)])
+    git("push", "-q", "-u", "origin", "feat:feat-remote")  # an upstream of another name: its name is sent
+    head = git("rev-parse", "HEAD")
+    assert cli._shot_commit([str(new), str(shot)]) == (head, "feat-remote")
+    git("checkout", "-q", "--detach")  # a detached HEAD an origin ref contains: no branch
+    assert cli._shot_commit([str(new)]) == (head, "")
+    git("commit", "-q", "--allow-empty", "-m", "three")
+    with pytest.raises(ValueError, match=r"^HEAD is not pushed: check out a branch and push it, then send$"):
+        cli._shot_commit([str(new)])
+    assert cli._shot_commit([str(tmp_path / "nowhere.png")]) is None, "no file: the host agent refuses it"
+
+
+def test_a_look_after_the_squash_is_sent_with_the_default_branch_s_commit(tmp_path):
+    """Design §4.10 *A look after the merge*: a `HEAD` no origin ref holds, whose every shot
+    `origin/<default>` holds as the same blob, is sent with `origin/<default>`'s sha and no branch; a shot
+    the default holds otherwise is refused as unpushed."""
+    git, work, shot = _shot_repo(tmp_path)
+    git("commit", "-q", "--allow-empty", "-m", "the branch's own")  # unpushed; the shot is main's blob
+    main = git("rev-parse", "origin/main")
+    assert cli._shot_commit([str(shot)]) == (main, "")
+    shot.write_bytes(b"\x89PNG two")
+    git("commit", "-q", "-am", "a changed shot")
+    with pytest.raises(ValueError, match=r"^HEAD is not pushed: push feat"):
+        cli._shot_commit([str(shot)])
+
+
+def test_a_shot_s_branch_is_its_upstream_only_where_the_upstream_holds_head(tmp_path):
+    """A branch cut from `origin/main` keeps `origin/main` as its upstream until pushed with `-u`: pushed
+    under its own name, the look names that branch, never `main`, whose file is not the look's."""
+    git, work, shot = _shot_repo(tmp_path)
+    git("branch", "-q", "--set-upstream-to", "origin/main")
+    git("commit", "-q", "--allow-empty", "-m", "the branch's own")
+    git("push", "-q", "origin", "feat")
+    assert cli._shot_commit([str(shot)]) == (git("rev-parse", "HEAD"), "feat")
+    other = tmp_path / "elsewhere.png"
+    other.write_bytes(b"\x89PNG")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    with pytest.raises(ValueError, match=r"^elsewhere.png is not in .*: a look's shots are of one checkout$"):
+        cli._shot_commit([str(shot), str(other)])
