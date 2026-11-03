@@ -1176,7 +1176,10 @@
    which writes one decided line on the repo's board: the row leaves on the press, its toast waiting for
    the answer, and comes back with its error line if the press is refused (§4.5 screen 6 rule 4, TD-1321).
    **Start session** (TD-678) is the person's own session on the entry, or the filled New session form;
-   **Open session** while a member holds it, that session's Focus. **Open** is the Repo page on the id. #}
+   **Open session** while a member holds it, that session's Focus. **Open** is the Repo page on the id.
+   A `decision (paul)` row whose question the person answered (`e.answered`, §4.4 *The card's status*, TD-1316)
+   reads *answered — waiting on <asker>*, its foot the answer as the question's row says it and its age, and
+   draws no answers, Reply, Go with it or Start session: **Lift the hold** and **Open** are in its ⋯. #}
 {% macro ledger(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.name }}'s ledger">{{ e.name }}</span>
@@ -1184,8 +1187,10 @@
   <span class="badge kindmark k-ledger">{{ e.kind }}</span>
   {#- an entry the person's own session holds (TD-1281): the word names the session, so no *held by* beside it #}
   {%- set with_you = e.want == 'with_you' and e.with_you %}
+  {%- set ans = e.answered if not with_you else none %}
   {%- if e.held and not with_you %} <span class="st">held by {{ e.held }}</span>{% endif %}
-  {%- if e.home == 'queue' %} <span class="st qneed">{% if with_you %}with you in {{ e.with_you }}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
+  {%- if ans %} <span class="st qans">answered — waiting on {{ ans.name }}</span>
+  {%- elif e.home == 'queue' %} <span class="st qneed">{% if with_you %}with you in {{ e.with_you }}{% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
   <span class="grow"></span>
   <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
 </div>
@@ -1196,7 +1201,8 @@
 {{ fold(e.row_id, fold_open or (e.answers and not card_whole(mode, e)), 'ledger', e) }}
 {%- endif %}
 {%- set whole = card_whole(mode, e) %}
-{%- if whole %}{{ answer_row(e, 'ledger') }}
+{%- if ans %}
+{%- elif whole %}{{ answer_row(e, 'ledger') }}
 {%- elif e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
   <span class="st sugglabel">its answers</span>
@@ -1206,12 +1212,17 @@
 </div>
 {%- endif %}
 <div class="row gap wrap mfoot">
-  {%- if with_you %}
+  {%- if ans %}
+  <span class="st">{{ ans.words }} · {% if ans.outcome %}{{ ans.name }}: {{ ans.outcome.text or 'done' }}{% else %}in {{ ans.name }}'s {{ ans.kind }}, {{ ans.age or 'just now' }}{% if ans.age %} ago{% endif %} — the hold goes when its PR merges{% endif %}</span>
+  {%- elif with_you %}
   <span class="st">with you in {{ e.with_you }} — an answer here still writes the decided line on {{ e.name }}'s board</span>
   {%- else %}
   <span class="st">in {{ e.name }}'s ledger — waits on you, with no date; an answer is written on {{ e.name }}'s board as a decided line, its session's work order</span>
   {%- endif %}
   <span class="grow"></span>
+  {%- if ans %}
+  {%- call qrow.dots(['Lift the hold', 'Open']) %}<button role="menuitem" type="button" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button><a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
+  {%- else %}
   {%- if not whole %}
   <button class="btn sm ghost" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="your words written on {{ e.name }}'s board as your decision on {{ e.id }}, one line landed on origin by shiftlead's own pull request">Reply</button>
   {%- if e.default %}
@@ -1239,6 +1250,7 @@
   {%- if e.home != 'queue' %}{{ qrow.controls({'id': e.id, 'title': e.title, 'repo': e.name, 'needs': 'owner' if e.why == 'yours' else 'decision', 'state': '', 'page': e.page, 'blocked_open': e.blocked_open, 'builds_open': e.builds_open}, e.root) }}{% endif %}
   {%- if whole %}{% call qrow.dots(['Open']) %}<a role="menuitem" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endcall %}
   {%- else %}<a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>{% endif %}
+  {%- endif %}
 </div>
 {%- endmacro %}
 

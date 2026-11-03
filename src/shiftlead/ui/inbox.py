@@ -26,6 +26,7 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import mail as mail_mod
 from sessionorc import promote as promote_mod
+from sessionorc import queue as queue_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import workorders as workorders_mod
@@ -2436,6 +2437,8 @@ def ledger_for_you(
     fleet: Collection[dict[str, Any]],
     named: Mapping[str, str] | None = None,
     now: datetime | None = None,
+    inbox: Iterable[Mapping[str, Any]] = (),
+    every: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """The ledger's rows of the Inbox's **Later** section (design §4.5 screen 6 *The ledger's entries
     that wait on you*, §4.5a **Inbox row: ledger entry**, TD-368, TD-565): the entries §4.4 *Repo
@@ -2451,10 +2454,31 @@ def ledger_for_you(
     rail's *Teams* picks filter by — the definitions' team for the repo (`named`, by resolved
     checkout), else the team most of its live records carry, else none; the link the Repo page
     opened on the id. `n` is every row, counted under *Later* alone. An entry held out of the lanes is a
-    `decision (<person>)` row like any (§4.4 *Holding an entry is a decision on it*, TD-1297)."""
+    `decision (<person>)` row like any (§4.4 *Holding an entry is a decision on it*, TD-1297).
+
+    `inbox` is the person inbox's entries with `_owing` applied: a `decision (paul)` row whose question the person
+    has answered carries `answered` while its asker acts on the answer (§4.4 *The card's status*, TD-1316, by
+    `queue.answered_hold`) — the asker's name, the question's kind, `words` (the answer as its row says it), `age`
+    (the answer's) and `outcome` (its `done`, if any) — and draws no answers. `every` is every repo's facts, the
+    bare `TD-n` link's index (the Repo page passes one repo as `repos`); `repos` where none is given."""
     from .repo import PRIORITY_RANK  # repo imports this module: read at call time
 
+    now = now or datetime.now(UTC)
     live = [s for s in fleet if s.get("state") not in ("exited", "closed") and s.get("repo")]
+    questions = [q for q in inbox or () if isinstance(q, Mapping)]
+    states = {str(s.get("id")): str(s.get("state") or "") for s in fleet if s.get("id")}
+    names = {str(s.get("id")): str(s.get("name") or s.get("id")) for s in fleet if s.get("id")}
+    linked = (
+        queue_mod.open_refs(
+            queue_mod.qid(str(r.get("name") or Path(str(r.get("root") or k)).name), str(e.get("id")))
+            for k, r in (every if every is not None else repos or {}).items()
+            if isinstance(r, dict)
+            for e in (r.get("ledger") or {}).get("entries") or ()
+            if isinstance(e, dict) and e.get("id")
+        )
+        if questions
+        else {}
+    )
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():
         if not isinstance(r, dict):
@@ -2505,6 +2529,11 @@ def ledger_for_you(
             d = e.get("default")
             ok = isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers)
             added = str(e.get("added") or "")
+            got_q = (
+                queue_mod.answered_hold({**e, "repo": name}, questions, states, linked, now)
+                if questions and not owner
+                else None
+            )
             rows.append(
                 {
                     "row": "ledger",
@@ -2535,10 +2564,31 @@ def ledger_for_you(
                     or bool(e.get("parts_open")),  # an open part counts as an open blocker (TD-1130)
                     "builds_open": ledger_mod.builds_open(e),
                     "url": f"/repo/{quote(name)}#{quote(e['id'])}",
+                    "answered": _held_answered(got_q, questions, names, now) if got_q else None,
                 }
             )
         groups.append({"repo": name, "rows": rows})
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}
+
+
+def _held_answered(
+    got: Mapping[str, Any], questions: list[Mapping[str, Any]], names: Mapping[str, str], now: datetime
+) -> dict[str, Any]:
+    """A ledger row's `answered` (§4.5 screen 12 *Three wants*, TD-1316) from `answered_hold`'s: its asker's name,
+    the question's kind, `words` — what the question's row says of the answer (`_owing`'s `answer_given`, else its
+    `answer_how`) — `age`, the answer's, and `outcome`, its `done` outcome where one is sent."""
+    q = next((x for x in questions if x.get("id") == got.get("mid")), {})
+    given = str(q.get("answer_given") or "")
+    outcome = got.get("outcome") if isinstance(got.get("outcome"), Mapping) else None
+    return {
+        "mid": str(got.get("mid") or ""),
+        "asker": str(got.get("asker") or ""),
+        "name": names.get(str(got.get("asker") or ""), str(got.get("asker") or "")),
+        "kind": str(got.get("kind") or ""),
+        "words": f"you answered \u201c{given}\u201d" if given else str(q.get("answer_how") or "you answered"),
+        "age": _age(got.get("closed_at"), now),
+        "outcome": {"text": str(outcome.get("text") or "")} if outcome else None,
+    }
 
 
 templates.env.globals["ledger_rows"] = ledger_rows

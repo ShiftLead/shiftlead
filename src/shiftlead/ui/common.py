@@ -171,8 +171,9 @@ templates.env.globals["card_shape"] = card_shape
 def card_whole(mode: Any, e: Any) -> bool:
     """Whether a row is drawn whole on a card (§4.5 screen 12 *An item's shape*, TD-911): its renderer in `card`
     mode and the item a Decide or Do (`queue.want_of`), or an entry the person's own session holds, which keeps its
-    answers (`with_you`, TD-1281); a Read item is one line, and the Inbox draws neither."""
-    return mode == "card" and hasattr(e, "get") and e.get("want") in ("decide", "do", "with_you")
+    answers (`with_you`, TD-1281), or a held entry the person answered, which draws none (`answered`, TD-1316); a
+    Read item is one line, and the Inbox draws neither."""
+    return mode == "card" and hasattr(e, "get") and e.get("want") in ("decide", "do", "with_you", "answered")
 
 
 templates.env.globals["card_whole"] = card_whole
