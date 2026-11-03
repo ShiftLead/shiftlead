@@ -289,3 +289,31 @@ def test_a_force_pushed_branch_moves_its_kept_ref_on_the_next_fetch(repos):
     new = repos.commit_shot(b"v2", force=True)  # a sibling of v1: origin/feat is no fast-forward of it
     shots._fetch_branch(repos.reader, "feat")
     assert git(repos.reader, "rev-parse", "refs/remotes/origin/feat") == new
+
+
+def test_a_shot_over_the_limit_is_held_by_no_step_and_falls_to_the_next(repos, monkeypatch):
+    """TD-1320: `SHOT_BYTES_MAX` bounds the commit step too — a commit's over-size shot falls to the branch, then
+    to the default, and one over the limit on every step is no shot at all."""
+    monkeypatch.setattr(shots, "SHOT_BYTES_MAX", len(PNG) + 4)
+    repos.commit_shot(b"ok", branch="main")
+    at = repos.commit_shot(b"far over the limit")  # on `feat`, which is this commit too
+    git(repos.reader, "fetch", "-q", "origin")
+    assert shots.read_from(repos.reader, "a.png", at, "feat") == (PNG + b"ok", "default")
+    repos.commit_shot(b"also over the limit", branch="main")
+    git(repos.reader, "fetch", "-q", "origin")
+    assert shots.locate(repos.reader, "a.png", at, "feat") == ("", "")
+
+
+def test_a_commit_only_a_local_ref_holds_is_not_the_commit_steps(repos):
+    """TD-1320: containment is an origin ref's — a commit held by a local branch or tag alone is unpushed, so the
+    commit step misses it rather than draw an image no one else can fetch."""
+    git(repos.reader, "checkout", "-q", "-b", "local")
+    p = repos.reader / SHOT
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(PNG + b"local")
+    git(repos.reader, "add", "-A")
+    git(repos.reader, "commit", "-q", "-m", "a local shot")
+    git(repos.reader, "tag", "held-here")
+    at = git(repos.reader, "rev-parse", "HEAD")
+    assert shots.locate(repos.reader, "a.png", at, "local") == ("", "")
+    assert shots.read_from(repos.reader, "a.png", at, "local") == (None, "")
