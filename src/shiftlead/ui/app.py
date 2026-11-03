@@ -1930,6 +1930,13 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         boards = hz["due"]
         # the board's columns are the servicing teams' flows' stages, read off the loop (§4.5 screen 11, TD-903)
         flows_here = await asyncio.to_thread(repo_board.team_stages, org, teams, str(r.get("root") or ""))
+        # the person inbox, read only where For you has a row: a held entry whose question the person answered
+        # reads *answered — waiting on <asker>* (§4.5 screen 11 *For you*, TD-1316)
+        asked: list[dict[str, Any]] = []
+        led = (r.get("ledger") or {}).get("entries") or ()
+        if any(isinstance(e, dict) and e.get("for_page") == "for-you" for e in led):
+            with contextlib.suppress(Exception):  # unread, the rows read as before: never the page's failure
+                asked = (await h.person_inbox(sessions)).get("entries") or []
         with timing.step("lists"):  # the ledger's lists, the cards and the rows the page draws (TD-893)
             # the teams' lanes over the ledger and the board's work orders (§4.4 *In a team's lanes*, TD-384)
             lanes = teamrun.repo_lanes(teamrun.lane_entries(r), str(r.get("root") or ""), sessions)
@@ -1953,7 +1960,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             )
             # For you's rows are the Inbox's ledger rows, and a due board line naming one is drawn in its place
             # and not again under Waiting on you (§4.5 screen 11 *For you*)
-            fy = ledger_for_you({str(r.get("root") or ""): r}, sessions, {here_root: named} if named else None, now)
+            fy = ledger_for_you(
+                {str(r.get("root") or ""): r}, sessions, {here_root: named} if named else None, now, asked, repos
+            )
             fy_rows = {str(x.get("id") or ""): x for x in ledger_rows(fy)}
             fy_ids = {str(x["id"]) for g in bd["foryou"]["groups"] for x in g["rows"]} | {
                 str(x["id"]) for x in bd["foryou"]["claimed"]
@@ -3947,7 +3956,7 @@ async def card_mail(
         fleet=fleet,
         cards=index,
     )
-    later = split_later(await h.ledger_view(fleet), hz["ahead"], index, hz["hidden"])[2]
+    later = split_later(await h.ledger_view(fleet, inbox["entries"]), hz["ahead"], index, hz["hidden"])[2]
     with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
         by_id = {str(c.get("id")): c for c in cards if isinstance(c, dict)}
         mail = attach(
@@ -4601,16 +4610,18 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     board_view = h.board_view
 
     @timing.timed("ledger")
-    async def ledger_view(fleet: list[dict[str, Any]]) -> dict[str, Any]:
+    async def ledger_view(fleet: list[dict[str, Any]], inbox: Any = ()) -> dict[str, Any]:
         """The ledger's rows of *Later* (§4.5 screen 6, TD-368, TD-565) from the home's repo facts and the
-        definitions' team per repo; empty when either cannot be read — nothing is then drawn."""
+        definitions' team per repo; empty when either cannot be read — nothing is then drawn. `inbox` is the
+        person inbox's entries (`person_inbox`'s), which draw a held entry the person answered as *answered —
+        waiting on <asker>* (TD-1316)."""
         repos: dict[str, Any] = {}
         named: dict[str, str] = {}
         with contextlib.suppress(Exception):
             repos = await h.repos()
         with contextlib.suppress(Exception):
             named = repo_teams(await h.defs(), host_name())
-        return ledger_for_you(repos, fleet, named)
+        return ledger_for_you(repos, fleet, named, None, inbox)
 
     h.ledger_view = ledger_view  # the Queue draws these rows on their cards (TD-771)
 
@@ -4651,7 +4662,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             cards=cards,
         )
         picks = rail_picks(request.query_params)
-        lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet)
+        lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet, got["entries"])
         # the ledger's rows and the board's lines not yet due whose entry a Queue card holds are drawn there
         # (§4.5 screen 6 *Where a row is drawn*, TD-771): *Later* keeps the rest
         lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"])
@@ -4849,7 +4860,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         hz, board_note = await board_view(choices)
         hz = with_standings(hz, fleet)
         build = await chip_build(call)
-        lf = await ledger_view(fleet)
+        lf = await ledger_view(fleet, got["entries"])
         origin = page_origin(request)
         gz = gzip_ok(request)
         cards = await h.queue_cards()

@@ -249,7 +249,9 @@ def attach(
     its due date. `start(card id, item id)` is a Decide or Do item's `item_start`, which its renderer draws as the
     item's own **Start session** (TD-1246); without it no item draws one. `with_of(card id, ref)` names the person's
     own session holding a ledger item's entry on its card, where one does: the item's want is then `with_you`, no
-    kind, drawn *with you in <name>* with its Open session (§4.5 screen 12 *Three wants*, TD-1281)."""
+    kind, drawn *with you in <name>* with its Open session (§4.5 screen 12 *Three wants*, TD-1281). Else a ledger item
+    whose `later` row carries `answered` — a held entry whose question the person answered (TD-1316) — is the want
+    `answered`, no kind and no Start session, drawn *answered — waiting on <asker>* beside *with you*."""
     cards: dict[str, dict[str, list[Any]]] = {}
     mentioned: dict[str, dict[str, str]] = {}
 
@@ -259,6 +261,8 @@ def attach(
         mine = with_of(card, ref) if with_of is not None and e.get("row") == "ledger" and want in WANTS else None
         if mine:
             want, kind = "with_you", ""
+        elif e.get("row") == "ledger" and e.get("answered") and want in WANTS:
+            want, kind = "answered", ""
         pr_row = e.get("row") in ("red_pr", "fork_pr")  # a PR's row starts no session (TD-1246, TD-1292)
         go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and not pr_row else {}
         cards.setdefault(card, {}).setdefault(sec, []).append(
@@ -298,10 +302,11 @@ def attach(
 def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) -> dict[str, Any]:
     """A card's attached items as its three wants draw them (§4.5 screen 12 *Three wants*): `decide` and `do`,
     each item in the Inbox's order; `read`, `{line: [item]}` for each of `READ_LINES` with any; `with_you`, the
-    person's entries their own session holds, no want and in no count (TD-1281); and `n`, the counts — `decide`,
+    person's entries their own session holds, no want and in no count (TD-1281); `answered`, the held entries whose
+    question the person answered, likewise (TD-1316); and `n`, the counts — `decide`,
     `do` (the pill's, a red PR in it) and `read`. Each item carries `on` — the row it is about, written as the page
     writes ids, where that is not the top entry (*on TD-n*, a link to the row)."""
-    out: dict[str, Any] = {"decide": [], "do": [], "read": {}, "with_you": []}
+    out: dict[str, Any] = {"decide": [], "do": [], "read": {}, "with_you": [], "answered": []}
     for sec in CARD_SECTIONS:
         for m in (got or {}).get(sec) or ():
             m = {**m, "on": "" if m.get("on_row") == top else _show(str(m.get("on_row") or ""), one_repo)}
@@ -449,7 +454,7 @@ def branch(r: Mapping[str, Any]) -> str:
     state = str(r.get("state") or "")
     if r.get("archived"):
         return "done"
-    if r.get("needs") and not r.get("with_you"):
+    if r.get("needs") and not (r.get("with_you") or r.get("answered")):
         return "needs"
     if state.startswith("waits ") or state in ("waiting", "settling"):
         return "waiting"
@@ -461,7 +466,7 @@ def _seg(r: Mapping[str, Any]) -> dict[str, str]:
     *in review* keeps its word in a grey segment (§4.5 screen 12 *A card*, TD-1131)."""
     word = (
         ""
-        if r.get("with_you")
+        if r.get("with_you") or r.get("answered")
         else {"owner": "yours to do", "decision": "your decision"}.get(str(r.get("needs") or ""), "")
     )
     return {"b": branch(r), "title": f"{r.get('show') or r.get('qid')}: {word or r.get('state') or 'open'}"}
