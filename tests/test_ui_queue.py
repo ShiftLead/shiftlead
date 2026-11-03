@@ -973,3 +973,31 @@ def test_a_waiting_row_is_teal_in_the_tree():
 
     assert branch({"state": "waiting"}) == "waiting" and branch({"state": "waits until 2026-10-30"}) == "waiting"
     assert branch({"state": "ready"}) == "open"
+
+
+@pytest.mark.unit
+def test_a_card_dots_done_or_back_to_design_draws_its_state_on_the_press():
+    """TD-1321 slice 2 (§4.5 screen 6 rule 4): Done… / Back to design… from a row's or the header's ⋯ has no
+    `.mailrow`, so the press finds its target, writes its state cell, turns its ⋯ off and takes the card's ledger
+    item away; the answer and a refusal find the target again, and a re-read draws a press still out again. The
+    Playwright half is `docs/mockups/reviews/td1321-src/td1321_qdots.py`."""
+    js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
+    css = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
+    # the target: a row's ⋯, else the header's — never a bare `[data-qid]`, which a board row carries too
+    assert 'const qt = !row && road ? b.closest(".qrow[data-qid]") || b.closest(".qhead[data-qid]") : null;' in js
+    assert 'qled = qt ? `ledger:${b.dataset.repo}:${b.dataset.ref}` : ""' in js
+    assert 'AO.qKey = (t) => `${t.classList.contains("qhead") ? "qhead" : "qrow"}:${t.dataset.qid}`;' in js
+    # its own ⋯, not an item's in the header's Decide or Do
+    assert '!d.closest(".mailrow") && d.closest(".qrow[data-qid], .qhead[data-qid]") === t' in js
+    assert "if (qt) qpressed(); else pressed();" in js and "if (qt) qanswered(); else answered();" in js
+    assert "AO.drawQState(t, `${r4[0]} — written on the board`, false);" in js
+    # an off ⋯: no pointer, no keys, a native toggle closed again
+    assert 'mark.setAttribute("aria-disabled", "true"); mark.tabIndex = -1;' in js
+    assert '$("summary", d).getAttribute("aria-disabled") === "true") return false;' in js
+    assert '$("summary", d).getAttribute("aria-disabled") === "true") { d.open = false; return; }' in js
+    assert '.qdotsbtn[aria-disabled="true"] { pointer-events: none;' in css
+    assert ".qstate.s-pressed { color: var(--fg); }" in css  # a state word, not dimmed
+    # a refusal: the cell as it was, the ledger item's error line kept by the page; a re-read redraws one still out
+    assert "const t = AO.qFind(qkey); if (t) AO.unDrawQState(t);" in js
+    assert "AO.pressErrs[qled] = words; delete AO.inflight[qled];" in js
+    assert 'if (f && f.kind === "qrow") AO.drawQState(t, f.text, true);' in js
