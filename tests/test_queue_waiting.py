@@ -150,6 +150,28 @@ def test_an_old_clock_held_mark_is_no_status_and_no_need(tmp_path):
     assert all(r["state"] != "held (person)" for c in cards.values() for r in [c["top"], *c["rows"]])
 
 
+def test_a_long_wait_phrase_wraps_inside_the_card(tmp_path, monkeypatch):
+    """§4.5 screen 12 *A card*, TD-1341: a Waiting card's wait phrase is the whole `Waits:` line, so it may wrap —
+    the stylesheet lets the phrase's span break and its group shrink to the card, while the pill and the short words
+    stay on one line; the card's `overflow: hidden` then has nothing to clip."""
+    import test_ui_queue as tq
+
+    phrase = "waits on Paul's turning push on from a device (the board line *Once #2820 is promoted, turn on push*)"
+    q = tq.queue()
+    wait = {"column": "event", "phrase": phrase, "id": "s#TD-41"}
+    q["cards"].insert(1, tq.card(tq.row("s", "TD-41", "push from a phone"), group="waiting", status="waiting",
+                                 wait=wait, would_be=[{"repo": "s", "n": 2}], places=[]))  # fmt: skip
+    html = tq.client(monkeypatch, tmp_path, tq.fake(q)).get("/queue").text
+    assert re.search(r'<span class="qstatus s-waits"[^>]*>' + re.escape(phrase.replace("'", "&#39;")) + "</span>", html)
+    css = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
+    rule = re.search(r"\.qstatus\.s-waits \{([^}]*)\}", css)
+    assert rule and all(d in rule[1] for d in ("white-space: normal", "overflow-wrap: anywhere", "min-width: 0"))
+    right = re.search(r"(?m)^\.qright \{([^}]*)\}", css)
+    assert right and "min-width: 0" in right[1] and "max-width: 100%" in right[1], "the group shrinks to the card"
+    base = re.search(r"(?m)^\.qstatus \{([^}]*)\}", css)
+    assert base and "white-space: nowrap" in base[1], "the short words and the pill stay on one line"
+
+
 def test_the_page_draws_waiting_between_in_progress_and_up_next_with_its_wait_column(tmp_path, monkeypatch):
     """§4.5 screen 12 *Waiting*, §4.5a *Queue page, Waiting: the wait column* and *group heading*."""
     import test_ui_queue as tq

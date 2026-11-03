@@ -1203,7 +1203,7 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qid { flex: none; white-space: nowrap; font-size: var(--t-mono-s); }
 .qtitle { flex: 1 1 18em; min-width: 0; overflow-wrap: anywhere; }
 .qhead .qtitle { font-weight: 600; }
-.qright { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; justify-content: flex-end; margin-left: auto; font-size: var(--t-small); }
+.qright { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; justify-content: flex-end; margin-left: auto; min-width: 0; max-width: 100%; font-size: var(--t-small); }
 .qright > .meta { white-space: nowrap; font-family: inherit; font-size: var(--t-small); }
 .qbuilds, .qnote { flex: 1 0 100%; padding-left: calc(6ch + 2.4em); font-size: var(--t-small); color: var(--muted); }
 .qpri { display: inline-block; min-width: 1.3em; padding: 0 3px; border-radius: 3px; text-align: center; font: 600 var(--t-cap)/1.5 "JetBrains Mono", monospace; color: var(--seg-fg); background: var(--p-medium); }
@@ -1222,6 +1222,10 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qcount.qdone { color: var(--working-fg); font-weight: 600; }
 .qcount.qdone::before { content: "● "; color: var(--working); }
 .qstatus { white-space: nowrap; color: var(--strong); }
+/* a Waiting card's wait phrase is a whole `Waits:` or `Blocked by:` line: it wraps inside the card rather than run
+   past it, where the card's `overflow: hidden` would clip it and the pill beside it (§4.5 screen 12 *A card*,
+   TD-1341); the short words and the pill stay on one line */
+.qstatus.s-waits { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
 .qstatus::before { content: "● "; color: var(--ended); }
 .qstatus.s-ready::before { color: var(--idle); } .qstatus.s-waiting::before, .qstatus.s-waits::before { color: var(--waiting); }
 .qstatus.s-blocked::before { content: "○ "; color: var(--muted); }
