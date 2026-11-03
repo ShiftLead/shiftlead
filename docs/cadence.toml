@@ -15,7 +15,7 @@
 
 # The fact-checker of a doc-only PR or a plan (§4.8): a model, or `<adapter>/<model>`; unset, the
 # first of review-model.
-# fact-check-model = "sonnet"
+# fact-check-model = "sonnet"   # unset: the first of review-model
 
 # The cap on a design plan's review rounds (§4.8 *Design review rounds*): in-repo plans, and wide
 # ones (another repo, a published format, anything that cannot be undone).
