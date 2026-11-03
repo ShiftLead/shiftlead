@@ -63,13 +63,13 @@ def test_the_counts_are_items_and_a_running_steer_leaves_the_status_steer():
     assert two["status"] == "needs you" and two["wants"]["n"] == {"decide": 1, "do": 1, "read": 4}
     assert sorted(two["wants"]["read"]) == ["answered", "fyi"] and two["wants"]["read"]["fyi"][1]["on"] == "TD-3"
     assert [m["id"] for m in two["wants"]["read"]["fyi"]] == ["b1", "f1"]
-    # the page header: items, not cards; a red PR on its card's pill alone; the needs-you number unchanged
-    assert (v["n"]["decide"], v["n"]["do"], v["n"]["needs_you"]) == (2, 0, 1)
+    # the needs-you number counts cards, the one whose status the items raised (TD-1311: no page count of items)
+    assert v["n"]["needs_you"] == 1
 
 
-def test_the_page_headers_decide_counts_items_on_a_card_with_two():
-    """TD-920: a card with a question and a paused steer, and one with a running steer alone, read Decide 3 — the
-    cards with any Decide item would read 2."""
+def test_a_cards_pill_counts_its_own_decide_items():
+    """TD-920: a card with a question and a paused steer reads Decide 2 on its pill, one with a running steer
+    alone Decide 1 (TD-1311: the page's own *Decide · Do* count is gone)."""
     secs = {
         "needs": [item("needs", "s#TD-3", id="a1", kind="ask"), item("needs", "s#TD-2", id="p1", kind="steer")],
         "steering": [item("steering", "s#TD-1", id="s1", kind="steer", card="s#TD-1")],
@@ -77,7 +77,6 @@ def test_the_page_headers_decide_counts_items_on_a_card_with_two():
     v = queue_view(queue(), NOW, attach(secs, lambda e, sec: Markup(f"<{e['id']}>")))
     one, two = v["up_next"]
     assert one["wants"]["n"]["decide"] == 1 and two["wants"]["n"]["decide"] == 2
-    assert v["n"]["decide"] == 3
 
 
 def test_a_ledger_row_is_always_a_want_and_no_card_has_a_held_line():
@@ -120,4 +119,3 @@ def test_a_card_draws_decide_and_do_in_its_header_and_read_folded_under_its_rows
 def test_a_card_with_nothing_attached_draws_no_want():
     v = queue_view(queue(), NOW, {"cards": {}, "mentioned": {}})
     assert all(c["wants"] == card_wants(None, c["top"]["qid"], True) for c in v["up_next"])
-    assert v["n"]["decide"] == v["n"]["do"] == 0

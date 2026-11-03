@@ -5,8 +5,9 @@
 {% elif not q.served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>
 {% else %}
 
-{# the top section's numbers, from which the page redraws the section it keeps outside these lists (TD-771, TD-1293) #}
-<span id="qcounts" hidden data-needs="{{ q.n.needs_you }}" data-cards="{{ q.n.cards }}" data-inprogress="{{ q.n.in_progress }}" data-waiting="{{ q.n.waiting }}" data-upnext="{{ q.n.up_next }}" data-decide="{{ q.n.decide }}" data-do="{{ q.n.do }}"></span>
+{# the Queue served: its presence shows the top section's parts after the heading, which the page keeps outside
+   these lists; the numbers there are recounted from the cards (TD-771, TD-1293, TD-1311) #}
+<span id="qcounts" hidden></span>
 {% if q.find_miss %}<div class="qnote qfindmiss" id="qfindmiss" data-for="{{ q.picks.find if q.picks else '' }}">{{ q.find_miss.id }} is on no open card{% if q.find_miss.repos %} — in the archive: {% for r in q.find_miss.repos %}{% if not loop.first %} · {% endif %}<a href="{{ r.url }}">{{ q.find_miss.id }} on {{ r.name }}'s Repo page</a>{% endfor %}{% endif %}</div>{% endif %}
 <div class="qnote" id="qnone"{% if not (q.filtered and not q.shown) %} hidden{% endif %}>no open card fits these picks</div>
 

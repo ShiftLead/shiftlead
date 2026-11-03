@@ -117,7 +117,7 @@ def test_the_groups_and_the_headers_counts():
     v = queue_view(queue(), NOW)
     assert [c["id"] for c in v["in_progress"]] == ["s#TD-10"]
     assert [c["id"] for c in v["up_next"]] == ["s#TD-20", "s#TD-30"] and v["upnext"] == ["s#TD-20", "s#TD-30"]
-    assert v["n"] == {"cards": 3, "in_progress": 1, "waiting": 0, "up_next": 2, "needs_you": 1, "decide": 0, "do": 0}
+    assert v["n"] == {"cards": 3, "in_progress": 1, "waiting": 0, "up_next": 2, "needs_you": 1}
     # one repo: the ids are written `TD-n`, and a `/queue#TD-n` finds an open row
     assert v["up_next"][0]["top"]["show"] == "TD-20" and v["up_next"][0]["rows"][0]["anchor"] == "TD-21"
     assert v["other"] == [
@@ -208,8 +208,12 @@ def test_the_page_draws_three_groups_and_up_next_alone_moves(tmp_path, monkeypat
     assert "other work" in inprog and "board:keep-it" in inprog and "grinder-2" in inprog
     assert re.search(r'id="qcards" data-upnext=\'\["s#TD-20", "s#TD-30"\]\'', upnext)
     assert upnext.count('data-move="top"') == 2 and '<span class="qplace">1</span>' in upnext
-    leg = html[html.index('class="qsleg"') : html.index('class="qhend')]
-    assert re.findall(r"<b>(\d+)</b>([a-z ]+)</span>", leg) == [("1", "in progress"), ("2", "up next")]
+    leg = html[html.index('class="qsleg"') : html.index('id="queuelists"')]
+    assert re.findall(r"<b>(\d+)</b>([a-z ]+)</span>", leg) == [
+        ("1", "in progress"),
+        ("2", "up next"),
+        ("1", "needs you"),
+    ]
     assert '<span class="qscards">· 3 cards</span>' in leg and '<b id="qfneedsn">1</b>' in html
 
 
@@ -262,37 +266,51 @@ def test_the_lists_alone_and_an_older_home(tmp_path, monkeypatch):
     top = old[old.index('id="qfilters"') : old.index('id="queuelists"')]
     assert 'data-served="0"' in top and '<span class="h1">Queue</span>' in top
     assert len(re.findall(r'class="q\w+ qserved" hidden', top)) == 3 and 'id="qcounts"' not in old
+    assert 'class="qteams qserved" hidden' in top  # the teams, inside the control line, still a served part (TD-1311)
 
 
 def test_the_summary_bar_replaces_the_sentence_and_its_widths_are_the_browsers(tmp_path, monkeypatch):
-    """§4.5 screen 12 *The page's top section is one block* (TD-1293, built by TD-1306): a segment per group with
-    cards, each as wide as its count and never under 1.2% of the bar — the server's widths are `AO.qBarFlex`'s one
-    line — a group at 0 drawing neither segment nor legend entry, at 0 cards no bar and *0 cards*; the sentence
-    and its amber *n need you.* are gone."""
-    n = {"cards": 231, "in_progress": 2, "waiting": 60, "up_next": 169}
-    bar = summary_bar(n)
-    assert [(s["key"], s["n"]) for s in bar] == [("in_progress", 2), ("waiting", 60), ("up_next", 169)]
+    """§4.5 screen 12 *The page's top section is one block* (TD-1293, built by TD-1306; TD-1311): a segment per
+    group with cards shown, each as wide as its count and never under 1.2% of the bar — the server's widths are
+    `AO.qBarFlex`'s one line — hatching its needs-you share, a group at 0 drawing neither segment nor legend
+    entry, at 0 cards no bar and *0 cards*; the sentence and its amber *n need you.* are gone, and so is
+    *Decide · Do*."""
+    g = {"in_progress": (2, 1), "waiting": (60, 0), "up_next": (169, 169)}
+    bar = summary_bar(g, 231)
+    assert [(s["key"], s["n"], s["needs"]) for s in bar] == [
+        ("in_progress", 2, 1),
+        ("waiting", 60, 0),
+        ("up_next", 169, 169),
+    ]
     assert [s["flex"] for s in bar] == [max(k, 231 * 0.012) for k in (2, 60, 169)] and bar[0]["flex"] > 2
-    assert [s["key"] for s in summary_bar({**n, "waiting": 0, "cards": 171})] == ["in_progress", "up_next"]
-    assert summary_bar({"cards": 0, "in_progress": 0, "waiting": 0, "up_next": 0}) == []
+    assert [s["key"] for s in summary_bar({**g, "waiting": (0, 0)}, 171)] == ["in_progress", "up_next"]
+    assert summary_bar({k: (0, 0) for k in g}, 0) == []
+    assert repr(summary_bar({"up_next": (2, 0)}, 250)[0]["flex"]) == "3"  # the floor, whole: `3` as the browser prints it
     js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "AO.qBarFlex = (n, total) => Math.max(n, total * 0.012);" in js
     html = client(monkeypatch, tmp_path, fake(queue())).get("/queue").text
     top = html[html.index('id="qfilters"') : html.index('id="queuelists"')]
-    segs = re.findall(r'<span style="flex: ([\d.]+); background: var\((--\w+)\)" title="(\d+) ([a-z ]+)">', top)
-    assert segs == [("1", "--working", "1", "in progress"), ("2", "--ended", "2", "up next")]
+    seg = r'<span class="qsbseg" style="flex: ([\d.]+)" title="([^"]+)">((?:<i [^>]*></i>)+)</span>'
+    segs = re.findall(seg, top)
+    assert [(f, t) for f, t, _ in segs] == [("1", "1 in progress"), ("2", "2 up next, 1 needs you")]
+    assert segs[0][2] == '<i style="flex: 1; background: var(--working)"></i>'
+    assert (
+        segs[1][2]
+        == '<i style="flex: 1; background: var(--ended)"></i><i class="qhatch" style="flex: 1; --seg: var(--ended)"></i>'
+    )
     assert 'class="qsbar" aria-hidden="true">' in top
     assert (
         "3 cards: 1 in progress" not in html
         and "need you." not in html
         and "needs you.</b>" not in html
         and "qtitlebar" not in html
+        and "qwantsn" not in html
     )
     empty = {"cards": [], "other_work": [], "at": NOW.isoformat(), "completed": []}
     top = client(monkeypatch, tmp_path, fake(empty)).get("/queue").text
     top = top[top.index('id="qfilters"') : top.index('id="queuelists"')]
     assert 'class="qsbar" aria-hidden="true" hidden></span>' in top and '<span class="qscards">0 cards</span>' in top
-    assert re.search(r'class="qwantsn" title="[^"]+" hidden></span>', top)  # Decide · Do draws nothing at both 0
+    assert "qsneeds" not in top and 'title="0 cards need you — press' in top
 
 
 def test_a_close_with_no_time_reads_today_or_its_days():
@@ -738,9 +756,11 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     # the teams, the switch and the find, and nothing else (TD-1287): no Steering, no repo or kind pick
     assert 'name="find"' in row and "Steering" not in row and "held (person)</a>" not in row
     assert 'data-k="repo"' not in row and 'data-k="kind"' not in row and "qkinds" not in row
-    # the heading line first, the switch on it, then the teams row (TD-1293)
+    # one control line: the heading, the teams, then the switch and find at the right (TD-1293, TD-1311)
     assert '<span class="qsub">teams</span>' in row
-    assert row.index(">Queue</span>") < row.index("qswitch") < row.index("qsub") < row.index(">All</a>")
+    line = row[row.index('class="qhline"') : row.index('class="qsum')]
+    assert line.index(">Queue</span>") < line.index("qsub") < line.index(">All</a>") < line.index("qswitch")
+    assert line.index("qswitch") < line.index('name="find"')
     assert re.search(
         r'id="qfneeds" role="switch" data-k="filter" data-v="needs-you" href="[^"]*" aria-checked="false"', row
     )
@@ -767,16 +787,13 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     assert 'id="qfindmiss" data-for="TD-3"' in part and 'href="/repo/s#TD-003"' in part
     assert '<div class="qnote" id="qnone">' in part  # drawn hidden otherwise, for the browser's apply (TD-829)
     assert '<div class="qnote" id="qnone" hidden>' in c.get("/queue?part=1").text
-    # the row stands outside the lists the page re-reads (typed find words survive); the lists carry its numbers
+    # the row stands outside the lists the page re-reads (typed find words survive); the lists carry only that
+    # the Queue is served, the numbers recounted from the cards (TD-1311)
     html = c.get("/queue").text
     assert html.index('id="qfilters"') < html.index('id="queuelists"')
     part = c.get("/queue?part=1").text
     assert 'id="qfilters"' not in part and ">Queue<" not in part
-    assert re.search(
-        r'id="qcounts" hidden data-needs="1" data-cards="3" data-inprogress="1" data-waiting="0" '
-        r'data-upnext="2" data-decide="\d+" data-do="\d+">',
-        part,
-    )
+    assert '<span id="qcounts" hidden></span>' in part
 
 
 def test_a_passed_over_flag_is_drawn_on_its_card(tmp_path, monkeypatch):

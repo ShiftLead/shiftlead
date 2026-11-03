@@ -280,5 +280,4 @@ def test_a_card_of_fork_items_alone_counts_no_do_and_draws_no_items_start():
     (c,) = v["in_progress"]
     (item,) = c["wants"]["do"]
     assert item["fork"], "the item is the fork's Do item"
-    assert v["n"]["do"] == 0, "a fork's item is in no Do count: it starts no session"
     assert c["items_start"] is False, "no item draws a Start session, so the card's header keeps its own"

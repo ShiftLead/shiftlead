@@ -1,26 +1,34 @@
 {# The page's top section, one block (§4.5 screen 12 *The page's top section is one block* and *Filters*, §4.5a
-   *Queue page: filters, find*; TD-1287, TD-1293): the heading line — **Queue**, the summary bar and its legend, the
-   **Needs you** switch, *Decide · Do* and the find box — then the teams row — *teams*, **All**, the team chips, and
-   after a divider the repos no team services. The chips and the switch are carried in the URL; what they hide is
-   marked `qoff`, never dropped, so a move's neighbours stay the whole Up next order. A press answers in the browser
-   (TD-829): `app.js` reads each link's `data-k`/`data-v` and the cards' `data-` attributes, and the `href` stays for
-   a page without its script. A repo chip is a `team` pick naming no team, read as the repo on both sides. The
-   section stands outside the lists the page re-reads, so words typed in the find box and its focus survive a
-   re-read; its numbers are redrawn from the lists' `#qcounts`. The heading always shows; the parts after it are
-   `hidden` while the Queue is not served (`data-served`), a re-read toggling them #}
+   *Queue page: filters, find*; TD-1287, TD-1293, TD-1311): the control line — **Queue**, the teams (*teams*,
+   **All**, the team chips, and after a divider *no team* and the repos no team services), then at the right the
+   **Needs you** switch and the find box — a rule, then the summary line: the bar and its legend, counting the
+   cards shown, each segment hatching its needs-you share. The chips and the switch are carried in the URL; what
+   they hide is marked `qoff`, never dropped, so a move's neighbours stay the whole Up next order. A press answers
+   in the browser (TD-829): `app.js` reads each link's `data-k`/`data-v` and the cards' `data-` attributes,
+   recounts the summary from the cards, and the `href` stays for a page without its script. A repo chip is a
+   `team` pick naming no team, read as the repo on both sides. The section stands outside the lists the page
+   re-reads, so words typed in the find box and its focus survive a re-read. The heading always shows; the parts
+   after it are `hidden` while the Queue is not served (`data-served`), a re-read toggling them by the lists'
+   `#qcounts` #}
 {% set fp = picks.filter %}
 {% set off = not (q.served and not agent_down) %}
-{% macro summary(n, bar) -%}
-<span class="qsbar" aria-hidden="true"{% if not n.cards %} hidden{% endif %}>{% for s in bar %}<span style="flex: {{ s.flex }}; background: var({{ s.color }})" title="{{ s.n }} {{ s.word }}"></span>{% endfor %}</span>
-<span class="qsleg">{% for s in bar %}<span><i style="background: var({{ s.color }})"></i><b>{{ s.n }}</b>{{ s.word }}</span>{% endfor %}<span class="qscards">{% if n.cards %}· {% endif %}{{ n.cards }} card{{ '' if n.cards == 1 else 's' }}</span></span>
+{% set sw = q.sumwords or {} %}
+{% macro summary(bar, sw) -%}
+<span class="qsbar" aria-hidden="true"{% if not bar %} hidden{% endif %}>{% for s in bar %}<span class="qsbseg" style="flex: {{ s.flex }}" title="{{ sw.titles[loop.index0] }}">{% if s.n - s.needs %}<i style="flex: {{ s.n - s.needs }}; background: var({{ s.color }})"></i>{% endif %}{% if s.needs %}<i class="qhatch" style="flex: {{ s.needs }}; --seg: var({{ s.color }})"></i>{% endif %}</span>{% endfor %}</span>
+<span class="qsleg">{% for e in sw.entries or [] %}{% if loop.index0 < bar | length %}<span><i style="background: var({{ bar[loop.index0].color }})"></i><b>{{ e.n }}</b>{{ e.word }}</span>{% else %}<span class="qsneeds"><i class="qhatch"></i><b>{{ e.n }}</b>{{ e.word }}</span>{% endif %}{% endfor %}<span class="qscards">{{ sw.cards }}</span></span>
 {%- endmacro %}
 <div class="qfilters" id="qfilters" role="group" aria-label="filters" data-teams='{{ team_repos | tojson }}' data-served="{{ '0' if off else '1' }}">
   <div class="qhline">
     <span class="h1">Queue</span>
-    <span class="qsum qserved"{% if off %} hidden{% endif %}>{{ summary(q.n, q.bar) }}</span>
+    <span class="qteams qserved"{% if off %} hidden{% endif %}>
+      <span class="qsub">teams</span>
+      <a class="qf" data-k="all" href="{{ pq(picks, team=[]) }}" aria-pressed="{{ 'false' if picks.team else 'true' }}">All</a>
+      {% for t in chips.team %}<a class="qf qfteam" data-k="team" data-v="{{ t }}" href="{{ pq(picks, team=t) }}" aria-pressed="{{ 'true' if t in picks.team else 'false' }}" title="the cards of {{ t }}'s repo">{{ t }}</a>{% endfor %}
+      {% if chips.repo %}<span class="qtdiv" aria-hidden="true"></span><span class="qnoteam"><span class="qsub"><i>no team</i></span>
+      {% for r in chips.repo %}<a class="qf qfrepo" data-k="team" data-v="{{ r }}" href="{{ pq(picks, team=r) }}" aria-pressed="{{ 'true' if r in picks.team else 'false' }}" title="no team services this repo">{{ r }}</a>{% endfor %}</span>{% endif %}
+    </span>
     <span class="qhend qserved"{% if off %} hidden{% endif %}>
-      <a class="qf qswitch" id="qfneeds" role="switch" data-k="filter" data-v="needs-you" href="{{ pq(picks, filter='needs-you') }}" aria-checked="{{ 'true' if fp == 'needs-you' else 'false' }}" title="only the cards that need you — it narrows the teams picked, it picks none; the completed lines are hidden while it is on"><span class="qbox"></span>Needs you <b id="qfneedsn">{{ q.n.needs_you }}</b></a>
-      <span class="qwantsn" title="what on the cards waits on you, counted in items, not cards — display only: it is not the top bar's number, which counts the Inbox"{% if not (q.n.decide or q.n.do) %} hidden{% endif %}>{% if q.n.decide %}Decide {{ q.n.decide }}{% endif %}{% if q.n.decide and q.n.do %} · {% endif %}{% if q.n.do %}Do {{ q.n.do }}{% endif %}</span>
+      <a class="qf qswitch" id="qfneeds" role="switch" data-k="filter" data-v="needs-you" href="{{ pq(picks, filter='needs-you') }}" aria-checked="{{ 'true' if fp == 'needs-you' else 'false' }}" title="{{ sw.hover }}"><span class="qbox"></span>Needs you <b id="qfneedsn">{{ (q.summary or {}).needs or 0 }}</b></a>
       <form class="qfind" method="get" action="/queue" role="search">
         {% if fp %}<input type="hidden" name="filter" value="{{ fp }}">{% endif %}
         {% if picks.team %}<input type="hidden" name="team" value="{{ picks.team | join(',') }}">{% endif %}
@@ -28,11 +36,5 @@
       </form>
     </span>
   </div>
-  <div class="qteams qserved"{% if off %} hidden{% endif %}>
-    <span class="qsub">teams</span>
-    <a class="qf" data-k="all" href="{{ pq(picks, team=[]) }}" aria-pressed="{{ 'false' if picks.team else 'true' }}">All</a>
-    {% for t in chips.team %}<a class="qf qfteam" data-k="team" data-v="{{ t }}" href="{{ pq(picks, team=t) }}" aria-pressed="{{ 'true' if t in picks.team else 'false' }}" title="the cards of {{ t }}'s repo">{{ t }}</a>{% endfor %}
-    {% if chips.repo %}<span class="qtdiv" aria-hidden="true"></span><span class="qnoteam"><span class="qsub"><i>no team</i></span>
-    {% for r in chips.repo %}<a class="qf qfrepo" data-k="team" data-v="{{ r }}" href="{{ pq(picks, team=r) }}" aria-pressed="{{ 'true' if r in picks.team else 'false' }}" title="no team services this repo">{{ r }}</a>{% endfor %}</span>{% endif %}
-  </div>
+  <div class="qsum qserved"{% if off %} hidden{% endif %}>{{ summary(q.bar or [], sw) }}</div>
 </div>

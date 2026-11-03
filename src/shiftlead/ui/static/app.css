@@ -1145,7 +1145,6 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qread { flex: 1 0 100%; }
 .qread > summary.qsech { display: list-item; cursor: pointer; padding-left: calc(4em + 20px + 2ch); }
 .qread .qsec .qsech, .qread .qsec .qmail { padding-left: calc(4em + 20px + 4ch); }
-.qwantsn { font-weight: 600; color: var(--needs-fg); }
 /* each card its own box on the Queue page (§4.5 screen 12 *A card*, TD-915): a border, a gap to the next, and a
    4 px left edge in the card's colour — amber a Decide or Do item, else teal Waiting, else green In progress, else
    grey (`card_edge`); the Repo page's board keeps its cards in one column box */
@@ -1301,24 +1300,28 @@ details.qdots { display: inline-block; }
 /* the filter row (§4.5a *Queue page: filters, find*, TD-771): toggles carried in the URL; what they hide is `qoff` */
 html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; } /* until the browser's apply (TD-829) */
 .qoff { display: none !important; }
-/* the top section, one block (§4.5 screen 12 *The page's top section is one block*, TD-1293): the heading line —
-   Queue, the summary bar and its legend, then at the right the switch, *Decide · Do* and find — the teams row, a rule */
+/* the top section, one block (§4.5 screen 12 *The page's top section is one block*, TD-1293, TD-1311): the control
+   line — Queue, the teams (drawn `display: contents`, so their chips flow in the line), then at the right the switch
+   and find — a rule, then the summary line across the width: the bar, each segment hatching its needs-you share,
+   and its legend */
 .qfilters { margin-top: 2px; }
-.qhline { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.qhline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+#qfilters[data-served="0"] .qhline { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
 .qhline .h1 { margin: 0; }
 .qserved[hidden] { display: none !important; }
-.qsum { display: inline-flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1 1 220px; max-width: 420px; }
-.qsbar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px; }
+.qsum { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.qsbar { display: flex; height: 8px; border-radius: 3px; overflow: hidden; gap: 2px; }
 .qsbar[hidden] { display: none; }
-.qsbar > span { display: block; }
+.qsbar > .qsbseg { display: flex; overflow: hidden; }
+.qsbseg > i { display: block; }
+.qhatch { min-width: 4px; background: repeating-linear-gradient(135deg, var(--seg) 0 3px, var(--needs) 3px 6px); }
+.qsneeds .qhatch { --seg: var(--ended); background: repeating-linear-gradient(135deg, var(--seg) 0 2px, var(--needs) 2px 4px); }
 .qsleg { display: flex; gap: 4px 14px; flex-wrap: wrap; font-size: var(--t-small); color: var(--muted); }
 .qsleg b { color: var(--fg); font-weight: 600; margin-right: 3px; font-variant-numeric: tabular-nums; }
 .qsleg i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
 .qhend { margin-left: auto; display: inline-flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.qhend .qwantsn { font-weight: 400; font-size: var(--t-small); }
-.qwantsn[hidden] { display: none; }
-.qteams { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; padding-bottom: 12px;
-  border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.qteams { display: contents; }
 .qteams > .qsub:first-child { margin-right: 4px; }
 .qtdiv { width: 1px; align-self: stretch; background: var(--border); margin: 0 6px 0 8px; }
 .qnoteam { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -1350,10 +1353,10 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   /* a card's items take the card's width, as the notes do: no desktop indent under the number (TD-985) */
   .qsech, .qmail, .qrows > .qsec .qsech, .qrows > .qsec .qmail, .qread > summary.qsech,
   .qread .qsec .qsech, .qread .qsec .qmail { padding-left: 0; }
-  /* the top section at phone width (TD-1293): the heading alone; the switch and *Decide · Do*; find across the
-     width; the summary across the width; the chips wrapping, no divider, *no team* and its repos as one unit */
+  /* the top section at phone width (TD-1293, TD-1311): the control line wraps — the heading and the chips, no
+     divider, *no team* and its repos as one unit, then the switch, then find across the width; the rule and the
+     summary line follow */
   .qhend { margin-left: 0; flex-basis: 100%; }
-  .qsum { flex-basis: 100%; max-width: none; order: 3; }
   .qfind { flex-basis: 100%; }
   .qfind input { width: 100%; min-width: 0; box-sizing: border-box; }
   .qtdiv { display: none; }

@@ -167,11 +167,12 @@ def test_the_page_draws_waiting_between_in_progress_and_up_next_with_its_wait_co
     assert '<span class="qstatus s-waits"' in waits and ">waits until Oct 30</span>" in waits
     assert "qmove" not in waits and "draggable" not in waits, "no grip and no ⤒ ↑ ↓"
     assert 'data-card="s#TD-40"' not in html[html.index('id="qupnext"') :]
-    leg = html[html.index('class="qsleg"') : html.index('class="qhend')]
+    leg = html[html.index('class="qsleg"') : html.index('id="queuelists"')]
     assert re.findall(r"<b>(\d+)</b>([a-z ]+)</span>", leg) == [
         ("1", "in progress"),
         ("1", "waiting"),
         ("2", "up next"),
+        ("1", "needs you"),
     ]
     assert "· 4 cards" in leg
 

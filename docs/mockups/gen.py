@@ -2146,29 +2146,36 @@ def queue_page():
         card(5, "TD-553", "L", "Drop the <span class=\"mono\">.agentorc.yml</span> fallback once samscrape, contractmatch and dev-cadence have renamed theirs",
              moves + '<span class="meta" style="font-size: 12px;">after contractmatch#TD-055</span>' + word("blocked", "#9ca3af")),
     ])
-    # TD-1293: the top section is one block — the heading line (Queue, the summary bar, then the switch,
-    # Decide · Do and find at the right), the teams row under it, then a rule
-    seg = lambda n, c, w: f'<span title="{n}" style="flex: {w}; background: {c};"></span>'
-    leg = lambda n, w, c: f'<span><i style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: {c}; margin-right: 5px;"></i><b style="color: #1c2128;">{n}</b> {w}</span>'
-    summary = ('<span style="display: inline-flex; flex-direction: column; gap: 4px; flex: 1 1 220px; max-width: 420px;">'
-               '<span style="display: flex; height: 6px; border-radius: 3px; overflow: hidden; gap: 2px;">'
-               + seg("1 in progress", "#16a34a", 1) + seg("28 up next", "#9ca3af", 28) + '</span>'
-               '<span class="meta" style="display: flex; gap: 14px; font-size: 12px;">' + leg(1, "in progress", "#16a34a") + leg(28, "up next", "#9ca3af")
-               + '<span>· 29 cards</span></span></span>')
-    heading = ('<div style="display: flex; gap: 14px; align-items: center;"><span style="font-size: 22px; font-weight: 600;">Queue</span>' + summary
-               + '<span style="margin-left: auto; display: inline-flex; gap: 12px; align-items: center;">'
-               + '<span style="border: 1px solid #cbd0d6; border-radius: 5px; padding: 2px 10px 2px 8px; font-size: 12px;" title="only the cards that need you — it narrows the teams picked, it picks none; '
-                 'the completed lines are hidden while it is on">☐ Needs you <b style="color: #7c3d00;">2</b></span>'
-               + '<span style="font-size: 12px; color: #7c3d00;" title="what on the cards waits on you, counted in items, not cards — display only">Decide 1 · Do 1</span>'
-               + '<span style="border: 1px solid #d0d5dc; border-radius: 4px; padding: 3px 8px; min-width: 16em; '
-                 'font-size: 12px; color: #8a94a3; background: #fff;">find an id or a title</span></span></div>')
-    filters = ('<div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; padding-bottom: 12px; border-bottom: 1px solid #dfe3e8;">'
-               # TD-1287: the teams (a chip per team, then per repo no team services, muted)
+    # TD-1293, TD-1311: the top section is one block — the control line (Queue, the teams, then the switch and find
+    # at the right), a rule, then the summary line across the width: the bar, each segment hatching its needs-you
+    # share, and its legend
+    hatch = lambda c, a: f"repeating-linear-gradient(135deg, {c} 0 {a}px, #f59e0b {a}px {2 * a}px)"
+    seg = lambda t, f, parts: f'<span title="{t}" style="flex: {f}; display: flex; overflow: hidden;">' + "".join(
+        f'<i style="display: block; flex: {n}; background: {bg};"></i>' for n, bg in parts) + "</span>"
+    sw = "display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px;"
+    leg = lambda n, w, bg: f'<span><i style="{sw} background: {bg};"></i><b style="color: #1c2128;">{n}</b> {w}</span>'
+    summary = ('<div style="display: flex; flex-direction: column; gap: 4px;">'
+               '<span style="display: flex; height: 8px; border-radius: 3px; overflow: hidden; gap: 2px;">'
+               + seg("1 in progress", 1, [(1, "#16a34a")])
+               + seg("28 up next, 2 need you", 28, [(26, "#9ca3af"), (2, hatch("#9ca3af", 3))]) + '</span>'
+               '<span class="meta" style="display: flex; gap: 14px; font-size: 12px;">' + leg(1, "in progress", "#16a34a")
+               + leg(28, "up next", "#9ca3af") + leg(2, "need you", hatch("#9ca3af", 2))
+               + '<span>· 29 cards</span></span></div>')
+    heading = ('<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-bottom: 12px; '
+               'border-bottom: 1px solid #dfe3e8; margin-bottom: 10px;"><span style="font-size: 22px; font-weight: 600;">Queue</span>'
+               # TD-1287: the teams (a chip per team, then per repo no team services, muted), in the control line
                + '<span class="meta" style="font-size: 12px; margin-right: 4px;">teams</span>'
                + chip("All", True) + chip("ao-grind") + chip("design")
                + '<span style="width: 1px; align-self: stretch; background: #dfe3e8; margin: 0 6px 0 8px;"></span>'
                + '<span class="meta" style="font-size: 12px;"><i>no team</i></span>'
-               + chip('<i style="color: #8a94a3;" title="no team services this repo">ledgerboard</i>') + '</div>')
+               + chip('<i style="color: #8a94a3;" title="no team services this repo">ledgerboard</i>')
+               + '<span style="margin-left: auto; display: inline-flex; gap: 12px; align-items: center;">'
+               + '<span style="border: 1px solid #cbd0d6; border-radius: 5px; padding: 2px 10px 2px 8px; font-size: 12px;" title="2 cards need you — '
+                 'press to keep only these: it narrows the teams picked, it picks none; the completed lines are hidden while it is on">'
+                 '☐ Needs you <b style="color: #7c3d00;">2</b></span>'
+               + '<span style="border: 1px solid #d0d5dc; border-radius: 4px; padding: 3px 8px; min-width: 16em; '
+                 'font-size: 12px; color: #8a94a3; background: #fff;">find an id or a title</span></span></div>')
+    filters = summary
     note = ('<div class="note" style="margin-top: 18px;">Design notes, not page text. The top bar\'s one number stays the Inbox\'s (it counts the '
             'questions drawn on cards, and opens the needs-you filter while any is here); the Queue tab carries none. A move\'s neighbours are '
             'the whole Up next order, whatever a filter hides; the filters are carried in the URL. No Snooze here: the rank orders the Queue, '

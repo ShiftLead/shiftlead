@@ -133,7 +133,7 @@ def test_the_item_is_no_want_counted_nowhere_and_draws_open_session(tmp_path, mo
     (c,) = v["in_progress"]
     assert c["wants"]["n"] == {"decide": 0, "do": 0, "read": 0} and len(c["wants"]["with_you"]) == 1
     assert c["status"] == "ready" and c["edge"] == "working"
-    assert (v["n"]["decide"], v["n"]["do"], v["n"]["needs_you"]) == (0, 0, 0)
+    assert v["n"]["needs_you"] == 0
     assert c["items_start"] is True, "the item draws its Open session: the header none"
     (e,) = drawn
     assert e["want"] == "with_you" and e["with_you"] == "p" and c["wants"]["with_you"][0]["kind"] == ""
