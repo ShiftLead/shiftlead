@@ -66,7 +66,7 @@ def test_a_line_is_done_or_snoozed_only_while_it_holds_the_item():
     # ledgerboard v2.3 (TD-1330): Snooze hides the item until the date and leaves its Due: alone; `due` moves it
     assert board.edit_line(line, ITEM, "snooze", "2026-10-01") == f"- [ ] {ITEM} Hide until: 2026-10-01.\n"
     assert board.edit_line(line, ITEM, "due", "2026-10-01") == f"- [ ] {ITEM.replace('2026-09-22', '2026-10-01')}\n"
-    # an item with no date gains one by `due`; a snooze of it is refused, since the reader would not read it back
+    # an undated item gains a date by `due`; a snooze of a line with no Due: and no Context: is refused
     assert board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "due", "2026-10-01") == (
         "- [ ] n/a — undated. Due: 2026-10-01."
     )

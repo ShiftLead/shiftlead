@@ -182,12 +182,18 @@ def author(root: Path) -> str:
 def answerer(root: Path, board_text: str) -> str | None:
     """Who a decide's answer is from (ledgerboard v2.3's `who_answered`): None on a board whose `People:`
     names one person, who is then the answerer; else the checkout's git `user.name` as a person's name
-    (spaces joined by `-`), or `person` when it is not one. ledgerboard refuses a name its `People:`
-    does not list, in its own words."""
+    (spaces joined by `-`) — on a `People:` of several names, that name or its first word as listed — or
+    `person`. ledgerboard refuses a name its `People:` does not list, in its own words."""
     people = ledgerboard.board_people(board_text)
     if people is not None and len(people) == 1:
         return None
-    name = "-".join(author(root).split())
+    words = author(root).split()
+    name = "-".join(words)
+    # on a People: line of several names, the user's name as listed (whole, or its first word), if it is there
+    for want in (name, words[0] if words else ""):
+        got = next((p for p in people or () if want and p.lower() == want.lower()), None)
+        if got:
+            return got
     return name if ledgerboard.is_person(name) else "person"
 
 
