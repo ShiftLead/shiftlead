@@ -8,6 +8,7 @@ Format: `- [ ] YYYY-MM-DD (session <first-8-of-session-uuid> on <host>, or n/a) 
 
 ## Needs the user
 
+- [ ] decide 2026-11-02 (person) — The Queue page's summary bar counts the whole Queue whatever is picked: recount it to the picks, and drop it to the **Needs you** switch's top. Context: TD-1310. Due: 2026-11-02. Decided: I chose D (2026-11-02).
 - [ ] decide 2026-11-02 (person) — The Queue page's summary bar counts the whole Queue whatever is picked: recount it to the picks, and drop it to the **Needs you** switch's top. Context: TD-1310. Due: 2026-11-02. Decided: go ahead (2026-11-02).
 - [x] decide 2026-11-02 (person) — The Queue page's summary bar counts the whole Queue whatever is picked: recount it to the picks, and drop it to the **Needs you** switch's top. Context: TD-1310. Due: 2026-11-02. Decided: go ahead (2026-11-02). Closed: 2026-11-02 — carried to TD-1310: Paul's go started its UI round, which the designer runs (mockups #2799, #2801, #2803; design #2802); the round now waits on Paul's pick of C or D, in TD-1310's Blocked by.
 - [x] decide 2026-11-02 (person) — The Queue page's top section looks disheveled: give the filter row and the header line one deliberate layout, through a frontend-design pass. Context: TD-1293. Due: 2026-11-02. Decided: go ahead (2026-11-02). Closed: 2026-11-02 — done: TD-1293 designed (#2783), built as TD-1306 (#2786), seen live and answered Works; archived in #2792.
