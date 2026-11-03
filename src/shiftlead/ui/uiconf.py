@@ -30,6 +30,7 @@ from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
+from sessionorc.models import stop_note
 from sessionorc.settings import BOARD_SHOW_DEFAULT, ON_WORK, ON_WORK_DEFAULT, parse_board_show, parse_file_link
 
 REFUSED_SCHEMES = ("javascript", "data", "vbscript", "file")
@@ -112,6 +113,22 @@ def team_until(team: str) -> str:
         return ""
     at = at if at.tzinfo else at.replace(tzinfo=UTC)
     return until if at > datetime.now(UTC) else ""
+
+
+def team_starts(team: str) -> str:
+    """The team card's **starts** note (design §4.5a *team card: starts note*, §6 *Schedule*, TD-133): for a
+    team whose `teams.<team>.schedule` the last `settings` read carried, *starts at the reset · Thu 07:00* —
+    the read's `starts` instant (the tick's `schedule_next`, else the reading's reset ahead) by the *stops*
+    note's formatter, in the reader's clock; *· held for a node's link* while a passed reset waits; *· no
+    reading yet* with no instant to name. "" for a team with no schedule."""
+    t = _read["teams"].get(team) or {}
+    if not isinstance(t.get("schedule"), dict):
+        return ""
+    starts = t.get("starts") if isinstance(t.get("starts"), dict) else {}
+    when = stop_note({"run_until": starts.get("at")}).removeprefix("stops ") if starts.get("at") else ""
+    if not when:
+        return "starts at the reset · no reading yet"
+    return f"starts at the reset · {when}" + (" · held for a node's link" if starts.get("held") else "")
 
 
 def team_on_work(team: str) -> str:

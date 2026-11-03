@@ -853,6 +853,9 @@ def team_groups(
                 # §4.5a team card **stops** note (§6 *Team stop time*, TD-337): the team's own setting,
                 # on a live team alone — a team with nothing live has the *starts* note's slot
                 "stops_note": stop_note({"run_until": until}) if live and (until := uiconf.team_until(team)) else "",
+                # §4.5a team card **starts** note (§6 *Schedule*, TD-133): the team's schedule, on a team
+                # with nothing live alone, beside *stopped* or *wound down <t>*
+                "starts_note": uiconf.team_starts(team) if not live and team != NO_TEAM else "",
                 # live, and every live session idle and declared (§4.5a, TD-099): drawn like a
                 # stopped team — sorted with them, Start alone, though it opens unfolded (TD-194) —
                 # since a wind-down would only wake the manager to find nothing to wind down

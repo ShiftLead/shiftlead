@@ -1160,3 +1160,37 @@ def test_the_flat_pages_rollup_counts_its_sessions_on_load_and_on_a_delta(tmp_pa
     for html in (loaded, ev["rollup"]):
         assert "rollup-list" not in html and "Agents (2)" in html  # the flat page: the totals line alone
         assert '<a href="#card-n1" data-open-card="n1">1 from teams</a>' in html
+
+
+def test_a_scheduled_team_with_nothing_live_says_when_it_starts(monkeypatch):
+    """§4.5a team card **starts** note (§6 *Schedule*, TD-133 slice 3): a team whose schedule the settings
+    read carries says *starts at the reset · <t>* beside *stopped* or *wound down*, by the *stops* note's
+    formatter, from the read's `starts`; *held for a node's link* while a passed reset waits, *no reading
+    yet* with no instant; nothing on a live team, nothing without a schedule."""
+    from sessionorc.models import stop_note
+    from shiftlead.ui import uiconf
+
+    at = _iso((datetime.now(UTC) + timedelta(days=2)).replace(second=0, microsecond=0))
+    rule = {"start": "reset", "profile": "grind", "window": "week"}
+    ms = [member("g1", role_label="Grinder")]
+    for m in ms:
+        m.update(rank=1, slot={"text": "", "caption": ""}, place="kmaster / samscrape")
+    team = ms[0]["team"]
+    dead = [{**m, "state": "exited"} for m in ms]
+    monkeypatch.setattr(uiconf, "_read", {"person": {}, "migrate": [], "teams": {}})
+    uiconf.set_read({"teams": {team: {"schedule": rule, "starts": {"at": at}}}})
+    (g,) = ui.team_groups(dead, (), {}, {})
+    when = stop_note({"run_until": at}).removeprefix("stops ")
+    assert g["starts_note"] == f"starts at the reset · {when}" and len(when) == len("Thu 07:00")
+    head = ui.templates.get_template("group_head.html").render(g=g)
+    assert f"· starts at the reset · {when}</span>" in head and 'class="meta startsnote"' in head
+    assert head.index(">stopped<") < head.index("startsnote")  # beside *stopped*
+    (live,) = ui.team_groups(ms, (), {}, {})
+    assert live["starts_note"] == "" and "startsnote" not in ui.templates.get_template("group_head.html").render(g=live)
+    uiconf.set_read({"teams": {team: {"schedule": rule, "starts": {"at": at, "held": True}}}})
+    assert ui.team_groups(dead, (), {}, {})[0]["starts_note"].endswith(" · held for a node's link")
+    uiconf.set_read({"teams": {team: {"schedule": rule, "starts": {"at": None}}}})
+    assert ui.team_groups(dead, (), {}, {})[0]["starts_note"] == "starts at the reset · no reading yet"
+    uiconf.set_read({"teams": {team: {"on_work": "start"}}})
+    (none,) = ui.team_groups(dead, (), {}, {})
+    assert none["starts_note"] == "" and "startsnote" not in ui.templates.get_template("group_head.html").render(g=none)
