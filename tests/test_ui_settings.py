@@ -589,6 +589,10 @@ def test_schedule_card_offers_the_profiles_and_their_windows():
     )
     assert fresh["windows"] == [] and fresh["note"] == "no reading of fresh yet — the label is not checked"
     assert fresh["was"] == '{"start":"reset","profile":"fresh","window":"week"}'
+    accented = setmod.schedule_card(
+        "t", {"start": "reset", "profile": "fresh", "window": "semäne"}, profiles, "", labels
+    )
+    assert accented["was"] == '{"start":"reset","profile":"fresh","window":"semäne"}'  # as JSON.stringify writes it
     gone = setmod.schedule_card("t", {"start": "reset", "profile": "old", "window": "week"}, profiles, "grind", labels)
     assert gone["options"][-1] == {"name": "old", "disabled": False, "title": "", "mark": " (not reported)"}
     assert gone["profile"] == "old" and gone["windows"] == [] and gone["note"] == ""

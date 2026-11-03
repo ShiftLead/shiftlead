@@ -455,7 +455,7 @@ def schedule_card(
     elif profile in profiles:
         note = f"no reading of {profile} yet — the label is not checked"
     was = (
-        json.dumps({"start": "reset", "profile": profile, "window": window}, separators=(",", ":"))
+        json.dumps({"start": "reset", "profile": profile, "window": window}, separators=(",", ":"), ensure_ascii=False)
         if standing
         else "null"
     )
