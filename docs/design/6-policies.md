@@ -1742,8 +1742,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   runs nothing from the PR's head except bytes step 1 proved are agent-cadence's, and never moves a
   checkout. The pull (above) follows the
   merge on its next pass, and the promote follows main as it always does.
-- **Schedule: a team start at the reset** (the tick's rule built, TD-133 slice 1; `ao schedule`, slice 2; the
-  card's note not yet): the one start the host agent makes that no person pressed at the time, and the general form
+- **Schedule: a team start at the reset** (TD-133: the tick's rule, `ao schedule` and the card's note built;
+  the Settings page's field not yet): the one start the host agent makes that no person pressed at the time, and the general form
   the run window (below) reduces to. **A schedule is a person's standing press, kept in
   `settings.yml`** under the team's own key (§5 `teams.<team>.schedule`; read on every tick, written
   only by `set_settings`, so a session cannot set one):
