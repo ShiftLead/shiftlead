@@ -8,6 +8,7 @@ Format: `- [ ] YYYY-MM-DD (session <first-8-of-session-uuid> on <host>, or n/a) 
 
 ## Needs the user
 
+- [ ] decide 2026-11-03 (person) — A Queue card with several Decide and Do items has no Start session that takes them all: add the header's beside the items', with a prompt that walks every item in turn. Context: TD-1338. Due: 2026-11-03. Decided: keep both (2026-11-03).
 - [ ] decide 2026-11-03 (session `designer-ao-1` on kmaster) — Should the designer's new review-round rules (TD-1325) be built as written after four rounds ended at the cap, or reviewed once more? Context: TD-1264. Due: 2026-11-06. Answers: Go (default) — TD-1325 is unblocked and built as written, with round 4's unreviewed fixes for the builder to check | One more round — one more Fable-then-Sonnet round on the merged text, then this question again | Hold: <note> — the builds stay blocked and the designer revises as your note says.
   - **Context:** You chose (ask m-e1f7f2e40275) that the designer follows agent-cadence's design-review rounds, Fable then Sonnet each round, capped at four. TD-1264 designs that, and build TD-1325 rewrites the briefs. Its own four rounds ended at the cap with a build-changing finding still in round 4, so the cadence asks you. Both entries are blocked on this line until you answer.
     - build-changing findings per round: 5, 3, 3, 2 (no fact-check rounds; the PR's closing fact-check is on #2821)
