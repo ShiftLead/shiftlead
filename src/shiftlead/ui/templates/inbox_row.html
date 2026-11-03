@@ -123,7 +123,7 @@
 <div class="row gap wrap shots" aria-label="screenshots">
   {%- for s in e.look_shots %}
   {%- if s.url %}<a class="shot" href="{{ s.url }}" target="_blank" rel="noopener" title="open {{ s.name }} in a new tab"><img src="{{ s.url }}" alt="{{ s.name }}" loading="lazy"><span class="st">{{ s.name }}</span></a>
-  {%- else %}<span class="shot gone st" title="not on origin's default branch of the sender's repo">{{ s.name }}</span>{% endif %}
+  {%- else %}<span class="shot gone st" title="not available from the sender's repo">{{ s.name }}</span>{% endif %}
   {%- endfor %}
 </div>
 {%- endif %}

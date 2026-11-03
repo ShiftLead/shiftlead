@@ -2402,6 +2402,13 @@ async def test_a_looks_screenshot_is_read_on_the_node_whose_registry_holds_the_r
             assert base64.b64decode(got["png"]) == b"\x89PNG node shot"
             head = await person.call("host_shot", host="laptop", repo="proj", name="a.png", head=True)
             assert head["exists"] is True and head["png"] == ""
+            # TD-1307: the look's commit, read over the link; the node's echo of `at` passed through
+            sha = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True, text=True)
+            at = sha.stdout.strip()
+            got = await person.call("host_shot", host="laptop", repo="proj", name="a.png", at=at, ref="main")
+            assert (got["at"], got["from"], got["exists"]) == (at, "commit", True)
+            assert base64.b64decode(got["png"]) == b"\x89PNG node shot"
+            assert (await person.call("host_shot", host="laptop", repo="proj", name="a.png"))["from"] == "default"
             for repo, name in (("proj", "b.png"), ("other", "a.png")):  # the working tree's; a repo not registered
                 miss = await person.call("host_shot", host="laptop", repo=repo, name=name)
                 assert miss["exists"] is False and miss["png"] == "", (repo, name)

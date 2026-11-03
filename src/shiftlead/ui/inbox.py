@@ -1298,72 +1298,88 @@ def live_look(it: Mapping[str, Any]) -> bool:
 
 
 # §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): the one directory a look's screenshots
-# are served from, as origin's default branch holds it, and the names that may be asked of it —
-# the shape and the count the host agent checks a look's `shots` against (`mail`, TD-292 slice 2).
-# The reading itself is `sessionorc.shots`, the one the host agent makes for another host (TD-300).
+# are served from, and the names that may be asked of it — the shape and the count the host agent
+# checks a look's `shots` against (`mail`, TD-292 slice 2). The reading itself is `sessionorc.shots`,
+# the one the host agent makes for another host (TD-300): the look's commit, its branch, then origin's
+# default branch (§4.10 *A look's shots are the pushed commit's*, TD-1307).
 SHOT_DIR = shots_mod.SHOT_DIR
 SHOT_NAME = mail_mod.SHOT_NAME
 SHOTS_MAX = mail_mod.SHOTS_MAX
-SHOT_TTL = 60.0  # seconds a screenshot's presence on origin is kept: a row is redrawn on every poll
-_shot_seen: dict[tuple[str, str], tuple[float, bool]] = {}
+SHOT_TTL = 60.0  # seconds a screenshot's presence is kept: a row is redrawn on every poll
+# (repo, name, shots_at, shots_ref) → (when, present, the branch's fetch count then): a fetch's end
+# drops every look on its branch at once (`shots.fetch_gen`)
+_shot_seen: dict[tuple[str, str, str, str], tuple[float, bool, int]] = {}
 SHOT_WAIT = 2.0  # seconds a row waits for another host's answer: a hung node holds the Inbox no longer
 _shot_host_down: dict[str, float] = {}  # a host that did not answer, by when: not asked again for `SHOT_TTL`
 shot_root = shots_mod.root_of
 shot_bytes = shots_mod.read
+shot_read_from = shots_mod.read_from
 
 
-def _shot_on_origin(root: Path, name: str) -> bool:
-    key, now = (str(root), name), time.monotonic()
-    at, seen = _shot_seen.get(key, (0.0, False))
-    if now - at > SHOT_TTL:
-        seen = shots_mod.exists(root, name)
-        _shot_seen[key] = (now, seen)
+def _shot_on_origin(root: Path, name: str, at: str = "", ref: str = "") -> bool:
+    """Whether this host's checkout `root` holds the look's `name` at its commit `at`, its branch
+    `ref` or origin's default branch — the presence read, which may fetch the branch in the
+    background (`shots.locate`) — kept `SHOT_TTL`, or until a fetch of `ref` ends."""
+    key, now = (str(root), name, at, ref), time.monotonic()
+    gen = shots_mod.fetch_gen(root, ref) if at and ref else 0
+    when, seen, was = _shot_seen.get(key, (0.0, False, gen))
+    if now - when > SHOT_TTL or was != gen:
+        seen = shots_mod.exists(root, name, at, ref, fetch=True)
+        _shot_seen[key] = (now, seen, shots_mod.fetch_gen(root, ref) if at and ref else 0)
     return seen
 
 
-def _shot_on_host(host: str, repo: str, name: str) -> bool:
+def _shot_on_host(host: str, repo: str, name: str, at: str = "", ref: str = "") -> bool:
     """The same test for a repo another host registers (TD-300): `host_shot` with `head`, asked
     through the home and kept `SHOT_TTL` as this host's is, waiting `SHOT_WAIT` and no longer. A host
     that cannot be asked, or does not answer in time, reads as not holding it — the row draws the
-    name alone — and is not asked again, for any name, for `SHOT_TTL`."""
-    key, now = (f"{host}:{repo}", name), time.monotonic()
-    at, seen = _shot_seen.get(key, (0.0, False))
-    if now - at > SHOT_TTL:
+    name alone — and is not asked again, for any name, for `SHOT_TTL`. Asked with `at`, a reply that
+    does not echo it is a node that predates the look's commit (TD-1307): the name alone, never the
+    default branch's file in the commit's place."""
+    key, now = (f"{host}:{repo}", name, at, ref), time.monotonic()
+    when, seen, _ = _shot_seen.get(key, (0.0, False, 0))
+    if now - when > SHOT_TTL:
         if now - _shot_host_down.get(host, -SHOT_TTL - 1.0) <= SHOT_TTL:
             return False
         try:
-            got = call_sync("host_shot", host=host, repo=repo, name=name, head=True, _timeout=SHOT_WAIT)
-            seen = bool((got or {}).get("exists"))
+            got = call_sync("host_shot", host=host, repo=repo, name=name, at=at, ref=ref, head=True, _timeout=SHOT_WAIT)
+            got = got if isinstance(got, dict) else {}
+            seen = bool(got.get("exists")) and (not at or got.get("at") == at)
         except Exception:  # noqa: BLE001 — whatever the transport raised, the image is not drawn
             _shot_host_down[host] = now
             seen = False
-        _shot_seen[key] = (now, seen)
+        _shot_seen[key] = (now, seen, 0)
     return seen
 
 
-def look_shots(shots: Any, repo: str, host: str = "") -> list[dict[str, str]]:
+def look_shots(shots: Any, repo: str, host: str = "", at: Any = "", ref: Any = "") -> list[dict[str, str]]:
     """A look's screenshots as its row draws them (§4.5a **Inbox row: a look**): each of the
     envelope's `shots`, in the order sent, at most four — `name`, the file's name, and `url`, the
-    image's address on this page when origin holds the file in the sender's repo (`repo`, a
-    registered checkout's name), else "" and the row draws the name alone. The repo is read where
-    the sender runs: this host's registry, or — `host`, the sender's record's, when it is another —
-    that host's through the home (TD-300). A path outside `docs/mockups/reviews/` has no address,
-    whatever its name."""
+    image's address on this page when the sender's repo (`repo`, a registered checkout's name) holds
+    the file at the look's commit (`at`, its `shots_at`), its branch (`ref`, its `shots_ref`) or
+    origin's default branch, else "" and the row draws the name alone. The repo is read where the
+    sender runs: this host's registry, or — `host`, the sender's record's, when it is another — that
+    host's through the home (TD-300). `at` and `ref` are the stored entry's, cleaned; the address
+    carries them, so the image is read in the same order. A path outside `docs/mockups/reviews/` has
+    no address, whatever its name."""
     if not isinstance(shots, list):
         return []
+    at, ref = shots_mod.where(at, ref)
     there = host if host and host != host_name() else ""
     root = None if there else shot_root(repo)
+    query = "&".join(f"{k}={quote(v, safe='')}" for k, v in (("host", there), ("at", at), ("ref", ref)) if v)
     out: list[dict[str, str]] = []
     for raw in shots[:SHOTS_MAX]:
         if not isinstance(raw, str) or not raw.strip():
             continue
         p = Path(raw.strip().removeprefix("./"))
         url = ""
-        if repo and p.parent == SHOT_DIR and SHOT_NAME.fullmatch(p.name):
-            if there and _shot_on_host(there, repo, p.name):
-                url = f"/repo/{quote(repo)}/shot/{quote(p.name)}?host={quote(there)}"
-            elif root is not None and _shot_on_origin(root, p.name):
-                url = f"/repo/{quote(repo)}/shot/{quote(p.name)}"
+        named = bool(repo) and p.parent == SHOT_DIR and bool(SHOT_NAME.fullmatch(p.name))
+        if named and (
+            (there and _shot_on_host(there, repo, p.name, at, ref))
+            or (not there and root is not None and _shot_on_origin(root, p.name, at, ref))
+        ):
+            url = f"/repo/{quote(repo)}/shot/{quote(p.name)}" + (f"?{query}" if query else "")
         out.append({"name": p.name, "url": url})
     return out
 
