@@ -172,6 +172,19 @@ def test_the_card_saves_and_its_switch_lands_through_the_home(client, subprocess
         assert got["id"] == push_mod.device_id(ep)
         page = client.get("/settings").text
         assert f'data-id="{got["id"]}" data-label="Linux · Firefox"' in page and f'data-key="{PUB}"' in page
+        # the worker's `pushsubscriptionchange` re-subscribes with `replaces` (TD-1329): the route forwards it, so the
+        # device keeps its label and *since* under the new endpoint, never a second device under the worker's label
+        since = push_mod.load(f)["devices"][0]["since"]
+        ep2 = "https://fcm.googleapis.com/fcm/send/def"
+        swap = {"endpoint": ep2, "keys": SUB_KEYS, "label": "Linux · Chrome", "key": PUB, "replaces": got["id"]}
+        got = client.post("/api/settings/push_subscribe", json=swap).json()
+        assert got["id"] == push_mod.device_id(ep2)
+        devices = push_mod.load(f)["devices"]
+        assert [(d["id"], d["endpoint"], d["label"], d["since"]) for d in devices] == [
+            (got["id"], ep2, "Linux · Firefox", since)
+        ]
+        page = client.get("/settings").text
+        assert f'data-id="{got["id"]}" data-label="Linux · Firefox"' in page and "Linux · Chrome" not in page
         assert client.post("/api/settings/push", json={"secrets": "look/dev"}).json()["ok"]
         test = client.post("/api/settings/notify_test", json={"channel": "push", "device": "f" * 16})
         # push's own refusals, never Telegram's: the device not listed, or the key being read again after the save
