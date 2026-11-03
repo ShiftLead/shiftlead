@@ -1,0 +1,65 @@
+"""TD-1310 mockups, read-only against the live UI: the Queue page with ao-grind picked, copied without
+scripts, its top line redrawn: now / A (recount, aligned, no needs mark) / B (recount, aligned, a needs
+sliver in each segment, 'items' named)."""
+import re, sys
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+OUT = Path(sys.argv[1]); UI = "http://127.0.0.1:8765"
+# shown with ao-grind picked: (group, var, word, shown, needs among shown)
+G = [("in_progress", "--working", "in progress", 4, 1), ("waiting", "--waiting", "waiting", 19, 0), ("up_next", "--ended", "up next", 24, 24)]
+TOTAL, NEEDS, DEC, DO = 231, 25, 21, 12
+CSS = """
+.qhline { align-items: flex-start !important; }
+.qhline .h1 { line-height: 26px; }
+.qhline .qsum { padding-top: 0; }
+.qhline .qhend { align-items: flex-start; }
+.qhline .qf.qswitch { height: 26px; box-sizing: border-box; }
+.qhline .qwantsn { line-height: 26px; }
+.qhline .qfind input { height: 26px; box-sizing: border-box; }
+.qhline .qsum .qsbar { margin-top: 0; height: 8px; border-radius: 3px; }
+.tdm-seg { display: flex; overflow: hidden; border-radius: 2px; }
+.tdm-seg > i { display: block; height: 100%; }
+.tdm-wide .qsum { max-width: 500px !important; }
+.tdm-items { color: var(--muted); margin-right: 4px; }
+"""
+EDIT = r"""
+([shape, G, TOTAL, NEEDS, DEC, DO, CSS]) => {
+  if (shape === 'now') return;
+  if (shape === 'B') document.body.classList.add('tdm-wide');
+  const st = document.createElement('style'); st.textContent = CSS; document.head.append(st);
+  const bar = document.querySelector('.qsbar');
+  bar.innerHTML = G.map(([g, v, w, n, nd]) => {
+    if (shape === 'B' && nd) {
+      const rest = n - nd;
+      return `<span class="tdm-seg" style="flex: ${n}" title="${n} ${w}, ${nd} need you">${rest ? `<i style="flex: ${rest}; background: var(${v})"></i>` : ''}<i style="flex: ${nd}; background: repeating-linear-gradient(135deg, var(${v}) 0 3px, var(--needs) 3px 6px)"></i></span>`;
+    }
+    return `<span style="flex: ${n}; background: var(${v})" title="${n} ${w}"></span>`;
+  }).join('');
+  const shown = G.reduce((a, x) => a + x[3], 0);
+  document.querySelector('.qsleg').innerHTML = G.map(([g, v, w, n]) => `<span><i style="background: var(${v})"></i><b>${n}</b>${w}</span>`).join('')
+    + (shape === 'B' ? `<span><i style="background: repeating-linear-gradient(135deg, var(--ended) 0 2px, var(--needs) 2px 4px)"></i><b>${NEEDS}</b>need you</span>` : '')
+    + `<span class="qscards">· ${shown} of ${TOTAL} cards</span>`;
+  document.querySelector('#qfneedsn').textContent = NEEDS;
+  document.querySelector('#qfneeds').title = `${NEEDS} cards need you`;
+  const w = document.querySelector('.qwantsn');
+  w.innerHTML = (shape === 'B' ? '<span class="tdm-items">items:</span>' : '') + `Decide ${DEC} · Do ${DO}`;
+}
+"""
+with sync_playwright() as p:
+    b = p.chromium.launch()
+    for width in (1600, 400):
+        pg = b.new_page(viewport={"width": width, "height": 900}, color_scheme="dark")
+        pg.goto(UI + "/queue?team=ao-grind", wait_until="networkidle", timeout=60000)
+        pg.wait_for_timeout(1500)
+        html = pg.content()
+        html = re.sub(r"<script\b.*?</script>", "", html, flags=re.S)
+        html = html.replace("<head>", f'<head><base href="{UI}/">', 1)
+        for shape in ("now", "A", "B"):
+            if width == 400 and shape == "now":
+                continue
+            pg.set_content(html, wait_until="networkidle")
+            pg.evaluate(EDIT, [shape, G, TOTAL, NEEDS, DEC, DO, CSS])
+            h = 170 if width == 1600 else 330
+            pg.screenshot(path=str(OUT / f"2026-11-02-td1310-{shape.lower()}-{width}.png"), clip={"x": 0, "y": 44 if width == 1600 else 40, "width": width, "height": h})
+        pg.close()
+    b.close()
