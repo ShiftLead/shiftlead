@@ -520,7 +520,7 @@ def test_a_post_that_raises_ends_the_child_with_every_unanswered_line_printed(mo
     def post(d, data, key, sub):
         if d["id"] == "boom":
             raise RuntimeError("the post raised")
-        time.sleep(0.5)
+        time.sleep(2.0)  # long enough that the raise is always the first answer
         return 201
 
     monkeypatch.setattr(notify, "_post", post)
