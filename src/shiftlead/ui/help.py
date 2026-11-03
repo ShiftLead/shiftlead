@@ -691,8 +691,17 @@ HELP: tuple[Help, ...] = (
         "Queue card",
         (
             "Starts your own session on this card's team, on its top entry, with the card's entries as its "
-            "context. It is drawn only where no item on the card asks you anything: each such item has its own. "
-            "Reads Open session while yours is running."
+            "context. It is drawn where no item on the card asks you anything. Reads Open session while yours "
+            "is running."
+        ),
+    ),
+    Help(
+        "card-start-all",
+        "Start session",
+        "Queue card, all items",
+        (
+            "Starts one session for every item on this card that waits on you, one at a time: it reads each "
+            "with you and waits for your answer before the next. Reads Open session while yours is running."
         ),
     ),
     Help(
@@ -882,6 +891,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "wait-column",
             "read-n",
             "card-start",
+            "card-start-all",
             "card-item-start",
             "card-answers",
             "card-dots",

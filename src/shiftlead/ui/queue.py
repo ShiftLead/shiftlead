@@ -222,6 +222,23 @@ def item_ref(e: Mapping[str, Any]) -> str:
     return mid if not row and mid.startswith("m-") else ""
 
 
+def items_n(wants: Mapping[str, Any]) -> int:
+    """The items on a card that count for the header's **Start session** (§4.5 screen 12 *Started from the header
+    on a card with items*, TD-1338, built by TD-1340): every Decide and Do item but a red PR or a fork's PR, one
+    whose entry another session holds included, and every item *with you in <name>*; an item *answered — waiting
+    on <asker>* is outside them, in `wants['answered']`. With one the item's button is the header's; with two or
+    more the header draws its own beside them, and its press walks them all."""
+    n = sum(1 for w in WANTS for m in wants.get(w) or () if not (m.get("red") or m.get("fork")))
+    return n + len(wants.get("with_you") or ())
+
+
+def walk_mine(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
+    """*waits on me* on the header's press that walks the card (TD-1340): the same ids but an entry *answered —
+    waiting on <asker>*, which waits on its asker, not the person."""
+    gone = {str(m.get("item") or "") for m in wants.get("answered") or ()}
+    return [m for m in mine if m not in gone]
+
+
 def waits_on_me(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
     """*waits on me* in **Start session**'s id list (§4.5 screen 12 *Started from an item*, TD-1246): the card's
     Decide and Do ledger entries in key order (`card_entries`), then every other Decide and Do item — a board
@@ -603,10 +620,11 @@ def queue_view(
                 "chips": not one_repo,
                 "find": _find_text([top, *rows]),
                 "session": card_session(c, fleet),
-                # a Decide or Do item but a red PR draws its own Start session, the header then none (TD-1246);
-                # so does an item *with you in <name>*, with its Open session (TD-1281)
-                "items_start": any(not (m.get("red") or m.get("fork")) for w in WANTS for m in wants.get(w) or ())
-                or bool(wants.get("with_you")),
+                # a Decide or Do item but a red PR draws its own Start session (TD-1246); so does an item *with
+                # you in <name>*, with its Open session (TD-1281); the header draws its own beside them where two
+                # or more count, none where one does (TD-1340)
+                "items_start": items_n(wants) > 0,
+                "items_n": items_n(wants),
             }
         )
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]
