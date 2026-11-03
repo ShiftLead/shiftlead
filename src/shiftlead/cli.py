@@ -4630,7 +4630,7 @@ def _shot_commit(values: list[str]) -> tuple[str, str] | None:
         try:
             rels.append(f.resolve().relative_to(top).as_posix())
         except ValueError:
-            continue  # another checkout's file: the host agent's checks say what it refuses
+            raise ValueError(f"{f.name} is not in {top}: a look's shots are of one checkout") from None
     head = _git_out(top, "rev-parse", "--verify", "-q", "HEAD")
     if not rels or not head:
         return None
@@ -4642,7 +4642,12 @@ def _shot_commit(values: list[str]) -> tuple[str, str] | None:
             raise ValueError(f"{name} differs from HEAD: commit it and push, then send")
     upstream = _git_out(top, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}") or ""
     branch = _git_out(top, "symbolic-ref", "-q", "--short", "HEAD") or ""
-    ref = upstream.removeprefix("origin/") if upstream.startswith("origin/") else branch
+    # the upstream's name only where it holds HEAD: a branch cut from `origin/main` and pushed under its own
+    # name without `-u` keeps `origin/main` as its upstream, whose file is not the look's
+    ups_holds = (
+        upstream.startswith("origin/") and _git_out(top, "merge-base", "--is-ancestor", head, upstream) is not None
+    )
+    ref = upstream.removeprefix("origin/") if ups_holds else branch
     if _git_out(top, "for-each-ref", "--contains", head, "--format=%(refname)", "refs/remotes/origin"):
         return head, ref if branch else ""
     from sessionorc import ledger as ledger_mod

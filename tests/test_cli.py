@@ -2753,3 +2753,18 @@ def test_a_look_after_the_squash_is_sent_with_the_default_branch_s_commit(tmp_pa
     git("commit", "-q", "-am", "a changed shot")
     with pytest.raises(ValueError, match=r"^HEAD is not pushed: push feat"):
         cli._shot_commit([str(shot)])
+
+
+def test_a_shot_s_branch_is_its_upstream_only_where_the_upstream_holds_head(tmp_path):
+    """A branch cut from `origin/main` keeps `origin/main` as its upstream until pushed with `-u`: pushed
+    under its own name, the look names that branch, never `main`, whose file is not the look's."""
+    git, work, shot = _shot_repo(tmp_path)
+    git("branch", "-q", "--set-upstream-to", "origin/main")
+    git("commit", "-q", "--allow-empty", "-m", "the branch's own")
+    git("push", "-q", "origin", "feat")
+    assert cli._shot_commit([str(shot)]) == (git("rev-parse", "HEAD"), "feat")
+    other = tmp_path / "elsewhere.png"
+    other.write_bytes(b"\x89PNG")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    with pytest.raises(ValueError, match=r"^elsewhere.png is not in .*: a look's shots are of one checkout$"):
+        cli._shot_commit([str(shot), str(other)])

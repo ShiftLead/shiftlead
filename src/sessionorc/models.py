@@ -449,7 +449,8 @@ class MailEntry:
     shots: list[str] = field(default_factory=list)
     # The look's commit and its origin branch (design §4.10 *A look's shots are the pushed commit's*, TD-1303):
     # `shots_at` the sender's 40-hex `HEAD`, `shots_ref` the branch it was pushed to (None on a detached `HEAD`
-    # or a look after the merge); each cleaned by `mail.shots_at` / `mail.shots_ref`, and only with `shots`.
+    # or a look after the merge); each cleaned here at every hop (`ref` only with `at`; a 64-hex SHA-256 id is
+    # dropped, as any other shape is), and set by `msg` only with `shots`.
     shots_at: str | None = None
     shots_ref: str | None = None
     # A `system` note whose wake is **uncharged** (§4.10: a lapse is the home's clock, not another

@@ -2783,6 +2783,8 @@ async def test_a_look_carries_its_commit_and_branch_cleaned_at_every_hop(agent, 
     """Design §4.10 *A look's shots are the pushed commit's* (TD-1303): `shots_at` (40 hex) and `shots_ref`
     ride beside `shots`, taken as given and cleaned — a malformed one dropped, never refused — `ref` kept
     only with `at`, and neither on a message without `shots`."""
+    from sessionorc.models import MailEntry
+
     sha = "0123456789abcdef0123456789abcdef01234567"
     shot = ["docs/mockups/reviews/2026-11-02-td1307-row.png"]
     async with LocalClient() as person:
@@ -2813,6 +2815,11 @@ async def test_a_look_carries_its_commit_and_branch_cleaned_at_every_hop(agent, 
                 assert (e["shots_at"], e["shots_ref"]) == want, (at, ref)
             e = await look(shots_at=sha, shots_ref="b")  # no shots: no look, no commit
             assert (e["shots_at"], e["shots_ref"]) == (None, None)
+            # an entry stored before TD-1307 loads with neither; a hand edit's junk is dropped on load
+            old = {"id": "m-1", "from": "ao-a", "to": ["person"], "at": "x", "kind": "ask", "text": "?"}
+            assert (MailEntry.from_dict(old).shots_at, MailEntry.from_dict(old).shots_ref) == (None, None)
+            junk = MailEntry.from_dict({**old, "shots_at": sha, "shots_ref": "../x"})
+            assert (junk.shots_at, junk.shots_ref) == (sha, None)
         await person.call("kill", id=builder)
 
 
