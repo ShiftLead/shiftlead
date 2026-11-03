@@ -130,7 +130,9 @@ agreement binds once written in the shared entry, the PR or the design (§4.10).
 
 The cadence rules: `agent-cadence path cadence.md` prints the pinned file (this repo pins agent-cadence
 in `docs/cadence.toml`). Every change goes branch → PR → squash merge; the pre-push hook blocks `main`.
-Every PR gets an **independent cheaper-model review** (code) or **fact-check** (docs), recorded
+Every PR gets an **independent review** by the repo's `review-model` (code: round one's reviewer,
+`agent-cadence run cadence_config.py get review-model --first`, the rounds as cadence §4.8 sizes them)
+or a **fact-check** by its `fact-check-model` (docs: `get fact-check-model`), recorded
 as a PR comment whose first line is `cadence-review: SHIP|FIXED|BLOCK · <model> · <code|docs> ·
 <n> findings` and which is never edited; merge only when `agent-cadence run check_cadence.py --pr
 N` exits 0. **A PR touching `src/sessionorc/` or `docs/briefs/` waits for this seat's read**
