@@ -71,3 +71,92 @@ def test_the_menu_is_fixed_and_the_card_still_clips():
     js = (UI / "static" / "app.js").read_text()
     assert 'document.addEventListener("toggle"' in js and 'document.addEventListener("scroll", placeOpen, true)' in js
     assert 'menu = !!$("details.more[open]", old)' in js and "if (d) d.open = true;" in js
+
+
+OUTSIDE_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+// a page of nodes: each a `details` (a menu: class `more`; a fold: class `fold`) holding a summary and an item
+const nodes = [];
+const node = (cls, parent) => {
+  const n = { cls, parent, open: false, focused: 0, focus() { this.focused++; document.activeElement = this; },
+    contains(t) { for (let x = t; x; x = x.parent) if (x === this) return true; return false; },
+    querySelector(sel) {
+      return sel === "summary" ? nodes.find((k) => k.parent === this && k.cls === "summary") : null;
+    } };
+  nodes.push(n); return n;
+};
+const listeners = [];
+const document = { documentElement: el(), body: el(), activeElement: null, createElement: el,
+  querySelector: () => null,
+  querySelectorAll: (sel) => sel === "details.more[open]" ? nodes.filter((n) => n.cls === "more" && n.open) : [],
+  addEventListener: (type, fn, capture) => listeners.push({ type, capture: !!capture }) };
+document.activeElement = document.body;
+global.window = {}; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+const page = node("page", null), menu = node("more", page), summary = node("summary", menu), item = node("item", menu);
+const fold = node("fold", page), inFold = node("item", fold), composer = node("textarea", page);
+const out = {};
+menu.open = true; fold.open = true;
+out.inside = [AO.menuPress(item), menu.open];
+out.summary = [AO.menuPress(summary), menu.open];
+out.outside = [AO.menuPress(page), menu.open, fold.open];
+menu.open = true;
+out.in_fold = [AO.menuPress(inFold), menu.open, fold.open];
+menu.open = true; document.activeElement = item;
+out.esc_in_menu = [AO.menuEsc({ key: "Escape" }), menu.open, document.activeElement === summary];
+menu.open = true; document.activeElement = composer;
+const ev = { key: "Escape" };
+out.esc_in_composer = [AO.menuEsc(ev), menu.open, document.activeElement === composer, ev.aoMenuClosed === true];
+menu.open = true; document.activeElement = document.body;
+out.other_key = [AO.menuEsc({ key: "x" }), menu.open];
+out.esc_on_body = [AO.menuEsc({ key: "Escape" }), menu.open, document.activeElement === summary];
+out.esc_none_open = AO.menuEsc({ key: "Escape" });
+out.pointerdown_capture = listeners.some((l) => l.type === "pointerdown" && l.capture);
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.unit
+def test_a_press_outside_an_open_menu_or_esc_closes_it_and_a_fold_stays_open():
+    """§4.5a *every page: a pop-up menu* (TD-1337): one page-wide `pointerdown`, caught on the way down,
+    closes an open `details.more` the press is not inside; a press inside it or on its own summary is the
+    menu's; a fold is no menu and stays open. `Esc` closes it wherever focus is, focus back on its button
+    only from the menu or no control — a composer keeps focus and the key."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = scratch_dir() / "menu_outside_probe.js"
+    probe.write_text(OUTSIDE_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    assert got["inside"] == [False, True]
+    assert got["summary"] == [False, True]
+    assert got["outside"] == [True, False, True]
+    assert got["in_fold"] == [True, False, True]
+    assert got["esc_in_menu"] == [True, False, True]
+    assert got["esc_in_composer"] == [False, False, True, True]
+    assert got["other_key"] == [False, True]
+    assert got["esc_on_body"] == [True, False, True]
+    assert got["esc_none_open"] is False
+    assert got["pointerdown_capture"] is True
+
+
+@pytest.mark.unit
+def test_an_esc_that_closed_a_menu_presses_no_page_key():
+    """The message page's `Esc` is Back (§4.5a **keys**): an `Esc` that closed a *Snooze* menu there closes the
+    menu alone (TD-1337's review) — the keys table returns on the mark `AO.menuEsc` puts on the event."""
+    js = (UI / "static" / "app.js").read_text()
+    assert "ev.aoMenuClosed = true;" in js
+    keys = js[js.index('const page = AO.keyPage(location.pathname);') :]
+    assert keys.index("if (ev.aoMenuClosed) return;") < keys.index("const name = AO.keyName(ev);")
