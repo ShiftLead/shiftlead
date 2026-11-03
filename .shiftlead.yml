@@ -55,7 +55,9 @@ teams:
     members:
       - {role: grinder, name: grinder-ao-1, brief: docs/briefs/grinder-ao-1.md}
       # the second grinder: both share the build stage's one lane and pick the top-ranked entry nobody holds (TD-749)
-      - {role: grinder, name: grinder-ao-2, brief: docs/briefs/grinder-ao-2.md}
+      # TD-641's trial (Paul, 2026-11-03): grinder-ao-2 alone on `grind-ask` (profiles.yml), whose unattended launch keeps its
+      # permission prompts, so settings.yml's `permissions: grinder:` rules answer them; grinder-ao-1 stays on `grind`
+      - {role: grinder, name: grinder-ao-2, brief: docs/briefs/grinder-ao-2.md, profile: grind-ask}
       # the design stage's member; what the person sees of a design is its own call (design §4.8)
       - {role: designer, name: designer-ao-1, unattended: true}
 
