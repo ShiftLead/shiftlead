@@ -143,7 +143,11 @@ class SettingsMixin:
         doc, now = settings_mod.load(), datetime.now(UTC)
         gate = (await self.rpc_gate())["profiles"]
         teams = {
-            name: {**t, **({"passed": _parse(t["until"]) <= now} if "until" in t else {})}
+            name: {
+                **t,
+                **({"passed": _parse(t["until"]) <= now} if "until" in t else {}),
+                **({"starts": self._schedule_starts(name, t["schedule"], now)} if "schedule" in t else {}),
+            }
             for name, t in settings_mod.teams(doc).items()
         }
         out = {
@@ -168,6 +172,52 @@ class SettingsMixin:
                 f"{settings_mod.ui_yml()}: ui.yml is no longer read — its open_in lives under person:"
             )
         return out
+
+    def _schedule_window_known(self, rule: dict[str, str]) -> bool:
+        """A schedule's window checked against its profile's reading (§6 *Schedule*, §4.7 `ao schedule`,
+        TD-133): a label the reading does not report is refused, naming the reported ones, as `ao gate`'s
+        reserves are; False when the profile has no reading yet, so nothing could be checked."""
+        reported = [
+            str(w.get("label")) for w in self._gate_reading(rule["profile"]).get("windows") or [] if isinstance(w, dict)
+        ]
+        if not reported:
+            return False
+        if rule["window"] not in reported:
+            raise RpcError(
+                f"schedule: profile {rule['profile']} reports no window {rule['window']}: "
+                f"its windows are {', '.join(reported)} (design §4.7)"
+            )
+        return True
+
+    def _schedule_starts(self, team: str, rule: Any, now: datetime) -> dict[str, Any]:
+        """When a team's schedule next fires (§4.7 `ao schedule`, §4.5a *starts* note, TD-133): the
+        upcoming reset the tick last read for this rule (`schedule_next` on the home's host record), else
+        the reset in the profile's reading while it is ahead — `{at}`, with `held` while a passed reset
+        waits for a node's link; `{at: None}` when nothing is known to wait for."""
+        if not isinstance(rule, dict):
+            return {"at": None}
+
+        def utc(value: Any) -> datetime | None:  # an offset-carrying instant, else None: never a guessed clock
+            try:
+                t = _parse(str(value))
+            except (TypeError, ValueError):
+                return None
+            return t.astimezone(UTC).replace(microsecond=0) if t.tzinfo is not None else None
+
+        def said(t: datetime) -> str:
+            return t.isoformat().replace("+00:00", "Z")
+
+        teams = self._host_rec.get("teams")
+        rec = teams.get(team) if isinstance(teams, dict) else None
+        nxt = rec.get("schedule_next") if isinstance(rec, dict) else None
+        same = isinstance(nxt, dict) and all(nxt.get(k) == rule.get(k) for k in ("profile", "window"))
+        if same and (at := utc(nxt.get("at"))) is not None:
+            return {"at": said(at), **({"held": True} if nxt.get("held") else {})}
+        for w in self._gate_reading(str(rule.get("profile") or "")).get("windows") or []:
+            mine = isinstance(w, dict) and w.get("label") == rule.get("window")
+            if mine and (at := utc(w.get("resets"))) is not None and at > now:
+                return {"at": said(at)}
+        return {"at": None}
 
     @staticmethod
     def _permissions_read(doc: dict[str, Any]) -> dict[str, Any]:
@@ -319,9 +369,15 @@ class SettingsMixin:
                     raise RpcError(f"{key}.{name}: {e}") from None
                 if "until" in parsed and _parse(parsed["until"]) <= now:
                     raise RpcError(f"{key}.{name}: until {parsed['until']} has passed — a stop time is ahead (§6)")
+                if key == "teams" and "schedule" in parsed and not self._schedule_window_known(parsed["schedule"]):
+                    out["unchecked"] = True  # no reading of the profile yet: its labels cannot be checked
                 change[str(name)] = {**{k: None for k in fields if fields[k] is None}, **parsed}
             doc[key] = settings_mod.merge(doc.get(key), change)
             out[key] = getattr(settings_mod, key)(doc)
+            if key == "teams":  # the reply says when a schedule fires, as the `settings` read does (§4.7)
+                for name, t in out[key].items():
+                    if "schedule" in t:
+                        t["starts"] = self._schedule_starts(name, t["schedule"], now)
         if person is not None:
             doc["person"] = self._person_change(doc.get("person"), person)
             out["person"] = settings_mod.person(doc)

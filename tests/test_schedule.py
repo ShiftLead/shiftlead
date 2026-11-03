@@ -7,12 +7,14 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from conftest import park_ticks
 
 from sessionorc import paths
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import SCHEDULE_LATE
 from sessionorc.agent_tick import NOT_RESTARTS
+from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import Session
 
 DECLARED = {"at": "2026-09-28T06:56:00Z", "why": "nothing pickable"}
@@ -258,3 +260,36 @@ async def test_a_surprise_mid_pass_loses_no_reset(agent, monkeypatch):
     monkeypatch.setattr(agent, "_work_replays", real)
     await agent._schedules(now + timedelta(minutes=1))
     assert [c[0] for c in replays.calls] == ["grinder-ao-1"]
+
+
+async def test_set_settings_checks_a_schedules_window_and_the_read_says_when_it_starts(agent):
+    """TD-133 slice 2 (§4.7 `ao schedule`): the window is checked against the profile's reading as
+    `ao gate`'s labels are — refused naming the reported ones, `unchecked` with no reading — and the
+    `settings` read gives each scheduled team `starts`: the tick's `schedule_next`, else the reading's reset."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        got = await person.call("set_settings", teams={"g": {"schedule": RULE}})
+        assert got["unchecked"] is True and got["teams"]["g"]["schedule"] == RULE
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": None}
+        reset = datetime.now(UTC) + timedelta(days=2)
+        _reading(agent, reset)
+        with pytest.raises(AgentError, match="profile grind reports no window 5h: its windows are week"):
+            await person.call("set_settings", teams={"g": {"schedule": {**RULE, "window": "5h"}}})
+        assert settings_mod.teams(settings_mod.load())["g"]["schedule"] == RULE  # refused before the write
+        got = await person.call("set_settings", teams={"g": {"schedule": RULE}})
+        assert "unchecked" not in got and got["teams"]["g"]["starts"] == {"at": _iso(reset)}  # the reply says it too
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": _iso(reset)}
+        held = _iso(datetime.now(UTC) - timedelta(minutes=5))
+        agent._host_rec["teams"] = {"g": {"schedule_next": {**RULE, "at": held, "held": True}}}
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": held, "held": True}
+        agent._host_rec["teams"] = {"g": {"schedule_next": {"profile": "grind", "window": "5h", "at": held}}}
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": _iso(reset)}  # another rule's
+        _reading(agent, datetime.now(UTC) - timedelta(hours=1))  # a reset passed and not yet rolled
+        agent._host_rec["teams"] = {}
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": None}
+        agent._usage["grind"] = {"windows": [{"label": "week", "resets": "2099-01-01T07:00:00"}]}  # no offset
+        agent._host_rec["teams"] = "x"  # a malformed host record: the read still answers
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": None}
+        agent._usage["grind"] = {"windows": [{"label": "week", "resets": "2099-01-01T08:00:00+01:00"}]}
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": "2099-01-01T07:00:00Z"}
+        agent._host_rec["teams"] = {}

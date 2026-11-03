@@ -2176,7 +2176,7 @@ def _team_setting_line(name: str, t: dict[str, Any], team: orgmod.TeamDef | None
         f"reserve priority +{t['reserve']}" if t.get("reserve") else "no reserve priority",
     ]
     if t.get("schedule"):
-        parts.append(f"schedule {t['schedule']}")
+        parts.append(_schedule_words(t))
     if t.get("balance"):  # §6 *Balance*: off until a person sets it
         parts.append(f"balance {_balance_words(t['balance'])}")
     if t.get("on_work"):  # §6 rule 8: said only where the file holds the key; absent, the team starts (TD-457)
@@ -2184,6 +2184,76 @@ def _team_setting_line(name: str, t: dict[str, Any], team: orgmod.TeamDef | None
     if words := teamrun.size_words(t.get("size"), team):  # §4.9 *A team's size*: a line its size differs on
         parts.append("size " + ", ".join(words))
     return f"{name}: " + " · ".join(parts)
+
+
+def _schedule_words(t: dict[str, Any]) -> str:
+    """A team's schedule as `ao schedule` says it (design §4.7, §6 *Schedule*, TD-133): *starts at the
+    reset of grind's week — Thu 07:00*, the instant in the reader's clock; *no schedule* without one."""
+    rule = t.get("schedule")
+    if not isinstance(rule, dict):
+        return "no schedule"
+    head = f"starts at the reset of {rule.get('profile')}'s {rule.get('window')}"
+    starts = t.get("starts") if isinstance(t.get("starts"), dict) else {}
+    if not starts.get("at"):
+        return f"{head} — no reading of it yet"
+    try:
+        when = datetime.fromisoformat(str(starts["at"]).replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        return f"{head} — {starts['at']}"
+    held = " (held for a node's link)" if starts.get("held") else ""
+    return f"{head} — {when:%a %H:%M}{held}"
+
+
+def cmd_schedule(args: argparse.Namespace) -> int:
+    """`ao schedule` / `ao schedule <team> reset --profile <p> --window <label>` / `ao schedule <team> off`
+    (design §4.7, §6 *Schedule*, §5 `teams.<team>.schedule`, TD-133): every team's rule and when it next
+    fires, or set or clear one through `set_settings` — a person's own, refused to a session as `ao gate`
+    is. The team is checked here against the org's definitions (the agent reads none); the window
+    against the profile's reading at the agent, as `ao gate`'s labels are. The listing is the `settings`
+    read's, a person's own as it is."""
+    if not args.name:
+        got = call_sync("settings")
+        teams = got.get("teams") or {}
+        names: list[str] = []
+        with contextlib.suppress(ValueError, OSError, AgentError, AgentUnavailable):  # the org adds *no schedule* rows
+            names = sorted(_org_here().teams)
+        names += sorted(n for n in teams if n not in names)
+        rows = [
+            {"team": n, "schedule": (teams.get(n) or {}).get("schedule"), "starts": (teams.get(n) or {}).get("starts")}
+            for n in names
+        ]
+
+        def prose() -> None:
+            if not rows:
+                print("no teams")
+            for r in rows:
+                print(f"{r['team']} · {_schedule_words(r)}")
+
+        return emit(args, rows, prose)
+    if args.what is None:
+        raise AgentError("ao schedule <team> reset --profile <p> --window <label>, or ao schedule <team> off")
+    try:
+        name = _defined_team(args)
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    if args.what == "off":
+        rule = None
+    else:
+        if not args.profile or not args.window:
+            raise AgentError(
+                f"ao schedule {name} reset needs --profile and --window, e.g. --profile grind --window week"
+            )
+        rule = {"start": "reset", "profile": args.profile, "window": args.window}
+    got = call_sync("set_settings", teams={name: {"schedule": rule}})
+    t = (got.get("teams") or {}).get(name) or {}
+
+    def said() -> None:
+        print(
+            f"{name} · {_schedule_words(t)}"
+            + (" (the profile has no reading yet, so the window was not checked)" if got.get("unchecked") else "")
+        )
+
+    return emit(args, got, said)
 
 
 def cmd_team_until(args: argparse.Namespace) -> int:
@@ -5032,6 +5102,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--at", metavar="DATE", help="the period's first day, YYYY-MM-DD (default: the current one)")
     p.add_argument("--entries", action="store_true", help="also the finished entries, one a line")
     p.set_defaults(fn=cmd_spend)
+
+    p = add("schedule", help="show, set or clear a team's start at a window's reset (design §6 Schedule, TD-133)")
+    p.add_argument("name", nargs="?", help="the team; none: every team's rule and when it next fires")
+    p.add_argument(
+        "what", nargs="?", choices=("reset", "off"), help="reset: start it at the window's reset; off: clear"
+    )
+    p.add_argument("--profile", help="the profile whose account reading names the reset")
+    p.add_argument("--window", help="the window's label as the profile's adapter reports it: 5h, week")
+    p.set_defaults(fn=cmd_schedule)
 
     p = add("gate", help="show or set the usage gate's reserves per profile (design §6, TD-100)")
     p.add_argument("profile", nargs="?", help="the profile; `-` for the unnamed default. None: show every profile")

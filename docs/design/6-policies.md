@@ -1742,7 +1742,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   runs nothing from the PR's head except bytes step 1 proved are agent-cadence's, and never moves a
   checkout. The pull (above) follows the
   merge on its next pass, and the promote follows main as it always does.
-- **Schedule: a team start at the reset** (the tick's rule built, TD-133 slice 1; `ao schedule` and the
+- **Schedule: a team start at the reset** (the tick's rule built, TD-133 slice 1; `ao schedule`, slice 2; the
   card's note not yet): the one start the host agent makes that no person pressed at the time, and the general form
   the run window (below) reduces to. **A schedule is a person's standing press, kept in
   `settings.yml`** under the team's own key (§5 `teams.<team>.schedule`; read on every tick, written
@@ -1783,7 +1783,7 @@ teams:
   is a person's `ao team start`. A kill or a person's Close is never undone, as rule 1 says. With
   the ledger still empty each member runs once, declares `none`, and the team winds down again. The
   team card says it (§4.5a *starts* note); `ao schedule` (§4.7) and the Settings page's **schedule**
-  field set and clear it (both not built; TD-133). A start time for one session is **Start time**,
+  field set and clear it (the field not built; TD-133). A start time for one session is **Start time**,
   above. **Not designed**: window overrides with an expiry (TD-101: not wanted yet), calendar-shaped
   windows and one-off runs — TD-026 holds them for the person's word on scope.
 - **Team stop time** (§5 `teams.<team>.until`; the Settings page and `ao team until`, §4.7): the
