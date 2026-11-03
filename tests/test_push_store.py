@@ -4,6 +4,7 @@ subscriptions live*; TD-1304 slice 1): `push.json`, the checks a subscription me
 `set_settings`. Nothing here sends."""
 
 import base64
+import json
 import os
 
 import pytest
@@ -178,7 +179,7 @@ def test_subscribe_and_load_keep_what_the_store_says(tmp_path):
 
     where = tmp_path / "push.json"
     where.write_text(
-        __import__("json").dumps(
+        json.dumps(
             {
                 "key": 7,
                 "public_key": "",
