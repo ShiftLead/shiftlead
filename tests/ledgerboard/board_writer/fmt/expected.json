@@ -1,0 +1,20 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "fmt",
+  "fixed": [
+   5,
+   6
+  ],
+  "paths": [
+   "board.md"
+  ],
+  "refused": [
+   {
+    "line": 7,
+    "why": "head: `(w-2)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+   }
+  ],
+  "subject": null
+ }
+}

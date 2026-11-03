@@ -604,3 +604,14 @@ def pinned_script(name: str) -> Path:
     script = payload / "scripts" / name
     assert script.is_file(), f"the pinned agent-cadence tree has no scripts/{name}"
     return script
+
+
+def copy_pinned_ledgerboard(scripts: Path) -> Path:
+    """The pinned tree's `scripts/ledgerboard/` package (v2.3, TD-1330) copied into `scripts`, beside a
+    reader copied there that imports it; returns the copy."""
+    pkg = pinned_script("ledgerboard/__init__.py").parent
+    dest = Path(scripts) / "ledgerboard"
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in pkg.glob("*.py"):  # file by file: the pinned tree is read-only, and a copied mode would keep it
+        (dest / f.name).write_bytes(f.read_bytes())
+    return dest

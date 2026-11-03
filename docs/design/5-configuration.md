@@ -240,9 +240,9 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   - **the gate**, agent-cadence's `check_cadence.py` (§6 rule 10);
   - **the ledger**, in ledgerboard format at `ledger:` — a file, or a v2 directory of one file per entry
     (§4.4 *Either layout*; default `docs/ledger` where that is a directory, else `docs/technical_debt.md`) — the format
-    `ShiftLead/ledgerboard`'s `SPEC.md` defines and its `ledgerboard.py` reads — the one parser,
-    vendored as `src/sessionorc/ledgerboard.py` and held byte-equal to the synced
-    `scripts/ledgerboard.py` while the copy stands (§8 *Which side a thing lives on*).
+    `ShiftLead/ledgerboard`'s `SPEC.md` defines and its package reads — the one parser,
+    vendored as `src/sessionorc/ledgerboard/` (v2.3, TD-1330) at the release the pinned tree's
+    `scripts/ledgerboard/` names (§8 *Which side a thing lives on*).
 
   **agent-cadence's own repo is its source**, not a consumer: a checkout whose root holds `files/` and `sync.sh` or, once
   `sync.sh` retires, `launcher/INTERFACE` (TD-1024) carries no lock and is at its own head, so its tree is itself (no lock, no `OLDEST` check)

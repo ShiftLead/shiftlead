@@ -115,7 +115,7 @@ def test_the_write_back_and_its_add_land_on_the_board_board_names(tmp_path, forg
     got = board.write_back(root, 5, ITEM, "snooze", "2026-11-01")
     git(root, "fetch", "-q", "origin")
     assert git(root, "show", "--name-only", "--format=", "origin/main") == REL
-    assert "Due: 2026-11-01." in git(root, "show", f"origin/main:{REL}")
+    assert "Hide until: 2026-11-01." in git(root, "show", f"origin/main:{REL}")
     assert got["line"] == 5 and (root / REL).read_text() == BOARD_TEXT  # the checkout is never written
     added = board.add(root, "Check the fetcher.", "2026-10-20", today="2026-10-14")
     git(root, "fetch", "-q", "origin")

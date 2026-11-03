@@ -1,0 +1,14 @@
+{
+ "argv": [
+  "rank",
+  "--rank",
+  "rank.yml",
+  "--action",
+  "prune",
+  "--drop",
+  "TD-4",
+  "--drop",
+  "TD-2",
+  "--json"
+ ]
+}

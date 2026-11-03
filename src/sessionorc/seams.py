@@ -6,8 +6,8 @@ agent-cadence's tree, the gate and the ledger, or `serve` names each lack in §5
 and the warnings, one sentence each. The Repo page's missing-seam lines (§4.5a) and `ao doctor`'s
 **repos** check (§4.7) draw this reading and read nothing themselves; the SessionStart commands are
 carried as text, for the clients to compare with the adapter's own line. It also carries the release
-the repo's vendored `ledgerboard.py` names in its header beside the wheel's (§5 *ledgerboard by its
-header*, TD-1013)."""
+the repo's vendored ledgerboard (its package's `__init__.py`, or an older single `ledgerboard.py`) names
+in its header beside the wheel's (§5 *ledgerboard by its header*, TD-1013)."""
 
 from __future__ import annotations
 
@@ -25,8 +25,14 @@ from sessionorc import ledgerboard as lb
 AGE_TIMEOUT = 20.0  # the bound of one ancestry read, git's or the forge's
 # a vendored copy's first line: the tagged release it came from and the hash of every byte after it
 RELEASE_HEADER = re.compile(r"^# ledgerboard v(\S+) sha256:([0-9a-f]{64})$")
-# where a repo keeps its copy: a consumer's, then agent-cadence's own source
-LEDGERBOARD_COPIES = ("scripts/ledgerboard.py", "files/scripts/ledgerboard.py")
+# where a repo keeps its copy: a consumer's, then agent-cadence's own source — the package's module from v2.3
+# (TD-1330), else a single file from before it; the package is read first, as Python imports it first
+LEDGERBOARD_COPIES = (
+    "scripts/ledgerboard/__init__.py",
+    "files/scripts/ledgerboard/__init__.py",
+    "scripts/ledgerboard.py",
+    "files/scripts/ledgerboard.py",
+)
 
 
 def ledgerboard_release(text: str) -> str | None:
@@ -46,7 +52,7 @@ def _file_release(path: Path) -> str | None:
 
 @functools.cache
 def wheel_release() -> str | None:
-    """The release of the `ledgerboard.py` this build carries (`sessionorc/ledgerboard.py`), read once."""
+    """The release of the ledgerboard this build carries (`sessionorc/ledgerboard/__init__.py`), read once."""
     return _file_release(Path(lb.__file__))
 
 
@@ -57,7 +63,10 @@ def ledgerboard(root: Path | str) -> dict[str, Any]:
     release to compare and is warned of for nothing, its lack saying why."""
     if cadence.pinned(root):
         payload = cadence.tree(root)[0]
-        copy = payload / "scripts" / "ledgerboard.py" if payload is not None else None
+        copy = None
+        if payload is not None:  # the pinned tree's package (v2.3 on), else its single file
+            package = payload / "scripts" / "ledgerboard" / "__init__.py"
+            copy = package if package.is_file() else payload / "scripts" / "ledgerboard.py"
         return {"release": _file_release(copy) if copy is not None else None, "wheel": wheel_release(), "pinned": True}
     copy = next((Path(root) / rel for rel in LEDGERBOARD_COPIES if (Path(root) / rel).is_file()), None)
     return {"release": _file_release(copy) if copy is not None else None, "wheel": wheel_release()}

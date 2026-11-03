@@ -1,0 +1,22 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--text",
+  "Who owns the export?",
+  "--context",
+  "TD-4",
+  "--due",
+  "2026-01-22",
+  "--session",
+  "w-4",
+  "--said",
+  "the docs team",
+  "--by",
+  "the person",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

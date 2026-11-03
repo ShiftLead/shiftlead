@@ -54,7 +54,7 @@ def test_done_and_snooze_commit_the_one_line_on_the_branch_with_ledgerboards_sub
     got = board.branch_edit(root, "snooze", key=key, until="2026-11-01")
     assert got["line"] == 6 and got["key"] == key
     assert git(root, "log", "-1", "--format=%s") == ledgerboard.subject("shiftlead", "snooze", OTHER, to="2026-11-01")
-    assert "Due: 2026-11-01." in (root / "docs/user_attention.md").read_text().splitlines()[5]
+    assert "Hide until: 2026-11-01." in (root / "docs/user_attention.md").read_text().splitlines()[5]
 
 
 @pytest.mark.unit

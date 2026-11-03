@@ -1,0 +1,24 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--kind",
+  "decide",
+  "--text",
+  "Ship on Friday?",
+  "--context",
+  "TD-6",
+  "--due",
+  "2026-01-16",
+  "--answer",
+  "Yes",
+  "--answer",
+  "No",
+  "--detail",
+  "{\"context\": \"The branch is green.\", \"question\": \"Ship Friday or wait?\", \"recommended\": \"only you know the week\"}",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

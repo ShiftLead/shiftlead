@@ -1,0 +1,12 @@
+{
+ "argv": [
+  "rank",
+  "--rank",
+  "rank.yml",
+  "--action",
+  "rank",
+  "--set",
+  "TD-4=|bad",
+  "--json"
+ ]
+}

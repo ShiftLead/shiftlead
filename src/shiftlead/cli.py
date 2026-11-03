@@ -5221,12 +5221,14 @@ def build_parser() -> argparse.ArgumentParser:
     q = bsub.add_parser(
         "edit", help="a session's own done or snooze of one line, committed on the branch it is on (not pushed)"
     )
-    q.add_argument("edit", choices=board_mod.BRANCH_ACTIONS, help="done checks it off; snooze moves its Due:")
+    q.add_argument(
+        "edit", choices=board_mod.BRANCH_ACTIONS, help="done checks it off; snooze hides it until --until (Due: stays)"
+    )
     q.add_argument("--line", type=int, help="the line's 1-based number on the board")
     q.add_argument("--expect", help="the line's first words, as last read: refused when line n does not open with them")
     q.add_argument("--key", help="the line's id, board: and eight hex digits, in place of --line and --expect")
     q.add_argument("--why", help="done: what was done, for its Closed: field")
-    q.add_argument("--until", help="snooze: the new Due: date, YYYY-MM-DD")
+    q.add_argument("--until", help="snooze: the date it is hidden until (its Hide until:), YYYY-MM-DD")
     q.add_argument("--board", help="the board file (default: .shiftlead.yml's board:, else docs/user_attention.md)")
     q.add_argument(
         "--json", action="store_true", default=argparse.SUPPRESS,

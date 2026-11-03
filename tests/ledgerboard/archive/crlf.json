@@ -1,0 +1,4 @@
+{
+ "archive": "# Archive\r\n\r\n- [x] 2026-01-01 (session `w-1` on box-1) — Old thing. Context: TD-7. Due: 2026-01-20. Closed: 2026-01-10 — done.\r\n- [x] 2026-01-02 (session `w-1` on box-1) — Merge the docs PR. Context: TD-7. Due: 2026-01-20. Closed: 2026-01-10 — done.\r\n  - **Context:** It was reviewed.\r\n",
+ "board": "# User Attention Board\r\n\r\nItems that need the person.\r\n\r\n- [ ] 2026-01-01 (session `w-1` on box-1) — Rotate the key. Context: TD-7. Due: 2026-01-20.\r\n"
+}

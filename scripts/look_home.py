@@ -165,7 +165,11 @@ def write_fixtures(home: Path, v2: bool = False) -> Path:
     source, ref = cadence.pin(ROOT)
     (repo / "scripts").mkdir()
     shutil.copy2(tree / "scripts" / "nudge_user_attention.py", repo / "scripts" / "nudge_user_attention.py")
-    shutil.copy2(tree / "scripts" / "ledgerboard.py", repo / "scripts" / "ledgerboard.py")  # the reader imports it
+    # the reader imports the package (TD-1330); file by file, since the pinned tree is read-only and a copied
+    # directory's mode would keep the home from being removed
+    (repo / "scripts" / "ledgerboard").mkdir()
+    for f in (tree / "scripts" / "ledgerboard").glob("*.py"):
+        (repo / "scripts" / "ledgerboard" / f.name).write_bytes(f.read_bytes())
     # served (design §5 *The seams*, TD-1011): a lock at the pinned commit, and the pinned tree's gate
     lock = f"source: {source}\ncommit: {ref[:7]}\nfiles_commit: {ref}\n"
     (repo / "docs" / "cadence-sync.lock").write_text(lock, encoding="utf-8")

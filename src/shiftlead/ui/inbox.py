@@ -1681,6 +1681,8 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
         for it in b.get("items") or ():
             if not isinstance(it, dict) or not it.get("text"):
                 continue
+            if "needs" in it and it["needs"] is None:
+                continue  # ledgerboard's `needs_you` leaves it out: hidden until its `Hide until:` (TD-1330)
             line, text, tag = it.get("line"), str(it["text"]), str(it.get("due_tag") or "")
             detail = board_detail(it)
             # **Open board** is a file link at the item's line, the checkout first (§4.6, TD-689)
@@ -2040,7 +2042,7 @@ def inbox_sections(
     into **Needs you** here rather than anywhere else. From step 3 the due **board items**
     (`boards`, from `board_rows`) join it the same way, counted: a due board item is waiting on a
     person by definition. They carry no snooze of the Inbox's own: a board row's Snooze is §4.4's
-    write-back, which moves its `Due:` date on the board itself.
+    write-back, which writes its `Hide until:` on the board itself, and a hidden item is no row.
 
     - **Needs you** — the state rows, open `ask`s to the person and **paused** `steer`s; oldest first.
     - **Steering** — open `steer`s whose clock is running; soonest bound first, and a `steer`

@@ -245,10 +245,13 @@ def swept(content: str) -> dict[str, str | None]:
 
 
 def board_items(content: str, today: date) -> list[dict[str, Any]]:
-    """The open items of a board's text, each ledgerboard's `item_record` with its id as `key`."""
+    """The open items of a board's text, each ledgerboard's `item_record` with its id as `key` and its
+    class in ledgerboard's `needs_you` as `needs` (v2.3, TD-1330) — None for an item hidden today (a
+    `Hide until:` still ahead), which the Inbox leaves out (design §4.4 *Board write-back*)."""
+    needs = {it.line: cls for it, cls, _ in ledgerboard.needs_you(content, today)}
     out: list[dict[str, Any]] = []
     for it in ledgerboard.parse_board(content, warn=False):
-        out.append({**ledgerboard.item_record(it, today), "key": ref("", it.text)})
+        out.append({**ledgerboard.item_record(it, today), "key": ref("", it.text), "needs": needs.get(it.line)})
     return out
 
 

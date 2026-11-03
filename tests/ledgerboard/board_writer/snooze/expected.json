@@ -1,0 +1,11 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "snooze",
+  "line": 7,
+  "paths": [
+   "board.md"
+  ],
+  "subject": "ledgerboard: snooze Merge the parser fix. to 2026-01-29 (session `w-1`)"
+ }
+}

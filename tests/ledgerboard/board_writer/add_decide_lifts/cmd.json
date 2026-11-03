@@ -1,0 +1,28 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--kind",
+  "decide",
+  "--text",
+  "Keep the old export?",
+  "--context",
+  "TD-4 decision (pat)",
+  "--due",
+  "2026-01-20",
+  "--answer",
+  "Keep — nothing changes",
+  "--answer",
+  "Drop",
+  "--default",
+  "1",
+  "--lift",
+  "drop",
+  "--detail",
+  "{\"context\": [\"Nobody has read it since the move.\", \"Two scripts still call it.\"], \"question\": \"Drop the old export\", \"recommended\": \"both scripts have a replacement\", \"otherwise\": \"it stays another release\"}",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}
