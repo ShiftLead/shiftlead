@@ -132,13 +132,17 @@ class SettingsMixin:
         max_age = settings_mod.usage(whole).get("max_age", settings_mod.MAX_AGE_DEFAULT)
         return {"profiles": out, "file": str(settings_mod.settings_file()), "max_age": max_age}
 
-    async def rpc_settings(self, caller: Any = None) -> dict[str, Any]:
+    async def rpc_settings(self, caller: Any = None, profiles: Any = None) -> dict[str, Any]:
         """`ao settings` and the Settings page's read (design §5, §4.7, TD-146): the home's
         `settings.yml`, each key as its reader keeps it, with what it makes today — each profile's
         lines against its last reading (as `gate` answers), each team's stop time with whether it
         has passed and its reserve priority. `migrate` names a `ui.yml` still on disk, which is no
         longer read. **A person's own**, refused to a session as `set_settings` is: `person:` is
-        theirs, and what a session needs of the gate `gate` answers."""
+        theirs, and what a session needs of the gate `gate` answers. `profiles`, the profile names the
+        Settings page read from `profiles.yml` (this agent reads no profile list), adds `labels`: each
+        name to the window labels of the reading the gate judges it by, in the reading's order — the
+        ones a schedule's window is checked against (§4.5a *Settings page: Teams*, TD-1346); a value
+        that is not a list of strings is taken as absent."""
         agent_common.person_only(caller, "read the settings", "§5 settings.yml", self._graph())
         doc, now = settings_mod.load(), datetime.now(UTC)
         gate = (await self.rpc_gate())["profiles"]
@@ -167,19 +171,24 @@ class SettingsMixin:
             "permissions": self._permissions_read(doc),
             "migrate": [],
         }
+        if isinstance(profiles, list) and all(isinstance(p, str) for p in profiles):
+            out["labels"] = {p: self._window_labels(p) for p in profiles}
         if settings_mod.ui_yml().exists():
             out["migrate"].append(
                 f"{settings_mod.ui_yml()}: ui.yml is no longer read — its open_in lives under person:"
             )
         return out
 
+    def _window_labels(self, profile: str) -> list[str]:
+        """The window labels of the reading the gate judges `profile` by (its own, else its account's,
+        TD-456), in the reading's order: what a schedule's window is checked against (§6 *Schedule*)."""
+        return [str(w.get("label")) for w in self._gate_reading(profile).get("windows") or [] if isinstance(w, dict)]
+
     def _schedule_window_known(self, rule: dict[str, str]) -> bool:
         """A schedule's window checked against its profile's reading (§6 *Schedule*, §4.7 `ao schedule`,
         TD-133): a label the reading does not report is refused, naming the reported ones, as `ao gate`'s
         reserves are; False when the profile has no reading yet, so nothing could be checked."""
-        reported = [
-            str(w.get("label")) for w in self._gate_reading(rule["profile"]).get("windows") or [] if isinstance(w, dict)
-        ]
+        reported = self._window_labels(rule["profile"])
         if not reported:
             return False
         if rule["window"] not in reported:

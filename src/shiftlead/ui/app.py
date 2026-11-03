@@ -4219,11 +4219,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             except HTTPException as e:
                 return e
 
+        # `profiles.yml` first, on a worker thread: the `settings` read takes its names, answering each
+        # one's window labels for the **schedule** field's window pick (§4.5a *Settings page: Teams*, TD-1346)
+        profiles, default, profile_notes = await asyncio.to_thread(settings_profiles)
         # Every read the page makes at once (§4.5 *Page loads*, TD-884): the RPCs, none waiting on
-        # another, and this host's files on a worker thread, so the loop is not held by a YAML load
+        # another, and this host's other files on a worker thread, so the loop is not held by a YAML load
         first, local_files = await asyncio.gather(
             asyncio.gather(
-                read("settings"),
+                read("settings", profiles=list(profiles)),
                 read("usage"),
                 read("host"),
                 read("list"),
@@ -4256,9 +4259,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             k: None if isinstance(r, HTTPException) else r
             for k, r in (("usage", first[1]), ("gate", first[5]), ("host", first[2]))
         }
-        profiles, default, org, local = (local_files[k] for k in ("profiles", "default", "org", "local"))
+        org, local = local_files["org"], local_files["local"]
         notes: list[str] = [why] if why else []
-        notes += local_files["notes"]
+        notes += profile_notes + local_files["notes"]
         node = (info or {}).get("mode") == "node"
         uiconf.set_read(got or None)
         term = setmod.you(got.get("person"))
@@ -4281,6 +4284,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     repos=readings,
                     flows=await asyncio.to_thread(team_flows, org),
                     host=info,
+                    profiles=profiles,
+                    default=default,
+                    labels=got.get("labels"),
                 ),
                 "repos": setmod.repo_cards(local_files["repos"], got.get("repos"), (info or {}).get("pulls"), readings),
                 # **Sweep** (§4.5a, §4.9b *The switch*, TD-1091): the switch and a line per registered checkout
@@ -4326,24 +4332,26 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             },
         )
 
-    def settings_files() -> dict[str, Any]:
-        """The Settings page's reads of this host's own files (§4.5 *Page loads*, TD-884) — the profiles,
-        the org and every repo's `teams:`, `hosts.yml` and the repos registry — timed as `files`, on a
-        worker thread beside the page's RPCs. A malformed profiles file is a note, never a 500."""
+    def settings_profiles() -> tuple[dict[str, Any], str, list[str]]:
+        """The Settings page's `profiles.yml` (§4.5 *Page loads*, TD-1346): read ahead of the page's RPCs,
+        whose `settings` read takes the names, timed as `files`. A malformed file is a note, never a 500."""
         with timing.step("files"):
-            notes: list[str] = []
             try:
                 profiles, default = profiles_mod.load()
             except ValueError as e:
-                profiles, default = {}, ""
-                notes.append(str(e))
+                return {}, "", [str(e)]
+            return dict(profiles), default, []
+
+    def settings_files() -> dict[str, Any]:
+        """The Settings page's other reads of this host's own files (§4.5 *Page loads*, TD-884) — the org
+        and every repo's `teams:`, `hosts.yml` and the repos registry — timed as `files`, on a worker
+        thread beside the page's RPCs."""
+        with timing.step("files"):
             org, org_notes = org_here()
             local = hosts.local_host()
             return {
-                "profiles": profiles,
-                "default": default,
                 "org": org,
-                "notes": notes + org_notes,
+                "notes": org_notes,
                 "local": local,
                 "repos": local.repos(),
                 "host_card": setmod.host_card(
@@ -4435,12 +4443,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/settings/teams")
     async def settings_teams(request: Request):
-        """§4.5a *Settings page: Teams* → **Save** / **Clear**: `{team, until?, reserve?, on_work?, balance?}` —
-        `until` in the CLI's forms (`06:00`, `+8h`, ISO) read in this host's clock and handed over as
+        """§4.5a *Settings page: Teams* → **Save** / **Clear**: `{team, until?, reserve?, on_work?, balance?,
+        schedule?}` — `until` in the CLI's forms (`06:00`, `+8h`, ISO) read in this host's clock and handed over as
         an instant, `null` to clear; `reserve` a whole percent, `0` or empty clearing it; `on_work`
         (**when work appears**, §6 rule 8) one of `ask`, `start`, `off`, as `ao team on-work`; `balance`
         (§6 *Balance*) the lines whole, `{prs?, oldest?, review?}`, or `null` for the switch off — a
-        line left out is a line not drawn, and the agent's refusal names what is wrong. A team the
+        line left out is a line not drawn, and the agent's refusal names what is wrong; `schedule` (§6
+        *Schedule*, TD-1346) the rule whole, `{start: reset, profile, window}`, or `null` for the switch off,
+        checked by the agent as `ao schedule` is (a label the profile does not report is refused). A team the
         org does not define is refused, naming the defined ones, as `ao team until` refuses it."""
         body = await body_of(request)
         team = str(body.get("team") or "")
@@ -4480,9 +4490,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         " — or turn it off",
                     )
             change["balance"] = bal
+        if "schedule" in body:
+            rule = body.get("schedule")
+            if rule is not None and not isinstance(rule, dict):
+                raise HTTPException(400, "schedule is {start: reset, profile, window}, or null for off")
+            change["schedule"] = rule
         flow = str(body.get("flow") or "") if "flow" in body else None
         if not change and flow is None:
-            raise HTTPException(400, "teams: send until, reserve, on_work, balance or flow")
+            raise HTTPException(400, "teams: send until, reserve, on_work, balance, schedule or flow")
         got: dict[str, Any] = {}
         org = org_here()[0]
         if flow is not None:  # **flow**: checked before anything is written, so a refusal saves nothing

@@ -548,6 +548,18 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "schedule",
+        "schedule",
+        "Settings page: Teams",
+        (
+            "Starts this team again when a usage window resets: pick the profile and the window, such as grind's "
+            "week, and at that reset the home starts the members a person last started, with the briefs they last "
+            "read. A team that is running, or that you stopped, is left alone, and a reset found more than an hour "
+            "late starts nothing. Turn it off and the team waits for Start, or for its work if you set that. ao "
+            "schedule sets the same rule."
+        ),
+    ),
+    Help(
         "file-link",
         "file link",
         "Settings page: You",
@@ -900,7 +912,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "row-back-to-design",
         ),
     ),
-    ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
+    ("settings", "Settings", ("on-work", "balance", "schedule", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
 )
 

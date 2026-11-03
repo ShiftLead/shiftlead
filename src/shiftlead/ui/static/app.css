@@ -1070,6 +1070,7 @@ html.phonefocus .composer.nopen #send { min-height: 40px; border-radius: 20px; m
 .setpage .setpicks { display: flex; flex-direction: column; gap: 4px; } .setpage .setpicks label { white-space: nowrap; } .setpage .setnum, .setpage .setin.setnum { width: 4.5em; display: inline-block; padding: 1px 4px; } /* board items shown (TD-220); `.setin`'s 100% below widened the page (TD-296 #9) */
 .setpage .setlabel { font-size: var(--t-small); font-weight: 600; color: var(--strong); }
 .setpage .setin { width: 100%; }
+.setpage .setschedule .setpicks { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 16px; } .setpage .setschedule .setin { width: auto; display: inline-block; } /* **schedule**: switch, profile and window in a line, as the mockup (TD-1346) */
 .setpage .setover { color: var(--needs-fg); font-weight: 600; }  /* **balance**: the mark that stands (§6 *Balance*) */
 .setpage .settemplate { display: flex; flex-direction: column; gap: 10px; }
 .setpage .setline.warn, .setpage .setsaid.warn { color: var(--needs-fg); }

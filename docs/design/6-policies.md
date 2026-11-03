@@ -1742,8 +1742,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   runs nothing from the PR's head except bytes step 1 proved are agent-cadence's, and never moves a
   checkout. The pull (above) follows the
   merge on its next pass, and the promote follows main as it always does.
-- **Schedule: a team start at the reset** (TD-133: the tick's rule, `ao schedule` and the card's note built;
-  the Settings page's field designed by TD-1344, not yet built: TD-1346): the one start the host agent makes that no person pressed at the time, and the general form
+- **Schedule: a team start at the reset** (TD-133: the tick's rule, `ao schedule` and the card's note;
+  the Settings page's field designed by TD-1344, built by TD-1346): the one start the host agent makes that no person pressed at the time, and the general form
   the run window (below) reduces to. **A schedule is a person's standing press, kept in
   `settings.yml`** under the team's own key (§5 `teams.<team>.schedule`; read on every tick, written
   only by `set_settings`, so a session cannot set one):
@@ -1783,7 +1783,7 @@ teams:
   is a person's `ao team start`. A kill or a person's Close is never undone, as rule 1 says. With
   the ledger still empty each member runs once, declares `none`, and the team winds down again. The
   team card says it (§4.5a *starts* note); `ao schedule` (§4.7) and the Settings page's **schedule**
-  field set and clear it (the field's shape is §4.5a *Settings page: Teams*; not yet built, TD-1346). A rule on a **metered** profile (§4.2a) waits on that profile's own spend reading, which has no account to fall back on and is kept only while some session — anyone's — runs under that profile, so with none running a wound-down team's rule has no reset to wait for and fires nothing; the field offers no such profile. A start time for one session is **Start time**,
+  field set and clear it (the field's shape is §4.5a *Settings page: Teams*; TD-1346). A rule on a **metered** profile (§4.2a) waits on that profile's own spend reading, which has no account to fall back on and is kept only while some session — anyone's — runs under that profile, so with none running a wound-down team's rule has no reset to wait for and fires nothing; the field offers no such profile. A start time for one session is **Start time**,
   above. **Not designed**: window overrides with an expiry (TD-101: not wanted yet), calendar-shaped
   windows and one-off runs — TD-026 holds them for the person's word on scope.
 - **Team stop time** (§5 `teams.<team>.until`; the Settings page and `ao team until`, §4.7): the
