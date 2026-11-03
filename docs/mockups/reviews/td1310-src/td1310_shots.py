@@ -1,6 +1,7 @@
 """TD-1310 mockups, read-only against the live UI: the Queue page with ao-grind picked, copied without
 scripts, its top line redrawn: now / A (recount, aligned, no needs mark) / B (recount, aligned, a needs
-sliver in each segment, 'items' named) / C (B without the heading line's Decide · Do)."""
+sliver in each segment, 'items' named) / C (B without the heading line's Decide · Do) / D (C's bar and legend on their own line under one control row:
+Queue, the chips, the switch and find; Paul, 2026-11-02)."""
 import re, sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
@@ -21,12 +22,20 @@ CSS = """
 .tdm-seg > i { display: block; height: 100%; }
 .tdm-wide .qsum { max-width: 500px !important; }
 .tdm-items { color: var(--muted); margin-right: 4px; }
+.tdm-d .qhline { align-items: center !important; }
+.tdm-d .qhline .qteams { display: contents; }
+.tdm-d .qhline .qteams > .qsub:first-child { margin-right: -6px; }
+.tdm-d .qhend { margin-left: auto; }
+.tdm-d .qhline { padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 10px; gap: 8px 8px; }
+.tdm-d .qhline .h1 { margin-right: 10px !important; }
+.tdm-d .qsum.tdm-line { display: flex; max-width: none !important; width: 100%; margin: 0 0 6px; }
+.tdm-d .qsum.tdm-line .qsbar { height: 8px; }
 """
 EDIT = r"""
 ([shape, G, TOTAL, NEEDS, DEC, DO, CSS]) => {
   if (shape === 'now') return;
-  const hatch = shape === 'B' || shape === 'C';
-  if (hatch) document.body.classList.add('tdm-wide');
+  const hatch = shape === 'B' || shape === 'C' || shape === 'D';
+  if (hatch && shape !== 'D') document.body.classList.add('tdm-wide');
   const st = document.createElement('style'); st.textContent = CSS; document.head.append(st);
   const bar = document.querySelector('.qsbar');
   bar.innerHTML = G.map(([g, v, w, n, nd]) => {
@@ -44,6 +53,14 @@ EDIT = r"""
   document.querySelector('#qfneeds').title = `${NEEDS} cards need you`;
   const w = document.querySelector('.qwantsn');
   if (shape === 'C') { w.remove(); return; }
+  if (shape === 'D') {
+    w.remove(); document.body.classList.add('tdm-d');
+    const line = document.querySelector('.qhline'), teams = document.querySelector('.qteams'), sum = document.querySelector('.qsum');
+    teams.style.cssText = 'margin: 0; padding: 0; border: 0;';
+    line.insertBefore(teams, document.querySelector('.qhend'));
+    sum.classList.add('tdm-line'); document.querySelector('#qfilters').append(sum);
+    return;
+  }
   w.innerHTML = (shape === 'B' ? '<span class="tdm-items">items:</span>' : '') + `Decide ${DEC} · Do ${DO}`;
 }
 """
