@@ -1207,7 +1207,7 @@
       if (row.querySelector(".st.decided:not([data-drawn])")) return false;
       AO.drawDecided(row, f.text);
     } else if (f.kind === "reply") {
-      if (row.querySelectorAll(".st.boardreply").length > f.replies) return false;
+      if (row.querySelectorAll(".st.boardreply:not([data-drawn])").length > f.replies) return false;
       AO.drawReply(row, f.text);
     } else return true;
     if (f.out) AO.drawOff(row);
@@ -1272,7 +1272,9 @@
         return;
       }
       AO.markPending(row, verb);
-      if (row.dataset.msg) AO.inflight[row.dataset.msg] = leaves && r4 ? { leaves, verb, kind: "left" } : { leaves, verb };
+      // an answered rule 4 press's minute is not overwritten by a later press of another kind on the row
+      const kept = AO.inflight[row.dataset.msg];
+      if (row.dataset.msg && !(kept && kept.until && !r4)) AO.inflight[row.dataset.msg] = leaves && r4 ? { leaves, verb, kind: "left" } : { leaves, verb };
       if (!leaves) return;
       // the control goes with its row, and while it holds the focus the refresh would decline to redraw
       if (row.contains(document.activeElement)) document.activeElement.blur();
@@ -1289,8 +1291,8 @@
       if (text !== undefined) f.text = text;
       const r = fresh();
       if (!r) return;
-      if (f.kind === "decided") AO.drawDecided(r, f.text);
-      else if (f.kind === "reply") AO.drawReply(r, f.text);
+      // a re-read that already drew the result from the board is left as the board says: never a second line
+      if ((f.kind === "decided" || f.kind === "reply") && !AO.redraw(r, f)) delete AO.inflight[msgOf];
       if (f.kind !== "left") AO.drawOn(r);
     };
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
@@ -1675,7 +1677,8 @@
       // rule 4's refusal (TD-1321): the row as it was, pressable, its error line and the toast in the same words —
       // *not decided: …*, *not replied: …*, *not done: …*, *not sent back to design: …* — never *<control> failed*,
       // which cannot tell a board decide from a board Done; a row the press took away comes back on the refresh
-      if (r4 && row) {
+      // …but an error after the answer landed is not a refusal: the drawn result stands
+      if (r4 && row && !(msgOf && AO.inflight[msgOf] && AO.inflight[msgOf].until)) {
         const words = `${r4[1]}: ${e.message}`;
         say(words);
         if (msgOf) {
