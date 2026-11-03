@@ -177,6 +177,17 @@ def test_subscribe_and_load_keep_what_the_store_says(tmp_path):
     assert [d["id"] for d in doc["devices"]] == [second]
     assert doc["devices"][0]["label"] == "x" * 80, "the replaced device's label is kept"
 
+    # TD-1317: a swapped device's delivery is its own — the old one's last result is not carried onto it, while
+    # its label and since are
+    doc = {"key": push_mod.KEY, "public_key": PUBLIC, "devices": []}
+    old = push_mod.subscribe(doc, EP, KEYS, "laptop", PUBLIC, "2026-11-02T00:00:00Z")
+    doc["devices"][0].update(last_ok="2026-11-02T00:05:00Z", last_error="410 Gone")
+    swapped = push_mod.subscribe(doc, other, KEYS, "", PUBLIC, "2026-11-02T00:06:00Z", replaces=old)
+    assert [d["id"] for d in doc["devices"]] == [swapped] and swapped != old
+    got = doc["devices"][0]
+    assert (got["last_ok"], got["last_error"]) == (None, None)
+    assert (got["label"], got["since"]) == ("laptop", "2026-11-02T00:00:00Z")
+
     where = tmp_path / "push.json"
     where.write_text(
         json.dumps(
