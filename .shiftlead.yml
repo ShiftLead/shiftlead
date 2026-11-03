@@ -52,6 +52,9 @@ teams:
     seats:
       - {name: docs-audit-ao-1, role: auditor, brief: docs/briefs/docs-audit.md, trigger: {prs: 10}}
       - {name: test-audit-ao-1, role: auditor, brief: docs/briefs/test-audit.md, trigger: {prs: 10}}
+      # the fact-check trial (design §4.9b *The fact-check*, TD-1213): a Gemini seat on a free account, asked
+      # beside each member's own fact-check of a doc-only PR, never instead of it; filled by an ask, closed idle
+      - {name: fact-check-ao-1, role: fact-checker, profile: gemini-reader, trigger: asks}
     members:
       - {role: grinder, name: grinder-ao-1, brief: docs/briefs/grinder-ao-1.md}
       # the second grinder: both share the build stage's one lane and pick the top-ranked entry nobody holds (TD-749)
