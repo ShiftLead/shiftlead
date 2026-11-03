@@ -23,8 +23,8 @@ from typing import Any
 
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
+from sessionorc import naming, workorders
 from sessionorc import rank as rank_mod
-from sessionorc import workorders
 from sessionorc.reports import branch_ref
 
 # A red PR nobody holds reads *stalled* this long after its `red_since` (§4.4 *A row's state*): the
@@ -93,13 +93,111 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
     return out
 
 
+def first_ref(about: Any, words: Any) -> str | None:
+    """The one entry a mail item names (§4.5 screen 6 *Where a row is drawn*): the first ref of its `about`,
+    else the first `TD-n` of `words` (its subject and text); None where it names none."""
+    named = refs(about) or refs(words)
+    return named[0] if named else None
+
+
 def mail_card(about: Any, words: str, index: Mapping[str, tuple[str, str]] | None) -> tuple[str, str] | None:
     """The `(card id, row qid)` a mail item is drawn on (§4.5 screen 6 *Where a row is drawn*): the entry
     its `about` names, else the first `TD-n` of `words` (its subject and text), where an open card holds
     it; None — its home is the Inbox — for the rest. The Inbox's own `item_home` and Telegram's link
     (§4.10 *What a message says*, TD-795) read it alike."""
-    named = refs(about) or refs(words)
-    return (index or {}).get(named[0]) if named else None
+    named = first_ref(about, words)
+    return (index or {}).get(named) if named else None
+
+
+# an answered question's word holds after a `done` outcome no longer than this (§4.4 *The card's status*, TD-1316)
+ANSWERED_DONE_FOR = timedelta(days=1)
+_GONE = ("exited", "closed")
+
+
+def open_refs(qids: Iterable[str]) -> dict[str, str]:
+    """The open members' index an answered question links through (§4.4 *The card's status*, TD-1316): each
+    `<repo>#TD-n` to itself, and the bare `TD-n` to it only where exactly one open member across the repos
+    carries it — two repos' `TD-n` link to neither."""
+    out: dict[str, str] = {}
+    bare: dict[str, set[str]] = {}
+    for q in qids:
+        out[q] = q
+        bare.setdefault(q.partition("#")[2], set()).add(q)
+    for tid, qs in bare.items():
+        if len(qs) == 1:
+            out[tid] = next(iter(qs))
+    return out
+
+
+def _get(o: Any, name: str) -> Any:
+    """A field of a person-inbox question, a `MailEntry` (the home's) or its view dict (the UI's)."""
+    if isinstance(o, Mapping):
+        return o.get("from" if name == "from_" else name)
+    return getattr(o, name, None)
+
+
+def _aware(v: Any) -> datetime | None:
+    """An aware UTC time from an ISO string (a `Z` read on 3.11+) or epoch seconds; None for anything else."""
+    if isinstance(v, int | float) and not isinstance(v, bool):
+        return datetime.fromtimestamp(v, UTC)
+    if not isinstance(v, str) or not v:
+        return None
+    try:
+        t = datetime.fromisoformat(v)
+    except ValueError:
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=UTC)
+
+
+def answered_hold(
+    member: Mapping[str, Any],
+    questions: Iterable[Any],
+    states: Mapping[str, str],
+    refs_open: Mapping[str, str],
+    now: datetime,
+) -> dict[str, Any] | None:
+    """A `decision (paul)` member whose question the person has answered, while its asker acts on the answer
+    (§4.4 *The card's status*, TD-1316): `{mid, asker, kind, closed_at, outcome}` of the newest such question
+    by `closed_at`, or None — the member then needs the person as before.
+
+    `member` is the open entry with its `repo` and `written` (its file's mtime); `questions` the person inbox's
+    entries (`MailEntry`s or their view dicts); `states` each record's state by bare id, from the **unfiltered**
+    records, an absent id gone; `refs_open` the open members' index (`open_refs`) over every repo. A question
+    links by its first ref (`first_ref`), resolved through `refs_open`. The newest linked question answered by
+    the person (`replied`, or `go_with_it`) holds while it owes its outcome and its asker's record is neither
+    exited, closed nor absent; after a `done` outcome, while the entry's file is not written after the answer
+    and no longer than `ANSWERED_DONE_FOR` past the outcome's `at`; never on any other outcome."""
+    if not ledger_mod.decided_by(dict(member), PERSON):
+        return None
+    me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
+    best: tuple[datetime, Any] | None = None
+    for q in questions:
+        if _get(q, "kind") not in ("ask", "steer") or _get(q, "closed_reason") not in ("replied", "go_with_it"):
+            continue
+        ref = first_ref(_get(q, "about"), f"{_get(q, 'subject') or ''} {_get(q, 'text') or ''}")
+        if not ref or refs_open.get(ref) != me:
+            continue
+        at = _aware(_get(q, "closed_at"))
+        if at is not None and (best is None or at > best[0]):
+            best = (at, q)
+    if best is None:
+        return None
+    closed, q = best
+    outcome = _get(q, "outcome")
+    asker = naming.split_address(str(_get(q, "from_") or ""))[0]
+    if not outcome:
+        if states.get(asker, "closed") in _GONE:
+            return None  # the asker is gone with the debt unpaid: the question is the person's again
+    elif not isinstance(outcome, Mapping) or outcome.get("state") != "done":
+        return None
+    else:
+        written, done_at = _aware(member.get("written")), _aware(outcome.get("at"))
+        if written is not None and written > closed:
+            return None
+        if done_at is None or now > done_at + ANSWERED_DONE_FOR:
+            return None
+    return {"mid": _get(q, "id"), "asker": asker, "kind": _get(q, "kind"), "closed_at": closed.isoformat(),
+            "outcome": dict(outcome) if isinstance(outcome, Mapping) else None}  # fmt: skip
 
 
 def blob_sha(data: bytes) -> str:
@@ -261,13 +359,16 @@ def reading(
     *,
     waiting: Collection[str] = (),
     doing: Mapping[str, list[Mapping[str, Any]]] | None = None,
+    questions: Iterable[Any] = (),
 ) -> dict[str, Any]:
     """The `queue` reading (§4.4 *The Queue*): `{cards, completed, other_work, at}`.
 
     `repos` are the home's repo readings by root; `records` the live graph's `Session`s (an ended one
     holds nothing); `waiting` the ids of sessions that wait on a question (the person's, or a reader
     holding their ask), which keeps an idle holder from reading *stalled*; `doing` the doing log by
-    team (`{team: [{id, text, at}]}`), whose first line after a claim is a passed-over flag's reason.
+    team (`{team: [{id, text, at}]}`), whose first line after a claim is a passed-over flag's reason;
+    `questions` the person inbox, whose answered questions about a held entry read *answered — waiting on
+    <asker>* (`answered_hold`, TD-1316).
 
     Each **card**: `id` (its top entry's `<repo>#TD-n`), `key` and `lined`, `top` and `rows` (each a row:
     `qid`, `repo`, `id`, `title`, `priority`, `state` — the one word of §4.4 *A row's state*, '' for a
@@ -284,6 +385,11 @@ def reading(
     entry touches, closed within `COMPLETED_WINDOW`, newest first. `other_work` is each live claim that
     names no open entry (`board:<key>`, a PR naming none), with its holder."""
     rs = _Repos(repos)
+    records = list(records)
+    # every record's state by id, ended ones too: an answered question's asker exited or closed is gone (TD-1316)
+    states = {str(r.id): str(getattr(r, "state", "") or "") for r in records}
+    names = {str(r.id): str(getattr(r, "name", "") or r.id) for r in records}
+    questions = list(questions)
     recs = [r for r in records if getattr(r, "state", "") not in ("exited", "closed") and not r.superseded_by]
     open_: dict[str, dict[str, Any]] = {}
     for name, r in rs.by_name.items():
@@ -407,11 +513,18 @@ def reading(
                     prs[q] = dict(pr)
                     break
 
+    linked = open_refs(open_)
+
     def row(q: str) -> dict[str, Any]:
         if q in open_:
             e = open_[q]
             st, needs, mine = _state(e, held.get(q, []), prs.get(q), recs, set(waiting), now)
             claim = held.get(q)
+            # *with you in <name>* first; then a held entry's answered question (§4.4 *A row's state*, TD-1316)
+            answered = answered_hold(e, questions, states, linked, now) if needs and not mine else None
+            if answered:
+                answered["name"] = names.get(answered["asker"], answered["asker"])
+                st = f"answered — waiting on {answered['name']}"
             return {
                 "qid": q,
                 "repo": e["repo"],
@@ -424,6 +537,7 @@ def reading(
                 # the person's own session holding their entry is its holder whatever else claims it (TD-1281)
                 "holder": mine or (_holder(claim[0][0]) if claim else None),
                 "with_you": mine["name"] if mine else None,
+                "answered": answered,
                 # what the row's controls read (§4.5 screen 12 *any open row*, TD-905): its page kind, an open
                 # id in its `Blocked by:` or an open part, and a design's open builds (`ledger.builds_open`, TD-1130)
                 "page": str(e.get("for_page") or ""),
@@ -448,6 +562,7 @@ def reading(
             "pr": pr,
             "holder": None,
             "with_you": None,
+            "answered": None,
             "page": "",
             "after": [],
             "blocked_open": False,
@@ -672,8 +787,9 @@ def card_entries(card: Mapping[str, Any]) -> tuple[list[str], list[str]]:
 def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
     """The ledger's part of a card's status (§4.4 *The card's status*): *needs you* > *stalled* > *blocked*
     > *waiting* > *ready*; *steer*, and a question's *needs you*, are the mail's. A row the person's own
-    session holds (`with_you`, TD-1281), which keeps its `needs`, is no need."""
-    if any(r["needs"] and not r.get("with_you") for r in rows):
+    session holds (`with_you`, TD-1281), or whose question the person answered (`answered`, TD-1316), which
+    keeps its `needs`, is no need."""
+    if any(r["needs"] and not r.get("with_you") and not r.get("answered") for r in rows):
         return "needs you"
     if any(r["state"] == "stalled" for r in rows):
         return "stalled"

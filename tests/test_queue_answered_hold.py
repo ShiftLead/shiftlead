@@ -1,0 +1,150 @@
+"""TD-1331 (TD-1316's build), design §4.4 *A row's state*, *The card's status*, *Repo facts*: a `decision (paul)`
+entry whose question the person has answered reads *answered — waiting on <asker>* and is no need while its asker
+acts on the answer — while the question owes its outcome, and after a `done` until the entry's file is written
+after the answer or a day passes — and needs the person again on any other outcome, a gone asker, or a second
+repo carrying the same bare id."""
+
+from __future__ import annotations
+
+import os
+from datetime import timedelta
+
+from test_queue import NOW, _by_id, _cards, _entry, _rec, _repo
+
+from sessionorc import ledger, queue
+from sessionorc.models import MailEntry, Session
+
+ANSWERED = NOW - timedelta(minutes=30)
+
+
+def _q(about: str | None = "TD-001", *, mid: str = "m-1", at=ANSWERED, outcome=None, asker: str = "ao-r-designer",
+       reason: str = "replied", kind: str = "ask", text: str = "Lift the hold?") -> MailEntry:  # fmt: skip
+    """A question from `asker` to the person, answered at `at` (the home's `closed_at`)."""
+    e = MailEntry(id=mid, from_=f"{asker}@kmaster", to=["person"], at=(at - timedelta(hours=1)).isoformat(),
+                  kind=kind, text=text, about=about)  # fmt: skip
+    e.closed_reason, e.closed_at = reason, at.isoformat().replace("+00:00", "Z")
+    e.outcome = outcome
+    return e
+
+
+def _held(tmp_path, name: str = "r", n: int = 1, *, written=None):
+    root, r = _repo(tmp_path, name, [_entry(n, "the held one", Priority="High", Blocked_by="decision (paul)")])
+    if written is not None:  # the one file's mtime is every entry's `written` in a v1 ledger
+        f = os.path.join(root, "docs", "technical_debt.md")
+        os.utime(f, (written.timestamp(), written.timestamp()))
+        r["ledger"] = ledger.reading(root, NOW, with_history=False)
+    return root, r
+
+
+def _asker(state: str = "working") -> Session:
+    s = _rec("ao-r-designer", "/x", state=state)
+    s.name = "designer"
+    return s
+
+
+def _top(repos, questions, records=None):
+    q = _cards(repos, [_asker()] if records is None else records, questions=questions)
+    return q, _by_id(q)
+
+
+def test_an_answered_question_still_owing_reads_answered_and_is_no_need(tmp_path):
+    root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
+    _, cards = _top({root: r}, [_q()])
+    c = cards["r#TD-001"]
+    t = c["top"]
+    assert t["state"] == "answered — waiting on designer" and t["needs"] == "decision", "it keeps its need"
+    assert t["answered"]["mid"] == "m-1" and t["answered"]["asker"] == "ao-r-designer"
+    assert t["answered"]["kind"] == "ask" and t["answered"]["outcome"] is None
+    assert c["status"] != "needs you"
+    # the id lists still name it the person's (Start session's *waits on me*)
+    assert queue.card_entries(c)[0] == ["r#TD-001"]
+    # unanswered: the need, as before
+    _, cards = _top({root: r}, [])
+    assert cards["r#TD-001"]["top"]["state"] == "" and cards["r#TD-001"]["status"] == "needs you"
+
+
+def test_a_go_with_it_and_an_about_free_question_link_by_their_words(tmp_path):
+    root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
+    q = _q(None, reason="go_with_it", kind="steer", text="TD-001: I will drop the hold")
+    _, cards = _top({root: r}, [q])
+    assert cards["r#TD-001"]["top"]["answered"]["kind"] == "steer"
+    # a lapse or a decline is nobody's answer
+    for reason in ("lapsed", "declined"):
+        _, cards = _top({root: r}, [_q(reason=reason)])
+        assert cards["r#TD-001"]["top"]["answered"] is None, reason
+
+
+def test_after_done_the_word_holds_until_the_file_is_written_after_the_answer_or_a_day_passes(tmp_path):
+    done = {"state": "done", "text": "#9 merged", "at": (NOW - timedelta(minutes=5)).isoformat(), "by": "m-9"}
+    root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
+    _, cards = _top({root: r}, [_q(outcome=done)])
+    assert cards["r#TD-001"]["top"]["state"] == "answered — waiting on designer"
+    # the file written after the answer, the hold still standing: the need again (the merge never pulled, or a
+    # sibling's edit) — a write before the `done` was sent counts too
+    for when in (NOW - timedelta(minutes=1), ANSWERED + timedelta(minutes=1)):
+        sub = tmp_path / f"w{int(when.timestamp())}"
+        sub.mkdir()
+        root2, r2 = _held(sub, written=when)
+        c = _by_id(_cards({root2: r2}, [_asker()], questions=[_q(outcome=done)]))["r#TD-001"]
+        assert c["top"]["answered"] is None and c["status"] == "needs you"
+    # a day after the outcome with the file unwritten: the need again
+    old = {**done, "at": (NOW - timedelta(days=1, minutes=1)).isoformat()}
+    _, cards = _top({root: r}, [_q(outcome=old)])
+    assert cards["r#TD-001"]["top"]["answered"] is None
+
+
+def test_any_outcome_but_done_or_a_gone_asker_is_the_need_again(tmp_path):
+    root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
+    for state in ("blocked", "dropped", "asker_gone", "dismissed", "asked_again"):
+        out = {"state": state, "text": "", "at": NOW.isoformat(), "by": ""}
+        c = _top({root: r}, [_q(outcome=out)])[1]["r#TD-001"]
+        assert c["top"]["answered"] is None and c["status"] == "needs you", state
+    # the asker exited, closed or absent with the debt unpaid
+    for recs in ([_asker("exited")], [_asker("closed")], []):
+        c = _top({root: r}, [_q()], records=recs)[1]["r#TD-001"]
+        assert c["top"]["answered"] is None and c["status"] == "needs you", recs
+
+
+def test_the_newest_answered_question_names_the_asker_and_an_open_one_is_its_own(tmp_path):
+    root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
+    older = _q(mid="m-0", at=ANSWERED - timedelta(minutes=10), outcome={"state": "asked_again", "text": "",
+               "at": ANSWERED.isoformat(), "by": ""})  # fmt: skip
+    _, cards = _top({root: r}, [older, _q(mid="m-1")])
+    assert cards["r#TD-001"]["top"]["answered"]["mid"] == "m-1"
+    # asked again and the new one not yet answered: the newest answered is the old one, settled — the need
+    _, cards = _top({root: r}, [older])
+    assert cards["r#TD-001"]["top"]["answered"] is None
+
+
+def test_a_bare_id_links_only_where_one_repo_carries_it_open(tmp_path):
+    a, ra = _held(tmp_path, "alpha", written=ANSWERED - timedelta(hours=2))
+    b, rb = _repo(tmp_path, "beta", [_entry(2, "another", Priority="Low")])
+    _, cards = _top({a: ra, b: rb}, [_q()])
+    assert cards["alpha#TD-001"]["top"]["answered"] is not None
+    c, rc = _repo(tmp_path, "gamma", [_entry(1, "gamma's own TD-001", Priority="Low")])
+    _, cards = _top({a: ra, c: rc}, [_q()])
+    assert cards["alpha#TD-001"]["top"]["answered"] is None, "two repos' TD-001: no link"
+    _, cards = _top({a: ra, c: rc}, [_q("alpha#TD-001")])
+    assert cards["alpha#TD-001"]["top"]["answered"] is not None, "a `<repo>#` ref links"
+
+
+def test_with_you_wins_over_the_answered_word(tmp_path):
+    root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
+    mine = _rec("p", root, "TD-001", state="idle")
+    mine.unattended = False
+    t = _by_id(_cards({root: r}, [_asker(), mine], questions=[_q()]))["r#TD-001"]["top"]
+    assert t["state"] == "with you in p" and t["answered"] is None
+
+
+def test_the_facts_carry_each_entrys_written(tmp_path):
+    root, r = _held(tmp_path, written=ANSWERED)
+    assert r["ledger"]["entries"][0]["written"] == ANSWERED.timestamp(), "the one file's mtime"
+    d = tmp_path / "v2" / "docs" / "ledger"
+    d.mkdir(parents=True)
+    (d / "README.md").write_text("# Ledger\n\nLedgerboard: 2\n", encoding="utf-8")
+    for n in (1, 2):
+        (d / f"TD-00{n}.md").write_text(_entry(n, f"entry {n}", Priority="Low"), encoding="utf-8")
+        t = (NOW - timedelta(hours=n)).timestamp()
+        os.utime(d / f"TD-00{n}.md", (t, t))
+    got = {e["id"]: e["written"] for e in ledger.reading(tmp_path / "v2", NOW, with_history=False)["entries"]}
+    assert got == {"TD-001": (NOW - timedelta(hours=1)).timestamp(), "TD-002": (NOW - timedelta(hours=2)).timestamp()}
