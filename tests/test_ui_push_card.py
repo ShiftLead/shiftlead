@@ -349,6 +349,7 @@ global.localStorage = { getItem: () => null, setItem: noop };
 global.sessionStorage = { getItem: (k) => store[k] || null, setItem: (k, v) => { store[k] = v; },
   removeItem: (k) => { delete store[k]; } };
 global.matchMedia = () => ({ matches: false });
+const realTimeout = setTimeout;
 global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
 global.location = { pathname: "/settings", protocol: "http:", host: "x", reload: () => log.push("reload") };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
@@ -359,6 +360,10 @@ Object.assign(window, { isSecureContext: true, PushManager: noop, Notification: 
 Object.defineProperty(globalThis, "navigator", { value: { serviceWorker: { getRegistration: async () =>
   ({ pushManager: { getSubscription: async () => sub } }) } }, configurable: true });
 const tick = () => new Promise((r) => setImmediate(r));
+// until `ok()` holds or 5 s pass: the device id is `crypto.subtle`'s, answered off the main thread, so a fixed
+// count of ticks is short on a loaded machine (TD-1322's precheck)
+const until = async (ok) => { for (let n = 0; n < 500 && !ok(); n++) await sleep(10); };
+const sleep = (ms) => new Promise((r) => realTimeout(r, ms));
 (async () => {
   const mine = await window.AO.push.deviceId(ENDPOINT);
   const rows = [row(mine), row("0000000000000000")];
@@ -372,14 +377,14 @@ const tick = () => new Promise((r) => setImmediate(r));
   store["ao.pushsaid"] = "the key is made";
   window.AO.pushCard(form, post, () => false, noop);
   const said0 = parts[".setpushsaid"].textContent, kept0 = store["ao.pushsaid"] || null;
-  for (let i = 0; i < 5; i++) await tick();
   const me = parts[".setpushme"];
+  await until(() => me.checked);
   const drawn = { checked: me.checked, disabled: me.disabled, test_hidden: parts[".setpushtest"].hidden };
   fail = true; me.checked = false; me.fire("change");
-  for (let i = 0; i < 8; i++) await tick();
+  await until(() => parts[".setpushsaid"].textContent === "the home did not answer" && me.checked);
   const failed = { log: log.slice(), said: parts[".setpushsaid"].textContent };
   log.length = 0; fail = false; me.checked = false; me.fire("change");
-  for (let i = 0; i < 8; i++) await tick();
+  await until(() => log.includes("reload"));
   const kept = store["ao.pushsaid"] || null;
   console.log(JSON.stringify({ said0, kept0, drawn, failed, off: log.slice(), kept, mine }));
 })();

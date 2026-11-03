@@ -19,6 +19,7 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -38,6 +39,12 @@ MORE = f"{PREFIX} · and more need you — open the Inbox"
 STATE_KINDS = ("permission", "question", "needs")  # the state rows told (§4.10 *What is told*)
 API = "https://api.telegram.org/bot{token}/sendMessage"
 REQUEST_SECONDS = 20.0
+# `--push`'s own bound (TD-1322): the home kills the child at CHILD_SECONDS + REQUEST_SECONDS from its start, doppler's
+# start included, so the posts get that less a margin for doppler, counted from `push_main`'s first line. Every pair
+# is posted at once (at most PUSH_THREADS), and a post, or a name's resolution, still running at the deadline is
+# printed *no answer* and left behind — the child ends inside the home's bound however the push services answer.
+PUSH_SECONDS = CHILD_SECONDS + REQUEST_SECONDS - 10.0
+PUSH_THREADS = 64
 
 
 def _who(name: str, team: str) -> str:
@@ -240,7 +247,10 @@ def _global(host: str, port: int) -> str | None:
     except OSError as e:
         return f"the push service's name did not resolve: {type(e).__name__}"
     for info in infos:
-        ip = ipaddress.ip_address(str(info[4][0]).split("%", 1)[0])
+        try:
+            ip = ipaddress.ip_address(str(info[4][0]).split("%", 1)[0])
+        except ValueError:  # TD-1322: an address that does not read is not a global one, and ends no other post
+            return "the push service's name resolves to an address that does not read"
         if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
             ip = ip.ipv4_mapped
         if not ip.is_global or ip.is_multicast:
@@ -293,7 +303,8 @@ def push_main(stdin: str) -> int:
     """`--push`: stdin `{sub, payloads: [{body, path, tag}], devices: [{id, endpoint, keys}]}`. The first stdout
     line is the key's reading with the public key it derived; then one line a device and payload, `{device,
     i, status}`, as each answers — so a timeout keeps those already printed. Never the private key, never an
-    endpoint."""
+    endpoint. The posts end by `PUSH_SECONDS` (TD-1322)."""
+    deadline = time.monotonic() + PUSH_SECONDS
     line, key = reading()
     _say(line)
     if key is None:
@@ -312,14 +323,34 @@ def push_main(stdin: str) -> int:
     devices = [d for d in job.get("devices") or [] if isinstance(d, dict) and d.get("id")]
     sub = str(job.get("sub") or PUSH_SUB)
     from concurrent.futures import ThreadPoolExecutor, as_completed
+    from concurrent.futures import TimeoutError as Late
 
-    with ThreadPoolExecutor(max_workers=min(8, max(1, len(devices) * len(payloads)))) as pool:
-        jobs = [(d, i, data) for d in devices for i, data in enumerate(payloads)]
-        futures = {pool.submit(_post, d, data, key, sub): (d["id"], i) for d, i, data in jobs}
-        for f in as_completed(futures):
+    from sessionorc.push import NO_ANSWER
+
+    jobs = [(d, i, data) for d in devices for i, data in enumerate(payloads)]
+    pool = ThreadPoolExecutor(max_workers=min(PUSH_THREADS, max(1, len(jobs))))
+    futures = {pool.submit(_post, d, data, key, sub): (d["id"], i) for d, i, data in jobs}
+    told: set[Any] = set()
+    try:
+        for f in as_completed(futures, timeout=max(0.0, deadline - time.monotonic())):
             dev, i = futures[f]
             _say({"device": dev, "i": i, "status": f.result()})
+            told.add(f)
+    except (Late, Exception):  # past the deadline, or a post that raised: never wait on the rest
+        for f, (dev, i) in futures.items():
+            if f not in told:
+                _say({"device": dev, "i": i, "status": NO_ANSWER})
+        pool.shutdown(wait=False, cancel_futures=True)
+        _abandon()  # the posts still running are never joined: the child ends now, its lines printed
+        return 0
+    pool.shutdown()
     return 0
+
+
+def _abandon() -> None:
+    """End the child at once, without joining the threads still posting (`--push`'s deadline, TD-1322)."""
+    sys.stdout.flush()
+    os._exit(0)
 
 
 def key_main(secrets: str) -> int:

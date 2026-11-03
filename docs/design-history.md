@@ -2104,6 +2104,7 @@ decisions; this file points at them rather than repeating them.
 
 ## §4.10 Messages between sessions (tail: the Inbox queue, outcomes, kinds, bounds, lifecycle, surface)
 
+- 2026-11-03 (TD-1322, grinder-ao-2; the reader of #2789): the push child keeps inside its bound itself — every device and payload posted at once, not in waves of eight, and a post or a name's resolution still running ten seconds short of `CHILD_SECONDS` plus `REQUEST_SECONDS` (counted from its posting, doppler's start the margin) printed *no answer* and left behind; an address that does not read is that device's status, where it had ended the child.
 - 2026-11-02 (TD-1313, grinder-ao-2; docs-audit-ao-1's audit of #2797): the background fetch is capped at four in flight on a reader over every branch (`FETCHES_MAX`, as #2797 built it); a read that would start a fifth starts none, so a look on a fifth branch answers a miss until one ends.
 - 2026-11-02 (TD-1307 slice 1, grinder-ao-2; the techlead's reading of #2795): `shots_ref` is the upstream's name only where that `origin/*` ref contains `HEAD`, else the local branch's — a branch cut from `origin/main` and pushed without `-u` would otherwise send `main`.
 - 2026-11-02 (TD-1303's review, round 15, Fable, 1 finding, a follow-on of round 14, adopted): a commit not read for two `SHOT_TTL`s leaves the `fetched` set, so a node, which sees no Inbox, prunes it too. The loop ends here: Sonnet said READY in round 14 and Fable's last finding was a follow-on of that round's adoption.
