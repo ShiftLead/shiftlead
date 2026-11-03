@@ -143,7 +143,11 @@ class SettingsMixin:
         doc, now = settings_mod.load(), datetime.now(UTC)
         gate = (await self.rpc_gate())["profiles"]
         teams = {
-            name: {**t, **({"passed": _parse(t["until"]) <= now} if "until" in t else {})}
+            name: {
+                **t,
+                **({"passed": _parse(t["until"]) <= now} if "until" in t else {}),
+                **({"starts": self._schedule_starts(name, t["schedule"], now)} if "schedule" in t else {}),
+            }
             for name, t in settings_mod.teams(doc).items()
         }
         out = {
@@ -168,6 +172,42 @@ class SettingsMixin:
                 f"{settings_mod.ui_yml()}: ui.yml is no longer read — its open_in lives under person:"
             )
         return out
+
+    def _schedule_window_known(self, rule: dict[str, str]) -> bool:
+        """A schedule's window checked against its profile's reading (§6 *Schedule*, §4.7 `ao schedule`,
+        TD-133): a label the reading does not report is refused, naming the reported ones, as `ao gate`'s
+        reserves are; False when the profile has no reading yet, so nothing could be checked."""
+        reported = [
+            str(w.get("label")) for w in self._gate_reading(rule["profile"]).get("windows") or [] if isinstance(w, dict)
+        ]
+        if not reported:
+            return False
+        if rule["window"] not in reported:
+            raise RpcError(
+                f"schedule: profile {rule['profile']} reports no window {rule['window']}: "
+                f"its windows are {', '.join(reported)} (design §4.7)"
+            )
+        return True
+
+    def _schedule_starts(self, team: str, rule: Any, now: datetime) -> dict[str, Any]:
+        """When a team's schedule next fires (§4.7 `ao schedule`, §4.5a *starts* note, TD-133): the
+        upcoming reset the tick last read for this rule (`schedule_next` on the home's host record), else
+        the reset in the profile's reading while it is ahead — `{at}`, with `held` while a passed reset
+        waits for a node's link; `{at: None}` when nothing is known to wait for."""
+        if not isinstance(rule, dict):
+            return {"at": None}
+        rec = (self._host_rec.get("teams") or {}).get(team)
+        nxt = rec.get("schedule_next") if isinstance(rec, dict) else None
+        if isinstance(nxt, dict) and all(nxt.get(k) == rule.get(k) for k in ("profile", "window")) and nxt.get("at"):
+            return {"at": nxt["at"], **({"held": True} if nxt.get("held") else {})}
+        for w in self._gate_reading(str(rule.get("profile") or "")).get("windows") or []:
+            if isinstance(w, dict) and w.get("label") == rule.get("window") and w.get("resets"):
+                try:
+                    if _parse(str(w["resets"])) > now:
+                        return {"at": str(w["resets"])}
+                except (TypeError, ValueError):
+                    pass
+        return {"at": None}
 
     @staticmethod
     def _permissions_read(doc: dict[str, Any]) -> dict[str, Any]:
@@ -319,6 +359,8 @@ class SettingsMixin:
                     raise RpcError(f"{key}.{name}: {e}") from None
                 if "until" in parsed and _parse(parsed["until"]) <= now:
                     raise RpcError(f"{key}.{name}: until {parsed['until']} has passed — a stop time is ahead (§6)")
+                if key == "teams" and "schedule" in parsed and not self._schedule_window_known(parsed["schedule"]):
+                    out["unchecked"] = True  # no reading of the profile yet: its labels cannot be checked
                 change[str(name)] = {**{k: None for k in fields if fields[k] is None}, **parsed}
             doc[key] = settings_mod.merge(doc.get(key), change)
             out[key] = getattr(settings_mod, key)(doc)

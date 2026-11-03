@@ -2249,6 +2249,53 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys,
     assert cli.main(["kill", rec["id"]]) == 0
 
 
+def test_ao_schedule_sets_lists_clears_and_is_a_persons(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-133 slice 2 end to end (design §4.7 `ao schedule`, §6 *Schedule*): every defined team listed
+    with its rule or *no schedule*, a rule written to `teams.<team>.schedule` through `set_settings`, a
+    team the org does not define refused naming the defined ones, `off` clearing it, and a session's
+    `ao schedule … reset` refused by the host agent."""
+    from sessionorc import paths
+
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (paths.home() / "org.yml").write_text(
+        f"projects:\n  ao: {{repos: {{ao: {{kmaster: {tmp_path}}}}}}}\n"
+        "teams:\n  ao-grind:\n    repo: ao\n    manager: {role: manager, name: m}\n"
+        "    members: [{role: grinder, name: g}]\n"
+    )
+    assert cli.main(["schedule"]) == 0
+    assert capsys.readouterr().out == "ao-grind · no schedule\n"
+    assert cli.main(["schedule", "nope", "reset", "--profile", "grind", "--window", "week"]) != 0
+    assert "no team 'nope': the org defines ao-grind" in capsys.readouterr().err
+    assert cli.main(["schedule", "ao-grind", "reset", "--profile", "grind"]) != 0
+    assert "needs --profile and --window" in capsys.readouterr().err
+    assert cli.main(["schedule", "ao-grind"]) != 0
+    assert "ao schedule <team> reset" in capsys.readouterr().err
+    assert cli.main(["schedule", "ao-grind", "reset", "--profile", "grind", "--window", "week"]) == 0
+    out = capsys.readouterr().out
+    assert (
+        out.startswith("ao-grind · starts at the reset of grind's week — no reading of it yet") and "not checked" in out
+    )
+    assert cli.main(["--json", "settings"]) == 0
+    got = json.loads(capsys.readouterr().out)["teams"]["ao-grind"]
+    assert got["schedule"] == {"start": "reset", "profile": "grind", "window": "week"} and got["starts"] == {"at": None}
+    assert cli.main(["schedule"]) == 0
+    assert capsys.readouterr().out == "ao-grind · starts at the reset of grind's week — no reading of it yet\n"
+    assert cli.main(["settings"]) == 0
+    assert (
+        "ao-grind: no stop time · no reserve priority · starts at the reset of grind's week" in capsys.readouterr().out
+    )
+    assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path), "--unattended"]) == 0
+    rec = json.loads(capsys.readouterr().out)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", rec["id"])
+    assert cli.main(["schedule", "ao-grind", "off"]) != 0
+    assert "a person's own" in capsys.readouterr().err
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
+    assert cli.main(["schedule", "ao-grind", "off"]) == 0
+    assert capsys.readouterr().out == "ao-grind · no schedule\n"
+    assert cli.main(["kill", rec["id"]]) == 0
+
+
 def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-146 slice 3 end to end (design §4.7): `ao team until` and `ao team reserve` write
     `teams.<team>` through `set_settings`, a team the org does not define is refused naming the
