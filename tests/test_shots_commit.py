@@ -181,3 +181,75 @@ def test_a_node_reading_echoes_the_requests_at_and_names_its_source(repos, monke
     assert (got["at"], got["from"], got["exists"]) == (at, "commit", True) and got["png"]
     assert shots.reading("other", "a.png", at, "feat")["at"] == at, "echoed whichever source, none too"
     assert shots.reading("proj", "a.png")["at"] == ""
+
+
+def _rebase(repos: Repos, body: bytes) -> None:
+    (repos.sender / SHOT).write_bytes(PNG + body)
+    git(repos.sender, "commit", "-q", "-a", "--amend", "-m", "rebased")
+    git(repos.sender, "push", "-q", "-f", "origin", "HEAD:refs/heads/feat")
+
+
+def test_a_look_read_as_a_hit_then_rebased_draws_its_branch_without_blinking(repos):
+    """Every presence read records its commit, hit or miss: a look first read while contained is in
+    the set of the branch's next fetch (here one another look on the branch caused), so once its
+    branch is rebased it reads the branch's file at once, never its name."""
+    old = repos.commit_shot(b"v1")
+    git(repos.reader, "fetch", "-q", "origin")
+    assert presence(repos, old, "feat")[1] == "commit"
+    assert presence(repos, "0" * 40, "feat") == ("", "")  # another look on the branch: its fetch
+    shots.wait_fetches()
+    _rebase(repos, b"v2")
+    git(repos.reader, "fetch", "-q", "origin")
+    shots._contained.clear()
+    assert presence(repos, old, "feat")[1] == "ref"
+    assert repos.fetches == ["feat"]
+
+
+def test_a_fetchs_end_drops_every_look_on_its_branch_at_once(repos):
+    """Two looks on one branch, both pushed after the reader last fetched: the one fetch's end bumps
+    the branch's count, so a presence answer kept under the old count is read again (the page's
+    `_shot_seen`), and both draw their commits."""
+    first = repos.commit_shot(b"one")
+    second = repos.commit_shot(b"two")
+    assert presence(repos, first, "feat") == ("", "") and presence(repos, second, "feat") == ("", "")
+    assert shots.fetch_gen(repos.reader, "feat") == 0
+    shots.wait_fetches()
+    assert shots.fetch_gen(repos.reader, "feat") == 1
+    assert presence(repos, first, "feat")[1] == "commit" and presence(repos, second, "feat")[1] == "commit"
+    assert repos.fetches == ["feat"], "one fetch for both"
+
+
+def test_a_commit_not_read_for_two_shot_ttls_leaves_the_fetched_set(repos, monkeypatch):
+    old = repos.commit_shot(b"v1")
+    git(repos.reader, "fetch", "-q", "origin")
+    _rebase(repos, b"v2")
+    git(repos.reader, "fetch", "-q", "origin")
+    presence(repos, old, "feat")
+    shots.wait_fetches()
+    assert presence(repos, old, "feat")[1] == "ref"
+    clock = [shots.time.monotonic()]
+    monkeypatch.setattr(shots.time, "monotonic", lambda: clock[0])
+    clock[0] += 2 * shots.SHOT_TTL + 1  # unread for two minutes: forgotten, as after a restart
+    assert presence(repos, old, "feat") == ("", "")
+    shots.wait_fetches()
+
+
+def test_fetches_in_flight_are_capped(repos, monkeypatch):
+    import threading
+
+    gate = threading.Event()
+    started: list[str] = []
+
+    def slow(root, ref):
+        started.append(ref)
+        gate.wait(10)
+
+    monkeypatch.setattr(shots, "_fetch_branch", slow)
+    for i in range(shots.FETCHES_MAX + 2):
+        presence(repos, "0" * 40, f"b{i}")
+    assert len(started) <= shots.FETCHES_MAX
+    with shots._lock:
+        running = sum(1 for b in shots._branches.values() if b.running is not None)
+    assert running == shots.FETCHES_MAX
+    gate.set()
+    shots.wait_fetches()

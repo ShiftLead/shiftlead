@@ -1325,7 +1325,7 @@ def _shot_on_origin(root: Path, name: str, at: str = "", ref: str = "") -> bool:
     when, seen, was = _shot_seen.get(key, (0.0, False, gen))
     if now - when > SHOT_TTL or was != gen:
         seen = shots_mod.exists(root, name, at, ref, fetch=True)
-        _shot_seen[key] = (now, seen, shots_mod.fetch_gen(root, ref) if at and ref else 0)
+        _shot_seen[key] = (now, seen, gen)  # the count before the read: a fetch ending during it reads again
     return seen
 
 

@@ -34,6 +34,8 @@ SHOT_DIR = Path("docs") / "mockups" / "reviews"
 SHOT_BYTES_MAX = 4 * 1024 * 1024  # one image; a frame on the link is 8 MiB and base64 grows it by a third
 SHOT_TTL = 60.0  # seconds a containment answer is kept, and a branch's last fetch bars the next
 FETCH_TIMEOUT = 30.0  # seconds one branch's fetch may take
+FETCHES_MAX = 4  # fetches in flight at once, over every branch: `host_shot` is ungated, so a caller naming many
+# branches waits its turn rather than starting one each
 
 
 def root_of(repo: str) -> Path | None:
@@ -120,26 +122,43 @@ def _run_fetch(key: tuple[str, str], began: set[str]) -> None:
 
 
 def _start_fetch(key: tuple[str, str], b: _Branch, now: float) -> None:
-    """Start the branch's fetch when none runs and its last ended over `SHOT_TTL` ago; the caller
-    holds `_lock`. The commits read so far are the ones its end marks `fetched`."""
+    """Start the branch's fetch when none runs and its last ended over `SHOT_TTL` ago, and fewer than
+    `FETCHES_MAX` run (else a later read starts it); the caller holds `_lock`. The commits read so far
+    are the ones its end marks `fetched`."""
     if b.running is not None or now - b.last_end <= SHOT_TTL:
+        return
+    if sum(1 for x in _branches.values() if x.running is not None) >= FETCHES_MAX:
         return
     b.running = threading.Thread(target=_run_fetch, args=(key, set(b.reads)), daemon=True, name=f"shot-fetch {key[1]}")
     b.running.start()
 
 
-def _note_read(root: Path, at: str, ref: str) -> bool:
-    """Record a presence read of `at` on `ref`, start the branch's fetch as §4.10 says, and say
-    whether a fetch of the branch has ended since `at` was first read (`fetched`)."""
-    key, now = (str(root), ref), time.monotonic()
-    with _lock:
-        b = _branches.setdefault(key, _Branch())
+def _prune(now: float) -> None:
+    """Forget what has gone quiet; the caller holds `_lock`. A commit not read for two `SHOT_TTL`s
+    leaves its branch's `reads` and `fetched`; a branch with no reads, no fetch running and none ended
+    within `SHOT_TTL` leaves; a containment answer past `SHOT_TTL` leaves."""
+    for key, b in list(_branches.items()):
         for old in [a for a, t in b.reads.items() if now - t > 2 * SHOT_TTL]:
             del b.reads[old]
             b.fetched.discard(old)
+        if not b.reads and b.running is None and now - b.last_end > SHOT_TTL:
+            del _branches[key]
+    for k in [k for k, (t, _) in _contained.items() if now - t > SHOT_TTL]:
+        del _contained[k]
+
+
+def _note_read(root: Path, at: str, ref: str, missed: bool) -> bool:
+    """Record a presence read of `at` on `ref`, hit or miss; on a miss of the commit (`missed`), start
+    the branch's fetch as §4.10 says. Say whether a fetch of the branch has ended since `at` was first
+    read (`fetched`)."""
+    key, now = (str(root), ref), time.monotonic()
+    with _lock:
+        _prune(now)
+        b = _branches.setdefault(key, _Branch())
         b.reads[at] = now
         done = at in b.fetched
-        _start_fetch(key, b, now)  # unset: the first fetch; set: a re-fetch, once `last_end` allows
+        if missed:
+            _start_fetch(key, b, now)  # unset: the first fetch; set: a re-fetch, once `last_end` allows
         return done
 
 
@@ -169,12 +188,16 @@ def _contains(root: Path, at: str, ref: str) -> bool:
     key, now = (str(root), at, ref), time.monotonic()
     with _lock:
         got = _contained.get(key)
+        b = _branches.get((str(root), ref))
+        gen = b.gen if b else 0
     if got is not None and now - got[0] <= SHOT_TTL:
         return got[1]
     cp = _git(root, "for-each-ref", "--contains", at, "--format=%(refname)", "refs/remotes/origin")
     held = cp is not None and cp.returncode == 0 and bool(cp.stdout.strip())
     with _lock:
-        _contained[key] = (now, held)
+        b = _branches.get((str(root), ref))
+        if (b.gen if b else 0) == gen:  # a fetch that ended meanwhile dropped this key: keep no answer read before it
+            _contained[key] = (now, held)
     return held
 
 
@@ -202,9 +225,11 @@ def locate(root: Path, name: str, at: Any = "", ref: Any = "", fetch: bool = Fal
     path = (SHOT_DIR / name).as_posix()
     if at:
         if _contains(root, at, ref) and _size_ok(root, f"{at}:{path}"):
+            if fetch and ref:
+                _note_read(root, at, ref, missed=False)  # every presence read records its commit, hit or miss
             return f"{at}:{path}", "commit"
         if ref:
-            if fetch and not _note_read(root, at, ref):
+            if fetch and not _note_read(root, at, ref, missed=True):
                 return "", ""
             if _size_ok(root, spec := f"refs/remotes/origin/{ref}:{path}"):
                 return spec, "ref"
