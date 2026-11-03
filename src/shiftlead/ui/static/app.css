@@ -1307,7 +1307,7 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .qfilters { margin-top: 2px; }
 .qhline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 12px;
   border-bottom: 1px solid var(--border); margin-bottom: 10px; }
-#qfilters[data-served="0"] .qhline { border-bottom: 0; }
+#qfilters[data-served="0"] .qhline { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
 .qhline .h1 { margin: 0; }
 .qserved[hidden] { display: none !important; }
 .qsum { display: flex; flex-direction: column; gap: 4px; min-width: 0; }

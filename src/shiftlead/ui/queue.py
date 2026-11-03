@@ -721,8 +721,10 @@ SUMMARY_GROUPS = (("in_progress", "in progress", "--working"), ("waiting", "wait
 
 def bar_flex(n: int, total: int) -> float:
     """A segment's width, as `flex`: its count, never under a sliver of 1.2% of the bar — the same one line as
-    `AO.qBarFlex` in `app.js`, which redraws the bar on a pick (§4.5 screen 12 *The page's top section*)."""
-    return max(n, total * 0.012)
+    `AO.qBarFlex` in `app.js`, which redraws the bar on a pick (§4.5 screen 12 *The page's top section*); a whole
+    number is an `int`, so the page prints `3` where the browser does, never `3.0`."""
+    f = max(n, total * 0.012)
+    return int(f) if float(f).is_integer() else f
 
 
 def summary_bar(groups: Mapping[str, tuple[int, int]], shown: int) -> list[dict[str, Any]]:
