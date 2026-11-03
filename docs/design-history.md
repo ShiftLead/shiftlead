@@ -2079,6 +2079,7 @@ decisions; this file points at them rather than repeating them.
 
 ## §4.10 Messages between sessions (tail: the Inbox queue, outcomes, kinds, bounds, lifecycle, surface)
 
+- 2026-11-02 (TD-1307 slice 1, grinder-ao-2; the techlead's reading of #2795): `shots_ref` is the upstream's name only where that `origin/*` ref contains `HEAD`, else the local branch's — a branch cut from `origin/main` and pushed without `-u` would otherwise send `main`.
 - 2026-11-02 (TD-1303's review, round 15, Fable, 1 finding, a follow-on of round 14, adopted): a commit not read for two `SHOT_TTL`s leaves the `fetched` set, so a node, which sees no Inbox, prunes it too. The loop ends here: Sonnet said READY in round 14 and Fable's last finding was a follow-on of that round's adoption.
 - 2026-11-02 (TD-1303's review, round 14, Sonnet, READY with 4 nits, all adopted): every presence read records its commit; the `fetched` set holds only the Inbox's looks and is empty after a restart (a rebased look draws its name once); a barred first read waits out `last_end`; the closing sentence names `last_end`, not *a fetch's end*.
 - 2026-11-02 (TD-1303's review, round 13, Fable, 5 findings — 3 follow-ons of round 12, 1 new, 1 nit — all adopted): `fetched` is set only for commits read, hit or miss, before the fetch began; §4.4a says a read answers a miss only while `fetched` is unset for the commit; a rebased look draws the branch's file once the branch is fetched again.

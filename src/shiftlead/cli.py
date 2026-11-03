@@ -4611,12 +4611,12 @@ def _git_out(top: pathlib.Path, *argv: str) -> str | None:
 
 def _shot_commit(values: list[str]) -> tuple[str, str] | None:
     """`--shot`'s three checks (design §4.10 *A look's shots are the pushed commit's*, TD-1303): `(shots_at,
-    shots_ref)` — the sender's `HEAD` and its origin branch (the upstream's name where it is an `origin/*` ref,
-    else the local branch's; empty on a detached `HEAD`) — once every shot is committed at `HEAD`, its working
-    file the same, and some `refs/remotes/origin/*` contains `HEAD`. A `HEAD` no origin ref contains, whose
-    every shot `origin/<default>` holds as the same blob (a look after the squash), sends `origin/<default>`'s
-    sha with no branch. Raises ValueError with the refusal's line; None when no value is a file in a checkout
-    (the host agent refuses such a path as before)."""
+    shots_ref)` — the sender's `HEAD` and its origin branch (the upstream's name where it is an `origin/*` ref
+    that contains `HEAD`, else the local branch's; empty on a detached `HEAD`) — once every shot is committed at
+    `HEAD`, its working file the same, and some `refs/remotes/origin/*` contains `HEAD`. A `HEAD` no origin ref
+    contains, whose every shot `origin/<default>` holds as the same blob (a look after the squash), sends
+    `origin/<default>`'s sha with no branch. Raises ValueError with the refusal's line; None when no value is a
+    file in a checkout (the host agent refuses such a path as before)."""
     files = [pathlib.Path(v).expanduser() for v in values]
     files = [f for f in files if f.is_file()]
     if not files:
