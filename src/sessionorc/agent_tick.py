@@ -125,7 +125,7 @@ def _asked(questions: list[Any], members: dict[str, list[str]] | None = None) ->
 FILLED_FOR = "[shiftlead] you are filled for: "
 # `restarts` entries that are not the tick's restarts, left out of rule 9's note (§4.9a, TD-468): a
 # person's Restart, and a team's start by a schedule or by rule 8
-NOT_RESTARTS = ("person", "start", "work")
+NOT_RESTARTS = ("person", "start", "schedule", "work")
 
 
 def filled_for(cause: dict[str, Any] | None) -> str | None:
@@ -319,6 +319,7 @@ class TickMixin:
         await self._retire_anchors()
         await self._keep_running(snapshot_at)
         await self._finished_pass(snapshot_at)
+        await self._schedules(snapshot_at)
         await self._work_marks(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
@@ -1903,6 +1904,113 @@ class TickMixin:
                     out.add(e.ref)
         return out
 
+    async def _schedules(self, now: datetime) -> None:
+        """§6 *Schedule* (TD-133): a team start at a window's reset, the person's standing press kept as
+        `teams.<team>.schedule: {start: reset, profile, window}` in `settings.yml`. The instant is that
+        window's `resets` in the profile's account reading (`_gate_reading`; no reading, no fire). The
+        home keeps, on its host record under the team, `schedule_next` — the upcoming reset last read,
+        with the rule it was read for, so a reading that has already rolled to the next week still
+        fires the one that passed — and `schedule_fired`, the reset last acted on, so a restart of the
+        agent never fires one twice. At a reset the team's records are replayed as rule 8's start
+        replays them (`_work_replays`: ended by the team's own ending, none suspended or at its ceiling,
+        a launch record each, the lead first, a seat held), `why: schedule`, the start's instant and
+        `of` on each entry, and `work_waiting` goes. A team with anything live, a stopped one (a person's
+        stop is never undone) or one with no launch record is left alone and the reset counted as
+        fired; a member on a node whose link is down holds the start to the next tick. At the home only."""
+        if self.mode != "home":
+            return
+        try:
+            conf = settings_mod.teams(settings_mod.load())
+        except Exception:  # noqa: BLE001 — a policy's surprise is a log line; the next tick reads again
+            log.exception("reading the teams' settings for a schedule failed")
+            return
+        teams = self._host_rec.setdefault("teams", {})
+        by_team: dict[str, list[Session]] = {}
+        for r in self._graph().values():
+            if r.team:
+                by_team.setdefault(r.team, []).append(r)
+        dirty = False
+        for team in sorted(
+            set(conf) | {t for t, rec in teams.items() if isinstance(rec, dict) and "schedule_next" in rec}
+        ):
+            try:
+                rec = teams.get(team) if isinstance(teams.get(team), dict) else {}
+                before = copy.deepcopy(rec)
+                rule = (conf.get(team) or {}).get("schedule")
+                if not rule:
+                    rec.pop("schedule_next", None)  # cleared: nothing upcoming; `schedule_fired` stays, a fact
+                else:
+                    await self._schedule_team(team, rule, rec, by_team.get(team) or [], now)
+                if rec == before:
+                    continue
+                dirty = True
+                if rec:
+                    teams[team] = rec
+                else:
+                    teams.pop(team, None)
+            except Exception:  # noqa: BLE001 — one team's surprise is a log line, never another's
+                log.exception("reading %s's schedule failed", team)
+        if dirty:
+            try:
+                self.host_store.save(self._host_rec)
+            except OSError:
+                log.exception("writing the home's host record failed")
+            await self._push_changes()
+
+    async def _schedule_team(
+        self, team: str, rule: dict[str, Any], rec: dict[str, Any], records: list[Session], now: datetime
+    ) -> None:
+        """One team's schedule on one tick (`_schedules`): `rec` is its host record, written in place."""
+        which = {"profile": rule["profile"], "window": rule["window"]}
+        resets = None
+        for w in self._gate_reading(rule["profile"]).get("windows") or []:
+            if isinstance(w, dict) and w.get("label") == rule["window"] and w.get("resets"):
+                resets = str(w["resets"])
+        nxt = rec.get("schedule_next") if isinstance(rec.get("schedule_next"), dict) else {}
+        upcoming = nxt.get("at") if {k: nxt.get(k) for k in which} == which else None
+        due = None
+        with contextlib.suppress(TypeError, ValueError):
+            if upcoming and _parse(str(upcoming)) <= now:
+                due = str(upcoming)
+            elif resets and _parse(resets) <= now:
+                due = resets  # a reading not yet rolled past its own reset
+        with contextlib.suppress(TypeError, ValueError):
+            if resets and _parse(resets) > now:
+                rec["schedule_next"] = {**which, "at": resets}
+            elif due and due == upcoming:
+                rec.pop("schedule_next", None)  # acted on below; the next reading names the next reset
+        if due is None or rec.get("schedule_fired") == due:
+            return
+        if not await self._schedule_start(team, records, now, due):
+            rec["schedule_next"] = {**which, "at": due}  # held for a link: the same reset, next tick
+            return
+        rec["schedule_fired"] = due
+        rec.pop("work_waiting", None)  # a schedule's start clears rule 8's mark (§6 rule 8)
+
+    async def _schedule_start(self, team: str, records: list[Session], now: datetime, due: str) -> bool:
+        """The start at a reset: False only while a member's node link is down (the reset is tried again);
+        True once it is acted on or found nothing to act on."""
+        if work_mod.team_wound_down(records) is None:
+            log.info("schedule: %s at the reset %s is live or stopped: left alone", team, due)
+            return True
+        replays = self._work_replays(records, now)
+        if not replays:
+            log.info("schedule: %s at the reset %s has no record to replay: a schedule never invents a team", team, due)
+            return True
+        down = [r.host for r in replays if r.host != self.host and r.host not in self._link_muxes]
+        if down:
+            log.info("schedule: %s waits for the link to %s", team, ", ".join(dict.fromkeys(down)))
+            return False
+        at = now_iso()
+        about = {"start": at, "of": len(replays)}
+        log.info("schedule: starting %s at the reset %s (%d records)", team, due, len(replays))
+        for r in replays:
+            try:
+                await self._replay(r, "schedule", mark=dict(about), keep_mail=True, held=bool(r.seat and r.unattended))
+            except Exception:  # noqa: BLE001 — one record's failure is never the team's start
+                log.exception("%s: a schedule's replay failed", self._address(r))
+        return True
+
     async def _work_marks(self, now: datetime) -> None:
         """Rule 8 (design §6 *Work for a team that wound down*, TD-227): on every tick at the home,
         each team read as **wound down** from its records (`work.team_wound_down`, the card's own
@@ -2740,7 +2848,11 @@ class TickMixin:
         the closed run's mail is the new record's, so a reply to its `ask` still has a thread (TD-352).
         Every entry, a failed one's too, carries `done` and `left` — what the run it replaces reported
         (`agent_common._reported`) — since the new record keeps none of the old one's `progress` (§4.9a, TD-245)."""
-        if why in ("start", "work"):  # a schedule's start and rule 8's: the team's, if none of it runs
+        if why in (
+            "start",
+            "schedule",
+            "work",
+        ):  # a start time's, a schedule's and rule 8's: the team's, if none of it runs
             self._mark_team_start(s.team, but=s)
         now = datetime.now(UTC)
         entry: dict[str, Any] = {

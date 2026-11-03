@@ -357,6 +357,8 @@ def weights(doc: dict[str, Any]) -> dict[str, Any]:
 # -- teams, repos, person (§5, TD-146)-------------------------------------------------------------
 
 TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow", "size")
+# a team's `schedule` (§6 *Schedule*, TD-133): the start, and the profile and window whose reset it is
+SCHEDULE_KEYS = frozenset({"start", "profile", "window"})
 ON_WORK = (
     "ask",
     "start",
@@ -462,18 +464,32 @@ def instant(value: Any) -> str:
 
 
 def parse_team(value: Any, drop: bool = False) -> dict[str, Any]:
-    """One team's settings: `schedule` (TD-133's rule, a mapping kept as written until that build
-    reads it), `until` (an instant, §6 *Team stop time*) and `reserve` (a flat percent added to the
-    profile's reserve for the team's sessions, §6 *Usage gate*), `balance` (§6 *Balance*),
+    """One team's settings: `schedule` (§6 *Schedule*: `{start: reset, profile, window}`), `until` (an
+    instant, §6 *Team stop time*) and `reserve` (a flat percent added to the profile's reserve
+    for the team's sessions, §6 *Usage gate*), `balance` (§6 *Balance*),
     `on_work` (§6 rule 8: `ask`, `start` or `off`) and `flow` (§4.9c: the name of the flow the team
     runs now — the client checks it against the team's `flows:`; the agent reads no definition) and
     `size` (§4.9 *A team's size*: `{<member line>: <n ≥ 0>}`, the whole map replaced; the client names the
     lines)."""
 
-    def schedule(v: Any) -> dict[str, Any]:
+    def schedule(v: Any) -> dict[str, str]:
+        # §6 *Schedule* (TD-133): `{start: reset, profile, window}` — the one start designed is at a window's
+        # reset; which windows a profile's adapter reports is the client's to check, as `ao gate` does
         if not isinstance(v, dict) or not v:
             raise ValueError(f"schedule is a mapping (§6 *Schedule*), not {v!r}")
-        return dict(v)
+        if set(v) - SCHEDULE_KEYS:
+            raise ValueError(
+                f"schedule takes {', '.join(sorted(SCHEDULE_KEYS))}, not {', '.join(sorted(set(v) - SCHEDULE_KEYS))}"
+            )
+        if v.get("start") != "reset":
+            raise ValueError(f"schedule.start is reset, the one start designed (§6 *Schedule*), not {v.get('start')!r}")
+        out = {"start": "reset"}
+        for key in ("profile", "window"):
+            word = v.get(key).strip() if isinstance(v.get(key), str) else ""
+            if not word:
+                raise ValueError(f"schedule.{key} is needed: the profile and the window whose reset starts the team")
+            out[key] = word
+        return out
 
     def on_work(v: Any) -> str:
         if v not in ON_WORK:
