@@ -415,7 +415,7 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
     )
     try:
         page = client.get("/settings").text
-        assert 'data-team="sett-team"' in page and "not built — TD-133" in page
+        assert 'data-team="sett-team"' in page and "not built — TD-133" not in page
         assert "grinder ×2" in page  # the Org section draws the definition, read-only
         assert client.post("/api/settings/teams", json={"team": "sett-team", "until": "+2h", "reserve": "10"}).json()[
             "ok"
@@ -516,6 +516,141 @@ def test_a_team_card_draws_balance_and_writes_its_lines_whole(client, subprocess
     finally:
         org.unlink()
         call_sync("set_settings", teams={"bal-team": None})
+
+
+def test_a_team_card_draws_the_schedule_and_writes_it_whole(client, subprocess_agent):
+    """**schedule** (§4.5a *Settings page: Teams*, §6 *Schedule*, TD-1346): off, the key is absent, the
+    picks disabled and *no schedule* beside them; a Save writes the rule whole as `ao schedule` does,
+    the card then draws it switched on with the *starts* line; a refusal is the RPC's words; off removes it."""
+    from sessionorc.client import call_sync
+
+    org = subprocess_agent.home / "org.yml"
+    org.write_text(
+        f"projects:\n  sp:\n    repos:\n      sp: {{kmaster: {subprocess_agent.home}}}\n"
+        "teams:\n  sch-team:\n    repo: sp\n    manager: {role: manager}\n"
+        "    members: [{role: grinder, count: 2}]\n"
+    )
+    post = lambda body: client.post("/api/settings/teams", json={"team": "sch-team", **body})  # noqa: E731
+    rule = {"start": "reset", "profile": "grind", "window": "week"}
+    try:
+        page = client.get("/settings").text
+        card = page[page.index('data-team="sch-team"') :]
+        card = card[: card.index("</form>")]
+        assert (
+            'class="setrow setschedule" data-was="null"' in card
+            and '<span class="note setstarts">no schedule</span>' in card
+        )
+        assert re.search(r'name="schedule_on"(?![^>]* checked)', card) and re.search(
+            r'name="schedule_profile"[^>]* disabled', card
+        )
+        assert post({"schedule": rule}).json()["ok"]
+        assert call_sync("settings")["teams"]["sch-team"]["schedule"] == rule
+        page = client.get("/settings").text
+        card = page[page.index('data-team="sch-team"') :]
+        card = card[: card.index("</form>")]
+        assert (
+            'data-was="{&#34;start&#34;:&#34;reset&#34;,&#34;profile&#34;:&#34;grind&#34;,&#34;window&#34;:&#34;week&#34;}"'
+            in card
+        )
+        assert re.search(r'name="schedule_on" checked', card) and "starts at the reset · no reading yet" in card
+        assert '<option value="grind" selected>grind (not reported)</option>' in card  # no such profile here
+        assert 'name="schedule_window" value="week"' in card  # its label in the text field
+        for bad, said in (({**rule, "window": ""}, "window is needed"), ({**rule, "start": "noon"}, "schedule.start")):
+            got = post({"schedule": bad})
+            assert got.status_code == 400 and said in got.json()["detail"], got.json()
+        assert post({"schedule": "on"}).status_code == 400
+        assert call_sync("settings")["teams"]["sch-team"]["schedule"] == rule
+        assert post({"schedule": None}).json()["ok"]
+        assert "sch-team" not in (call_sync("settings")["teams"] or {})
+    finally:
+        org.unlink()
+        call_sync("set_settings", teams={"sch-team": None})
+
+
+def test_schedule_card_offers_the_profiles_and_their_windows():
+    """`schedule_card` (TD-1346): every profile offered, a metered one disabled with the reason; the window
+    pick is the `labels` the read answered, a text field where none; off, the picks hold the default and its
+    first label; a standing rule's profile or label no longer reported is its own option, marked; a standing
+    metered rule keeps its own label in a fixed option; every profile metered, the switch cannot turn on."""
+    import types
+
+    sub, met = types.SimpleNamespace(billing="subscription"), types.SimpleNamespace(billing="metered")
+    profiles = {"grind": sub, "api": met, "fresh": sub}
+    labels = {"grind": ["5h", "week"], "fresh": [], "api": ["month"]}
+    off = setmod.schedule_card("t", None, profiles, "grind", labels)
+    assert off["on"] is False and off["can"] and off["was"] == "null" and off["starts"] == "no schedule"
+    assert (off["profile"], off["window"]) == ("grind", "5h")
+    assert [(o["name"], o["disabled"]) for o in off["options"]] == [("grind", False), ("api", True), ("fresh", False)]
+    assert off["options"][1]["title"] == setmod.SCHEDULE_METERED
+    assert json.loads(off["labels"]) == {"grind": ["5h", "week"], "fresh": []}  # never a metered profile's
+    assert setmod.schedule_card("t", None, profiles, "api", labels)["profile"] == "grind"  # the default metered
+    fresh = setmod.schedule_card(
+        "t", {"start": "reset", "profile": "fresh", "window": "week"}, profiles, "grind", labels
+    )
+    assert fresh["windows"] == [] and fresh["note"] == "no reading of fresh yet — the label is not checked"
+    assert fresh["was"] == '{"start":"reset","profile":"fresh","window":"week"}'
+    accented = setmod.schedule_card(
+        "t", {"start": "reset", "profile": "fresh", "window": "semäne"}, profiles, "", labels
+    )
+    assert accented["was"] == '{"start":"reset","profile":"fresh","window":"semäne"}'  # as JSON.stringify writes it
+    gone = setmod.schedule_card("t", {"start": "reset", "profile": "old", "window": "week"}, profiles, "grind", labels)
+    assert gone["options"][-1] == {"name": "old", "disabled": False, "title": "", "mark": " (not reported)"}
+    assert gone["profile"] == "old" and gone["windows"] == [] and gone["note"] == ""
+    lost = setmod.schedule_card("t", {"start": "reset", "profile": "grind", "window": "day"}, profiles, "grind", labels)
+    assert lost["windows"][-1] == {"label": "day", "mark": " (not reported)"} and lost["window"] == "day"
+    metered = setmod.schedule_card(
+        "t", {"start": "reset", "profile": "api", "window": "spend"}, profiles, "grind", labels
+    )
+    assert metered["fixed"] and metered["windows"] == [{"label": "spend", "mark": ""}] and metered["profile"] == "api"
+    none = setmod.schedule_card("t", None, {"api": met}, "api", labels)
+    assert not none["can"] and none["why"] == setmod.SCHEDULE_METERED
+    assert setmod.schedule_card("t", None, profiles, "grind", "junk")["windows"] == []  # a malformed read: no labels
+
+
+@pytest.mark.unit
+def test_the_schedule_rows_window_pick_and_save_body():
+    """`AO.scheduleWindowPick` and `AO.scheduleBody` (TD-1346), run as themselves under node: a profile
+    pick keeps the label the new profile reports, else its first, and a profile with none is a text field
+    with its note; the body carries the rule only when it moved from the drawn one, so an unmoved Save of a
+    *(not reported)* rule writes nothing, and off is `null`."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    from test_ui_menu import PROBE
+
+    probe = scratch_dir() / "sched_probe.js"
+    head = PROBE[: PROBE.index("const P =")]
+    probe.write_text(
+        head
+        + """
+const W = window.AO.scheduleWindowPick, B = window.AO.scheduleBody;
+const held = {grind: ["5h", "week"], other: ["week", "month"], fresh: []};
+const was = '{"start":"reset","profile":"old","window":"day"}';
+console.log(JSON.stringify({keep: W(held, "other", "week"), first: W(held, "other", "5h"),
+  none: W(held, "fresh", "week"), unknown: W(held, "old", "day"), unmoved: B(was, true, "old", "day"),
+  moved: B(was, true, "grind", "week"), off: B(was, false, "old", "day"), offnone: B("null", false, "grind", "5h"),
+  trimmed: B("null", true, "grind", " week ")}));
+"""
+    )
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout.strip().splitlines()[-1])
+    assert got["keep"] == {"labels": ["week", "month"], "value": "week"}
+    assert got["first"] == {"labels": ["week", "month"], "value": "week"}
+    assert got["none"] == {
+        "labels": None,
+        "value": "week",
+        "note": "no reading of fresh yet — the label is not checked",
+    }
+    assert got["unknown"]["labels"] is None and got["unknown"]["value"] == "day"
+    assert got["unmoved"] == {} and got["offnone"] == {}
+    assert got["moved"] == {"schedule": {"start": "reset", "profile": "grind", "window": "week"}}
+    assert got["off"] == {"schedule": None}
+    assert got["trimmed"] == {"schedule": {"start": "reset", "profile": "grind", "window": "week"}}
+    # Cancel after a profile pick: the form's `reset` puts the drawn window control back, which `reset()` cannot
+    js = (UI / "static" / "app.js").read_text()
+    assert "slot.dataset.drawn = slot.innerHTML;" in js
+    assert 'f.addEventListener("reset", () => { slot.innerHTML = slot.dataset.drawn;' in js
 
 
 def test_balance_card_reads_the_numbers_and_the_mark():

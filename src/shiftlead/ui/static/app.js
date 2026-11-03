@@ -7885,6 +7885,19 @@
     if (/^\$\s*[\d,]*\.?\d+$/.test(t) || /^\d*\.?\d+\s*[Mm]?\s*tok$/.test(t)) return { says: `→ amount ${t}` };
     return { error: "a metered profile's reserve is an amount ($5, 20M tok), not a percent" };
   };
+  // **schedule**'s window pick for a profile (§4.5a *Settings page: Teams*, TD-1346): the labels the page holds
+  // for it, keeping `keep` where it is one of them, else the first; a profile with none takes a text field
+  AO.scheduleWindowPick = function (held, profile, keep) {
+    const labels = Array.isArray((held || {})[profile]) ? held[profile] : [];
+    if (labels.length) return { labels, value: labels.includes(keep) ? keep : labels[0] };
+    return { labels: null, value: keep || "", note: `no reading of ${profile} yet — the label is not checked` };
+  };
+  // **schedule**'s part of the team card's Save body: the rule whole, null off — and nothing where it did not
+  // move from the drawn one (`was`, the row's JSON), so an unmoved Save writes nothing
+  AO.scheduleBody = function (was, on, profile, window) {
+    const rule = on ? { start: "reset", profile, window: String(window || "").trim() } : null;
+    return JSON.stringify(rule) === was ? {} : { schedule: rule };
+  };
   // **board items shown** (§4.5a, TD-220 slice 4): the pick and its number as `person.inbox.board_show`
   // — `next:<n>`, `due`, `<n>d`, `all`; a number left empty is the one drawn until typed (10, 7), and
   // one out of range goes to `set_settings`, whose refusal is said in place
@@ -7928,6 +7941,33 @@
         if (on.checked && !parts[0].value.trim() && !parts[1].value.trim() && !parts[2].checked) { parts[0].value = "10"; parts[1].value = "2d"; parts[2].checked = true; }
       });
     });
+    // **schedule** (§4.5a, §6 *Schedule*, TD-1346): off, the picks are not the person's to move but keep their
+    // values; a profile pick redraws the window pick from the labels the page holds, keeping the label where the
+    // new profile reports it, else its first — a text field where it has none. Cancel's `reset` puts the drawn
+    // control back, which `form.reset()` alone cannot rebuild, so the dirty test sees the same elements.
+    AO.scheduleWindow = (row, profile, keep) => {
+      let held = {}; try { held = JSON.parse(row.dataset.labels || "{}"); } catch (e) {}
+      const pick = AO.scheduleWindowPick(held, profile, keep);
+      const slot = $(".setschedwin", row), off = !row.closest("form").elements.schedule_on.checked;
+      if (pick.labels) {
+        const sel = document.createElement("select"); sel.className = "input setin"; sel.name = "schedule_window";
+        pick.labels.forEach((l) => sel.append(new Option(l, l)));
+        sel.value = pick.value; sel.disabled = off;
+        slot.replaceChildren(sel);
+      } else {
+        const inp = document.createElement("input"); inp.className = "input setnum"; inp.name = "schedule_window";
+        inp.placeholder = "week"; inp.autocomplete = "off"; inp.spellcheck = false; inp.value = pick.value; inp.disabled = off;
+        const note = document.createElement("span"); note.className = "note"; note.textContent = pick.note;
+        slot.replaceChildren(inp, " ", note);
+      }
+    };
+    $$(".setschedule", page).forEach((row) => {
+      const f = row.closest("form"), on = f.elements.schedule_on, slot = $(".setschedwin", row);
+      slot.dataset.drawn = slot.innerHTML;
+      on.addEventListener("change", () => { f.elements.schedule_profile.disabled = !on.checked; f.elements.schedule_window.disabled = !on.checked; });
+      f.elements.schedule_profile.addEventListener("change", () => AO.scheduleWindow(row, f.elements.schedule_profile.value, f.elements.schedule_window.value.trim()));
+      f.addEventListener("reset", () => { slot.innerHTML = slot.dataset.drawn; f.elements.schedule_profile.disabled = !on.defaultChecked; });
+    });
     // the form's balance as `set_settings` takes it, keys in the file's order: null off, a whole number where prs is one
     AO.balanceOf = (f) => {
       if (!f.elements.balance_on.checked) return null;
@@ -7949,6 +7989,9 @@
         // **balance** (§6 *Balance*): the lines whole, written only when they moved; off is null, an empty field no line
         const row = $(".setbalance", f);
         if (row) { const bal = AO.balanceOf(f); if (JSON.stringify(bal) !== row.dataset.was) body.balance = bal; }
+        // **schedule** (§6 *Schedule*, TD-1346): the rule whole, written only when it moved; off is null
+        const sr = $(".setschedule", f);
+        if (sr) Object.assign(body, AO.scheduleBody(sr.dataset.was, f.elements.schedule_on.checked, f.elements.schedule_profile.value, f.elements.schedule_window.value));
         // **flow** (§4.9c): written only when the pick moved, and nothing more (TD-356)
         const fl = f.elements.flow; if (fl && fl.value !== fl.dataset.was) body.flow = fl.value;
         return ["teams", body];

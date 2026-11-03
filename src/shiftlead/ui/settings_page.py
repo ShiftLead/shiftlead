@@ -33,6 +33,7 @@ from sessionorc.models import tokens_short
 from shiftlead import profiles as profiles_mod
 from shiftlead import repoconfig, teamrun
 
+from . import uiconf
 from .cards import swept_words
 from .common import USAGE_UNKNOWN, _age, usage_clock, usage_read
 
@@ -362,9 +363,13 @@ def team_cards(
     repos: Mapping[str, Any] | None = None,
     flows: Mapping[str, list[dict[str, Any]]] | None = None,
     host: Mapping[str, Any] | None = None,
+    profiles: Mapping[str, Any] | None = None,
+    default: str = "",
+    labels: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """**Teams** (§4.5 screen 8): a card per team the org defines, with the settings a person
-    moves — the schedule (drawn disabled until TD-133), the stop time, the reserve priority,
+    moves — the schedule (`schedule_card`, from `profiles.yml`'s `profiles` and `default` and the
+    `settings` read's `labels`), the stop time, the reserve priority,
     **when work appears** (§6 rule 8) and **balance** (`balance_card`, read against `sessions` and
     the `repos` reading) — as `settings.yml` holds them. The stop time is drawn in the
     reader's clock, as `ao team until` takes it; one already past says so. `on_work` is the picker's
@@ -383,7 +388,7 @@ def team_cards(
                 "until": until.astimezone().strftime("%a %d %b %H:%M") if until else "",
                 "passed": bool(until and until <= now),
                 "reserve": t.get("reserve") if isinstance(t.get("reserve"), int) else 0,
-                "schedule": t.get("schedule") or None,
+                "schedule": schedule_card(name, t.get("schedule"), profiles or {}, default, labels),
                 "on_work": t.get("on_work")
                 if t.get("on_work") in settings_mod.ON_WORK
                 else settings_mod.ON_WORK_DEFAULT,
@@ -395,6 +400,79 @@ def team_cards(
             }
         )
     return out
+
+
+# why the **schedule** field offers no metered profile (§4.5a *Settings page: Teams*, §6 *Schedule*)
+SCHEDULE_METERED = (
+    "a metered profile has no account reading to fall back on, so with no session running under it"
+    " a wound-down team's rule has no reset to wait for"
+)
+
+
+def schedule_card(
+    team: str,
+    rule: Any,
+    profiles: Mapping[str, Any],
+    default: str = "",
+    labels: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """The team card's **schedule** row (§4.5a *Settings page: Teams*, §6 *Schedule*, TD-1346): a switch,
+    a **profile** pick of every profile `profiles.yml` defines, a metered one disabled with the reason,
+    and a **window** pick of the labels the `settings` read answered for that profile (`labels`: the
+    reading the gate judges it by, the windows `set_settings` checks a label against), or a text field
+    where it has none. A standing rule is drawn as it stands: a profile no longer defined, or a label its
+    reading lacks, as its own option marked *(not reported)*; one on a metered profile keeps that profile
+    selected and its label in a fixed option. Off with no rule, the picks hold what turning on starts
+    at: the default profile (else, that one metered, the first offered) and its first label. `was` is
+    the drawn rule as the page's JSON compares it, `labels` what a profile pick redraws from, and
+    `starts` the team card's *starts* words, or *no schedule*."""
+    got = labels if isinstance(labels, Mapping) else {}
+    metered = {n for n, p in profiles.items() if getattr(p, "billing", "") == "metered"}
+    offered = [n for n in profiles if n not in metered]
+    readings = {
+        n: [str(x) for x in got.get(n) or [] if isinstance(x, str)] for n in offered if isinstance(got.get(n), list)
+    }
+    standing = rule if isinstance(rule, dict) and rule.get("profile") and "window" in rule else None
+    if standing:
+        profile, window = str(standing["profile"]), str(standing.get("window") or "")
+    else:
+        profile = default if default in offered else (offered[0] if offered else "")
+        window = (readings.get(profile) or [""])[0]
+    options = [
+        {"name": n, "disabled": n in metered, "title": SCHEDULE_METERED if n in metered else "", "mark": ""}
+        for n in profiles
+    ]
+    if profile and profile not in profiles:
+        options.append({"name": profile, "disabled": False, "title": "", "mark": " (not reported)"})
+    windows: list[dict[str, str]] = []
+    note, fixed = "", False
+    if profile in metered:  # a standing rule's own label, never from `labels` (§4.5a)
+        windows, fixed = [{"label": window, "mark": ""}], True
+    elif profile in profiles and readings.get(profile):
+        windows = [{"label": w, "mark": ""} for w in readings[profile]]
+        if window and window not in readings[profile]:
+            windows.append({"label": window, "mark": " (not reported)"})
+    elif profile in profiles:
+        note = f"no reading of {profile} yet — the label is not checked"
+    was = (
+        json.dumps({"start": "reset", "profile": profile, "window": window}, separators=(",", ":"), ensure_ascii=False)
+        if standing
+        else "null"
+    )
+    return {
+        "on": bool(standing),
+        "can": bool(offered) or bool(standing),
+        "why": "" if offered else SCHEDULE_METERED,
+        "profile": profile,
+        "window": window,
+        "options": options,
+        "windows": windows,
+        "fixed": fixed,
+        "note": note,
+        "was": was,
+        "labels": json.dumps(readings, separators=(",", ":")),
+        "starts": (uiconf.team_starts(team) or "starts at the reset · no reading yet") if standing else "no schedule",
+    }
 
 
 def _row(key: str, value: Any, default: Any = None, *, is_default: bool | None = None) -> dict[str, Any]:

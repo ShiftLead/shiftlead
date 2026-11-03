@@ -293,3 +293,18 @@ async def test_set_settings_checks_a_schedules_window_and_the_read_says_when_it_
         agent._usage["grind"] = {"windows": [{"label": "week", "resets": "2099-01-01T08:00:00+01:00"}]}
         assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": "2099-01-01T07:00:00Z"}
         agent._host_rec["teams"] = {}
+
+
+async def test_the_settings_read_answers_each_named_profiles_window_labels(agent):
+    """TD-1346 (§4.5a *Settings page: Teams*): the page passes the profile names it read from `profiles.yml`
+    and the `settings` read answers `labels`, each to the labels of the reading the gate judges it by, in
+    the reading's order; a profile with none answers `[]`; no `profiles`, or not a list of names, no key."""
+    await park_ticks(agent)
+    agent._usage.clear()
+    agent._usage["grind"] = {"windows": [{"label": "5h", "pct": 3}, {"label": "week", "pct": 12}, "junk"]}
+    async with LocalClient() as person:
+        got = await person.call("settings", profiles=["grind", "fresh"])
+        assert got["labels"] == {"grind": ["5h", "week"], "fresh": []}
+        assert "labels" not in await person.call("settings")
+        assert "labels" not in await person.call("settings", profiles="grind")
+        assert "labels" not in await person.call("settings", profiles=["grind", 3])

@@ -162,9 +162,25 @@
       {% if t.flows %}<label class="setrow"><span class="setlabel">flow</span>
         <select class="input setin" name="flow" data-was="{{ t.flow }}">{% for p in t.flows %}<option value="{{ p.name }}"{% if p.current %} selected{% endif %}{% if p.cannot %} disabled title="{{ p.cannot }}"{% endif %}>{{ p.name }}{% if p.cannot %} — cannot be followed{% endif %}</option>{% endfor %}</select>
         <span class="note">{{ t.flow_strip or "—" }} · written on Save and nothing more: the running team moves on its card's Apply</span></label>{% endif %}
-      <label class="setrow"><span class="setlabel">schedule</span>
-        <input class="input setin" value="{{ t.schedule | tojson if t.schedule else '' }}" placeholder="at a reset" disabled>
-        <span class="note">not built — TD-133</span></label>
+      {# **schedule** (§4.5a, §6 *Schedule*, TD-1346): `teams.<team>.schedule`, whole, written only when it moved;
+         off, the key is absent. The window pick is redrawn from `data-labels` on a profile pick (`app.js`),
+         a text field where the profile has no reading; `schedule_window` in both forms #}
+      {%- set sc = t.schedule %}
+      <div class="setrow setschedule" data-was="{{ sc.was }}" data-labels="{{ sc.labels }}">
+        <span class="setlabel">schedule</span>
+        <span class="setpicks">
+          <label title="{{ sc.why or help_title('schedule') }}"><input type="checkbox" name="schedule_on"{% if sc.on %} checked{% endif %}{% if not sc.can %} disabled{% endif %}> start at a reset</label>
+          <label>profile <select class="input setin" name="schedule_profile"{% if not sc.on %} disabled{% endif %}>{% for o in sc.options %}<option value="{{ o.name }}"{% if o.name == sc.profile %} selected{% endif %}{% if o.disabled %} disabled title="{{ o.title }}"{% endif %}>{{ o.name }}{{ o.mark }}</option>{% endfor %}</select></label>
+          <label>window <span class="setschedwin">
+            {%- if sc.fixed or sc.windows -%}
+            <select class="input setin" name="schedule_window"{% if not sc.on %} disabled{% endif %}>{% for w in sc.windows %}<option value="{{ w.label }}"{% if w.label == sc.window %} selected{% endif %}>{{ w.label }}{{ w.mark }}</option>{% endfor %}</select>
+            {%- else -%}
+            <input class="input setnum" name="schedule_window" value="{{ sc.window }}" placeholder="week" autocomplete="off" spellcheck="false"{% if not sc.on %} disabled{% endif %}>{% if sc.note %} <span class="note">{{ sc.note }}</span>{% endif %}
+            {%- endif -%}
+          </span></label>
+        </span>
+        <span class="note setstarts">{{ sc.starts }}</span>
+      </div>
       {% call saverow("applies on the next tick") %}{% if t.until %}<button class="btn sm ghost" type="button" data-clear="until">Clear stop time</button>{% endif %}{% endcall %}
     </form>
     {% else %}
