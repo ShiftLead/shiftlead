@@ -1634,6 +1634,24 @@
     // a row a poll redrew keeps its links, from what its context knows, asking nothing (§4.6, TD-1108)
     (root ? $$(".mailrow[data-paths-ctx]", root) : []).forEach((row) => AO.linkItem(row, row, true));
   };
+  // a menu (`details.more`: a Queue card's ⋯, a row's Snooze) the person has open when a re-read swaps the HTML
+  // under it is opened again on the fresh copy (TD-1315), as a session card's delta keeps its menu (TD-121): keyed by
+  // the nearest row or card around it and its place among that one's menus, so a read is never held back for it
+  const menuHome = (d) => d.closest && d.closest("[data-qid], [data-msg], [data-card]");
+  AO.openMenus = function (root) {
+    return (root ? $$("details.more[open]", root) : []).map((d) => {
+      const home = menuHome(d);
+      if (!home) return null;
+      const [k, v] = home.dataset.qid ? ["qid", home.dataset.qid] : home.dataset.msg ? ["msg", home.dataset.msg] : ["card", home.dataset.card];
+      return { k, v, i: $$("details.more", home).indexOf(d) };
+    }).filter(Boolean);
+  };
+  AO.reopenMenus = function (root, keys) {
+    (keys || []).forEach(({ k, v, i }) => {
+      const home = root && $(`[data-${k}="${CSS.escape(v)}"]`, root), d = home && $$("details.more", home)[i];
+      if (d && menuHome(d) === home) d.open = true;  // its `toggle` places it, as a press does
+    });
+  };
   // design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): a fold a Queue card draws
   // closed comes as its summary alone (`data-lazy`); its first open reads its body, `GET /api/fold?key=`,
   // the row renderer's own HTML. The bodies are kept by key while the page lives, so a fold a re-read swaps
@@ -4702,10 +4720,7 @@
     }
     let busy = false;
     async function reread() {
-      // a menu the person has open (a card's ⋯, a row's Snooze) holds the read back, as a drag does: the swap would
-      // shut it under them (TD-1315); the next read after it closes draws what changed
-      if (busy || box.querySelector(".qcard.dragging") || (lists && lists.querySelector("details.more[open]"))) return;
-      busy = true;
+      if (busy || box.querySelector(".qcard.dragging")) return; busy = true;
       let read = false;
       // the lines of the window held, or of the picked one where it is wider (TD-882)
       const win = AO.qWinFetch(loaded(), store.get("qwin", "day")) || loaded();
@@ -4715,6 +4730,7 @@
         if (res.ok) {
           read = true;
           const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
+          const menus = AO.openMenus(lists);  // a ⋯ or Snooze the person has open, opened again after the swap
           lists.innerHTML = await res.text();
           // the top section stands outside the lists, so typed find words and its focus survive: its numbers
           // follow, and its parts after the heading show while the Queue is served (TD-1293); a page loaded
@@ -4727,6 +4743,7 @@
           }
           opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
           AO.reopenFolds(lists);  // a row's *details* the person opened, filled from what was kept (TD-891)
+          AO.reopenMenus(lists, menus);
           apply();
           wire();
         }

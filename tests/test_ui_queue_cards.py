@@ -540,9 +540,45 @@ def test_a_reread_keeps_a_cards_read_and_done_folds_as_the_press_left_them(tmp_p
     assert json.loads(got.stdout.strip().splitlines()[-1]) == [True, True, False, False, True]
 
 
-def test_a_reread_waits_while_a_menu_on_the_queue_is_open():
-    # TD-1315: an open ⋯ (or a row's Snooze) would be shut by the swap, so the read waits, as for a drag
+MENUS_PROBE = (
+    FOLDS_PROBE[: FOLDS_PROBE.index("const AO = window.AO;")]
+    + """
+const AO = window.AO;
+global.CSS = { escape: (s) => s };
+// a page's homes (a row by data-qid, an Inbox row by data-msg), each with its menus in order
+const page = (open) => {
+  const homes = [["qid", "s#TD-1"], ["msg", "m9"]].map(([k, v]) => {
+    const h = { dataset: { [k]: v } };
+    h.menus = [0, 1].map((n) => ({ open: open.includes(`${v}/${n}`), closest: () => h }));
+    h.querySelectorAll = (sel) => (sel === "details.more" ? h.menus : []);
+    return h;
+  });
+  const all = () => homes.flatMap((h) => h.menus);
+  return { homes, all, querySelectorAll: (sel) => (sel === "details.more[open]" ? all().filter((d) => d.open) : []),
+    querySelector: (sel) => homes.find((h) => Object.entries(h.dataset).some(([k, v]) => sel === `[data-${k}="${v}"]`)) || null };
+};
+const before = page(["s#TD-1/1", "m9/0"]);
+const keys = AO.openMenus(before);
+const after = page([]);  // the swap draws every menu shut
+AO.reopenMenus(after, keys);
+console.log(JSON.stringify({ keys, open: after.all().map((d) => d.open) }));
+"""
+)
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_reread_opens_again_the_menu_the_person_had_open(tmp_path):
+    # TD-1315: an open ⋯ or Snooze is shut by the swap; it is opened again on the fresh copy, never holding the read
     js = JS.read_text()
     q = js[js.index("AO.queue = function") :]
-    guard = q[q.index("async function reread()") : q.index("busy = true;")]
-    assert ".qcard.dragging" in guard and 'lists.querySelector("details.more[open]")' in guard
+    body = q[q.index("async function reread()") : q.index("wire();")]
+    assert (
+        body.index("AO.openMenus(lists)") < body.index("lists.innerHTML =") < body.index("AO.reopenMenus(lists, menus)")
+    )
+    assert "details.more[open]" not in body[: body.index("busy = true")]  # a menu never holds a read back
+    probe = tmp_path / "menus_probe.js"
+    probe.write_text(MENUS_PROBE)
+    got = subprocess.run(["node", str(probe), str(JS)], capture_output=True, text=True, timeout=60, check=True)
+    out = json.loads(got.stdout.strip().splitlines()[-1])
+    assert out["keys"] == [{"k": "qid", "v": "s#TD-1", "i": 1}, {"k": "msg", "v": "m9", "i": 0}]
+    assert out["open"] == [False, True, True, False]
