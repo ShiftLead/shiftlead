@@ -252,6 +252,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _find_text,  # noqa: F401
     _gh_user_type,  # noqa: F401
     _gh_user_type_read,  # noqa: F401
+    _held_answered,  # noqa: F401
     _needs_key,  # noqa: F401
     _next_due,  # noqa: F401
     _order_teams,  # noqa: F401
@@ -1860,6 +1861,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             with timing.step("files"):  # the org file and every registered repo's `teams:` (TD-893)
                 return org_here()[0]
 
+        # the person inbox, read only where For you has a row: a held entry whose question the person answered
+        # reads *answered — waiting on <asker>* (§4.5 screen 11 *For you*, TD-1316)
+        led = (r.get("ledger") or {}).get("entries") or ()
+        asks = any(isinstance(e, dict) and e.get("for_page") == "for-you" for e in led)
         # Every read that waits on no other, at once (§4.5 *Page loads*, TD-893): the RPCs, the board, and
         # the definitions on a worker thread, read fresh once for the page and its flows (the board's and the
         # pills' are the cached `defs`)
@@ -1871,6 +1876,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             board_view(),
             call("queue", omit=["completed"]),
             *(() if part else (call("usage"), call("gate"))),  # the top bar's chip, handed to it below
+            *((call("inbox", id=PERSON),) if asks else ()),  # last: a person's read, which marks nothing
             return_exceptions=True,
         )
         for x in (first[0], first[2], first[3], first[4]):
@@ -1930,13 +1936,13 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         boards = hz["due"]
         # the board's columns are the servicing teams' flows' stages, read off the loop (§4.5 screen 11, TD-903)
         flows_here = await asyncio.to_thread(repo_board.team_stages, org, teams, str(r.get("root") or ""))
-        # the person inbox, read only where For you has a row: a held entry whose question the person answered
-        # reads *answered — waiting on <asker>* (§4.5 screen 11 *For you*, TD-1316)
+        # the answered questions as the Inbox stamps them (`_owing`: what the person answered); unread, the
+        # rows read as before — never the page's failure
         asked: list[dict[str, Any]] = []
-        led = (r.get("ledger") or {}).get("entries") or ()
-        if any(isinstance(e, dict) and e.get("for_page") == "for-you" for e in led):
-            with contextlib.suppress(Exception):  # unread, the rows read as before: never the page's failure
-                asked = (await h.person_inbox(sessions)).get("entries") or []
+        if asks and isinstance(first[-1], dict):
+            asked = [e for e in first[-1].get("entries") or () if isinstance(e, dict)]
+            for e in asked:
+                _owing(e, None, now)
         with timing.step("lists"):  # the ledger's lists, the cards and the rows the page draws (TD-893)
             # the teams' lanes over the ledger and the board's work orders (§4.4 *In a team's lanes*, TD-384)
             lanes = teamrun.repo_lanes(teamrun.lane_entries(r), str(r.get("root") or ""), sessions)

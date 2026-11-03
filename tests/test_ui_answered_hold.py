@@ -185,3 +185,19 @@ def test_the_queue_reading_feeds_the_row_and_the_ui_reads_it_aware(tmp_path):
     # the `later` row's age is the answer's, read from a `Z` time
     (row,) = _rows(_repos(tmp_path, "r"), [_ask(closed_at=(NOW - timedelta(hours=2)).astimezone(UTC).isoformat())])
     assert row["answered"]["age"].startswith("2h")
+
+
+def test_on_a_card_it_is_drawn_whole_its_details_folded_and_with_you_wins(tmp_path):
+    (row,) = _rows(_repos(tmp_path, "r"), [_ask()])
+    html = _render({**row, "ask": "Lift the hold on TD-60?", "detail": "why"}, mode="card", home="queue")
+    assert '<div class="body sentence">Lift the hold on TD-60?</div>' in html, "its Ask: sentence, as a whole item"
+    assert '" open>' not in html.split("data-fold=")[1][:80], "its details folded though it has answers"
+    # the person's own session holding it: *with you* wins over the answered word, in `put` and in the row
+    from shiftlead.ui.app import templates
+
+    item = {**row, "home": "queue", "on_card": "r#TD-060", "on_row": "r#TD-060"}
+    drawn: list[dict] = []
+    attach({"needs": [item]}, lambda e, sec: drawn.append(e) or Markup(""), (), None, lambda c, i: "p")
+    assert drawn[0]["want"] == "with_you"
+    html = templates.get_template("queue_mail.html").render(e={**drawn[0], "with_you": "p"}, section="needs")
+    assert "with you in p" in html and "answered — waiting on" not in html

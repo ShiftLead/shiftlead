@@ -2564,14 +2564,14 @@ def ledger_for_you(
                     or bool(e.get("parts_open")),  # an open part counts as an open blocker (TD-1130)
                     "builds_open": ledger_mod.builds_open(e),
                     "url": f"/repo/{quote(name)}#{quote(e['id'])}",
-                    "answered": _answered(got_q, questions, names, now) if got_q else None,
+                    "answered": _held_answered(got_q, questions, names, now) if got_q else None,
                 }
             )
         groups.append({"repo": name, "rows": rows})
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}
 
 
-def _answered(
+def _held_answered(
     got: Mapping[str, Any], questions: list[Mapping[str, Any]], names: Mapping[str, str], now: datetime
 ) -> dict[str, Any]:
     """A ledger row's `answered` (§4.5 screen 12 *Three wants*, TD-1316) from `answered_hold`'s: its asker's name,
