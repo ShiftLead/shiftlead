@@ -69,6 +69,6 @@
     {{ want(c, 'decide') }}{{ want(c, 'do') }}{{ with_you(c) }}
     </div>
   </div>
-  {% if body %}<div class="qrows">{% for ln in c.lines or [] %}{% if ln.fold %}{{ fold(ln, repo) }}{% else %}{{ row(ln.row, repo) }}{% endif %}{% else %}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}{% endfor %}{{ read(c) }}</div>{% endif %}
+  {% if body %}<div class="qrows">{% for ln in c.lines or [] %}{% if ln.fold %}{{ fold(ln, repo, c.id) }}{% else %}{{ row(ln.row, repo) }}{% endif %}{% else %}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}{% endfor %}{{ read(c) }}</div>{% endif %}
 </div>
 {% endmacro %}

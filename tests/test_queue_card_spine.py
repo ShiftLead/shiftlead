@@ -134,10 +134,12 @@ def test_the_card_draws_the_spine_the_fold_the_meter_and_after_links():
     assert '<span class="qmeter" role="img" aria-label="3 of 4 parts done">' in head and ">3/4</span>" in head
     body = html[html.index('class="qrows"') :]
     # the fold is first on the spine, before TD-772, and holds its rows
-    assert body.index('<details class="qfold">') < body.index('data-qid="s#TD-769"') < body.index('data-qid="s#TD-772"')
+    # each fold keyed for the page's fold memory: the card's id, then the parent's, "" for the loose one (TD-1315)
+    parent = f'<details class="qfold" data-fold="{c["id"]}:done:s#TD-748">'
+    assert body.index(parent) < body.index('data-qid="s#TD-769"') < body.index('data-qid="s#TD-772"')
     assert re.search(r'<span class="qtick" aria-hidden="true">✓</span> 3 done</summary>', body)
-    assert body.count('<details class="qfold loose">') == 1
-    assert body.rindex('<details class="qfold loose">') > body.index('data-qid="s#TD-122"')
+    assert body.count('<details class="qfold loose"') == 1
+    assert body.rindex(f'<details class="qfold loose" data-fold="{c["id"]}:done:">') > body.index('data-qid="s#TD-122"')
     # a loose row draws no rule; a part its own and its ancestors'
     td909 = body[body.index('data-qid="s#TD-909"') :]
     assert "qrail" not in td909[: td909.index("</div>")]

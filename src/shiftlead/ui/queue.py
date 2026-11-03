@@ -484,7 +484,8 @@ def _tree(rows: list[dict[str, Any]], top: dict[str, Any]) -> list[dict[str, Any
     archived — to one `fold` line first on the parent's spine, *✓ n done*; a parent never folds while a part of it
     is open (it is a done group head); finished loose rows fold to one line at the card's end. Each parent, and
     `top` when it is one, gains its `meter`. Returns the lines: `{"row": r}` or `{"fold": [rows], "n", "depth",
-    "rails", "loose"}`; a folded row keeps its `rails` for when the fold opens."""
+    "rails", "loose", "of"}` (`of` the parent's `qid`, "" for the loose rows' fold: with the card's id, the fold's key
+    for the page's fold memory, TD-1315); a folded row keeps its `rails` for when the fold opens."""
     on = {str(r.get("qid") or "") for r in rows} | {str(top.get("qid") or "")}
     kids: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
@@ -519,7 +520,7 @@ def _tree(rows: list[dict[str, Any]], top: dict[str, Any]) -> list[dict[str, Any
             for k in done:
                 place(k, up, True, folded, depth)
             rs = [r for ln in folded for r in (ln["fold"] if "fold" in ln else [ln["row"]])]  # all of it is done
-            into.append({"fold": rs, "n": len(rs), "depth": depth, "rails": [*up, "done"], "loose": False})
+            into.append({"fold": rs, "n": len(rs), "depth": depth, "rails": [*up, "done"], "loose": False, "of": q})
         for k in ks:
             if id(k) not in seen:
                 place(k, up, True, into, depth)
@@ -535,7 +536,7 @@ def _tree(rows: list[dict[str, Any]], top: dict[str, Any]) -> list[dict[str, Any
             place(r, [], False, out, 1)
     if ends:
         rs = [r for ln in ends for r in (ln["fold"] if "fold" in ln else [ln["row"]])]
-        out.append({"fold": rs, "n": len(rs), "depth": 1, "rails": [], "loose": True})
+        out.append({"fold": rs, "n": len(rs), "depth": 1, "rails": [], "loose": True, "of": ""})
     return out
 
 

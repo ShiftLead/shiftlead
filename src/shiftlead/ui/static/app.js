@@ -1610,7 +1610,7 @@
   // the capture runs before the summary's own toggling, so `d.open` is the state being left.
   const foldsOpen = new Set(), foldsShut = new Set();
   document.addEventListener?.("click", (ev) => {
-    const s = ev.target && ev.target.closest && ev.target.closest("details.fold > summary, details.cardline > summary");
+    const s = ev.target && ev.target.closest && ev.target.closest("details.fold > summary, details.cardline > summary, details.qread > summary, details.qfold > summary");
     const d = s && s.parentElement;
     if (!d || !d.dataset.fold) return;
     const id = d.dataset.fold;
@@ -1626,7 +1626,8 @@
     if (d) { if (d.dataset.fold) { foldsShut.delete(d.dataset.fold); foldsOpen.add(d.dataset.fold); } d.open = true; d.scrollIntoView({ block: "nearest" }); }
   });
   AO.reopenFolds = function (root) {
-    (root ? $$("details.fold, details.cardline", root) : []).forEach((d) => {  // a card's Read line too (TD-911)
+    // a Queue card's Read and its ✓ n done folds too (TD-911, TD-1315): a re-read never opens or shuts one
+    (root ? $$("details.fold, details.cardline, details.qread, details.qfold", root) : []).forEach((d) => {
       if (foldsShut.has(d.dataset.fold)) d.open = false;
       else if (foldsOpen.has(d.dataset.fold)) { d.open = true; AO.fillFold(d); }
     });
@@ -4701,7 +4702,10 @@
     }
     let busy = false;
     async function reread() {
-      if (busy || box.querySelector(".qcard.dragging")) return; busy = true;
+      // a menu the person has open (a card's ⋯, a row's Snooze) holds the read back, as a drag does: the swap would
+      // shut it under them (TD-1315); the next read after it closes draws what changed
+      if (busy || box.querySelector(".qcard.dragging") || (lists && lists.querySelector("details.more[open]"))) return;
+      busy = true;
       let read = false;
       // the lines of the window held, or of the picked one where it is wider (TD-882)
       const win = AO.qWinFetch(loaded(), store.get("qwin", "day")) || loaded();

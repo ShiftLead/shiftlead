@@ -490,3 +490,59 @@ def test_the_repo_page_draws_no_held_row_for_an_old_clock_mark(tmp_path, monkeyp
     next(e for r in rs.values() for e in r["ledger"]["entries"] if e["id"] == "TD-10")["held"] = held
     html = client(monkeypatch, tmp_path, fake(rs, queue())).get("/repo/samscrape").text
     assert "held in samscrape's ledger" not in html and "the person&#39;s session paul-1" not in html
+
+
+FOLDS_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const heard = {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+const document = { documentElement: el(), body: el(), querySelector: () => null, querySelectorAll: () => [],
+  addEventListener: (type, f) => (heard[type] = heard[type] || []).push(f), createElement: el, activeElement: null };
+global.window = {}; global.document = document; global.Event = class { constructor(t) { this.type = t; } };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+// a fold as the card draws it: `cls` its details class, `key` its data-fold, drawn closed
+const fold = (cls, key, open) => ({ cls, open: !!open, dataset: { fold: key } });
+const press = (d) => {  // a press on its summary: the capture runs before the summary toggles it
+  const s = { parentElement: d };
+  const target = { closest: (sel) => (sel.split(",").some((x) => x.trim() === `details.${d.cls} > summary`) ? s : null) };
+  heard.click.forEach((f) => f({ target }));
+  d.open = !d.open;
+};
+const root = (folds) => ({ querySelectorAll: (sel) =>
+  folds.filter((d) => sel.split(",").some((x) => x.trim() === `details.${d.cls}`)) });
+const read = fold("qread", "s#TD-1:read"), done = fold("qfold", "s#TD-1:done:s#TD-1");
+const loose = fold("qfold", "s#TD-1:done:", true), other = fold("qread", "s#TD-2:read");
+press(read); press(done); press(loose);  // opened, opened, shut
+// the re-read swaps in fresh folds, each drawn closed but the loose one, drawn open
+const fresh = [fold("qread", "s#TD-1:read"), fold("qfold", "s#TD-1:done:s#TD-1"),
+  fold("qfold", "s#TD-1:done:", true), fold("qread", "s#TD-2:read"), fold("qfold", "s#TD-2:done:", true)];
+AO.reopenFolds(root(fresh));
+console.log(JSON.stringify(fresh.map((d) => d.open)));
+"""
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
+def test_a_reread_keeps_a_cards_read_and_done_folds_as_the_press_left_them(tmp_path):
+    # TD-1315: Paul opened a card's Read (5) and the next `queue`/`inbox` event shut it again
+    probe = tmp_path / "folds_probe.js"
+    probe.write_text(FOLDS_PROBE)
+    got = subprocess.run(["node", str(probe), str(JS)], capture_output=True, text=True, timeout=60, check=True)
+    # opened Read and ✓ n done stay open, the shut loose fold stays shut; folds nobody pressed are drawn as sent
+    assert json.loads(got.stdout.strip().splitlines()[-1]) == [True, True, False, False, True]
+
+
+def test_a_reread_waits_while_a_menu_on_the_queue_is_open():
+    # TD-1315: an open ⋯ (or a row's Snooze) would be shut by the swap, so the read waits, as for a drag
+    js = JS.read_text()
+    q = js[js.index("AO.queue = function") :]
+    guard = q[q.index("async function reread()") : q.index("busy = true;")]
+    assert ".qcard.dragging" in guard and 'lists.querySelector("details.more[open]")' in guard

@@ -76,9 +76,10 @@
 
 {# a card's Read (§4.5 screen 12 *Three wants*, §4.5a *Queue page: card*): under the rows, folded with its count,
    uncounted, never colouring the card; inside, each Inbox section it gathers its own line, *answered for you*
-   and *fyi* each with **Dismiss all** over the ids on screen in that line of that card; a line at 0 is not drawn #}
+   and *fyi* each with **Dismiss all** over the ids on screen in that line of that card; a line at 0 is not drawn;
+   a re-read keeps it as the person's press left it (`data-fold`, `AO.reopenFolds`, TD-1315) #}
 {% macro read(c) %}{% set rd = (c.wants or {}).get('read') or {} %}{% if rd %}
-  <details class="qread"><summary class="qsech">Read ({{ c.wants.n.read }})</summary>
+  <details class="qread" data-fold="{{ c.id }}:read"><summary class="qsech">Read ({{ c.wants.n.read }})</summary>
   {%- for sec, label in {'answered': 'answered for you', 'waiting': 'waiting on them', 'fyi': 'fyi'}.items() %}{% set ms = rd.get(sec) %}{% if ms %}
     <div class="qsec qsec-{{ sec }}" data-sec="{{ sec }}">
       <div class="qsech"><span>{{ label }} ({{ ms | length }})</span>{% if sec in ('answered', 'fyi') %}<button type="button" class="btn sm ghost qdismissall" title="dismiss the ones on screen in this line of this card — never one that arrived after the page was drawn">Dismiss all</button>{% endif %}</div>
@@ -119,9 +120,9 @@
 
 {# finished rows folded (§4.4 *Rows*, §4.5 screen 12 *A card*; TD-1131): a parent's finished parts to one line,
    *✓ n done*, first on its spine, at the parts' level; finished loose rows to the same line, unindented, at the
-   card's end; a press opens it in place #}
-{% macro fold(f, repo='') %}
-  <details class="qfold{% if f.loose %} loose{% endif %}"><summary class="qrow qfoldsum" style="--qd: {{ f.depth or 1 }}">
+   card's end; a press opens it in place, and a re-read keeps it as the press left it (`data-fold`, TD-1315) #}
+{% macro fold(f, repo='', card='') %}
+  <details class="qfold{% if f.loose %} loose{% endif %}" data-fold="{{ card }}:done:{{ f.of }}"><summary class="qrow qfoldsum" style="--qd: {{ f.depth or 1 }}">
     {%- for b in f.rails or [] %}{% if b %}<span class="qrail b-{{ b }}" style="--ql: {{ loop.index }}" aria-hidden="true"></span>{% endif %}{% endfor %}<span class="qtick" aria-hidden="true">✓</span> {{ f.n }} done</summary>
     {%- for r in f.fold %}{{ row(r, repo) }}{% endfor %}
   </details>

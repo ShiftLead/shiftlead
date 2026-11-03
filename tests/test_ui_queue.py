@@ -573,7 +573,7 @@ def test_a_cards_wants_draw_their_counts_and_none_at_zero(tmp_path, monkeypatch)
     assert ">Decide 1 · Do 1</span>" in head and ">Read 3</span>" in head  # the pill; Read n, drawn when folded
     assert head.index(">Read 3</span>") < head.index(">Decide 1 · Do 1</span>")  # the status ends the line
     assert (
-        '<details class="qread"><summary class="qsech">Read (3)</summary>' in body
+        '<details class="qread" data-fold="s#TD-20:read"><summary class="qsech">Read (3)</summary>' in body
         and "answered for you (2)" in body
         and "fyi (1)" in body
         and "waiting on them" not in body
