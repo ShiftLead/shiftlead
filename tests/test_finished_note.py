@@ -126,9 +126,9 @@ async def test_the_tick_marks_a_start_and_rule_8s_but_no_restart(agent, monkeypa
     monkeypatch.setattr(agent, "_mark_team_start", lambda team, but=None: seen.append(team))
     s = _rec("g1")
     agent.sessions[s.id] = s
-    for why in ("start", "work", "crash", "wanted", "cache", "fill"):
+    for why in ("start", "schedule", "work", "crash", "wanted", "cache", "fill"):
         await agent._replay(s, why)  # no launch record: each replay fails after the mark
-    assert seen == ["g", "g"]
+    assert seen == ["g", "g", "g"], "start, schedule and work mark the start; a restart does not"
 
 
 async def test_ao_team_starts_create_marks_the_start(agent, tmp_path):
