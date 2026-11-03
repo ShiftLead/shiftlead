@@ -397,6 +397,13 @@ async def agent(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)  # so `pane_line` can look at this server
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
+
+    async def no_push_child(secrets, mode, stdin=""):
+        # never a real Doppler (TD-1304): the pass reads the push key whenever a secrets config is set, Telegram's
+        # included; a test that drives the push child sets its own
+        return [], "no push child in tests", False
+
+    a._push_run = no_push_child
     task = asyncio.create_task(a.serve(paths.socket_path()))
 
     # the tick loop too (TD-1087): `serve` binds the socket a loop step before it makes `_ticker`, so a
