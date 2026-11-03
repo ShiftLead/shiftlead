@@ -354,7 +354,8 @@ global.location = { pathname: "/settings", protocol: "http:", host: "x", reload:
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 Object.assign(window, { isSecureContext: true, PushManager: noop, Notification: { permission: "granted" },
-  navigator: { userAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0", serviceWorker: {} } });
+  navigator: { userAgent: "Mozilla/5.0 (X11; Linux x86_64; rv:131.0) Gecko/20100101 Firefox/131.0",
+    serviceWorker: {} } });
 Object.defineProperty(globalThis, "navigator", { value: { serviceWorker: { getRegistration: async () =>
   ({ pushManager: { getSubscription: async () => sub } }) } }, configurable: true });
 const tick = () => new Promise((r) => setImmediate(r));
@@ -379,7 +380,8 @@ const tick = () => new Promise((r) => setImmediate(r));
   const failed = { log: log.slice(), said: parts[".setpushsaid"].textContent };
   log.length = 0; fail = false; me.checked = false; me.fire("change");
   for (let i = 0; i < 8; i++) await tick();
-  console.log(JSON.stringify({ said0, kept0, drawn, failed, off: log.slice(), kept: store["ao.pushsaid"] || null, mine }));
+  const kept = store["ao.pushsaid"] || null;
+  console.log(JSON.stringify({ said0, kept0, drawn, failed, off: log.slice(), kept, mine }));
 })();
 """
 
