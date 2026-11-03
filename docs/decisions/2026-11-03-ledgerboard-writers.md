@@ -5,8 +5,8 @@
 **Date:** 2026-11-03
 **Supersedes:** in [ADR 2026-10-12](2026-10-12-ledgerboard-dev-cadence-shiftlead.md), the layer table's
 **ledgerboard** row, the first line of *The ledgerboard API* ("Pure functions over text"), and the *one file*
-of *How ledgerboard is consumed*, as listed under *Decision*; the rest of that ADR (the three layers, the
-rule of no second parser, the API's functions, the version line) stands, and so does
+of *How ledgerboard is consumed*, and extends its rule of no second parser to writing, as listed under
+*Decision*; the rest of that ADR (the three layers, the API's functions, the version line) stands, and so does
 [ADR 2026-10-25](2026-10-25-shiftlead-requires-dev-cadence.md)'s part.
 **Related:** TD-1326 (this ADR); TD-1330 (ShiftLead's v2.3 vendor and its board writes, the first build on
 it); TD-1286 (every ledger and board write goes through the helpers; its ledger half waits for v2.4);
@@ -35,8 +35,9 @@ functions (§1.2). ledgerboard's v2.3 release cites this boundary, so the amendm
 1. **Keep the boundary; each consumer keeps its writer.** The drift stays where it is now, and Paul's
    helper rule names two different helpers. Rejected.
 2. **agent-cadence's writers are the helpers, and ShiftLead runs them.** One implementation, but the
-   writers would carry agent-cadence's git, roster and counter code, and ShiftLead (which calls them
-   in-process from the host agent) would depend on a process layer for a file edit. It was TD-1286's
+   writers carry agent-cadence's git, roster and counter code today, so ShiftLead (which edits files
+   in-process from the host agent) would take a process layer for a file edit — this ADR's reading; the target
+   design gives the drift alone. It was TD-1286's
    reading before the target design. Rejected.
 3. **ledgerboard ships the writers, git-free, beside the pure module; each consumer wraps them with its own
    git and policy.** Chosen (the target design's §1.1).
