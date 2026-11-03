@@ -1,0 +1,10 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "rank",
+  "paths": [
+   "rank.yml"
+  ],
+  "subject": "queue: rank TD-3, TD-9 (ledgerboard)"
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--text",
+  "Use the new id scheme",
+  "--context",
+  "TD-5",
+  "--answer",
+  "Go",
+  "--answer",
+  "Not yet",
+  "--default",
+  "0",
+  "--decided",
+  "Go",
+  "--by",
+  "pat",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

@@ -1,0 +1,28 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--text",
+  "Lift the gate?",
+  "--context",
+  "TD-7 decision (lee)",
+  "--due",
+  "2026-01-25",
+  "--kind",
+  "decide",
+  "--answer",
+  "Go",
+  "--answer",
+  "Not yet",
+  "--default",
+  "0",
+  "--detail",
+  "{\"context\": \"The design is done.\", \"question\": \"Go?\", \"recommended\": \"it is ready.\"}",
+  "--session",
+  "w-9",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

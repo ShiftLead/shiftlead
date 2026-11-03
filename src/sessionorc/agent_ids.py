@@ -175,13 +175,15 @@ def ids_script(root: str, timeout: float = cadence.TREE_TIMEOUT) -> Path | None:
 def taken_by_line(script: Path, root: str, rel: str, taken_by: str | None) -> str | None:
     """The header line each new entry writes (`**Taken by:** <by>`, cadence §2.10), or None where the repo's
     ledger does not accept the field (design §4.4 *Its answer*, TD-1089): `taken by` is in the `CADENCE_FIELDS`
-    of the `ledgerboard.py` beside the script run — read as a literal, never imported — or else the ledger
+    of the ledgerboard beside the script run — its package's `ledgerboard/__init__.py` (v2.3 on, TD-1330), else a
+    single `ledgerboard.py`, read as a literal, never imported — or else the ledger
     declares no field vocabulary, by the vendored `declared()`, of a directory its `README.md`'s preamble as
     `load()` heads its text (TD-1145). A missing or non-literal sibling, or a ledger that cannot be read (a
     faulted v2 ledger among them), gives None."""
     if not taken_by:
         return None
-    fields = _cadence_fields(script.parent / "ledgerboard.py")
+    package = script.parent / "ledgerboard" / "__init__.py"
+    fields = _cadence_fields(package if package.is_file() else script.parent / "ledgerboard.py")
     if fields is None:
         return None
     if "taken by" not in fields:
@@ -192,7 +194,7 @@ def taken_by_line(script: Path, root: str, rel: str, taken_by: str | None) -> st
 
 
 def _cadence_fields(path: Path) -> tuple[str, ...] | None:
-    """`CADENCE_FIELDS` of a `ledgerboard.py`, as a literal tuple of strings, or None."""
+    """`CADENCE_FIELDS` of a ledgerboard module file, as a literal tuple of strings, or None."""
     try:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except (OSError, ValueError, SyntaxError):

@@ -1,0 +1,7 @@
+{
+ "exit": 3,
+ "out": {
+  "action": "add",
+  "refused": "board.md: line 8: context: the gate's person lee is not on the board's `People:`"
+ }
+}

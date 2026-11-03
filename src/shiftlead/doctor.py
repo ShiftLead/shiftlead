@@ -456,7 +456,8 @@ def session_start_warning(seams: dict[str, Any], root: Any = "<checkout>") -> st
 
 
 def ledgerboard_warning(lbr: dict[str, Any] | None) -> str | None:
-    """The repo's vendored `ledgerboard.py` against the wheel's (§5 *ledgerboard by its header*, TD-1013):
+    """The repo's vendored ledgerboard (its package's `__init__.py`, or a single `ledgerboard.py`) against the
+    wheel's (§5 *ledgerboard by its header*, TD-1013):
     *ledgerboard v1.2 here, v1.3 in this build*, *ledgerboard has no release header* for a copy without
     one (or no copy), None when the releases are equal or the reading carries none (an older host agent),
     and for a pinned repo whose tree gave no release (its unserved lack says why, TD-1014)."""

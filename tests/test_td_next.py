@@ -697,7 +697,10 @@ async def test_the_home_and_a_direct_run_at_once_take_different_ids_from_one_cou
     """The real script (the pinned tree's, as a synced repo carries it), on a bare origin with no forge: one
     counter, with the home and without it."""
     files = {LEDGER: _ledger(1, 2), ARCHIVE: _ledger()}
-    files.update({f"scripts/{p.name}": p.read_text() for p in pinned_script("ledger_next_id.py").parent.glob("*.py")})
+    scripts = pinned_script("ledger_next_id.py").parent
+    files.update({f"scripts/{p.name}": p.read_text() for p in scripts.glob("*.py")})
+    # ledgerboard v2.3 is a package beside them (TD-1330)
+    files.update({f"scripts/ledgerboard/{p.name}": p.read_text() for p in (scripts / "ledgerboard").glob("*.py")})
     root = _one(tmp_path, gh, files=files)
     other = _repo(tmp_path, "other", {}, origin=Path(_git(root, "remote", "get-url", "origin")))
     env = {**os.environ, **GIT_ENV, "LEDGER_IDS_RACE_SECONDS": "20"}

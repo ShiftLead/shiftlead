@@ -1,0 +1,4 @@
+{
+ "archive": "# Archive\n\nProse with a separator.\n\n- [x] 2026-01-01 (session `w-1` on box-1) — Split here and\fthere. Context: TD-7. Due: 2026-01-20. Closed: 2026-01-10 — done.\n",
+ "board": "# Board\n\n- [ ] 2026-01-02 (session `w-1` on box-1) — Keep it. Context: TD-7. Due: 2026-01-20.\n"
+}

@@ -1,0 +1,12 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "archive",
+  "moved": 2,
+  "paths": [
+   "archive.md",
+   "board.md"
+  ],
+  "subject": "ledgerboard: archive 2 closed items (session w-1)"
+ }
+}

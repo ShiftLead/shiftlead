@@ -4,10 +4,12 @@ its three **adds**, *Put on the board* (TD-140), an orphaned question's answer (
 person's answer to a ledger entry that waits on them (TD-565), the only lines this system ever adds
 to a board.
 
-A board is in ledgerboard's format and every line of it is read and written through the vendored
-`ledgerboard.py` (ADR 2026-10-12, TD-585) — its `edit_line`, `item_line`, `decided_line` and
-`subject("shiftlead", …)`, with no line shape of its own here; this module only edits the one item it
-is pointed at, and only while origin's board still holds the item
+A board is in ledgerboard's format and every line of it is read through the vendored `ledgerboard`
+package (ADR 2026-10-12, TD-585) and **written through its board writer, `ledgerboard.board`** (ADR
+2026-11-03, TD-1330) — `plan_edit` for an edit, `plan_add` for an add, `apply` to write the file —
+with no line shape of its own here. What ShiftLead keeps is its own (ledgerboard's target design §1.1
+*What the consumer keeps*): the lock, the temporary worktree, the commit and its subject, the push and
+the PR. This module only edits the one item it is pointed at, and only while origin's board still holds the item
 the person was shown, open, word for word. **The edit is made on origin's head and landed there**
 (TD-222, built by TD-264): in the host agent's own detached tree for the repo
 (`~/.shiftlead/boards/<repo>/tree`), reset to `origin/<default>` at every press, committed with a
@@ -32,9 +34,10 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import gitinfo, ledgerboard, paths, workorders
+from sessionorc.ledgerboard import board as lb_board
 
 BOARD = workorders.BOARD
-ACTIONS = ("snooze", "done", "reply", "decide")
+ACTIONS = ("snooze", "due", "done", "reply", "decide")  # `due` (v2.3) moves Due:; `snooze` writes `Hide until:`
 TOOL = "shiftlead"  # the `<tool>:` of every board commit's subject (ledgerboard's `subject`)
 HEAD_MAX = 60
 ANSWER_MAX = 80  # an answer in a commit subject
@@ -100,11 +103,11 @@ def edit_line(
         if ledgerboard.parse_decided(m.group("text")) is not None:
             raise Refused("this item is already decided: Reply says more to its session, Done closes it")
     to = None
-    if action == "snooze":
+    if action in ("snooze", "due"):
         try:
             to = date.fromisoformat(str(due))
         except ValueError:
-            raise Refused(f"a snooze needs a date as YYYY-MM-DD, not {due!r}") from None
+            raise Refused(f"a {action} needs a date as YYYY-MM-DD, not {due!r}") from None
     try:
         return ledgerboard.edit_line(body, action, to=to, answer=answer, reply=reply, by=by, today=_day(today)) + end
     except ledgerboard.Refused as e:
@@ -174,6 +177,38 @@ def author(root: Path) -> str:
     except Refused:
         name = ""
     return name or "the person"
+
+
+def answerer(root: Path, board_text: str) -> str | None:
+    """Who a decide's answer is from (ledgerboard v2.3's `who_answered`): None on a board whose `People:`
+    names one person, who is then the answerer; else the checkout's git `user.name` as a person's name
+    (spaces joined by `-`) — on a `People:` of several names, that name or its first word as listed — or
+    `person`. ledgerboard refuses a name its `People:` does not list, in its own words."""
+    people = ledgerboard.board_people(board_text)
+    if people is not None and len(people) == 1:
+        return None
+    words = author(root).split()
+    name = "-".join(words)
+    # on a People: line of several names, the user's name as listed (whole, or its first word), if it is there
+    for want in (name, words[0] if words else ""):
+        got = next((p for p in people or () if want and p.lower() == want.lower()), None)
+        if got:
+            return got
+    return name if ledgerboard.is_person(name) else "person"
+
+
+def _plan(fn: Any, *args: Any, **kw: Any) -> lb_board.Plan:
+    try:
+        return fn(*args, **kw)
+    except ledgerboard.Refused as e:
+        raise Refused(str(e)) from None
+
+
+def _apply(plan: lb_board.Plan) -> None:
+    try:
+        lb_board.apply(plan)
+    except OSError as e:
+        raise Refused(f"the board could not be written, and is as it was: {e}") from None
 
 
 # -- origin's head (design §4.4 *The edit is made on origin's head, and landed there*, TD-264) ----
@@ -400,9 +435,7 @@ def _land(
     branch = f"{prefix}/{Path(root).name}/{datetime.now(UTC):%Y%m%d%H%M%S}-{sha[:7]}"
     pushed = False
     try:
-        cp = _git(
-            t, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", timeout=clock.left("git push"), c_locale=True
-        )
+        cp = _git(t, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", timeout=clock.left("git push"), c_locale=True)
         if cp.returncode != 0:
             reason = _push_refusal(cp)
             raise unreachable(_why(cp, "git push")) if reason is None else refused_push(reason)
@@ -561,9 +594,17 @@ def _write_back(
     # it changes the text and never the id (§4.4 *A board line's id*)
     text = ledgerboard.ITEM_RE.match(lines[at].rstrip("\n")).group("text").strip()  # type: ignore[union-attr]
     by = author(root) if action == "reply" else ""
-    lines[at] = edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer)
+    # ShiftLead's own checks first (the item word for word, a decide on a decided line, a field's name)
+    edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer)
+    if action == "decide":
+        by = answerer(root, "".join(lines)) or ""
+    plan = _plan(
+        lb_board.plan_edit, str(path), action, at + 1, text,
+        to=due if action in ("snooze", "due") else None, answer=answer or None, text=reply or None,
+        by=by or None, tool=TOOL,
+    )  # fmt: skip
     msg = message(text, action, due, answer=answer)
-    path.write_text("".join(lines), encoding="utf-8")
+    _apply(plan)
 
     def still() -> bool:
         return _find(_read_origin(t, want, rel), None, text) is not None
@@ -604,24 +645,6 @@ def item_line(text: str, due: str, today: str, session: str | None, host: str | 
 NEEDS = "## Needs the user"  # the board's section for the person's lines (cadence §3), a heading's words
 
 
-def _top_of_needs(lines: list[str]) -> int:
-    """Where the add goes: above the first item **of the *Needs the user* section** — another
-    section's items (a board's parked in-flight work) are never where a person's line lands — or,
-    when that section holds none, right under its heading and blank line. A board with no such
-    heading takes it above its first item, else at the end."""
-    head = next((i for i, ln in enumerate(lines) if ln.split()[:4] == NEEDS.split()), None)
-    if head is None:
-        return next((i for i, ln in enumerate(lines) if ledgerboard.is_item(ln)), len(lines))
-    end = next((i for i in range(head + 1, len(lines)) if lines[i].startswith("#")), len(lines))
-    first = next((i for i in range(head + 1, end) if ledgerboard.is_item(lines[i])), None)
-    if first is not None:
-        return first
-    at = head + 1
-    while at < end and not lines[at].strip():
-        at += 1
-    return at
-
-
 def add(
     root: str | Path,
     text: str,
@@ -645,13 +668,32 @@ def add(
     the line as a reply does (` — <name>, <date>: <answer>`), committed by the same `append`."""
     root = Path(root)
     today = today or date.today().isoformat()
-    words = text
+    by = None
     if answer is not None:
-        words = " ".join(str(text or "").split()).rstrip(".") + reply_tail(answer, author(root), today)
-    line = item_line(words, due, today, session, host, context)
+        reply_tail(answer, "x", today)  # an empty answer is refused in our words, before the tree is touched
+        by = author(root)
+    # the line first, so words the board refuses refuse the press before origin is fetched
+    bare = item_line(text, due, today, session, host, context)
     # the subject is the line's without the answer: a person's words stay on the board (ledgerboard's `subject`)
-    bare = item_line(text, due, today, session, host, context) if answer is not None else line
-    return _insert(root, line, message(ledgerboard.ITEM_RE.match(bare.rstrip("\n"))["text"], "append"))
+    msg = message(ledgerboard.ITEM_RE.match(bare.rstrip("\n"))["text"], "append")
+    return _insert(
+        root,
+        lambda path: _plan(
+            lb_board.plan_add,
+            str(path),
+            text,
+            due=due or None,
+            context=context,
+            session=session,
+            host=host,
+            said=answer,
+            by=by,
+            under=NEEDS,
+            today=today,
+            tool=TOOL,
+        ),  # fmt: skip
+        msg,
+    )
 
 
 def decided_line(title: str, ref: str, answers: list[str], default: int | None, words: str, today: str) -> str:
@@ -667,18 +709,42 @@ def decided_line(title: str, ref: str, answers: list[str], default: int | None, 
         raise Refused(str(e)) from None
 
 
-def add_decided(root: str | Path, line: str, session: str = "") -> dict[str, Any]:
-    """The third add (design §4.4 *Board write-back*, TD-565): `line` (`decided_line`) at the top of
-    the open items of the board on origin's head, by the second add's road, committed by the same
-    `append` — its session *n/a*, the person's, or `session`'s name for a road a person's session
+def add_decided(
+    root: str | Path,
+    title: str,
+    ref: str,
+    answers: list[str],
+    default: int | None,
+    words: str,
+    today: str,
+    session: str = "",
+) -> dict[str, Any]:
+    """The third add (design §4.4 *Board write-back*, TD-565): the decided line `decided_line` gives for
+    these fields, written by ledgerboard's `plan_add` (its `decided`, who answered as `answerer` says) at
+    the top of the open items of the board on origin's head, by the second add's road, committed by the
+    same `append` — its session *n/a*, the person's, or `session`'s name for a road a person's session
     pressed (§4.8 *A person's session passes one of them*, TD-1117). Returns `{commit, message, pr, line}`."""
+    root = Path(root)
+    line = decided_line(title, ref, answers, default, words, today)  # refused in our words before origin
     text = ledgerboard.ITEM_RE.match(line.rstrip("\n"))["text"]
-    return _insert(Path(root), line, message(text, "append", session=session))
+
+    def plan(path: Path) -> lb_board.Plan:
+        try:
+            board_text = path.read_text(encoding="utf-8")
+        except OSError as e:
+            raise Refused(f"cannot read {path}: {e}") from None
+        return _plan(
+            lb_board.plan_add, str(path), title, context=ref, answers=list(answers), default=default,
+            decided=words, by=answerer(root, board_text), under=NEEDS, today=today, tool=TOOL,
+        )  # fmt: skip
+
+    return _insert(root, plan, message(text, "append", session=session))
 
 
-def _insert(root: Path, line: str, msg: str) -> dict[str, Any]:
-    """An add's press: `line` above the first item of the board's open items on origin's head, in
-    the host agent's own tree, landed by its own PR as an edit is."""
+def _insert(root: Path, plan: Any, msg: str) -> dict[str, Any]:
+    """An add's press: `plan(path)` — ledgerboard's `plan_add` on the board at `path` in the host
+    agent's own tree, reset to origin's head — written there, committed and landed by its own PR as an
+    edit is."""
     with _EDIT:
         clock = _Clock()
         if shutil.which("gh") is None:
@@ -687,14 +753,10 @@ def _insert(root: Path, line: str, msg: str) -> dict[str, Any]:
         def press() -> dict[str, Any]:
             t, want = _tree(root, clock)
             path = t / workorders.board_rel(root)
-            lines = _read_lines(path)
-            at = _top_of_needs(lines)
-            if lines and not lines[-1].endswith("\n") and at == len(lines):
-                lines[-1] += "\n"
-            lines.insert(at, line)
-            path.write_text("".join(lines), encoding="utf-8")
+            p = plan(path)
+            _apply(p)
             # an add moves no line, so a refused merge is never a moved line: unreachable, or made once more
-            return {**_land(root, t, want, msg, clock, lambda: True), "line": at + 1}
+            return {**_land(root, t, want, msg, clock, lambda: True), "line": p.info["line"]}
 
         return _twice(press)
 
@@ -802,7 +864,6 @@ def branch_edit(
             raise Refused(f"line {line} is outside the board ({len(lines)} lines)")
         at = int(line) - 1
     body = lines[at].rstrip("\r\n")
-    eol = lines[at][len(body) :]
     m = ledgerboard.ITEM_RE.match(body)
     if m is None:
         raise Refused(f"line {at + 1} is not an open item: {body[:80]!r}")
@@ -811,13 +872,13 @@ def branch_edit(
     if exp and not (text.startswith(exp) or body.lstrip().startswith(exp)):
         raise Refused(f"line {at + 1} no longer starts with the expected item — the board moved; re-read it. "
                       f"Line {at + 1} is: {body[:80]!r}")  # fmt: skip
-    try:
-        new = ledgerboard.edit_line(body, action, to=to, why=why or None, today=_day(today))
-    except ledgerboard.Refused as e:
-        raise Refused(str(e)) from None
+    plan = _plan(
+        lb_board.plan_edit, str(path), action, at + 1, text, to=to.isoformat() if to else None, why=why or None,
+        today=_day(today), tool=TOOL,
+    )  # fmt: skip
+    new = plan.changes[str(path)].splitlines(keepends=True)[at].rstrip("\r\n")
     msg = message(text, action, to.isoformat() if to else None)
-    lines[at] = new + eol
-    path.write_bytes("".join(lines).encode("utf-8", errors="surrogateescape"))
+    _apply(plan)
     cp = _git(root, "commit", "-q", "-m", msg, "--", str(path))
     if cp.returncode != 0:
         path.write_bytes(raw)

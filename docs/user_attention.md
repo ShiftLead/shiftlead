@@ -6,6 +6,8 @@ All conventions — entry format and the `<host>` semantics, `Due:` dates and sn
 
 Format: `- [ ] YYYY-MM-DD (session <first-8-of-session-uuid> on <host>, or n/a) — what's needed. Context: TD-NNN / PR #N / branch. Due: YYYY-MM-DD.`
 
+People: paul
+
 ## Needs the user
 
 - [x] decide 2026-11-03 (person) — A Queue card with several Decide and Do items has no Start session that takes them all: add the header's beside the items', with a prompt that walks every item in turn. Context: TD-1338. Due: 2026-11-03. Decided: keep both (2026-11-03). Closed: 2026-11-03 — carried to TD-1338: Paul's keep both is in its Why, its decision (paul) hold dropped, so its design round (the designer's) can start.

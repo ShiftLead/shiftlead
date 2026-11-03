@@ -1,0 +1,22 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--kind",
+  "act",
+  "--text",
+  "Rotate the deploy key",
+  "--context",
+  "TD-3",
+  "--due",
+  "2026-01-22",
+  "--session",
+  "w-3",
+  "--host",
+  "box",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

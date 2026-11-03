@@ -1,0 +1,11 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "reply",
+  "line": 8,
+  "paths": [
+   "board.md"
+  ],
+  "subject": "ledgerboard: reply Pick a cache. (session `w-2`)"
+ }
+}

@@ -1,0 +1,630 @@
+{
+ "item-line": {
+  "answer": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: each answer has its own label"
+   }
+  ],
+  "answer-sep": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: a decide carries two or more answers"
+   }
+  ],
+  "answers": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: no period after its answers; answers: `Decided:` stands after `Answers:`; text: names a field (Decided:) where none is read; answers: an act carries no answers: a question with answers is a decide"
+   }
+  ],
+  "any-head": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "head: `(someone)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+   }
+  ],
+  "char": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "open: not an open item"
+   }
+  ],
+  "choices": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: no period after its answers"
+   }
+  ],
+  "context": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "context: does not end with its period"
+   },
+   {
+    "accepted": false,
+    "why": "context: empty"
+   }
+  ],
+  "date": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "head: '2026-1-5' is not a date as YYYY-MM-DD"
+   }
+  ],
+  "dated-due": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "context: does not end with its period; due: an fyi carries no `Due:`"
+   }
+  ],
+  "decide-item": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: a decide carries two or more answers"
+   }
+  ],
+  "decided": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "text: names a field (Decided:) where none is read"
+   },
+   {
+    "accepted": false,
+    "why": "text: names a field (Decided:) where none is read"
+   }
+  ],
+  "decided-item": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "head: `(person)` stands only on a decided line"
+   }
+  ],
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "due: '2026-0x-20' is not a date as YYYY-MM-DD"
+   }
+  ],
+  "due": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "due: no period after its date"
+   },
+   {
+    "accepted": false,
+    "why": "due: spelled 'due', not `Due:`"
+   }
+  ],
+  "due-name": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "due: spelled 'DUE', not `Due:`"
+   }
+  ],
+  "entry-id": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   }
+  ],
+  "field-at": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "context: `Context:` stands more than once; text: does not end a sentence (`.`, `?` or `!`)"
+   }
+  ],
+  "field-name": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "context: does not end with its period; due: `Due:` stands after `Closed:`; it follows Context; text: names a field (Closed:) where none is read"
+   }
+  ],
+  "fyi-item": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "due: an fyi carries no `Due:`"
+   }
+  ],
+  "fyi-reply": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "context: does not end with its period; due: an fyi carries no `Due:`"
+   }
+  ],
+  "head": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "head: `(session w-1 on box-1)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+   }
+  ],
+  "head-name": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "head: `(session `w;1`)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+   }
+  ],
+  "hide": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "hide: no period after its date"
+   }
+  ],
+  "item-line": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "open: not an open item"
+   },
+   {
+    "accepted": false,
+    "why": "open: an item line opens `- [ ] ` at column 0, single-spaced"
+   },
+   {
+    "accepted": false,
+    "why": "open: an item line opens `- [ ] ` at column 0, single-spaced"
+   }
+  ],
+  "label": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: each answer has its own label"
+   }
+  ],
+  "label-char": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: each answer has its own label"
+   }
+  ],
+  "label-chars": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "context: `Context:` stands more than once; answers: no period after its answers; answers: `Context:` stands after `Answers:`; answers: a decide carries two or more answers"
+   }
+  ],
+  "label-start": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: each answer has its own label"
+   }
+  ],
+  "lifts": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "lifts: no period after its answers"
+   }
+  ],
+  "look-answers": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: a look carries exactly `Works | Not right: <what>`, `Works` marked ` (default)` or not"
+   },
+   {
+    "accepted": false,
+    "why": "answers: a look carries exactly `Works | Not right: <what>`, `Works` marked ` (default)` or not"
+   }
+  ],
+  "look-item": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: a look carries exactly `Works | Not right: <what>`, `Works` marked ` (default)` or not"
+   }
+  ],
+  "non-word": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "answers: no period after its answers; lifts: not one of the item's answers: it, Drop it; answers: a decide carries two or more answers"
+   }
+  ],
+  "other-item": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "due: no `Due:` (every kind but fyi carries one)"
+   }
+  ],
+  "parts": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   }
+  ],
+  "reply": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "extra: '— Pat, 2026-01-06 later.' after `Due:`"
+   }
+  ],
+  "reply-name": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "extra: '— Pat, Lee, 2026-01-06: later.' after `Due:`"
+   }
+  ],
+  "repo": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   }
+  ],
+  "repo-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   }
+  ],
+  "text": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "text: does not end a sentence (`.`, `?` or `!`)"
+   }
+  ],
+  "undated": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "context: does not end with its period; due: an fyi carries no `Due:`"
+   }
+  ],
+  "words": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "text: names a field (Answers:): say it in other words"
+   }
+  ]
+ },
+ "person": {
+  "person": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ],
+  "person-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": null
+   }
+  ]
+ },
+ "rank-file": {
+  "comment": [
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": false,
+    "why": [
+     "ℹ rank line 2: a comment below the first entry — comments come first"
+    ]
+   }
+  ],
+  "comment-line": [
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": false,
+    "why": [
+     "ℹ rank line 2: a comment below the first entry — comments come first"
+    ]
+   }
+  ],
+  "eol": [
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": false,
+    "why": [
+     "⚠ rank line 1: cannot read 'TD-3: 0h TD-4: 0i' — write TD-NNN: <key>"
+    ]
+   }
+  ],
+  "key": [
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": false,
+    "why": [
+     "⚠ rank line 1: cannot read 'TD-3: |a' — write TD-NNN: <key>"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "⚠ rank line 1: cannot read 'TD-3: a:b' — write TD-NNN: <key>"
+    ]
+   }
+  ],
+  "line-char": [
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": false,
+    "why": [
+     "ℹ rank line 2: blank — ignored"
+    ]
+   }
+  ],
+  "rank-entry": [
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": false,
+    "why": [
+     "⚠ rank line 2: cannot read 'TD-4 0i' — write TD-NNN: <key>"
+    ]
+   }
+  ],
+  "rank-file": [
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": false,
+    "why": [
+     "ℹ rank line 3: blank — ignored"
+    ]
+   }
+  ],
+  "rank-line": [
+   {
+    "accepted": true,
+    "why": []
+   },
+   {
+    "accepted": false,
+    "why": [
+     "⚠ rank line 1: cannot read 'TD-3 0h' — write TD-NNN: <key>"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "⚠ rank line 1: cannot read 'TD-3:0h' — write TD-NNN: <key>"
+    ]
+   }
+  ]
+ }
+}

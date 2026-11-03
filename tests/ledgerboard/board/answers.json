@@ -13,15 +13,20 @@
     ""
    ],
    "decided": null,
+   "decided_by": null,
    "default": "On disk",
    "detail": [],
    "due": "2026-01-20",
    "due_error": null,
    "due_tag": "due 2026-01-20",
+   "hidden": false,
+   "hide_until": null,
    "host": "box-1",
    "kind": "decide",
+   "lifts": null,
    "line": 5,
    "overdue_days": null,
+   "parts": [],
    "refs": [
     "TD-040"
    ],
@@ -40,15 +45,20 @@
     ""
    ],
    "decided": null,
+   "decided_by": null,
    "default": "South",
    "detail": [],
    "due": "2026-01-21",
    "due_error": null,
    "due_tag": "due 2026-01-21",
+   "hidden": false,
+   "hide_until": null,
    "host": "box-1",
    "kind": "decide",
+   "lifts": null,
    "line": 6,
    "overdue_days": null,
+   "parts": [],
    "refs": [
     "TD-041"
    ],
@@ -70,15 +80,20 @@
     "date": "2026-01-14",
     "text": "Keep"
    },
+   "decided_by": null,
    "default": "Keep",
    "detail": [],
    "due": "2026-01-22",
    "due_error": null,
    "due_tag": "due 2026-01-22",
+   "hidden": false,
+   "hide_until": null,
    "host": "box-2",
    "kind": "decide",
+   "lifts": null,
    "line": 7,
    "overdue_days": null,
+   "parts": [],
    "refs": [
     "TD-042"
    ],
@@ -92,5 +107,23 @@
   "- [ ] decide 2026-01-05 (session s-1 on box-1) — **Where the cache lives.** Context: TD-040. Answers: On disk (default) — the next run reads it back | In memory — every run starts cold | Not now",
   "- [ ] decide 2026-01-06 (session s-2 on box-1) — Pick a region. Context: TD-041. Answers: North — closer — but dearer | South (default)",
   "- [ ] decide 2026-01-07 (session s-3 on box-2) — An old whole-answer mark. Context: TD-042. Answers: Keep — nothing changes (default) | Drop"
- ]
+ ],
+ "needs_you": [
+  [
+   7,
+   "decided",
+   1
+  ],
+  [
+   5,
+   "due",
+   -5
+  ],
+  [
+   6,
+   "due",
+   -6
+  ]
+ ],
+ "people": null
 }

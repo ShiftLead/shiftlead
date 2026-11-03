@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import park_ticks, pinned_script, served
+from conftest import copy_pinned_ledgerboard, park_ticks, pinned_script, served
 
 from sessionorc import board, ledgerboard
 from sessionorc.client import AgentError, LocalClient
@@ -63,11 +63,15 @@ def test_a_line_is_done_or_snoozed_only_while_it_holds_the_item():
     line = f"- [ ] {ITEM}\n"
     # Done ticks it and closes it today: ledgerboard's edit (TD-585; was a tick alone)
     assert board.edit_line(line, ITEM, "done", today="2026-10-13") == f"- [x] {ITEM} Closed: 2026-10-13.\n"
-    assert board.edit_line(line, ITEM, "snooze", "2026-10-01") == f"- [ ] {ITEM.replace('2026-09-22', '2026-10-01')}\n"
-    # an item with no date gains one
-    assert board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "snooze", "2026-10-01") == (
+    # ledgerboard v2.3 (TD-1330): Snooze hides the item until the date and leaves its Due: alone; `due` moves it
+    assert board.edit_line(line, ITEM, "snooze", "2026-10-01") == f"- [ ] {ITEM} Hide until: 2026-10-01.\n"
+    assert board.edit_line(line, ITEM, "due", "2026-10-01") == f"- [ ] {ITEM.replace('2026-09-22', '2026-10-01')}\n"
+    # an undated item gains a date by `due`; a snooze of a line with no Due: and no Context: is refused
+    assert board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "due", "2026-10-01") == (
         "- [ ] n/a — undated. Due: 2026-10-01."
     )
+    with pytest.raises(board.Refused, match="Hide until"):
+        board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "snooze", "2026-10-01")
     for bad in (
         lambda: board.edit_line("- [ ] something else\n", ITEM, "done"),  # another item moved onto the line
         lambda: board.edit_line(f"- [x] {ITEM}\n", ITEM, "done"),  # already done
@@ -101,7 +105,7 @@ def test_write_back_lands_the_one_line_on_origin_and_leaves_the_checkout_alone(r
     )
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#1)"
     assert on_origin(repo, "show", "--name-only", "--format=", "origin/main") == str(board.BOARD)
-    assert "Due: 2026-10-01." in origin_board(repo)
+    assert "Due: 2026-09-22. Hide until: 2026-10-01." in origin_board(repo)  # v2.3: Due: stays (TD-1330)
     assert (repo / board.BOARD).read_text() == BOARD_TEXT and git(repo, "rev-parse", "HEAD") == head
     assert git(repo, "status", "--porcelain") == "M other.txt"  # someone else's edit, untouched
     assert "board/" not in git(repo, "ls-remote", "--heads", "origin")  # the PR's branch is deleted
@@ -177,7 +181,7 @@ def test_a_push_the_forge_refuses_reads_apart_from_an_unreachable_origin(repo, t
     hook = Path(git(repo, "remote", "get-url", "origin")) / "hooks" / "pre-receive"
     seen = tmp_path / "push-locale"
     hook.write_text(
-        f"#!/bin/sh\nprintf %s \"$LC_ALL\" > {seen}\n"
+        f'#!/bin/sh\nprintf %s "$LC_ALL" > {seen}\n'
         "echo 'error: GH007: Your push would publish a private email address.' >&2\nexit 1\n"
     )
     hook.chmod(0o755)
@@ -595,7 +599,7 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         # the closed asker's own record keeps the handed note for the name's next create (TD-271)
         left = [e for e in (await me.call("inbox", id=got["asker"]))["entries"] if e["from"] == "person"]
         assert len(left) == 1 and left[0]["handed"] and left[0]["text"].startswith("the DIU one")
-        assert got["message"] == "shiftlead: append Which fetcher first?. (session `asker`)"  # the answer stays off it
+        assert got["message"] == "shiftlead: append Which fetcher first? (session `asker`)"  # the answer stays off it
         line = origin_board(repo).splitlines()[got["line"] - 1]
         assert line.startswith("- [ ] ") and "(session `asker` on " in line
         assert "— Which fetcher first? — t, " in line and ": the DIU one. Context: TD-149. Due: " in line
@@ -834,7 +838,8 @@ def test_a_decide_is_committed_and_refused_where_every_edit_is(repo):
         on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
         and git(repo, "status", "--porcelain") == ""
     )
-    assert ledgerboard.DECIDED_RE.search(origin_board(repo).splitlines()[8]).group("text") == "Keep it"
+    # v2.3 (TD-1330): who answered is on the line — a board with no People: names the checkout's user
+    assert ledgerboard.DECIDED_RE.search(origin_board(repo).splitlines()[8]).group("text") == "Keep it (by t)"
     head = on_origin(repo, "rev-parse", "origin/main")
     git(repo, "pull", "-q", "--ff-only", "origin", "main")  # the checkout catches up (§6 *Pull*)
     for line, text in ((9, ASKED), (6, "not an item")):  # already decided; moved
@@ -873,8 +878,8 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
                             answer="Not right: the ring is amber", answers=pair)  # fmt: skip
         assert got["answer"] == "Not right: the ring is amber"
     lines = origin_board(repo).splitlines()
-    assert ledgerboard.DECIDED_RE.search(lines[8]).group("text") == "Keep it"
-    assert ledgerboard.DECIDED_RE.search(lines[9]).group("text") == "Not right: the ring is amber"
+    assert ledgerboard.DECIDED_RE.search(lines[8]).group("text") == "Keep it (by t)"  # v2.3: who answered
+    assert ledgerboard.DECIDED_RE.search(lines[9]).group("text") == "Not right: the ring is amber (by t)"
 
 
 @pytest.mark.unit
@@ -1144,7 +1149,7 @@ def test_a_ledger_answer_is_one_decided_line_the_reader_reads_as_a_work_order(tm
     (root / "docs").mkdir(parents=True)
     (root / "scripts").mkdir()
     shutil.copy2(pinned_script("nudge_user_attention.py"), root / "scripts")
-    shutil.copy2(pinned_script("ledgerboard.py"), root / "scripts")
+    copy_pinned_ledgerboard(root / "scripts")
     (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{line}"))
     (o,) = workorders.read(root, fetch=False)["orders"]
     assert o["decided"] == {"text": "At the reset", "date": "2026-10-12"} and "TD-133" in o["refs"]
@@ -1161,8 +1166,9 @@ def test_a_ledger_answer_is_one_decided_line_the_reader_reads_as_a_work_order(tm
 
 def test_the_third_add_lands_the_decided_line_at_the_top_committed_by_the_id(repo):
     line = board.decided_line(LEDGER_TITLE, "TD-133", ["Yes", "No"], 1, "No", "2026-10-12")
-    got = board.add_decided(repo, line)
-    assert origin_board(repo).splitlines()[got["line"] - 1] == line.rstrip("\n")
+    got = board.add_decided(repo, LEDGER_TITLE, "TD-133", ["Yes", "No"], 1, "No", "2026-10-12")
+    # ledgerboard's plan_add writes it, naming who answered (v2.3, TD-1330): the checkout's user, as no People: does
+    assert origin_board(repo).splitlines()[got["line"] - 1] == line.rstrip("\n").replace("No (2026", "No (by t) (2026")
     assert got["line"] == 7 and got["message"] == "shiftlead: append When should a team start on its own? (session n/a)"
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
     assert (repo / board.BOARD).read_text() == BOARD_TEXT  # the checkout is never written
@@ -1230,7 +1236,7 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         )
         line = origin_board(repo).splitlines()[got["line"] - 1]
         assert line.startswith("- [ ] decide ") and "(person) — When should a team start on its own? Context:" in line
-        assert "Context: TD-133." in line and line.endswith("Decided: At the reset (" + line[-12:])
+        assert "Context: TD-133." in line and line.endswith("Decided: At the reset (by t) (" + line[-12:])
         # the home read the board again: the line is a work order naming the id, and a second press is refused
         orders = agent._repos[root]["work_orders"]["orders"]
         assert [o["decided"]["text"] for o in orders] == ["At the reset"] and "TD-133" in orders[0]["refs"]
@@ -1417,7 +1423,7 @@ def keyed(tmp_path, forge) -> Path:
     reader = pinned_script("nudge_user_attention.py")
     (root / "scripts" / "nudge_user_attention.py").write_text(reader.read_text())
     # the reader imports its sibling: without it, it loads only where an earlier test left one importable
-    (root / "scripts" / "ledgerboard.py").write_text(reader.with_name("ledgerboard.py").read_text())
+    copy_pinned_ledgerboard(root / "scripts")
     git(root, "init", "-q", "-b", "main")
     git(root, "config", "user.email", "t@example.com")
     git(root, "config", "user.name", "t")
@@ -1478,7 +1484,7 @@ async def test_board_edit_and_board_reply_find_the_line_by_its_id_alone(agent, k
         with pytest.raises(AgentError, match="names the item's line or its id"):
             await me.call("board_edit", board=path, action="done")
     line = origin_board(keyed).splitlines()[6]
-    assert "on it" in line and "Due: 2026-10-01" in line
+    assert "on it" in line and "Hide until: 2026-10-01" in line
 
 
 def test_of_two_open_lines_sharing_an_id_the_one_shown_word_for_word_is_found(keyed):
@@ -1565,3 +1571,23 @@ async def test_a_persons_session_presses_done_and_back_to_design_but_answers_no_
     settle.observe(entries, "o/r", {}, datetime.now(UTC))
     got = await agent.rpc_ledger_decide(repo=root, id="TD-36", road="done", caller="ao-me@laptop")
     assert got["message"].endswith("(session lap)")
+
+
+def test_the_inbox_reads_needs_you_so_a_hidden_item_is_no_row():
+    """TD-1330 (ledgerboard v2.3): a Snooze writes `Hide until:`; `board_items` carries each item's
+    `needs_you` class as `needs`, None while hidden, and the Inbox's `board_rows` draws no row for it —
+    until the date, when it is back with its Due: as it was."""
+    from datetime import date
+
+    from sessionorc import workorders
+    from shiftlead.ui.inbox import board_rows
+
+    hidden = board.edit_line(f"- [ ] {ITEM}\n", ITEM, "snooze", "2026-10-01")
+    text = f"# User attention\n\n## Needs the user\n\n{hidden}- [ ] n/a — undated.\n"
+    for today, shown in ((date(2026, 9, 25), 1), (date(2026, 10, 1), 2)):
+        items = workorders.board_items(text, today)
+        assert [i["needs"] is None for i in items] == [shown == 1, False]
+        report = {"today": today.isoformat(), "boards": [{"root": "/r", "board": "/r/b.md", "items": items}]}
+        rows = board_rows(report)
+        assert len(rows) == shown and rows[-1]["text"].startswith("n/a — undated")
+    assert "Due: 2026-09-22. Hide until: 2026-10-01." in hidden  # its deadline stands

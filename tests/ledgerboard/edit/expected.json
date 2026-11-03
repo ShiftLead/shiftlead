@@ -1,4 +1,96 @@
 {
+ "archive_subjects": [
+  {
+   "ok": "shiftlead: archive 1 closed item (session w-1)"
+  },
+  {
+   "ok": "shiftlead: archive 12 closed items (session w-1)"
+  },
+  {
+   "ok": "agent-cadence: archive 3 closed items (session n/a)"
+  },
+  {
+   "refused": "a tool is one word with no parenthesis, not 'my tool'"
+  }
+ ],
+ "board_problems": [
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ],
+   [
+    2,
+    "head: `(session w-2)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ],
+   [
+    3,
+    "text: does not end a sentence (`.`, `?` or `!`)"
+   ],
+   [
+    4,
+    "open: an item line opens `- [ ] ` at column 0, single-spaced; kind: 'nested' is not a kind: one of decide, act, look, watch, fyi, in lower case; head: a date then `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`, then ` — `"
+   ]
+  ],
+  [],
+  [
+   [
+    5,
+    "context: the gate's person lee is not on the board's `People:`"
+   ]
+  ],
+  [
+   [
+    0,
+    "ℹ people: no `People:` line — nobody is named who may answer this board's items"
+   ]
+  ],
+  [],
+  [
+   [
+    3,
+    "people: not a person's name: 'pat smith', ''"
+   ],
+   [
+    3,
+    "people: named twice: PAT"
+   ],
+   [
+    4,
+    "people: a second `People:` line — the first is read"
+   ]
+  ],
+  [
+   [
+    3,
+    "people: `People:` lists no name"
+   ]
+  ]
+ ],
  "bold_heads": {
   "2026-01-05 (session s-1 on h) — **Fix the export** before Friday. Due: 2026-01-20.": "Fix the export",
   "2026-01-05 (session s-1) — **  ** is no head. Due: 2026-01-20.": null,
@@ -8,6 +100,59 @@
   "decide 2026-01-05 (session s-1) — Pick one. Context: TD-004. Due: 2026-01-20. Answers: a | b.": null,
   "decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-20. Answers: **a** | b.": "a"
  },
+ "canonical_items": [
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20."
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20."
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20."
+  },
+  {
+   "refused": "due: `Due:` stands before `Context:`; it follows Context; text: does not end a sentence (`.`, `?` or `!`)"
+  },
+  {
+   "refused": "text: names a field (Due:): say it in other words"
+  },
+  {
+   "refused": "the rewrite would change the line's item key or what the reader reads: fix the line by hand — due: `Due:` stands before `Context:`; it follows Context; context: does not end with its period"
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20."
+  },
+  {
+   "refused": "the rewrite would change the line's item key or what the reader reads: fix the line by hand — context: does not end with its period; text: names a field (Decided:) where none is read"
+  },
+  {
+   "ok": "- [ ] fyi 2026-01-15 (session `w-1` on box-1) — Heads up. Context: TD-7. — w-2, 2026-01-16: noted"
+  },
+  {
+   "refused": "context: no `Context:`"
+  },
+  {
+   "refused": "head: `(session w-1 on box-1)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`"
+  },
+  {
+   "refused": "due: an fyi carries no `Due:`"
+  },
+  {
+   "refused": "due: `Due:` stands after `Answers:`; it follows Context"
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.\n"
+  },
+  {
+   "ok": "- [ ] fyi 2026-01-15 (session `w-1` on box-1) — Heads up. Context: TD-7. — w-2, 2026-01-16: noted. Decided: ok (2026-01-16)."
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20. — w-2, 2026-01-16: on it"
+  },
+  {
+   "refused": "the rewrite would change the line's item key or what the reader reads: fix the line by hand — due: spelled 'due', not `Due:`; due: no period after its date"
+  }
+ ],
  "components": {
   "ledger/basic.md": [
    {
@@ -231,24 +376,195 @@
    "refused": "a decision needs its words: one of the entry's answers, or what you typed"
   },
   {
-   "refused": "an answer may not carry Context:, Answers:, Decided: or Closed: — say it in other words"
+   "refused": "an answer may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — say it in other words"
   },
   {
    "ok": "- [ ] decide 2026-01-15 (person) — Where the cache lives. Context: TD-40. Due: 2026-01-15. Answers: On disk (default) — the next run reads it back | In memory — every run starts cold | Not now. Decided: On disk (2026-01-15).\n"
   },
   {
    "ok": "- [ ] decide 2026-01-15 (person) — Pick a region. Context: TD-41. Due: 2026-01-15. Answers: North (default) — closer — but dearer | South. Decided: North (2026-01-15).\n"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: On disk — the next run reads it back | In memory (default) | Not now.\n  - **Context:** The cache is rebuilt on every run, which takes a minute.\n    - disk: 40 MB\n    - memory: none\n  - **Question:** Where should the cache live?\n  - **Caveats:** Nobody has measured a cold start yet.\n  - **Recommended:** In memory — nothing to clean up. **Otherwise:** On disk, if cold starts hurt; Not now, if neither.\n"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: On disk | In memory — every run starts cold | Not now.\n  - **Context:** The cache is rebuilt on every run.\n  - **Question:** Where should it live?\n  - **Recommended:** only you know how often runs restart.\n"
+  },
+  {
+   "ok": "- [ ] look 2026-01-15 (session `w-1` on box-1) — Look at the new export page. Context: TD-7. Due: 2026-01-20. Answers: Works | Not right: <what>.\n  - **Question:** Open the export page and run one export.\n"
+  },
+  {
+   "ok": "- [ ] look 2026-01-15 (session `w-1` on box-1) — Look at the new export page. Context: TD-7. Due: 2026-01-20. Answers: Works (default) | Not right: <what>.\n"
+  },
+  {
+   "ok": "- [ ] fyi 2026-01-15 (session `w-1` on box-1) — The nightly job moved to 02:00. Context: TD-7.\n"
+  },
+  {
+   "ok": "- [ ] watch 2026-01-15 (session `w-1` on box-1) — Check the queue drains after the deploy. Context: PR #12. Due: 2026-01-20.\n"
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1`) — Rotate the test key. Context: TD-7. Due: 2026-01-20.\n"
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it? Context: TD-7. Due: 2026-01-20.\n"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: Files \\| folders (default) | Database.\n  - **Context:** The cache is rebuilt on every run.\n  - **Question:** Where should it live?\n  - **Recommended:** Files | folders — it survives a restart.\n"
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Wait for the mirror... Context: TD-7. Due: 2026-01-20.\n"
+  },
+  {
+   "refused": "a board line's text may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+  },
+  {
+   "refused": "the context may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+  },
+  {
+   "refused": "the detail block's caveats may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+  },
+  {
+   "refused": "a decide offers two or more answers"
+  },
+  {
+   "refused": "a decide needs its detail block's question"
+  },
+  {
+   "refused": "an act carries no answers: a question with answers is a decide"
+  },
+  {
+   "refused": "a look's answers are the writer's (Works | Not right: <what>): give none"
+  },
+  {
+   "refused": "a look's default is 0 (Works), or None"
+  },
+  {
+   "refused": "an fyi carries no Due: date — give due as None"
+  },
+  {
+   "refused": "a watch needs its Due date"
+  },
+  {
+   "refused": "default is the index of one of the 3 answers, not 3"
+  },
+  {
+   "refused": "an answer may not carry ` (default)`: the mark is the writer's — give default"
+  },
+  {
+   "refused": "an answer's consequence may not read as a reply (` — <name>, <date>: `) — say it in other words"
+  },
+  {
+   "refused": "two answers have the same label: each answer needs its own"
+  },
+  {
+   "refused": "a host is written only with its session: give the session too"
+  },
+  {
+   "refused": "a kind is one of decide, act, look, watch, fyi, not 'ask'"
+  },
+  {
+   "refused": "a detail block's parts are context, question, caveats, recommended, otherwise, not notes"
+  },
+  {
+   "refused": "otherwise is written on the Recommended bullet: give recommended too"
+  },
+  {
+   "refused": "today is written as YYYY-MM-DD, not '2026-1-5'"
+  },
+  {
+   "refused": "a look's default is 0 (Works), or None"
+  },
+  {
+   "refused": "the detail block's context is a string, or a list of strings"
+  },
+  {
+   "ok": "- [ ] act 2026-01-15 (session `w-1`) — Rotate the key. Context: TD-1. Due: 2026-01-20. Hide until: 2026-01-18.\n"
+  },
+  {
+   "ok": "- [ ] fyi 2026-01-15 (n/a) — The mirror moved. Context: none. Hide until: 2026-01-18.\n"
+  },
+  {
+   "refused": "hide_until as YYYY-MM-DD, not '2026-1-18'"
+  },
+  {
+   "refused": "a board line's text may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (person) — Where the cache lives. Context: TD-40. Due: 2026-01-15. Answers: On disk (default) | Not now. Decided: On disk (by pat.lee) (2026-01-15).\n"
+  },
+  {
+   "refused": "who answered, 'pat lee', is not a person's name (letters, digits, `_`, `-`, dot-separated)"
+  },
+  {
+   "refused": "an answer may not end in `(by <name>)` — the reader would read it as who answered; say it in other words"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Option A (default) | Option B \\| c | Not yet. Lifts: Option A | Option B \\| c.\n  - **Context:** The design is done.\n  - **Question:** Go?\n  - **Recommended:** Option A — it is ready.\n"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go (default) | Not yet.\n  - **Context:** The design is done.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n"
+  },
+  {
+   "refused": "a lifting answer is one of the item's answers, not 'Later'"
+  },
+  {
+   "refused": "'go' is named twice among the lifting answers"
+  },
+  {
+   "refused": "lifts names one or more of the answers, or is None (`Go`)"
+  },
+  {
+   "refused": "only a decide names the answers that lift (lifts)"
+  },
+  {
+   "refused": "a decide that lifts a gate names exactly one entry in its context"
+  },
+  {
+   "refused": "a decide that lifts a gate names exactly one entry in its context"
+  },
+  {
+   "refused": "a decide that lifts a gate names exactly one entry in its context"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (session `w-1`) — Go on it? Context: TD-12, TD-13 see the decision (made last week). Due: 2026-01-20. Answers: Go | Not yet.\n  - **Context:** The design is done.\n  - **Question:** Go?\n  - **Recommended:** it is ready.\n"
   }
  ],
+ "edit_actions": {
+  "board_edit: done Ship it (session s-1)": "done",
+  "board_edit: due Rotate. to 2026-01-30 (session s-1)": "due",
+  "board_edit: snooze Rotate. to 2026-01-20 (session s-1)": "snooze",
+  "ledgerboard: archive 2 closed items (session n/a)": null,
+  "not a subject": null,
+  "queue: rank TD-1 (shiftlead)": null,
+  "shiftlead: append Ship it (session n/a)": null
+ },
  "edits": {
   "decide-again-rewrites": {
    "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b. Decided: b (2026-01-15)."
   },
+  "decide-by": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b (default). Decided: b (by pat) (2026-01-15)."
+  },
+  "decide-by-again-rewrites": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b. Decided: b (by pat) (2026-01-15)."
+  },
+  "decide-by-refused-name": {
+   "refused": "who answered, 'pat smith', is not a person's name (letters, digits, `_`, `-`, dot-separated)"
+  },
   "decide-fresh": {
    "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b (default). Decided: b (2026-01-15)."
   },
+  "decide-keeps-parts-lifts": {
+   "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B. Decided: Option B (by pat) (2026-01-15)."
+  },
+  "decide-refused-answer-ends-by": {
+   "refused": "an answer may not end in `(by <name>)` — the reader would read it as who answered; say it in other words"
+  },
   "decide-refused-empty": {
    "refused": "the answer is empty"
+  },
+  "decide-refused-not-right-ends-by": {
+   "refused": "an answer may not end in `(by <name>)` — the reader would read it as who answered; say it in other words"
   },
   "done-unpunctuated": {
    "ok": "- [x] 2026-01-05 (session s-1) — Ship it. Closed: 2026-01-15."
@@ -256,29 +572,89 @@
   "done-with-why": {
    "ok": "- [x] 2026-01-05 (session s-1 on h) — Ship it. Due: 2026-01-10. Closed: 2026-01-15 — merged."
   },
+  "due-added-after-parts": {
+   "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15. Due: 2026-01-25."
+  },
+  "due-existing": {
+   "ok": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-20. Answers: now | later."
+  },
+  "due-fyi-refused": {
+   "refused": "after the edit the reader does not read Due: 2026-01-20 with the item's other fields unchanged"
+  },
+  "due-keeps-parts-lifts": {
+   "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-25. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B."
+  },
+  "due-keeps-the-hide": {
+   "ok": "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-30. Hide until: 2026-01-12. — Pat, 2026-01-06: later. Answers: now | later."
+  },
+  "due-undated-ahead-of-the-hide": {
+   "ok": "- [ ] act 2026-01-05 (n/a) — Rotate. Context: TD-1. Due: 2026-01-20. Hide until: 2026-01-12."
+  },
+  "due-undated-before-answers": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-20. Answers: a | b."
+  },
+  "due-undated-no-fields": {
+   "ok": "- [ ] 2026-01-05 (session s-1) — Plain. Due: 2026-01-20."
+  },
   "not-an-open-item": {
    "refused": "the line is not an open item"
   },
   "reply-ahead-of-answers": {
    "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. — Sam, 2026-01-15: leaning b, ask the team. Answers: a | b."
   },
+  "reply-keeps-decided-by": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. — w-2, 2026-01-15: on it. Answers: a | b. Decided: a (by pat) (2026-01-11)."
+  },
+  "reply-keeps-parts-lifts": {
+   "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. — w-2, 2026-01-15: looking. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B."
+  },
+  "reply-naming-hide-refused": {
+   "refused": "a reply may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+  },
   "reply-refused-due-on-undated": {
    "refused": "this item has no Due: date, so a reply may not carry one — the reader would take it for the item's; snooze sets its date"
   },
   "reply-refused-field": {
-   "refused": "a reply may not carry Context:, Answers:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+   "refused": "a reply may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+  },
+  "reply-refused-lifts": {
+   "refused": "a reply may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+  },
+  "reply-refused-parts": {
+   "refused": "a reply may not carry Context:, Parts:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"
   },
   "reply-second": {
    "ok": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-10. — Sam, 2026-01-12: halfway — Sam, 2026-01-15: all done"
   },
+  "snooze-answer-holding-a-hide": {
+   "ok": "- [ ] decide 2026-01-05 (n/a) — Pick. Context: TD-1. Due: 2026-01-20. Hide until: 2026-01-25. Answers: A (ok. Hide until: 2030-01-01) | B."
+  },
   "snooze-existing": {
-   "ok": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-20. Answers: now | later."
+   "ok": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-10. Hide until: 2026-01-20. Answers: now | later."
+  },
+  "snooze-fyi-ahead-of-replies": {
+   "ok": "- [ ] fyi 2026-01-05 (n/a) — The mirror moved. Context: none. Hide until: 2026-01-20. — Pat, 2026-01-06: noted"
+  },
+  "snooze-hides": {
+   "ok": "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-20."
+  },
+  "snooze-keeps-decided-by": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Hide until: 2026-01-20. Answers: a | b. Decided: a (by pat) (2026-01-11)."
+  },
+  "snooze-keeps-parts-lifts": {
+   "ok": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Hide until: 2026-01-18. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B."
+  },
+  "snooze-moves-the-hide": {
+   "ok": "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-25. — Pat, 2026-01-06: later. Answers: now | later."
+  },
+  "snooze-no-context-refused": {
+   "refused": "after the edit the reader does not read Hide until: 2026-01-20 with the item's other fields unchanged"
   },
   "snooze-undated-before-answers": {
-   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-20. Answers: a | b."
+   "refused": "after the edit the reader does not read Hide until: 2026-01-20 with the item's other fields unchanged"
   },
   "snooze-undated-no-fields": {
-   "ok": "- [ ] 2026-01-05 (session s-1) — Plain. Due: 2026-01-20."
+   "refused": "after the edit the reader does not read Hide until: 2026-01-20 with the item's other fields unchanged"
   }
  },
  "implicit_keys": [
@@ -288,6 +664,69 @@
   "3|0|1234567|owner/name",
   "4|0|000003"
  ],
+ "item_keys": {
+  "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-12. — Pat, 2026-01-06: later. Answers: now | later.": "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Answers: now | later",
+  "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. — Pat, 2026-01-06: later. Answers: now | later.": "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Answers: now | later",
+  "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B.": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B",
+  "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-25. Hide until: 2026-01-22. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B. Decided: Option A (by pat) (2026-01-21).": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B",
+  "- [x] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-12. Closed: 2026-01-13.": "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1"
+ },
+ "item_problems": {
+  "  - [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
+  "- [ ] \tact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
+  "- [ ] \u000bact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it  Context: TD-7. Due: 2026-01-20.": "text: does not end a sentence (`.`, `?` or `!`)",
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7 Due: 2026-01-20.": "context: does not end with its period",
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.": null,
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.  ": "extra: whitespace at the line's end",
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20. Wait for it.": "extra: 'Wait for it.' after `Due:`",
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20. — w-2, 2026-01-16: on it": null,
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20. — w-2, 2026-01-16: see Due: 2026-05-01": null,
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-02-01.": null,
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Due: 2026-01-20.": "context: no `Context:`",
+  "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Due: 2026-01-20. Context: TD-7.": "due: `Due:` stands before `Context:`; it follows Context",
+  "- [ ] 2026-01-15 (session `w-1` on box-1, branch x) — Ship it. Context: TD-7. Due: 2026-01-20.": "head: `(session `w-1` on box-1, branch x)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`",
+  "- [ ] 2026-01-15 (session w-1 on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.": "head: `(session w-1 on box-1)` is not `(session `<name>` on <host>)`, `(session `<name>`)`, `(n/a)` or `(person)`",
+  "- [ ] Decide 2026-01-15 (session `w-1` on box-1) — Pick one? Context: TD-7. Due: 2026-01-20. Answers: a | b.": "kind: 'Decide' is not a kind: one of decide, act, look, watch, fyi, in lower case",
+  "- [ ] act 2026-01-05 (n/a) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-12. Hide until: 2026-01-13.": "hide: `Hide until:` stands more than once",
+  "- [ ] act 2026-01-05 (n/a) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-1-12": "hide: '2026-1-12' is not a date as YYYY-MM-DD; hide: no period after its date",
+  "- [ ] act 2026-01-05 (n/a) — Rotate. Context: TD-1. Hide until: 2026-01-12. Due: 2026-01-10.": "due: `Due:` stands after `Hide until:`; it follows Context; hide: `Hide until:` follows Due",
+  "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-12. — Pat, 2026-01-06: later. Answers: now | later.": "answers: an act carries no answers: a question with answers is a decide",
+  "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. — Pat, 2026-01-06: later. Answers: now | later. Hide until: 2026-01-12.": "hide: `Hide until:` follows Due; answers: `Hide until:` stands after `Answers:`; answers: an act carries no answers: a question with answers is a decide",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Check it. Context: TD-12. Due: 2026-01-20. Lifts: Go.": "lifts: an act carries no `Lifts:`: only a decide's answer lifts; lifts: `Lifts: Go.` is what no `Lifts:` means: leave it out; lifts: `Lifts:` follows Answers",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Check it. Context: TD-12. Parts: TD-15. Due: 2026-01-20.": "parts: an act carries no `Parts:`: only a decide asks about a parent's parts",
+  "- [ ] act 2026-01-15 (session `w-1` on box-1) — Do it. Context: TD-7. Due: 2026-01-20. Answers: yes | no.": "answers: an act carries no answers: a question with answers is a decide",
+  "- [ ] decide 2026-01-15 (person) — Pick a region. Context: TD-41. Due: 2026-01-15. Answers: North (default) | South.": "head: `(person)` stands only on a decided line",
+  "- [ ] decide 2026-01-15 (person) — Pick a region. Context: TD-41. Due: 2026-01-15. Answers: North (default) | South. Decided: North (2026-01-15).": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: A | B. Lifts: A | a.": "lifts: an answer stands twice",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Not yet. Lifts: Go.": "lifts: `Lifts: Go.` is what no `Lifts:` means: leave it out",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Not yet. Lifts: Later.": "lifts: not one of the item's answers: Later",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Lifts: Go. Answers: Go | Not yet.": "lifts: `Lifts: Go.` is what no `Lifts:` means: leave it out; lifts: `Lifts:` follows Answers",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Due: 2026-01-20. Parts: TD-15. Answers: Go | Not yet.": "parts: `Parts:` follows Context",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15 and TD-16. Due: 2026-01-20. Answers: Go | Not yet.": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-15. Due: 2026-01-20. Answers: Go | Not yet.": "parts: an id stands twice",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Option A | Not yet. Lifts: Option A.": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Hide until: 2026-01-18. Answers: Option A | Not yet. Lifts: Option A.": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: PR #5 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.": "context: a decide that lifts a gate names exactly one entry in its Context",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: TD-12 decision (pat), TD-13. Due: 2026-01-20. Answers: Go | Not yet.": "context: a decide that lifts a gate names exactly one entry in its Context",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: TD-12, TD-13, see the decision (made last week). Due: 2026-01-20. Answers: Go | Not yet.": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: TD-12, TD-13. Due: 2026-01-20. Answers: Go | Not yet.": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick one? Context: TD-7. Due: 2026-01-20.": "answers: a decide carries two or more answers",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick one? Context: TD-7. Due: 2026-01-20. Answers: a (default) | b (default).": "answers: more than one marked ` (default)`",
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: a | b.": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: a | b. Decided: Context: x (2026-01-16).": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: a | b. Decided: a (2026-01-16).": null,
+  "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Pick the cache store? Context: TD-7. Due: 2026-01-20. Answers: a | b. Decided: b (default) (2026-01-16).": null,
+  "- [ ] fyi 2026-01-05 (n/a) — Moved. Context: none. Hide until: 2026-01-12.": null,
+  "- [ ] fyi 2026-01-15 (n/a) — The nightly job moved to 02:00. Context: TD-7.": null,
+  "- [ ] fyi 2026-01-15 (n/a) — The nightly job moved to 02:00. Context: TD-7. — w-2, 2026-01-16: noted. Decided: ok (2026-01-16).": null,
+  "- [ ] fyi 2026-01-15 (session `w-1` on box-1) — Heads up. Context: TD-7. Due: 2026-01-20.": "due: an fyi carries no `Due:`",
+  "- [ ] look 2026-01-15 (session `w-1` on box-1) — Look at it. Context: TD-7. Due: 2026-01-20. Answers: Works | Not right:.": "answers: a look carries exactly `Works | Not right: <what>`, `Works` marked ` (default)` or not",
+  "- [ ] look 2026-01-15 (session `w-1`) — Look at the new export page. Context: PR #12. Due: 2026-01-20. Answers: Works | Not right: <what>.": null,
+  "- [ ] todo 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.": "kind: 'todo' is not a kind: one of decide, act, look, watch, fyi, in lower case",
+  "- [ ]  act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
+  "- [x] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20. Closed: 2026-01-16.": "open: not an open item"
+ },
  "key_orders": [
   [
    "0h",
@@ -499,6 +938,9 @@
   },
   {
    "refused": "not a tool name: 'a (b)'"
+  },
+  {
+   "ok": "queue: respace TD-3, TD-4 (shiftlead)"
   }
  ],
  "rank_paths": {
@@ -533,6 +975,15 @@
   [
    {},
    []
+  ],
+  [
+   {
+    "TD-003": "0h",
+    "TD-004": "0hzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzi"
+   },
+   [
+    "ℹ rank line 4: TD-004's key is 73 characters, over 64 — respace the file"
+   ]
   ]
  ],
  "rank_writes": [
@@ -564,9 +1015,74 @@
    "refused": "not a key: 'é'"
   }
  ],
+ "respaces": [
+  {
+   "ok": [
+    "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-003: 0i\nTD-004: 0r\n",
+    [
+     "TD-003",
+     "TD-004"
+    ]
+   ]
+  },
+  {
+   "ok": [
+    "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-003: 0i\nTD-004: 0r\n",
+    []
+   ]
+  },
+  {
+   "ok": [
+    "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-001: 2|0|000002\nTD-003: 2|0|000004\nTD-004: 2|0|000004\n",
+    [
+     "TD-003",
+     "TD-004"
+    ]
+   ]
+  },
+  {
+   "ok": [
+    "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-003: 09\nTD-004: 0r\n",
+    [
+     "TD-003",
+     "TD-004"
+    ]
+   ]
+  },
+  {
+   "ok": [
+    "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-003: 2|0|000004\nTD-004: 2|0|000004i\n",
+    [
+     "TD-003",
+     "TD-004"
+    ]
+   ]
+  },
+  {
+   "refused": "the rank file has lines the reader cannot use: ⚠ rank line 4: TD-003 again — its first line holds (0h)"
+  },
+  {
+   "refused": "not a key: '|x'"
+  },
+  {
+   "ok": [
+    "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-005: 2|0|000030i\n",
+    []
+   ]
+  },
+  {
+   "ok": [
+    "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-006: 1i\nTD-005: 2|0|000030i\n",
+    [
+     "TD-006"
+    ]
+   ]
+  }
+ ],
  "subject_kinds": {
   "Fix the parser (#12)": null,
   "board_edit: done Ship it (session s-1)": "edit",
+  "board_edit: due Rotate. to 2026-01-30 (session s-1)": "edit",
   "board_edit: finish Ship it (session s-1)": null,
   "queue: join TD-7 (shiftlead)": "queue",
   "queue: prune TD-1, TD-2 (a-tool)": "queue",
@@ -574,9 +1090,14 @@
   "queue: rank TD-3 (shiftlead) extra": null,
   "queue: rank TD-3 TD-12 (shiftlead)": null,
   "queue: rank TD-3, TD-12 (shiftlead)": "queue",
+  "queue: respace TD-3, TD-4 (shiftlead)": "queue",
   "queue: sort TD-3 (shiftlead)": null,
   "shiftlead: answer A question (from TD-12)": "append",
   "shiftlead: append A new item (session w-1)": "append",
+  "shiftlead: archive 0 closed items (session w-1)": null,
+  "shiftlead: archive 1 closed item (session n/a)": "archive",
+  "shiftlead: archive 1 closed items (session w-1)": null,
+  "shiftlead: archive 3 closed items (session w-1)": "archive",
   "shiftlead: board A new item (from TD-12)": "append",
   "shiftlead: board decide TD-12 (person)": "append",
   "shiftlead: reply on Pick a name (session w-1)": "edit"
@@ -599,6 +1120,12 @@
   },
   {
    "refused": "a snooze needs its date"
+  },
+  {
+   "ok": "board_edit: due Rotate. to 2026-01-30 (session s-1)"
+  },
+  {
+   "refused": "a due needs its date"
   }
  ],
  "versions": [

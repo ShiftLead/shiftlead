@@ -1,0 +1,11 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "add",
+  "line": 5,
+  "paths": [
+   "board.md"
+  ],
+  "subject": "ledgerboard: append The mirror moved. (session n/a)"
+ }
+}

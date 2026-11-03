@@ -10,7 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 from html.parser import HTMLParser
 
 import pytest
-from conftest import fake_gh_bin, pinned_script, with_origin
+from conftest import copy_pinned_ledgerboard, fake_gh_bin, pinned_script, with_origin
 from fastapi.testclient import TestClient
 from test_ui_inbox import PERMISSION, entry, needs_line, rec, state_rows_of
 
@@ -20,9 +20,9 @@ def reader_script() -> pathlib.Path:
     return pinned_script("nudge_user_attention.py")
 
 
-def ledgerboard_script() -> pathlib.Path:
-    """The pinned tree's `ledgerboard.py`: the reader imports it from beside itself."""
-    return pinned_script("ledgerboard.py")
+def ledgerboard_into(scripts: pathlib.Path) -> None:
+    """The pinned tree's `ledgerboard/` package copied into `scripts`: the reader imports it from beside itself."""
+    copy_pinned_ledgerboard(scripts)
 
 
 def host(tmp_path, monkeypatch, repos=()):
@@ -46,7 +46,7 @@ def repo(tmp_path, name, board=None, *, reader=True):
     if reader:
         (root / "scripts").mkdir()
         shutil.copy(reader_script(), root / "scripts" / "nudge_user_attention.py")
-        shutil.copy(ledgerboard_script(), root / "scripts" / "ledgerboard.py")
+        ledgerboard_into(root / "scripts")
     return root
 
 
@@ -838,7 +838,7 @@ def test_a_board_line_only_on_origin_is_read_from_origin_on_a_clone_behind(tmp_p
     (seed / "docs" / "user_attention.md").write_text(f"# Board\n\n- [ ] the old line. Due: {due}.\n")
     (seed / "scripts").mkdir()
     shutil.copy(reader_script(), seed / "scripts" / "nudge_user_attention.py")
-    shutil.copy(ledgerboard_script(), seed / "scripts" / "ledgerboard.py")
+    ledgerboard_into(seed / "scripts")
     _git("add", "-A", cwd=seed)
     _git("commit", "-q", "-m", "board", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
@@ -1011,7 +1011,7 @@ def _behind_clone(tmp_path):
     (seed / "docs" / "user_attention.md").write_text(f"# Board\n\n- [ ] the old line. Due: {due}.\n")
     (seed / "scripts").mkdir()
     shutil.copy(reader_script(), seed / "scripts" / "nudge_user_attention.py")
-    shutil.copy(ledgerboard_script(), seed / "scripts" / "ledgerboard.py")
+    ledgerboard_into(seed / "scripts")
     for d in (seed,):
         for k, v in (("user.email", "t@t"), ("user.name", "t")):
             _git("config", k, v, cwd=d)
@@ -1689,7 +1689,7 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)
     shutil.copy2(reader_script(), root / "scripts")
-    shutil.copy2(ledgerboard_script(), root / "scripts")
+    ledgerboard_into(root / "scripts")
     text = (
         "decide 2026-10-01 (session gone-1 on kmaster) — **Keep the nightly backup?** Context: TD-777."
         " Due: 2026-10-02. Answers: keep | drop. Decided: keep (2026-10-03)."
@@ -1732,7 +1732,7 @@ def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)
     shutil.copy2(reader_script(), root / "scripts")
-    shutil.copy2(ledgerboard_script(), root / "scripts")
+    ledgerboard_into(root / "scripts")
     text = (
         "decide 2026-10-01 (session gone-1 on kmaster) — **Keep the nightly backup?** Context: TD-777."
         " Due: 2026-10-02. Answers: keep | drop. Decided: keep (2026-10-03)."

@@ -958,8 +958,9 @@ class InboxMixin:
         try:
             today = datetime.now().date().isoformat()
             try:
-                line = board_mod.decided_line(str(e.get("title") or ""), id, answers, default, said, today)
-                done = await asyncio.to_thread(board_mod.add_decided, root, line)
+                done = await asyncio.to_thread(
+                    board_mod.add_decided, root, str(e.get("title") or ""), id, answers, default, said, today
+                )
             except board_mod.Refused as err:
                 raise RpcError(str(err)) from None
             log.info("board %s: %s", root, done["message"])
@@ -1019,7 +1020,7 @@ class InboxMixin:
             raise RpcError(f"{id} is already being decided")
         today = datetime.now().date().isoformat()
         try:  # the line is made before anyone is told, so words the board refuses refuse the press whole
-            line = board_mod.decided_line(str(e.get("title") or ""), id, [], None, said, today)
+            board_mod.decided_line(str(e.get("title") or ""), id, [], None, said, today)
         except board_mod.Refused as err:
             raise RpcError(str(err)) from None
         rec = None if mine else graph.get(str(caller))
@@ -1035,7 +1036,9 @@ class InboxMixin:
                     f"{id} (design §4.4 *The tell*)"
                 )
             try:
-                done = await asyncio.to_thread(board_mod.add_decided, root, line, session=session)
+                done = await asyncio.to_thread(
+                    board_mod.add_decided, root, str(e.get("title") or ""), id, [], None, said, today, session=session
+                )
             except board_mod.Refused as err:
                 raise RpcError(str(err)) from None
             log.info("board %s: %s", root, done["message"])

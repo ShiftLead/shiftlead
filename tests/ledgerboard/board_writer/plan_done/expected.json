@@ -1,0 +1,14 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "done",
+  "changes": [
+   {
+    "path": "board.md",
+    "text": "# Attention board\n\nFormat: `- [ ] YYYY-MM-DD (session <name> on <host>, or n/a) — what. Context: x. Due: YYYY-MM-DD.`\n\n## Needs the user\n\n- [x] act 2026-01-10 (session `w-1` on box) — Merge the parser fix. Context: PR #12. Due: 2026-01-20. Closed: 2026-01-15.\n- [ ] decide 2026-01-11 (session `w-2`) — **Pick a cache.** Context: TD-7. Due: 2026-01-18. Answers: Memory (default) | Disk.\n  - **Context:** Two caches fit.\n  - **Question:** Which one?\n  - **Recommended:** Memory — it is faster.\n- [x] act 2026-01-02 (n/a) — Tag v1.0. Context: none. Due: 2026-01-05. Closed: 2026-01-06 — tagged.\n  - **Context:** The release.\n"
+   }
+  ],
+  "line": 7,
+  "subject": "ledgerboard: done Merge the parser fix. (session `w-1`)"
+ }
+}

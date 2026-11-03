@@ -1,0 +1,18 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--kind",
+  "watch",
+  "--text",
+  "Re-check the flaky test",
+  "--context",
+  "PR #14",
+  "--due",
+  "2026-02-01",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}
