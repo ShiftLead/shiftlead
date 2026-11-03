@@ -851,6 +851,29 @@
     placeMenu(d);
   }, true);
   const placeOpen = () => $$("details.more[open]").forEach(placeMenu);
+  // A pop-up menu closes on a press outside it and on `Esc` (§4.5a *every page: a pop-up menu*, TD-1337). The
+  // press is caught on the way down, so one in the Focus terminal, which keeps its own mouse events, counts too,
+  // and it still does what it pressed; a press inside an open menu or on its own summary is left to the menu.
+  // A fold (`details.fold`, a row's *details*) is no menu and stays open. True where a menu was closed.
+  AO.menuPress = function (target) {
+    const open = $$("details.more[open]").filter((d) => !(target && d.contains(target)));
+    open.forEach((d) => { d.open = false; });
+    return open.length > 0;
+  };
+  // `Esc` closes an open menu wherever focus is; focus goes back to its button when it was in the menu or on no
+  // control, and is left where it is (a composer, the terminal) otherwise, the key going on to it as well.
+  AO.menuEsc = function (ev) {
+    if (ev.key !== "Escape") return false;
+    const open = $$("details.more[open]");
+    if (!open.length) return false;
+    const at = document.activeElement, home = !at || at === document.body || open.some((d) => d.contains(at));
+    open.forEach((d) => { d.open = false; });
+    const s = home && $("summary", open[0]);
+    if (s && s.focus) s.focus();
+    return home;
+  };
+  document.addEventListener("pointerdown", (ev) => { AO.menuPress(ev.target); }, true);
+  document.addEventListener("keydown", (ev) => { if (AO.menuEsc(ev)) ev.preventDefault(); }, true);
   // the Queue card's ⋯ (§4.5 screen 12 *Three verbs: ⋯*, §4.5a *Queue card: ⋯*; TD-914): a control of its own —
   // `Enter` opens it (its summary's own press) with focus on its first name, the arrows move among its names,
   // `Esc` closes it and puts focus back on the mark. True where the key was the ⋯'s.
@@ -4344,6 +4367,11 @@
       // …never for a press whose target a held swap has just replaced: that press opened the menu now open
       document.addEventListener("click", (e) => {
         if (rollupMenu && e.target.isConnected && !rollupMenu.menu.parentElement.contains(e.target)) rollupClose(false);
+      });
+      // `Esc` with focus outside the menu closes it too, as every pop-up menu's (§4.5a *every page: a pop-up menu*,
+      // TD-1337); from inside it, `rollupKeys` has already closed it and put focus back
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && rollupMenu) rollupClose(!document.activeElement || document.activeElement === document.body);
       });
     }
     layout();
