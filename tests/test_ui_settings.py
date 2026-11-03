@@ -567,6 +567,61 @@ def test_a_team_card_draws_the_schedule_and_writes_it_whole(client, subprocess_a
         call_sync("set_settings", teams={"sch-team": None})
 
 
+def test_the_settings_page_hands_profiles_yml_to_the_schedule_card(client, subprocess_agent, monkeypatch):
+    """The page's wiring (§4.5a *Settings page: Teams*, TD-1346, TD-1351): `profiles.yml` read first, its
+    names handed to the `settings` read, whose `labels` reach the schedule card — the window pick lists the
+    default profile's labels, a metered profile is a disabled option. The agent here holds no reading, so
+    the read answers the labels a reading would, for the names it is given and only when given them."""
+    from shiftlead.ui import app as ui
+
+    home = subprocess_agent.home
+    (home / "profiles.yml").write_text(
+        f"default: grind\nprofiles:\n  grind: {{}}\n  api: {{billing: metered, config_dir: {home / 'api-claude'}}}\n"
+    )
+    (home / "org.yml").write_text(
+        f"projects:\n  sp:\n    repos:\n      sp: {{kmaster: {home}}}\n"
+        "teams:\n  sch-team:\n    repo: sp\n    manager: {role: manager}\n"
+    )
+    real, asked = ui.LocalClient.call, []
+
+    async def call(self, method, **kw):
+        got = await real(self, method, **kw)
+        if method == "settings" and "profiles" in kw:
+            asked.append(kw["profiles"])
+            got = {**got, "labels": {p: {"grind": ["5h", "week"]}.get(p, []) for p in kw["profiles"]}}
+        return got
+
+    monkeypatch.setattr(ui.LocalClient, "call", call)
+    try:
+        page = client.get("/settings").text
+        assert sorted(asked[-1]) == ["api", "grind"]
+        card = page[page.index('data-team="sch-team"') :]
+        card = card[: card.index("</form>")]
+        assert re.search(r'<option value="grind" selected>grind</option>', card)
+        assert re.search(r'<option value="api" disabled title="[^"]+">api</option>', card)
+        assert re.search(
+            r'name="schedule_window" disabled><option value="5h" selected>5h</option>'
+            r'<option value="week">week</option>',
+            card,
+        ), card
+    finally:
+        (home / "org.yml").unlink()
+        (home / "profiles.yml").unlink()
+
+
+def test_a_malformed_profiles_yml_is_a_note_on_the_settings_page(client, subprocess_agent):
+    """`settings_profiles` (§4.5 *Page loads*, TD-1346, TD-1351): a `profiles.yml` that does not load is
+    named on the page, never a 500."""
+    bad = subprocess_agent.home / "profiles.yml"
+    bad.write_text("default: nobody\nprofiles:\n  grind: {}\n")
+    try:
+        got = client.get("/settings")
+        assert got.status_code == 200
+        assert re.search(r'<div class="note warn">profiles\.yml: default [^<]*nobody', got.text), got.text[:2000]
+    finally:
+        bad.unlink()
+
+
 def test_schedule_card_offers_the_profiles_and_their_windows():
     """`schedule_card` (TD-1346): every profile offered, a metered one disabled with the reason; the window
     pick is the `labels` the read answered, a text field where none; off, the picks hold the default and its
