@@ -196,17 +196,27 @@ class SettingsMixin:
         waits for a node's link; `{at: None}` when nothing is known to wait for."""
         if not isinstance(rule, dict):
             return {"at": None}
-        rec = (self._host_rec.get("teams") or {}).get(team)
+
+        def utc(value: Any) -> datetime | None:  # an offset-carrying instant, else None: never a guessed clock
+            try:
+                t = _parse(str(value))
+            except (TypeError, ValueError):
+                return None
+            return t.astimezone(UTC).replace(microsecond=0) if t.tzinfo is not None else None
+
+        def said(t: datetime) -> str:
+            return t.isoformat().replace("+00:00", "Z")
+
+        teams = self._host_rec.get("teams")
+        rec = teams.get(team) if isinstance(teams, dict) else None
         nxt = rec.get("schedule_next") if isinstance(rec, dict) else None
-        if isinstance(nxt, dict) and all(nxt.get(k) == rule.get(k) for k in ("profile", "window")) and nxt.get("at"):
-            return {"at": nxt["at"], **({"held": True} if nxt.get("held") else {})}
+        same = isinstance(nxt, dict) and all(nxt.get(k) == rule.get(k) for k in ("profile", "window"))
+        if same and (at := utc(nxt.get("at"))) is not None:
+            return {"at": said(at), **({"held": True} if nxt.get("held") else {})}
         for w in self._gate_reading(str(rule.get("profile") or "")).get("windows") or []:
-            if isinstance(w, dict) and w.get("label") == rule.get("window") and w.get("resets"):
-                try:
-                    if _parse(str(w["resets"])) > now:
-                        return {"at": str(w["resets"])}
-                except (TypeError, ValueError):
-                    pass
+            mine = isinstance(w, dict) and w.get("label") == rule.get("window")
+            if mine and (at := utc(w.get("resets"))) is not None and at > now:
+                return {"at": said(at)}
         return {"at": None}
 
     @staticmethod
@@ -364,6 +374,10 @@ class SettingsMixin:
                 change[str(name)] = {**{k: None for k in fields if fields[k] is None}, **parsed}
             doc[key] = settings_mod.merge(doc.get(key), change)
             out[key] = getattr(settings_mod, key)(doc)
+            if key == "teams":  # the reply says when a schedule fires, as the `settings` read does (§4.7)
+                for name, t in out[key].items():
+                    if "schedule" in t:
+                        t["starts"] = self._schedule_starts(name, t["schedule"], now)
         if person is not None:
             doc["person"] = self._person_change(doc.get("person"), person)
             out["person"] = settings_mod.person(doc)

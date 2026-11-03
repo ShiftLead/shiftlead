@@ -275,8 +275,9 @@ async def test_set_settings_checks_a_schedules_window_and_the_read_says_when_it_
         _reading(agent, reset)
         with pytest.raises(AgentError, match="profile grind reports no window 5h: its windows are week"):
             await person.call("set_settings", teams={"g": {"schedule": {**RULE, "window": "5h"}}})
+        assert settings_mod.teams(settings_mod.load())["g"]["schedule"] == RULE  # refused before the write
         got = await person.call("set_settings", teams={"g": {"schedule": RULE}})
-        assert "unchecked" not in got
+        assert "unchecked" not in got and got["teams"]["g"]["starts"] == {"at": _iso(reset)}  # the reply says it too
         assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": _iso(reset)}
         held = _iso(datetime.now(UTC) - timedelta(minutes=5))
         agent._host_rec["teams"] = {"g": {"schedule_next": {**RULE, "at": held, "held": True}}}
@@ -286,3 +287,9 @@ async def test_set_settings_checks_a_schedules_window_and_the_read_says_when_it_
         _reading(agent, datetime.now(UTC) - timedelta(hours=1))  # a reset passed and not yet rolled
         agent._host_rec["teams"] = {}
         assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": None}
+        agent._usage["grind"] = {"windows": [{"label": "week", "resets": "2099-01-01T07:00:00"}]}  # no offset
+        agent._host_rec["teams"] = "x"  # a malformed host record: the read still answers
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": None}
+        agent._usage["grind"] = {"windows": [{"label": "week", "resets": "2099-01-01T08:00:00+01:00"}]}
+        assert (await person.call("settings"))["teams"]["g"]["starts"] == {"at": "2099-01-01T07:00:00Z"}
+        agent._host_rec["teams"] = {}
