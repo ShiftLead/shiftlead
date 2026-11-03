@@ -459,6 +459,66 @@ def test_the_child_refuses_an_endpoint_that_resolves_inward(monkeypatch):
     assert push_mod.words(401) == "the push service refused the key's sender (401)"
 
 
+def _burst(devices: int) -> dict:
+    payloads = [{"body": f"row {n}", "path": "/inbox", "tag": f"t{n}"} for n in range(notify.BURST)]
+    payloads.append({"body": notify.MORE, "path": "/inbox", "tag": "more"})  # a full burst: BURST, then *and more*
+    return {"payloads": payloads, "devices": [{"id": f"d{n}", "endpoint": EP1, "keys": KEYS} for n in range(devices)]}
+
+
+def test_a_full_burst_to_three_devices_ends_inside_the_bound_with_every_status(monkeypatch, capsys):
+    """TD-1322: 7 payloads × 3 devices posted at once, not in waves of 8, so posts that each take a request's
+    whole time end together; and a post still running at the deadline is printed *no answer* and left behind,
+    the child ending at once with every line printed."""
+    import time
+
+    pytest.importorskip("pywebpush")
+    raw, _, _ = _pair()
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", raw)
+    monkeypatch.setattr(notify, "PUSH_SECONDS", 3.0)
+    monkeypatch.setattr(notify, "_post", lambda d, data, key, sub: time.sleep(1.0) or 201)
+    started = time.monotonic()
+    assert notify.push_main(json.dumps(_burst(3))) == 0
+    assert time.monotonic() - started < 2.5  # three waves of 8 would take 3 s
+    lines = [json.loads(x) for x in capsys.readouterr().out.splitlines()[1:]]
+    assert sorted((x["device"], x["i"]) for x in lines) == [(f"d{d}", i) for d in range(3) for i in range(7)]
+    assert {x["status"] for x in lines} == {201}
+
+    left = []
+    monkeypatch.setattr(notify, "PUSH_SECONDS", 0.5)
+    monkeypatch.setattr(notify, "_abandon", lambda: left.append(True))
+    hang = lambda d, data, key, sub: time.sleep(3.0 if d["id"] == "d1" else 0.0) or 201  # noqa: E731
+    monkeypatch.setattr(notify, "_post", hang)
+    started = time.monotonic()
+    assert notify.push_main(json.dumps(_burst(3))) == 0
+    assert time.monotonic() - started < 2.0 and left == [True]
+    lines = [json.loads(x) for x in capsys.readouterr().out.splitlines()[1:]]
+    assert len(lines) == 21
+    assert {x["status"] for x in lines if x["device"] == "d1"} == {push_mod.NO_ANSWER}
+    assert {x["status"] for x in lines if x["device"] != "d1"} == {201}
+
+
+def test_an_address_that_does_not_read_ends_only_its_own_post(monkeypatch, capsys):
+    """TD-1322: `getaddrinfo` answering an address `ipaddress` cannot parse is that device's status, in words;
+    the other devices' posts are printed as they answer."""
+    import socket
+
+    pytest.importorskip("pywebpush")
+    raw, _, _ = _pair()
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", raw)
+    real = notify._post
+
+    def post(d, data, key, sub):
+        return real(d, data, key, sub) if d["id"] == "bad" else 201
+
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [(0, 0, 0, "", ("not-an-address", 443))])
+    monkeypatch.setattr(notify, "_post", post)
+    devices = [{"id": "bad", "endpoint": EP1, "keys": KEYS}, {"id": "ok", "endpoint": EP2, "keys": KEYS}]
+    job = {"payloads": [{"body": "x", "path": "/inbox", "tag": "t"}], "devices": devices}
+    assert notify.push_main(json.dumps(job)) == 0
+    lines = {x["device"]: x["status"] for x in map(json.loads, capsys.readouterr().out.splitlines()[1:])}
+    assert lines == {"bad": "the push service's name resolves to an address that does not read", "ok": 201}
+
+
 def test_make_key_refuses_over_a_key_and_words_a_doppler_refusal(monkeypatch, capsys, tmp_path):
     raw, _, public = _pair()
     monkeypatch.setenv("VAPID_PRIVATE_KEY", raw)
