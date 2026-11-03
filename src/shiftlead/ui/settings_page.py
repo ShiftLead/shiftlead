@@ -762,3 +762,91 @@ def telegram(
         "told": TELEGRAM_TOLD,
         "when": TELEGRAM_WHEN,
     }
+
+
+PUSH_READING = "reading the key…"
+
+
+def _push_clock(dt: datetime, now: datetime) -> str:
+    """A device's delivery time: *14:02*, with the date in front once it is a day old (§4.5a **Push**)."""
+    try:
+        local = dt.astimezone()
+    except (OverflowError, ValueError, OSError):
+        local = dt
+    return local.strftime("%b %-d %H:%M") if (now - dt).total_seconds() >= 86400 else local.strftime("%H:%M")
+
+
+def push_card(
+    notify: Mapping[str, Any] | None,
+    view: Mapping[str, Any] | None,
+    now: datetime | None = None,
+    *,
+    node: bool = False,
+    home: str = "",
+    reach: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """**You**: **Push** (§4.5a, §4.10 *Told on the home-screen app too*; TD-1305): `notify.push` as the
+    `settings` read keeps it — **on all devices** (on when absent), **with Telegram** (`both` when absent),
+    **secrets** (its own; Telegram's drawn greyed as what an empty one sends) — and the `host` read's `push`
+    view: the key's reading, the public key the page subscribes with, each device's line and `last_line`.
+    `block` is the switch's line the server can tell (the key's, or the secrets'), "" when the key reads
+    *key*; the browser's own cases (a secure context, iOS, the permission) are the page's, checked first.
+    On a node only `node` and `home` are drawn: the card is the home's."""
+    n = notify if isinstance(notify, Mapping) else {}
+    p = n.get("push") if isinstance(n.get("push"), Mapping) else {}
+    tg = n.get("telegram") if isinstance(n.get("telegram"), Mapping) else {}
+    v = view if isinstance(view, Mapping) else {}
+    now = now or datetime.now(UTC)
+    own, tg_secrets = str(p.get("secrets") or ""), str(tg.get("secrets") or "")
+    reading = v.get("key") if isinstance(v.get("key"), str) else None
+    devices = []
+    for d in v.get("devices") or []:
+        if not isinstance(d, Mapping) or not d.get("id"):
+            continue
+        ok = _when(d.get("last_ok"))
+        err = d.get("last_error") if isinstance(d.get("last_error"), Mapping) else {}
+        bad = _when(err.get("at"))
+        last, failed = "", False
+        if bad is not None and (ok is None or bad > ok):
+            last, failed = f"last failed {_push_clock(bad, now)}: {err.get('reason') or 'no reason given'}", True
+        elif ok is not None:
+            last = f"last told {_push_clock(ok, now)}"
+        since = _when(d.get("since"))
+        devices.append({
+            "id": str(d["id"]),
+            "label": str(d.get("label") or "a device"),
+            "since": since.astimezone().strftime("%b %-d") if since is not None else "",
+            "last": last,
+            "failed": failed,
+        })  # fmt: skip
+    block, make = "", False
+    if not own and not tg_secrets:
+        block = "set secrets first"
+    elif reading is None:
+        block = PUSH_READING
+    elif reading == "no key":
+        block, make = "make the key first", True
+    elif reading.startswith("unreadable: "):
+        block = f"the key could not be read: {reading.removeprefix('unreadable: ')}"
+    elif reading != "key":
+        block = f"the key could not be read: {reading}"
+    paused = f"push is paused: {reading}" if devices and reading not in (None, "key") else ""
+    last_line = str(v.get("last_line") or "")
+    url = str((reach or {}).get("url") or "") if isinstance(reach, Mapping) else ""
+    return {
+        "node": node,
+        "home": home,
+        "on": p.get("on") is not False,
+        "telegram": p.get("telegram") if p.get("telegram") in settings_mod.PUSH_TELEGRAM else "both",
+        "tg_on": tg.get("on") is True,
+        "secrets": own,
+        "tg_secrets": tg_secrets,
+        "reading": reading or "",
+        "public_key": str(v.get("public_key") or "") if reading == "key" else "",
+        "block": block,
+        "make": make,
+        "devices": devices,
+        "paused": paused,
+        "last_line": "" if last_line == paused else last_line,
+        "https": url if url.startswith("https://") else "",
+    }

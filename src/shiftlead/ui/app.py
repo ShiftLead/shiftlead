@@ -1422,6 +1422,14 @@ class Readings:
 def create_app() -> FastAPI:
     app = FastAPI(title="shiftlead")
     app.mount("/static", _Static(directory=str(HERE / "static")), name="static")
+
+    @app.get("/sw.js", include_in_schema=False)
+    async def service_worker() -> Response:
+        """The push service worker (§4.10 *The service worker*, TD-1305), served at the root so its scope is
+        the whole app, and revalidated on every load (`no-cache`) so a new worker is taken at once."""
+        body = await asyncio.to_thread((HERE / "static" / "sw.js").read_bytes)
+        return Response(body, media_type="text/javascript", headers={"Cache-Control": "no-cache"})
+
     app.add_middleware(_WsAttemptLog)
     app.add_middleware(_Gzip)
 
@@ -4252,6 +4260,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "telegram": setmod.telegram(
                     got.get("notify"), None if node else (info or {}).get("notify"), reach=got.get("reach")
                 ),
+                # **Push** (§4.5a **You**, §4.10 *Told on the home-screen app too*; TD-1305): the home's alone
+                "push": setmod.push_card(
+                    got.get("notify"),
+                    None if node else (info or {}).get("push"),
+                    node=node,
+                    home=str((info or {}).get("home") or hosts.home_name()),
+                    reach=got.get("reach"),
+                ),
                 "browser_keys": setmod.BROWSER_KEYS,
                 "host_card": local_files["host_card"],
                 "profile_cards": setmod.profile_cards(profiles, default),
@@ -4540,8 +4556,43 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.post("/api/settings/notify_test")
     async def settings_notify_test(request: Request):
         """§4.5a **You**: **Telegram** → **Send a test**: `notify_test` (§4.10) — one message now with the
-        saved values, whatever the switch says, sent from the home; its result in words."""
+        saved values, whatever the switch says, sent from the home; its result in words. **Push**'s **Send a
+        test to this device** sends `{channel: push, device}` (TD-1305)."""
+        body = await body_of(request)
+        if body.get("channel") == "push":
+            return JSONResponse({"ok": True, **(await call("notify_test", channel="push", device=body.get("device")))})
         return JSONResponse({"ok": True, **(await call("notify_test"))})
+
+    @app.post("/api/settings/push")
+    async def settings_push(request: Request):
+        """§4.5a **You**: **Push** → **Save** (TD-1305): `{on, telegram, secrets}` into `notify.push` through
+        `set_settings`, an empty secrets cleared (sends then read Telegram's) — its refusal said in place."""
+        body = await body_of(request)
+        if not body or not set(body) <= {"on", "telegram", "secrets"}:
+            raise HTTPException(400, "push: send {on, telegram, secrets}")
+        change = {k: (v.strip() or None) if isinstance(v, str) else v for k, v in body.items()}
+        return answer(await call("set_settings", notify={"push": change}))
+
+    @app.post("/api/settings/push_subscribe")
+    async def settings_push_subscribe(request: Request):
+        """**tell me on this device** on (§4.5a **You**: **Push**, §4.10 *On and off, per device*): the browser's
+        subscription to `push_subscribe {endpoint, keys, label, key}`, answering `{id}`; lands at once."""
+        body = await body_of(request)
+        params = {k: body.get(k) for k in ("endpoint", "keys", "label", "key", "replaces") if body.get(k) is not None}
+        return JSONResponse({"ok": True, **(await call("push_subscribe", **params))})
+
+    @app.post("/api/settings/push_unsubscribe")
+    async def settings_push_unsubscribe(request: Request):
+        """**tell me on this device** off, or a device's **Remove** (§4.5a **You**: **Push**): `push_unsubscribe
+        {id}`; lands at once."""
+        body = await body_of(request)
+        return JSONResponse({"ok": True, **(await call("push_unsubscribe", id=body.get("id")))})
+
+    @app.post("/api/settings/push_key")
+    async def settings_push_key(request: Request):
+        """**Make key** (§4.5a **You**: **Push**, §4.10 *The key*): `push_key` at the home, its result in
+        words; the private key is never shown."""
+        return JSONResponse({"ok": True, **(await call("push_key"))})
 
 
 def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:

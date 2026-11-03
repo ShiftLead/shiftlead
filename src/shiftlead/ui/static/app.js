@@ -7742,6 +7742,8 @@
       // **weights** (§4.5a *Settings page: Usage*, TD-832): the rows whole; the route sends what differs from the default
       spend: (f) => ["spend", { as_of: f.elements.as_of.value.trim(), rows: $$(".setwrows .setweight", f).map((r) => Object.fromEntries($$("input", r).map((i) => [i.name, i.value.trim()]))) }],
       notify: (f) => ["notify", { telegram: { on: f.elements.tg_on.checked, secrets: f.elements.tg_secrets.value.trim(), link: f.elements.tg_link.value.trim() } }],
+      // **Push** (§4.5a **You**, §4.10; TD-1305): the three `notify.push` fields whole, an empty secrets cleared
+      push: (f) => ["push", { on: f.elements.push_on.checked, telegram: f.elements.push_tg.value, secrets: f.elements.push_secrets.value.trim() }],
       // **Sweep** (§4.5a, §4.9b *The switch*, TD-1091): the three fields whole, an empty one cleared by the route
       sweep: (f) => ["sweep", { on: f.elements.sweep_on.checked, every: f.elements.sweep_every.value.trim(), profile: f.elements.sweep_profile.value }],
     };
@@ -7755,6 +7757,8 @@
       if (cancel) cancel.hidden = !dirty;
       // **Send a test** sends the saved values, so not while the card holds others (§4.5a **You**: **Telegram**)
       const test = $(".settgtest", f); if (test) { test.disabled = dirty; test.title = dirty ? "save first: a test sends the saved values" : test.dataset.title || test.title; }
+      // **Make key** waits while the Push card holds changes not yet saved (§4.5a **You**: **Push**)
+      const make = $(".setpushmake", f); if (make) { make.disabled = dirty || !(f.elements.push_secrets && f.elements.push_secrets.defaultValue); make.title = dirty ? "save first" : ""; }
     };
     const drawn = (f) => {
       for (const el of f.elements) {
@@ -7879,6 +7883,9 @@
         settle(b.closest("form"));
       });
     });
+    // **Push** (§4.5a **You**: **Push**, §4.10 *Told on the home-screen app too*; TD-1305)
+    const pf = $("form#setpush", page);
+    if (pf) AO.pushCard(pf, post, () => $$("form.setcard", page).some((o) => o.dataset.drawn !== state(o)), settle);
     const openin = $("#setopenin");
     if (openin) openin.addEventListener("change", () => {
       $("#settemplate").classList.toggle("hidden", openin.value !== "template");
@@ -7897,6 +7904,120 @@
       try { Object.keys(localStorage).filter((k) => k.startsWith("ao.")).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
       location.reload();
     });
+  };
+  // **Push**'s browser half (§4.10 *On and off, per device*, *Where it works*; TD-1305). Every case the switch
+  // cannot work in is told before any `crypto.subtle` or `serviceWorker` call: a node draws no switch at all
+  // (the server), then a secure context, iOS, the browser's support and its permission, then the key's line.
+  AO.push = {
+    b64url: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""),
+    fromB64url: (s) => Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (s.length % 4)) % 4)), (c) => c.charCodeAt(0)),
+    // a device's id: the first 16 hex digits of the SHA-256 of its endpoint, as the home and the worker work it out
+    deviceId: async (endpoint) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(endpoint)))].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16),
+    labelOf: (ua) => {
+      const os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
+        : /Mac OS X|Macintosh/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /CrOS/.test(ua) ? "ChromeOS" : /Linux/.test(ua) ? "Linux" : "a device";
+      const br = /Edg\//.test(ua) ? "Edge" : /Firefox\/|FxiOS/.test(ua) ? "Firefox" : /Chrome\/|CriOS/.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "";
+      return br ? `${os} · ${br}` : os;
+    },
+    // the browser's own line, or "" when it can take push: `{text, href}` for the https address
+    browserBlock: (w, https) => {
+      const nav = w.navigator, ua = nav.userAgent || "";
+      if (!w.isSecureContext) return https ? { text: "needs the https address — open ", href: https } : { text: "needs HTTPS: ao connect tailscale" };
+      const ios = /iPhone|iPad|iPod/.test(ua) || (nav.platform === "MacIntel" && nav.maxTouchPoints > 1);
+      if (ios) {
+        const v = ua.match(/OS (\d+)_(\d+)/) || ua.match(/Version\/(\d+)\.(\d+)/);
+        if (v && (Number(v[1]) < 16 || (Number(v[1]) === 16 && Number(v[2]) < 4))) return { text: "needs iOS 16.4 or later" };
+        const standalone = nav.standalone === true || (w.matchMedia && w.matchMedia("(display-mode: standalone)").matches);
+        if (!standalone) return { text: "add shiftlead to the home screen first (Share → Add to Home Screen), then turn this on there" };
+      }
+      if (!("serviceWorker" in nav) || !("PushManager" in w) || !("Notification" in w)) return { text: "this browser cannot take push" };
+      if (w.Notification.permission === "denied") return { text: "notifications are blocked for this site in the browser’s settings" };
+      return null;
+    },
+  };
+  AO.pushCard = function (f, post, anyDirty, settle) {
+    const me = $(".setpushme", f), why = $(".setpushwhy", f), test = $(".setpushtest", f), said = $(".setpushsaid", f);
+    const key = f.dataset.key || "", block = f.dataset.block || "", serverWhy = why.textContent;
+    const listed = new Set($$(".setpushdev", f).map((r) => r.dataset.id));
+    let mine = null;
+    const say = (text, bad) => { said.textContent = text; said.classList.toggle("warn", !!bad); };
+    const tell = (b) => {
+      why.textContent = b.text;
+      if (b.href) { const a = document.createElement("a"); a.href = b.href; a.textContent = b.href; why.append(a); }
+    };
+    const current = async () => { const reg = await navigator.serviceWorker.getRegistration("/"); return reg ? reg.pushManager.getSubscription() : null; };
+    // a press that lands: the page drawn again, unless another card holds edits a reload would throw away
+    // the result in words outlives the reload: kept for the page drawn next, and said there (§4.5a **Make key**)
+    const landed = (text) => {
+      if (!anyDirty()) { try { sessionStorage.setItem("ao.pushsaid", text); } catch (e) { /* said only until the reload */ } location.reload(); return; }
+      say(`${text} · reload to see the devices`); draw();
+    };
+    try { const was = sessionStorage.getItem("ao.pushsaid"); if (was) { sessionStorage.removeItem("ao.pushsaid"); say(was); } } catch (e) { /* no storage: nothing kept */ }
+    const draw = async () => {
+      const b = AO.push.browserBlock(window, f.dataset.https);
+      if (b) { me.disabled = true; me.checked = false; tell(b); test.hidden = true; return; }
+      const sub = await current().catch(() => null);
+      const id = sub ? await AO.push.deviceId(sub.endpoint) : null;
+      mine = id && listed.has(id) ? id : null;
+      me.checked = !!mine; test.hidden = !mine;
+      $$(".setpushdev", f).forEach((r) => {
+        const it = r.dataset.id === mine;
+        $(".setpushthis", r).hidden = !it; $(".setpushrm", r).hidden = it;
+      });
+      if (block && !mine) { me.disabled = true; why.textContent = serverWhy; return; }
+      me.disabled = false;
+      why.textContent = mine ? "on · lands at once, no Save" : "off · lands at once, no Save";
+    };
+    me.addEventListener("change", async () => {
+      const on = me.checked; me.disabled = true; say(on ? "turning on…" : "turning off…");
+      try {
+        if (on) {
+          const perm = await Notification.requestPermission();  // inside the press, as browsers require
+          if (perm !== "granted") throw new Error(perm === "denied" ? "notifications are blocked for this site in the browser’s settings" : "notifications were not allowed");
+          const old = await current();  // one the home does not list cannot be reused: made under an earlier key
+          if (old && !listed.has(await AO.push.deviceId(old.endpoint))) await old.unsubscribe();
+          const reg = await navigator.serviceWorker.register(`/sw.js?k=${encodeURIComponent(key)}`, { scope: "/" });
+          await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: AO.push.fromB64url(key) });
+          const j = sub.toJSON(), ask = sub.options && sub.options.applicationServerKey;
+          const got = await post("push_subscribe", { endpoint: j.endpoint, keys: j.keys, label: AO.push.labelOf(navigator.userAgent), key: ask ? AO.push.b64url(ask) : key });
+          listed.add(got.id);
+          landed("on");
+        } else {
+          // the home first: a failed post leaves the browser subscribed and listed, so the switch is pressed again
+          if (mine) await post("push_unsubscribe", { id: mine });
+          const sub = await current(); if (sub) await sub.unsubscribe();
+          listed.delete(mine);
+          landed("off");
+        }
+      } catch (err) { me.checked = !on; say(err.message, true); draw(); }
+    });
+    f.addEventListener("click", async (e) => {
+      const rm = e.target.closest(".setpushrm"); if (!rm) return;
+      const row = rm.closest(".setpushdev");
+      if (!confirm(`Remove ${row.dataset.label}, on since ${row.dataset.since}? It is told nothing more until it is turned on there again.`)) return;
+      try { await post("push_unsubscribe", { id: row.dataset.id }); listed.delete(row.dataset.id); row.remove(); say(`removed ${row.dataset.label}`); }
+      catch (err) { say(err.message, true); }
+    });
+    test.addEventListener("click", async () => {
+      test.disabled = true; say("sending…");
+      try { const got = await post("notify_test", { channel: "push", device: mine }); say(got.result || (got.sent ? "sent" : "the send failed"), !got.sent); }
+      catch (err) { say(err.message, true); }
+      test.disabled = false;
+    });
+    const make = $(".setpushmake", f);
+    if (make) {
+      settle(f);
+      make.addEventListener("click", async () => {
+        make.disabled = true; say("making the key…");
+        try { const got = await post("push_key", {}); landed(got.result || "the key is made"); }
+        catch (err) { say(err.message, true); make.disabled = false; }
+      });
+    }
+    const tg = f.elements.push_tg, tgline = $(".setpushtgline", f);
+    const tgsay = () => { tgline.textContent = tg.value === "fallback" ? (tg.dataset.tgOn ? "only when no device took the row" : "Telegram is off: nothing is sent when push fails") : "both: each row on every channel that is on"; };
+    tg.addEventListener("change", tgsay);
+    draw();
   };
   function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 })();
