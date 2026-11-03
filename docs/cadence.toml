@@ -8,8 +8,19 @@
 # prints every key with its value and source; `--check` names a key nothing reads.
 # To change a value, uncomment its line and edit the value (each is shown at its default).
 
-# The independent reviewer's model (§4.8): a cheaper model than the author's, never the same.
+# The independent reviewers (§4.8): an ordered, comma-separated list ("sonnet, fable"), each a
+# cheaper model than the author's, never the same. A round of review is one pass through the list,
+# one reviewer at a time; `get review-model --first` prints round one's reviewer.
 # review-model = "sonnet"
+
+# The fact-checker of a doc-only PR or a plan (§4.8): a model, or `<adapter>/<model>`; unset, the
+# first of review-model.
+# fact-check-model = "sonnet"
+
+# The cap on a design plan's review rounds (§4.8 *Design review rounds*): in-repo plans, and wide
+# ones (another repo, a published format, anything that cannot be undone).
+# design-rounds = 4
+# design-rounds-wide = 6
 
 # The model the deep sweep's agents run on (/stranded-work deep).
 # sweep-model = "sonnet"
