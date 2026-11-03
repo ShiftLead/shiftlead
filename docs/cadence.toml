@@ -18,7 +18,7 @@
 # fact-check-model = "sonnet"   # unset: the first of review-model
 
 # The cap on a design plan's review rounds (§4.8 *Design review rounds*): in-repo plans, and wide
-# ones (another repo, a published format, anything that cannot be undone).
+# ones (another repo, the cadence payload, a vendored or published format, anything irreversible).
 # design-rounds = 4
 # design-rounds-wide = 6
 
