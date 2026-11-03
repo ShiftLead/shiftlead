@@ -2296,6 +2296,39 @@ def test_ao_schedule_sets_lists_clears_and_is_a_persons(subprocess_agent, tmp_pa
     assert cli.main(["kill", rec["id"]]) == 0
 
 
+def test_ao_schedule_says_the_instant_in_the_readers_clock_and_a_held_start(monkeypatch, capsys):
+    """TD-1348 (design §4.7 `ao schedule`, §6 *Schedule*): a rule with a reading says its instant as
+    *Thu 07:00* in the reader's clock, *(held for a node's link)* while a passed reset waits, and an
+    instant it cannot parse as given. The listing prints each team's words."""
+    if not hasattr(time, "tzset"):
+        pytest.skip("no tzset on this platform")
+    monkeypatch.setenv("TZ", "America/Denver")
+    time.tzset()
+    try:
+        rule = {"start": "reset", "profile": "grind", "window": "week"}
+        head = "starts at the reset of grind's week"
+        at = "2026-11-05T14:00:00Z"  # a Thursday, 07:00 in Denver (MST)
+        assert cli._schedule_words({"schedule": rule, "starts": {"at": at}}) == f"{head} — Thu 07:00"
+        assert (
+            cli._schedule_words({"schedule": rule, "starts": {"at": at, "held": True}})
+            == f"{head} — Thu 07:00 (held for a node's link)"
+        )
+        assert cli._schedule_words({"schedule": rule, "starts": {"at": "soon"}}) == f"{head} — soon"
+        rows = [
+            {"team": "ao-grind", "schedule": rule, "starts": {"at": at, "held": True}},
+            {"team": "dc-grind", "schedule": None},
+        ]
+        monkeypatch.setattr(cli, "call_sync", lambda method, **kw: {"teams": {r["team"]: r for r in rows}})
+        monkeypatch.setattr(cli, "_org_here", lambda: (_ for _ in ()).throw(OSError("no org here")))
+        assert cli.main(["schedule"]) == 0
+        assert capsys.readouterr().out == (
+            f"ao-grind · {head} — Thu 07:00 (held for a node's link)\ndc-grind · no schedule\n"
+        )
+    finally:
+        monkeypatch.undo()
+        time.tzset()
+
+
 def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-146 slice 3 end to end (design §4.7): `ao team until` and `ao team reserve` write
     `teams.<team>` through `set_settings`, a team the org does not define is refused naming the
