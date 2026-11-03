@@ -253,3 +253,39 @@ def test_fetches_in_flight_are_capped(repos, monkeypatch):
     assert running == shots.FETCHES_MAX
     gate.set()
     shots.wait_fetches()
+
+
+def test_the_branch_fetch_keeps_every_other_ref_and_never_asks_for_a_login(repos, monkeypatch):
+    """TD-1319, §4.10 *The fetch never holds a read up*: the one branch, `--no-prune` (a pruning
+    config never deletes another kept ref), forced (`+`, so a rebased branch's kept ref follows), with
+    `GIT_TERMINAL_PROMPT=0` and no stdin (a fetch never asks for a login on the home's terminal)."""
+    calls: list[tuple[list[str], dict]] = []
+    real = subprocess.run
+
+    def run(argv, **kw):
+        calls.append((list(argv), kw))
+        return real(argv, **kw)
+
+    monkeypatch.setattr(shots.subprocess, "run", run)
+    shots._fetch_branch(repos.reader, "feat")
+    (argv, kw), *_ = [c for c in calls if "fetch" in c[0]]
+    assert argv[argv.index("fetch") :] == [
+        "fetch",
+        "-q",
+        "--no-prune",
+        "origin",
+        "+refs/heads/feat:refs/remotes/origin/feat",
+    ]
+    assert kw["env"]["GIT_TERMINAL_PROMPT"] == "0" and kw["stdin"] is subprocess.DEVNULL
+    assert kw["timeout"] == shots.FETCH_TIMEOUT
+
+
+def test_a_force_pushed_branch_moves_its_kept_ref_on_the_next_fetch(repos):
+    """TD-1319: the refspec is forced, so a branch rewritten on origin (not a fast-forward of the
+    kept ref) is taken, never refused, and the kept ref names the rewritten commit."""
+    repos.commit_shot(b"v1")
+    git(repos.reader, "fetch", "-q", "origin")
+    git(repos.sender, "reset", "-q", "--hard", "HEAD~1")
+    new = repos.commit_shot(b"v2", force=True)  # a sibling of v1: origin/feat is no fast-forward of it
+    shots._fetch_branch(repos.reader, "feat")
+    assert git(repos.reader, "rev-parse", "refs/remotes/origin/feat") == new
