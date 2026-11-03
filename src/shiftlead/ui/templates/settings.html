@@ -325,6 +325,43 @@
       <div class="note settglast{% if telegram.last_failed %} warn{% endif %}"{% if not telegram.last %} hidden{% endif %}>{{ telegram.last }}</div>
       {% call saverow("applies on the next tick · sent by the home") %}<span class="note settgsaid" role="status"></span><button class="btn sm settgtest" type="button" title="{{ help_title('telegram-test') }}">Send a test</button>{% endcall %}
     </form>
+    {#- **Push** (§4.5a **You**: **Push**, §4.10 *Told on the home-screen app too*; TD-1305): **tell me on this
+        device** lands at once (`push_subscribe` / `push_unsubscribe`), never through Save — a subscription is
+        the browser's, not a setting; **on all devices**, **with Telegram** and **secrets** are `notify.push`'s,
+        written by the card's **Save**. Where the switch cannot work it is disabled with its one line: the
+        browser's cases the page tells (a secure context, iOS, the permission), then the key's (`push.block`). -#}
+    {% if push.node %}
+    <div class="card pad setcard" id="setpush">
+      <div class="row gap wrap"><span class="h2">on this device</span><span class="badge">Push</span></div>
+      <div class="note">turn this on from {{ push.home }}’s page</div>
+    </div>
+    {% else %}
+    <form class="card pad setcard" data-section="push" id="setpush" data-key="{{ push.public_key }}" data-block="{{ push.block }}" data-https="{{ push.https }}">
+      <div class="row gap wrap"><span class="h2">on this device</span><span class="badge">Push</span></div>
+      <div class="setrow"><span class="setlabel">tell me on this device</span>
+        <span class="row gap"><input type="checkbox" class="setpushme" aria-label="tell me on this device" title="lands at once, no Save" disabled>
+          {%- if push.make %}<button class="btn sm setpushmake" type="button"{% if not push.secrets %} disabled{% endif %}>Make key</button>{% endif %}</span>
+        <span class="note setpushwhy">{{ push.block or "checking this browser…" }}{% if push.make and not push.secrets %} · set notify.push.secrets — the key is written only there{% endif %}</span></div>
+      <div class="note warn setpushpaused"{% if not push.paused %} hidden{% endif %}>{{ push.paused }}</div>
+      <div class="setpushdevs">{% for d in push.devices %}
+        <div class="row gap setpushdev" data-id="{{ d.id }}" data-label="{{ d.label }}" data-since="{{ d.since }}"><span class="setpushlabel">{{ d.label }} <span class="badge setpushthis" hidden>this device</span></span><span class="note">since {{ d.since }}</span><span class="note grow{% if d.failed %} warn{% endif %}">{{ d.last }}</span><button class="btn sm ghost setpushrm" type="button">Remove</button></div>
+      {%- endfor %}</div>
+      <label class="setrow"><span class="setlabel">on all devices</span>
+        <input type="checkbox" name="push_on"{% if push.on %} checked{% endif %}>
+        <span class="note">off stops every push and keeps the devices</span></label>
+      <label class="setrow"><span class="setlabel">with Telegram</span>
+        <select class="input setin" name="push_tg" data-tg-on="{{ 'on' if push.tg_on else '' }}">
+          <option value="both"{% if push.telegram == "both" %} selected{% endif %}>both</option>
+          <option value="fallback"{% if push.telegram == "fallback" %} selected{% endif %}>only when push fails</option></select>
+        <span class="note setpushtgline">{% if push.telegram == "fallback" and not push.tg_on %}Telegram is off: nothing is sent when push fails{% else %}both: each row on every channel that is on{% endif %}</span></label>
+      <label class="setrow"><span class="setlabel">secrets</span>
+        <input class="input setin mono" name="push_secrets" value="{{ push.secrets }}" placeholder="{{ push.tg_secrets or 'samscrape/prd' }}" autocomplete="off" spellcheck="false">
+        <span class="note">{% if push.tg_secrets %}Telegram’s when empty · {% endif %}a Doppler project/config holding VAPID_PRIVATE_KEY · Make key needs it set</span></label>
+      <div class="note">the same rows and words as Telegram · a tap opens the row in the app · no text a session wrote is sent</div>
+      <div class="note setpushlast"{% if not push.last_line %} hidden{% endif %}>{{ push.last_line }}</div>
+      {% call saverow("applies on the next tick · sent by the home") %}<span class="note setpushsaid" role="status"></span><button class="btn sm setpushtest" type="button" hidden>Send a test to this device</button>{% endcall %}
+    </form>
+    {% endif %}
     <div class="card pad setcard" id="setbrowser">
       <div class="row gap wrap"><span class="h2">this browser</span></div>
       <dl class="setvals">{% for key, name, how in browser_keys %}<dt>{{ name }}</dt><dd class="mono" data-key="{{ key }}" title="{{ how }}">—</dd>{% endfor %}</dl>
