@@ -558,11 +558,12 @@ def queue_view(
       `would_be`, TD-918) are drawn each with its repo;
     - `other`: the *other work* lines, each hold that names no open entry, with its holder;
     - `upnext`: the whole Up next order, each card's id (a move's neighbours, §4.4 *A move lands*);
-    - `n`: the header's counts — cards, in progress, waiting, up next, and those whose status is *needs you*.
-    - `bar`: the heading line's summary, a segment per group with cards (`summary_bar`, TD-1293).
+    - `n`: the counts — cards (the whole Queue, the summary's *of m*), in progress, waiting and up next (the
+      group headings), and those whose status is *needs you* (drawn nowhere; the summary counts the cards shown,
+      `apply_picks`' `bar` and `summary`, TD-1311).
 
     `mail` is what is attached to each card (`attach`), gathered into its `wants` (`card_wants`): Decide and Do
-    drawn in the header, Read in the body, raising the card's status to *needs you* or *steer*. `promotes` is the `host`
+    drawn on its pill, Read in the body, raising the card's status to *needs you* or *steer*. `promotes` is the `host`
     reading's: each completed line's `live` is its close's promote state, *not yet live* or *live* by the
     newest close it holds, "" where its repo promotes nothing or live is unknown (§4.5 screen 12, TD-904). `fleet`
     is the live records: each open card's `session` (`card_session`) is what its **Start session** reads (TD-912)."""
@@ -698,10 +699,6 @@ def queue_view(
         "waiting": len(waiting),
         "up_next": len(up_next),
         "needs_you": sum(1 for c in shaped if c.get("status") == "needs you"),
-        # the page header's *Decide n · Do n*: items, not cards, display only — in no top-bar or rail
-        # number; a red PR is counted on its card's pill alone (§4.5 screen 12 *Three wants*)
-        "decide": sum(c["wants"]["n"]["decide"] for c in shaped),
-        "do": sum(sum(1 for m in c["wants"]["do"] if not (m.get("red") or m.get("fork"))) for c in shaped),
     }
     return {
         "completed": {"lines": lines, "counts": counts},
@@ -711,33 +708,59 @@ def queue_view(
         "other": other,
         "upnext": [str(c["id"]) for c in up_next],
         "n": n,
-        "bar": summary_bar(n),
         "one_repo": one_repo,
         "repos": sorted(repos - {""}),
         "served": q.get("at") is not None or bool(cards),
     }
 
 
-# the summary bar's groups, in its order: the key in `n`, the legend's word, the colour token (TD-1293)
+# the summary bar's groups, in its order: the group's key, the legend's word, the colour token (TD-1293)
 SUMMARY_GROUPS = (("in_progress", "in progress", "--working"), ("waiting", "waiting", "--waiting"),
                   ("up_next", "up next", "--ended"))  # fmt: skip
 
 
 def bar_flex(n: int, total: int) -> float:
     """A segment's width, as `flex`: its count, never under a sliver of 1.2% of the bar — the same one line as
-    `AO.qBarFlex` in `app.js`, which redraws the bar on a re-read (§4.5 screen 12 *The page's top section*)."""
+    `AO.qBarFlex` in `app.js`, which redraws the bar on a pick (§4.5 screen 12 *The page's top section*)."""
     return max(n, total * 0.012)
 
 
-def summary_bar(n: Mapping[str, int]) -> list[dict[str, Any]]:
-    """The heading line's summary (§4.5 screen 12 *The page's top section is one block*, TD-1293): one segment and
-    one legend entry per group with cards, a group at 0 drawing neither; at 0 cards nothing."""
-    total = int(n.get("cards") or 0)
-    return [
-        {"key": k, "n": int(n.get(k) or 0), "word": w, "color": c, "flex": bar_flex(int(n.get(k) or 0), total)}
-        for k, w, c in SUMMARY_GROUPS
-        if n.get(k)
-    ]
+def summary_bar(groups: Mapping[str, tuple[int, int]], shown: int) -> list[dict[str, Any]]:
+    """The summary line's bar (§4.5 screen 12 *The page's top section is one block*, TD-1293, TD-1311): one
+    segment per group with cards shown, `groups` its `(n, needs)` by key — the cards shown and those among them
+    whose status is *needs you*, the segment's hatched share; a group at 0 draws nothing, and at 0 shown
+    nothing does."""
+    out = []
+    for k, w, c in SUMMARY_GROUPS:
+        n, needs = (int(x or 0) for x in groups.get(k) or (0, 0))
+        if n:
+            out.append({"key": k, "n": n, "word": w, "color": c, "needs": needs, "flex": bar_flex(n, shown)})
+    return out
+
+
+def _need(n: int) -> str:
+    return f"{n} needs you" if n == 1 else f"{n} need you"
+
+
+def summary_words(bar: Any, summary: Mapping[str, Any], filtered: bool) -> dict[str, Any]:
+    """The summary line's words and the switch's hover (§4.5 screen 12 *The page's top section is one block*,
+    TD-1311), the twin of `AO.qSummaryWords` in `app.js`, which redraws them on a pick: `titles`, each
+    segment's (*24 up next, 24 need you*, *19 waiting*); `entries`, the legend's `{n, word}` in order — the
+    groups', then *need you* while a card is shown and any the chips and the find pass needs the person; `cards`, the
+    count's text (*· 47 of 231 cards* while a pick is on, its `· ` only after an entry); `hover`, the switch's
+    title. Words, never markup: the template draws the swatches and the bold."""
+    titles = [f"{s['n']} {s['word']}" + (f", {_need(s['needs'])}" if s["needs"] else "") for s in bar]
+    k, m, shown = (int(summary.get(x) or 0) for x in ("needs", "of", "cards"))
+    entries = [{"n": s["n"], "word": s["word"]} for s in bar]
+    if k and shown:  # with none shown, no legend entry at all
+        entries.append({"n": k, "word": "needs you" if k == 1 else "need you"})
+    count = f"{shown} of {m}" if filtered else f"{m}"
+    cards = ("· " if entries else "") + f"{count} card{'' if m == 1 else 's'}"
+    hover = (
+        f"{k} card{' needs' if k == 1 else 's need'} you — press to keep only these: it narrows the teams picked, it"
+        " picks none; the completed lines are hidden while it is on"
+    )
+    return {"titles": titles, "entries": entries, "cards": cards, "hover": hover}
 
 
 def queue_window(params: Any) -> str:
@@ -833,11 +856,18 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
         return all(_finds(w, text) for w in words)
 
     cards = [*(view.get("in_progress") or ()), *(view.get("waiting") or ()), *(view.get("up_next") or ())]
+    # the summary's needs-you counts (TD-1311): `k` the cards the chips and the find pass that need the person,
+    # whatever the switch is — the legend's *need you* and the switch's own number, which its press leaves as
+    # it was — and per group those among its shown cards, the segment's hatch
+    k, needs = 0, dict.fromkeys(("in_progress", "waiting", "up_next"), 0)
     for c in cards:
-        ok = by_repo_find(c.get("repos"), str(c.get("find") or ""))
-        if picks.get("filter") == "needs-you":
-            ok = ok and c.get("status") == "needs you"
+        nf = by_repo_find(c.get("repos"), str(c.get("find") or ""))
+        wants = c.get("status") == "needs you"
+        ok = nf and wants if picks.get("filter") == "needs-you" else nf
         c["off"] = not ok
+        k += int(nf and wants)
+        if ok and wants and c.get("group") in needs:
+            needs[str(c["group"])] += 1
     status_pick = bool(picks.get("filter"))
     for ln in (view.get("completed") or {}).get("lines") or ():
         ln["off"] = status_pick or not by_repo_find([ln.get("repo")], str(ln.get("find") or ""))
@@ -863,4 +893,9 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
         "completed": {w: sum(ln["n"] for ln in done if w in ln["wins"] and not ln["off"]) for w in WINDOWS},
     }
     view["filtered"] = bool(picks.get("filter") or picks.get("team") or words)
+    # the summary line counts the cards shown (§4.5 screen 12 *The page's top section is one block*, TD-1311)
+    shown_in = view["shown_in"]
+    view["bar"] = summary_bar({g: (shown_in[g], needs[g]) for g in needs}, view["shown"])
+    view["summary"] = {"cards": view["shown"], "needs": k, "of": int((view.get("n") or {}).get("cards") or 0)}
+    view["sumwords"] = summary_words(view["bar"], view["summary"], view["filtered"])
     return view

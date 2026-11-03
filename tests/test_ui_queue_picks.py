@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import shutil
 import subprocess
 from html.parser import HTMLParser
@@ -20,7 +21,7 @@ from conftest import scratch_dir
 from starlette.datastructures import QueryParams
 from test_ui_queue import NOW, client, fake, queue
 
-from shiftlead.ui.queue import apply_picks, picks_query, queue_picks, queue_view
+from shiftlead.ui.queue import apply_picks, picks_query, queue_picks, queue_view, summary_words
 
 pytestmark = pytest.mark.unit
 
@@ -47,7 +48,8 @@ console.log(JSON.stringify(cases.map((c) => {
   const p = AO.qPicks(c.search);
   return { picks: p, query: AO.qQuery(p, c.change || {}), filtered: AO.qFiltered(p),
     off: c.items.map((it) => !AO.qPass(it.rows ? { ...it, find: AO.qFindText(it.rows) } : it, p, c.teams)),
-    finds: (c.cards || []).map(AO.qFindText) };
+    finds: (c.cards || []).map(AO.qFindText),
+    words: c.words ? AO.qSummaryWords(c.words.bar, c.words.summary, c.words.filtered) : null };
 })));
 """
 
@@ -327,3 +329,155 @@ def test_a_wider_window_is_read_once_and_a_narrower_answers_from_what_is_held(tm
     assert "if (read && loading() && loading() !== win) setTimeout(reread, 0);" in qjs
     part = client(monkeypatch, tmp_path, fake(queue())).get("/queue?part=1&win=month").text
     assert 'data-loaded="month"' in part and part.count('class="qdline') == 4
+
+
+def test_the_summarys_words_in_the_browser_are_the_servers():
+    """TD-1311: `AO.qSummaryWords` is `summary_words`' twin — each segment's title, the legend's entries, the
+    count and the switch's hover — at 0, 1 and many, filtered and not."""
+    one = {"key": "up_next", "n": 1, "word": "up next", "needs": 1, "flex": 1}
+    many = [
+        {"key": "in_progress", "n": 4, "word": "in progress", "needs": 1, "flex": 4},
+        {"key": "waiting", "n": 19, "word": "waiting", "needs": 0, "flex": 19},
+        {"key": "up_next", "n": 24, "word": "up next", "needs": 24, "flex": 24},
+    ]
+    words = [
+        {"bar": [], "summary": {"cards": 0, "needs": 0, "of": 0}, "filtered": False},
+        {"bar": [], "summary": {"cards": 0, "needs": 3, "of": 231}, "filtered": True},
+        {"bar": [one], "summary": {"cards": 1, "needs": 1, "of": 1}, "filtered": False},
+        {"bar": [one], "summary": {"cards": 1, "needs": 1, "of": 231}, "filtered": True},
+        {"bar": many, "summary": {"cards": 47, "needs": 25, "of": 231}, "filtered": True},
+        {"bar": many[1:2], "summary": {"cards": 19, "needs": 0, "of": 19}, "filtered": False},
+    ]
+    got = _node([{"search": "", "items": [], "teams": {}, "words": w} for w in words])
+    for w, js in zip(words, got, strict=True):
+        assert js["words"] == summary_words(w["bar"], w["summary"], w["filtered"]), w
+    assert got[0]["words"]["cards"] == "0 cards" and got[1]["words"]["cards"] == "0 of 231 cards"
+    assert got[1]["words"]["entries"] == []  # none shown: no legend entry, *need you* neither
+    assert got[2]["words"] == {
+        "titles": ["1 up next, 1 needs you"],
+        "entries": [{"n": 1, "word": "up next"}, {"n": 1, "word": "needs you"}],
+        "cards": "· 1 card",
+        "hover": "1 card needs you — press to keep only these: it narrows the teams picked, it picks none; the"
+        " completed lines are hidden while it is on",
+    }
+    assert got[4]["words"]["titles"] == ["4 in progress, 1 needs you", "19 waiting", "24 up next, 24 need you"]
+    assert got[4]["words"]["cards"] == "· 47 of 231 cards" and got[5]["words"]["entries"] == [
+        {"n": 19, "word": "waiting"}
+    ]
+
+
+SUMMARY_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+global.window = {};
+global.document = { documentElement: el(), body: el(), addEventListener: noop, createElement: el,
+  querySelector: () => null, querySelectorAll: () => [] };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+const cases = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+// the top section and the lists as the summary reads them: each card's group, status and whether a pick hides it
+console.log(JSON.stringify(cases.map((c) => {
+  const p = AO.qPicks(c.search);
+  const item = (k) => ({ kind: "card", status: k.status, repos: k.repos, find: AO.qFindText(k.rows) });
+  const cards = c.cards.map((k) => ({ k, group: k.group, dataset: { status: k.status },
+    off: !AO.qPass(item(k), p, c.teams) }));
+  const group = (g) => ({ querySelectorAll: (sel) => cards.filter((x) => x.group === g
+    && !(sel.includes(":not(.qoff)") && x.off)) });
+  const lists = {
+    querySelector: (sel) => (sel === "#qcounts" ? (c.served ? {} : null) : group(sel.match(/data-group="(\\w+)"/)[1])),
+    querySelectorAll: (sel) => (sel === ".qgroup .qcard" ? cards : []),
+  };
+  const parts = { ".qsbar": { hidden: "was", innerHTML: "was" }, ".qsleg": { innerHTML: "was" },
+    "#qfneeds": { title: "was" }, "#qfneedsn": { textContent: "was" } };
+  const top = { querySelector: (sel) => parts[sel] || null };
+  const got = AO.qDrawSummary(top, lists, p, AO.qFiltered(p), (x, pk) => AO.qPass(item(x.k), pk, c.teams));
+  return { got, bar: parts[".qsbar"], leg: parts[".qsleg"].innerHTML, hover: parts["#qfneeds"].title,
+    n: parts["#qfneedsn"].textContent };
+})));
+"""
+
+SUMMARY_SEARCHES = ["", "?filter=needs-you", "?team=db", "?team=s", "?team=s&filter=needs-you", "?find=keep",
+                    "?find=zzz", "?team=nowhere", "?find=recover"]  # fmt: skip
+
+
+def _summary_queue() -> dict:
+    """`queue(repo2=True)` with a needs-you card in two groups more: In progress's s#TD-10 and Up next's db#TD-5."""
+    q = queue(repo2=True)
+    q["cards"][0]["status"] = q["cards"][3]["status"] = "needs you"
+    return q
+
+
+def _summary_node(cases: list[dict]) -> list[dict]:
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the Queue's in-browser summary is JavaScript, and nothing else runs it")
+    d = scratch_dir()
+    (d / "probe.js").write_text(SUMMARY_PROBE)
+    (d / "cases.json").write_text(json.dumps(cases))
+    out = subprocess.run(
+        [node, str(d / "probe.js"), str(UI / "static" / "app.js"), str(d / "cases.json")],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout)
+
+
+def test_the_summary_follows_a_pick_on_both_sides(tmp_path, monkeypatch):
+    """TD-1311, §4.5 screen 12 *The page's top section is one block*: a team or repo chip, the switch and a find
+    word each recount the bar, its hatch per segment, the legend's *n of m* and *need you* entry and the switch's
+    number and hover from the cards shown — the browser's `AO.qDrawSummary` drawing the same markup as the
+    server's page; the switch's press leaves its number as it was."""
+    q = _summary_queue()
+    view = queue_view(q, NOW)
+    cards = [
+        {"group": c["group"], "status": c["status"], "repos": c["repos"],
+         "rows": [{"qid": r["qid"], "title": r["title"]} for r in [c["top"], *c["rows"]]]}
+        for c in [*view["in_progress"], *view["waiting"], *view["up_next"]]
+    ]  # fmt: skip
+    got = _summary_node([{"search": s, "cards": cards, "teams": {}, "served": True} for s in SUMMARY_SEARCHES])
+    page = client(monkeypatch, tmp_path, fake(q, []))
+    for s, js in zip(SUMMARY_SEARCHES, got, strict=True):
+        server = apply_picks(queue_view(q, NOW), queue_picks(QueryParams(s.lstrip("?"))), {})
+        assert js["got"]["bar"] == server["bar"], s
+        assert js["got"]["summary"] == server["summary"] and js["got"]["words"] == server["sumwords"], s
+        html = page.get("/queue" + s).text
+        top = html[html.index('id="qfilters"') : html.index('id="queuelists"')]
+        bar = re.search(r'<span class="qsbar" aria-hidden="true"( hidden)?>(.*?)</span>\n', top)
+        assert (bar[2], bool(bar[1])) == (js["bar"]["innerHTML"], js["bar"]["hidden"]), s
+        assert re.search(r'<span class="qsleg">(.*)</span></div>', top)[1] == js["leg"], s
+        assert f'title="{js["hover"]}"' in top and f'<b id="qfneedsn">{js["n"]}</b>' in top, s
+    by = dict(zip(SUMMARY_SEARCHES, got, strict=True))
+    # all: three needs-you cards, In progress's and two of Up next's three hatched
+    assert [(b["key"], b["n"], b["needs"]) for b in by[""]["got"]["bar"]] == [("in_progress", 1, 1), ("up_next", 3, 2)]
+    assert by[""]["got"]["words"]["cards"] == "· 4 cards" and by[""]["n"] == "3"
+    # the switch: its number as it was, every segment hatched whole, *n of m*
+    assert by["?filter=needs-you"]["n"] == "3" and all(
+        b["n"] == b["needs"] for b in by["?filter=needs-you"]["got"]["bar"]
+    )
+    assert by["?filter=needs-you"]["got"]["words"]["cards"] == "· 3 of 4 cards"
+    # a repo chip: the one db card, *1 needs you*
+    assert by["?team=db"]["got"]["words"]["entries"] == [{"n": 1, "word": "up next"}, {"n": 1, "word": "needs you"}]
+    assert by["?team=db"]["got"]["words"]["cards"] == "· 1 of 4 cards" and by["?team=db"]["n"] == "1"
+    assert "1 card needs you — press" in by["?team=db"]["hover"]
+    # a find word that holds no card needing the person: no *need you* entry, no hatch, the switch at 0
+    assert by["?find=recover"]["got"]["bar"][0]["needs"] == 1 and by["?find=zzz"]["got"]["bar"] == []
+    assert by["?find=zzz"]["leg"] == '<span class="qscards">0 of 4 cards</span>' and by["?find=zzz"]["bar"]["hidden"]
+    assert by["?find=zzz"]["n"] == "0" and "0 cards need you — press" in by["?find=zzz"]["hover"]
+
+
+def test_an_unserved_re_read_leaves_the_summary_as_it_was():
+    """TD-1311: with no `#qcounts` in the lists (the Queue not served), nothing is recounted, so the hidden parts
+    keep their last numbers."""
+    (js,) = _summary_node([{"search": "?team=db", "cards": [], "teams": {}, "served": False}])
+    assert js["got"] is None
+    assert js["bar"] == {"hidden": "was", "innerHTML": "was"} and js["leg"] == js["hover"] == js["n"] == "was"

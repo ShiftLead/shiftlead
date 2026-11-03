@@ -4451,31 +4451,57 @@
   };
   AO.qCardRows = (card) => $$(".qhead[data-qid], .qrows > .qrow[data-qid]", card)
     .map((el) => ({ qid: el.dataset.qid, title: ($(".qtitle", el) || {}).textContent || "" }));
-  // the heading line's summary bar (§4.5 screen 12 *The page's top section is one block*, TD-1293): a segment's
+  // the summary line's bar (§4.5 screen 12 *The page's top section is one block*, TD-1293, TD-1311): a segment's
   // flex is its count, never under a sliver — the same one line as `ui.queue.bar_flex`, which draws it first
   AO.qBarFlex = (n, total) => Math.max(n, total * 0.012);
-  // the summary, the switch's number and *Decide · Do*, redrawn from a re-read's `#qcounts` (TD-1293)
-  AO.qDrawCounts = (top, d) => {
-    const num = (k) => Number(d[k] || 0), cards = num("cards");
-    const groups = [["inprogress", "in progress", "--working"], ["waiting", "waiting", "--waiting"], ["upnext", "up next", "--ended"]]
-      .filter(([k]) => num(k));
-    const bar = $(".qsbar", top), leg = $(".qsleg", top);
-    if (bar) {
-      bar.hidden = !cards;
-      bar.innerHTML = groups.map(([k, w, c]) =>
-        `<span style="flex: ${AO.qBarFlex(num(k), cards)}; background: var(${c})" title="${num(k)} ${w}"></span>`).join("");
+  AO.Q_SUMMARY_GROUPS = [["in_progress", "in progress", "--working"], ["waiting", "waiting", "--waiting"], ["up_next", "up next", "--ended"]];
+  // the summary's words and the switch's hover, the twin of `ui.queue.summary_words` (TD-1311): `bar` the
+  // segments `{n, word, needs}`, `summary` `{cards, needs, of}`; words, never markup, and no DOM
+  AO.qSummaryWords = (bar, summary, filtered) => {
+    const need = (n) => `${n} ${n === 1 ? "needs" : "need"} you`;
+    const titles = bar.map((s) => `${s.n} ${s.word}` + (s.needs ? `, ${need(s.needs)}` : ""));
+    const k = Number(summary.needs || 0), m = Number(summary.of || 0), shown = Number(summary.cards || 0);
+    const entries = bar.map((s) => ({ n: s.n, word: s.word }));
+    if (k && shown) entries.push({ n: k, word: k === 1 ? "needs you" : "need you" });  // none shown: no entry
+    const cards = (entries.length ? "· " : "") + `${filtered ? `${shown} of ${m}` : m} card${m === 1 ? "" : "s"}`;
+    const hover = `${k} card${k === 1 ? " needs" : "s need"} you — press to keep only these: it narrows the teams picked, it`
+      + " picks none; the completed lines are hidden while it is on";
+    return { titles, entries, cards, hover };
+  };
+  // the summary line and the switch's number and hover, recounted from the cards drawn (TD-1311): per group the
+  // cards shown and those among them that need the person; `k` the cards the chips and the find pass that need
+  // the person, whatever the switch is. With no `#qcounts` in the lists (the Queue not served) nothing is
+  // recounted, so the hidden parts keep their last numbers; else it returns what it drew from
+  AO.qDrawSummary = (top, lists, picks, filtered, pass) => {
+    if (!$("#qcounts", lists)) return null;
+    const bar = [];
+    let shown = 0;
+    AO.Q_SUMMARY_GROUPS.forEach(([key, word, color]) => {
+      const g = $(`.qgroup[data-group="${key}"]`, lists);
+      const on = g ? $$(".qcard:not(.qoff)", g) : [];
+      if (on.length) bar.push({ key, word, color, n: on.length, needs: on.filter((el) => el.dataset.status === "needs you").length });
+      shown += on.length;
+    });
+    bar.forEach((s) => { s.flex = AO.qBarFlex(s.n, shown); });
+    const all = $$(".qgroup .qcard", lists);
+    const k = all.filter((el) => el.dataset.status === "needs you" && pass(el, { ...picks, filter: "" })).length;
+    const summary = { cards: shown, needs: k, of: all.length }, w = AO.qSummaryWords(bar, summary, filtered);
+    const bel = $(".qsbar", top), leg = $(".qsleg", top);
+    if (bel) {
+      bel.hidden = !bar.length;
+      bel.innerHTML = bar.map((s, i) => `<span class="qsbseg" style="flex: ${s.flex}" title="${w.titles[i]}">`
+        + (s.n - s.needs ? `<i style="flex: ${s.n - s.needs}; background: var(${s.color})"></i>` : "")
+        + (s.needs ? `<i class="qhatch" style="flex: ${s.needs}; --seg: var(${s.color})"></i>` : "") + "</span>").join("");
     }
     if (leg) {
-      leg.innerHTML = groups.map(([k, w, c]) => `<span><i style="background: var(${c})"></i><b>${num(k)}</b>${w}</span>`).join("")
-        + `<span class="qscards">${cards ? "· " : ""}${cards} card${cards === 1 ? "" : "s"}</span>`;
+      leg.innerHTML = w.entries.map((e, i) => (i < bar.length
+        ? `<span><i style="background: var(${bar[i].color})"></i><b>${e.n}</b>${e.word}</span>`
+        : `<span class="qsneeds"><i class="qhatch"></i><b>${e.n}</b>${e.word}</span>`)).join("")
+        + `<span class="qscards">${w.cards}</span>`;
     }
-    const needs = $("#qfneedsn", top); if (needs) needs.textContent = String(num("needs"));
-    const wants = $(".qwantsn", top);
-    if (wants) {
-      const dec = num("decide"), dos = num("do");
-      wants.textContent = [dec ? `Decide ${dec}` : "", dos ? `Do ${dos}` : ""].filter(Boolean).join(" · ");
-      wants.hidden = !(dec || dos);
-    }
+    const sw = $("#qfneeds", top); if (sw) sw.title = w.hover;
+    const n = $("#qfneedsn", top); if (n) n.textContent = String(k);
+    return { bar, summary, words: w };
   };
   AO.qFiltered = (picks) => !!(picks.filter || picks.team.length || picks.find.split(/\s+/).filter(Boolean).length);
   // `item`: {kind: "card" | "line" | "other", status, repos, find}; `teams`: a team's name → its repo, and a
@@ -4589,6 +4615,9 @@
           const s = $(".qghead .qshare", g); if (s) share(s, $$(".qcard:not(.qoff)", g).length);
         }
       });
+      // the summary line counts the cards shown, while the Queue is served (TD-1311): unserved, the hidden parts
+      // keep their last numbers
+      if (filters) AO.qDrawSummary(filters, lists, picks, filtered, (el, p) => AO.qPass(card(el), p, teams));
       const none = $("#qnone", lists); if (none) none.hidden = !(filtered && !$(".qgroup .qcard:not(.qoff)", lists));
       const miss = $("#qfindmiss", lists); if (miss) miss.hidden = (miss.dataset.for || "") !== picks.find;
       if (filters) $$("a.qf[data-k]", filters).forEach((a) => {
@@ -4739,14 +4768,13 @@
           const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
           const menus = AO.openMenus(lists);  // a ⋯ or Snooze the person has open, opened again after the swap
           lists.innerHTML = await res.text();
-          // the top section stands outside the lists, so typed find words and its focus survive: its numbers
-          // follow, and its parts after the heading show while the Queue is served (TD-1293); a page loaded
-          // unserved has no chips, so the first served read reloads it
+          // the top section stands outside the lists, so typed find words and its focus survive: its parts after
+          // the heading show while the Queue is served (TD-1293), and `apply` below recounts its numbers from the
+          // cards (TD-1311); a page loaded unserved has no chips, so the first served read reloads it
           const n = $("#qcounts", lists);
           if (filters) {
             if (n && filters.dataset.served === "0") { location.reload(); return; }
             $$(".qserved", filters).forEach((el) => (el.hidden = !n));
-            if (n) AO.qDrawCounts(filters, n.dataset);
           }
           opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
           AO.reopenFolds(lists);  // a row's *details* the person opened, filled from what was kept (TD-891)
