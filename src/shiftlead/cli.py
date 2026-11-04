@@ -3937,7 +3937,7 @@ def cmd_msg(args: argparse.Namespace) -> int:
     (from 1) and sends that answer's own text, any words given following it after a blank line.
     Refusals print as the host agent words them."""
     words = list(args.words)
-    if args.withdraw:
+    if args.withdraw is not None:
         return _withdraw(args, words)
     if (args.team or args.repo) and (args.pass_up or args.reply_to or args.pick is not None):
         # design §4.10 *A team or a repo as the address* (TD-1000): it opens a question, never answers one
@@ -4240,13 +4240,19 @@ _WITHDRAW_ALONE = (
 )
 
 
+def _unset(v: object) -> bool:
+    """An option left out: None, a switch not set, an empty list — never a zero, which was given."""
+    return v is None or v is False or v == []
+
+
 def _withdraw(args: argparse.Namespace, words: list[str]) -> int:
     """`ao msg --withdraw <id>` (design §4.10 *Withdrawing a question*, §4.7, TD-1382): take your own
     open question to the person back, closed `withdrawn`. The id is its only word: no text, no
     addressee, no other option. It addresses nobody, so it prints no *when it is read* line."""
     if words:
         return fail(args, "--withdraw takes the question's id alone: no text and no addressee", 2)
-    if extra := [flag for flag, attr in _WITHDRAW_ALONE if getattr(args, attr, None) not in (None, False, [])]:
+    # a zero is given (`--pick 0`, `--pr 0`): only None, an unset switch or an empty list is absent
+    if extra := [flag for flag, attr in _WITHDRAW_ALONE if not _unset(getattr(args, attr, None))]:
         return fail(args, f"--withdraw takes the question's id alone: {', '.join(extra)} does not apply", 2)
     got = call_sync("msg_withdraw", id=args.withdraw)
     return emit(args, got, lambda: print(f"{got['msg']} withdrawn: the person meets it in FYI"))

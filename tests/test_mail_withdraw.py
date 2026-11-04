@@ -45,6 +45,7 @@ async def test_a_sender_withdraws_its_own_ask_and_steer_and_nobody_is_told(agent
             assert again == got
             paused = await c.call("msg_withdraw", id=steer)
             assert paused["closed_reason"] == "withdrawn"
+            assert await c.call("msg_withdraw", id=steer) == paused  # a steer's repeat too
             for mid in (ask, steer):
                 copies = _copies(agent, mid)
                 assert len(copies) >= 2, "the person's copy and the sender's outbox"
@@ -75,6 +76,7 @@ async def test_a_sender_withdraws_its_own_ask_and_steer_and_nobody_is_told(agent
         assert got["declined"] is False and got["closed_reason"] == "withdrawn"
         assert not [e for e in agent.person_inbox if e.id == ask]
         await person.call("inbox_dismiss", msg=steer)
+        assert not [e for e in agent.person_inbox if e.id == steer], "Dismiss removes it"
         await person.call("kill", id=w)
 
 

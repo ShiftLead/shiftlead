@@ -2105,6 +2105,9 @@ def test_msg_withdraw_prints_one_line_and_takes_the_id_alone(subprocess_agent, t
         ["--team", "t"],
         ["--source", "x"],
         ["--recommend", "x"],
+        ["--pick", "0"],  # a zero is given, not absent (review of #2917)
+        ["--pr", "0"],
+        ["--bound", "0"],
     ):
         words = [x for x in extra if not x.startswith("--")] if extra == ["person"] else []
         flags = [] if extra == ["person"] else extra
@@ -2115,6 +2118,11 @@ def test_msg_withdraw_prints_one_line_and_takes_the_id_alone(subprocess_agent, t
     assert out.strip() == f"{q['id']} withdrawn: the person meets it in FYI"
     assert cli.main(["--json", "msg", "--withdraw", q["id"]]) == 0  # a repeat answers as the first
     assert json.loads(capsys.readouterr().out)["closed_reason"] == "withdrawn"
+    assert cli.main(["msg", "--withdraw", ""]) != 0  # an empty id is a withdraw refused, never a send
+    capsys.readouterr()
+    with pytest.raises(SystemExit):  # argparse's action prints the skill and exits
+        cli.main(["--skill"])
+    assert "ao msg --withdraw <id>" in capsys.readouterr().out  # `ao --skill` names the verb
     call_sync("kill", id=asker)
 
 
