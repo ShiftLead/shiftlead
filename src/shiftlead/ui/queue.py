@@ -92,8 +92,32 @@ def ledger_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | Non
     return {"home": "queue", "on_card": card, "on_row": row, "mentions": []}
 
 
+def asked_entries(lines: Iterable[Mapping[str, Any]]) -> set[str]:
+    """The entries an open Decide or Do board line asks about (§4.5 screen 12 *Three verbs*, TD-1362): each
+    `<repo>#TD-n` its `Context:` names, a bare `TD-n` read as the line's own repo's, as `item_home` reads it.
+    Such a line is the entry's question itself, so the entry's own row is not drawn beside it."""
+    out: set[str] = set()
+    for e in lines or ():
+        if not isinstance(e, Mapping) or e.get("row") != "board" or e.get("decided"):
+            continue
+        if want_of(e, "needs") not in WANTS:
+            continue
+        m = CONTEXT.search(str(e.get("text") or ""))
+        name = str(e.get("repo_name") or "")
+        for r in _refs(m.group(1)) if m else ():
+            if "#" in r:
+                out.add(r)
+            elif name:
+                out.add(f"{name}#{r}")
+    return out
+
+
 def split_later(
-    lf: Mapping[str, Any] | None, ahead: Any, index: Mapping[str, tuple[str, str]] | None, hidden: Any = ()
+    lf: Mapping[str, Any] | None,
+    ahead: Any,
+    index: Mapping[str, tuple[str, str]] | None,
+    hidden: Any = (),
+    due: Any = (),
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     """*Later*'s rows split by where each is drawn (§4.5 screen 6 *Where a row is drawn*, TD-771; screen 12 *What
     is attached to a card*, TD-828): the ledger's rows (`lf`, `ledger_for_you`'s groups) and the board's lines
@@ -102,15 +126,18 @@ def split_later(
     `lf`, `ahead`, the rows the Queue draws and the `hidden` lines no card holds (which the Inbox's *not shown*
     fold draws and counts). Each row the Queue draws is tagged `home: queue` with its card and row and the
     renderer's section it is drawn with — `later` a ledger row, `coming` a board line with its due date — and
-    lands in its card's *Needs you*, counted there and never in the top bar's number."""
+    lands in its card's *Needs you*, counted there and never in the top bar's number. A ledger row the Inbox
+    would keep is left out where an open Decide or Do line the page draws — `due` or `ahead` — asks its question
+    (`asked_entries`, TD-1362): that line is drawn in its place."""
     groups, moved = [], []
+    asked = asked_entries([*(due or ()), *(ahead or ())])
     for g in (lf or {}).get("groups") or []:
         keep = []
         for e in g.get("rows") or []:
             home = ledger_home(e, index)
             if home["home"] == "queue":
                 moved.append({**e, **home, "later_section": "later"})
-            else:
+            elif not (asked and set(_refs(f"{e.get('name') or ''}#{e.get('id') or ''}")) & asked):
                 keep.append(e)
         if keep:
             groups.append({**g, "rows": keep})

@@ -22,7 +22,7 @@
 {% endmacro %}
 {# a ledger row of the board: For you's are the Inbox's ledger rows (a board line naming the entry in its
    place), the rest the Queue card's own row partial — one partial, never a copy (§4.5 screen 11 *A row*) #}
-{% macro brow(r, col) %}{% if col == 'foryou' and (fy_boards.get(r.id) or fy_rows.get(r.id)) %}<div class="brow" id="{{ r.anchor }}" data-qid="{{ r.qid }}">{% for b in fy_boards.get(r.id) or [] %}{{ ir.row(b, 'needs') }}{% else %}{{ ir.row(fy_rows[r.id], 'later') }}{% endfor %}</div>{% else %}{{ qrow(r, name) }}{% endif %}{% endmacro %}
+{% macro brow(r, col) %}{% if col == 'foryou' and (fy_boards.get(r.id) or fy_rows.get(r.id)) %}<div class="brow" id="{{ r.anchor }}" data-qid="{{ r.qid }}">{% for b in fy_boards.get(r.id) or [] %}{{ ir.row(b, b.fy_section or 'needs') }}{% else %}{{ ir.row(fy_rows[r.id], 'later') }}{% endfor %}</div>{% else %}{{ qrow(r, name) }}{% endif %}{% endmacro %}
 {# one column of the board's ledger columns: claimed, then queued by card, then blocked, folded #}
 {% macro col(c) %}
 <div class="bcol" id="col-{{ c.key }}" data-col="{{ c.key }}">
