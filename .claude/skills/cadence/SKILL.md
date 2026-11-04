@@ -1,6 +1,6 @@
 ---
 name: cadence
-description: Run the cadence check on this branch's PR (review evidence, squash, CI, base, ledger, worktree, pushed, deploy) — do the independent review and post its evidence comment if missing, then merge only when every row passes. Pass a PR number to check another PR, or "week" for every PR merged in the last 7 days.
+description: Run the cadence check on this branch's PR (review evidence, squash, CI, base, ledger, board, worktree, pushed, deploy) — do the independent review and post its evidence comment if missing, then merge only when every row passes. Pass a PR number to check another PR, or "week" for every PR merged in the last 7 days.
 ---
 
 # Cadence — check a PR against cadence.md §1–§5 before merging
