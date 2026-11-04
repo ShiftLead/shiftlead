@@ -5235,7 +5235,16 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got = await call("inbox_delete", msg=ref)
             # design §4.10 *Deleting is declining*: on an open `ask` or `steer` the entry is not
             # stripped — it closes as `declined`, the asker is told, and it stays for retention.
-            return JSONResponse({"ok": True, "unread": got["unread"], "declined": bool(got.get("declined"))})
+            # a Delete drawn while open on an entry its sender since withdrew removes it, and the
+            # page says so: the closed branch's `closed_reason` passes through (§4.10, TD-1382)
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "unread": got["unread"],
+                    "declined": bool(got.get("declined")),
+                    "closed_reason": got.get("closed_reason"),
+                }
+            )
         raise HTTPException(404, f"no action {action}")
 
 

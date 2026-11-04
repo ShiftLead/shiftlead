@@ -498,6 +498,8 @@ class MailMixin:
                     f"copied (design §4.10)"
                 )
             replied = held[0]
+            if gone := mail.withdrawn_refusal(replied):  # first: its asker took it back (§4.10)
+                raise RpcError(gone)
             if replied.answered and replied.answered.get("answerer") == mail.RULES:
                 # a prompt the person's own rules answered (§4.9b, TD-641): nobody asked and nobody
                 # answered who could take an Overrule — the rule is the person's to change
@@ -1239,6 +1241,44 @@ class MailMixin:
         await self._push_changes()
         return {"id": PERSON, "msg": id, "passed_up": at, "recommend": rec, "answers": picks}
 
+    async def rpc_msg_withdraw(self, id: str, caller: Any = None) -> dict[str, Any]:
+        """`ao msg --withdraw <id>` (design §4.10 *Withdrawing a question*, TD-1382): a sender takes
+        back its own open question to the person. The entry must be an `ask` or a `steer` in the
+        person inbox, open, and the caller's own — its `from_` a record whose `superseded_by` chain
+        reaches the caller, so a resumed sender withdraws what it asked before the resume. It
+        closes `withdrawn` on every copy (the person's, the sender's outbox, a seat's that passed it
+        up) and clears `paused_at`. Nobody is told: no `system` note, and a row withdrawn inside the
+        notify hold is never told, since the hold reads only open rows. Refused in the section's
+        order: the person, no record, not in the person inbox, not the caller's (an orphaned one
+        among them), a `note` or `reply`, closed for another reason. A second withdraw of the
+        caller's own withdrawn entry answers as the first did."""
+        if mail.is_person(caller):
+            raise RpcError("the person withdraws nothing: delete or dismiss it (design §4.10 *Withdrawing a question*)")
+        records = self._graph()
+        me = records.get(self._addr(str(caller)))
+        if me is None:
+            raise RpcError(f"{caller}: this host agent has no record of the caller (design §4.10)")
+        caller_key = self._addr(str(caller))
+        held = [e for e in self.person_inbox if e.id == id]
+        if not held:
+            raise RpcError(
+                "--withdraw takes back a question to the person; a question to a session is answered, lapses or "
+                "expires (design §4.10 *Withdrawing a question*)"
+            )
+        e = held[0]
+        mine = {k for k in records if caller_key in mail.chain(records, k, self._successor)}
+        if e.orphaned or e.from_ not in mine:
+            raise RpcError(f"{id} is {e.from_}'s question: only its asker withdraws it (design §4.10)")
+        if e.kind not in ("ask", "steer"):
+            raise RpcError(f"nothing waits on a {e.kind}: the person dismisses it (design §4.10)")
+        if not e.open and e.closed_reason != "withdrawn":
+            raise RpcError(f"{id} is already closed ({e.closed_reason}) (design §4.10)")
+        if e.open:
+            self._close_entry(id, "withdrawn", now_iso())
+            self._mark(id, paused_at=None)
+            await self._push_changes()
+        return {"id": PERSON, "msg": id, "closed_reason": "withdrawn", "closed_at": e.closed_at}
+
     async def rpc_inbox(
         self,
         id: str | None = None,
@@ -1468,7 +1508,15 @@ class MailMixin:
             kept = [e for e in self.person_inbox if e.id != msg]
             self.person_inbox = kept
             self.person_store.save(kept)
-            return {"id": PERSON, "deleted": msg, "declined": False, "unread": sum(1 for e in kept if not e.read_at)}
+            # the closed branch says how it had closed: a Delete drawn while open meets a withdrawn
+            # entry and removes it, and the page says so (§4.10 *Withdrawing a question*)
+            return {
+                "id": PERSON,
+                "deleted": msg,
+                "declined": False,
+                "closed_reason": held[0].closed_reason,
+                "unread": sum(1 for e in kept if not e.read_at),
+            }
         s = self._find(self._addr(id))
         kept = [e for e in s.inbox if e.id != msg]
         if len(kept) == len(s.inbox):

@@ -377,6 +377,15 @@ def asks_seat(s: Session | None) -> bool:
     return s is not None and isinstance(s.seat, dict) and s.seat.get("trigger") == "asks"
 
 
+def withdrawn_refusal(e: MailEntry) -> str | None:
+    """Design §4.10 *Withdrawing a question* (TD-1382): the words Reply, Go with it, Pause, Resume,
+    Snooze and Send to reviewer meet on an entry its sender withdrew — checked before each control's
+    own closed or kind check, so a page drawn before the withdraw meets this line. None otherwise."""
+    if e.closed_reason != "withdrawn":
+        return None
+    return f"{e.id} was withdrawn by its sender at {e.closed_at}: nothing waits on an answer (design §4.10)"
+
+
 def self_decide_refusal(caller: Any) -> str:
     """TD-119, design §4.8: whatever it holds, a session never answers its own permission prompt."""
     return f"{caller} cannot decide itself: a session does not answer its own permission prompt (design §4.8)"

@@ -90,6 +90,7 @@ MAILBOX = frozenset(
     {
         "msg",
         "pass_up",
+        "msg_withdraw",
         "inbox",
         "thread",
         "pr_reads",

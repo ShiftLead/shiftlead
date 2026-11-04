@@ -121,6 +121,8 @@ class InboxMixin:
         hides a row while its clock runs, pause stops the clock, and both on one row invite the
         wrong press."""
         e = self._person_entry(msg, caller, "snooze")
+        if gone := mail.withdrawn_refusal(e):  # first, before its own checks (§4.10 *Withdrawing a question*)
+            raise RpcError(gone)
         if e.kind == "steer":
             raise RpcError(f"{msg} is a steer: it has Pause, which stops its clock, and no Snooze (design §4.10)")
         # **Unsnooze** brings a look handed to a reviewer back sooner (§4.5a **Send to reviewer**): the
@@ -139,6 +141,8 @@ class InboxMixin:
         team defines none). Refused in words: not a look, not an open `ask`, already with a reviewer,
         no techlead seat. Returns `{id, msg, to, read_when}`."""
         e = self._person_entry(msg, caller, "hand")
+        if gone := mail.withdrawn_refusal(e):  # first, before its own checks (§4.10 *Withdrawing a question*)
+            raise RpcError(gone)
         if not e.shots:
             raise RpcError(f"{msg} is not a look: it names no screenshots (design §4.10 *A look*)")
         if e.kind != "ask":
@@ -1084,6 +1088,8 @@ class InboxMixin:
         is held on. Only a `steer` can be paused — an `ask` to the person has no clock — and a
         `steer` addressed to a session cannot be: the pause is the person's."""
         e = self._person_entry(msg, caller, "pause")
+        if gone := mail.withdrawn_refusal(e):  # first, before its own checks (§4.10 *Withdrawing a question*)
+            raise RpcError(gone)
         if e.kind != "steer":
             raise RpcError(f"only a steer can be paused: {msg} is a {e.kind}, and has no clock to stop (design §4.10)")
         if not e.open:
@@ -1104,6 +1110,8 @@ class InboxMixin:
         ordinary one: it only says the clock runs again and what is left, so it wakes within the
         wake budget like any `note`."""
         e = self._person_entry(msg, caller, "resume")
+        if gone := mail.withdrawn_refusal(e):  # first, before its own checks (§4.10 *Withdrawing a question*)
+            raise RpcError(gone)
         if not e.paused_at:
             raise RpcError(f"{msg} is not paused")
         held = datetime.now(UTC) - _parse(e.paused_at)
@@ -1120,6 +1128,8 @@ class InboxMixin:
         sender is told by a `system` note that wakes it as a person's reply does. It closes a
         paused `steer` as it closes a running one."""
         e = self._person_entry(msg, caller, "answer")
+        if gone := mail.withdrawn_refusal(e):  # first, before its own checks (§4.10 *Withdrawing a question*)
+            raise RpcError(gone)
         if e.kind != "steer":
             raise RpcError(f"Go with it answers a steer, which carries the default: {msg} is a {e.kind} (§4.10)")
         if not e.open:

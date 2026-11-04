@@ -1353,6 +1353,7 @@ def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
         "ok": True,
         "unread": 0,
         "declined": False,
+        "closed_reason": "replied",  # the closed branch says how it had closed (TD-1382)
     }
     assert client.get("/api/person/inbox").json()["entries"] == []
     assert client.post("/api/person/unmail", json={"msg": ask}).status_code == 400  # already gone

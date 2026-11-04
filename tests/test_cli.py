@@ -2081,6 +2081,51 @@ def test_msg_pass_up_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path
         call_sync("kill", id=sid)
 
 
+def test_msg_withdraw_prints_one_line_and_takes_the_id_alone(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-1382 (design §4.10 *Withdrawing a question*, §4.7): `ao msg --withdraw <id>` takes the
+    caller's own open question to the person back, prints one line and no *when it is read* line,
+    and refuses text and every other `msg` option beside it, `--json` excepted."""
+    (tmp_path / "a").mkdir()
+    asker = call_sync("create", name="wd-asker", dir=str(tmp_path / "a"), adapter="agentshell")["id"]
+    monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
+    assert cli.main(["--json", "msg", "person", "merge it now?", "--kind", "ask"]) == 0
+    q = json.loads(capsys.readouterr().out)["entry"]
+    assert cli.main(["msg", "--withdraw", q["id"], "some text"]) == 2
+    assert "the question's id alone" in capsys.readouterr().err
+    for extra in (
+        ["person"],
+        ["--kind", "ask"],
+        ["--about", "TD-1"],
+        ["--reply-to", "m-2"],
+        ["--subject", "x"],
+        ["--answer", "x"],
+        ["--default", "x"],
+        ["--bound", "60"],
+        ["--thread", "m-2"],
+        ["--team", "t"],
+        ["--source", "x"],
+        ["--recommend", "x"],
+        ["--pick", "0"],  # a zero is given, not absent (review of #2917)
+        ["--pr", "0"],
+        ["--bound", "0"],
+    ):
+        words = [x for x in extra if not x.startswith("--")] if extra == ["person"] else []
+        flags = [] if extra == ["person"] else extra
+        assert cli.main(["msg", "--withdraw", q["id"], *flags, *words]) == 2, extra
+        assert "the question's id alone" in capsys.readouterr().err, extra
+    assert cli.main(["msg", "--withdraw", q["id"]]) == 0
+    out = capsys.readouterr().out
+    assert out.strip() == f"{q['id']} withdrawn: the person meets it in FYI"
+    assert cli.main(["--json", "msg", "--withdraw", q["id"]]) == 0  # a repeat answers as the first
+    assert json.loads(capsys.readouterr().out)["closed_reason"] == "withdrawn"
+    assert cli.main(["msg", "--withdraw", ""]) != 0  # an empty id is a withdraw refused, never a send
+    capsys.readouterr()
+    with pytest.raises(SystemExit):  # argparse's action prints the skill and exits
+        cli.main(["--skill"])
+    assert "ao msg --withdraw <id>" in capsys.readouterr().out  # `ao --skill` names the verb
+    call_sync("kill", id=asker)
+
+
 def test_msg_source_and_the_answered_for_you_lines(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-075 step 2 (design §4.9b): `ao msg --reply-to <id> --source "<where>"` sends a reply
     answered from the record and says the person is told; the asker's `ao inbox` prints the source,

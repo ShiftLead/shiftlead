@@ -501,3 +501,21 @@ async def test_send_to_reviewer_is_refused_in_words(agent, tmp_path):
 @pytest.mark.unit
 def test_inbox_hand_travels_with_the_mailbox():
     assert "inbox_hand" in modes.MAILBOX
+
+
+@pytest.mark.integration
+async def test_a_withdrawn_look_leaves_its_handed_entry_owing(agent, tmp_path):
+    """§4.10 *Withdrawing a question* (TD-1382): a look with a reviewer withdraws as any question does —
+    the handed entry in the seat's inbox stands and owes, and `snoozed_for` is left as it is."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        builder, seat, look = await _look(person, tmp_path)
+        got = await person.call("inbox_hand", msg=look, seat=seat)
+        async with LocalClient(caller=builder) as c:
+            assert (await c.call("msg_withdraw", id=look))["closed_reason"] == "withdrawn"
+        h = next(e for e in agent.sessions[seat].inbox if e.id == got["handed"])
+        assert h.owes and h.open, "the handed entry stands and owes"
+        mine = next(e for e in agent.person_inbox if e.id == look)
+        assert mine.closed_reason == "withdrawn" and mine.snoozed_for == h.id
+        for sid in (builder, seat):
+            await person.call("kill", id=sid)

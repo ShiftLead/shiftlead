@@ -745,6 +745,7 @@ async def test_a_person_deletes_from_the_person_inbox_and_no_session_may(agent, 
             "id": "person",
             "deleted": one,
             "declined": False,
+            "closed_reason": None,  # a note: the closed branch says how it had closed (TD-1382)
             "unread": 1,
         }
         # `two` is an open `ask`: deleting it declines it rather than stripping it (§4.10, 2026-09-19),
