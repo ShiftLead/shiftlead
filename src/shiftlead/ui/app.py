@@ -1977,12 +1977,18 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             fy_ids = {str(x["id"]) for g in bd["foryou"]["groups"] for x in g["rows"]} | {
                 str(x["id"]) for x in bd["foryou"]["claimed"]
             }
+            # a line not yet due that the horizon draws is placed too, with its due words (TD-1362): drawn under
+            # *Not due yet* as well, it put the entry's own **Lift the hold** / **Answer…** beside its question
             fy_boards: dict[str, list[dict[str, Any]]] = {}
-            for b in boards:
-                if hit := next((i for i in b.get("refs") or () if i in fy_ids), None):
-                    fy_boards.setdefault(hit, []).append(b)
-            placed = {id(b) for bs in fy_boards.values() for b in bs}
-            boards = [b for b in boards if id(b) not in placed]
+            for sec, lines in (("needs", boards), ("coming", hz.get("ahead") or [])):
+                for b in lines:
+                    hits = (str(i).removeprefix(f"{name}#") for i in b.get("refs") or ())
+                    if hit := next((i for i in hits if i in fy_ids), None):
+                        fy_boards.setdefault(hit, []).append({**b, "fy_section": sec})
+            placed = {str(b.get("id")) for bs in fy_boards.values() for b in bs}
+            boards = [b for b in boards if str(b.get("id")) not in placed]
+            if placed and hz.get("ahead"):
+                hz = {**hz, "ahead": [b for b in hz["ahead"] if str(b.get("id")) not in placed]}
             ctx = {
                 "r": r,
                 "name": name,
@@ -4705,7 +4711,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet, got["entries"])
         # the ledger's rows and the board's lines not yet due whose entry a Queue card holds are drawn there
         # (§4.5 screen 6 *Where a row is drawn*, TD-771): *Later* keeps the rest
-        lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"])
+        lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"], hz["due"])
         hz = horizon_left(hz, ahead, unshown)
         return templates.TemplateResponse(
             request,
@@ -4904,7 +4910,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         origin = page_origin(request)
         gz = gzip_ok(request)
         cards = await h.queue_cards()
-        lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"])  # a card's is drawn there (TD-771)
+        lf, ahead, _, unshown = split_later(
+            lf, hz["ahead"], cards, hz["hidden"], hz["due"]
+        )  # a card's is drawn there (TD-771)
         hz = horizon_left(hz, ahead, unshown)
 
         def read() -> tuple[list[dict[str, Any]], bytes]:
