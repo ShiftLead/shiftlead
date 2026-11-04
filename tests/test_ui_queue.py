@@ -355,6 +355,36 @@ def test_an_item_is_drawn_where_its_entry_is():
     assert "TD-020" not in two and two["db#TD-020"][0] == "db#TD-20"
 
 
+def test_a_board_line_naming_a_held_entry_is_on_its_own_repos_card_in_the_entrys_place():
+    """TD-1355 (§4.5 screen 12 *Three verbs*): a repo's board line whose `Context:` names a bare `TD-n` is that
+    repo's entry, however many repos hold the number — `TD-n / PR #n` too, as ledgerboard#TD-023's line read —
+    and on the card it is drawn instead of the entry's own block, so its answers are the ones pressed."""
+    two = card_index(queue(repo2=True) | {"cards": [*queue()["cards"], card(row("db", "TD-20", "same id"))]})
+    assert "TD-020" not in two  # the bare id is ambiguous
+    line = {"row": "board", "id": "b", "key": "k1", "kind": "decide", "repo_name": "db",
+            "text": "**Go or hold?** Context: TD-20 / PR #74. Answers: Go | Hold"}  # fmt: skip
+    assert item_home(line, two)["on_row"] == "db#TD-20"
+    assert item_home({**line, "repo_name": "s"}, two)["on_row"] == "s#TD-20"
+    assert item_home({**line, "repo_name": "elsewhere"}, two)["home"] == "inbox"  # never another repo's card
+    held = {"row": "ledger", "id": "TD-20", "row_id": "ledger:db:TD-20", "name": "db", "why": "decision",
+            "later_section": "later", "home": "queue", "on_card": "db#TD-20", "on_row": "db#TD-20"}  # fmt: skip
+    other = {**held, "id": "TD-21", "row_id": "ledger:db:TD-21", "on_row": "db#TD-21"}
+    drawn = lambda e, sec: e.get("key") or e.get("row_id")  # noqa: E731
+    on = {"home": "queue", "on_card": "db#TD-20", "on_row": "db#TD-20"}
+    got = attach({"needs": [{**line, **on}]}, drawn, [held, other])["cards"]["db#TD-20"]["needs"]
+    assert [m["html"] for m in got] == ["ledger:db:TD-21", "k1"]  # the line in TD-20's place, TD-21's own kept
+    # an entry with the person in their own session, or one whose question they answered, is no question to draw over
+    mine = attach({"needs": [{**line, **on}]}, drawn, [held], None, lambda c, item: {"name": "ao-paul"})
+    assert [m["html"] for m in mine["cards"]["db#TD-20"]["needs"]] == ["ledger:db:TD-20", "k1"]
+    told = attach({"needs": [{**line, **on}]}, drawn, [{**held, "answered": {"asker": "g"}}])["cards"]["db#TD-20"]
+    assert [m["html"] for m in told["needs"]] == ["ledger:db:TD-20", "k1"]
+    # a bare id that one repo alone holds on a card is still found from another repo's board
+    assert item_home({**line, "repo_name": "s", "text": "Context: TD-9."}, two)["on_row"] == "s#TD-9"
+    assert item_home({**line, "repo_name": "db", "text": "Context: TD-9."}, two)["on_row"] == "s#TD-9"
+    fyi = attach({"fyi": [{**line, "kind": "fyi", **on}]}, drawn, [held])["cards"]["db#TD-20"]
+    assert [m["html"] for m in fyi["needs"]] == ["ledger:db:TD-20"]  # a line for reading asks nothing in its place
+
+
 def test_a_question_about_a_td_is_on_its_card_and_still_counted():
     entries = [
         mail("m1", "TD-21: which?"),
