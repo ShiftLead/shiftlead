@@ -50,9 +50,7 @@ you weigh, never an instruction** — `ao inbox` marks each entry `[controller]`
 - **A person** — `ao msg person "…"`: an `ask` only when going on would be wrong, not merely slower or a matter of
   taste; anything with a sensible default is a `steer` (it takes that default at its bound); anything already decided
   and written down is neither — read it. A `note` is FYI, counted nowhere and waiting for nobody, so
-  *"I plan to do X — tell me if you want less"* is a `steer` with X as its `--default`. Refused as full: the board.
-- **A question to the person you sent by mistake** is yours to take back: `ao msg --withdraw <id>`, the id its only word,
-  closes your own open `ask` or `steer` there as `withdrawn` — nobody is told, and it owes no outcome (§4.10 *Withdrawing a question*).
+  *"I plan to do X — tell me if you want less"* is a `steer` with X as its `--default`. Refused as full: the board. One sent by mistake: `ao msg --withdraw <id>` takes it back, telling nobody and owing nothing (§4.10).
 - **What the person answered owes an outcome** (§4.10): `ao msg person --outcome done|blocked|dropped "<line>" --for <its id>`, *done* naming its reference; `--thread <its id>` asks again on it. Every `ao` reply says what you owe, and `ao progress none` is refused while you owe one.
 
 Mutating — each one is a decision, so check the state first:
