@@ -64,7 +64,9 @@ question, TD-039).
 
 ## Escalate = a line on the attention board, once per problem
 
-`docs/user_attention.md`, `Due:` today, with the session id, the evidence and what you tried;
+`docs/user_attention.md`, `Due:` today, with the session id, the evidence and what you tried, written by
+`agent-cadence run board_edit.py add --board docs/user_attention.md --text … --due <today> --no-commit`
+(never typed, design §4.4 *A session writes the ledger and the board only through the helpers*);
 branch → PR → merge per `/cadence`. Never write the same problem twice. Something that needs a
 person but is not a board item yet: `ao msg person "…"`.
 

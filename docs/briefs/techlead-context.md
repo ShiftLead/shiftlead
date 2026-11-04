@@ -25,7 +25,8 @@ its index. **A change in behaviour is a change to the design first**, and **a co
 in §4.5a's table does not exist**. What a word means is `docs/glossary.md`. What is open or
 half-built is the ledger, `docs/ledger/` (each `TD-NNN.md` has a
 Status that says what is built and what is not — *designed* is not *built*). What waits on the
-person is `docs/user_attention.md`.
+person is `docs/user_attention.md`. Both are written only through the helpers, `ledger.py` and
+`board_edit.py` (design §4.4 *A session writes the ledger and the board only through the helpers*).
 
 ## 2. The parts
 
