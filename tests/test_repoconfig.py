@@ -394,7 +394,9 @@ def test_entry_rules_are_written_once_and_read_both_ways():
     # the priority is the pick's (TD-851): written, and no longer among what the person is asked
     assert "`**Priority:** high`" in filled and "Never ask the person a priority" in filled
     assert "do not settle: which of two readings" in filled and "settle: a priority" not in filled
-    assert "`**Type:** feature`" in filled and "open PR" in filled and "Summary row" in filled
+    assert "`**Type:** feature`" in filled and "open PR" in filled and "Summary row" not in filled
+    # a split ledger has no summary table; the typed entry is closed by the helper (§4.4, TD-1357)
+    assert "ledger.py fmt TD-n" in filled
     assert not any(slot in filled for slot in repoconfig.ENTRY_SLOTS)
     # the Team rule (§4.4 *An entry names its team*, TD-763): who writes it, and a `tag` fill's one PR
     assert "`**Team:** <team>`" in filled and "two or more teams" in filled
