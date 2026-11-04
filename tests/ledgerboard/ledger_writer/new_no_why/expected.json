@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "new",
+  "unusable": "--why is required: the Why is the point of an entry"
+ }
+}

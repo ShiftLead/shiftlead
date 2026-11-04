@@ -1,0 +1,424 @@
+{
+ "repo": "acme/widgets",
+ "today": "2026-01-15",
+ "verdict": [
+  {
+   "name": "a lift, closed in the same write",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a Decided one day ahead of both UTC dates",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a Decided two days ahead",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a Log date two days after the PR opened",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-17"
+  },
+  {
+   "name": "a Decided one day behind the PR's opening",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a Decided two days behind the PR's opening",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a board with CRLF line endings",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a CRLF board whose answered line drops its CR",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a lift not yet merged",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": null
+  },
+  {
+   "name": "a lift with another file changed",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/ledger/TD-150.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a ledger change that is not decide_lift's",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a base board with no People",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a subject that is not a decide",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: reply Warm the cache nightly? (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "two commits",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 2,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a waiting-only answer, closed kept waiting",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Not yet (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a work order, left open and decided",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: One more round (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a work order closed under the carve-out",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: One more round (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a finished lift left open",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "one go for a parent's parts",
+   "files": [
+    "docs/ledger/TD-111.md",
+    "docs/ledger/TD-112.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Go on the parts?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a lifting answer that logs nothing",
+   "files": [
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Go on the late one?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "another repo's entry, on the board alone",
+   "files": [
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Go on the other repo's entry?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "another repo's entry, with a ledger file",
+   "files": [
+    "docs/ledger/TD-150.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Go on the other repo's entry?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a re-answer",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a Decided that names no answerer",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "an event item answered by anyone listed",
+   "files": [
+    "docs/ledger/TD-140.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Still waiting on event (vendor-ships) for TD-140?: Drop the gate (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a teammate's answer on an owner board",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  },
+  {
+   "name": "a teammate's answer on an any board",
+   "files": [
+    "docs/ledger/TD-100.md",
+    "docs/user_attention.md"
+   ],
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)",
+   "commits": 1,
+   "created_at": "2026-01-15",
+   "merged_at": "2026-01-15"
+  }
+ ],
+ "tripwire": [
+  {
+   "name": "a decide lift",
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)"
+  },
+  {
+   "name": "set by= with the board's Decided",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "no board item, but the base had one (read the head alone and it passes)",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "the item closed with no Decided",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "a gate removed by hand",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "a gate removed by hand, in the migrate commit",
+   "subject": "ledger: migrate v2.4 (9 entries)"
+  },
+  {
+   "name": "a reassign",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "an override",
+   "subject": "ledger: set TD-130 (session w-1)"
+  },
+  {
+   "name": "an entry the diff archives",
+   "delete": [
+    "docs/ledger/TD-150.md"
+   ],
+   "subject": "ledger: archive TD-150 (session w-1)"
+  },
+  {
+   "name": "no board item, and none at base or head",
+   "subject": "ledger: set TD-130 (session w-1)"
+  },
+  {
+   "name": "an answer on another repo's board",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "an answer said to be on this repo's own board",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "set by= on one part of a shared item, left open",
+   "subject": "ledger: set TD-111 (session w-1)"
+  },
+  {
+   "name": "a shared item said to be left open, with nothing shared",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "the last part of a shared item lifted, the item newly closed",
+   "subject": "ledger: set TD-112 (session w-1)"
+  },
+  {
+   "name": "a lift by someone other than the gate's person, owner board",
+   "subject": "ledger: set TD-150 (session w-1)"
+  },
+  {
+   "name": "a teammate's lift on an any board",
+   "subject": "board: decide Warm the cache nightly?: Go (session w-1)"
+  },
+  {
+   "name": "no board item, on a board with no People",
+   "subject": "ledger: set TD-150 (session w-1)"
+  }
+ ],
+ "uncovered": [
+  {
+   "name": "a new decision, its item filed with it",
+   "boards": []
+  },
+  {
+   "name": "a new decision with no item",
+   "boards": []
+  },
+  {
+   "name": "a new decision covered on another repo's board",
+   "boards": [
+    {
+     "url": "git@example.com:acme/kim.git",
+     "basename": "kim",
+     "board": "kim.md",
+     "archive": null
+    }
+   ]
+  },
+  {
+   "name": "a new decision no board read covers",
+   "boards": [
+    {
+     "url": "git@example.com:acme/kim.git",
+     "basename": "kim",
+     "board": "empty.md",
+     "archive": null
+    }
+   ]
+  },
+  {
+   "name": "a new decision item with no lifting answer",
+   "boards": []
+  },
+  {
+   "name": "a new decision item whose Lifts name its answers",
+   "boards": []
+  },
+  {
+   "name": "a gate already at base",
+   "boards": []
+  }
+ ]
+}

@@ -25,7 +25,7 @@ import re
 import subprocess
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -105,11 +105,8 @@ def until_of(blocked_raw: str | None) -> str:
     """The words after a `decision (<who>)` item's dash, as written — what the Queue card's row reads as
     *held until <them>* (design §4.5 screen 12, §4.5a *Queue card: what needs the person*, TD-795);
     '' when the line has no decision, nothing after it, or a list going on past it."""
-    d = lb.DECISION_RE.search(blocked_raw or "")
-    if d is None:
-        return ""
-    rest = (blocked_raw or "")[d.end() :].strip()
-    return "" if rest.startswith(",") else rest.lstrip("—–-").strip()
+    old = lb.parse_gates(blocked_raw)["old_form"]  # v2.4: the old form's text, read only as the last item
+    return old[1].lstrip("—–-").strip() if old else ""
 
 
 def answers_of(value: str) -> tuple[list[str], list[str], int | None]:
@@ -522,7 +519,11 @@ def entries(
     parts: dict[str, list[str]] = {}
     held: set[str] = set()
     ranked: dict[str, dict[str, Any]] = {}
-    for n, r in enumerate(lb.pickable(t, archive or "", resolve, rank_text=rank_text, repo=repo)["entries"]):
+    for n, r in enumerate(
+        lb.pickable(t, archive or "", resolve, rank_text=rank_text, repo=repo, today=datetime.now(UTC).date())[
+            "entries"
+        ]
+    ):
         got = derived.setdefault(r["id"], [])
         got += [b for b in r["blocked_by"] if b not in got]
         got = parts.setdefault(r["id"], [])

@@ -1,0 +1,726 @@
+{
+ "blocked": [
+  "TD-501",
+  "TD-502",
+  "TD-506",
+  "TD-507",
+  "TD-509",
+  "TD-510",
+  "TD-521",
+  "TD-525",
+  "TD-528"
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-501",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-501: Blocked by TD-511, entry archived with a Status word this reader does not know (Xyzzy) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-502",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-502: Blocked by TD-512, entry archived with a Status word this reader does not know (Steps) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-503",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-503: every blocker is archived (TD-513) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-504",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-504: every blocker is archived (TD-514) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-505",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-505: every blocker is archived (TD-515) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-506",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-506: Blocked by TD-516, superseded (TD-516 → TD-517), whose chain ends in an entry whose Status word this reader does not know — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-507",
+   "kind": "cross-unknown-status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-507: Blocked by acme/tools#TD-41, another repo's entry archived with a Status word this reader does not know (Xyzzy) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-508",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-508: every blocker is archived (acme/tools#TD-42) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-509",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-509: Blocked by TD-519, entry archived with a Status word this reader does not know (Resolved)) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-510",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-510: Blocked by TD-520, entry archived with a Status word this reader does not know (Resolved**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-521",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-521: Blocked by TD-522, entry archived with a Status word this reader does not know (**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-523",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-523: every blocker is archived (TD-524) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-525",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-525: Blocked by TD-526, superseded (TD-526 → acme/tools#TD-43), whose chain ends in an entry whose Status word this reader does not know — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-527",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-527: every blocker is archived (acme/tools#TD-44) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-528",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-528: Blocked by TD-529, entry archived with a Status word this reader does not know (**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-530",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-530: every blocker is archived (TD-531) — pickable; the Blocked by field can go"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-501",
+   "kind": "blocker-unknown-status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-501: Blocked by TD-511, entry archived with a Status word this reader does not know (Xyzzy) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-502",
+   "kind": "blocker-unknown-status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-502: Blocked by TD-512, entry archived with a Status word this reader does not know (Steps) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-503",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-503: every blocker is archived (TD-513) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-504",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-504: every blocker is archived (TD-514) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-505",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-505: every blocker is archived (TD-515) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-506",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-506: Blocked by TD-516, superseded (TD-516 → TD-517), whose chain ends in an entry whose Status word this reader does not know — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-507",
+   "kind": "cross-unknown-status",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-507: Blocked by acme/tools#TD-41, another repo's entry archived with a Status word this reader does not know (Xyzzy) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-508",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-508: every blocker is archived (acme/tools#TD-42) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-509",
+   "kind": "blocker-unknown-status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-509: Blocked by TD-519, entry archived with a Status word this reader does not know (Resolved)) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-510",
+   "kind": "blocker-unknown-status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-510: Blocked by TD-520, entry archived with a Status word this reader does not know (Resolved**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-521",
+   "kind": "blocker-unknown-status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-521: Blocked by TD-522, entry archived with a Status word this reader does not know (**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-523",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-523: every blocker is archived (TD-524) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-525",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-525: Blocked by TD-526, superseded (TD-526 → acme/tools#TD-43), whose chain ends in an entry whose Status word this reader does not know — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-527",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-527: every blocker is archived (acme/tools#TD-44) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-528",
+   "kind": "blocker-unknown-status",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-528: Blocked by TD-529, entry archived with a Status word this reader does not know (**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-530",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-530: every blocker is archived (TD-531) — pickable; the Blocked by field can go"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [
+    "TD-511"
+   ],
+   "card_key": "2|0|000501",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-511",
+    "priority": "Medium"
+   },
+   "id": "TD-501",
+   "key": "2|0|000501",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an entry archived with an unknown word",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-512"
+   ],
+   "card_key": "2|0|000502",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-512",
+    "priority": "Medium"
+   },
+   "id": "TD-502",
+   "key": "2|0|000502",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an entry whose archived Status opens with prose",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000503",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-513",
+    "priority": "Medium"
+   },
+   "id": "TD-503",
+   "key": "2|0|000503",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by an entry archived with a retired word in capitals",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000504",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-514",
+    "priority": "Medium"
+   },
+   "id": "TD-504",
+   "key": "2|0|000504",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by an entry archived with no Status",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000505",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-515",
+    "priority": "Medium"
+   },
+   "id": "TD-505",
+   "key": "2|0|000505",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by an entry archived with a bold-led known word",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-516"
+   ],
+   "card_key": "2|0|000506",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-516",
+    "priority": "Medium"
+   },
+   "id": "TD-506",
+   "key": "2|0|000506",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by a chain that ends in an unknown word",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "acme/tools#TD-41"
+   ],
+   "card_key": "2|0|000507",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-41",
+     "state": "archived",
+     "status": "Xyzzy 2026-01-05",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-41",
+    "priority": "Medium"
+   },
+   "id": "TD-507",
+   "key": "2|0|000507",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by another repo's entry archived with an unknown word",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000508",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-42",
+     "state": "archived",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-42",
+    "priority": "Medium"
+   },
+   "id": "TD-508",
+   "key": "2|0|000508",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by another repo's archived entry, from a resolver that gives no Status",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-519"
+   ],
+   "card_key": "2|0|000509",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-519",
+    "priority": "Medium"
+   },
+   "id": "TD-509",
+   "key": "2|0|000509",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an entry whose word keeps its parenthesis",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-520"
+   ],
+   "card_key": "2|0|000510",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-520",
+    "priority": "Medium"
+   },
+   "id": "TD-510",
+   "key": "2|0|000510",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an entry whose word keeps its bold after a period",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-522"
+   ],
+   "card_key": "2|0|000521",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-522",
+    "priority": "Medium"
+   },
+   "id": "TD-521",
+   "key": "2|0|000521",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an entry whose first run strips to nothing",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000523",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-524",
+    "priority": "Medium"
+   },
+   "id": "TD-523",
+   "key": "2|0|000523",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by an entry archived Open",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-526"
+   ],
+   "card_key": "2|0|000525",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-526",
+    "priority": "Medium"
+   },
+   "id": "TD-525",
+   "key": "2|0|000525",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by a chain that ends in another repo's unknown word",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000527",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-44",
+     "state": "archived",
+     "status": "",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-44",
+    "priority": "Medium"
+   },
+   "id": "TD-527",
+   "key": "2|0|000527",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by another repo's entry whose Status the resolver gives empty",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-529"
+   ],
+   "card_key": "2|0|000528",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-529",
+    "priority": "Medium"
+   },
+   "id": "TD-528",
+   "key": "2|0|000528",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an entry whose first run is bold alone",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000530",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-531",
+    "priority": "Medium"
+   },
+   "id": "TD-530",
+   "key": "2|0|000530",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by an entry archived with no first run",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-501",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "text": "ℹ TD-501: Blocked by TD-511, entry archived with a Status word this reader does not know (Xyzzy) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-502",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "text": "ℹ TD-502: Blocked by TD-512, entry archived with a Status word this reader does not know (Steps) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-503",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-503: every blocker is archived (TD-513) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-504",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-504: every blocker is archived (TD-514) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-505",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-505: every blocker is archived (TD-515) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-506",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-506: Blocked by TD-516, superseded (TD-516 → TD-517), whose chain ends in an entry whose Status word this reader does not know — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-507",
+   "kind": "cross-unknown-status",
+   "level": "info",
+   "text": "ℹ TD-507: Blocked by acme/tools#TD-41, another repo's entry archived with a Status word this reader does not know (Xyzzy) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-508",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-508: every blocker is archived (acme/tools#TD-42) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-509",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "text": "ℹ TD-509: Blocked by TD-519, entry archived with a Status word this reader does not know (Resolved)) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-510",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "text": "ℹ TD-510: Blocked by TD-520, entry archived with a Status word this reader does not know (Resolved**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-521",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "text": "ℹ TD-521: Blocked by TD-522, entry archived with a Status word this reader does not know (**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-523",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-523: every blocker is archived (TD-524) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-525",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-525: Blocked by TD-526, superseded (TD-526 → acme/tools#TD-43), whose chain ends in an entry whose Status word this reader does not know — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-527",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-527: every blocker is archived (acme/tools#TD-44) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-528",
+   "kind": "blocker-unknown-status",
+   "level": "info",
+   "text": "ℹ TD-528: Blocked by TD-529, entry archived with a Status word this reader does not know (**) — decide this entry: drop the blocker if its work is done, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-530",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-530: every blocker is archived (TD-531) — pickable; the Blocked by field can go"
+  }
+ ],
+ "pickable": [
+  "TD-503",
+  "TD-504",
+  "TD-505",
+  "TD-508",
+  "TD-523",
+  "TD-527",
+  "TD-530"
+ ],
+ "rows": []
+}

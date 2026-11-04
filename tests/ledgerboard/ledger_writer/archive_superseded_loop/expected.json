@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "archive",
+  "refused": "TD-002 is Blocked by TD-001 and is its successor: it would block on itself — name another successor, or take the blocker off it first"
+ }
+}

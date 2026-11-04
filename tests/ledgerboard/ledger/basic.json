@@ -8,6 +8,14 @@
  "check": [
   {
    "field": "blocked by",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-002: Blocked by item 'decision (the owner) — the board, 2026-01-03 item' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
    "id": "TD-005",
    "kind": "blockers-archived",
    "level": "info",
@@ -52,7 +60,7 @@
    "kind": "blocked-item",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-NNN or decision (<who>)"
+   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "pickable",
@@ -64,6 +72,14 @@
   }
  ],
  "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-002: Blocked by item 'decision (the owner) — the board, 2026-01-03 item' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+  },
   {
    "field": "blocked by",
    "id": "TD-005",
@@ -110,7 +126,7 @@
    "kind": "blocked-item",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-NNN or decision (<who>)"
+   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "pickable",
@@ -147,6 +163,7 @@
    "id": "TD-002",
    "key": "1|0|000002",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": false,
    "priority": "High",
@@ -175,6 +192,7 @@
    "id": "TD-006",
    "key": "1|0|000006",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": false,
    "priority": "High",
@@ -197,6 +215,7 @@
    "id": "TD-001",
    "key": "2|1|000001",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Medium",
@@ -218,6 +237,7 @@
    "id": "TD-004",
    "key": "2|0|000004",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": false,
    "priority": "Medium",
@@ -243,6 +263,7 @@
    "id": "TD-007",
    "key": "3|0|000007",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": false,
    "priority": "Low",
@@ -262,6 +283,7 @@
    "id": "TD-005",
    "key": "2|0|000005",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Medium",
@@ -280,6 +302,7 @@
    "id": "TD-003",
    "key": "3|0|000003",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Low",
@@ -288,6 +311,13 @@
   }
  ],
  "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-002",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-002: Blocked by item 'decision (the owner) — the board, 2026-01-03 item' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+  },
   {
    "field": "blocked by",
    "id": "TD-005",
@@ -321,7 +351,7 @@
    "id": "TD-007",
    "kind": "blocked-item",
    "level": "error",
-   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-NNN or decision (<who>)"
+   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
   },
   {
    "field": "pickable",

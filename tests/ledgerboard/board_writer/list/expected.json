@@ -19,6 +19,7 @@
     "kind": "act",
     "lifts": null,
     "line": 7,
+    "notes": [],
     "overdue_days": null,
     "parts": [],
     "refs": [
@@ -55,6 +56,7 @@
     "kind": "decide",
     "lifts": null,
     "line": 8,
+    "notes": [],
     "overdue_days": null,
     "parts": [],
     "refs": [

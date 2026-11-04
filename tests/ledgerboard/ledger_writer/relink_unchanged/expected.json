@@ -1,0 +1,10 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "relink",
+  "paths": [],
+  "subject": null,
+  "warnings": [],
+  "was": "docs/technical_debt.md"
+ }
+}

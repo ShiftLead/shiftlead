@@ -221,6 +221,7 @@
    "id": "TD-031",
    "key": "1|0|000031",
    "part_of": "TD-030",
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "High",
@@ -242,6 +243,7 @@
    "id": "TD-032",
    "key": "3|0|000032",
    "part_of": "TD-030",
+   "parts_gates": {},
    "parts_open": [],
    "pickable": false,
    "priority": "Low",
@@ -260,6 +262,7 @@
    "id": "TD-052",
    "key": "3|0|000052",
    "part_of": "TD-030",
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Low",
@@ -278,6 +281,7 @@
    "id": "TD-030",
    "key": "2|1|000030",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [
     "TD-031",
     "TD-032",
@@ -299,6 +303,7 @@
    "id": "TD-034",
    "key": "2|0|000034",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Medium",
@@ -317,6 +322,7 @@
    "id": "TD-036",
    "key": "2|0|000036",
    "part_of": "TD-037",
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Medium",
@@ -334,6 +340,7 @@
    "id": "TD-043",
    "key": "2|0|000043",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [
     "TD-044"
    ],
@@ -357,6 +364,7 @@
    "id": "TD-044",
    "key": "2|0|000044",
    "part_of": "TD-043",
+   "parts_gates": {},
    "parts_open": [],
    "pickable": false,
    "priority": "Medium",
@@ -374,6 +382,7 @@
    "id": "TD-045",
    "key": "2|0|000045",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [
     "TD-046"
    ],
@@ -397,6 +406,7 @@
    "id": "TD-047",
    "key": "2|0|000047",
    "part_of": "TD-046",
+   "parts_gates": {},
    "parts_open": [],
    "pickable": false,
    "priority": "Medium",
@@ -415,6 +425,7 @@
    "id": "TD-046",
    "key": "2|0|000046",
    "part_of": "TD-045",
+   "parts_gates": {},
    "parts_open": [
     "TD-047"
    ],
@@ -435,6 +446,7 @@
    "id": "TD-050",
    "key": "2|0|000050",
    "part_of": "TD-049",
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Medium",
@@ -453,6 +465,7 @@
    "id": "TD-049",
    "key": "2|0|000049",
    "part_of": "TD-048",
+   "parts_gates": {},
    "parts_open": [
     "TD-050"
    ],
@@ -476,6 +489,7 @@
    "id": "TD-048",
    "key": "2|0|000048",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [
     "TD-049"
    ],
@@ -496,6 +510,7 @@
    "id": "TD-038",
    "key": "3|0|000038",
    "part_of": "TD-099",
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Low",
@@ -514,6 +529,7 @@
    "id": "TD-039",
    "key": "3|0|000039",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Low",
@@ -532,6 +548,7 @@
    "id": "TD-040",
    "key": "3|0|000040",
    "part_of": null,
+   "parts_gates": {},
    "parts_open": [],
    "pickable": true,
    "priority": "Low",
@@ -550,6 +567,7 @@
    "id": "TD-051",
    "key": "3|0|000051",
    "part_of": "TD-51",
+   "parts_gates": {},
    "parts_open": [
     "TD-051"
    ],

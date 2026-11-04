@@ -2,6 +2,7 @@
  "exit": 0,
  "out": {
   "action": "due",
+  "item_notes": [],
   "line": 7,
   "paths": [
    "board.md"

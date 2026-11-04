@@ -1,0 +1,19 @@
+{
+ "argv": [
+  "archive",
+  "TD-1",
+  "--why",
+  "the last comment is kept",
+  "--pr",
+  "12",
+  "--pointer",
+  "`src/parse.py`",
+  "--also",
+  "notes.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

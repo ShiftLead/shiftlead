@@ -1,0 +1,388 @@
+{
+ "answered_by": [
+  {
+   "problems": [],
+   "value": null
+  },
+  {
+   "problems": [],
+   "value": "any"
+  },
+  {
+   "problems": [],
+   "value": "Owner"
+  },
+  {
+   "problems": [
+    [
+     4,
+     "answered by: `Answered by:` is owner or any, not 'everyone'"
+    ],
+    [
+     5,
+     "answered by: a second `Answered by:` line — the first is read"
+    ]
+   ],
+   "value": "everyone"
+  },
+  {
+   "problems": [],
+   "value": null
+  }
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-570",
+   "kind": "gate-reassigned-often",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-570: decision (lee) was reassigned 3 times — is the decision stuck?"
+  }
+ ],
+ "close": {
+  "kept_waiting": {
+   "ok": "- [x] decide 2026-01-06 (session `w-1`) — **Go on the parts?** Context: TD-500 decision (pat). Parts: TD-501, TD-502. Due: 2026-01-20. Answers: Go (default) | Not yet | One more round. Decided: Not yet (by pat) (2026-01-15). Closed: 2026-01-15 — kept waiting."
+  },
+  "lifted": {
+   "ok": "- [x] decide 2026-01-06 (session `w-1`) — **Go on the parts?** Context: TD-500 decision (pat). Parts: TD-501, TD-502. Due: 2026-01-20. Answers: Go (default) | Not yet | One more round. Decided: Go (by pat) (2026-01-15). Closed: 2026-01-15 — lifted."
+  },
+  "no_gate_refused": {
+   "refused": "only an item whose Context names a gate is closed by its answer"
+  },
+  "not_a_decide_refused": {
+   "refused": "only a decide closes the item it answers (close)"
+  },
+  "second_label": {
+   "ok": "- [x] decide 2026-01-06 (session `w-1`) — Which store? Context: TD-521 decision (Pat). Due: 2026-01-20. Answers: Files | Db | Not yet. Lifts: Files | Db. Decided: Db (by pat) (2026-01-15). Closed: 2026-01-15 — lifted."
+  },
+  "work_order_refused": {
+   "refused": "'One more round' neither lifts nor only keeps waiting — a work order stays open"
+  }
+ },
+ "closed_items": [
+  [
+   {
+    "answers": [
+     "Files",
+     "Db",
+     "Not yet"
+    ],
+    "decided": [
+     "Db",
+     "2026-01-14"
+    ],
+    "decided_by": "pat",
+    "detail": [
+     "- Context: the store."
+    ],
+    "kind": "decide",
+    "lifts": [
+     "Files",
+     "Db"
+    ],
+    "line": 8,
+    "parts": [
+     "TD-522"
+    ],
+    "text": "decide 2026-01-06 (session `w-1`) — Which store? Context: TD-521 decision (pat). Parts: TD-522. Due: 2026-01-20. Answers: Files | Db | Not yet. Lifts: Files | Db. Decided: Db (by pat) (2026-01-14)."
+   },
+   {
+    "answers": [],
+    "decided": null,
+    "decided_by": null,
+    "detail": [],
+    "kind": "act",
+    "lifts": null,
+    "line": 10,
+    "parts": [],
+    "text": "act 2026-01-02 (session `w-2`) — Done thing. Context: TD-2. Due: 2026-01-09."
+   },
+   {
+    "answers": [
+     "Drop the gate",
+     "Keep waiting"
+    ],
+    "decided": [
+     "Keep waiting",
+     "2026-01-04"
+    ],
+    "decided_by": "sam",
+    "detail": [],
+    "kind": "decide",
+    "lifts": [
+     "Drop the gate"
+    ],
+    "line": 11,
+    "parts": [],
+    "text": "decide 2026-01-03 (n/a) — Still waiting? Context: TD-530 event (vendor-ships). Due: 2026-01-09. Answers: Drop the gate | Keep waiting. Lifts: Drop the gate. Decided: Keep waiting (by sam) (2026-01-04)."
+   }
+  ]
+ ],
+ "closes": [
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true,
+  false,
+  true
+ ],
+ "decide_lift": {
+  "answered_by_any": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by sam; answer \"Go\"\n- 2026-01-15: gate lift skipped: TD-502 no longer carries decision (Pat)\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by sam; answer \"Go\"\n"
+   }
+  },
+  "answerer_off_people_refused": {
+   "refused": "lee is not on the board's People: (pat) — only a listed person answers"
+  },
+  "archived_entry_refused": {
+   "refused": "TD-550, the item's Context entry, is archived — the answer lifts nothing; it takes review"
+  },
+  "bad_answered_by_refused": {
+   "refused": "Answered by is owner or any, not 'everyone'"
+  },
+  "cross_repo_refused": {
+   "refused": "acme/app#TD-12 is another repo's entry — its lift is a tool PR there, through lift_gate"
+  },
+  "event_answerer_off_people_refused": {
+   "refused": "lee is not on the board's People: (pat, sam) — only a listed person answers"
+  },
+  "event_drop_the_gate": {
+   "ok": {
+    "TD-530": "## TD-530: Waits on a vendor's merged PR\n\n**Priority:** Medium\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n\n**Why:** the vendor's fix must land first.\n\n**Event (vendor-ships):** the vendor merges its fix.\ncheck: pr-merged acme/tools#42\n\n**Log:**\n- 2026-01-05: gate added: event (vendor-ships)\n- 2026-01-15: gate lifted: event (vendor-ships) — by sam; answer \"Drop the gate\"\n"
+   }
+  },
+  "event_keep_waiting": {
+   "ok": {
+    "TD-530": "## TD-530: Waits on a vendor's merged PR\n\n**Priority:** Medium\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n**Blocked by:** event (vendor-ships)\n\n**Why:** the vendor's fix must land first.\n\n**Event (vendor-ships):** the vendor merges its fix.\ncheck: pr-merged acme/tools#42\n\n**Log:**\n- 2026-01-05: gate added: event (vendor-ships)\n- 2026-01-15: kept waiting: event (vendor-ships) — by sam; answer \"Keep waiting\"\n"
+   }
+  },
+  "event_work_order_writes_nothing": {
+   "ok": {}
+  },
+  "gate_person_off_people_refused": {
+   "refused": "the gate's person pat is not on the board's People: (sam)"
+  },
+  "kept_waiting": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Pat)\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: kept waiting: decision (Pat) — by pat; answer \"Not yet\"\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9, decision (pat)\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: kept waiting: decision (pat) — by pat; answer \"Not yet\"\n"
+   }
+  },
+  "lift_parent_go": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"\n- 2026-01-15: gate lift skipped: TD-502 no longer carries decision (Pat)\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Go\"\n"
+   }
+  },
+  "mismatched_snapshot_refused": {
+   "refused": "TD-503, a part the item lists, is not Part of TD-500 — the snapshot does not match"
+  },
+  "missing_part_refused": {
+   "refused": "TD-599, a part the item lists, is not among the entries given"
+  },
+  "no_people_line": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"\n- 2026-01-15: gate lift skipped: TD-502 no longer carries decision (Pat)\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Go\"\n"
+   }
+  },
+  "no_people_line_wrong_person_refused": {
+   "refused": "only pat answers for decision (pat) on a board whose Answered by is owner, not sam"
+  },
+  "not_a_decide_refused": {
+   "refused": "decide_lift takes one open decide item line"
+  },
+  "not_the_owner_refused": {
+   "refused": "only pat answers for decision (pat) on a board whose Answered by is owner, not sam"
+  },
+  "parent_without_the_gate": {
+   "ok": {
+    "TD-521": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"\n"
+   }
+  },
+  "two_lifts_second_label": {
+   "ok": {
+    "TD-521": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by PAT; answer \"db\"\n"
+   }
+  },
+  "two_lifts_waiting": {
+   "ok": {
+    "TD-521": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Blocked by:** decision (Pat)\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: kept waiting: decision (Pat) — by pat; answer \"Not yet\"\n"
+   }
+  },
+  "work_order_keeps_waiting": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Pat)\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: kept waiting: decision (Pat) — by pat; answer \"One more round\"\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9, decision (pat)\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: kept waiting: decision (pat) — by pat; answer \"One more round\"\n"
+   }
+  }
+ },
+ "item_lines": [
+  {
+   "refused": "'Not yet' only keeps the gate waiting — it never lifts (v2.4)"
+  }
+ ],
+ "item_problems": {
+  "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Keep waiting. Lifts: Go | Keep waiting.": "lifts: Keep waiting only keeps the gate waiting — it never lifts"
+ },
+ "lift_gate": {
+  "archived_refused": {
+   "refused": "TD-550 is archived — a gate is lifted only on an open entry"
+  },
+  "decision_answer": {
+   "ok": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Go\"\n"
+  },
+  "decision_any_board": {
+   "ok": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by sam; answer \"Go\"\n"
+  },
+  "decision_any_board_off_people_refused": {
+   "refused": "lee is not on the board's People: (pat, sam) — only a listed person answers"
+  },
+  "decision_bad_suffix_refused": {
+   "refused": "a suffix is board <repo>, no board item or shared board item left open, not 'somewhere else'"
+  },
+  "decision_board_elsewhere": {
+   "ok": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"; board acme/app\n"
+  },
+  "decision_evidence_refused": {
+   "refused": "lifting decision (pat) takes no evidence"
+  },
+  "decision_header_spelling": {
+   "ok": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"\n"
+  },
+  "decision_no_answer_refused": {
+   "refused": "the answer needs its words"
+  },
+  "decision_no_board_item": {
+   "ok": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"; no board item\n"
+  },
+  "decision_not_the_person_refused": {
+   "refused": "only pat lifts decision (pat), not sam (the set route's, or a board without Answered by: any)"
+  },
+  "decision_quoted_label": {
+   "ok": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go, \"as is\"\"\n"
+  },
+  "decision_second_label": {
+   "ok": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by PAT; answer \"db\"\n"
+  },
+  "decision_second_label_extra_suffix": {
+   "ok": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by PAT; answer \"db\"; no board item\n"
+  },
+  "decision_shared_item": {
+   "ok": "## TD-521: Its one part, waiting only on the go\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-04\n**Status:** Open\n**Part of:** TD-520\n\n**Why:** the only part.\n\n**Ask:** say go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"; shared board item left open\n"
+  },
+  "decision_waiting_only_refused": {
+   "refused": "'Keep waiting' only keeps the gate waiting — it never lifts"
+  },
+  "event_bad_answered_by_refused": {
+   "refused": "Answered by is owner or any, not 'bogus'"
+  },
+  "event_host_file": {
+   "ok": "## TD-531: Waits on a line in another repo's file\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n**Blocked by:** TD-9, until 2026-03-01\n\n**Why:** the pin must move first.\n\n**Event (pin-bumped):** the consumer pins the new release.\ncheck: file-contains acme/app docs/pin.toml \"version = 2.4\"\n\n**Log:**\n- 2026-01-15: gate lifted: event (pin-bumped) — by box-1; file-contains passed; Acme/App@0123abc\n"
+  },
+  "event_host_other_pr_refused": {
+   "refused": "a pr-merged check's evidence is <repo>#<n>, the merged PR of its own check, not 'acme/tools#43'"
+  },
+  "event_host_other_repo_refused": {
+   "refused": "a file-contains check's evidence is <repo>@<sha>, where it was read of its own check, not 'acme/other@0123abc'"
+  },
+  "event_host_pr": {
+   "ok": "## TD-530: Waits on a vendor's merged PR\n\n**Priority:** Medium\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n\n**Why:** the vendor's fix must land first.\n\n**Event (vendor-ships):** the vendor merges its fix.\ncheck: pr-merged acme/tools#42\n\n**Log:**\n- 2026-01-05: gate added: event (vendor-ships)\n- 2026-01-15: gate lifted: event (vendor-ships) — by box-1; pr-merged passed; acme/tools#42\n"
+  },
+  "event_host_sha_for_a_pr_refused": {
+   "refused": "a pr-merged check's evidence is <repo>#<n>, the merged PR of its own check, not 'acme/tools@0123abc'"
+  },
+  "event_person": {
+   "ok": "## TD-530: Waits on a vendor's merged PR\n\n**Priority:** Medium\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n\n**Why:** the vendor's fix must land first.\n\n**Event (vendor-ships):** the vendor merges its fix.\ncheck: pr-merged acme/tools#42\n\n**Log:**\n- 2026-01-05: gate added: event (vendor-ships)\n- 2026-01-15: gate lifted: event (vendor-ships) — by sam; answer \"Drop the gate\"\n"
+  },
+  "event_person_no_people_refused": {
+   "refused": "lifting event (vendor-ships) by a person's answer needs the board's People:, who may answer it"
+  },
+  "event_person_off_people_refused": {
+   "refused": "lee is not on the board's People: (pat, sam) — only a listed person answers"
+  },
+  "event_suffix_refused": {
+   "refused": "lifting event (vendor-ships) takes no suffix"
+  },
+  "not_a_gate_refused": {
+   "refused": "a gate is decision (<person>), until YYYY-MM-DD or event (<name>), one of them, not 'hold'"
+  },
+  "not_carried_refused": {
+   "refused": "TD-502 does not carry decision (pat)"
+  },
+  "old_form_refused": {
+   "refused": "the entry's Blocked by holds decision (pat) in the old form — migrate it first: set decision (<person>) alone, with its text in an **Ask:** section"
+  },
+  "override": {
+   "ok": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by sam; override: pat is away for a month\n"
+  },
+  "override_of_an_event_refused": {
+   "refused": "an override lifts a decision, not event (vendor-ships)"
+  },
+  "override_with_answer_refused": {
+   "refused": "lifting decision (pat) takes no answer"
+  },
+  "override_without_why_refused": {
+   "refused": "the override's why needs its words"
+  },
+  "until_ahead_refused": {
+   "refused": "until 2026-02-01 is not reached on 2026-01-15"
+  },
+  "until_reached": {
+   "ok": "## TD-540: Not before a date\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-01\n**Status:** Open\n\n**Why:** waits for the quiet week.\n\n**Log:**\n- 2026-01-15: gate lifted: until 2026-01-10 — by box-1; date reached\n"
+  },
+  "until_reached_today": {
+   "ok": "## TD-540: Not before a date\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-01\n**Status:** Open\n\n**Why:** waits for the quiet week.\n\n**Log:**\n- 2026-01-10: gate lifted: until 2026-01-10 — by box-1; date reached\n"
+  },
+  "until_with_answer_refused": {
+   "refused": "lifting until 2026-01-10 takes no answer"
+  }
+ },
+ "reassign": {
+  "already_carried_refused": {
+   "refused": "the entry already waits on decision (Sam) — lift decision (pat) instead"
+  },
+  "no_why_refused": {
+   "refused": "the reassign's why needs its words"
+  },
+  "not_carried_refused": {
+   "refused": "the entry does not carry decision (pat) on an open entry"
+  },
+  "old_form_refused": {
+   "refused": "the entry's Blocked by holds decision (pat) in the old form — migrate it first: set decision (<person>) alone, with its text in an **Ask:** section"
+  },
+  "reassign": {
+   "ok": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (sam)\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate reassigned: decision (Pat) → decision (sam) — by pat; pat is away this month\n"
+  },
+  "same_person_refused": {
+   "refused": "a reassign names another person: decision (pat) is already PAT's"
+  }
+ },
+ "reassigns": [
+  3,
+  2,
+  0,
+  0
+ ],
+ "same_text": [
+  true,
+  true,
+  true,
+  false
+ ],
+ "waiting_only": {
+  "Go": false,
+  "Keep waiting": true,
+  "NOT  YET": true,
+  "Not now": false,
+  "Not yet.": true,
+  "keep waiting please": false,
+  "not yet": true
+ }
+}

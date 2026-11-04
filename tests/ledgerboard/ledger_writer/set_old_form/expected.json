@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "set",
+  "refused": "the Blocked by holds decision (Robin) in the old form, which set cannot lift or drop — migrate it first (decision (Robin) with its text in **Ask:**), then lift it"
+ }
+}

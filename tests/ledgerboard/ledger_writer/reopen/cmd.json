@@ -1,0 +1,15 @@
+{
+ "argv": [
+  "reopen",
+  "TD-5",
+  "--why",
+  "the header is wrong again",
+  "--also",
+  "notes.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

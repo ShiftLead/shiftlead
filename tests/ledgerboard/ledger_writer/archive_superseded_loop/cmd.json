@@ -1,0 +1,15 @@
+{
+ "argv": [
+  "archive",
+  "TD-1",
+  "--why",
+  "it covers itself",
+  "--superseded-by",
+  "TD-2",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

@@ -1,0 +1,8 @@
+{
+ "argv": [
+  "split",
+  "--to",
+  "notes.md/ledger",
+  "--json"
+ ]
+}

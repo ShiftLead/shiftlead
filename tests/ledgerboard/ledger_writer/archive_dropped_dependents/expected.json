@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "archive",
+  "refused": "TD-001 cannot be dropped while TD-002 is Blocked by it — decide each first: drop the blocker, or block it on what replaces TD-001"
+ }
+}

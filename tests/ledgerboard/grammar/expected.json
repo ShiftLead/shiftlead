@@ -1,4 +1,444 @@
 {
+ "blocked-by": {
+  "blocked-by": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "TD-1; TD-2"
+    ]
+   }
+  ],
+  "blocked-item": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "soon"
+    ]
+   }
+  ],
+  "date": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "until 2026-1-20"
+    ]
+   }
+  ],
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "TD-x"
+    ]
+   }
+  ],
+  "entry-id": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "td-12"
+    ]
+   }
+  ],
+  "event-name": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "event (Big)"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "event (a_b)"
+    ]
+   }
+  ],
+  "gate": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "hold"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "decision (pat) — after the review"
+    ]
+   }
+  ],
+  "person": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "decision (sam..lee)"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "decision (sam lee)"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "decision (.sam)"
+    ]
+   }
+  ],
+  "person-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "decision (a+b)"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "decision ()"
+    ]
+   }
+  ],
+  "repo": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "a//b#TD-3"
+    ]
+   },
+   {
+    "accepted": false,
+    "why": [
+     "https://h/o/r#TD-3"
+    ]
+   }
+  ],
+  "repo-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": [
+     "-x#TD-3"
+    ]
+   }
+  ]
+ },
+ "event-section": {
+  "char": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its words run past the first line — the event in plain words is one line, the check the second"
+   }
+  ],
+  "check": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes"
+   }
+  ],
+  "check-line": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: line names no check — check: <type> <args>, a space after the colon"
+   }
+  ],
+  "commit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the commit '012345' is not 7 to 40 of [0-9a-f]"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the commit 'ABCDEF0' is not 7 to 40 of [0-9a-f]"
+   }
+  ],
+  "digit": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the PR number 'x' is not 1 to 18 of [0-9]"
+   }
+  ],
+  "event-name": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "the event name 'Ships' is not [a-z0-9-]+"
+   }
+  ],
+  "event-section": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "it has no check: line — the last line is check: <type> <args>"
+   }
+  ],
+  "event-words": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its first line says the event in plain words, after the lead"
+   }
+  ],
+  "file-contains": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: nothing may follow the quoted text"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the quoted text is an argument of its own: a space comes before its opening quote"
+   }
+  ],
+  "hex": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the commit 'ABCDEF1' is not 7 to 40 of [0-9a-f]"
+   }
+  ],
+  "path": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: file-contains takes <repo>[@<ref>] <path> \"<text>\""
+   }
+  ],
+  "path-char": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the path 'docs/*.md' holds a glob character, URL syntax (# or %), a quote, a backslash, whitespace, a control, or anything outside ASCII"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the path 'a#b' holds a glob character, URL syntax (# or %), a quote, a backslash, whitespace, a control, or anything outside ASCII"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the path 'a%2e' holds a glob character, URL syntax (# or %), a quote, a backslash, whitespace, a control, or anything outside ASCII"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the path 'café.md' holds a glob character, URL syntax (# or %), a quote, a backslash, whitespace, a control, or anything outside ASCII"
+   }
+  ],
+  "pr-merged": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the PR number '12a' is not 1 to 18 of [0-9]"
+   }
+  ],
+  "quoted": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the quoted text is empty"
+   },
+   {
+    "accepted": false,
+    "why": "its check: nothing may follow the quoted text"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the quoted text holds a control character"
+   }
+  ],
+  "ref": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: an empty ref"
+   }
+  ],
+  "ref-char": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the ref 'a~1' holds a character it may not: one git refuses or revision, URL or query syntax uses (~^:?*[\\#%&=+), whitespace, a control, or anything outside ASCII"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the ref 'a^' holds a character it may not: one git refuses or revision, URL or query syntax uses (~^:?*[\\#%&=+), whitespace, a control, or anything outside ASCII"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the ref 'ma#in' holds a character it may not: one git refuses or revision, URL or query syntax uses (~^:?*[\\#%&=+), whitespace, a control, or anything outside ASCII"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the ref 'mé' holds a character it may not: one git refuses or revision, URL or query syntax uses (~^:?*[\\#%&=+), whitespace, a control, or anything outside ASCII"
+   }
+  ],
+  "ref-includes": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: ref-includes takes <repo>@<ref> <commit>: the ref is required"
+   }
+  ],
+  "repo": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the repo 'https://h/o/r' is not a name or /-separated components of ASCII [A-Za-z0-9_.-] (none . or .., none starting with -)"
+   }
+  ],
+  "repo-part": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the repo '-x' is not a name or /-separated components of ASCII [A-Za-z0-9_.-] (none . or .., none starting with -)"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the repo 'a/..' is not a name or /-separated components of ASCII [A-Za-z0-9_.-] (none . or .., none starting with -)"
+   }
+  ],
+  "text-char": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the quoted text holds a control character"
+   }
+  ]
+ },
  "item-line": {
   "answer": [
    {
@@ -414,6 +854,26 @@
     "why": null
    },
    {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   },
+   {
     "accepted": false,
     "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
    }
@@ -422,6 +882,18 @@
    {
     "accepted": true,
     "why": null
+   },
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
+   },
+   {
+    "accepted": false,
+    "why": "parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `"
    },
    {
     "accepted": false,
@@ -464,48 +936,6 @@
    {
     "accepted": false,
     "why": "text: names a field (Answers:): say it in other words"
-   }
-  ]
- },
- "person": {
-  "person": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": null
-   }
-  ],
-  "person-part": [
-   {
-    "accepted": true,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": null
-   },
-   {
-    "accepted": false,
-    "why": null
    }
   ]
  },

@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "relink",
+  "unusable": "docs/ledger/README.md: a file of the ledger, which the writer reads already — name only files outside it"
+ }
+}

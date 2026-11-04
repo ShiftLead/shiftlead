@@ -23,6 +23,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 7,
+   "notes": [],
    "overdue_days": null,
    "parts": [
     "TD-15",
@@ -66,6 +67,7 @@
     "Db"
    ],
    "line": 8,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -100,6 +102,7 @@
     "Drop the gate"
    ],
    "line": 9,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -138,6 +141,7 @@
    "kind": "act",
    "lifts": null,
    "line": 10,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -170,6 +174,9 @@
    "kind": "fyi",
    "lifts": null,
    "line": 11,
+   "notes": [
+    "hide-spent: Hide until: 2026-01-12 has come, so it hides nothing; a snooze replaces it"
+   ],
    "overdue_days": null,
    "parts": [
     "TD-23"
@@ -207,6 +214,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 12,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -233,6 +241,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 13,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -265,6 +274,7 @@
    "kind": "fyi",
    "lifts": null,
    "line": 14,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -303,6 +313,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 15,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [

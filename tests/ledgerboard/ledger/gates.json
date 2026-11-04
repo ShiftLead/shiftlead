@@ -1,0 +1,922 @@
+{
+ "blocked": [
+  "TD-102",
+  "TD-104",
+  "TD-111",
+  "TD-117",
+  "TD-118",
+  "TD-112",
+  "TD-110",
+  "TD-103",
+  "TD-105",
+  "TD-106",
+  "TD-107",
+  "TD-114",
+  "TD-115"
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-101",
+   "kind": "until-past",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-101: until 2026-01-10 is reached — the gate no longer holds; drop it from Blocked by"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-101",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-101: every blocker is archived (TD-100) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-105",
+   "kind": "gate-repeated",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-105: Blocked by names decision (pat), event (x), until (written 2 times) more than once — at most one decision per person, one until and differently named events"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-105",
+   "kind": "ask-missing",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-105: Blocked by names decision (Pat), decision (pat) and the entry has no **Ask:** — say what the person owes, a go included"
+  },
+  {
+   "field": "taken by",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-106: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*)"
+  },
+  {
+   "field": "waits",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+  },
+  {
+   "field": "status",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-106: the Status word 'Built' is retired — write Open, with Kind live-check (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-106: Blocked by item 'hold' is retired — write decision (<person>), with an **Ask:**; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-107",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-107: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "priority",
+   "id": "TD-108",
+   "kind": "priority",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-108: Priority 'Urgent' is not High, Medium or Low — read after Low; write High, Medium or Low"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-113",
+   "kind": "until-past",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-113: until 2026-01-15 is reached — the gate no longer holds; drop it from Blocked by"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: cannot read Blocked by item 'decision (Kim Lee)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: cannot read Blocked by item 'until 2026-02-30' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: cannot read Blocked by item 'event (Big)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: cannot read Blocked by item 'until soon' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-115",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-115: Blocked by item 'Decision (kim) — waits on the vendor, then TD-101' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "waits",
+   "id": "TD-116",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-116: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-117",
+   "kind": "gate-repeated",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-117: Blocked by names decision (Zed) more than once — at most one decision per person, one until and differently named events"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-118",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-118: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "event",
+   "id": "TD-103",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-103: Blocked by names event (vendor-ships) and the entry has no **Event (vendor-ships):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-105",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-105: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-112",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-112: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-115",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-115: Blocked by names event (y) and the entry has no **Event (y):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-117",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-117: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-101",
+   "kind": "until-past",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-101: until 2026-01-10 is reached — the gate no longer holds; drop it from Blocked by"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-101",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-101: every blocker is archived (TD-100) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-105",
+   "kind": "gate-repeated",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-105: Blocked by names decision (pat), event (x), until (written 2 times) more than once — at most one decision per person, one until and differently named events"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-105",
+   "kind": "ask-missing",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-105: Blocked by names decision (Pat), decision (pat) and the entry has no **Ask:** — say what the person owes, a go included"
+  },
+  {
+   "field": "taken by",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-106: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*)"
+  },
+  {
+   "field": "waits",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+  },
+  {
+   "field": "status",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-106: the Status word 'Built' is retired — write Open, with Kind live-check (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-106: Blocked by item 'hold' is retired — write decision (<person>), with an **Ask:**; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-107",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-107: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "priority",
+   "id": "TD-108",
+   "kind": "priority",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-108: Priority 'Urgent' is not High, Medium or Low — read after Low; write High, Medium or Low"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-113",
+   "kind": "until-past",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-113: until 2026-01-15 is reached — the gate no longer holds; drop it from Blocked by"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: cannot read Blocked by item 'decision (Kim Lee)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: cannot read Blocked by item 'until 2026-02-30' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: cannot read Blocked by item 'event (Big)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-114: cannot read Blocked by item 'until soon' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-115",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-115: Blocked by item 'Decision (kim) — waits on the vendor, then TD-101' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "waits",
+   "id": "TD-116",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-116: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-117",
+   "kind": "gate-repeated",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-117: Blocked by names decision (Zed) more than once — at most one decision per person, one until and differently named events"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-118",
+   "kind": "retired",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-118: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "event",
+   "id": "TD-103",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-103: Blocked by names event (vendor-ships) and the entry has no **Event (vendor-ships):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-105",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-105: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-112",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-112: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-115",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-115: Blocked by names event (y) and the entry has no **Event (y):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-117",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-117: Blocked by names event (x) and the entry has no **Event (x):** section — its words, then check: <type> <args>"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "1|0|000101",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-100, until 2026-01-10",
+    "priority": "High"
+   },
+   "id": "TD-101",
+   "key": "1|0|000101",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "High",
+   "title": "An until that is past, its id archived",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "until 2026-02-01"
+   ],
+   "card_key": "2|0|000102",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "until 2026-02-01",
+    "priority": "Medium"
+   },
+   "id": "TD-102",
+   "key": "2|0|000102",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "An until still ahead",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "decision (pat)"
+   ],
+   "card_key": "2|0|000104",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (pat)",
+    "priority": "Medium"
+   },
+   "id": "TD-104",
+   "key": "2|0|000104",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A decision with its Ask",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "decision (Pat)"
+   ],
+   "card_key": "2|0|000110",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (Pat)",
+    "part of": "TD-110",
+    "priority": "Medium"
+   },
+   "id": "TD-111",
+   "key": "2|0|000111",
+   "part_of": "TD-110",
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A part waiting on a decision",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000110",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "until 2026-01-15",
+    "part of": "TD-110",
+    "priority": "Medium"
+   },
+   "id": "TD-113",
+   "key": "2|0|000113",
+   "part_of": "TD-110",
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "A part whose until is past",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "decision (zed)",
+    "decision (Zed)",
+    "event (x)"
+   ],
+   "card_key": "2|0|000110",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (zed), decision (Zed), event (x)",
+    "part of": "TD-110",
+    "priority": "Low"
+   },
+   "id": "TD-117",
+   "key": "3|0|000117",
+   "part_of": "TD-110",
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "A part naming one gate twice",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "decision (designer)"
+   ],
+   "card_key": "2|0|000110",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (designer)",
+    "part of": "TD-110",
+    "priority": "Low"
+   },
+   "id": "TD-118",
+   "key": "3|0|000118",
+   "part_of": "TD-110",
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "A part waiting on a role",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000110",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Urgent"
+   },
+   "id": "TD-108",
+   "key": "4|0|000108",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Urgent",
+   "title": "A priority outside the three",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-108",
+    "decision (pat)",
+    "event (x)"
+   ],
+   "card_key": "2|0|000110",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-108, decision (pat), event (x)",
+    "part of": "TD-110",
+    "priority": "Medium"
+   },
+   "id": "TD-112",
+   "key": "2|0|000112",
+   "part_of": "TD-110",
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A part waiting on a decision and an event",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000110",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Medium"
+   },
+   "id": "TD-110",
+   "key": "2|0|000110",
+   "part_of": null,
+   "parts_gates": {
+    "decision (Pat)": [
+     "TD-111",
+     "TD-112"
+    ],
+    "decision (designer)": [
+     "TD-118"
+    ],
+    "decision (zed)": [
+     "TD-117"
+    ],
+    "event (x)": [
+     "TD-112",
+     "TD-117"
+    ]
+   },
+   "parts_open": [
+    "TD-111",
+    "TD-112",
+    "TD-113",
+    "TD-117",
+    "TD-118"
+   ],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A parent whose parts carry gates",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "event (vendor-ships)"
+   ],
+   "card_key": "2|1|000103",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "event (vendor-ships)",
+    "priority": "Medium",
+    "type": "feature"
+   },
+   "id": "TD-103",
+   "key": "2|1|000103",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "An event gate",
+   "type": "feature"
+  },
+  {
+   "blocked_by": [
+    "decision (Pat)",
+    "decision (pat)",
+    "until 2026-02-01",
+    "until 2026-03-01",
+    "event (x)",
+    "event (x)"
+   ],
+   "card_key": "3|0|000105",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (Pat), decision (pat), until 2026-02-01, until 2026-03-01, event (x), event (x)",
+    "priority": "Low"
+   },
+   "id": "TD-105",
+   "key": "3|0|000105",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Each gate named twice, and no Ask",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "'hold'"
+   ],
+   "card_key": "3|0|000106",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "hold",
+    "priority": "Low",
+    "status": "Built 2026-01-02",
+    "taken by": "0123abcd",
+    "waits": "until 2026-02-01 — the vendor's window"
+   },
+   "id": "TD-106",
+   "key": "3|0|000106",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Retired words",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "decision (designer)"
+   ],
+   "card_key": "3|0|000107",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (designer)",
+    "priority": "Low"
+   },
+   "id": "TD-107",
+   "key": "3|0|000107",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "A role in a decision",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "'decision (Kim Lee)'",
+    "'until 2026-02-30'",
+    "'event (Big)'",
+    "'until soon'"
+   ],
+   "card_key": "3|0|000114",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (Kim Lee), until 2026-02-30, event (Big), until soon",
+    "priority": "Low"
+   },
+   "id": "TD-114",
+   "key": "3|0|000114",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Items the grammar does not read",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "until 2026-02-01",
+    "event (y)",
+    "decision (kim)"
+   ],
+   "card_key": "3|0|000115",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "Until 2026-02-01, EVENT (y), Decision (kim) — waits on the vendor, then TD-101",
+    "priority": "Low"
+   },
+   "id": "TD-115",
+   "key": "3|0|000115",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "The words read in any case, and the old form last",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000116",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "waits": "until 2026-02-01"
+   },
+   "id": "TD-116",
+   "key": "3|0|000116",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "Waits alone is never a gate",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-101",
+   "kind": "until-past",
+   "level": "info",
+   "text": "ℹ TD-101: until 2026-01-10 is reached — the gate no longer holds; drop it from Blocked by"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-101",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-101: every blocker is archived (TD-100) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-105",
+   "kind": "gate-repeated",
+   "level": "info",
+   "text": "ℹ TD-105: Blocked by names decision (pat), event (x), until (written 2 times) more than once — at most one decision per person, one until and differently named events"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-105",
+   "kind": "ask-missing",
+   "level": "info",
+   "text": "ℹ TD-105: Blocked by names decision (Pat), decision (pat) and the entry has no **Ask:** — say what the person owes, a go included"
+  },
+  {
+   "field": "taken by",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-106: the Taken by field is retired — write Id take, the counter take's nonce (SPEC *Retired words*)"
+  },
+  {
+   "field": "waits",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-106: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+  },
+  {
+   "field": "status",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-106: the Status word 'Built' is retired — write Open, with Kind live-check (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-106",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-106: Blocked by item 'hold' is retired — write decision (<person>), with an **Ask:**; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-107",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-107: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "priority",
+   "id": "TD-108",
+   "kind": "priority",
+   "level": "info",
+   "text": "ℹ TD-108: Priority 'Urgent' is not High, Medium or Low — read after Low; write High, Medium or Low"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-113",
+   "kind": "until-past",
+   "level": "info",
+   "text": "ℹ TD-113: until 2026-01-15 is reached — the gate no longer holds; drop it from Blocked by"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-114: cannot read Blocked by item 'decision (Kim Lee)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-114: cannot read Blocked by item 'until 2026-02-30' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-114: cannot read Blocked by item 'event (Big)' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-114",
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-114: cannot read Blocked by item 'until soon' — write TD-n, <repo>#TD-n, decision (<person>), until YYYY-MM-DD or event (<name>)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-115",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-115: Blocked by item 'Decision (kim) — waits on the vendor, then TD-101' is retired — write decision (<person>), with the text in an **Ask:** section; it keeps the block (SPEC *Retired words*)"
+  },
+  {
+   "field": "waits",
+   "id": "TD-116",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-116: the Waits field is retired — write a gate in Blocked by — until YYYY-MM-DD or event (<name>) (SPEC *Retired words*)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-117",
+   "kind": "gate-repeated",
+   "level": "info",
+   "text": "ℹ TD-117: Blocked by names decision (Zed) more than once — at most one decision per person, one until and differently named events"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-118",
+   "kind": "retired",
+   "level": "info",
+   "text": "ℹ TD-118: Blocked by item 'decision (designer)' is retired — write decision (<person>): designer is a role, reserved by name; it keeps the block (SPEC *Retired words*)"
+  }
+ ],
+ "pickable": [
+  "TD-101",
+  "TD-113",
+  "TD-108",
+  "TD-116"
+ ],
+ "rows": []
+}

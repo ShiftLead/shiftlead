@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "new",
+  "unusable": "TD-005 is in the ledger or its archive already"
+ }
+}

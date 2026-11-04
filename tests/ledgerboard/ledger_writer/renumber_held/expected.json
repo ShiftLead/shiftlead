@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "renumber",
+  "unusable": "TD-006 is in the ledger or its archive already"
+ }
+}

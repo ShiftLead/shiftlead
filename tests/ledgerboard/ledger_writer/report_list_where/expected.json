@@ -1,0 +1,32 @@
+{
+ "exit": 0,
+ "out": {
+  "entries": [
+   {
+    "blocked_by": [
+     "TD-001"
+    ],
+    "card_key": "2|0|000001",
+    "cross_repo": [],
+    "fields": {
+     "added": "2026-01-03",
+     "blocked by": "TD-001",
+     "owner": "builder",
+     "priority": "Low",
+     "status": "Open",
+     "type": "feature"
+    },
+    "id": "TD-002",
+    "key": "3|1|000002",
+    "part_of": null,
+    "parts_gates": {},
+    "parts_open": [],
+    "pickable": false,
+    "priority": "Low",
+    "title": "A report for the weekly totals",
+    "type": "feature"
+   }
+  ],
+  "flags": []
+ }
+}

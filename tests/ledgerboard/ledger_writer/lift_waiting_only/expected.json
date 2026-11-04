@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "lift",
+  "refused": "'Not yet' only keeps the gate waiting — it never lifts"
+ }
+}

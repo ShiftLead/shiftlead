@@ -1,0 +1,40 @@
+{
+  "origin_key": [
+    "git@github.example:Acme/Tools.git",
+    "ssh://git@git.example.org:2222/Group/Sub/Repo.git/",
+    "https://bot:s3cret@forge.example:8443/acme/tools.git",
+    "https://forge.example/acme/.github/",
+    "HTTPS://Forge.Example/Acme/Tools",
+    "file:///srv/git/tools.git",
+    "/srv/git/tools.git",
+    "../tools",
+    "https://forge.example/acme//tools",
+    "https://forge.example/acme/../tools",
+    "https://forge.example/-tools",
+    "http://forge.example/acme/tools",
+    "git://forge.example/acme/tools.git",
+    "https://forge.example/",
+    "git@forge.example:~user/tools.git"
+  ],
+  "item_key": [
+    "- [ ] decide 2026-01-05 (n/a) — Go on the tools build? Context: Acme/Tools#TD-4. Due: 2026-01-20. Answers: Go | Not yet.",
+    "- [ ] decide 2026-01-05 (n/a) — Go on the tools build? Context: acme/tools#TD-4. Due: 2026-01-20. Answers: Go | Not yet."
+  ],
+  "item_refs": [
+    "- [ ] act 2026-01-05 (n/a) — Look at both. Context: Acme/Tools#TD-4, acme/tools#TD-4, TD-5/TD-6. Due: 2026-01-20.",
+    "- [ ] act 2026-01-05 (n/a) — Three deep and dot-led. Context: group/sub/repo#TD-7, acme/.github#TD-8. Due: 2026-01-20.",
+    "- [ ] act 2026-01-05 (n/a) — No ref from a bad repo. Context: a/../b#TD-9, ./x#TD-9, https://forge.example/acme/tools#TD-9, ünï#TD-9. Due: 2026-01-20.",
+    "- [ ] act 2026-01-05 (n/a) — The tail of a longer word or URL is no ref. Context: é_o/r#TD-1, git@forge.example:o/r#TD-2, a/./b#TD-3. Due: 2026-01-20.",
+    "- [ ] act 2026-01-05 (n/a) — After other punctuation a ref reads. Context: x—o/r#TD-1, “o/r#TD-2”, a=o/r#TD-3, `o/r#TD-4`, [o/r#TD-5](https://forge.example). Due: 2026-01-20.",
+    "- [ ] act 2026-01-05 (n/a) — Refs run together. Context: TD-5/o/r#TD-6, TD-7, xTD-8. Due: 2026-01-20.",
+    "- [ ] act 2026-01-05 (n/a) — Invisible and encoded characters start no ref. Context: Lösung/r#TD-1, o/​r#TD-2, a­b/r#TD-3, %2Fo/r#TD-4, a\\o/r#TD-5. Due: 2026-01-20."
+  ],
+  "blocked": [
+    "group/sub/repo#TD-1, TD-2",
+    "a/../b#TD-1",
+    "-x#TD-1, TD-2"
+  ],
+  "item_problem": [
+    "- [ ] decide 2026-01-05 (n/a) — Go on the parts? Context: TD-12. Parts: Acme/Tools#TD-3, acme/tools#TD-3. Due: 2026-01-20. Answers: Go | Not yet."
+  ]
+}

@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "fmt",
+  "TD-1",
+  "--check",
+  "--ledger",
+  "ledger",
+  "--json"
+ ]
+}

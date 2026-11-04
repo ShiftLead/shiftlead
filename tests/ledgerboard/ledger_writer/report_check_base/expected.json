@@ -1,0 +1,16 @@
+{
+ "exit": 1,
+ "out": {
+  "errors": 1,
+  "flags": [
+   {
+    "field": null,
+    "id": null,
+    "kind": "archive-loss",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ the archive lost TD-005: an archived entry is never removed, so restore it from the base"
+   }
+  ]
+ }
+}

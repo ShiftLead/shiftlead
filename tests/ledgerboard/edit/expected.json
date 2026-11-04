@@ -671,6 +671,12 @@
   "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-25. Hide until: 2026-01-22. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B. Decided: Option A (by pat) (2026-01-21).": "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B",
   "- [x] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-12. Closed: 2026-01-13.": "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1"
  },
+ "item_notes": {
+  "hide a day before due": [],
+  "hide equal to due": [],
+  "later hide on an fyi with a due": [],
+  "later hide, impossible due": []
+ },
  "item_problems": {
   "  - [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
   "- [ ] \tact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.": "open: an item line opens `- [ ] ` at column 0, single-spaced",
@@ -1078,6 +1084,45 @@
     ]
    ]
   }
+ ],
+ "split_notes": [
+  [
+   [
+    5,
+    "Each open entry is a file here; the table below is gone, and [the old archive](../ledger_archive.md) moved.",
+    "names the summary table: a v2 ledger has none"
+   ],
+   [
+    5,
+    "Each open entry is a file here; the table below is gone, and [the old archive](../ledger_archive.md) moved.",
+    "links ../ledger_archive.md relatively: the README moved into the ledger directory"
+   ]
+  ],
+  [],
+  [
+   [
+    11,
+    "[ref]: ../old_archive.md",
+    "links ../old_archive.md relatively: the README moved into the ledger directory"
+   ]
+  ],
+  [
+   [
+    5,
+    "The ledger was `docs/technical_debt.md`; closed entries went to technical_debt_archive.md.",
+    "names technical_debt.md, a v1 file: the ledger is now this directory"
+   ],
+   [
+    6,
+    "See [the old file](https://example.com/technical_debt.md) and [the archive](technical_debt_archive.md).",
+    "links technical_debt_archive.md relatively: the README moved into the ledger directory"
+   ],
+   [
+    8,
+    "Write `[the archive](technical_debt_archive.md)` no more.",
+    "names technical_debt_archive.md, a v1 file: the ledger is now this directory"
+   ]
+  ]
  ],
  "subject_kinds": {
   "Fix the parser (#12)": null,

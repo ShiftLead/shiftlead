@@ -1,0 +1,13 @@
+{
+ "argv": [
+  "reopen",
+  "TD-1",
+  "--why",
+  "it is open",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

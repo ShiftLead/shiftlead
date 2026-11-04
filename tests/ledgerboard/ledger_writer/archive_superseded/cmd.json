@@ -1,0 +1,17 @@
+{
+ "argv": [
+  "archive",
+  "TD-1",
+  "--why",
+  "the new grammar covers it",
+  "--superseded-by",
+  "TD-3",
+  "--also",
+  "notes.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

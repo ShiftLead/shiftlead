@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "note",
+  "refused": "a note may not begin with a Log writer's prefix ('filed by', 'gate added:', 'gate lifted:', 'gate reassigned:', 'kept waiting:', 'gate lift skipped:', 'was:', 'archived:', 'reopened —') — say it in other words"
+ }
+}

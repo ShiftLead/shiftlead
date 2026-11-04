@@ -1,0 +1,753 @@
+{
+ "blocked": [
+  "TD-321",
+  "TD-323",
+  "TD-324",
+  "TD-325",
+  "TD-326",
+  "TD-327",
+  "TD-328",
+  "TD-329",
+  "TD-332",
+  "TD-333",
+  "TD-334"
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-320",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-320: every blocker is archived (TD-300) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-321",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-321: Blocked by TD-301, superseded (TD-301 → TD-302) — name TD-302 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-322",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-322: Blocked by TD-303, superseded (TD-303 → TD-304) — name TD-304 instead; that entry is Resolved, so the block is lifted"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-322",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-322: every blocker is archived (TD-303) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-323",
+   "kind": "blocker-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-323: Blocked by TD-305, entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-324",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-324: Blocked by TD-306, superseded (TD-306 → TD-307 → TD-305), whose chain ends in an entry archived Dropped — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-325",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-325: Blocked by TD-308, superseded (TD-308 → TD-309 → TD-308), whose chain loops — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-326",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-326: Blocked by TD-310, superseded (TD-310), whose chain cannot be followed to its end — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-327",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-327: Blocked by TD-311, superseded (TD-311 → acme/tools#TD-5) — name acme/tools#TD-5 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-328",
+   "kind": "cross-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-328: Blocked by acme/tools#TD-7, superseded (acme/tools#TD-7 → acme/tools#TD-8) — the gate sweep rewires it to acme/tools#TD-8 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-329",
+   "kind": "cross-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-329: Blocked by acme/tools#TD-9, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-330",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-330: every blocker is archived (acme/tools#TD-10) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-331",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-331: every blocker is archived (acme/tools#TD-11) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-332",
+   "kind": "cross-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-332: Blocked by acme/tools#TD-12, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-333",
+   "kind": "cross-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-333: Blocked by acme/tools#TD-13, superseded (acme/tools#TD-13), whose chain cannot be followed to its end — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-334",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-334: Blocked by TD-312, superseded (TD-312 → TD-302) — name TD-302 instead"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-320",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-320: every blocker is archived (TD-300) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-321",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-321: Blocked by TD-301, superseded (TD-301 → TD-302) — name TD-302 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-322",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-322: Blocked by TD-303, superseded (TD-303 → TD-304) — name TD-304 instead; that entry is Resolved, so the block is lifted"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-322",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-322: every blocker is archived (TD-303) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-323",
+   "kind": "blocker-dropped",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-323: Blocked by TD-305, entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-324",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-324: Blocked by TD-306, superseded (TD-306 → TD-307 → TD-305), whose chain ends in an entry archived Dropped — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-325",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-325: Blocked by TD-308, superseded (TD-308 → TD-309 → TD-308), whose chain loops — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-326",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-326: Blocked by TD-310, superseded (TD-310), whose chain cannot be followed to its end — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-327",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-327: Blocked by TD-311, superseded (TD-311 → acme/tools#TD-5) — name acme/tools#TD-5 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-328",
+   "kind": "cross-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-328: Blocked by acme/tools#TD-7, superseded (acme/tools#TD-7 → acme/tools#TD-8) — the gate sweep rewires it to acme/tools#TD-8 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-329",
+   "kind": "cross-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-329: Blocked by acme/tools#TD-9, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-330",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-330: every blocker is archived (acme/tools#TD-10) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-331",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-331: every blocker is archived (acme/tools#TD-11) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-332",
+   "kind": "cross-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-332: Blocked by acme/tools#TD-12, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-333",
+   "kind": "cross-superseded",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-333: Blocked by acme/tools#TD-13, superseded (acme/tools#TD-13), whose chain cannot be followed to its end — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-334",
+   "kind": "blocker-superseded",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-334: Blocked by TD-312, superseded (TD-312 → TD-302) — name TD-302 instead"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000302",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Medium"
+   },
+   "id": "TD-302",
+   "key": "2|0|000302",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "The successor, still open",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000320",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-300",
+    "priority": "Medium"
+   },
+   "id": "TD-320",
+   "key": "2|0|000320",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by a resolved entry",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-301"
+   ],
+   "card_key": "2|0|000321",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-301",
+    "priority": "Medium"
+   },
+   "id": "TD-321",
+   "key": "2|0|000321",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an entry superseded by an open one",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000322",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-303",
+    "priority": "Medium"
+   },
+   "id": "TD-322",
+   "key": "2|0|000322",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by an entry superseded by a resolved one",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-305"
+   ],
+   "card_key": "2|0|000323",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-305",
+    "priority": "Medium"
+   },
+   "id": "TD-323",
+   "key": "2|0|000323",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by a dropped entry",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-306"
+   ],
+   "card_key": "3|0|000324",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-306",
+    "priority": "Low"
+   },
+   "id": "TD-324",
+   "key": "3|0|000324",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by a chain that ends in Dropped",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-308"
+   ],
+   "card_key": "3|0|000325",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-308",
+    "priority": "Low"
+   },
+   "id": "TD-325",
+   "key": "3|0|000325",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by a chain that loops",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-310"
+   ],
+   "card_key": "3|0|000326",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-310",
+    "priority": "Low"
+   },
+   "id": "TD-326",
+   "key": "3|0|000326",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by a superseded entry that names no successor",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-311"
+   ],
+   "card_key": "3|0|000327",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-311",
+    "priority": "Low"
+   },
+   "id": "TD-327",
+   "key": "3|0|000327",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by an entry superseded by another repo's",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "acme/tools#TD-7"
+   ],
+   "card_key": "3|0|000328",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-7",
+     "state": "archived",
+     "status": "Superseded",
+     "successor": "TD-8",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-7",
+    "priority": "Low"
+   },
+   "id": "TD-328",
+   "key": "3|0|000328",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by another repo's superseded entry",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "acme/tools#TD-9"
+   ],
+   "card_key": "3|0|000329",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-9",
+     "state": "archived",
+     "status": "Dropped",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-9",
+    "priority": "Low"
+   },
+   "id": "TD-329",
+   "key": "3|0|000329",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by another repo's dropped entry",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000330",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-10",
+     "state": "archived",
+     "status": "Resolved",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-10",
+    "priority": "Low"
+   },
+   "id": "TD-330",
+   "key": "3|0|000330",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "Blocked by another repo's resolved entry",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000331",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-11",
+     "state": "archived",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-11",
+    "priority": "Low"
+   },
+   "id": "TD-331",
+   "key": "3|0|000331",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "Blocked by another repo's archived entry, from a resolver that gives no Status",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "acme/tools#TD-12"
+   ],
+   "card_key": "3|0|000332",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-12",
+     "state": "archived",
+     "status": "Dropped 2026-02-01",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-12",
+    "priority": "Low"
+   },
+   "id": "TD-332",
+   "key": "3|0|000332",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by another repo's entry dropped under a newer release's Status",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "acme/tools#TD-13"
+   ],
+   "card_key": "3|0|000333",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-13",
+     "state": "archived",
+     "status": [
+      "Superseded"
+     ],
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-13",
+    "priority": "Low"
+   },
+   "id": "TD-333",
+   "key": "3|0|000333",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by another repo's entry whose Status the resolver gives malformed",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-312"
+   ],
+   "card_key": "3|0|000334",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-312",
+    "priority": "Low"
+   },
+   "id": "TD-334",
+   "key": "3|0|000334",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Blocked by an entry superseded with a period after its successor",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-320",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-320: every blocker is archived (TD-300) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-321",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-321: Blocked by TD-301, superseded (TD-301 → TD-302) — name TD-302 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-322",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-322: Blocked by TD-303, superseded (TD-303 → TD-304) — name TD-304 instead; that entry is Resolved, so the block is lifted"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-322",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-322: every blocker is archived (TD-303) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-323",
+   "kind": "blocker-dropped",
+   "level": "info",
+   "text": "ℹ TD-323: Blocked by TD-305, entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-324",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-324: Blocked by TD-306, superseded (TD-306 → TD-307 → TD-305), whose chain ends in an entry archived Dropped — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-325",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-325: Blocked by TD-308, superseded (TD-308 → TD-309 → TD-308), whose chain loops — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-326",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-326: Blocked by TD-310, superseded (TD-310), whose chain cannot be followed to its end — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-327",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-327: Blocked by TD-311, superseded (TD-311 → acme/tools#TD-5) — name acme/tools#TD-5 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-328",
+   "kind": "cross-superseded",
+   "level": "info",
+   "text": "ℹ TD-328: Blocked by acme/tools#TD-7, superseded (acme/tools#TD-7 → acme/tools#TD-8) — the gate sweep rewires it to acme/tools#TD-8 instead"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-329",
+   "kind": "cross-dropped",
+   "level": "info",
+   "text": "ℹ TD-329: Blocked by acme/tools#TD-9, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-330",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-330: every blocker is archived (acme/tools#TD-10) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-331",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-331: every blocker is archived (acme/tools#TD-11) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-332",
+   "kind": "cross-dropped",
+   "level": "info",
+   "text": "ℹ TD-332: Blocked by acme/tools#TD-12, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-333",
+   "kind": "cross-superseded",
+   "level": "info",
+   "text": "ℹ TD-333: Blocked by acme/tools#TD-13, superseded (acme/tools#TD-13), whose chain cannot be followed to its end — decide this entry; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-334",
+   "kind": "blocker-superseded",
+   "level": "info",
+   "text": "ℹ TD-334: Blocked by TD-312, superseded (TD-312 → TD-302) — name TD-302 instead"
+  }
+ ],
+ "pickable": [
+  "TD-302",
+  "TD-320",
+  "TD-322",
+  "TD-330",
+  "TD-331"
+ ],
+ "rows": []
+}

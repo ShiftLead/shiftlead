@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "set",
+  "unusable": "TD-009 is in neither ledger nor its archive"
+ }
+}

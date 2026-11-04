@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "decide",
+  "refused": "the ledger half: only robin answers for decision (robin) on a board whose Answered by is owner, not sam"
+ }
+}

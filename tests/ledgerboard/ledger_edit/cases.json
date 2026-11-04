@@ -160,6 +160,152 @@
      "a reason."
     ]
    ]
+  },
+  {
+   "name": "filed",
+   "id": "TD-085",
+   "title": "Filed with its Log",
+   "fields": {
+    "Priority": "Low",
+    "Added": "2026-01-15",
+    "Status": "Open",
+    "Blocked by": "TD-80, decision (Kim)"
+   },
+   "sections": [
+    [
+     "Why",
+     "the reason."
+    ],
+    [
+     "Ask",
+     "go?"
+    ]
+   ],
+   "filed": {
+    "today": "2026-01-15",
+    "who": "Kim",
+    "session": "plan-7",
+    "words": "file it",
+    "while": "TD-80"
+   }
+  },
+  {
+   "name": "filed_refused_added_comment",
+   "id": "TD-086",
+   "title": "t",
+   "fields": {
+    "Priority": "Low",
+    "Added": "2026-01-15 a comment"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ]
+   ],
+   "filed": {
+    "today": "2026-01-15",
+    "who": "Kim",
+    "session": "plan-7",
+    "words": "w"
+   }
+  },
+  {
+   "name": "filed_refused_status_note",
+   "id": "TD-086",
+   "title": "t",
+   "fields": {
+    "Priority": "Low",
+    "Status": "Open 2026-01-15: x"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ]
+   ],
+   "filed": {
+    "today": "2026-01-15",
+    "who": "Kim",
+    "session": "plan-7",
+    "words": "w"
+   }
+  },
+  {
+   "name": "filed_refused_who_with_a_space",
+   "id": "TD-086",
+   "title": "t",
+   "fields": {
+    "Priority": "Low"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ]
+   ],
+   "filed": {
+    "today": "2026-01-15",
+    "who": "Kim Lee",
+    "session": "plan-7",
+    "words": "w"
+   }
+  },
+  {
+   "name": "filed_gates_in_canonical_order",
+   "id": "TD-121",
+   "title": "Gates written in their order",
+   "fields": {
+    "Priority": "Medium",
+    "Added": "2026-01-15",
+    "Blocked by": "event (vendor-ships), TD-3, until 2026-02-01, decision (pat), other/repo#TD-9"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ],
+    [
+     "Ask",
+     "pat says go."
+    ]
+   ],
+   "filed": {
+    "today": "2026-01-15",
+    "who": "pat",
+    "session": "plan-7",
+    "words": "file it"
+   }
+  },
+  {
+   "name": "refused_old_form",
+   "id": "TD-122",
+   "title": "t",
+   "fields": {
+    "Priority": "Low",
+    "Blocked by": "TD-3, decision (pat) — once the layout is agreed"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ]
+   ]
+  },
+  {
+   "name": "unreadable_blocked_by_written_as_given",
+   "id": "TD-123",
+   "title": "t",
+   "fields": {
+    "Priority": "Low",
+    "Blocked by": "until soon, TD-3"
+   },
+   "sections": [
+    [
+     "Why",
+     "w"
+    ]
+   ]
   }
  ],
  "today": "2026-01-20",
@@ -763,6 +909,320 @@
      }
     }
    ]
+  },
+  {
+   "name": "note_lifts_the_status_notes",
+   "file": "legacy_status.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "a new note"
+     }
+    }
+   ]
+  },
+  {
+   "name": "note_leaves_an_unknown_status",
+   "file": "unknown_status.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "looked"
+     }
+    }
+   ]
+  },
+  {
+   "name": "note_refused_writer_prefix",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "gate lifted: decision (Kim) — by Kim; answer \"Go\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "note_refused_log_not_last",
+   "file": "log_not_last.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "x"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_copies_an_unknown_status_whole",
+   "file": "unknown_status.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "held long enough",
+      "pr": 9
+     }
+    }
+   ]
+  },
+  {
+   "name": "reopen_undated_status_takes_the_resolved_date",
+   "file": "undated_status.md",
+   "steps": [
+    {
+     "action": "reopen",
+     "args": {
+      "why": "not done"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_inserts_its_resolved_line_before_the_log",
+   "file": "legacy_status.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "all built",
+      "pr": 12,
+      "pointer": "`src/thing.py`"
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_adds_a_section_before_the_log",
+   "file": "legacy_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Related",
+      "words": "TD-80."
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_refused_the_log",
+   "file": "legacy_status.md",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Log",
+      "words": "- 2026-01-01: rewritten"
+     }
+    }
+   ]
+  },
+  {
+   "name": "rename_ref_rewrites_a_while_token",
+   "file": "log_shapes.md",
+   "steps": [
+    {
+     "action": "rename_ref",
+     "args": {
+      "old": "other-repo#TD-4",
+      "new": "other-repo#TD-40"
+     }
+    }
+   ]
+  },
+  {
+   "name": "renumber_leaves_the_log",
+   "file": "log_shapes.md",
+   "steps": [
+    {
+     "action": "renumber",
+     "args": {
+      "new": "TD-180"
+     }
+    }
+   ]
+  },
+  {
+   "name": "note_leaves_in_progress",
+   "file": "in_progress.md",
+   "steps": [
+    {
+     "action": "note",
+     "args": {
+      "words": "looked"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_copies_in_progress_whole",
+   "file": "in_progress.md",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "replaced",
+      "superseded_by": "TD-90"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_blocked_by_canonical_order",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "until 2026-02-01, Decision (kim), TD-4"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_old_form",
+   "file": "reordered.md",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "decision (kim) — after the review"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_gate_on_old_form",
+   "text": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat) — the board's 2026-01-03 item\n\n**Why:** w\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (pat), until 2026-02-01"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_migrates_old_form",
+   "text": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat) — the board's 2026-01-03 item\n\n**Why:** w\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (pat)"
+      }
+     }
+    },
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "the board's 2026-01-03 item"
+     }
+    },
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (pat), until 2026-02-01"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_other_field_keeps_old_form",
+   "text": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat) — the board's 2026-01-03 item\n\n**Why:** w\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Priority": "High"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "rename_ref_keeps_one_copy",
+   "text": "## TD-402: Blocked by it and by its would-be successor\n\n**Priority:** Medium\n**Blocked by:** TD-400, TD-410, until 2026-03-01\n",
+   "steps": [
+    {
+     "action": "rename_ref",
+     "args": {
+      "old": "TD-400",
+      "new": "TD-410"
+     }
+    }
+   ]
+  },
+  {
+   "name": "rename_ref_keeps_one_copy_across_repos",
+   "text": "## TD-402: Blocked by it and by its would-be successor\n\n**Priority:** Medium\n**Blocked by:** TD-400, acme/tools#TD-3, until 2026-03-01\n",
+   "steps": [
+    {
+     "action": "rename_ref",
+     "args": {
+      "old": "TD-400",
+      "new": "Acme/Tools#TD-3"
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_dropped",
+   "text": "## TD-400: The entry to archive\n\n**Priority:** Medium\n\n**Why:** w\n\n**Fix:** f\n",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "no longer needed",
+      "dropped": true
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_dropped_refused_with_pr",
+   "text": "## TD-400: The entry to archive\n\n**Priority:** Medium\n\n**Why:** w\n\n**Fix:** f\n",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "x",
+      "dropped": true,
+      "pr": 4
+     }
+    }
+   ]
+  },
+  {
+   "name": "archive_superseded_by_another_repo",
+   "text": "## TD-400: The entry to archive\n\n**Priority:** Medium\n\n**Why:** w\n\n**Fix:** f\n",
+   "steps": [
+    {
+     "action": "archive",
+     "args": {
+      "why": "moved",
+      "superseded_by": "acme/tools#TD-3"
+     }
+    }
+   ]
   }
  ],
  "check": [
@@ -782,6 +1242,203 @@
    "ledger": "check/before.md",
    "archive": "",
    "old": "check/before.md"
+  },
+  {
+   "name": "log_flags_standing_where_the_entry_is_unchanged",
+   "ledger": "check/log_after.md",
+   "archive": "",
+   "old": "check/log_before.md"
+  },
+  {
+   "name": "log_flags_no_old",
+   "ledger": "check/log_after.md",
+   "archive": ""
+  }
+ ],
+ "log": [
+  {
+   "name": "every_shape",
+   "file": "log_shapes.md",
+   "gates": [
+    "decision (kim)",
+    "decision (Lee)",
+    "until 2026-03-01",
+    "event (tool-v3)",
+    "event (other)"
+   ]
+  },
+  {
+   "name": "legacy_status",
+   "file": "legacy_status.md",
+   "gates": [
+    "decision (Kim)"
+   ]
+  },
+  {
+   "name": "unknown_status",
+   "file": "unknown_status.md",
+   "gates": [
+    "decision (Kim)"
+   ]
+  },
+  {
+   "name": "undated_status",
+   "file": "undated_status.md",
+   "gates": []
+  },
+  {
+   "name": "log_not_last",
+   "file": "log_not_last.md",
+   "gates": [
+    "decision (Kim)"
+   ]
+  },
+  {
+   "name": "in_progress",
+   "file": "in_progress.md",
+   "gates": []
+  },
+  {
+   "name": "date_then_punctuation_is_prose",
+   "text": "## TD-088: x\n\n**Added:** 2026-01-02\n**Status:** Resolved 2026-01-05, PR #4\n\n**Why:** w\n",
+   "gates": []
+  },
+  {
+   "name": "superseded_by_with_no_date",
+   "text": "## TD-089: x\n\n**Added:** 2026-01-02\n**Status:** Superseded by TD-90: TD-90 does it all\n\n**Why:** w\n",
+   "gates": []
+  },
+  {
+   "name": "was_takes_the_resolved_date",
+   "text": "## TD-092: x\n\n**Added:** 2026-09-01\n**Status:** Open 2026-11-01: looked again — was: Resolved: built\n\n**Why:** w\n\n**Resolved:** 2026-10-01 (PR #3)\n",
+   "gates": []
+  }
+ ],
+ "archive_plan": [
+  {
+   "name": "resolved",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400"
+  },
+  {
+   "name": "dropped_refused_with_dependents",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "dropped": true
+  },
+  {
+   "name": "dropped",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-403",
+   "dropped": true
+  },
+  {
+   "name": "superseded_by_live",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-410"
+  },
+  {
+   "name": "superseded_follows_the_chain",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-420"
+  },
+  {
+   "name": "superseded_by_dropped_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-422"
+  },
+  {
+   "name": "chain_ending_in_dropped_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-423"
+  },
+  {
+   "name": "superseded_unknown_status",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-403",
+   "superseded_by": "TD-425"
+  },
+  {
+   "name": "chain_looping_back_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-424"
+  },
+  {
+   "name": "successor_a_dependent_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-401"
+  },
+  {
+   "name": "successor_unknown_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-499"
+  },
+  {
+   "name": "superseded_by_itself_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-400"
+  },
+  {
+   "name": "superseded_by_another_repo",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "acme/tools#TD-3",
+   "resolve": {
+    "acme/tools#TD-3": [
+     "open",
+     ""
+    ]
+   }
+  },
+  {
+   "name": "another_repo_unresolved_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "acme/tools#TD-4",
+   "resolve": {}
+  },
+  {
+   "name": "not_open_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-421"
+  },
+  {
+   "name": "dropped_and_superseded_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "dropped": true,
+   "superseded_by": "TD-410"
+  },
+  {
+   "name": "successor_waiting_on_a_dependent_refused",
+   "ledger": "plan/ledger.md",
+   "archive": "plan/archive.md",
+   "tid": "TD-400",
+   "superseded_by": "TD-411"
   }
  ]
 }

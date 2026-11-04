@@ -1,0 +1,28 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "renumber",
+  "id": "TD-012",
+  "mentions": [
+   "ledger/README.md:7: The parser bug is [TD-001](TD-012.md).",
+   "ledger/TD-003.md:8: **Why:** the new grammar keeps comments, which also closes TD-001.",
+   "notes.md:3: The parser bug: [TD-001](ledger/TD-012.md#why). TD-001 is the one the export waits on."
+  ],
+  "moved": {
+   "from": "ledger/TD-001.md",
+   "to": "ledger/TD-012.md"
+  },
+  "notes": [],
+  "paths": [
+   "ledger/TD-001.md",
+   "ledger/TD-012.md",
+   "ledger/TD-002.md",
+   "ledger/TD-003.md",
+   "ledger/rank.yml",
+   "ledger/README.md",
+   "notes.md"
+  ],
+  "subject": null,
+  "was": "TD-001"
+ }
+}

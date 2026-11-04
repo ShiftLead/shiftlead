@@ -1,0 +1,21 @@
+{
+  "acme/tools#TD-41": {
+    "state": "archived",
+    "why": "",
+    "status": "Xyzzy 2026-01-05"
+  },
+  "acme/tools#TD-42": [
+    "archived",
+    ""
+  ],
+  "acme/tools#TD-43": {
+    "state": "archived",
+    "why": "",
+    "status": "Xyzzy 2026-01-06"
+  },
+  "acme/tools#TD-44": {
+    "state": "archived",
+    "why": "",
+    "status": ""
+  }
+}

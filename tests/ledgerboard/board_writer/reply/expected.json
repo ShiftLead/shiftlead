@@ -2,6 +2,7 @@
  "exit": 0,
  "out": {
   "action": "reply",
+  "item_notes": [],
   "line": 8,
   "paths": [
    "board.md"

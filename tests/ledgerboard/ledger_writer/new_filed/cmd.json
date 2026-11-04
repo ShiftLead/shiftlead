@@ -1,0 +1,30 @@
+{
+ "argv": [
+  "new",
+  "--id",
+  "TD-7",
+  "--title",
+  "List the late entries",
+  "--priority",
+  "Low",
+  "--blocked-by",
+  "TD-001, until 2026-02-01",
+  "--take",
+  "0123456789abcdef0123456789abcdef",
+  "--by",
+  "builder-1",
+  "--session",
+  "s-42",
+  "--words",
+  "found while fixing the parser",
+  "--while",
+  "TD-001",
+  "--why",
+  "why.md",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

@@ -1,0 +1,14 @@
+{
+ "argv": [
+  "archive",
+  "TD-2",
+  "--why",
+  "the totals are no longer wanted",
+  "--dropped",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

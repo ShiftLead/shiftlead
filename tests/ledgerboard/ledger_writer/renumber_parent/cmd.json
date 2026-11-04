@@ -1,0 +1,13 @@
+{
+ "argv": [
+  "renumber",
+  "TD-8",
+  "--id",
+  "TD-12",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

@@ -1,0 +1,6 @@
+{
+  "acme/tools#TD-31": {"state": "archived", "why": "", "status": "Dropped 2026-01-05"},
+  "acme/tools#TD-32": {"state": "archived", "why": "", "status": "Resolved 2026-01-05"},
+  "acme/tools#TD-33": {"state": "archived", "why": "", "status": "Dropped 2026-01-05 — the vendor withdrew it"},
+  "acme/tools#TD-34": {"state": "open", "why": ""}
+}

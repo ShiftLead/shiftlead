@@ -1,0 +1,9 @@
+{
+ "exit": 3,
+ "out": {
+  "action": "new",
+  "needs": [
+   "other-repo#TD-9"
+  ]
+ }
+}

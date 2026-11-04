@@ -15,7 +15,7 @@ from conftest import pinned_script
 
 ROOT = Path(__file__).resolve().parent.parent
 WHEEL = ROOT / "src" / "sessionorc" / "ledgerboard"
-PACKAGE_FILES = ("__init__.py", "board.py")
+PACKAGE_FILES = ("__init__.py", "board.py", "ledger.py")
 FIXTURES = ROOT / "tests" / "ledgerboard"
 MANIFEST = FIXTURES / "MANIFEST"
 

@@ -1,0 +1,14 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "relink",
+  "paths": [
+   "notes.md"
+  ],
+  "subject": null,
+  "warnings": [
+   "docs/technical_debt.md#summary: an anchor into technical_debt.md, which the split removes — point it at the entry's file by hand"
+  ],
+  "was": "docs/technical_debt.md"
+ }
+}

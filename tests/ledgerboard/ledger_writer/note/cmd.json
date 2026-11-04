@@ -1,0 +1,12 @@
+{
+ "argv": [
+  "note",
+  "TD-1",
+  "the parser now keeps it in memory",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

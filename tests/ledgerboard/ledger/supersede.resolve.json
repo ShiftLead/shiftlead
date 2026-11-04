@@ -1,0 +1,42 @@
+{
+  "acme/tools#TD-5": [
+    "open",
+    ""
+  ],
+  "acme/tools#TD-7": {
+    "state": "archived",
+    "why": "",
+    "status": "Superseded",
+    "successor": "TD-8"
+  },
+  "acme/tools#TD-8": [
+    "open",
+    ""
+  ],
+  "acme/tools#TD-9": {
+    "state": "archived",
+    "why": "",
+    "status": "Dropped"
+  },
+  "acme/tools#TD-10": {
+    "state": "archived",
+    "why": "",
+    "status": "Resolved"
+  },
+  "acme/tools#TD-11": [
+    "archived",
+    ""
+  ],
+  "acme/tools#TD-12": {
+    "state": "archived",
+    "why": "",
+    "status": "Dropped 2026-02-01"
+  },
+  "acme/tools#TD-13": {
+    "state": "archived",
+    "why": "",
+    "status": [
+      "Superseded"
+    ]
+  }
+}

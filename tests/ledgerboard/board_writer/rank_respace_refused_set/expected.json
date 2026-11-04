@@ -1,5 +1,5 @@
 {
- "exit": 3,
+ "exit": 1,
  "out": {
   "action": "rank",
   "refused": "a respace sets and drops no lines: it rewrites the keys itself"

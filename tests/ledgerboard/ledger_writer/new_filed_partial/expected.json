@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "new",
+  "unusable": "the filed by line needs --by, --session and --words: --session, --words missing"
+ }
+}

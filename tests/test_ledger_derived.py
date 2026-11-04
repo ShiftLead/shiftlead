@@ -149,7 +149,8 @@ def test_the_rule_and_another_repos_entries_through_one_registry(tmp_path):
     assert home["TD-2"]["type"] == home["TD-019"]["type"] == "debt", "the Type's first word, as the script splits it"
     assert home["TD-011"]["blocked_by"] == ["TD-010"] and home["TD-013"]["blocked_by"] == ["TD-777"]
     assert home["TD-014"]["blocked_by"] == ["decision (Paul)"], "what follows the decision is its pointer"
-    assert home["TD-015"]["blocked_by"] == ["decision (Paul)", "'after the decision: TD-010'", "'soon'"]
+    # v2.4 (ledgerboard SPEC *The ledger*): an id after a decision's comma is an id like any other
+    assert home["TD-015"]["blocked_by"] == ["TD-010", "decision (Paul)", "'soon'"]
     assert home["TD-017"]["blocked_by"] == ["other#TD-003"], "archived there lifts it; open there blocks"
     assert home["TD-018"]["blocked_by"] == ["other#TD-003", "nowhere#TD-001"]
     assert (home["TD-011"]["type"], home["TD-016"]["type"]) == ("feature", "debt"), "an unknown Type reads as debt"

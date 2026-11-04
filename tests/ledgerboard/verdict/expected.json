@@ -1,0 +1,324 @@
+{
+ "tripwire": {
+  "a decide lift": [],
+  "a gate removed by hand": [
+   [
+    "tripwire-unanswered",
+    "TD-150 drops decision (pat) with no answer logged — a gate is lifted by its person's answer, reassigned (gate reassigned) or overridden (override:)"
+   ]
+  ],
+  "a gate removed by hand, in the migrate commit": [],
+  "a lift by someone other than the gate's person, owner board": [
+   [
+    "tripwire-by",
+    "TD-150 lifts decision (pat) by sam, not pat — only the gate's person answers, or anyone listed on a board whose Answered by is any"
+   ]
+  ],
+  "a reassign": [],
+  "a shared item said to be left open, with nothing shared": [
+   [
+    "tripwire-shared",
+    "TD-150 lifts decision (pat) leaving a shared board item open, but no item it covers still asks another listed entry"
+   ]
+  ],
+  "a teammate's lift on an any board": [],
+  "an answer on another repo's board": [],
+  "an answer said to be on this repo's own board": [
+   [
+    "tripwire-board",
+    "TD-150 lifts decision (pat) on board acme/widgets, which is this repo's own — its answer is on this board, written as Decided:"
+   ]
+  ],
+  "an entry the diff archives": [],
+  "an override": [],
+  "no board item, and none at base or head": [],
+  "no board item, but the base had one (read the head alone and it passes)": [
+   [
+    "tripwire-no-board-item",
+    "TD-150 lifts decision (pat) with no board item, but an open item on this repo's board asks it — answer that item"
+   ]
+  ],
+  "no board item, on a board with no People": [],
+  "set by= on one part of a shared item, left open": [],
+  "set by= with the board's Decided": [],
+  "the item closed with no Decided": [
+   [
+    "tripwire-no-decided",
+    "TD-150 lifts decision (pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+   ]
+  ],
+  "the last part of a shared item lifted, the item newly closed": []
+ },
+ "uncovered": {
+  "a gate already at base": {
+   "flags": [],
+   "refusals": []
+  },
+  "a new decision covered on another repo's board": {
+   "flags": [
+    [
+     "decision-elsewhere",
+     "TD-170 gains decision (kim), and this repo's board does not list kim: covered on example.com/acme/kim, which not every machine reads"
+    ]
+   ],
+   "refusals": []
+  },
+  "a new decision item whose Lifts name its answers": {
+   "flags": [],
+   "refusals": []
+  },
+  "a new decision item with no lifting answer": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-no-lift",
+     "the new decide item on line 12 asks decision (pat) and none of its answers lifts it (Go)"
+    ]
+   ]
+  },
+  "a new decision no board read covers": {
+   "flags": [
+    [
+     "decision-elsewhere",
+     "TD-170 gains decision (kim), and this repo's board does not list kim: no board read covers it — the sweep files its item"
+    ]
+   ],
+   "refusals": []
+  },
+  "a new decision with no item": {
+   "flags": [],
+   "refusals": [
+    [
+     "decision-uncovered",
+     "TD-160 gains decision (pat) and no open decide item on this repo's board asks it — file the item in the same PR"
+    ]
+   ]
+  },
+  "a new decision, its item filed with it": {
+   "flags": [],
+   "refusals": []
+  }
+ },
+ "verdict": {
+  "a CRLF board whose answered line drops its CR": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-diff",
+     "the answered line changes its line ending"
+    ]
+   ]
+  },
+  "a Decided one day ahead of both UTC dates": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a Decided one day behind the PR's opening": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a Decided that names no answerer": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-no-by",
+     "the Decided: names no answerer (by <person>)"
+    ]
+   ]
+  },
+  "a Decided two days ahead": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-decided-date",
+     "the Decided: date 2026-01-17 is outside 2026-01-14 .. 2026-01-16"
+    ]
+   ]
+  },
+  "a Decided two days behind the PR's opening": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-decided-date",
+     "the Decided: date 2026-01-13 is outside 2026-01-14 .. 2026-01-16"
+    ]
+   ]
+  },
+  "a Log date two days after the PR opened": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-log-date",
+     "the Log date 2026-01-17 is outside 2026-01-14 .. 2026-01-16"
+    ]
+   ]
+  },
+  "a base board with no People": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-no-decided",
+     "TD-100 lifts decision (Pat), and no item covering it on this repo's board gains a Decided: in the same diff"
+    ]
+   ],
+   "review": [
+    [
+     "lift-a0",
+     "the base board declares no People: line, so who may answer is unchecked"
+    ]
+   ]
+  },
+  "a board with CRLF line endings": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a finished lift left open": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "the answered line is not what the decide writer writes, byte for byte"
+    ]
+   ]
+  },
+  "a ledger change that is not decide_lift's": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-ledger",
+     "docs/ledger/TD-100.md is not what decide_lift writes, byte for byte"
+    ]
+   ]
+  },
+  "a lift not yet merged": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a lift with another file changed": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-files",
+     "the PR changes ['docs/ledger/TD-100.md', 'docs/ledger/TD-150.md', 'docs/user_attention.md'], and a lift changes ['docs/ledger/TD-100.md', 'docs/user_attention.md']"
+    ]
+   ]
+  },
+  "a lift, closed in the same write": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a lifting answer that logs nothing": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a re-answer": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-reanswer",
+     "the item was answered already — a re-answer takes ordinary review"
+    ]
+   ]
+  },
+  "a subject that is not a decide": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-subject",
+     "the commit's subject is not a board decide: 'board: reply Warm the cache nightly? (session w-1)'"
+    ]
+   ]
+  },
+  "a teammate's answer on an any board": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a teammate's answer on an owner board": {
+   "carve_out": false,
+   "flags": [
+    [
+     "tripwire-by",
+     "TD-100 lifts decision (Pat) by sam, not Pat — only the gate's person answers, or anyone listed on a board whose Answered by is any"
+    ]
+   ],
+   "review": [
+    [
+     "lift-refused",
+     "decide_lift refuses it: only pat answers for decision (pat) on a board whose Answered by is owner, not sam"
+    ]
+   ]
+  },
+  "a waiting-only answer, closed kept waiting": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a work order closed under the carve-out": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-board-line",
+     "the answered line is not what the decide writer writes, byte for byte"
+    ]
+   ]
+  },
+  "a work order, left open and decided": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "an event item answered by anyone listed": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "another repo's entry, on the board alone": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "another repo's entry, with a ledger file": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-files",
+     "another repo's entry is answered on the board alone: ['docs/ledger/TD-150.md', 'docs/user_attention.md']"
+    ]
+   ]
+  },
+  "one go for a parent's parts": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "two commits": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-commits",
+     "a lift PR is one commit, squash-merged; this has 2"
+    ]
+   ]
+  }
+ }
+}

@@ -1,5 +1,5 @@
 {
- "exit": 3,
+ "exit": 1,
  "out": {
   "action": "decide",
   "refused": "this board has no People: line, so an answer needs --by, who gave it"

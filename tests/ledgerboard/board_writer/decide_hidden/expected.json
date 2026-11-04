@@ -1,0 +1,17 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "decide",
+  "item_notes": [
+   {
+    "line": 9,
+    "note": "hide-spent: a decided item is never hidden, so Hide until: 2026-01-17 hides nothing"
+   }
+  ],
+  "line": 9,
+  "paths": [
+   "board.md"
+  ],
+  "subject": "ledgerboard: decide Pick a cache.: Disk (session w-9)"
+ }
+}
