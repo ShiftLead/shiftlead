@@ -117,8 +117,16 @@ full conventions in `docs/cadence.md` (the pinned tree's: `agent-cadence path ca
 1. **Ledger before idle.** The moment Paul approves a multi-item plan, or a session pauses with
    steps undone, write the pending steps into the ledger, [docs/ledger/](docs/ledger/README.md)
    (a new `TD-NNN.md` entry or a line in the relevant one). Items that need Paul to act or decide go
-   on [docs/user_attention.md](docs/user_attention.md) in the board's `Format:` line, each with
-   a `Due:` date matched to its urgency; snoozing is editing the date. Due items are printed
+   on [docs/user_attention.md](docs/user_attention.md), each with a `Due:` date matched to its
+   urgency. **Both files are written only through the helpers, never typed** (design §4.4 *A session
+   writes the ledger and the board only through the helpers*): a change to an entry is
+   `agent-cadence run ledger.py set|note|edit|archive|reopen|renumber`, and `agent-cadence run ledger.py
+   fmt TD-n` closes the one line no helper wrote; a new entry takes its id from `ao td reserve` and,
+   until agent-cadence#TD-188 lets `ledger.py new` file here (TD-1360), is typed with the header line
+   `ao td reserve` prints and then `ledger.py fmt TD-n`. A board line is `agent-cadence run board_edit.py
+   add --board docs/user_attention.md --no-commit` (with a `Due:` or a `Context:`; `add --help` lists the
+   rest), and a change to one its `done`, `snooze` or `due` with `--no-commit`, or `ao board edit
+   done|snooze`; a `decide` or a `reply` is Paul's. Commit a helper's result in your own PR. Due items are printed
    into the context of every session started in a repo that wires the SessionStart hook (this
    repo does, via `.claude/settings.json`). If parked work has a branch, push it and name it.
 2. **Periodic sweep.** Run `/stranded-work` weekly or whenever in doubt; `/attention` is the
@@ -153,7 +161,10 @@ can act on you ([ADR 2026-09-24](docs/decisions/2026-09-24-cloud-sessions.md)). 
 - **Your PR is the one signal the org can see.** Open it as soon as the work is pushable and put
   in its body what waits on whom; a board line committed on your branch reaches nobody until the
   merge it was meant to cause. Ledger lines are fine: they land at merge, which is when they are
-  read. Findings on your work come back as PR comments, nowhere else.
+  read — but a cloud session writes no new entry (it has no `ao td reserve`; your PR's reader files it,
+  design §4.4), and changes an entry with `agent-cadence run ledger.py set|note` only where
+  `agent-cadence` runs in your container, else leaves that to the reader too. Findings on your work
+  come back as PR comments, nowhere else.
 
 agent-cadence's scripts and docs are not copied into this repo: the pin in `docs/cadence.toml`
 names the commit, `agent-cadence run <script>` runs one and `agent-cadence path <name>` finds a doc.
