@@ -76,6 +76,10 @@ async def test_another_sender_and_a_resumed_sender(agent, tmp_path):
             async with LocalClient(caller=new) as c:
                 with pytest.raises(AgentError, match=f"you have {first['id']} open"):
                     await c.call("msg", to="person", text="merge?", kind="ask", about="TD-9", subject="Merge")
+                with pytest.raises(AgentError, match=f"you have {first['id']} open"):
+                    await c.call(
+                        "msg", to="person", text="merge?", kind="steer", default="yes", about="TD-9", subject="Merge"
+                    )
         finally:
             agent.sessions[old].superseded_by = None
         for sid in (old, new, other):
