@@ -1428,6 +1428,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-11-04 (TD-1286, the designer; build TD-1363): `ao td reserve --json` gains `id_take` and `id_take_line`, and standard error *write `**Id take:** <nonce>` in each entry's header*, agent-cadence TD-188's step 3 (§4.4 *Its answer*).
 - 2026-11-02 (TD-1303's review, round 1, Fable): `--shot` records `HEAD`'s branch as `shots_ref` too.
 - 2026-11-02 (TD-1303, the designer): `ao msg --shot` records `HEAD` as the envelope's `shots_at` and refuses a shot not committed there or a `HEAD` no `origin` ref contains. Built by TD-1307.
 - 2026-10-31 (TD-1291, grinder-ao-2; auditing #2756): `ao td reserve`'s paragraph names the `question` key in `--json` and the filing-question line, said last on standard error, which TD-1282 added and wrote in §4.4 alone.
