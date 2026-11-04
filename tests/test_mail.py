@@ -1278,9 +1278,10 @@ async def test_about_is_filled_from_the_senders_one_claim(agent, tmp_path):
         mk = _mk(person, tmp_path)
         a = await mk("a", unattended=True, team="ao-grind")
         async with LocalClient(caller=a) as s:
+            n = iter(range(100))  # each its own text: a same-matter repeat is refused (§4.10, TD-1383)
 
             async def about(**kw):
-                return (await s.call("msg", to="person", text="which?", kind="ask", **kw))["entry"]["about"]
+                return (await s.call("msg", to="person", text=f"which {next(n)}?", kind="ask", **kw))["entry"]["about"]
 
             assert await about() is None  # no claim
             await s.call("progress", id=a, ref="td-771", status="claimed")
@@ -1940,14 +1941,14 @@ async def test_a_question_carries_its_likely_answers_cleaned_more_strictly_than_
             # cleaning to nothing, and repeating an earlier one exactly, are drops — not refusals;
             # the comparison is after cleaning and is case-sensitive
             thin = await c.call(
-                "msg", to="person", text="?", kind="ask", answers=["\x1b[0m", "yes", "\x1b[1myes", "YES"]
+                "msg", to="person", text="??", kind="ask", answers=["\x1b[0m", "yes", "\x1b[1myes", "YES"]
             )
             assert thin["entry"]["answers"] == ["yes", "YES"]
             # a fifth is refused in the design's words
             with pytest.raises(AgentError, match="at most four answers"):
                 await c.call("msg", to="person", text="?", kind="ask", answers=["a", "b", "c", "d", "e"])
             # …counted after the drops: five given, four left, is a send
-            five = await c.call("msg", to="person", text="?", kind="ask", answers=["a", "b", "", "c", "d"])
+            five = await c.call("msg", to="person", text="???", kind="ask", answers=["a", "b", "", "c", "d"])
             assert five["entry"]["answers"] == ["a", "b", "c", "d"]
             # only a question carries them
             for kind in ("note", "reply"):
@@ -2791,9 +2792,11 @@ async def test_a_look_carries_its_commit_and_branch_cleaned_at_every_hop(agent, 
     async with LocalClient() as person:
         builder = await _mk(person, tmp_path)("builder", unattended=True)
         async with LocalClient(caller=builder) as c:
+            n = iter(range(100))  # each its own text: a same-matter repeat is refused (§4.10, TD-1383)
 
             async def look(**kw):
-                return (await c.call("msg", to="person", kind="steer", default="Works", text="the row?", **kw))["entry"]
+                text = f"the row {next(n)}?"
+                return (await c.call("msg", to="person", kind="steer", default="Works", text=text, **kw))["entry"]
 
             e = await look(shots=shot, shots_at=sha, shots_ref="td1307-shots-at")
             assert (e["shots_at"], e["shots_ref"]) == (sha, "td1307-shots-at")
@@ -2842,7 +2845,7 @@ async def test_a_look_names_its_screenshots_on_a_steer_or_an_ask_to_the_person_a
             assert steer["shots"] == [good[0], "docs/mockups/reviews/b_2.png"] and steer["bound"]
             ask = (
                 await c.call(
-                    "msg", to="person", kind="ask", text="the row?", answers=["Works", "Not right: x"], shots=good[0]
+                    "msg", to="person", kind="ask", text="row two?", answers=["Works", "Not right: x"], shots=good[0]
                 )
             )["entry"]
             assert ask["shots"] == [good[0]] and ask["bound"] is None

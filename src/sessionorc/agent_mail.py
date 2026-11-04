@@ -54,6 +54,12 @@ def _claim_about(rec: Any) -> str | None:
     return None
 
 
+def _fold(value: str | None) -> str:
+    """A matter's words as *One open copy of a question* compares them (§4.10, TD-1379): case and runs of
+    white space folded, none read as empty."""
+    return " ".join(str(value or "").split()).casefold()
+
+
 def _shots(shots: Any, kind: str) -> list[str]:
     """A look's screenshots (design §4.10 *A look*, TD-292), checked whole before anything else is
     done with them: a list of repo-relative paths, each a `.png` directly under
@@ -806,6 +812,10 @@ class MailMixin:
             # one never expires, and the person inbox's depths are what bound it instead (§4.10).
             span = timedelta(seconds=float(bound)) if bound is not None else mail.ASK_BOUND
             entry.bound = (now + span).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        if PERSON in named and kind in ASK_KINDS and sender != PERSON:
+            # §4.10 *One open copy of a question* (TD-1379): read here, once `about` has its default and
+            # `subject` is derived, and before anything lands — no `await` falls between this and the landing
+            self._check_one_open_copy(records, sender, entry)
         landed: list[str] = []
         failed: list[str] = []
         for sid in copies:
@@ -1030,6 +1040,31 @@ class MailMixin:
         return [e for e in self.person_inbox if e.id == msg_id] + [
             e for r in self._graph().values() for e in r.holds(msg_id)
         ]
+
+    def _check_one_open_copy(self, records: dict[str, Session], sender: str, entry: MailEntry) -> None:
+        """§4.10 *One open copy of a question* (TD-1379, TD-1383): an `ask` or a `steer` to the person is
+        refused while the same sender — along the `superseded_by` chain, as `message_gate`'s `mine` reads
+        it — has an open question there on the same matter: the same `about` and `subject` as each is
+        stored (a copy storing no subject, a passed-up question, read by `mail.subject_of` of its text),
+        case and runs of white space folded; with no `about`, the same text too. Either kind refuses
+        either; another sender's question, a `note` and a `reply` are not read."""
+        mine = {sender} | {k for k in records if sender in mail.chain(records, k, self._successor)}
+        about, subject = _fold(entry.about), _fold(entry.subject or mail.subject_of(entry.text))
+        text = _fold(entry.text)
+        for e in self.person_inbox:
+            if not e.open or e.orphaned or e.from_ not in mine:
+                continue
+            if _fold(e.about) != about or _fold(e.subject or mail.subject_of(e.text)) != subject:
+                continue
+            if not about and _fold(e.text) != text:
+                continue
+            on = f" on {entry.about}" if entry.about else ""
+            raise RpcError(
+                f'you have {e.id} open to the person{on}, "{e.subject or mail.subject_of(e.text)}": wait for its '
+                f"answer, or withdraw it (ao msg --withdraw {e.id}) and ask anew (design §4.10 *One open copy of "
+                f"a question*)",
+                open=e.id,
+            )
 
     def _check_person_depth(self, sender: str, *, question: bool) -> None:
         """The person inbox's depths (design §4.10 *The numbers*): it fills exactly when the person
