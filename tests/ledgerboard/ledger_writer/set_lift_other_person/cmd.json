@@ -1,0 +1,15 @@
+{
+ "argv": [
+  "set",
+  "TD-1",
+  "--blocked-by",
+  "until 2026-01-10, event (ships)",
+  "--by",
+  "Sam",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

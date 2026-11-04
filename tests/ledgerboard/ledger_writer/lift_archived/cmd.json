@@ -1,0 +1,15 @@
+{
+ "argv": [
+  "lift",
+  "TD-5",
+  "--gate",
+  "until 2026-01-10",
+  "--by",
+  "host-1",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

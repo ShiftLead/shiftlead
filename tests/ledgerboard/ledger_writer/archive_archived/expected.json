@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "archive",
+  "unusable": "TD-005 is archived (ledger/archive/TD-005.md): archived already"
+ }
+}

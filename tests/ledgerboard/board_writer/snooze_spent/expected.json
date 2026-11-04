@@ -1,0 +1,17 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "snooze",
+  "item_notes": [
+   {
+    "line": 7,
+    "note": "hide-spent: Hide until: 2026-01-15 has come, so it hides nothing; a snooze replaces it"
+   }
+  ],
+  "line": 7,
+  "paths": [
+   "board.md"
+  ],
+  "subject": "ledgerboard: snooze Merge the parser fix. to 2026-01-15 (session `w-1`)"
+ }
+}

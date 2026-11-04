@@ -1,4 +1,81 @@
 {
+ "archive_plan": {
+  "another_repo_unresolved_refused": {
+   "refused": "the successor acme/tools#TD-4 cannot be resolved — a successor exists, open or Resolved"
+  },
+  "chain_ending_in_dropped_refused": {
+   "refused": "the successor's chain (TD-423 → TD-422) ends in an entry archived Dropped — a successor is open or Resolved"
+  },
+  "chain_looping_back_refused": {
+   "refused": "superseding TD-400 by TD-424 loops back (TD-424 → TD-400 → TD-424) — name another successor"
+  },
+  "dropped": {
+   "ok": {
+    "rewire": [],
+    "successor": null
+   }
+  },
+  "dropped_and_superseded_refused": {
+   "refused": "an entry is dropped or superseded, not both"
+  },
+  "dropped_refused_with_dependents": {
+   "refused": "TD-400 cannot be dropped while TD-401, TD-402 are Blocked by it — decide each first: drop the blocker, or block it on what replaces TD-400"
+  },
+  "not_open_refused": {
+   "refused": "'TD-421' names no open entry"
+  },
+  "resolved": {
+   "ok": {
+    "rewire": [],
+    "successor": null
+   }
+  },
+  "successor_a_dependent_refused": {
+   "refused": "TD-401 is Blocked by TD-400 and is its successor: it would block on itself — name another successor, or take the blocker off it first"
+  },
+  "successor_unknown_refused": {
+   "refused": "the successor TD-499 names no entry in the ledger or the archive — a successor exists, open or Resolved"
+  },
+  "successor_waiting_on_a_dependent_refused": {
+   "refused": "the successor TD-411 waits on TD-401, which is Blocked by TD-400: rewired, they would block on each other — name another successor, or untangle them first"
+  },
+  "superseded_by_another_repo": {
+   "ok": {
+    "rewire": [
+     "TD-401",
+     "TD-402"
+    ],
+    "successor": "acme/tools#TD-3"
+   }
+  },
+  "superseded_by_dropped_refused": {
+   "refused": "the successor's chain (TD-422) ends in an entry archived Dropped — a successor is open or Resolved"
+  },
+  "superseded_by_itself_refused": {
+   "refused": "superseding TD-400 by TD-400 loops back (TD-400 → TD-400) — name another successor"
+  },
+  "superseded_by_live": {
+   "ok": {
+    "rewire": [
+     "TD-401",
+     "TD-402"
+    ],
+    "successor": "TD-410"
+   }
+  },
+  "superseded_follows_the_chain": {
+   "ok": {
+    "rewire": [
+     "TD-401",
+     "TD-402"
+    ],
+    "successor": "TD-421"
+   }
+  },
+  "superseded_unknown_status": {
+   "refused": "the successor's chain (TD-425) ends in an entry archived with a Status word this reader does not know (Xyzzy) — a successor is open or Resolved"
+  }
+ },
  "canonical": {
   "already": {
    "idempotent": true,
@@ -36,6 +113,42 @@
   }
  },
  "check": {
+  "log_flags_no_old": [
+   {
+    "field": "log",
+    "id": "TD-090",
+    "kind": "log-not-last",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-090: a section follows its Log — the Log is the body's last section; move the section above it"
+   },
+   {
+    "field": "log",
+    "id": "TD-091",
+    "kind": "log-line",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-091: its Log line '- 2026-01-02 a line with no colon' is not `- YYYY-MM-DD: words`"
+   }
+  ],
+  "log_flags_standing_where_the_entry_is_unchanged": [
+   {
+    "field": "log",
+    "id": "TD-090",
+    "kind": "log-not-last",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-090: a section follows its Log — the Log is the body's last section; move the section above it"
+   },
+   {
+    "field": "log",
+    "id": "TD-091",
+    "kind": "log-line",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-091: its Log line '- 2026-01-02 a line with no colon' is not `- YYYY-MM-DD: words`"
+   }
+  ],
   "no_old_no_rule": [
    {
     "field": "part of",
@@ -84,25 +197,40 @@
  },
  "edit_entry": {
   "archive": {
-   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20: built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Resolved:** 2026-01-20 (PR #12) — `src/thing.py` and its test\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Resolved:** 2026-01-20 (PR #12) — `src/thing.py` and its test\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-12: half built\n- 2026-01-20: archived: Resolved — built\n"
   },
   "archive_after_reopen": {
-   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Resolved 2026-01-20: fixed\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #17)\n"
+   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Resolved 2026-01-20\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #17)\n\n**Log:**\n- 2026-01-05: built\n- 2026-01-20: reopened — it broke\n- 2026-01-20: archived: Resolved — fixed\n"
   },
   "archive_as_is": {
-   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20: built as it says\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Resolved:** 2026-01-20 (PR #12)\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Resolved:** 2026-01-20 (PR #12)\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-12: half built\n- 2026-01-20: archived: Resolved — built as it says\n"
+  },
+  "archive_copies_an_unknown_status_whole": {
+   "ok": "## TD-082: A Status no lift reads\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** Resolved 2026-01-20\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #9)\n\n**Log:**\n- 2026-01-02: was: **Live check held** until the next run\n- 2026-01-20: archived: Resolved — held long enough\n"
+  },
+  "archive_copies_in_progress_whole": {
+   "ok": "## TD-087: Statuses that only look like a word and a note\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** Superseded 2026-01-20 by TD-90\n\n**Why:** a reason.\n\n**Log:**\n- 2026-01-02: was: In progress: the first half\n- 2026-01-20: archived: Superseded — replaced\n"
+  },
+  "archive_dropped": {
+   "ok": "## TD-400: The entry to archive\n\n**Priority:** Medium\n**Status:** Dropped 2026-01-20\n\n**Why:** w\n\n**Fix:** f\n\n**Log:**\n- 2026-01-20: archived: Dropped — no longer needed\n"
+  },
+  "archive_dropped_refused_with_pr": {
+   "refused": "a dropped entry keeps its Why and Fix, and nothing replaces it: no pr, pointer, as_is or superseded_by"
   },
   "archive_header_resolved": {
-   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Resolved 2026-01-20: built again\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #16)\n"
+   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Resolved 2026-01-20\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #16)\n\n**Log:**\n- 2026-01-06: built\n- 2026-01-20: archived: Resolved — built again\n"
+  },
+  "archive_inserts_its_resolved_line_before_the_log": {
+   "ok": "## TD-081: Notes written into the Status before the Log\n\n**Priority:** Low\n**Added:** 2026-01-02 found while building TD-80\n**Status:** Resolved 2026-01-20\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-20 (PR #12) — `src/thing.py`\n\n**Log:**\n- 2026-01-02: was: Open\n- 2026-01-03: an earlier line\n- 2026-01-03: was: Resolved 2026-01-03: done too soon\n- 2026-01-04: half built 2026-01-06: the rest built\n- 2026-01-05: a later line\n- 2026-01-20: archived: Resolved — all built\n"
   },
   "archive_no_fix": {
-   "ok": "## TD-060: A decision with no Fix section\n\n**Priority:** Medium\n**Kind:** decision\n**Status:** Resolved 2026-01-20: decided\n\n**Why:** a choice to make.\n\n**Ask:** which way?\n\n**Done when** it is decided.\n\n**Related:** TD-012.\n\n**Resolved:** 2026-01-20 (PR #14)\n"
+   "ok": "## TD-060: A decision with no Fix section\n\n**Priority:** Medium\n**Kind:** decision\n**Status:** Resolved 2026-01-20\n\n**Why:** a choice to make.\n\n**Ask:** which way?\n\n**Done when** it is decided.\n\n**Related:** TD-012.\n\n**Resolved:** 2026-01-20 (PR #14)\n\n**Log:**\n- 2026-01-20: archived: Resolved — decided\n"
   },
   "archive_no_pr": {
-   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20: done by hand\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Resolved:** 2026-01-20 — `docs/thing.md`\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Resolved 2026-01-20\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Resolved:** 2026-01-20 — `docs/thing.md`\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-12: half built\n- 2026-01-20: archived: Resolved — done by hand\n"
   },
   "archive_qualified_fix_only_no_status": {
-   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** Resolved 2026-01-20: designed\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n\n**Resolved:** 2026-01-20 (PR #15)\n"
+   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** Resolved 2026-01-20\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n\n**Resolved:** 2026-01-20 (PR #15)\n\n**Log:**\n- 2026-01-20: archived: Resolved — designed\n"
   },
   "archive_refused_pointer_hash": {
    "refused": "with no PR, the pointer may not hold #<digits>: a reader would take it for the PR"
@@ -114,10 +242,16 @@
    "refused": "a superseded entry keeps its Why and Fix: no pr, pointer or as_is"
   },
   "archive_superseded": {
-   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Superseded 2026-01-20 by TD-070: TD-070 does it all\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Superseded 2026-01-20 by TD-070\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-12: half built\n- 2026-01-20: archived: Superseded — TD-070 does it all\n"
+  },
+  "archive_superseded_by_another_repo": {
+   "ok": "## TD-400: The entry to archive\n\n**Priority:** Medium\n**Status:** Superseded 2026-01-20 by acme/tools#TD-3\n\n**Why:** w\n\n**Fix:** f\n\n**Log:**\n- 2026-01-20: archived: Superseded — moved\n"
   },
   "crlf_note": {
-   "ok": "## TD-067: CRLF\n\n**Priority:** Low\n**Status:** Open 2026-01-20: read through CRLF\n\n**Why:** w\n"
+   "ok": "## TD-067: CRLF\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Log:**\n- 2026-01-20: read through CRLF\n"
+  },
+  "edit_adds_a_section_before_the_log": {
+   "ok": "## TD-081: Notes written into the Status before the Log\n\n**Priority:** Low\n**Added:** 2026-01-02 found while building TD-80\n**Status:** Open 2026-01-04: half built 2026-01-06: the rest built — was: Resolved 2026-01-03: done too soon — was: Open\n\n**Why:** a reason.\n\n**Related:** TD-80.\n\n**Log:**\n- 2026-01-03: an earlier line\n- 2026-01-05: a later line\n"
   },
   "edit_adds_after_why": {
    "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Ask:** which way?\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
@@ -132,10 +266,13 @@
    "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** all three are done.\n\n**Related:** TD-012.\n"
   },
   "edit_fix_after_reopen": {
-   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Open 2026-01-20: it broke — was: Resolved 2026-01-05: built\n\n**Why:** a reason.\n\n**Fix:** fix it again.\n\n**Resolved:** 2026-01-05 (PR #7) — `docs/thing.md`\n"
+   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** a reason.\n\n**Fix:** fix it again.\n\n**Resolved:** 2026-01-05 (PR #7) — `docs/thing.md`\n\n**Log:**\n- 2026-01-05: built\n- 2026-01-20: reopened — it broke\n"
   },
   "edit_refused_bold_paragraph": {
    "refused": "after the edit the entry would not read back as meant, with the rest unchanged — rephrase it, or edit by hand"
+  },
+  "edit_refused_the_log": {
+   "refused": "the Log is written by its writers (note, archive, reopen), never replaced by edit"
   },
   "edit_refused_two_named": {
    "refused": "the body has 2 sections named 'Note' — edit it by hand"
@@ -144,16 +281,31 @@
    "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** a new reason.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
   },
   "note": {
-   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built 2026-01-20: the second half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-12: half built\n- 2026-01-20: the second half built\n"
+  },
+  "note_leaves_an_unknown_status": {
+   "ok": "## TD-082: A Status no lift reads\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** **Live check held** until the next run\n\n**Why:** a reason.\n\n**Fix:** the steps.\n\n**Log:**\n- 2026-01-20: looked\n"
+  },
+  "note_leaves_in_progress": {
+   "ok": "## TD-087: Statuses that only look like a word and a note\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** In progress: the first half\n\n**Why:** a reason.\n\n**Log:**\n- 2026-01-20: looked\n"
+  },
+  "note_lifts_the_status_notes": {
+   "ok": "## TD-081: Notes written into the Status before the Log\n\n**Priority:** Low\n**Added:** 2026-01-02 found while building TD-80\n**Status:** Open 2026-01-04\n\n**Why:** a reason.\n\n**Log:**\n- 2026-01-02: was: Open\n- 2026-01-03: an earlier line\n- 2026-01-03: was: Resolved 2026-01-03: done too soon\n- 2026-01-04: half built 2026-01-06: the rest built\n- 2026-01-05: a later line\n- 2026-01-20: a new note\n"
   },
   "note_no_status": {
-   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** 2026-01-20: first words\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n"
+   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n\n**Log:**\n- 2026-01-20: first words\n"
+  },
+  "note_refused_log_not_last": {
+   "refused": "a section follows the entry's Log, which is the body's last — move it above the Log, by hand"
   },
   "note_refused_two_lines": {
    "refused": "a note is one line (cadence.md §2.12)"
   },
+  "note_refused_writer_prefix": {
+   "refused": "a note may not begin with a Log writer's prefix ('filed by', 'gate added:', 'gate lifted:', 'gate reassigned:', 'kept waiting:', 'gate lift skipped:', 'was:', 'archived:', 'reopened —') — say it in other words"
+  },
   "note_title_with_comment": {
-   "ok": "## TD-069: A title <!-- with a comment -->\n\n**Priority:** Low\n**Status:** Open 2026-01-20: read past the comment\n"
+   "ok": "## TD-069: A title <!-- with a comment -->\n\n**Priority:** Low\n**Status:** Open\n\n**Log:**\n- 2026-01-20: read past the comment\n"
   },
   "refused_bad_today": {
    "refused": "note needs today's date as YYYY-MM-DD, not 'soon'"
@@ -182,14 +334,26 @@
   "rename_ref_by_number": {
    "ok": "## TD-065: Two sections of one name\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** TD-107, other-repo#TD-007, decision (the owner)\n**Part of:** TD-030 (its build)\n\n**Note:** the first.\n\n**Note:** the second.\n"
   },
+  "rename_ref_keeps_one_copy": {
+   "ok": "## TD-402: Blocked by it and by its would-be successor\n\n**Priority:** Medium\n**Blocked by:** TD-410, until 2026-03-01\n"
+  },
+  "rename_ref_keeps_one_copy_across_repos": {
+   "ok": "## TD-402: Blocked by it and by its would-be successor\n\n**Priority:** Medium\n**Blocked by:** Acme/Tools#TD-3, until 2026-03-01\n"
+  },
   "rename_ref_other_repo": {
    "ok": "## TD-065: Two sections of one name\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** TD-7, other-repo#TD-8, decision (the owner)\n**Part of:** TD-030 (its build)\n\n**Note:** the first.\n\n**Note:** the second.\n"
   },
   "rename_ref_parent": {
    "ok": "## TD-065: Two sections of one name\n\n**Priority:** Low\n**Status:** Open\n**Blocked by:** TD-7, other-repo#TD-007, decision (the owner)\n**Part of:** TD-031 (its build)\n\n**Note:** the first.\n\n**Note:** the second.\n"
   },
+  "rename_ref_rewrites_a_while_token": {
+   "ok": "## TD-080: An entry whose Log holds every writer shape\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Kim), until 2026-03-01, event (tool-v3)\n\n**Why:** a reason.\n\n**Ask:** go or not?\n\n**Log:**\n- 2026-01-02: filed by Kim, session plan-7, while other-repo#TD-40: \"file the \"tool\" entry\"\n- 2026-01-02: gate added: decision (Kim)\n- 2026-01-03: gate added: until 2026-03-01\n- 2026-01-04: gate added: event (tool-v3)\n- 2026-01-05: kept waiting: decision (Kim) — by Kim; answer \"Not yet\"\n- 2026-01-06: gate reassigned: decision (Kim) → decision (Lee) — by Kim; away a month\n- 2026-01-07: gate lifted: decision (Lee) — by Lee; answer \"Go\"; board other-repo\n- 2026-01-07: gate lifted: decision (Lee) — by Kim; override: Lee is away\n- 2026-01-08: gate lifted: event (tool-v3) — by box-1; pr-merged passed; tool#31\n- 2026-01-08: gate lifted: event (tool-v3) — by Kim; answer \"Drop it\"\n- 2026-01-09: gate lifted: until 2026-03-01 — by box-1; date reached\n- 2026-01-09: gate lift skipped: TD-81 no longer carries decision (Kim)\n- 2026-01-10: archived: Dropped — nothing needs it\n- 2026-01-11: reopened — it is needed after all\n- 2026-01-11: was: Built 2026-01-10: half of it\n- 2026-01-12: note: was: a lifted note that would read as a writer line\n- 2026-01-12: a tool of the future wrote this: unknown, kept byte for byte\n- 2026-01-13: gate lifted: by hand, in no shape\n"
+  },
   "renumber": {
    "ok": "## TD-140: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "renumber_leaves_the_log": {
+   "ok": "## TD-180: An entry whose Log holds every writer shape\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Kim), until 2026-03-01, event (tool-v3)\n\n**Why:** a reason.\n\n**Ask:** go or not?\n\n**Log:**\n- 2026-01-02: filed by Kim, session plan-7, while other-repo#TD-4: \"file the \"tool\" entry\"\n- 2026-01-02: gate added: decision (Kim)\n- 2026-01-03: gate added: until 2026-03-01\n- 2026-01-04: gate added: event (tool-v3)\n- 2026-01-05: kept waiting: decision (Kim) — by Kim; answer \"Not yet\"\n- 2026-01-06: gate reassigned: decision (Kim) → decision (Lee) — by Kim; away a month\n- 2026-01-07: gate lifted: decision (Lee) — by Lee; answer \"Go\"; board other-repo\n- 2026-01-07: gate lifted: decision (Lee) — by Kim; override: Lee is away\n- 2026-01-08: gate lifted: event (tool-v3) — by box-1; pr-merged passed; tool#31\n- 2026-01-08: gate lifted: event (tool-v3) — by Kim; answer \"Drop it\"\n- 2026-01-09: gate lifted: until 2026-03-01 — by box-1; date reached\n- 2026-01-09: gate lift skipped: TD-81 no longer carries decision (Kim)\n- 2026-01-10: archived: Dropped — nothing needs it\n- 2026-01-11: reopened — it is needed after all\n- 2026-01-11: was: Built 2026-01-10: half of it\n- 2026-01-12: note: was: a lifted note that would read as a writer line\n- 2026-01-12: a tool of the future wrote this: unknown, kept byte for byte\n- 2026-01-13: gate lifted: by hand, in no shape\n"
   },
   "renumber_refused": {
    "refused": "renumber needs the new TD-n, not '140'"
@@ -198,28 +362,61 @@
    "refused": "TD-040 is numbered 40 already — a renumber gives it another number"
   },
   "reopen": {
-   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Open 2026-01-20: it broke — was: Resolved 2026-01-05: built\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-05 (PR #7) — `docs/thing.md`\n"
+   "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-05 (PR #7) — `docs/thing.md`\n\n**Log:**\n- 2026-01-05: built\n- 2026-01-20: reopened — it broke\n"
   },
   "reopen_header_resolved": {
-   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Open 2026-01-20: it broke — was: Resolved 2026-01-06: built\n\n**Why:** a reason.\n\n**Fix:** the steps.\n\n**Resolved:** 2026-01-06 (PR #8) — `src/old.py`\n"
+   "ok": "## TD-063: Archived the old way, its Resolved a header field\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** a reason.\n\n**Fix:** the steps.\n\n**Resolved:** 2026-01-06 (PR #8) — `src/old.py`\n\n**Log:**\n- 2026-01-06: built\n- 2026-01-20: reopened — it broke\n"
   },
   "reopen_no_status": {
-   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** Open 2026-01-20: not done\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n"
+   "ok": "## TD-061: No Status, and only a qualified Fix\n\n**Priority:** Low\n**Added:** 2026-01-03\n**Status:** Open\n\n**Why:** a reason.\n\n**Fix (to design):** the shape first.\n\n**Log:**\n- 2026-01-20: reopened — not done\n"
   },
   "reopen_refused_both_resolved": {
    "refused": "it has both a Resolved field and a **Resolved:** section — merge them by hand, then reopen"
   },
+  "reopen_undated_status_takes_the_resolved_date": {
+   "ok": "## TD-083: An archived Status with no date of its own\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-09 (PR #5)\n\n**Log:**\n- 2026-01-09: built in the first pass\n- 2026-01-20: reopened — not done\n"
+  },
+  "set_blocked_by_canonical_order": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-4, decision (kim), until 2026-02-01\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
   "set_fields": {
    "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** High\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Waits:** the next run\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
   },
+  "set_migrates_old_form": {
+   "ok": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat), until 2026-02-01\n\n**Why:** w\n\n**Ask:** the board's 2026-01-03 item\n"
+  },
+  "set_other_field_keeps_old_form": {
+   "ok": "## TD-120: An entry in the old form\n\n**Priority:** High\n**Blocked by:** TD-3, decision (pat) — the board's 2026-01-03 item\n\n**Why:** w\n"
+  },
   "set_refused_field_twice": {
    "refused": "set names one field twice"
+  },
+  "set_refused_gate_on_old_form": {
+   "refused": "the entry's Blocked by is in the old form, whose text would swallow until 2026-02-01 — migrate it first: set decision (<person>) alone, with its text in an **Ask:** section"
+  },
+  "set_refused_old_form": {
+   "refused": "Blocked by in the old form (decision (kim) with text after it) is read but never written — write decision (<person>) and put the text in an **Ask:** section"
   },
   "set_refused_two_lines": {
    "refused": "the Location field is one line (cadence.md §2.12)"
   }
  },
  "entry_text": {
+  "filed": {
+   "ok": "## TD-085: Filed with its Log\n\n**Priority:** Low\n**Added:** 2026-01-15\n**Status:** Open\n**Blocked by:** TD-80, decision (Kim)\n\n**Why:** the reason.\n\n**Ask:** go?\n\n**Log:**\n- 2026-01-15: filed by Kim, session plan-7, while TD-80: \"file it\"\n- 2026-01-15: gate added: decision (Kim)\n"
+  },
+  "filed_gates_in_canonical_order": {
+   "ok": "## TD-121: Gates written in their order\n\n**Priority:** Medium\n**Added:** 2026-01-15\n**Blocked by:** TD-3, other/repo#TD-9, decision (pat), until 2026-02-01, event (vendor-ships)\n\n**Why:** w\n\n**Ask:** pat says go.\n\n**Log:**\n- 2026-01-15: filed by pat, session plan-7: \"file it\"\n- 2026-01-15: gate added: decision (pat)\n- 2026-01-15: gate added: until 2026-02-01\n- 2026-01-15: gate added: event (vendor-ships)\n"
+  },
+  "filed_refused_added_comment": {
+   "refused": "a filed entry's Added is the date alone (its words go in the Log), not '2026-01-15 a comment'"
+  },
+  "filed_refused_status_note": {
+   "refused": "a filed entry's Status is Open (its notes go in the Log), not 'Open 2026-01-15: x'"
+  },
+  "filed_refused_who_with_a_space": {
+   "refused": "filed: who is a token with no spaces, commas, colons or quotes, not 'Kim Lee'"
+  },
   "mapping": {
    "ok": "## TD-051: Sections as a mapping\n\n**Priority:** Low\n\n**Why:** a reason.\n\n**Related:** TD-050.\n"
   },
@@ -241,11 +438,271 @@
   "refused_no_fields": {
    "refused": "an entry with sections needs at least one field: the paragraph after the heading is the header block"
   },
+  "refused_old_form": {
+   "refused": "Blocked by in the old form (decision (pat) with text after it) is read but never written — write decision (<person>) and put the text in an **Ask:** section"
+  },
   "refused_title": {
    "refused": "an entry needs its title, on one line"
   },
   "refused_unnamed_later": {
    "refused": "only the first section may have no name — the text before the first lead"
+  },
+  "unreadable_blocked_by_written_as_given": {
+   "ok": "## TD-123: t\n\n**Priority:** Low\n**Blocked by:** until soon, TD-3\n\n**Why:** w\n"
+  }
+ },
+ "log": {
+  "date_then_punctuation_is_prose": {
+   "gate_age": {},
+   "log_lines": [],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-088: x\n\n**Added:** 2026-01-02\n**Status:** Resolved 2026-01-05, PR #4\n\n**Why:** w\n"
+   }
+  },
+  "every_shape": {
+   "gate_age": {
+    "decision (Lee)": "2026-01-06",
+    "decision (kim)": "2026-01-05",
+    "event (other)": "2026-01-02",
+    "event (tool-v3)": "2026-01-04",
+    "until 2026-03-01": "2026-01-03"
+   },
+   "log_lines": [
+    {
+     "date": "2026-01-02",
+     "kind": "filed",
+     "session": "plan-7",
+     "text": "filed by Kim, session plan-7, while other-repo#TD-4: \"file the \"tool\" entry\"",
+     "while": "other-repo#TD-4",
+     "who": "Kim",
+     "words": "file the \"tool\" entry"
+    },
+    {
+     "date": "2026-01-02",
+     "gate": "decision (Kim)",
+     "kind": "gate-added",
+     "text": "gate added: decision (Kim)"
+    },
+    {
+     "date": "2026-01-03",
+     "gate": "until 2026-03-01",
+     "kind": "gate-added",
+     "text": "gate added: until 2026-03-01"
+    },
+    {
+     "date": "2026-01-04",
+     "gate": "event (tool-v3)",
+     "kind": "gate-added",
+     "text": "gate added: event (tool-v3)"
+    },
+    {
+     "by": "Kim",
+     "date": "2026-01-05",
+     "gate": "decision (Kim)",
+     "kind": "kept-waiting",
+     "label": "Not yet",
+     "text": "kept waiting: decision (Kim) — by Kim; answer \"Not yet\""
+    },
+    {
+     "by": "Kim",
+     "date": "2026-01-06",
+     "gate": "decision (Kim)",
+     "kind": "gate-reassigned",
+     "text": "gate reassigned: decision (Kim) → decision (Lee) — by Kim; away a month",
+     "to": "decision (Lee)",
+     "why": "away a month"
+    },
+    {
+     "by": "Lee",
+     "date": "2026-01-07",
+     "gate": "decision (Lee)",
+     "kind": "gate-lifted",
+     "label": "Go",
+     "suffix": "; board other-repo",
+     "text": "gate lifted: decision (Lee) — by Lee; answer \"Go\"; board other-repo",
+     "via": "answer"
+    },
+    {
+     "by": "Kim",
+     "date": "2026-01-07",
+     "gate": "decision (Lee)",
+     "kind": "gate-lifted",
+     "text": "gate lifted: decision (Lee) — by Kim; override: Lee is away",
+     "via": "override",
+     "why": "Lee is away"
+    },
+    {
+     "by": "box-1",
+     "check": "pr-merged",
+     "date": "2026-01-08",
+     "evidence": "tool#31",
+     "gate": "event (tool-v3)",
+     "kind": "gate-lifted",
+     "text": "gate lifted: event (tool-v3) — by box-1; pr-merged passed; tool#31",
+     "via": "check"
+    },
+    {
+     "by": "Kim",
+     "date": "2026-01-08",
+     "gate": "event (tool-v3)",
+     "kind": "gate-lifted",
+     "label": "Drop it",
+     "text": "gate lifted: event (tool-v3) — by Kim; answer \"Drop it\"",
+     "via": "answer"
+    },
+    {
+     "by": "box-1",
+     "date": "2026-01-09",
+     "gate": "until 2026-03-01",
+     "kind": "gate-lifted",
+     "text": "gate lifted: until 2026-03-01 — by box-1; date reached",
+     "via": "date"
+    },
+    {
+     "date": "2026-01-09",
+     "gate": "decision (Kim)",
+     "id": "TD-81",
+     "kind": "gate-lift-skipped",
+     "text": "gate lift skipped: TD-81 no longer carries decision (Kim)"
+    },
+    {
+     "date": "2026-01-10",
+     "kind": "archived",
+     "text": "archived: Dropped — nothing needs it",
+     "why": "nothing needs it",
+     "word": "Dropped"
+    },
+    {
+     "date": "2026-01-11",
+     "kind": "reopened",
+     "text": "reopened — it is needed after all",
+     "why": "it is needed after all"
+    },
+    {
+     "date": "2026-01-11",
+     "kind": "was",
+     "status": "Built 2026-01-10: half of it",
+     "text": "was: Built 2026-01-10: half of it"
+    },
+    {
+     "date": "2026-01-12",
+     "kind": "note",
+     "text": "note: was: a lifted note that would read as a writer line"
+    },
+    {
+     "date": "2026-01-12",
+     "kind": "note",
+     "text": "a tool of the future wrote this: unknown, kept byte for byte"
+    },
+    {
+     "date": "2026-01-13",
+     "kind": "malformed",
+     "text": "gate lifted: by hand, in no shape"
+    }
+   ],
+   "log_problems": [
+    [
+     "log-line",
+     "its Log line '- 2026-01-13: gate lifted: by hand, in no shape' begins with a writer's prefix but not in its shape"
+    ]
+   ],
+   "status_notes_to_log": {
+    "ok": "## TD-080: An entry whose Log holds every writer shape\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Kim), until 2026-03-01, event (tool-v3)\n\n**Why:** a reason.\n\n**Ask:** go or not?\n\n**Log:**\n- 2026-01-02: filed by Kim, session plan-7, while other-repo#TD-4: \"file the \"tool\" entry\"\n- 2026-01-02: gate added: decision (Kim)\n- 2026-01-03: gate added: until 2026-03-01\n- 2026-01-04: gate added: event (tool-v3)\n- 2026-01-05: kept waiting: decision (Kim) — by Kim; answer \"Not yet\"\n- 2026-01-06: gate reassigned: decision (Kim) → decision (Lee) — by Kim; away a month\n- 2026-01-07: gate lifted: decision (Lee) — by Lee; answer \"Go\"; board other-repo\n- 2026-01-07: gate lifted: decision (Lee) — by Kim; override: Lee is away\n- 2026-01-08: gate lifted: event (tool-v3) — by box-1; pr-merged passed; tool#31\n- 2026-01-08: gate lifted: event (tool-v3) — by Kim; answer \"Drop it\"\n- 2026-01-09: gate lifted: until 2026-03-01 — by box-1; date reached\n- 2026-01-09: gate lift skipped: TD-81 no longer carries decision (Kim)\n- 2026-01-10: archived: Dropped — nothing needs it\n- 2026-01-11: reopened — it is needed after all\n- 2026-01-11: was: Built 2026-01-10: half of it\n- 2026-01-12: note: was: a lifted note that would read as a writer line\n- 2026-01-12: a tool of the future wrote this: unknown, kept byte for byte\n- 2026-01-13: gate lifted: by hand, in no shape\n"
+   }
+  },
+  "in_progress": {
+   "gate_age": {},
+   "log_lines": [],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-087: Statuses that only look like a word and a note\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** In progress: the first half\n\n**Why:** a reason.\n"
+   }
+  },
+  "legacy_status": {
+   "gate_age": {
+    "decision (Kim)": "2026-01-03"
+   },
+   "log_lines": [
+    {
+     "date": "2026-01-03",
+     "kind": "note",
+     "text": "an earlier line"
+    },
+    {
+     "date": "2026-01-05",
+     "kind": "note",
+     "text": "a later line"
+    }
+   ],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-081: Notes written into the Status before the Log\n\n**Priority:** Low\n**Added:** 2026-01-02 found while building TD-80\n**Status:** Open 2026-01-04\n\n**Why:** a reason.\n\n**Log:**\n- 2026-01-02: was: Open\n- 2026-01-03: an earlier line\n- 2026-01-03: was: Resolved 2026-01-03: done too soon\n- 2026-01-04: half built 2026-01-06: the rest built\n- 2026-01-05: a later line\n"
+   }
+  },
+  "log_not_last": {
+   "gate_age": {
+    "decision (Kim)": "2026-01-02"
+   },
+   "log_lines": [
+    {
+     "date": "2026-01-02",
+     "kind": "note",
+     "text": "a note"
+    },
+    {
+     "date": null,
+     "kind": "unreadable",
+     "text": "- 2026-01-03 a line with no colon"
+    }
+   ],
+   "log_problems": [
+    [
+     "log-not-last",
+     "a section follows its Log — the Log is the body's last section; move the section above it"
+    ],
+    [
+     "log-line",
+     "its Log line '- 2026-01-03 a line with no colon' is not `- YYYY-MM-DD: words`"
+    ]
+   ],
+   "status_notes_to_log": {
+    "ok": "## TD-084: A section written below the Log\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** a reason.\n\n**Log:**\n- 2026-01-02: a note\n- 2026-01-03 a line with no colon\n\n**Done when:** it is done.\n"
+   }
+  },
+  "superseded_by_with_no_date": {
+   "gate_age": {},
+   "log_lines": [],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-089: x\n\n**Added:** 2026-01-02\n**Status:** Superseded by TD-90\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: TD-90 does it all\n"
+   }
+  },
+  "undated_status": {
+   "gate_age": {},
+   "log_lines": [],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-083: An archived Status with no date of its own\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** Resolved\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-09 (PR #5)\n\n**Log:**\n- 2026-01-09: built in the first pass\n"
+   }
+  },
+  "unknown_status": {
+   "gate_age": {
+    "decision (Kim)": "2026-01-02"
+   },
+   "log_lines": [],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-082: A Status no lift reads\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** **Live check held** until the next run\n\n**Why:** a reason.\n\n**Fix:** the steps.\n"
+   }
+  },
+  "was_takes_the_resolved_date": {
+   "gate_age": {},
+   "log_lines": [],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-092: x\n\n**Added:** 2026-09-01\n**Status:** Open 2026-11-01\n\n**Why:** w\n\n**Resolved:** 2026-10-01 (PR #3)\n\n**Log:**\n- 2026-10-01: was: Resolved: built\n- 2026-11-01: looked again\n"
+   }
   }
  }
 }

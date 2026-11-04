@@ -1,0 +1,13 @@
+{
+ "argv": [
+  "archive",
+  "TD-8",
+  "--why",
+  "the suite is done",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

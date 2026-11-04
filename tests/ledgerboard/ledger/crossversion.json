@@ -1,0 +1,194 @@
+{
+ "blocked": [
+  "TD-401",
+  "TD-403",
+  "TD-404"
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-401",
+   "kind": "cross-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-401: Blocked by acme/tools#TD-31, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-402",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-402: every blocker is archived (acme/tools#TD-32) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-403",
+   "kind": "cross-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-403: Blocked by acme/tools#TD-33, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-401",
+   "kind": "cross-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-401: Blocked by acme/tools#TD-31, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-402",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-402: every blocker is archived (acme/tools#TD-32) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-403",
+   "kind": "cross-dropped",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-403: Blocked by acme/tools#TD-33, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [
+    "acme/tools#TD-31"
+   ],
+   "card_key": "2|0|000401",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-31",
+     "state": "archived",
+     "status": "Dropped 2026-01-05",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-31",
+    "priority": "Medium"
+   },
+   "id": "TD-401",
+   "key": "2|0|000401",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by another repo's entry archived Dropped with its date",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000402",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-32",
+     "state": "archived",
+     "status": "Resolved 2026-01-05",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-32",
+    "priority": "Medium"
+   },
+   "id": "TD-402",
+   "key": "2|0|000402",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by another repo's entry archived Resolved with its date",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "acme/tools#TD-33"
+   ],
+   "card_key": "2|0|000403",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-33",
+     "state": "archived",
+     "status": "Dropped 2026-01-05 — the vendor withdrew it",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-33",
+    "priority": "Medium"
+   },
+   "id": "TD-403",
+   "key": "2|0|000403",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by another repo's entry whose Status carries words after its date",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "acme/tools#TD-34"
+   ],
+   "card_key": "2|0|000404",
+   "cross_repo": [
+    {
+     "item": "acme/tools#TD-34",
+     "state": "open",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "acme/tools#TD-34",
+    "priority": "Medium"
+   },
+   "id": "TD-404",
+   "key": "2|0|000404",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by another repo's entry still open",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-401",
+   "kind": "cross-dropped",
+   "level": "info",
+   "text": "ℹ TD-401: Blocked by acme/tools#TD-31, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-402",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-402: every blocker is archived (acme/tools#TD-32) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-403",
+   "kind": "cross-dropped",
+   "level": "info",
+   "text": "ℹ TD-403: Blocked by acme/tools#TD-33, another repo's entry archived Dropped — decide this entry: drop the blocker if it no longer applies, or block on what replaces it; the block stays"
+  }
+ ],
+ "pickable": [
+  "TD-402"
+ ],
+ "rows": []
+}

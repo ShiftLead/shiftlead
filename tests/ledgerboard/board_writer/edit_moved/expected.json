@@ -1,5 +1,5 @@
 {
- "exit": 3,
+ "exit": 1,
  "out": {
   "action": "done",
   "refused": "line 8 no longer starts with the expected item (the board moved; read it again). Line 8 is: '- [ ] decide 2026-01-11 (session `w-2`) — **Pick a cache.** Context: TD-7. Due: '"

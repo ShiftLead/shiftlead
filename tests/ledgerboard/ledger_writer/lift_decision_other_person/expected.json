@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "lift",
+  "refused": "only Robin lifts decision (Robin), not Sam (the set route's, or a board without Answered by: any)"
+ }
+}

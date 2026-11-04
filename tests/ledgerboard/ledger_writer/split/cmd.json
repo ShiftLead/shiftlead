@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "split",
+  "--also",
+  "notes.md",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

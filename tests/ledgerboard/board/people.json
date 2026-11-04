@@ -26,6 +26,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 8,
+   "notes": [],
    "overdue_days": 3,
    "parts": [],
    "refs": [
@@ -61,6 +62,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 9,
+   "notes": [],
    "overdue_days": 3,
    "parts": [],
    "refs": [
@@ -96,6 +98,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 10,
+   "notes": [],
    "overdue_days": 3,
    "parts": [],
    "refs": [
@@ -131,6 +134,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 11,
+   "notes": [],
    "overdue_days": 3,
    "parts": [],
    "refs": [
@@ -157,6 +161,7 @@
    "kind": "act",
    "lifts": null,
    "line": 12,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [

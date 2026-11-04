@@ -1,0 +1,17 @@
+{
+ "argv": [
+  "archive",
+  "TD-1",
+  "--why",
+  "the tool repo's rewrite covers it",
+  "--superseded-by",
+  "other-repo#TD-9",
+  "--resolved",
+  "resolved.json",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

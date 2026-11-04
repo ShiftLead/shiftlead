@@ -1,0 +1,991 @@
+{
+ "today": "2026-01-15",
+ "lines": {
+  "go_parts": "- [ ] decide 2026-01-06 (session `w-1`) — **Go on the parts?** Context: TD-500 decision (pat). Parts: TD-501, TD-502. Due: 2026-01-20. Answers: Go (default) | Not yet | One more round.",
+  "two_lifts": "- [ ] decide 2026-01-06 (session `w-1`) — Which store? Context: TD-521 decision (Pat). Due: 2026-01-20. Answers: Files | Db | Not yet. Lifts: Files | Db.",
+  "parent_no_gate": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the part? Context: TD-520 decision (pat). Parts: TD-521. Due: 2026-01-20. Answers: Go | Not yet.",
+  "mismatched": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-503. Due: 2026-01-20. Answers: Go | Not yet.",
+  "event": "- [ ] decide 2026-01-06 (session `w-1`) — Still waiting on the vendor? Context: TD-530 event (vendor-ships). Due: 2026-01-20. Answers: Drop the gate | Keep waiting | Rewrite the check. Lifts: Drop the gate.",
+  "archived": "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: TD-550 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.",
+  "missing_part": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-599. Due: 2026-01-20. Answers: Go | Not yet.",
+  "cross_repo": "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: acme/app#TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.",
+  "act": "- [ ] act 2026-01-06 (session `w-1`) — Look at it. Context: TD-500. Due: 2026-01-20."
+ },
+ "decide_lift": [
+  {
+   "name": "lift_parent_go",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "kept_waiting",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Not yet",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "work_order_keeps_waiting",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "One more round",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "two_lifts_second_label",
+   "line": "two_lifts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "db",
+   "by": "PAT",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "two_lifts_waiting",
+   "line": "two_lifts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Not yet",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "parent_without_the_gate",
+   "line": "parent_no_gate",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "mismatched_snapshot_refused",
+   "line": "mismatched",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "event_drop_the_gate",
+   "line": "event",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Drop the gate",
+   "by": "sam",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "event_keep_waiting",
+   "line": "event",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Keep waiting",
+   "by": "sam",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "event_work_order_writes_nothing",
+   "line": "event",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Rewrite the check",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "event_answerer_off_people_refused",
+   "line": "event",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Drop the gate",
+   "by": "lee",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "archived_entry_refused",
+   "line": "archived",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "missing_part_refused",
+   "line": "missing_part",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "cross_repo_refused",
+   "line": "cross_repo",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "not_a_decide_refused",
+   "line": "act",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "not_the_owner_refused",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "sam",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "answered_by_any",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "sam",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": "any"
+  },
+  {
+   "name": "gate_person_off_people_refused",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "sam",
+   "people": [
+    "sam"
+   ],
+   "answered_by": "any"
+  },
+  {
+   "name": "answerer_off_people_refused",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "lee",
+   "people": [
+    "pat"
+   ],
+   "answered_by": "any"
+  },
+  {
+   "name": "no_people_line",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": null,
+   "answered_by": null
+  },
+  {
+   "name": "no_people_line_wrong_person_refused",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "sam",
+   "people": null,
+   "answered_by": null
+  },
+  {
+   "name": "bad_answered_by_refused",
+   "line": "go_parts",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-502",
+    "TD-503",
+    "TD-520",
+    "TD-521",
+    "TD-530",
+    "TD-550",
+    "TD-505"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": "everyone"
+  }
+ ],
+ "lift_gate": [
+  {
+   "name": "decision_answer",
+   "file": "TD-501",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go"
+  },
+  {
+   "name": "decision_header_spelling",
+   "file": "TD-500",
+   "gate": "decision (PAT)",
+   "by": "pat",
+   "answer": "Go"
+  },
+  {
+   "name": "decision_no_board_item",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "suffix": "no board item"
+  },
+  {
+   "name": "decision_board_elsewhere",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "suffix": "board acme/app"
+  },
+  {
+   "name": "decision_shared_item",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "suffix": "shared board item left open"
+  },
+  {
+   "name": "decision_bad_suffix_refused",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "suffix": "somewhere else"
+  },
+  {
+   "name": "decision_not_the_person_refused",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "sam",
+   "answer": "Go"
+  },
+  {
+   "name": "decision_any_board",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "sam",
+   "answer": "Go",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": "any"
+  },
+  {
+   "name": "decision_any_board_off_people_refused",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "lee",
+   "answer": "Go",
+   "people": [
+    "pat",
+    "sam"
+   ],
+   "answered_by": "any"
+  },
+  {
+   "name": "decision_waiting_only_refused",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Keep waiting"
+  },
+  {
+   "name": "decision_evidence_refused",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go",
+   "evidence": "acme/tools#42"
+  },
+  {
+   "name": "decision_no_answer_refused",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "pat"
+  },
+  {
+   "name": "decision_quoted_label",
+   "file": "TD-521",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go, \"as is\""
+  },
+  {
+   "name": "override",
+   "file": "TD-500",
+   "gate": "decision (pat)",
+   "by": "sam",
+   "override": "pat is away for a month"
+  },
+  {
+   "name": "override_without_why_refused",
+   "file": "TD-500",
+   "gate": "decision (pat)",
+   "by": "sam",
+   "override": " "
+  },
+  {
+   "name": "override_with_answer_refused",
+   "file": "TD-500",
+   "gate": "decision (pat)",
+   "by": "sam",
+   "override": "away",
+   "answer": "Go"
+  },
+  {
+   "name": "override_of_an_event_refused",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "sam",
+   "override": "away"
+  },
+  {
+   "name": "event_host_pr",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "box-1",
+   "evidence": "acme/tools#42"
+  },
+  {
+   "name": "event_host_other_pr_refused",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "box-1",
+   "evidence": "acme/tools#43"
+  },
+  {
+   "name": "event_host_sha_for_a_pr_refused",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "box-1",
+   "evidence": "acme/tools@0123abc"
+  },
+  {
+   "name": "event_host_file",
+   "file": "TD-531",
+   "gate": "event (pin-bumped)",
+   "by": "box-1",
+   "evidence": "Acme/App@0123abc"
+  },
+  {
+   "name": "event_host_other_repo_refused",
+   "file": "TD-531",
+   "gate": "event (pin-bumped)",
+   "by": "box-1",
+   "evidence": "acme/other@0123abc"
+  },
+  {
+   "name": "event_person",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "sam",
+   "answer": "Drop the gate",
+   "people": [
+    "pat",
+    "sam"
+   ]
+  },
+  {
+   "name": "event_person_no_people_refused",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "sam",
+   "answer": "Drop the gate"
+  },
+  {
+   "name": "event_person_off_people_refused",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "lee",
+   "answer": "Drop the gate",
+   "people": [
+    "pat",
+    "sam"
+   ]
+  },
+  {
+   "name": "event_suffix_refused",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "sam",
+   "answer": "Drop the gate",
+   "people": [
+    "sam"
+   ],
+   "suffix": "no board item"
+  },
+  {
+   "name": "until_reached",
+   "file": "TD-540",
+   "gate": "until 2026-01-10",
+   "by": "box-1"
+  },
+  {
+   "name": "until_reached_today",
+   "file": "TD-540",
+   "gate": "until 2026-01-10",
+   "by": "box-1",
+   "today": "2026-01-10"
+  },
+  {
+   "name": "until_ahead_refused",
+   "file": "TD-541",
+   "gate": "until 2026-02-01",
+   "by": "box-1"
+  },
+  {
+   "name": "until_with_answer_refused",
+   "file": "TD-540",
+   "gate": "until 2026-01-10",
+   "by": "box-1",
+   "answer": "Go"
+  },
+  {
+   "name": "not_carried_refused",
+   "file": "TD-502",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go"
+  },
+  {
+   "name": "archived_refused",
+   "file": "TD-550",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go"
+  },
+  {
+   "name": "old_form_refused",
+   "file": "TD-560",
+   "gate": "decision (pat)",
+   "by": "pat",
+   "answer": "Go"
+  },
+  {
+   "name": "not_a_gate_refused",
+   "file": "TD-500",
+   "gate": "hold",
+   "by": "pat",
+   "answer": "Go"
+  },
+  {
+   "name": "decision_second_label",
+   "file": "TD-521",
+   "gate": "decision (Pat)",
+   "by": "PAT",
+   "answer": "db"
+  },
+  {
+   "name": "decision_second_label_extra_suffix",
+   "file": "TD-521",
+   "gate": "decision (Pat)",
+   "by": "PAT",
+   "answer": "db",
+   "suffix": "no board item"
+  },
+  {
+   "name": "event_bad_answered_by_refused",
+   "file": "TD-530",
+   "gate": "event (vendor-ships)",
+   "by": "pat",
+   "answer": "Drop the gate",
+   "people": [
+    "pat"
+   ],
+   "answered_by": "bogus"
+  }
+ ],
+ "same_text": [
+  {
+   "decide": "lift_parent_go",
+   "id": "TD-501",
+   "lift": "decision_answer"
+  },
+  {
+   "decide": "event_drop_the_gate",
+   "id": "TD-530",
+   "lift": "event_person"
+  },
+  {
+   "decide": "two_lifts_second_label",
+   "id": "TD-521",
+   "lift": "decision_second_label"
+  },
+  {
+   "decide": "two_lifts_second_label",
+   "id": "TD-521",
+   "lift": "decision_second_label_extra_suffix"
+  }
+ ],
+ "reassign": [
+  {
+   "name": "reassign",
+   "file": "TD-500",
+   "frm": "pat",
+   "to": "sam",
+   "by": "pat",
+   "why": "pat is away this month"
+  },
+  {
+   "name": "same_person_refused",
+   "file": "TD-500",
+   "frm": "pat",
+   "to": "PAT",
+   "by": "pat",
+   "why": "x"
+  },
+  {
+   "name": "not_carried_refused",
+   "file": "TD-502",
+   "frm": "pat",
+   "to": "sam",
+   "by": "pat",
+   "why": "x"
+  },
+  {
+   "name": "already_carried_refused",
+   "file": "TD-504",
+   "frm": "pat",
+   "to": "Sam",
+   "by": "pat",
+   "why": "x"
+  },
+  {
+   "name": "no_why_refused",
+   "file": "TD-500",
+   "frm": "pat",
+   "to": "sam",
+   "by": "pat",
+   "why": ""
+  },
+  {
+   "name": "old_form_refused",
+   "file": "TD-560",
+   "frm": "pat",
+   "to": "sam",
+   "by": "pat",
+   "why": "away"
+  }
+ ],
+ "reassigns": [
+  [
+   "TD-570",
+   "decision (lee)"
+  ],
+  [
+   "TD-571",
+   "decision (kim)"
+  ],
+  [
+   "TD-500",
+   "decision (pat)"
+  ],
+  [
+   "TD-572",
+   "decision (lee)"
+  ]
+ ],
+ "check": [
+  "TD-570",
+  "TD-571",
+  "TD-572"
+ ],
+ "closes": [
+  {
+   "line": "go_parts",
+   "label": "Go",
+   "after": "lift_parent_go"
+  },
+  {
+   "line": "go_parts",
+   "label": "Go"
+  },
+  {
+   "line": "go_parts",
+   "label": "not yet"
+  },
+  {
+   "line": "go_parts",
+   "label": "One more round"
+  },
+  {
+   "line": "two_lifts",
+   "label": "DB",
+   "after": "two_lifts_second_label"
+  },
+  {
+   "line": "cross_repo",
+   "label": "Go"
+  },
+  {
+   "line": "cross_repo",
+   "label": "Not yet"
+  },
+  {
+   "line": "act",
+   "label": "Go"
+  },
+  {
+   "line": "event",
+   "label": "Drop the gate",
+   "after": "event_drop_the_gate"
+  }
+ ],
+ "close": [
+  {
+   "name": "lifted",
+   "line": "go_parts",
+   "answer": "Go",
+   "by": "pat"
+  },
+  {
+   "name": "kept_waiting",
+   "line": "go_parts",
+   "answer": "Not yet",
+   "by": "pat"
+  },
+  {
+   "name": "work_order_refused",
+   "line": "go_parts",
+   "answer": "One more round",
+   "by": "pat"
+  },
+  {
+   "name": "no_gate_refused",
+   "line": "act",
+   "answer": "Go",
+   "by": "pat"
+  },
+  {
+   "name": "second_label",
+   "line": "two_lifts",
+   "answer": "Db",
+   "by": "pat"
+  },
+  {
+   "name": "not_a_decide_refused",
+   "line": "go_parts",
+   "action": "reply",
+   "reply": "ok",
+   "by": "pat"
+  }
+ ],
+ "waiting_only": [
+  "Keep waiting",
+  "not yet",
+  "Not yet.",
+  "NOT  YET",
+  "Not now",
+  "Go",
+  "keep waiting please"
+ ],
+ "closed_items": [
+  "# Board\n\nPeople: pat\n\n## Needs the user\n\n- [ ] act 2026-01-06 (session `w-1`) — Still open. Context: TD-1. Due: 2026-01-20.\n- [x] decide 2026-01-06 (session `w-1`) — Which store? Context: TD-521 decision (pat). Parts: TD-522. Due: 2026-01-20. Answers: Files | Db | Not yet. Lifts: Files | Db. Decided: Db (by pat) (2026-01-14). Closed: 2026-01-14 — lifted.\n  - Context: the store.\n- [x] act 2026-01-02 (session `w-2`) — Done thing. Context: TD-2. Due: 2026-01-09. Closed: 2026-01-08 — shipped.\n- [X] decide 2026-01-03 (n/a) — Still waiting? Context: TD-530 event (vendor-ships). Due: 2026-01-09. Answers: Drop the gate | Keep waiting. Lifts: Drop the gate. Decided: Keep waiting (by sam) (2026-01-04). Closed: 2026-01-04 — kept waiting.\n"
+ ],
+ "answered_by": [
+  "# Board\n\nPeople: pat\n\n- [ ] act 2026-01-06 (n/a) — x. Context: none. Due: 2026-01-20.\n",
+  "# Board\n\nPeople: pat, sam\nAnswered by: any\n\n- [ ] act 2026-01-06 (n/a) — x. Context: none. Due: 2026-01-20.\n",
+  "# Board\n\nPeople: pat\nAnswered by: Owner\n",
+  "# Board\n\nPeople: pat\nAnswered by: everyone\nAnswered by: any\n",
+  "# Board\n\nPeople: pat\n\n- [ ] act 2026-01-06 (n/a) — x. Context: none. Due: 2026-01-20.\nAnswered by: any\n"
+ ],
+ "item_lines": [
+  {
+   "text": "Go?",
+   "due": "2026-01-20",
+   "session": "w-1",
+   "host": null,
+   "context": "TD-12 decision (pat)",
+   "kind": "decide",
+   "detail": {
+    "context": "The design is done.",
+    "question": "Go?",
+    "recommended": "it is ready."
+   },
+   "answers": [
+    "Go",
+    "Not yet"
+   ],
+   "default": 0,
+   "lifts": [
+    "Go",
+    "not yet"
+   ]
+  }
+ ],
+ "item_problems": [
+  "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Keep waiting. Lifts: Go | Keep waiting."
+ ]
+}

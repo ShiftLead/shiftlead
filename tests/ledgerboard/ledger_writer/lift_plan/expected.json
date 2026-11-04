@@ -1,0 +1,15 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "lift",
+  "changes": [
+   {
+    "path": "ledger/TD-001.md",
+    "text": "## TD-001: Choose the export format\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Robin), event (ships)\n\n**Why:** two formats are wanted and only one can ship first.\n\n**Ask:** which format ships first, CSV or JSON.\n\n**Event (ships):** the vendor's tool ships its exporter.\ncheck: pr-merged acme/tools#3\n\n**Log:**\n- 2026-01-02: gate added: decision (Robin)\n- 2026-01-02: gate added: until 2026-01-10\n- 2026-01-02: gate added: event (ships)\n- 2026-01-15: gate lifted: until 2026-01-10 — by host-1; date reached\n"
+   }
+  ],
+  "id": "TD-001",
+  "notes": [],
+  "subject": null
+ }
+}

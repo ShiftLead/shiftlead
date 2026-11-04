@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "edit",
+  "unusable": "--from is empty: a section is never emptied by edit"
+ }
+}

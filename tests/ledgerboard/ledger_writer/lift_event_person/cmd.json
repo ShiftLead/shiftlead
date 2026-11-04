@@ -1,0 +1,19 @@
+{
+ "argv": [
+  "lift",
+  "TD-1",
+  "--gate",
+  "event (ships)",
+  "--by",
+  "Robin",
+  "--answer",
+  "It shipped",
+  "--people",
+  "Robin",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

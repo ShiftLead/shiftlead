@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "lift",
+  "refused": "until 2026-01-10 is not reached on 2026-01-05"
+ }
+}

@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "new",
+  "unusable": "technical_debt.md is a v1 ledger: the writers write a v2 directory — split it first"
+ }
+}

@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "set",
+  "unusable": "--by: set takes them only with --blocked-by that drops a decision"
+ }
+}

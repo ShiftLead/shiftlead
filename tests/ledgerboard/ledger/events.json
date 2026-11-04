@@ -1,0 +1,283 @@
+{
+ "blocked": [
+  "TD-201",
+  "TD-202",
+  "TD-204",
+  "TD-205"
+ ],
+ "check": [
+  {
+   "field": "event",
+   "id": "TD-202",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-202: Blocked by names event (shipped) and the entry has no **Event (shipped):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-203",
+   "kind": "event-ungated",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-203: its **Event (stale):** section has no event (stale) gate, and no gate lifted: event (stale) Log line says why"
+  },
+  {
+   "field": "event",
+   "id": "TD-204",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-204: it has 2 **Event (twice):** sections — one per name; a re-added gate reuses its section"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (no-check):** section: it has no check: line — the last line is check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (two-checks):** section: it has 2 check: lines — exactly one"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (after):** section: a line follows its check: line — the check is the section's last line"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (unknown):** section: its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (no-words):** section: its first line says the event in plain words, after the lead"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (confined):** section: its check: the path '../secrets' has a .. segment"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (Bad-Name):** section: the event name 'Bad-Name' is not [a-z0-9-]+"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "event",
+   "id": "TD-202",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-202: Blocked by names event (shipped) and the entry has no **Event (shipped):** section — its words, then check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-203",
+   "kind": "event-ungated",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-203: its **Event (stale):** section has no event (stale) gate, and no gate lifted: event (stale) Log line says why"
+  },
+  {
+   "field": "event",
+   "id": "TD-204",
+   "kind": "event-section",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-204: it has 2 **Event (twice):** sections — one per name; a re-added gate reuses its section"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (no-check):** section: it has no check: line — the last line is check: <type> <args>"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (two-checks):** section: it has 2 check: lines — exactly one"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (after):** section: a line follows its check: line — the check is the section's last line"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (unknown):** section: its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (no-words):** section: its first line says the event in plain words, after the lead"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (confined):** section: its check: the path '../secrets' has a .. segment"
+  },
+  {
+   "field": "event",
+   "id": "TD-205",
+   "kind": "event-check",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-205: its **Event (Bad-Name):** section: the event name 'Bad-Name' is not [a-z0-9-]+"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [
+    "event (vendor-ships)"
+   ],
+   "card_key": "2|0|000201",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "event (vendor-ships)",
+    "priority": "Medium"
+   },
+   "id": "TD-201",
+   "key": "2|0|000201",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "An event with its section, its text holding quotes",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "event (merged)",
+    "event (shipped)"
+   ],
+   "card_key": "2|0|000202",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "event (merged), event (shipped)",
+    "priority": "Medium"
+   },
+   "id": "TD-202",
+   "key": "2|0|000202",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "One event with its section, one without",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000203",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low"
+   },
+   "id": "TD-203",
+   "key": "3|0|000203",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "Sections whose gates are gone",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "event (twice)"
+   ],
+   "card_key": "3|0|000204",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "event (twice)",
+    "priority": "Low"
+   },
+   "id": "TD-204",
+   "key": "3|0|000204",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "A section named twice",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "event (no-check)",
+    "event (two-checks)",
+    "event (after)",
+    "event (unknown)",
+    "event (no-words)",
+    "event (confined)"
+   ],
+   "card_key": "3|0|000205",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "event (no-check), event (two-checks), event (after), event (unknown), event (no-words), event (confined)",
+    "priority": "Low"
+   },
+   "id": "TD-205",
+   "key": "3|0|000205",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Sections the reader refuses",
+   "type": "debt"
+  }
+ ],
+ "flags": [],
+ "pickable": [
+  "TD-203"
+ ],
+ "rows": []
+}

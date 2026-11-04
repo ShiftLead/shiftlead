@@ -1,0 +1,41 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "split",
+  "archived": 1,
+  "changes": [
+   {
+    "path": "docs/ledger/TD-001.md",
+    "text": "## TD-001: The parser drops a trailing comment\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** a comment is lost on a round trip; see [the plan](../plans/parse.md#comments), [the exporter](archive/TD-005.md) and [this entry](TD-001.md).\n"
+   },
+   {
+    "path": "docs/ledger/archive/TD-005.md",
+    "text": "## TD-005: The old exporter wrote the wrong header\n\n**Priority:** Low\n**Added:** 2025-12-01\n**Status:** Resolved 2025-12-20\n\n**Why:** the header named the wrong column; the parser is [TD-001](../TD-001.md).\n\n**Resolved:** 2025-12-20 (PR #4) — `src/export.py`\n"
+   },
+   {
+    "path": "docs/ledger/README.md",
+    "text": "# Technical Debt\n\nLedgerboard: 2\n\n\nThe plans are in [plans](../plans/).\n"
+   },
+   {
+    "path": "docs/technical_debt.md",
+    "text": null
+   },
+   {
+    "path": "docs/technical_debt_archive.md",
+    "text": null
+   },
+   {
+    "path": "docs/ledger/rank.yml",
+    "text": "TD-001: m\n"
+   },
+   {
+    "path": "docs/technical_debt_rank.yml",
+    "text": null
+   }
+  ],
+  "open": 1,
+  "subject": null,
+  "to": "docs/ledger",
+  "warnings": []
+ }
+}

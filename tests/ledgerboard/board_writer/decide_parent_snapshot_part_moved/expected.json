@@ -1,0 +1,19 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "decide",
+  "entries": [
+   "TD-008",
+   "TD-009"
+  ],
+  "item_notes": [],
+  "line": 15,
+  "notes": [],
+  "paths": [
+   "board.md",
+   "ledger/TD-008.md",
+   "ledger/TD-009.md"
+  ],
+  "subject": "ledgerboard: decide Go on the report suite?: Go (session n/a)"
+ }
+}

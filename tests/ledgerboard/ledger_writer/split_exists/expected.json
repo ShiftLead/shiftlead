@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "split",
+  "unusable": "docs/ledger exists: split writes a new directory"
+ }
+}

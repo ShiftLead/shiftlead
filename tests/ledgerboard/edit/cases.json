@@ -1639,5 +1639,29 @@
       "text": "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-006: 2|0|000006zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz1\nTD-005: 2|0|000030i\n",
       "ledger": "# L\n\n## TD-005: x\n\n**Priority:** Medium\n\n**Type:** debt\n\n**Why:** x\n\n## TD-006: x\n\n**Priority:** Medium\n\n**Type:** debt\n\n**Why:** x\n\n"
     }
+  ],
+  "split_notes": [
+    "# Ledger\n\nLedgerboard: 2\n\nEach open entry is a file here; the table below is gone, and [the old archive](../ledger_archive.md) moved.\nSee [the cadence](https://example.com/cadence.md), [this section](#entries) and [the root](/docs/x.md).\n\n```\nA [link in a fence](kept.md) and the summary table.\n```\n",
+    "# Ledger\n\nLedgerboard: 2\n\nNothing here names the old layout.\n",
+    "# Ledger\n\n````\n```\nthe table, inside a four-backtick fence\n````\n```py\nthe table\n```\nA `[code](span.md)` and an escaped \\[link](x.md) are no links.\n[ref]: ../old_archive.md\n",
+    "# Ledger\n\nLedgerboard: 2\n\nThe ledger was `docs/technical_debt.md`; closed entries went to technical_debt_archive.md.\nSee [the old file](https://example.com/technical_debt.md) and [the archive](technical_debt_archive.md).\n[old]: https://example.com/docs/technical_debt.md\nWrite `[the archive](technical_debt_archive.md)` no more.\nmy_technical_debt.md, technical_debt.mdx and technical-debt.md are other names.\n```\ncat docs/technical_debt.md\n```\n"
+  ],
+  "item_notes": [
+    {
+      "name": "hide a day before due",
+      "line": "- [ ] act 2026-01-01 (n/a) — Hide a day early. Context: TD-21. Due: 2026-01-20. Hide until: 2026-01-19."
+    },
+    {
+      "name": "hide equal to due",
+      "line": "- [ ] act 2026-01-01 (n/a) — Hide to the day. Context: TD-22. Due: 2026-01-20. Hide until: 2026-01-20."
+    },
+    {
+      "name": "later hide, impossible due",
+      "line": "- [ ] act 2026-01-01 (n/a) — No such day. Context: TD-23. Due: 2026-02-30. Hide until: 2026-03-20."
+    },
+    {
+      "name": "later hide on an fyi with a due",
+      "line": "- [ ] fyi 2026-01-01 (n/a) — An fyi with a date. Context: none. Due: 2026-01-20. Hide until: 2026-02-01."
+    }
   ]
 }

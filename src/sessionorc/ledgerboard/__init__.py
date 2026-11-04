@@ -1,4 +1,4 @@
-# ledgerboard v2.3 sha256:2964e2b9f5e19cafcae3bc25c42ee36a861da031d8aa78d108b689c224fcf022
+# ledgerboard v2.4 sha256:b31d544b2d40f6071b3c70aafb46174a1c65ca1507dec2ea7fc5861cfc22ce19
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/__init__.py (vendored by agent-cadence as files/scripts/ledgerboard/__init__.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
@@ -18,17 +18,17 @@ Sections: the ledger (entries, ``Fields:``, ``Blocked by``, ``Part of``, derived
 (cards, keys, the rank file, the pick order); the board
 (items, the item record, keys and refs); the ledger as a directory (``load``, ``split``); edits (``edit_line``, composing an item, the commit
 subject of a write and its parser); line predicates for diff walkers; ledger entries and their writers
-(``canonical``, ``entry_text``, ``edit_entry``, v2.2); the format version.
+(``canonical``, ``entry_text``, ``edit_entry``, v2.2; the Log, v2.4); the format version.
 """
 
 from __future__ import annotations
 
 import logging
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from dataclasses import replace as _dc_replace
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger("ledgerboard")
@@ -51,15 +51,25 @@ TYPE_RE = re.compile(r"^\*\*Type:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
 TYPES = ("debt", "feature")  # pick order within a Priority; the first is the default
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)  # the seed template's example entry lives in one
 ID_ITEM_RE = re.compile(r"^TD-(\d+)$")
-XREPO_ITEM_RE = re.compile(r"^([\w.-]+(?:/[\w.-]+)?)#(TD-\d+)$")
-DECISION_RE = re.compile(r"\bdecision\s*\(([^)]+)\)", re.IGNORECASE)
+# A repo in an id (v2.4): a name, or `/`-separated components (owner/name, or deeper for a nested
+# group), each ASCII [A-Za-z0-9_.-]+, none `.` or `..`, none starting with `-`: no URL, no host, no traversal.
+REPO_PART = r"(?!\.\.?(?![A-Za-z0-9_.-]))(?!-)[A-Za-z0-9_.-]+"
+REPO = rf"{REPO_PART}(?:/{REPO_PART})*"
+REPO_RE = re.compile(REPO)
+XREPO_ITEM_RE = re.compile(rf"^({REPO})#(TD-\d+)$")
+ASK_RE = re.compile(r"^\*\*Ask:\*\*", re.MULTILINE)  # the body section a decision gate pairs with (v2.4)
 WORD_RE = re.compile(r"[^\s,;]+")
 PRIORITIES = ("high", "medium", "low")
-EDIT_ERRORS = ("pickable-disagrees", "undeclared-field", "cycle", "legacy-part")  # information on a standing ledger, an error in a new edit
+EDIT_ERRORS = ("pickable-disagrees", "undeclared-field", "cycle", "legacy-part", "priority", "ask-missing",
+               "gate-repeated", "blocker-superseded", "blocker-dropped",
+               "blocker-unknown-status")  # information on a standing ledger, an error in a new edit
 
 # A resolver answers one ``<repo>#TD-NNN`` item: ``(state, why)`` or a mapping carrying at least
 # ``state`` and ``why`` (any other keys ride along into the entry's ``cross_repo``). ``state`` is
-# ``open | archived | unresolved``; ``why`` says why it is unresolved, else "".
+# ``open | archived | unresolved``; ``why`` says why it is unresolved, else "". From v2.4 an archived
+# entry's mapping may carry ``status`` (its Status, read by its first word: Superseded, Dropped, a word
+# this reader does not know (outside STATUS_WORDS: the block stays), else closed and done) and
+# ``successor`` (a Superseded entry's id after ``by``, bare when in its own repo).
 Resolve = Callable[[str], Any]
 
 
@@ -81,6 +91,16 @@ def first_word(value: str | None) -> str:
     """A field's value: its first word, lower-cased; the rest of the line is a free comment."""
     m = WORD_RE.search(value or "")
     return m.group(0).strip("*_`").rstrip(".:").lower() if m else ""  # `**Decided` reads as decided
+
+
+def _status_word(status: str | None) -> str:
+    """An archived Status's word as written, for a flag (v2.4, TD-039): ``first_word()``'s strips without its
+    lower-casing, or the first run itself when they leave nothing (``** Xyzzy`` names ``**``); ``""`` only
+    for a Status with no first run, which reads as closed and done."""
+    m = WORD_RE.search(status or "")
+    if not m:
+        return ""
+    return m.group(0).strip("*_`").rstrip(".:") or m.group(0)
 
 
 def header_block(body: str) -> dict[str, str]:
@@ -162,6 +182,9 @@ def entries(text: str) -> list[dict]:
     return out
 
 
+_entries = entries  # for a function whose parameter is named entries (decide_lift's, as SPEC names it)
+
+
 def rows(text: str) -> list[dict]:
     """The summary table's rows, in order: {id, title, priority} (comments dropped)."""
     return [{"id": m.group(1), "title": m.group(3), "priority": m.group(4)}
@@ -169,23 +192,171 @@ def rows(text: str) -> list[dict]:
 
 
 def parse_blocked(raw: str) -> tuple[list[str], list[str], list[str]]:
-    """(entry ids — ``TD-NNN`` or ``<repo>#TD-NNN`` — decision holders, unreadable items) of one Blocked by value."""
-    ids, who, bad = [], [], []
-    d = DECISION_RE.search(raw)
-    if d:
-        who.append(d.group(1).strip())
-        rest = raw[d.end():].strip()
-        if rest.startswith(","):  # a list continuing past the decision: it was not written last
-            bad.append(f"after the decision: {rest[1:].strip()}")
-        raw = raw[: d.start()]  # otherwise what follows the decision is its pointer, never read
-    for item in (x.strip() for x in raw.split(",")):
+    """(entry ids — ``TD-NNN`` or ``<repo>#TD-NNN`` — decision holders, every other item) of one
+    Blocked by value: ``parse_gates()`` seen as three lists. The third holds what is neither an id nor
+    a decision: an ``until`` or ``event`` gate (v2.4) as the writers write it, and a retired or
+    unreadable item as written —
+    so a caller that reads the three as before keeps every block. A retired ``decision (designer)``
+    and the old form's holder are decision holders."""
+    g = parse_gates(raw)
+    who = g["decisions"] + [r["holder"] for r in g["retired"] if r["kind"] != "gate"]
+    rest = [f"until {d}" for d in g["until"]] + [f"event ({n})" for n in g["events"]] + \
+        [r["item"] for r in g["retired"] if r["kind"] == "gate"] + g["bad"]
+    return g["ids"], who, rest
+
+
+# The gates of `Blocked by` (v2.4, SPEC *The ledger*): after the ids, `decision (<person>)`,
+# `until YYYY-MM-DD` and `event (<name>)`. The words are read in any case and written lower.
+GATE_DECISION_RE = re.compile(r"^decision[ \t]*\((?P<who>[^()]*)\)", re.IGNORECASE)
+GATE_UNTIL_RE = re.compile(r"^until[ \t]+(?P<date>\S+)$", re.IGNORECASE)
+GATE_EVENT_RE = re.compile(r"^event[ \t]*\((?P<name>[^()]*)\)$", re.IGNORECASE)
+EVENT_NAME_RE = re.compile(r"[a-z0-9-]+")
+GATE_ITEM_SEP_RE = re.compile(r"[ \t]*,[ \t]*")
+RETIRED_ROLES = ("designer",)  # a role in `decision (…)`, reserved by name (SPEC *Retired words*)
+# The retired words (SPEC *Retired words*): each with what replaces it. The list grows only.
+RETIRED_FIELDS = {"waits": "a gate in Blocked by — until YYYY-MM-DD or event (<name>)",
+                  "taken by": "Id take, the counter take's nonce",
+                  "resolved": "the **Resolved:** body line of an archived entry"}
+RETIRED_GATES = {"hold": "decision (<person>), with an **Ask:**"}
+RETIRED_STATUS = {"designed": "Open, with Kind build", "built": "Open, with Kind live-check", "partly": "Open",
+                  "live": "Open", "in": "Open"}  # an open entry's; the archived ones are migrate's to map
+OLD_FORM_REPLACES = "decision (<person>), with the text in an **Ask:** section"
+
+
+def parse_gates(raw: str | None) -> dict:
+    """One Blocked by value read (v2.4, SPEC *The ledger*): ``{ids, decisions, until, events, retired,
+    old_form, bad}``, each in the order written.
+
+    - ``ids``: ``TD-n`` and ``<repo>#TD-n`` items; ``decisions``: each ``decision (<person>)``'s person;
+      ``until``: each ``until YYYY-MM-DD``'s date (a real day); ``events``: each ``event (<name>)``'s name,
+      ``[a-z0-9-]+``. The words ``decision``, ``until`` and ``event`` are read in any case.
+    - ``old_form``: ``(holder, text)`` for the old form ``decision (<who>) <text>``, read only as the last
+      item: a decision followed by anything but a comma or the end runs to the end of the line, which is
+      its text (so it is last by construction). Else None.
+    - ``retired``: ``[{item, replace, kind, holder}]``, each retired item with what replaces it: ``kind``
+      ``old-form`` (and its ``holder``), ``role`` (a role in ``decision (…)``, its ``holder``) or ``gate``
+      (``hold``; ``holder`` None).
+    - ``bad``: every other item, as written. An empty item between commas is skipped.
+    A retired or unreadable item keeps the block; ``pickable()`` reads the rest."""
+    out: dict = {"ids": [], "decisions": [], "until": [], "events": [], "retired": [], "old_form": None, "bad": []}
+    rest = (raw or "").strip(" \t\r")  # a CRLF file's line ending is no part of the value
+    while rest:
+        m = GATE_ITEM_SEP_RE.search(rest)
+        item, after = (rest[: m.start()], rest[m.end():]) if m else (rest, "")
+        d = GATE_DECISION_RE.match(item)
+        if d and item[d.end():].strip(" \t"):  # the old form: its text runs to the end of the line
+            who, text = d.group("who").strip(" \t"), rest[d.end():].strip(" \t")
+            out["old_form"] = (who, text)
+            out["retired"].append({"item": rest, "replace": OLD_FORM_REPLACES, "kind": "old-form", "holder": who})
+            break
+        rest = after
         if not item:
             continue
+        u, e = GATE_UNTIL_RE.match(item), GATE_EVENT_RE.match(item)
         if ID_ITEM_RE.match(item) or XREPO_ITEM_RE.match(item):
-            ids.append(item)  # a `<repo>#TD-NNN` item is resolved by pickable()'s resolver, not here
+            out["ids"].append(item)  # a `<repo>#TD-NNN` item is resolved by pickable()'s resolver, not here
+        elif d and d.group("who").lower() in RETIRED_ROLES:
+            out["retired"].append({"item": item, "kind": "role", "holder": d.group("who"),
+                                   "replace": f"decision (<person>): {d.group('who')} is a role, reserved by name"})
+        elif d and is_person(d.group("who")):
+            out["decisions"].append(d.group("who"))
+        elif u and _real_day(u.group("date")):
+            out["until"].append(u.group("date"))
+        elif e and EVENT_NAME_RE.fullmatch(e.group("name")):
+            out["events"].append(e.group("name"))
+        elif item.lower() in RETIRED_GATES:
+            out["retired"].append({"item": item, "replace": RETIRED_GATES[item.lower()], "kind": "gate", "holder": None})
         else:
-            bad.append(item)
-    return ids, who, bad
+            out["bad"].append(item)
+    return out
+
+
+def _real_day(text: str) -> bool:
+    try:
+        return bool(ISO_DAY_RE.fullmatch(text)) and date.fromisoformat(text).isoformat() == text
+    except ValueError:
+        return False
+
+
+def gate_items(g: Mapping) -> list[str]:
+    """The gates of a ``parse_gates()`` result, each as the writers write it, in the canonical order:
+    decisions, then ``until``, then events (each group in the order written)."""
+    return ([f"decision ({w})" for w in g["decisions"]] + [f"until {d}" for d in g["until"]]
+            + [f"event ({n})" for n in g["events"]])
+
+
+def gate_repeats(g: Mapping) -> list[str]:
+    """What a ``parse_gates()`` result names more than the grammar allows: a second decision for one
+    person (compared case-insensitively), a second ``until``, an event name twice."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for key, shown in ([(f"decision {w.lower()}", f"decision ({w})") for w in g["decisions"]]
+                       + [(f"event {n}", f"event ({n})") for n in g["events"]]):
+        if key in seen and shown not in out:
+            out.append(shown)
+        seen.add(key)
+    if len(g["until"]) > 1:
+        out.append(f"until (written {len(g['until'])} times)")
+    return out
+
+
+def _written_blocked(value: str, current: str | None = None) -> str:
+    """A Blocked by value as a writer writes it (v2.4, SPEC *The ledger*): its ids in the order written,
+    then its gates in the canonical order (``gate_items()``); a value holding an item the grammar does
+    not read is written as given, for ``check()`` to flag. Raises Refused for the old form, which is read
+    but never written, and for a gate added to an entry whose ``current`` value still holds the old form,
+    whose text would swallow it."""
+    g = parse_gates(value)
+    if g["old_form"]:
+        raise Refused(f"Blocked by in the old form (decision ({g['old_form'][0]}) with text after it) is read "
+                      "but never written — write decision (<person>) and put the text in an **Ask:** section")
+    was = parse_gates(current)
+    if was["old_form"]:
+        had = {_gate_key(x) for x in gate_items(was)} | {_gate_key(f"decision ({was['old_form'][0]})")}
+        added = [x for x in gate_items(g) if _gate_key(x) not in had]
+        if added:
+            raise Refused(f"the entry's Blocked by is in the old form, whose text would swallow {added[0]} — "
+                          "migrate it first: set decision (<person>) alone, with its text in an **Ask:** section")
+    if g["bad"] or g["retired"]:
+        return value
+    return ", ".join(g["ids"] + gate_items(g))
+
+
+def ref_key(ref: str) -> str:
+    """A ref as compared (v2.4): ``<repo>#TD-n`` with its repo lowercased, any other ref as written.
+    Only the comparison folds case; the text, and an item's key, keep the repo as written."""
+    repo, sep, rest = ref.rpartition("#")
+    return f"{repo.lower()}#{rest}" if sep and rest.startswith("TD-") and REPO_RE.fullmatch(repo) else ref
+
+
+ORIGIN_SCP_RE = re.compile(r"^(?:[^@/:\s]+@)?(?P<host>[A-Za-z0-9][A-Za-z0-9.-]*):(?P<path>[^/\s][^\s]*)$")
+ORIGIN_URL_RE = re.compile(r"^(?:ssh|https)://(?:[^@/\s]*@)?(?P<host>[A-Za-z0-9][A-Za-z0-9.-]*)(?::\d+)?"
+                           r"/(?P<path>[^\s]*)$", re.IGNORECASE)
+
+
+def origin_key(url: str) -> str | None:
+    """A repo's pick key from its origin URL (v2.4): ``<host>/<path>``, lowercased, every path
+    component kept, a trailing ``/`` and ``.git`` stripped, userinfo and port dropped (a key never
+    holds a credential). It reads ssh (``git@host:path``, ``ssh://user@host:port/path``) and https
+    (``https://user:token@host:port/path``). None for anything else — ``file://``, a plain local
+    path, another scheme — and for a path that is not the ``<repo>`` grammar: such a repo has no origin."""
+    url = str(url or "").strip()
+    m = ORIGIN_URL_RE.match(url) if "://" in url else ORIGIN_SCP_RE.match(url)
+    if not m:
+        return None
+    path = m.group("path").lower().rstrip("/")
+    path = path[:-4] if path.endswith(".git") else path
+    path = path.rstrip("/")
+    if not path or not re.fullmatch(REPO, path):
+        return None
+    return f"{m.group('host').lower()}/{path}"
+
+
+def origin_path(url: str) -> str | None:
+    """The repo an id names from its origin (v2.4): ``origin_key``'s path part (``owner/name``, or
+    deeper for a nested group), lowercased; None when the origin is not readable."""
+    key = origin_key(url)
+    return key.split("/", 1)[1] if key else None
 
 
 def parse_part_of(raw: str | None) -> tuple[str | None, str | None]:
@@ -312,6 +483,74 @@ def _resolved(item: str, resolve: Resolve | None) -> dict:
     return out
 
 
+def _archived_status(archive: str) -> dict[int, dict]:
+    """Each archived entry's Status read (v2.4, SPEC *Superseded and dropped*), by number: ``{id, word,
+    successor, status_word}`` — ``word`` ``superseded`` (``successor`` the id after its ``by``, or None),
+    ``dropped``, ``unknown-status`` for a first word outside ``STATUS_WORDS`` (the block stays, TD-039), or
+    ``resolved`` for any other Status (``Resolved``, ``Done``, ``Built``, ``Open``, no first run at all):
+    closed and done. ``status_word`` is ``_status_word()`` of the Status, which a flag names."""
+    out: dict[int, dict] = {}
+    for e in entries(archive):
+        status = e["fields"].get("status") or ""
+        word, written = first_word(status), _status_word(status)
+        by = re.search(rf"\bby[ \t]+({LOG_ID})(?![\w#/-]|\.\w)", status, re.IGNORECASE) if word == "superseded" else None
+        read = ("resolved" if written == "" or word in STATUS_WORDS and word not in ("superseded", "dropped")
+                else word if word in ("superseded", "dropped") else "unknown-status")
+        out.setdefault(_num(e["id"]), {"id": e["id"], "word": read, "successor": by.group(1) if by else None,
+                                       "status_word": written})
+    return out
+
+
+def _chain(start: str, live_nums: set[int], gone: Mapping[int, dict],
+           resolve: Resolve | None) -> tuple[list[str], str, str]:
+    """Where a blocker's requirement lives now (v2.4): ``start`` followed through each Superseded entry to its
+    successor. ``(path, state, word)``: ``path`` the ids walked, ``start`` first and the end last; ``state``
+    the end's — ``open``, ``resolved``, ``dropped``, ``unknown-status`` (archived with a Status word outside
+    ``STATUS_WORDS``, locally or through the resolver: TD-039), ``unknown`` (no such entry), ``unresolved``
+    (another repo's the resolver cannot answer, or a Superseded with no successor) or ``cycle``; ``word`` the
+    end's Status word as written (``_status_word()``) when it is ``unknown-status``, else ``""``. A successor
+    written bare in another repo's entry is that repo's."""
+    path, seen = [], set()
+    cur = start
+    while True:
+        key = ref_key(cur) if "#" in cur else f"#{_num(cur)}"
+        if key in seen:
+            return path + [cur], "cycle", ""
+        seen.add(key)
+        path.append(cur)
+        if "#" in cur:
+            x = _resolved(cur, resolve)
+            if x["state"] != "archived":
+                return path, x["state"], ""
+            if x.get("status") is not None and not isinstance(x["status"], str):
+                return path, "unresolved", ""  # a Status the resolver cannot have read: hold
+            status, nxt = x.get("status") or "", x.get("successor")
+            word, written = first_word(status), _status_word(status)
+            if written == "":
+                return path, "resolved", ""  # no first run (or no status given): closed and done, as before
+            if word not in STATUS_WORDS:
+                return path, "unknown-status", written
+            if word == "dropped":
+                return path, "dropped", ""
+            if word != "superseded":
+                return path, "resolved", ""
+            if not isinstance(nxt, str) or not (ID_ITEM_RE.match(nxt) or XREPO_ITEM_RE.match(nxt)):
+                return path, "unresolved", ""
+            cur = nxt if "#" in nxt else f"{cur.rpartition('#')[0]}#{nxt}"
+            continue
+        n = _num(cur)
+        if n in live_nums:
+            return path, "open", ""
+        st = gone.get(n)
+        if st is None:
+            return path, "unknown", ""
+        if st["word"] != "superseded":
+            return path, st["word"], st.get("status_word", "") if st["word"] == "unknown-status" else ""
+        if st["successor"] is None:
+            return path, "unresolved", ""
+        cur = st["successor"]
+
+
 class _Flags(list):
     """The flags as the sentences every mode prints (a list of str), with a record beside each
     for ``check``: level (error for ⚠, info for ℹ), entry id, field, kind."""
@@ -327,22 +566,31 @@ class _Flags(list):
 
 
 def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclared: bool = False,
-             rank_text: str | None = None, repo: str = "") -> dict:
+             rank_text: str | None = None, repo: str = "", *, today: date | str) -> dict:
     """Every live entry in pick order, with its derived pickable, open blockers and raw fields; plus flags.
 
     **Pickable is derived, never written:** an entry is pickable when it has no Blocked by field,
-    or every entry it names is archived and it names no decision — and no open entry is Part of
-    it (v2.1; its ``parts_open``, kept apart from ``blocked_by``). ``resolve`` answers a
-    ``<repo>#TD-NNN`` item (see ``Resolve``); without one, such an item keeps its block.
-    ``undeclared`` also flags a header field with no vocabulary, when the ledger declares any.
+    or every entry it names is archived and it has no ``decision``, no ``event`` and no ``until`` after
+    ``today`` (v2.4) — and no open entry is Part of it (v2.1; its ``parts_open``, kept apart from
+    ``blocked_by``). ``today`` is required: the UTC date, a date or ``YYYY-MM-DD`` (an aware datetime
+    is taken as its UTC date). ``resolve`` answers a ``<repo>#TD-NNN`` item (see ``Resolve``); without
+    one, such an item keeps its block. ``undeclared`` also flags a header field with no vocabulary,
+    when the ledger declares any. A parent's record carries ``parts_gates`` (v2.4): each gate that holds
+    on one of its open direct parts, keyed in its canonical form, with the parts carrying it.
 
     **Pick order is the rank** (SPEC *The rank*): ``rank_text`` is the rank file's text (None or
     "": no lines), ``repo`` the last component of an implicit key. Each record carries its ``key``
     (its line's, else its implicit key) and its ``card_key``; entries sort by card, then within a
     card by dependency (after its blockers and its parts), then key."""
+    try:
+        day = utc_day(today, "pickable()'s today")
+    except Refused as why:
+        raise ValueError(str(why)) from None
     live = entries(ledger)
+    texts = _entry_texts(ledger)
     live_nums = {_num(e["id"]) for e in live}
     archived = heading_nums(archive)
+    gone = _archived_status(archive)
     parent_of, part_of = _parents(live)
     parts_open: dict[str, list[str]] = {}
     for c, par in parent_of.items():
@@ -360,9 +608,22 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
         flags.add(text, None, "rank", "rank")
     keys: dict[str, str] = {}
     pick, blocked = [], []
+    holding: dict[str, list[str]] = {}  # each entry's gates that hold today, as written (parts_gates)
     for e in live:
         n = _num(e["id"])
         prio = e["priority"] or table.get(n) or "?"
+        if first_word(prio) not in PRIORITIES:
+            said = "has no Priority" if prio == "?" else f"Priority {prio!r} is not High, Medium or Low"
+            flags.add(f"ℹ {e['id']}: {said} — read after Low; write High, Medium or Low",
+                      e["id"], "priority", "priority")
+        for key in e["fields"]:
+            if key in RETIRED_FIELDS:
+                flags.add(f"ℹ {e['id']}: the {key.capitalize()} field is retired — write "
+                          f"{RETIRED_FIELDS[key]} (SPEC *Retired words*)", e["id"], key, "retired")
+        status = first_word(e["fields"].get("status"))
+        if status in RETIRED_STATUS:
+            flags.add(f"ℹ {e['id']}: the Status word {status.capitalize()!r} is retired — write "
+                      f"{RETIRED_STATUS[status]} (SPEC *Retired words*)", e["id"], "status", "retired")
         etype = (e["type_raw"] or TYPES[0]).lower()
         for key in e["below"]:
             flags.add(f"ℹ {e['id']}: its {key.capitalize()} line is below the header block — "
@@ -384,7 +645,7 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
         keys.setdefault(e["id"], lined.get(n) or implicit_key(prio, etype, e["id"], repo))
         rec = {"id": e["id"], "title": e["title"], "priority": prio, "type": etype,
                "blocked_by": [], "cross_repo": [], "pickable": True, "fields": e["fields"],
-               "key": keys[e["id"]], "card_key": "", "part_of": None, "parts_open": []}
+               "key": keys[e["id"]], "card_key": "", "part_of": None, "parts_open": [], "parts_gates": {}}
         par, why = part_of.get(e["id"], (None, None))
         if why:
             flags.add(f"⚠ {e['id']}: its Part of {why}", e["id"], "part of", "part-of-item")
@@ -401,10 +662,31 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
             rec["parts_open"] = list(parts_open[e["id"]])
             rec["pickable"] = False
         if e["blocked_raw"] is not None:
-            ids, who, bad = parse_blocked(e["blocked_raw"])
+            g = parse_gates(e["blocked_raw"])
+            ids, bad = g["ids"], g["bad"]
             for item in bad:
-                flags.add(f"⚠ {e['id']}: cannot read Blocked by item {item!r} — "
-                          "write TD-NNN or decision (<who>)", e["id"], "blocked by", "blocked-item")
+                flags.add(f"⚠ {e['id']}: cannot read Blocked by item {item!r} — write TD-n, <repo>#TD-n, "
+                          "decision (<person>), until YYYY-MM-DD or event (<name>)", e["id"], "blocked by",
+                          "blocked-item")
+            for r in g["retired"]:
+                flags.add(f"ℹ {e['id']}: Blocked by item {r['item']!r} is retired — write {r['replace']}; "
+                          "it keeps the block (SPEC *Retired words*)", e["id"], "blocked by", "retired")
+            rep = gate_repeats(g)
+            if rep:
+                flags.add(f"ℹ {e['id']}: Blocked by names {', '.join(rep)} more than once — at most one "
+                          "decision per person, one until and differently named events", e["id"], "blocked by",
+                          "gate-repeated")
+            for d in g["until"]:
+                if d <= day:
+                    flags.add(f"ℹ {e['id']}: until {d} is reached — the gate no longer holds; drop it from "
+                              "Blocked by", e["id"], "blocked by", "until-past")
+            gates = [f"decision ({w})" for w in g["decisions"]] + [f"until {d}" for d in g["until"] if d > day] \
+                + [f"event ({x})" for x in g["events"]]
+            holding[e["id"]] = gates + [f"decision ({r['holder']})" for r in g["retired"] if r["holder"] is not None]
+            if g["decisions"] and "ask" not in e["fields"] and not ASK_RE.search(texts.get(e["id"], "")):
+                flags.add(f"ℹ {e['id']}: Blocked by names {', '.join(f'decision ({w})' for w in g['decisions'])} "
+                          "and the entry has no **Ask:** — say what the person owes, a go included",
+                          e["id"], "blocked by", "ask-missing")
             open_ids = []
             for b in ids:
                 if "#" in b:
@@ -416,6 +698,8 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
                         flags.add(f"⚠ {e['id']}: cannot resolve {b} — {x['why']}; the block stays",
                                   e["id"], "blocked by", "cross-repo")
                         open_ids.append(b)  # unresolved: keep the block — the safe direction
+                    elif not _ended(e["id"], b, live_nums, gone, resolve, flags, cross=True):
+                        open_ids.append(b)
                     continue
                 bn = _num(b)
                 if bn in live_nums:
@@ -424,12 +708,17 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
                     flags.add(f"⚠ {e['id']}: Blocked by {b}, which names no entry in the ledger or the archive",
                               e["id"], "blocked by", "blocked-unknown")
                     open_ids.append(b)  # unknown: keep the block — the safe direction
-            if not open_ids and not who and not bad:
-                now = "pickable; " if rec["pickable"] else "it still waits on its open parts; "
-                flags.add(f"ℹ {e['id']}: every blocker is archived ({', '.join(ids)}) — {now}"
-                          "the Blocked by field can go", e["id"], "blocked by", "blockers-archived")
+                elif not _ended(e["id"], b, live_nums, gone, resolve, flags, cross=False):
+                    open_ids.append(b)
+            kept = [f"decision ({r['holder']})" if r["holder"] is not None else repr(r["item"]) for r in g["retired"]] \
+                + [repr(b) for b in bad]  # a retired decision still names who it waits on
+            if not open_ids and not gates and not kept:
+                if ids:
+                    now = "pickable; " if rec["pickable"] else "it still waits on its open parts; "
+                    flags.add(f"ℹ {e['id']}: every blocker is archived ({', '.join(ids)}) — {now}"
+                              "the Blocked by field can go", e["id"], "blocked by", "blockers-archived")
             else:
-                rec["blocked_by"] = open_ids + [f"decision ({w})" for w in who] + [repr(b) for b in bad]
+                rec["blocked_by"] = open_ids + gates + kept
                 rec["pickable"] = False
             below_me = _descendants(e["id"], parts_open)
             legacy = [b for b in ids if "#" not in b and any(_num(b) == _num(d) for d in below_me)]
@@ -449,6 +738,19 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
                 else "waits on itself"
             flags.add(f"ℹ {t}: {on} — none of it can be picked; break it (a part is never blocked "
                       "by its parent or an ancestor)", t, "blocked by", "cycle")
+    by_id = {r["id"]: r for r in pick + blocked}
+    for par, kids in parts_open.items():
+        if par not in by_id:
+            continue
+        pg: dict[str, list[str]] = {}
+        canon: dict[str, str] = {}
+        for kid in sorted(kids, key=_num):
+            for gate in holding.get(kid, []):
+                canon.setdefault(_gate_key(gate), gate)  # the lowest-numbered part's spelling
+                carriers = pg.setdefault(canon[_gate_key(gate)], [])
+                if kid not in carriers:  # a gate written twice on one part is one carrier
+                    carriers.append(kid)
+        by_id[par]["parts_gates"] = pg
     order = _card_order(live, keys, lined, parent_of)
     for r in pick + blocked:
         r["card_key"] = order[r["id"]][1]
@@ -459,30 +761,105 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
             "flag_recs": flags.recs, "declared": {k: list(v) for k, v in vocab.items()}}
 
 
+def _ended(tid: str, b: str, live_nums: set[int], gone: Mapping[int, dict], resolve: Resolve | None,
+           flags: _Flags, *, cross: bool) -> bool:
+    """Whether archived blocker ``b`` of ``tid`` releases it (v2.4, SPEC *Superseded and dropped*), flagging a
+    blocker that was superseded, dropped or archived with a Status word this reader does not know. A
+    Superseded one releases only when the end of its chain is Resolved; a Dropped one, one whose Status word
+    is unknown (TD-039), or a chain that ends in Dropped, in an unknown word, in no entry or in a loop, keeps
+    the block."""
+    path, state, word = _chain(b, live_nums, gone, resolve)
+    if len(path) == 1 and state == "resolved":
+        return True
+    where = "another repo's " if cross else ""
+    if len(path) == 1 and state == "unknown-status":
+        flags.add(f"ℹ {tid}: Blocked by {b}, {where}entry archived with a Status word this reader does not know "
+                  f"({word}) — decide this entry: drop the blocker if its work is done, or block on what replaces "
+                  "it; the block stays", tid, "blocked by", "cross-unknown-status" if cross else "blocker-unknown-status")
+        return False
+    if len(path) == 1 and state == "dropped":
+        flags.add(f"ℹ {tid}: Blocked by {b}, {where}entry archived Dropped — decide this entry: drop the "
+                  "blocker if it no longer applies, or block on what replaces it; the block stays",
+                  tid, "blocked by", "cross-dropped" if cross else "blocker-dropped")
+        return False
+    chain = " → ".join(path)
+    if state in ("open", "resolved"):
+        then = "" if state == "open" else "; that entry is Resolved, so the block is lifted"
+        flags.add(f"ℹ {tid}: Blocked by {b}, superseded ({chain}) — "
+                  f"{'the gate sweep rewires it to' if cross else 'name'} {path[-1]} instead{then}",
+                  tid, "blocked by", "cross-superseded" if cross else "blocker-superseded")
+        return state == "resolved"
+    why = {"dropped": "ends in an entry archived Dropped", "unknown": "ends in no entry", "cycle": "loops",
+           "unresolved": "cannot be followed to its end",
+           "unknown-status": "ends in an entry whose Status word this reader does not know"}[state]
+    flags.add(f"ℹ {tid}: Blocked by {b}, superseded ({chain}), whose chain {why} — decide this entry; the block "
+              "stays", tid, "blocked by", "cross-superseded" if cross else "blocker-superseded")
+    return False
+
+
 def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | None = None,
-          rank_text: str | None = None) -> list[dict]:
+          rank_text: str | None = None, *, today: date | str) -> list[dict]:
     """The ledger's flags: {level, id, field, kind, text, standing}. ``old`` is the ledger before
     an edit (None: every ⚠ is an error and nothing is standing). With it, a flag on an entry whose
     header block is unchanged — or a Fields: flag under an unchanged declaration — is standing:
     information, whatever it was. On a changed or new entry, EDIT_ERRORS are errors too. ``rank_text``
     adds the rank file's flags (never standing: the file is a tool's). Also with ``old`` (v2.2): an
     entry that left the ledger while an open entry is still Part of it is an error,
-    ``archive-open-parts``, naming the parts — never standing, since only this edit made it."""
+    ``archive-open-parts``, naming the parts — never standing, since only this edit made it. Each
+    open entry's Log (v2.4) adds ``log-not-last`` and ``log-line`` (``log_problems()``), standing when the
+    entry's whole text is unchanged; an archived entry's Log is not read. Each open entry's events (v2.4)
+    add ``event-section``, ``event-check`` and ``event-ungated`` (``event_problems()``), scoped the same way, and
+    ``gate-reassigned-often`` (info) for a decision reassigned more than twice to reach it (``reassigns()``).
+    ``today`` is ``pickable()``'s (v2.4): the UTC date, required."""
     recs = [dict(r, standing=False)
-            for r in pickable(ledger, archive, resolve, undeclared=True, rank_text=rank_text)["flag_recs"]]
+            for r in pickable(ledger, archive, resolve, undeclared=True, rank_text=rank_text,
+                              today=today)["flag_recs"]]
+    texts = _entry_texts(ledger)
+    for tid, text in texts.items():
+        for kind, why in log_problems(text):
+            recs.append({"level": "error", "id": tid, "field": "log", "kind": kind, "text": f"⚠ {tid}: {why}",
+                         "standing": False})
+        for level, kind, why in event_problems(text):
+            recs.append({"level": level, "id": tid, "field": "event", "kind": kind,
+                         "text": f"{'⚠' if level == 'error' else 'ℹ'} {tid}: {why}", "standing": False})
+        e = entries(text)
+        for gate in (gate_items(parse_gates(e[0]["blocked_raw"])) if e else []):
+            n = reassigns(text, gate) if gate.startswith("decision") else 0
+            if n > 2:
+                recs.append({"level": "info", "id": tid, "field": "blocked by", "kind": "gate-reassigned-often",
+                             "text": f"ℹ {tid}: {gate} was reassigned {n} times — is the decision stuck?",
+                             "standing": False})
     if old is None:
         return recs
     before = {e["id"]: e["fields"] for e in entries(old)}
     changed = {e["id"] for e in entries(ledger) if before.get(e["id"]) != e["fields"]}
+    old_texts = _entry_texts(old)
+    rewritten = {t for t, x in texts.items() if old_texts.get(t) != x}  # a Log flag's scope: the whole entry
     decl_changed = declarations(old) != declarations(ledger)
     for r in recs:
-        counts = True if r["kind"] == "rank" else decl_changed if r["id"] is None else r["id"] in changed
+        counts = True if r["kind"] == "rank" else decl_changed if r["id"] is None else \
+            r["id"] in (rewritten if r["kind"] in TEXT_KINDS else changed)
         if not counts:
             r["standing"], r["level"] = True, "info"
         elif r["kind"] in EDIT_ERRORS:
             r["level"] = "error"
         r["text"] = ("⚠" if r["level"] == "error" else "ℹ") + r["text"][1:]
     return recs + _left_with_open_parts(old, ledger)
+
+
+LOG_KINDS = ("log-not-last", "log-line")  # check()'s flags on an entry's Log (v2.4)
+EVENT_KINDS = ("event-section", "event-check", "event-ungated")  # check()'s flags on an entry's events (v2.4)
+TEXT_KINDS = LOG_KINDS + EVENT_KINDS + ("ask-missing", "gate-reassigned-often")  # flags that read the body: scoped by the entry's whole text
+
+
+def _entry_texts(text: str) -> dict[str, str]:
+    """Each entry's text (its heading to the next ``## `` heading), HTML comments dropped, by id."""
+    text = COMMENT_RE.sub("", text)
+    out = {}
+    for m in HEADING_RE.finditer(text):
+        nxt = SECTION_RE.search(text, m.end())
+        out.setdefault(m.group(1), text[m.start(): nxt.start() if nxt else len(text)])
+    return out
 
 
 def _left_with_open_parts(old: str, ledger: str) -> list[dict]:
@@ -680,7 +1057,7 @@ def respace(text: str, ledger: str, *, fixed: Iterable[str] = (), repo: str = ""
             raise Refused(f"not a key: {k!r}")
     lined_nums = {_num(t) for t in lines}
     recs = pickable(ledger, "", lambda _x: ("unresolved", "respace reads no other repo"), rank_text="",
-                    repo=repo)["entries"]
+                    repo=repo, today=date.min)["entries"]  # keys and order only: neither reads today
     points = {r["key"] for r in recs if _num(r["id"]) not in lined_nums} | set(fixed)
     # an entry filed later has an implicit key in its band past every id read: each band's range of those
     # stays a gap no rewritten key enters, so a respace never moves a line across where a new entry will sort
@@ -856,7 +1233,13 @@ PARTS_RE = re.compile(r"\s+Parts:\s*(?P<ids>.*?)(?=\s+(?:Due|Hide until|Answers|
 # starts a sentence and is read only after the item's Due:, or after its Context: when it has none (an fyi).
 HIDE_RE = re.compile(r"(?:^|(?<=[.?!]\s))Hide until:\s*(?P<date>\d{4}-\d{2}-\d{2})\b")
 HIDE_KEY_RE = re.compile(r"\s*\bHide until:\s*\d{4}-\d{2}-\d{2}\b\.?")  # what item_key strips, as it strips Due:
-REF_TD_RE = re.compile(r"(?:[\w.-]+(?:/[\w.-]+)?#)?TD-\d+")
+# A TD ref in prose (v2.4): `<repo>#TD-n` with the repo as XREPO_ITEM_RE has it, read only at the
+# start or after whitespace, ASCII punctuation other than `/ . - @ : # _ \`, or a typographic dash or
+# quote (REF_BEFORE), and not a repo whose first component is a `TD-n`; or a bare `TD-n` with no `#`
+# before it. Anything else before a repo (a letter, a combining mark, a zero-width character, a path
+# or URL) makes it the tail of a longer word, so a bad repo is no ref at all, never a shorter one.
+REF_BEFORE = "\\s!\"$&'()*+,;<=>?\\[\\]^`{|}~—–“”‘’«»…"
+REF_TD_RE = re.compile(rf"(?<![^{REF_BEFORE}])(?!TD-\d+[/#]){REPO}#TD-\d+|(?<!#)TD-\d+")
 REF_PR_RE = re.compile(r"\bPRs?\s*#\d+(?:\s*(?:/|,|&|and)\s*#\d+)*")  # PR #12 · PRs #12/#13 · PR #12, #13
 REF_BRANCH_RE = re.compile(r"^(?P<said>branch\s+)?`?(?P<name>[A-Za-z0-9][\w./-]*)`?$")
 REF_FILE_RE = re.compile(r"\.\w{1,5}$")  # docs/plans/x.md is a path, not a branch
@@ -1033,7 +1416,7 @@ def parse_parts(text: str) -> list[str]:
         m = None
     out: list[str] = []
     for x in REF_TD_RE.finditer(m.group("ids") if m else ""):
-        if x.group(0) not in out:
+        if ref_key(x.group(0)) not in {ref_key(o) for o in out}:
             out.append(x.group(0))
     return out
 
@@ -1126,6 +1509,97 @@ def closed_items(content: str) -> list[str]:
     return [ln for ln in content.splitlines() if CLOSED_ITEM_RE.match(ln)]
 
 
+def parse_closed_items(content: str) -> list[BoardItem]:
+    """The board's (or its archive's) closed items, in order, each read as parse_board() reads an open one
+    (v2.4): its trailing `Closed:` field cut first, since the fields before it are anchored at the line's
+    end. Each keeps its 1-based line and its detail block."""
+    lines = content.splitlines()
+    shown = []
+    for ln in lines:
+        m = CLOSED_ITEM_RE.match(ln)
+        if m is None:
+            shown.append("" if ANY_ITEM_RE.match(ln) else ln)  # an open item is not read here; its line stays
+            continue
+        c = CLOSED_RE.search(m.group("text"))
+        text = (m.group("text")[: c.start()] if c else m.group("text")).rstrip()
+        shown.append(f"{ln[: m.start('text')].replace('[x]', '[ ]').replace('[X]', '[ ]')}{text}" if text else "")
+    return parse_board("\n".join(shown), warn=False)
+
+
+# The answers that only keep a gate waiting (v2.4): they never lift, and an item whose Context names a gate
+# is closed by one (SPEC *The board*).
+WAITING_ONLY = ("keep waiting", "not yet")
+ANSWERED_BY_RE = re.compile(r"^Answered by:(?P<value>.*)$")
+ANSWERED_BY = ("owner", "any")  # who may give a lifting answer on the board; absent means owner
+
+
+def waiting_only(label: object) -> bool:
+    """Whether ``label`` is one of the two waiting-only answers, `Keep waiting` and `Not yet`, compared
+    case-insensitively (v2.4)."""
+    return isinstance(label, str) and " ".join(label.split()).rstrip(".").lower() in WAITING_ONLY
+
+
+def _answered_by_line(content: str) -> tuple[int, str] | None:
+    for n, ln in enumerate(content.splitlines(), start=1):
+        if ANY_ITEM_RE.match(ln):
+            return None
+        m = ANSWERED_BY_RE.match(ln.rstrip())
+        if m:
+            return n, m.group("value")
+    return None
+
+
+def answered_by(content: str) -> str | None:
+    """The board's `Answered by:` preamble line (v2.4), its value stripped as written, or None when it has
+    none (which means `owner`). Read only above the board's first item; a value other than `owner` or
+    `any` (in any case) is returned as it stands, for board_problems() to flag."""
+    got = _answered_by_line(content)
+    return got[1].strip() if got else None
+
+
+def _item_text(item: BoardItem | str) -> str:
+    if isinstance(item, BoardItem):
+        return item.text
+    m = ITEM_RE.match(item) or CLOSED_ITEM_RE.match(item)
+    return m.group("text").strip() if m else item.strip()
+
+
+def _item_gate(text: str) -> tuple[str | None, str | None]:
+    """(the one entry ref, the one gate) an item's Context names, each None when it names none or more
+    than one."""
+    c = CONTEXT_RE.search(_gate_body(text))
+    ctx = c.group("ctx") if c else ""
+    refs = list(dict.fromkeys(ref_key(x.group(0)) for x in REF_TD_RE.finditer(ctx)))
+    gates = list(dict.fromkeys(" ".join(g.group(0).split()) for g in CONTEXT_ANY_GATE_RE.finditer(ctx)))
+    ref = next((x.group(0) for x in REF_TD_RE.finditer(ctx)), None) if len(refs) == 1 else None
+    return ref, gates[0] if len(gates) == 1 else None
+
+
+def _lifting(label: str, lifts: list[str] | None) -> bool:
+    """Whether ``label`` lifts: one of the item's `Lifts:` (`Go` when it has none), compared
+    case-insensitively, and never a waiting-only answer."""
+    said = " ".join(label.split()).lower()
+    return not waiting_only(label) and said in {" ".join(x.split()).lower() for x in (lifts or ["Go"])}
+
+
+def closes(item: BoardItem | str, label: str, entries_after: Mapping[str, str]) -> bool:
+    """Whether answering ``label`` on ``item`` (a line or a BoardItem) closes it in the same write (v2.4, SPEC
+    *The board*): on an item whose Context names a gate, a waiting-only answer, and a lifting one when the
+    Context names this repo's entry (a bare ``TD-n``) and nothing listed still carries the gate after the
+    write — neither that entry nor any `Parts:` id, read from ``entries_after`` (id to text; an id it lacks
+    carries nothing). Any other answer is a work order and leaves it open."""
+    text = _item_text(item)
+    ref, gate = _item_gate(text)
+    if gate is None:
+        return False
+    if waiting_only(label):
+        return True
+    if ref is None or "#" in ref or not _lifting(label, parse_lifts(text)):
+        return False
+    by_num = {_num(k): v for k, v in entries_after.items() if _is_id(k)}
+    return not any(_carried(by_num.get(_num(x)), gate) for x in [ref, *parse_parts(text)] if "#" not in x)
+
+
 def detail_block(lines: list[str], lineno: int) -> list[str]:
     """The detail block under the item on 1-based line `lineno` — the run of lines right after it
     indented deeper than its `-`, ended by a blank line, a line no deeper than the item, or another
@@ -1215,7 +1689,7 @@ def item_refs(text: str) -> list[str]:
             found.append((p.start(), f"branch {b.group('name')}"))
     refs: list[str] = []
     for _, ref in sorted(found):
-        if ref not in refs:
+        if ref_key(ref) not in {ref_key(r) for r in refs}:
             refs.append(ref)
     return refs
 
@@ -1230,9 +1704,26 @@ def due_tag(item: BoardItem, today: date) -> str:
     return "no due date"
 
 
+def item_notes(item: BoardItem, today: date) -> list[str]:
+    """The item's notes on its `Hide until:` against ``today`` (v2.4), in rule order: they inform and never
+    refuse, so no gate reads them. ``hide-spent``: a hide on an item not hidden today (its date has come, or the
+    item is decided). ``hide-late``: a hidden item whose hide is after its readable `Due:`. At most one applies."""
+    hide = item.hide_until
+    if hide is None:
+        return []
+    if not item.hidden(today):
+        if item.decided is not None:
+            return [f"hide-spent: a decided item is never hidden, so Hide until: {hide.isoformat()} hides nothing"]
+        return [f"hide-spent: Hide until: {hide.isoformat()} has come, so it hides nothing; a snooze replaces it"]
+    if item.due is not None and hide > item.due:
+        return [f"hide-late: Hide until: {hide.isoformat()} is after Due: {item.due.isoformat()}, "
+                "so the item stays hidden past its deadline"]
+    return []
+
+
 def item_record(item: BoardItem, today: date) -> dict:
     """The item as one JSON-ready record — the board's API, and the fixtures' shape. The
-    today-relative fields (``overdue_days``, ``due_tag``) are computed against ``today``."""
+    today-relative fields (``overdue_days``, ``due_tag``, ``hidden``, ``notes``) are computed against ``today``."""
     return {
         "line": item.line,
         "text": item.text,
@@ -1254,6 +1745,7 @@ def item_record(item: BoardItem, today: date) -> dict:
         "detail": item.detail,
         "hide_until": item.hide_until.isoformat() if item.hide_until else None,
         "hidden": item.hidden(today),
+        "notes": item_notes(item, today),  # v2.4
         "lifts": item.lifts,  # v2.3
         "parts": item.parts,  # v2.3
     }
@@ -1363,14 +1855,18 @@ def _trailing_field_start(body: str, after_due: bool = False) -> int | None:
 
 def edit_line(body: str, action: str, *, to: date | None = None, answer: str | None = None,
               why: str | None = None, reply: str | None = None, by: str | None = None,
-              today: date | None = None) -> str:
+              today: date | None = None, close: bool = False) -> str:
     """The open item line `body` (no line ending) after `action` — snooze (hidden until `to`), due (its
     Due: moved to `to`), done (with
-    `why`), decide (`answer`), reply (`reply`, by `by`); raises Refused. Every edit is re-parsed
+    `why`), decide (`answer`; with `close`, v2.4, also closed: `Closed: <today> — kept waiting.` for a
+    waiting-only answer, `— lifted.` for a lifting one, on an item whose Context names a gate — closes()
+    says when), reply (`reply`, by `by`); raises Refused. Every edit is re-parsed
     and refused if the reader would not read back what was meant."""
     today = today or date.today()  # noqa: DTZ011  # a civil date, as the readers use
     if ITEM_RE.match(body) is None:
         raise Refused("the line is not an open item")
+    if close and action != "decide":
+        raise Refused("only a decide closes the item it answers (close)")
     if action == "done":
         why = " ".join((why or "").split()).rstrip(".?!")  # the field supplies its one period
         fld = f"Closed: {today.isoformat()}{f' — {why}' if why else ''}."
@@ -1458,6 +1954,24 @@ def edit_line(body: str, action: str, *, to: date | None = None, answer: str | N
             # the field starts a sentence (the reader's rule): end an unpunctuated item first
             head = body.rstrip()
             new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} {fld}"
+        if close:  # v2.4: the answer closes the item in the same write
+            if _item_gate(text)[1] is None:
+                raise Refused("only an item whose Context names a gate is closed by its answer")
+            reason = "kept waiting" if waiting_only(answer) else "lifted" if _lifting(answer, parse_lifts(text)) else None
+            if reason is None:
+                raise Refused(f"{answer!r} neither lifts nor only keeps waiting — a work order stays open")
+            closed = re.sub(r"^(\s*-\s*)\[ \]", r"\1[x]", new, count=1) + f" Closed: {today.isoformat()} — {reason}."
+            got = parse_closed_items(closed)
+            m = CLOSED_RE.search(closed)
+            was = parse_board(body, warn=False)[0]
+            if ITEM_RE.match(closed) or len(got) != 1 or not m or m.group(0) != f"Closed: {today.isoformat()} — {reason}." \
+                    or got[0].decided != (answer, today) or got[0].decided_by != by \
+                    or (got[0].answers, got[0].lifts, got[0].parts, got[0].consequences, got[0].default, got[0].due) \
+                    != (was.answers, was.lifts, was.parts, was.consequences, was.default, was.due) \
+                    or item_key(closed) != item_key(body):
+                raise Refused(f"the reader would not read back 'Decided: {answer}' and the item closed "
+                              f"{reason} today, with its other fields unchanged — rephrase the answer")
+            return closed
         got = parse_board(new, warn=False)
         if not got or got[0].decided != (answer, today) or got[0].decided_by != by \
                 or got[0].answers != parse_answers(text) or got[0].lifts != parse_lifts(text) \
@@ -1669,8 +2183,11 @@ def item_line(text: str, due: str | None, today: str, session: str | None, host:
         if [x.lower() for x in lifted] == ["go"]:
             lifted = []  # `Go` alone is what no Lifts: means: it is not written
     if kind == "decide" and (lifted or lifts is not None or CONTEXT_ANY_GATE_RE.search(ctx)) \
-            and len({x.group(0) for x in REF_TD_RE.finditer(ctx)}) != 1:
+            and len({ref_key(x.group(0)) for x in REF_TD_RE.finditer(ctx)}) != 1:
         raise Refused("a decide that lifts a gate names exactly one entry in its context")
+    waits = [x for x in lifted if waiting_only(x)]
+    if waits:
+        raise Refused(f"{waits[0]!r} only keeps the gate waiting — it never lifts (v2.4)")
     label = offered[default][0] if offered and default is not None else None
     lines = _detail_lines(detail, label if kind == "decide" else None) if detail is not None else []
 
@@ -1908,9 +2425,9 @@ def item_problem(line: str) -> str | None:
         ids = parts_s.split(", ")
         if kind != "decide":
             problems.append(f"parts: {_a_kind(kind)} carries no `Parts:`: only a decide asks about a parent's parts")
-        if not all(REF_TD_RE.fullmatch(x) for x in ids):
+        if not all(ID_ITEM_RE.fullmatch(x) or XREPO_ITEM_RE.fullmatch(x) for x in ids):
             problems.append("parts: `Parts:` lists entry ids, `TD-n` or `<repo>#TD-n`, separated by `, `")
-        elif len(set(ids)) != len(ids):
+        elif len({ref_key(x) for x in ids}) != len(ids):  # a repo in any case is one repo
             problems.append("parts: an id stands twice")
         if not pm.group("period"):
             problems.append("parts: no period after its ids")
@@ -1951,13 +2468,16 @@ def item_problem(line: str) -> str | None:
                 problems.append(f"lifts: not one of the item's answers: {', '.join(off)}")
             if len({x.lower() for x in named_lifts}) != len(named_lifts):
                 problems.append("lifts: an answer stands twice")
+            waits = [x for x in named_lifts if waiting_only(x)]
+            if waits:
+                problems.append(f"lifts: {', '.join(waits)} only keeps the gate waiting — it never lifts")
         if not lm.group("period"):
             problems.append("lifts: no period after its answers")
         i = order.index("Lifts")
         if i == 0 or order[i - 1] != "Answers":
             problems.append("lifts: `Lifts:` follows Answers")
     if kind == "decide" and ctx is not None and (parts or lifts_seg or CONTEXT_ANY_GATE_RE.search(ctx)) \
-            and len({x.group(0) for x in REF_TD_RE.finditer(ctx)}) != 1:
+            and len({ref_key(x.group(0)) for x in REF_TD_RE.finditer(ctx)}) != 1:
         problems.append("context: a decide that lifts a gate names exactly one entry in its Context")
     for name in ("Decided", "Closed"):
         if name in order:
@@ -2076,6 +2596,25 @@ def people_problems(board: str) -> list[tuple[int, str]]:
     return out
 
 
+def answered_by_problems(board: str) -> list[tuple[int, str]]:
+    """(1-based line, problem) for the board's `Answered by:` preamble line (v2.4): a value other than `owner`
+    or `any`, and a second such line above the first item. None means `owner`, and is no problem."""
+    got = _answered_by_line(board)
+    if got is None:
+        return []
+    n, value = got
+    out = []
+    if value.strip().lower() not in ANSWERED_BY:
+        out.append((n, f"answered by: `Answered by:` is owner or any, not {value.strip()!r}"))
+    lines = board.splitlines()
+    for m in range(n, len(lines)):
+        if ANY_ITEM_RE.match(lines[m]):
+            break
+        if ANSWERED_BY_RE.match(lines[m].rstrip()):
+            out.append((m + 1, "answered by: a second `Answered by:` line — the first is read"))
+    return out
+
+
 def board_problems(board: str, old: str | None = None) -> list[tuple[int, str]]:
     """(1-based line, problem) for each open item line of `board` that item_problem() faults and
     that is new: no item line of `old`, open or closed, has its item key. Every `- [ ]` line at any
@@ -2083,13 +2622,13 @@ def board_problems(board: str, old: str | None = None) -> list[tuple[int, str]]:
     judges every open line. A new `decide` line whose Context names a gate, `decision (<person>)`, is
     also faulted when the board's `People:` does not list that person. First come the board's
     `People:` problems (people_problems(), v2.3), whose note on a board with none opens `ℹ` and is no
-    fault. The board's gate: a consumer calls it on the board as the edit leaves
-    it, with the board as the edit found it."""
+    fault; then its `Answered by:` problems (answered_by_problems(), v2.4). The board's gate: a consumer calls
+    it on the board as the edit leaves it, with the board as the edit found it."""
     closed = {item_key(ln) for ln in closed_items(board)}
     known = None if old is None else {item_key(ln) for ln in old.splitlines() if ANY_ITEM_RE.match(ln)}
     people = board_people(board)
     on = {x.lower() for x in people or []}
-    out = people_problems(board)
+    out = people_problems(board) + answered_by_problems(board)
     for n, ln in enumerate(board.splitlines(), start=1):
         if not ITEM_RE.match(ln) or item_key(ln) in closed or (known is not None and item_key(ln) in known):
             continue
@@ -2204,6 +2743,8 @@ def archive_subject(tool: str, count: int, session: str | None = None) -> str:
 EDIT_SUBJECT_RE = re.compile(r"^\S+: (?P<action>snooze|due|done|decide|reply) .+ \(session [^)]+\)$")
 APPEND_SUBJECT_RE = re.compile(r"^\S+: append .+ \(session [^)]+\)$")
 ARCHIVE_SUBJECT_RE = re.compile(r"^\S+: archive (?:1 closed item|(?:[2-9]|[1-9]\d+) closed items) \(session [^)\s]+\)\Z")  # v2.3
+# The ledger's one-time migrate commit (v2.4, SPEC *The merge gate's verdicts*): the tripwire exempts it by subject.
+MIGRATE_SUBJECT_RE = re.compile(r"^ledger: migrate v(?P<release>[0-9]{1,9}(?:\.[0-9]{1,9}){0,2}) \((?P<n>[0-9]{1,9}) entries\)\Z")
 # Subjects one consumer wrote for an append before this format had one; still read, so a board PR
 # in flight across the change classifies as before.
 LEGACY_APPEND_SUBJECT_RES = (
@@ -2239,9 +2780,19 @@ def queue_subject(tool: str, action: str, ids: list[str]) -> str:
     return f"queue: {action} {', '.join(sorted(set(ids), key=_num))} ({tool})"
 
 
+def migrate_subject(release: str, n: int) -> str:
+    """The one-time migrate commit's subject, ``ledger: migrate v<release> (<n> entries)`` (v2.4)."""
+    out = f"ledger: migrate v{release} ({n} entries)"
+    if isinstance(n, bool) or not isinstance(n, int) or not MIGRATE_SUBJECT_RE.match(out):
+        raise Refused(f"a migrate subject names a release (2.4) and a whole count, not {release!r} and {n!r}")
+    return out
+
+
 def subject_kind(line: str) -> str | None:
     """`edit`, `append` or `archive` for a board write's commit subject, `queue` for a rank file write's (or a PR
-    title carrying one); None otherwise."""
+    title carrying one), `migrate` for the ledger's one-time migrate commit (v2.4); None otherwise."""
+    if MIGRATE_SUBJECT_RE.match(line):
+        return "migrate"
     if QUEUE_SUBJECT_RE.match(line):
         return "queue"
     if ARCHIVE_SUBJECT_RE.match(line):
@@ -2411,7 +2962,7 @@ def split(ledger: str, archive: str) -> dict[str, str]:
                     continue
                 title, _, rest = part.partition("\n")
                 if not where and title.strip().lower() == "## summary":
-                    kept += [ln for ln in rest.splitlines() if ln.strip() and not ln.lstrip().startswith("|")]
+                    kept += _summary_kept(rest)
                     continue
                 raise Refused(f"{title!r} in the {'archive' if where else 'ledger'} is not an entry — "
                               "move it into an entry or the README first; nothing was split")
@@ -2434,14 +2985,95 @@ def split(ledger: str, archive: str) -> dict[str, str]:
     return files
 
 
+def _summary_kept(rest: str) -> list[str]:
+    """The ``## Summary`` section's lines but its table, verbatim (v2.4): blank lines kept, the table's
+    rows taken out, and of the blank lines on its two sides one kept; leading and trailing blanks dropped."""
+    out: list[str] = []
+    lines = rest.splitlines()
+    hidden = set()  # the lines inside an HTML comment (a template's own rows are no table)
+    pos, starts = 0, []
+    for ln in lines:
+        starts.append(pos)
+        pos += len(ln) + 1
+    joined = "\n".join(lines)
+    for m in COMMENT_RE.finditer(joined):
+        hidden |= {n for n, at in enumerate(starts) if m.start() <= at < m.end()}
+
+    def row(n: int) -> bool:
+        return n not in hidden and lines[n].lstrip().startswith("|")
+
+    i = 0
+    while i < len(lines):
+        if row(i):
+            while i < len(lines) and row(i):
+                i += 1
+            if out and not out[-1].strip() and i < len(lines) and not lines[i].strip():
+                i += 1  # the table stood between two blank lines: one of them stays
+            continue
+        out.append(lines[i])
+        i += 1
+    while out and not out[0].strip():
+        out.pop(0)
+    while out and not out[-1].strip():
+        out.pop()
+    return out
+
+
 def _v2_readme(text: str, kept: list[str]) -> str:
     """``README.md`` from a v1 ledger's opening prose: ``Ledgerboard: 2`` under its title (any
-    ``Ledgerboard: 1`` line dropped), then ``kept`` — the Summary section's lines that are not table."""
+    ``Ledgerboard: 1`` line dropped), then ``kept`` — the Summary section's lines that are not table
+    (``_summary_kept()``). A ``---`` that would follow the prose's own closing ``---`` with nothing
+    between them (the pair that framed the table) is dropped (v2.4)."""
     lines = [ln for ln in text.rstrip("\n").split("\n") if not VERSION_RE.match(ln)] if text.strip() else []
     at = 1 if lines and lines[0].startswith("# ") else 0
     lines[at:at] = (["", "Ledgerboard: 2"] if at else ["Ledgerboard: 2", ""])
     out = "\n".join(lines).rstrip("\n") + "\n"
+    kept = list(kept)
+    if kept and kept[0].strip() == "---" and lines and lines[-1].strip() == "---":
+        kept.pop(0)
+        while kept and not kept[0].strip():
+            kept.pop(0)
     return out + ("\n" + "\n".join(kept) + "\n" if kept else "")
+
+
+SPLIT_TABLE_RE = re.compile(r"\b(?:summary table|table below|the table)\b", re.IGNORECASE)
+INLINE_CODE_RE = re.compile(r"(`+).*?\1")  # a code span: no link inside one
+SPLIT_LINK_RE = re.compile(r"(?<!\\)\[[^\]]*\]\((?![a-z][a-z0-9+.-]*:|#|/)(?P<target>[^)\s]+)\)"
+                           r"|^ {0,3}\[[^\]]+\]:\s*(?![a-z][a-z0-9+.-]*:|#|/)(?P<ref>\S+)", re.IGNORECASE)
+ANY_LINK_RE = re.compile(r"(?<!\\)\[[^\]]*\]\([^)]*\)|^ {0,3}\[[^\]]+\]:\s*\S+")  # a link or definition, any target
+V1_NAME_RE = re.compile(r"(?<![\w.-])technical_debt(?:_archive)?\.md\b")  # the v1 files, by LEDGER_V1_PATH's name
+
+
+def split_notes(readme: str) -> list[tuple[int, str, str]]:
+    """The lines of a ``README.md`` that ``split()`` wrote which may still describe the v1 layout (v2.4), for a
+    caller to warn about: ``(line number, line, why)`` for a line naming the summary table, which a v2 ledger
+    has none of, for one holding a relative Markdown link, which the move from beside the v1 file into the
+    v2 directory breaks (a link to the v1 archive file among them), or a reference definition doing the same,
+    and for one naming a v1 file (``technical_debt.md``, ``technical_debt_archive.md``) outside a link, in a code
+    span too. Best effort, for a warning: a line inside a fenced code block, and a link inside a code span, are skipped;
+    nothing is rewritten."""
+    out, fence = [], ""
+    for n, line in enumerate(readme.splitlines(), 1):
+        f = FENCE_RE.match(line)
+        if f:
+            mark = f.group("fence")
+            if not fence:
+                fence = mark
+            elif mark[0] == fence[0] and len(mark) >= len(fence) and not f.group("info").strip():
+                fence = ""  # CommonMark: the same character, at least as long, and no info string
+            continue
+        if fence:
+            continue
+        if SPLIT_TABLE_RE.search(line):
+            out.append((n, line, "names the summary table: a v2 ledger has none"))
+        for m in SPLIT_LINK_RE.finditer(INLINE_CODE_RE.sub("", line)):
+            target = m.group("target") or m.group("ref")
+            out.append((n, line, f"links {target} relatively: the README moved into the ledger directory"))
+        spans = " ".join(m.group(0) for m in INLINE_CODE_RE.finditer(line))  # a code span shows text, never a link
+        named = V1_NAME_RE.search(spans) or V1_NAME_RE.search(ANY_LINK_RE.sub("", INLINE_CODE_RE.sub(" ", line)))
+        if named:
+            out.append((n, line, f"names {named.group(0)}, a v1 file: the ledger is now this directory"))
+    return out
 
 
 def v2_problems(path: str, ls: Ls, read: Read) -> list[str]:
@@ -2621,13 +3253,21 @@ def _section_key(lead: str) -> str:
     return field_key(lead.strip().rstrip(":"))
 
 
-def entry_text(tid: str, title: str, fields, sections) -> str:
+def entry_text(tid: str, title: str, fields, sections, *, filed: Mapping | None = None) -> str:
     """A new entry in canonical form: ``## <tid>: <title>``, its ``fields`` ({name: value} or (name,
     value) pairs, one line each; an empty value is left out), then ``sections`` — (name, text) pairs or a {name: text}
     mapping, each written ``**<name>:** <text>``, a whitespace-only line emptied (in a code block
     too); a first pair with no name is the unnamed lead, written as given. Raises Refused for an id that is not ``TD-n``, an empty or multi-line title, a
     field that is not one ``**Name:** value`` line, a field named twice, and sections that would not
-    read back as given (a paragraph of a section's text that opens in bold would start another)."""
+    read back as given (a paragraph of a section's text that opens in bold would start another).
+
+    A Blocked by (v2.4) is written with its ids first, then its gates in the canonical order; the old
+    form ``decision (<who>) <text>`` is refused.
+
+    ``filed`` (v2.4: {today, who, session, words, while}) writes the entry's Log: its first line,
+    ``filed by <who>, session <s>[, while <id>]: "<words>"``, then one ``gate added: <gate>`` for each
+    gate its Blocked by is filed with, in the canonical order. With it, Added is a bare date, Status (if given)
+    is ``Open``, and no section is named Log; ``today`` is a date, ``YYYY-MM-DD`` or an aware datetime."""
     if not ID_ITEM_RE.match(str(tid)):
         raise Refused(f"an entry's id is TD-n, not {tid!r}")
     title = str(title or "")
@@ -2646,8 +3286,21 @@ def entry_text(tid: str, title: str, fields, sections) -> str:
         if field_key(name) in seen:
             raise Refused(f"the field {name!r} is named twice")
         seen.add(field_key(name))
-        header.append((name, value))
+        header.append((name, _written_blocked(value) if field_key(name) == "blocked by" else value))
     pairs = list(sections.items()) if isinstance(sections, Mapping) else list(sections or ())
+    if filed is not None:
+        added, status = _value(header, "added"), _value(header, "status")
+        if added is not None and not ISO_DAY_RE.fullmatch(added):
+            raise Refused(f"a filed entry's Added is the date alone (its words go in the Log), not {added!r}")
+        if status is not None and status != "Open":
+            raise Refused(f"a filed entry's Status is Open (its notes go in the Log), not {status!r}")
+        if any(name and _section_key(f"{name}:") == "log" for name, _ in pairs):
+            raise Refused("a filed entry's Log is written from filed, not given as a section")
+        day = utc_day(filed.get("today"), "filed")
+        lines = [f"- {day}: {_filed_line(filed)}"]
+        for gate in gate_items(parse_gates(_value(header, "blocked by"))):
+            lines.append(f"- {day}: gate added: {gate}")
+        pairs.append((None, "\n".join([f"**{LOG_LEAD}**", *lines])))  # written as given: lines under the lead
     if pairs and not header:
         raise Refused("an entry with sections needs at least one field: the paragraph after the heading "
                       "is the header block")
@@ -2658,10 +3311,10 @@ def entry_text(tid: str, title: str, fields, sections) -> str:
         if not words.strip():
             raise Refused(f"the section {name or '(unnamed)'!r} is empty")
         if not name:
-            if k:
+            if k and not (filed is not None and k == len(pairs) - 1):
                 raise Refused("only the first section may have no name — the text before the first lead")
             parts.append(words)
-            want.append((None, words))
+            want.append((_section_key(LOG_LEAD) if k else None, words))
             continue
         lead = f"{str(name).strip()}:"
         parts.append(f"**{lead}** {words}")
@@ -2677,7 +3330,7 @@ def entry_text(tid: str, title: str, fields, sections) -> str:
 
 ENTRY_ACTIONS = ("set", "note", "edit", "archive", "reopen", "renumber", "rename_ref")
 _ENTRY_ARGS = {"set": {"fields"}, "note": {"words"}, "edit": {"section", "words"},
-               "archive": {"why", "pr", "pointer", "as_is", "superseded_by"}, "reopen": {"why"},
+               "archive": {"why", "pr", "pointer", "as_is", "superseded_by", "dropped"}, "reopen": {"why"},
                "renumber": {"new"}, "rename_ref": {"old", "new"}}  # each action's keyword arguments
 _DATED_ACTIONS = ("note", "archive", "reopen")  # the actions that write today's date
 PR_IN_TEXT_RE = re.compile(r"#\d+")  # a consumer reads the first `#<digits>` of a Resolved line as its PR
@@ -2719,6 +3372,30 @@ def _keyed(sections: list[tuple[str | None, str]], key: str) -> list[int]:
     return [i for i, (lead, _) in enumerate(sections) if lead is not None and _section_key(lead) == key]
 
 
+def _one_copy(value: str) -> str:
+    """A Blocked by value with each id named once: a later copy of an id (a local one by number, another
+    repo's by ``ref_key``) dropped with its comma; the rest, gates and the old form's text among it, as written."""
+    g = parse_gates(value)
+    keys = [f"#{_num(x)}" if "#" not in x else ref_key(x) for x in g["ids"]]
+    if len(set(keys)) == len(keys):
+        return value
+    out, seen, rest = [], set(), value.strip(" \t")
+    while rest:
+        if GATE_DECISION_RE.match(rest) and parse_gates(rest)["old_form"]:
+            out.append(rest)  # the old form runs to the end of the line
+            break
+        m = GATE_ITEM_SEP_RE.search(rest)
+        item, rest = (rest[: m.start()], rest[m.end():]) if m else (rest, "")
+        if ID_ITEM_RE.match(item) or XREPO_ITEM_RE.match(item):
+            k = f"#{_num(item)}" if "#" not in item else ref_key(item)
+            if k in seen:
+                continue
+            seen.add(k)
+        if item:
+            out.append(item)
+    return ", ".join(out)
+
+
 def _rename(value: str, old: str, new: str) -> str:
     """``value`` with each id item ``old`` written ``new``; a local id matches by number (``TD-7`` is ``TD-007``)."""
     m = ID_ITEM_RE.match(old)
@@ -2730,30 +3407,412 @@ def _rename(value: str, old: str, new: str) -> str:
     return rx.sub(new, value)
 
 
+def dependents(ledger: str, tid: str) -> list[str]:
+    """The open entries of ``ledger`` whose Blocked by names ``tid`` (a local id, matched by number), in file order."""
+    return [e["id"] for e in entries(ledger) if _num(e["id"]) != _num(tid)
+            and any("#" not in x and _num(x) == _num(tid) for x in parse_gates(e["blocked_raw"])["ids"])]
+
+
+def archive_plan(ledger: str, archive: str, tid: str, *, superseded_by: str | None = None, dropped: bool = False,
+                 resolve: Resolve | None = None) -> dict:
+    """What archiving open entry ``tid`` leaves its dependents (v2.4, SPEC *Superseded and dropped*):
+    ``{successor, rewire}``. Raises Refused when the archive may not go ahead.
+
+    - Resolved (neither keyword): ``{successor: None, rewire: []}``; its dependents are released as before.
+    - ``dropped``: refused while any open entry is Blocked by ``tid``, naming every one — each is decided
+      first.
+    - ``superseded_by`` (``TD-m`` or ``<repo>#TD-m``): the successor followed through each Superseded entry
+      to the end of its chain, which ``successor`` names and the archive writes. It must be open or
+      Resolved: refused when it names no entry (or one the resolver cannot answer), ends in Dropped or in a
+      Status word this reader does not know (TD-039), loops,
+      or is ``tid`` itself or one of its dependents (which would block on itself). ``rewire``: the
+      dependents, each to get ``edit_entry(…, "rename_ref", old=tid, new=successor)`` in the same change."""
+    if not _is_id(tid) or not any(_num(e["id"]) == _num(tid) for e in entries(ledger)):
+        raise Refused(f"{tid!r} names no open entry")
+    deps = dependents(ledger, tid)
+    if dropped and superseded_by is not None:
+        raise Refused("an entry is dropped or superseded, not both")
+    if dropped:
+        if deps:
+            raise Refused(f"{tid} cannot be dropped while {', '.join(deps)} {'is' if len(deps) == 1 else 'are'} "
+                          f"Blocked by it — decide each first: drop the blocker, or block it on what replaces {tid}")
+        return {"successor": None, "rewire": []}
+    if superseded_by is None:
+        return {"successor": None, "rewire": []}
+    if not _is_id(superseded_by, other_repo=True):
+        raise Refused(f"superseded by another entry's TD-n or <repo>#TD-n, not {superseded_by!r}")
+    live_nums = {_num(e["id"]) for e in entries(ledger)} - {_num(tid)}
+    gone = dict(_archived_status(archive))
+    gone[_num(tid)] = {"id": tid, "word": "superseded", "successor": superseded_by,
+                       "status_word": ""}  # as the archive will read it
+    path, state, word = _chain(superseded_by, live_nums, gone, resolve)
+    end = path[-1]
+    if "#" not in end and _num(end) == _num(tid) or state == "cycle":
+        raise Refused(f"superseding {tid} by {superseded_by} loops back ({' → '.join(path)}) — name another successor")
+    if state == "dropped":
+        raise Refused(f"the successor's chain ({' → '.join(path)}) ends in an entry archived Dropped — a successor is "
+                      "open or Resolved")
+    if state == "unknown-status":
+        raise Refused(f"the successor's chain ({' → '.join(path)}) ends in an entry archived with a Status word this "
+                      f"reader does not know ({word}) — a successor is open or Resolved")
+    if state in ("unknown", "unresolved"):
+        what = "names no entry in the ledger or the archive" if state == "unknown" else "cannot be resolved"
+        via = "" if len(path) == 1 else f" (its chain: {' → '.join(path)})"
+        raise Refused(f"the successor {end} {what}{via} — a successor exists, open or Resolved")
+    own = [d for d in deps if "#" not in end and _num(d) == _num(end)]
+    if own:
+        raise Refused(f"{own[0]} is Blocked by {tid} and is its successor: it would block on itself — name another "
+                      "successor, or take the blocker off it first")
+    if "#" not in end:  # a successor that waits, through its own blockers, on a dependent would close a loop
+        edges = {_num(e["id"]): [_num(x) for x in parse_gates(e["blocked_raw"])["ids"] if "#" not in x]
+                 for e in entries(ledger)}
+        dep_nums, seen, todo = {_num(d): d for d in deps}, set(), [_num(end)]
+        while todo:
+            n = todo.pop()
+            for m in edges.get(n, []):
+                if m in dep_nums:
+                    raise Refused(f"the successor {end} waits on {dep_nums[m]}, which is Blocked by {tid}: rewired, "
+                                  "they would block on each other — name another successor, or untangle them first")
+                if m not in seen and m != _num(tid):
+                    seen.add(m)
+                    todo.append(m)
+    return {"successor": end, "rewire": deps}
+
+
+# ---------------------------------------------------------------------------------------------
+# The Log (v2.4): an entry's dated history, the body's last section
+# ---------------------------------------------------------------------------------------------
+
+LOG_LEAD = "Log:"
+LOG_LINE_RE = re.compile(r"^- (?P<date>\d{4}-\d{2}-\d{2}): (?P<words>\S.*?)$")
+# The writer prefixes (SPEC *The Log*): `note` refuses words that begin with one, and a lifted
+# Status note that would is written `note: <text>`.
+LOG_PREFIXES = ("filed by ", "gate added:", "gate lifted:", "gate reassigned:", "kept waiting:",
+                "gate lift skipped:", "was:", "archived:", "reopened —")
+LOG_TOKEN = r"[A-Za-z0-9_.@/-]+"  # who, a session, a host: no spaces, commas, colons or quotes
+LOG_ID = rf"(?:{REPO}#)?TD-\d+"  # the ids Blocked by takes
+LOG_GATE = r"decision \(" + PERSON + r"\)|until \d{4}-\d{2}-\d{2}|event \([a-z0-9-]+\)"
+LOG_LIFT_SUFFIX = rf"; board {REPO}|; no board item|; shared board item left open"
+# Each writer-made shape, tried in this order; a quoted label or words run to the line's last `"`.
+LOG_SHAPES = (
+    ("filed", re.compile(rf"filed by (?P<who>{LOG_TOKEN}), session (?P<session>{LOG_TOKEN})"
+                         rf"(?:, while (?P<while>{LOG_ID}))?: \"(?P<words>.*)\"")),
+    ("gate-added", re.compile(rf"gate added: (?P<gate>{LOG_GATE})")),
+    ("gate-lifted", re.compile(rf"gate lifted: (?P<gate>decision \({PERSON}\)|event \([a-z0-9-]+\)) — by "
+                               rf"(?P<by>{LOG_TOKEN}); answer \"(?P<label>.*)\"(?P<suffix>{LOG_LIFT_SUFFIX})?")),
+    ("gate-lifted", re.compile(rf"gate lifted: (?P<gate>decision \({PERSON}\)) — by (?P<by>{LOG_TOKEN}); "
+                               r"override: (?P<why>\S.*)")),
+    ("gate-lifted", re.compile(rf"gate lifted: (?P<gate>event \([a-z0-9-]+\)) — by (?P<by>{LOG_TOKEN}); "
+                               r"(?P<check>[a-z0-9-]+) passed; (?P<evidence>\S+)")),
+    ("gate-lifted", re.compile(rf"gate lifted: (?P<gate>until \d{{4}}-\d{{2}}-\d{{2}}) — by (?P<by>{LOG_TOKEN}); "
+                               r"date reached")),
+    ("gate-lift-skipped", re.compile(rf"gate lift skipped: (?P<id>{LOG_ID}) no longer carries "
+                                     rf"(?P<gate>decision \({PERSON}\)|event \([a-z0-9-]+\))")),
+    ("kept-waiting", re.compile(rf"kept waiting: (?P<gate>{LOG_GATE}) — by (?P<by>{LOG_TOKEN}); "
+                                r"answer \"(?P<label>.*)\"")),
+    ("gate-reassigned", re.compile(rf"gate reassigned: (?P<gate>decision \({PERSON}\)) → "
+                                   rf"(?P<to>decision \({PERSON}\)) — by (?P<by>{LOG_TOKEN}); (?P<why>\S.*)")),
+    ("archived", re.compile(r"archived: (?P<word>[A-Za-z]+) — (?P<why>\S.*)")),
+    ("reopened", re.compile(r"reopened — (?P<why>\S.*)")),
+    ("was", re.compile(r"was: (?P<status>\S.*)")),
+)
+# The Status words, in two roles: the head words status_notes_to_log() reads (SPEC *The Log*), the four
+# of the target table and the reserved ones v2.5's migrate maps away; and the words an archived blocker's
+# Status is known by (SPEC *Superseded and dropped*, TD-039). A word added here is one pickable() reads:
+# as closed and done, unless it joins Superseded's or Dropped's rules; a word outside it keeps the block.
+# Whoever adds one decides both roles.
+STATUS_WORDS = ("open", "resolved", "superseded", "dropped", "designed", "built", "partly", "live", "in",
+                "done", "moved", "obe")
+# The head, read whole or not at all: the word is followed by its end, a `:`, its date or `by`; a date
+# or a `by <id>` there is part of the head, and is followed by the end, whitespace or a `:`. So
+# `In progress`, `Open, held`, `Resolved 2026-10-03.` and `Open 2026-01-01T10:00` are prose.
+STATUS_HEAD_RE = re.compile(
+    r"^(?P<word>[A-Za-z]+)\.?(?=$|:|[ \t]+\d{4}-\d{2}-\d{2}|[ \t]+by[ \t])"
+    r"(?:[ \t]+(?P<date>\d{4}-\d{2}-\d{2})(?![\d-])|(?![ \t]+\d{4}-\d{2}-\d{2}))"
+    rf"(?:[ \t]+by[ \t]+(?P<by>{LOG_ID})|(?![ \t]+by[ \t]))"
+    r"(?=$|:|[ \t])")
+WAS_CUT = " — was: "
+LOG_AGE_KINDS = ("gate-added", "kept-waiting", "gate-reassigned")
+
+
+def log_line(line: str) -> dict | None:
+    """One Log line read: {date, kind, text} and the shape's parts, or None for a line that is not
+    ``- YYYY-MM-DD: words``. ``kind`` is a writer shape's (``filed``, ``gate-added``, ``gate-lifted``,
+    ``gate-lift-skipped``, ``kept-waiting``, ``gate-reassigned``, ``archived``, ``reopened``, ``was``),
+    ``note`` for any other words, or ``malformed`` for words that begin with a writer prefix and do
+    not take its shape. A ``gate-lifted`` line also says ``via``: answer, override, check or date."""
+    m = LOG_LINE_RE.match(line.rstrip("\r"))
+    if not m:
+        return None
+    words = m.group("words")
+    out = {"date": m.group("date"), "text": words}
+    for k, (kind, rx) in enumerate(LOG_SHAPES):
+        s = rx.fullmatch(words)
+        if s:
+            out["kind"] = kind
+            out.update({n: v for n, v in s.groupdict().items() if v is not None})
+            if kind == "gate-lifted":
+                out["via"] = ("answer", "override", "check", "date")[k - 2]
+            return out
+    out["kind"] = "malformed" if words.startswith(LOG_PREFIXES) else "note"
+    return out
+
+
+def _log_section(sections: list[tuple[str | None, str]]) -> int | None:
+    at = _keyed(sections, "log")
+    if len(at) > 1:
+        raise Refused(f"the body has {len(at)} Log sections — merge them by hand")
+    return at[0] if at else None
+
+
+def _log_body_lines(section_text: str) -> list[str]:
+    """A Log section's lines after its lead, blank lines dropped."""
+    first, _, rest = section_text.partition("\n")
+    after = first[first.index("**", 2) + 2:].strip() if first.startswith("**") else first
+    return ([after] if after else []) + [ln for ln in rest.split("\n") if ln.strip()]
+
+
+def log_lines(text: str) -> list[dict]:
+    """The Log of one entry's text, in file order: each line as ``log_line()`` reads it, or
+    {date: None, kind: "unreadable", text} for a line that is not ``- YYYY-MM-DD: words``."""
+    sections = _entry_sections(_entry_parts(text)[2])
+    at = _log_section(sections)
+    if at is None:
+        return []
+    return [log_line(ln) or {"date": None, "kind": "unreadable", "text": ln}
+            for ln in _log_body_lines(sections[at][1])]
+
+
+def log_problems(text: str) -> list[tuple[str, str]]:
+    """Why one entry's Log is not as its writers write it: [(kind, sentence)] — ``log-not-last`` (a
+    section follows the Log, or two Logs) and ``log-line`` (a line that is not ``- YYYY-MM-DD:
+    words``, or a writer prefix not in its shape)."""
+    try:
+        sections = _entry_sections(_entry_parts(text)[2])
+    except Refused:
+        return []
+    at = _keyed(sections, "log")
+    if not at:
+        return []
+    out = []
+    if len(at) > 1:
+        out.append(("log-not-last", f"its body has {len(at)} Log sections — the Log is one section, the body's last"))
+    elif at[0] != len(sections) - 1:
+        out.append(("log-not-last", "a section follows its Log — the Log is the body's last section; "
+                    "move the section above it"))
+    for ln in _log_body_lines(sections[at[-1]][1]):
+        got = log_line(ln)
+        if got is None:
+            out.append(("log-line", f"its Log line {ln!r} is not `- YYYY-MM-DD: words`"))
+        elif got["kind"] == "malformed":
+            out.append(("log-line", f"its Log line {ln!r} begins with a writer's prefix but not in its shape"))
+    return out
+
+
+def _gate_key(gate: str) -> str:
+    """A gate compared: a person's name in any case."""
+    return " ".join(gate.split()).lower()
+
+
+def gate_age(text: str, gate: str) -> date | None:
+    """The date ``gate`` (as written in Blocked by) has waited since, on one entry (SPEC *The Log*):
+    its latest ``gate added``, ``kept waiting`` or ``gate reassigned`` (to it) Log line; else the
+    Log's first line; else the Added date; else None."""
+    key, latest, first = _gate_key(gate), None, None
+    for rec in log_lines(text):
+        if rec["date"] is None:
+            continue
+        first = first or rec["date"]
+        if rec["kind"] in LOG_AGE_KINDS and _gate_key(rec.get("to") or rec["gate"]) == key:
+            latest = rec["date"] if latest is None or rec["date"] >= latest else latest
+    if latest or first:
+        return date.fromisoformat(latest or first)
+    added = ISO_DAY_RE.search(_value(_entry_parts(text)[1], "added") or "")
+    return date.fromisoformat(added.group(0)) if added else None
+
+
+def utc_day(value: object, what: str) -> str:
+    """A ledger date as ``YYYY-MM-DD`` (SPEC: every ledger date is the UTC date): a date, or a
+    ``YYYY-MM-DD`` string, as given; an aware datetime turned into its UTC date. Refused: a naive
+    datetime (its zone unknown), and anything else."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise Refused(f"{what} is a naive datetime — pass an aware one (it is turned into its UTC date) or a date")
+        return value.astimezone(timezone.utc).date().isoformat()
+    try:
+        if not isinstance(value, date) and not (isinstance(value, str) and ISO_DAY_RE.fullmatch(value)):
+            raise ValueError
+        return (value if isinstance(value, date) else date.fromisoformat(value)).isoformat()
+    except ValueError:
+        raise Refused(f"{what} needs today's date as YYYY-MM-DD, not {value!r}") from None
+
+
+def _log_text(words: str) -> str:
+    """Lifted prose as a Log line's words: one that would read as a writer's line becomes ``note: …``."""
+    return f"note: {words}" if words.startswith(LOG_PREFIXES) else words
+
+
+def _log_insert(sections: list[tuple[str | None, str]], lines: list[tuple[str, str]], *,
+                by_date: bool) -> list[tuple[str | None, str]]:
+    """``sections`` with ``lines`` ([(date, words)]) in the Log, which is made at the end when there is
+    none: appended (a writer's own line), or each among the lines by date, after any of an equal
+    date (a lifted note). Refused when a section follows the Log."""
+    sections = list(sections)
+    at = _log_section(sections)
+    if at is None:
+        sections.append((LOG_LEAD, f"**{LOG_LEAD}**"))
+        at = len(sections) - 1
+    elif at != len(sections) - 1:
+        raise Refused("a section follows the entry's Log, which is the body's last — move it above the Log, by hand")
+    first, _, rest = sections[at][1].partition("\n")
+    have = [ln for ln in rest.split("\n") if ln.strip()]
+    for day, words in lines:
+        new = f"- {day}: {words}"
+        if not by_date:
+            have.append(new)
+            continue
+        pos, last = len(have), None
+        for i, ln in enumerate(have):
+            m = LOG_LINE_RE.match(ln)
+            last = m.group("date") if m else last
+            if last is not None and last > day:
+                pos = i
+                break
+        have.insert(pos, new)
+    sections[at] = (sections[at][0], "\n".join([first, *have]))
+    return sections
+
+
+def _fallback_day(header: list[tuple[str, str]], sections: list[tuple[str | None, str]]) -> str | None:
+    """The date an undated Status note takes: the ``**Resolved:**`` line's (or the older header field's),
+    else Added's."""
+    for text in [sections[i][1] for i in _keyed(sections, "resolved")] + [_value(header, "resolved") or ""]:
+        m = ISO_DAY_RE.search(text)
+        if m:
+            return m.group(0)
+    m = ISO_DAY_RE.search(_value(header, "added") or "")
+    return m.group(0) if m else None
+
+
+def _lift_status(header: list[tuple[str, str]], sections: list[tuple[str | None, str]]
+                 ) -> tuple[list[tuple[str, str]], list[tuple[str | None, str]], bool]:
+    """(header, sections, read): the Status's notes lifted into Log lines (SPEC *The Log*), or the
+    two unchanged when there is nothing to lift; ``read`` is False when the Status is there and not
+    one ``status_notes_to_log()`` reads (an unknown word, or text with no date to give it)."""
+    status = _value(header, "status")
+    if not status or not status.strip():
+        return header, sections, True
+    m = STATUS_HEAD_RE.match(status)
+    if not m or m.group("word").lower() not in STATUS_WORDS:
+        return header, sections, False
+    head = status[:m.end()].rstrip()
+    rest = status[m.end():]
+    if not rest.strip():
+        return header, sections, True
+    tail, *was = rest.split(WAS_CUT)
+    tail = tail.strip()
+    if tail.startswith(":"):
+        tail = tail[1:].strip()
+    fallback = _fallback_day(header, sections)
+    day = m.group("date") or fallback
+    lines = []
+    if tail:
+        lines.append((day, _log_text(tail)))
+    for w in was:
+        w = w.strip()
+        if w:
+            inner = STATUS_HEAD_RE.match(w)
+            lines.append(((inner and inner.group("date")) or fallback, f"was: {w}"))
+    if any(d is None for d, _ in lines):
+        return header, sections, False
+    return _with(header, "Status", head), _log_insert(sections, lines, by_date=True), True
+
+
+def status_notes_to_log(text: str) -> str:
+    """One entry's text with its Status notes moved into its Log (SPEC *The Log*), in canonical form.
+    The Status read is ``<Word>[.] [D] [by <id>] [[:] <tail>] [ — was: <Status>]…`` with a known word
+    (``STATUS_WORDS``): the tail becomes one Log line, verbatim, dated by the Status's date, else the
+    ``**Resolved:**`` line's, else Added's; each ``— was:`` segment one ``was: <Status>`` line, dated
+    by its own date or the same. Lines go in among the Log's by date, after any of an equal date; a
+    line that would begin with a writer's prefix is written ``note: <text>``. The Status is left as
+    ``<Word> [D] [by <id>]``. The word is not in bold and is followed by its end, ``.``, ``:``, its
+    date or ``by``; a date or ``by <id>`` there is followed by the end, whitespace or ``:``. An unknown word, a Status with nothing after its head, or text with no date to give it: the
+    text is returned as given, not reformatted. Refused for an entry ``canonical()`` refuses, and when
+    there are notes to lift into a Log that is not the body's last section."""
+    m, header, body = _entry_parts(canonical(text))
+    sections = _entry_sections(body)
+    new_header, new_sections, _ = _lift_status(header, sections)
+    if new_header == header:
+        return text
+    return canonical(_render(m.group(1), m.group(3), new_header, "\n\n".join(t for _, t in new_sections)))
+
+
+def _filed_line(filed: Mapping, what: str = "filed") -> str:
+    """``filed by <who>, session <s>[, while <id>]: "<words>"`` from {who, session, words, while}."""
+    who, session, w = (str(filed.get(k) or "") for k in ("who", "session", "while"))
+    for name, v in (("who", who), ("session", session)):
+        if not re.fullmatch(LOG_TOKEN, v):
+            raise Refused(f"{what}: {name} is a token with no spaces, commas, colons or quotes, not {v!r}")
+    if w and not re.fullmatch(LOG_ID, w):
+        raise Refused(f"{what}: while names an entry (TD-n or <repo>#TD-n), not {w!r}")
+    words = _one_line(f"{what}'s words", filed.get("words"))
+    return f"filed by {who}, session {session}{f', while {w}' if w else ''}: \"{words}\""
+
+
+def _before_log(sections: list[tuple[str | None, str]]) -> int:
+    """Where a section a writer adds goes: before the Log, else at the end."""
+    at = _log_section(sections)
+    return len(sections) if at is None else at
+
+
+def _status_to_log(header: list[tuple[str, str]], sections: list[tuple[str | None, str]], day: str
+                   ) -> tuple[list[tuple[str, str]], list[tuple[str | None, str]]]:
+    """Before archive or reopen replace the Status: its notes lifted into the Log; a Status that
+    cannot be read that way copied whole into one ``was: <value>`` line, dated by the fallbacks
+    (the Resolved line, Added), else ``day``."""
+    header, sections, read = _lift_status(header, sections)
+    status = _value(header, "status")
+    if not read and status and status.strip():
+        sections = _log_insert(sections, [(_fallback_day(header, sections) or day, f"was: {status.strip()}")],
+                               by_date=True)
+    return header, sections
+
+
 def edit_entry(text: str, action: str, *, today: date | str | None = None, fields: Mapping[str, str] | None = None,
                words: str | None = None, section: str | None = None, why: str | None = None,
                pr: int | None = None, pointer: str | None = None, as_is: bool = False,
-               superseded_by: str | None = None, new: str | None = None, old: str | None = None) -> str:
+               superseded_by: str | None = None, new: str | None = None, old: str | None = None,
+               dropped: bool = False) -> str:
     """One entry's text after ``action`` (``ENTRY_ACTIONS``), in canonical form; raises Refused. The
-    edits (SPEC *Ledger entries and their edits*):
+    edits (SPEC *Ledger entries and their edits*; from v2.4 note, archive and reopen write the Log):
 
-    - ``set`` (``fields``: {name: value}; an empty value removes the field);
-    - ``note`` (``words``): `` <today>: <words>`` appended to Status, whose first word must not change;
-      with no Status, ``**Status:** <today>: <words>``;
+    - ``set`` (``fields``: {name: value}; an empty value removes the field); a Blocked by (v2.4) is
+      written with its ids first, then its gates in the canonical order, and refused in the old form,
+      or when it adds a gate to an entry whose Blocked by still holds the old form;
+    - ``note`` (``words``): the Status's notes lifted into the Log (``status_notes_to_log``), then
+      ``- <today>: <words>`` appended to it; refused for words that begin with a Log writer's prefix;
     - ``edit`` (``section``, ``words``): that named section's paragraphs replaced by ``words``, its lead
-      kept; a section the body lacks is added after the first Why, else before the first Done when or
-      Related, else at the end;
-    - ``archive`` (``why``; ``pr``, an int or None; ``pointer``; ``as_is``; or ``superseded_by``): the
-      archived form — Status ``Resolved <today>: <why>`` and Fix replaced by ``**Resolved:** <today>
-      (PR #<pr>) — <pointer>`` (after the whole Fix with ``as_is``; at the end of the body when no
-      section is named exactly Fix), any earlier ``**Resolved:**`` section and header ``Resolved``
-      removed; or Status ``Superseded <today> by <id>: <why>`` with the rest kept;
-    - ``reopen`` (``why``): Status ``Open <today>: <why> — was: <old Status>``; a header ``Resolved``
-      moves to a ``**Resolved:**`` section at the end of the body; refused when the entry has both;
+      kept; a section the body lacks is added after the first Why, else before the first Done when,
+      Related or Log, else at the end; the Log itself is refused;
+    - ``archive`` (``why``; ``pr``, an int or None; ``pointer``; ``as_is``; or ``superseded_by``, ``TD-n`` or
+      ``<repo>#TD-n``; or ``dropped``, v2.4: Status ``Dropped <today>`` and ``archived: Dropped — <why>``,
+      the rest kept; ``archive_plan()`` says first which dependents each leaves, or refuses): the
+      Status's notes lifted (one it cannot read copied whole into a ``was:`` line), then the archived
+      form — Status ``Resolved <today>`` and Fix replaced by ``**Resolved:** <today> (PR #<pr>) —
+      <pointer>`` (after the whole Fix with ``as_is``; before the Log when no section is named exactly
+      Fix), any earlier ``**Resolved:**`` section and header ``Resolved`` removed, and the Log line
+      ``archived: Resolved — <why>``; or Status ``Superseded <today> by <id>`` and ``archived:
+      Superseded — <why>``, with the rest kept;
+    - ``reopen`` (``why``): the Status lifted as for archive, then ``Open``, and the Log line
+      ``reopened — <why>``; a header ``Resolved`` moves to a ``**Resolved:**`` section before the Log;
+      refused when the entry has both;
     - ``renumber`` (``new``): the heading's id; ``rename_ref`` (``old``, ``new``): that id rewritten in
-      Blocked by and Part of.
+      Blocked by, Part of and a Log ``filed by`` line's ``while``; a Blocked by that then names an id twice
+      keeps its first copy (v2.4).
 
-    ``today`` is the caller's date, taken by note, archive and reopen only (none is read here). Every edit is refused for an entry
+    ``today`` is the caller's date, taken by note, archive and reopen only (none is read here): a date,
+    ``YYYY-MM-DD``, or an aware datetime, written as its UTC date; a naive datetime is refused. A writer
+    that appends to the Log refuses one that is not the body's last section. Every edit is refused for an entry
     ``canonical()`` refuses, and unless the result reads back exactly the change meant — the id,
     title, fields (as ``entries()`` reads them) and sections — and nothing else. Validity (a
     vocabulary, a Blocked by item, a cycle) is ``check()``'s, which the caller runs on the result."""
@@ -2761,20 +3820,12 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
         raise Refused(f"unknown action {action}")
     given = {k for k, v in (("fields", fields), ("words", words), ("section", section), ("why", why),
                             ("pr", pr), ("pointer", pointer), ("as_is", as_is or None),
-                            ("superseded_by", superseded_by), ("new", new), ("old", old)) if v is not None}
+                            ("superseded_by", superseded_by), ("new", new), ("old", old),
+                            ("dropped", dropped or None)) if v is not None}
     stray = sorted(given - _ENTRY_ARGS[action]) + (["today"] if today is not None and action not in _DATED_ACTIONS else [])
     if stray:
         raise Refused(f"{action} takes no {', '.join(stray)}")
-    day = ""
-    if action in _DATED_ACTIONS:
-        if isinstance(today, datetime):
-            today = today.date()  # a civil date: a time never reaches the file
-        try:
-            if not isinstance(today, date) and not (isinstance(today, str) and ISO_DAY_RE.fullmatch(today)):
-                raise ValueError
-            day = (today if isinstance(today, date) else date.fromisoformat(today)).isoformat()
-        except ValueError:
-            raise Refused(f"{action} needs today's date as YYYY-MM-DD, not {today!r}") from None
+    day = utc_day(today, action) if action in _DATED_ACTIONS else ""
     m, header, body = _entry_parts(canonical(text))
     tid, title = m.group(1), m.group(3).strip()
     title_read = entries(canonical(text))[0]["title"]  # as the reader reads it: an HTML comment dropped
@@ -2793,21 +3844,26 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
                 header = _with(header, name, None)
                 continue
             value = _one_line(f"the {name} field", value)
+            if field_key(name) == "blocked by":
+                value = _written_blocked(value, _value(header, "blocked by"))
             fm = FIELD_RE.match(f"**{name}:** {value}")
             if not fm or fm.group(1) != name or fm.group(2) != value:
                 raise Refused(f"{name!r}: {value!r} would not read back as one field")
             header = _with(header, name, value)
     elif action == "note":
         said = _one_line("a note", words)
-        was = _value(header, "status")
-        now = f"{was} {day}: {said}" if was and was.strip() else f"{day}: {said}"
-        if was and was.strip() and first_word(now) != first_word(was):
-            raise Refused(f"the note would change the Status's first word ({first_word(was)!r}) — say it in other words")
-        header = _with(header, "Status", now)
+        if said.startswith(LOG_PREFIXES):
+            raise Refused(f"a note may not begin with a Log writer's prefix ({', '.join(repr(x.strip()) for x in LOG_PREFIXES)}) "
+                          "— say it in other words")
+        header, sections, _ = _lift_status(header, sections)
+        sections = _log_insert(sections, [(day, said)], by_date=False)
+        body_changed = True
     elif action == "edit":
         name = _one_line("the section's name", section).rstrip(":").strip()
         if not name:
             raise Refused("edit needs the section's name")
+        if _section_key(name) == "log":
+            raise Refused("the Log is written by its writers (note, archive, reopen), never replaced by edit")
         said = "\n".join(ln.rstrip() if not ln.strip() else ln
                          for ln in str(words or "").replace("\r\n", "\n").split("\n")).strip("\n")
         if not said.strip():
@@ -2819,18 +3875,29 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
             sections[at[0]] = (sections[at[0]][0], f"**{sections[at[0]][0]}** {said}")
         else:
             why_at = _keyed(sections, "why")
-            ends = sorted(_keyed(sections, "done when") + _keyed(sections, "related"))
+            ends = sorted(_keyed(sections, "done when") + _keyed(sections, "related") + _keyed(sections, "log"))
             pos = why_at[0] + 1 if why_at else ends[0] if ends else len(sections)
             sections.insert(pos, (f"{name}:", f"**{name}:** {said}"))
         body_changed = True
     elif action == "archive":
         said = _one_line("the archive's why", why)
-        if superseded_by is not None:
+        if dropped:
+            if pr is not None or pointer is not None or as_is or superseded_by is not None:
+                raise Refused("a dropped entry keeps its Why and Fix, and nothing replaces it: no pr, pointer, "
+                              "as_is or superseded_by")
+            header, sections = _status_to_log(header, sections, day)
+            header = _with(header, "Status", f"Dropped {day}")
+            sections = _log_insert(sections, [(day, f"archived: Dropped — {said}")], by_date=False)
+            body_changed = True
+        elif superseded_by is not None:
             if pr is not None or pointer is not None or as_is:
                 raise Refused("a superseded entry keeps its Why and Fix: no pr, pointer or as_is")
-            if not _is_id(superseded_by) or _num(superseded_by) == _num(tid):
-                raise Refused(f"superseded by another entry's TD-n, not {superseded_by!r}")
-            header = _with(header, "Status", f"Superseded {day} by {superseded_by}: {said}")
+            if not _is_id(superseded_by, other_repo=True) or ("#" not in superseded_by and _num(superseded_by) == _num(tid)):
+                raise Refused(f"superseded by another entry's TD-n or <repo>#TD-n, not {superseded_by!r}")
+            header, sections = _status_to_log(header, sections, day)
+            header = _with(header, "Status", f"Superseded {day} by {superseded_by}")
+            sections = _log_insert(sections, [(day, f"archived: Superseded — {said}")], by_date=False)
+            body_changed = True
         else:
             if pr is not None and (isinstance(pr, bool) or not isinstance(pr, int) or pr < 1):
                 raise Refused(f"a PR is the forge's number, not {pr!r}")
@@ -2838,29 +3905,32 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
             if pr is None and PR_IN_TEXT_RE.search(ptr):
                 raise Refused("with no PR, the pointer may not hold #<digits>: a reader would take it for the PR")
             line = f"**Resolved:** {day}{f' (PR #{pr})' if pr is not None else ''}{f' — {ptr}' if ptr else ''}"
-            header = _with(_with(header, "Status", f"Resolved {day}: {said}"), "Resolved", None)
+            header, sections = _status_to_log(header, sections, day)
+            header = _with(_with(header, "Status", f"Resolved {day}"), "Resolved", None)
             sections = [s for i, s in enumerate(sections) if i not in _keyed(sections, "resolved")]
             fix = _keyed(sections, "fix")
             if len(fix) > 1:
                 raise Refused(f"the body has {len(fix)} sections named Fix — archive it by hand")
             if not fix:
-                sections.append(("Resolved:", line))
+                sections.insert(_before_log(sections), ("Resolved:", line))
             elif as_is:
                 sections.insert(fix[0] + 1, ("Resolved:", line))
             else:
                 sections[fix[0]] = ("Resolved:", line)
+            sections = _log_insert(sections, [(day, f"archived: Resolved — {said}")], by_date=False)
             body_changed = True
     elif action == "reopen":
         said = _one_line("the reopen's why", why)
-        was = _value(header, "status")
-        header = _with(header, "Status", f"Open {day}: {said}" + (f" — was: {was}" if was and was.strip() else ""))
         held = _value(header, "resolved")
+        if held is not None and _keyed(sections, "resolved"):
+            raise Refused("it has both a Resolved field and a **Resolved:** section — merge them by hand, then reopen")
+        header, sections = _status_to_log(header, sections, day)
+        header = _with(header, "Status", "Open")
         if held is not None:
-            if _keyed(sections, "resolved"):
-                raise Refused("it has both a Resolved field and a **Resolved:** section — merge them by hand, then reopen")
             header = _with(header, "Resolved", None)
-            sections.append(("Resolved:", f"**Resolved:** {held}".rstrip()))
-            body_changed = True
+            sections.insert(_before_log(sections), ("Resolved:", f"**Resolved:** {held}".rstrip()))
+        sections = _log_insert(sections, [(day, f"reopened — {said}")], by_date=False)
+        body_changed = True
     elif action == "renumber":
         if not _is_id(new):
             raise Refused(f"renumber needs the new TD-n, not {new!r}")
@@ -2875,6 +3945,21 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
             v = _value(header, key)
             if v is not None:
                 header = [(n, _rename(x, old, new) if field_key(n) == key else x) for n, x in header]
+        v = _value(header, "blocked by")
+        if v is not None:  # a dependent that already named the new id keeps one copy (v2.4)
+            header = [(n, _one_copy(x) if field_key(n) == "blocked by" else x) for n, x in header]
+        at = _log_section(sections)
+        if at is not None:  # the one Log token rewritten: a filed line's `while`, never other prose
+            first, _, rest = sections[at][1].partition("\n")
+            lines = []
+            for ln in rest.split("\n"):
+                rec = log_line(ln)
+                if rec and rec["kind"] == "filed" and rec.get("while") and _rename(rec["while"], old, new) != rec["while"]:
+                    ln = ln.replace(f", while {rec['while']}: ", f", while {_rename(rec['while'], old, new)}: ", 1)
+                lines.append(ln)
+            if lines != rest.split("\n"):
+                sections[at] = (sections[at][0], "\n".join([first, *lines]))
+                body_changed = True
 
     if body_changed and any(re.search(r"\n[ \t]*\n", c.group(0)) for c in COMMENT_RE.finditer(body)):
         raise Refused("an HTML comment in the body spans paragraphs, so a section's edit could land inside "
@@ -2890,6 +3975,1535 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
         raise Refused(f"after the {action} the entry would not read back as meant, with the rest unchanged — "
                       "rephrase it, or edit by hand")
     return out
+
+
+# ---------------------------------------------------------------------------------------------
+# The next id (v2.4): the counter's reading, and the merge gate's judgement of each new id's take
+# ---------------------------------------------------------------------------------------------
+
+COUNTER_BRANCH = "cadence/ledger-ids"  # the counter: a branch on origin, never merged, holding one file
+COUNTER_FILE = "LAST"  # the last id given, as a number
+TAKE_SUBJECT_RE = re.compile(r"^TD-(\d{1,9})(?:\.\.TD-(\d{1,9}))? \[skip ci\]$")
+TAKE_NONCE_RE = re.compile(r"[0-9a-f]{32}")
+TAKE_RANGE_MAX = 100  # the widest range a take is read as giving; the writers take at most 10
+TAKE_FIELDS = ("by", "branch", "host", "take")
+UNHASHED_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[^\s@]+@[^\s@]+\.[^\s@]+",
+                         re.IGNORECASE)  # a bare session id or an email address, which a take publishes
+
+
+def _tid(n: int) -> str:
+    """An id at the ledger's width: three digits, more past 999."""
+    return f"TD-{n:03d}"
+
+
+def ids_held(files: Mapping[str, str]) -> set[int]:
+    """Every id the files of a ledger and its archive hold (v2.4, SPEC *The next id*), as numbers: each
+    file's headings and table rows outside HTML comments, and each entry file's name (``TD-NNN.md``, its
+    path's last part). ``files`` maps a path to its text, in either layout. Refused when a file declares a
+    newer major of the format than this module reads: its ids cannot be judged."""
+    out: set[int] = set()
+    for path, text in files.items():
+        text = text or ""
+        if format_major(text) > FORMAT_MAJOR:
+            raise Refused(f"{path} declares Ledgerboard: {format_major(text)}, newer than this module reads "
+                          f"({FORMAT_MAJOR}) — its ids are not read")
+        m = ENTRY_FILE_RE.match(str(path).replace("\\", "/").rsplit("/", 1)[-1])
+        if m:
+            out.add(int(m.group(1)))
+        bare = COMMENT_RE.sub("", text)
+        out |= heading_nums(bare) | {int(r.group(2)) for r in ROW_RE.finditer(bare)}
+    return out
+
+
+def next_id(last: str | None, ids: Iterable[int], floor: int | None = None) -> tuple[int, list[str]]:
+    """(the next id's number, warnings) (v2.4): one above the highest of the counter's ``LAST`` (its text;
+    absent or not a number is ignored, with a warning), ``ids`` (ids_held() of the default branch, and any
+    the caller adds) and ``floor`` (a front end's own last-given id)."""
+    warnings: list[str] = []
+    raw = (last or "").strip()
+    top = [*ids, floor or 0]
+    if raw.isascii() and raw.isdigit() and len(raw) <= 18:  # a number a counter could reach, never a giant
+        top.append(int(raw))
+    else:
+        warnings.append(f"the counter's {COUNTER_FILE} is {'not a number (' + raw[:20] + ')' if raw else 'absent'}"
+                        " — ignored; the ledger, archive and floor decide")
+    return max(top) + 1, warnings
+
+
+def parse_take(subject: str, body: str) -> dict | None:
+    """One counter commit read as a take (v2.4, SPEC *The next id*): ``{ids, by, branch, host, take}`` — the
+    ids its subject gives (``TD-n [skip ci]`` or the range ``TD-a..TD-b [skip ci]``, in order) and its body's
+    ``name: value`` fields, those it has. None for a commit that is not a take's: another subject, a range that
+    runs backwards or is wider than ``TAKE_RANGE_MAX``."""
+    m = TAKE_SUBJECT_RE.match((subject or "").strip())
+    if not m:
+        return None
+    lo, hi = int(m.group(1)), int(m.group(2) or m.group(1))
+    if lo < 1 or hi < lo or hi - lo + 1 > TAKE_RANGE_MAX:
+        return None
+    out: dict = {"ids": list(range(lo, hi + 1))}
+    for ln in (body or "").splitlines():
+        k, sep, v = ln.partition(":")
+        if sep and k.strip() in TAKE_FIELDS and k.strip() not in out:  # names as written; the first wins
+            if k.strip() != "take" or TAKE_NONCE_RE.fullmatch(v.strip()):  # a nonce is 32 lower-case hex, or none
+                out[k.strip()] = v.strip()
+    return out
+
+
+def _take_named(t: Mapping) -> str:
+    """A take as a failure names it: its by, date and short sha, never its nonce."""
+    return f"{t.get('by') or 'unknown'} on {str(t.get('date') or '?')[:10]} ({str(t.get('sha') or '?')[:7]})"
+
+
+def judge_takes(new_ids: Iterable[int], takes: Iterable[Mapping], entries: Iterable[str], branch: str | None,
+                default: str, accept_taken_by: bool = False) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """The merge gate's judgement of each new id against the counter's takes (v2.4, SPEC *The next id*):
+    (fails, warns), each a list of (kind, text). ``takes`` are every take the counter holds, each a record
+    of ``ids``, ``sha``, ``date``, ``by``, ``branch``, ``host`` and ``take`` (parse_take()'s, with the commit's
+    sha and date); ``entries`` the ledger and archive texts holding the new entries; ``branch`` the one they
+    are for and ``default`` the default branch. With no takes, nothing is judged.
+
+    - ``id-untaken`` (fail): an id no take gave, at or above the counter's first; ``id-before-counter``
+      (warn): one below it.
+    - An id's ``Id take`` is judged alone wherever it is present: the nonce of any take that gave it passes
+      (a range's for each of its ids; either take of an id given twice); ``id-take`` (fail): a nonce of
+      another id's take (naming both ids) or of no take. A missing one is ``id-no-take`` (fail), unless
+      ``accept_taken_by`` (the consumer's transition): then a ``Taken by`` naming a giving take's ``by`` warns
+      ``id-no-take``, one naming another fails ``id-taken-by``, and none warns ``id-no-taken-by`` when a giving
+      take has a ``by`` and the ledger declares no ``Fields:`` vocabulary (whose check would refuse the field).
+    - An id whose entry is in none of ``entries`` is not judged past ``id-untaken``.
+    - ``id-branch`` (warn): the take names a branch that is neither ``default`` nor ``branch``;
+      ``id-by-unhashed`` (warn): its ``by`` is a bare session id or an email address.
+    A failure names a take by its by, date and short sha, never its nonce."""
+    takes = [t for t in takes if t.get("ids")]
+    fails: list[tuple[str, str]] = []
+    warns: list[tuple[str, str]] = []
+    if not takes:
+        return fails, warns
+    gave: dict[int, list[Mapping]] = {}
+    by_nonce: dict[str, list[Mapping]] = {}
+    for t in takes:
+        for n in t["ids"]:
+            gave.setdefault(int(n), []).append(t)
+        if t.get("take"):
+            by_nonce.setdefault(str(t["take"]).strip(), []).append(t)
+    first = min(gave)
+    new = sorted({int(n) for n in new_ids})
+    nobody = [n for n in new if n not in gave and n >= first]
+    before = [n for n in new if n not in gave and n < first]
+    if nobody:
+        fails.append(("id-untaken", f"{', '.join(map(_tid, nobody))} handed out by nobody: the counter gave no such "
+                      "id — take ids from the counter, and an id its fallback printed with its claim"))
+    if before:
+        warns.append(("id-before-counter", f"{', '.join(map(_tid, before))} below the counter's first take "
+                      f"({_tid(first)}): older than the counter, not judged against it"))
+    fields: dict[int, dict] = {}
+    texts = [t or "" for t in entries]
+    for t in texts:
+        for e in _entries(t):
+            fields.setdefault(_num(e["id"]), e["fields"])
+    vocab = bool(texts) and bool(declared(texts[0])[0])  # a Fields: line refuses Taken by, so none is asked for
+    wrong, missing, legacy, mismatch, untagged, elsewhere, unhashed = [], [], [], [], [], [], []
+    for n in (n for n in new if n in gave and n in fields):  # an id with no entry given is not judged
+        mine = gave[n]
+        f = fields.get(n, {})
+        nonce = (f.get("id take") or "").strip()
+        used = mine
+        if nonce:
+            hit = [t for t in mine if str(t.get("take") or "").strip() == nonce]
+            if hit:
+                used = hit
+            else:
+                other = by_nonce.get(nonce, [])
+                if other:
+                    ids = sorted({int(x) for t in other for x in t["ids"]})
+                    wrong.append(f"{_tid(n)}'s Id take is the take of {', '.join(map(_tid, ids))} "
+                                 f"({_take_named(other[0])}), not one of {_tid(n)}'s ({'; '.join(map(_take_named, mine))})")
+                else:
+                    wrong.append(f"{_tid(n)}'s Id take names no take the counter holds — {_tid(n)} was handed out "
+                                 f"by {'; '.join(map(_take_named, mine))}")
+        elif not accept_taken_by:
+            missing.append(f"{_tid(n)} (handed out by {'; '.join(map(_take_named, mine))})")
+        else:
+            said = first_word(f.get("taken by"))
+            hit = [t for t in mine if said and first_word(t.get("by")) == said]
+            if hit:
+                used = hit
+                legacy.append(_tid(n))
+            elif said:
+                handed = ", ".join(dict.fromkeys((t.get("by") or "unknown") for t in mine))
+                mismatch.append(f"{_tid(n)} was handed to {handed}, not {said}")
+            elif any(t.get("by") for t in mine) and not vocab:
+                untagged.append(_tid(n))
+        if any((t.get("branch") or "").strip() and (t.get("branch") or "").strip() not in (default, branch or "")
+               for t in used):
+            elsewhere.append(f"{_tid(n)} ({', '.join(dict.fromkeys(str(t.get('branch')).strip() for t in used))})")
+        if any(UNHASHED_RE.search(str(t.get("by") or "")) for t in used):
+            unhashed.append(_tid(n))
+    if wrong:
+        fails.append(("id-take", "; ".join(wrong) + " — write the Id take of the take that gave this id"))
+    if missing:
+        fails.append(("id-no-take", f"no **Id take:** on {', '.join(missing)} — write its take's nonce in the header"))
+    if mismatch:
+        fails.append(("id-taken-by", "; ".join(mismatch) + " — an id is the session's the counter handed it to; "
+                      "take this entry its own"))
+    if legacy:
+        warns.append(("id-no-take", f"a matching **Taken by:** but no **Id take:** on {', '.join(legacy)} — write its "
+                      "take's nonce in the header"))
+    if untagged:
+        warns.append(("id-no-taken-by", f"no **Id take:** or **Taken by:** on {', '.join(untagged)} — write its "
+                      "take's nonce in the header"))
+    if elsewhere:
+        warns.append(("id-branch", f"taken for another branch: {', '.join(elsewhere)}"))
+    if unhashed:
+        warns.append(("id-by-unhashed", f"{', '.join(unhashed)} taken by a bare session id or an email address, "
+                      "which the counter publishes — take ids with a hashed by"))
+    return fails, warns
+
+
+# ---------------------------------------------------------------------------------------------
+# Lifting a gate (v2.4): one text edit every route writes, and the decide lift that composes it
+# ---------------------------------------------------------------------------------------------
+
+ARCHIVED_WORDS = ("resolved", "superseded", "dropped", "done", "moved", "obe")  # a Status only an archived entry has
+LIFT_SUFFIX_RE = re.compile(rf"board (?P<repo>{REPO})|no board item|shared board item left open")
+EVIDENCE_PR_RE = re.compile(rf"(?P<repo>{REPO})#(?P<n>[0-9]{{1,18}})")
+EVIDENCE_AT_RE = re.compile(rf"(?P<repo>{REPO})@(?P<sha>[0-9a-f]{{7,40}})")
+LOG_TOKEN_RE = re.compile(LOG_TOKEN)
+
+
+def _one_gate(gate: object) -> str:
+    """``gate`` as the writers write it — ``decision (<person>)``, ``until YYYY-MM-DD`` or ``event (<name>)`` —
+    or Refused."""
+    g = parse_gates(gate if isinstance(gate, str) else "")
+    items = gate_items(g)
+    if len(items) != 1 or g["ids"] or g["bad"] or g["retired"]:
+        raise Refused(f"a gate is decision (<person>), until YYYY-MM-DD or event (<name>), one of them, not {gate!r}")
+    return items[0]
+
+
+def _blocked_items(raw: str | None) -> list[str]:
+    """One Blocked by value's items as written, in order; the old form's last item runs to the line's end."""
+    out, rest = [], (raw or "").strip(" \t\r")
+    while rest:
+        m = GATE_ITEM_SEP_RE.search(rest)
+        item, after = (rest[: m.start()], rest[m.end():]) if m else (rest, "")
+        d = GATE_DECISION_RE.match(item)
+        if d and item[d.end():].strip(" \t"):
+            out.append(rest)
+            break
+        if item:
+            out.append(item)
+        rest = after
+    return out
+
+
+def _item_gate_key(item: str) -> str | None:
+    """The canonical key of one Blocked by item that is a readable gate, else None."""
+    g = parse_gates(item)
+    items = gate_items(g)
+    return _gate_key(items[0]) if len(items) == 1 and not g["old_form"] else None
+
+
+def _carried(text: str | None, gate: str) -> str | None:
+    """The gate as the open entry ``text``'s Blocked by writes it (its person's spelling), or None when the
+    entry is missing, archived or does not carry it."""
+    if not text or not entries(text):
+        return None
+    e = entries(text)[0]
+    if first_word(e["fields"].get("status")) in ARCHIVED_WORDS:
+        return None
+    key = _gate_key(gate)
+    return next((x for x in gate_items(parse_gates(e["blocked_raw"])) if _gate_key(x) == key), None)
+
+
+def _logged(text: str, what: str, value: str | None, lines: list[str], day: str) -> str:
+    """The entry with its Blocked by set to ``value`` (None or "" removes the field) and ``lines`` appended to
+    its Log, all dated ``day``; refused unless it reads back as exactly that."""
+    m, header, body = _entry_parts(canonical(text))
+    tid, title = m.group(1), m.group(3).strip()
+    title_read = entries(canonical(text))[0]["title"]
+    header = _with(header, "Blocked by", value or None)
+    sections = _log_insert(_entry_sections(body), [(day, w) for w in lines], by_date=False)
+    if any(re.search(r"\n[ \t]*\n", c.group(0)) for c in COMMENT_RE.finditer(body)):
+        raise Refused("an HTML comment in the body spans paragraphs, so the Log line could land inside it — edit by hand")
+    out = canonical(_render(tid, title, header, "\n\n".join(t for _, t in sections)))
+    want = (tid, title_read, {field_key(n): v for n, v in header},
+            [(_section_key(lead) if lead is not None else None, t) for lead, t in sections])
+    e = entries(out)[0]
+    got = (e["id"], e["title"], e["fields"],
+           [(_section_key(lead) if lead is not None else None, t) for lead, t in _entry_sections(_entry_parts(out)[2])])
+    tail = log_lines(out)[-len(lines):] if lines else []
+    if got != want or [r["text"] for r in tail] != lines or any(r["kind"] in ("note", "malformed") for r in tail):
+        raise Refused(f"after the {what} the entry would not read back as meant — edit by hand")
+    return out
+
+
+def _without(text: str, gate: str) -> tuple[str, str | None]:
+    """(the gate as the entry writes it, its Blocked by without that gate), or Refused when it does not carry
+    it; the other items keep their order and spelling (canonical when every one is readable)."""
+    e = entries(text)[0]
+    key = _gate_key(gate)
+    items = _blocked_items(e["blocked_raw"])
+    old = parse_gates(e["blocked_raw"])["old_form"]
+    if old and _gate_key(f"decision ({old[0]})") == key:
+        raise Refused(f"the entry's Blocked by holds {gate} in the old form — migrate it first: set "
+                      "decision (<person>) alone, with its text in an **Ask:** section")
+    at = next((i for i, x in enumerate(items) if _item_gate_key(x) == key), None)
+    if at is None:
+        raise Refused(f"{e['id']} does not carry {gate}")
+    written = gate_items(parse_gates(items[at]))[0]
+    rest = items[:at] + items[at + 1:]
+    value = ", ".join(rest)
+    g = parse_gates(value)
+    return written, (", ".join(g["ids"] + gate_items(g)) if not (g["bad"] or g["retired"]) else value)
+
+
+def lift_gate(text: str, gate: str, by: str, *, answer: str | None = None, evidence: str | None = None,
+              suffix: str | None = None, override: str | None = None, today: date | str,
+              people: list[str] | None = None, answered_by: str | None = None) -> str:
+    """One open entry's text with ``gate`` removed from its Blocked by and the matching `gate lifted` Log line
+    appended (v2.4, SPEC *Lifting a gate*): the one text edit every route writes — the person's ``set by=``,
+    a host's event and ``until`` lifts, the cross-repo decision lift — and that decide_lift() composes. The
+    inputs match one shape exactly, and anything else is refused:
+
+    - ``decision (<p>)``: ``answer`` (never a waiting-only one), and ``suffix`` at most one of ``board <repo>``,
+      ``no board item``, ``shared board item left open``; ``by`` is the gate's person, unless ``people`` (the
+      board's `People:`) and ``answered_by`` ``any`` are passed, when it is anyone listed. Or ``override``
+      (its why, required), when ``by`` may be any person: ``override: <why>``;
+    - ``event (<name>)`` lifted by a person: ``answer``, with ``by`` on ``people``, which is then required;
+    - ``event (<name>)`` lifted by a host: ``evidence``, ``<repo>#<n>`` for a ``pr-merged`` check or
+      ``<repo>@<sha>`` for the others, of the check's own repo (and PR), the check type read from the entry's
+      Event section; ``by`` is the host's token;
+    - ``until D``: none of them; ``today`` (the UTC date) must have reached D.
+
+    An emptied Blocked by is removed; the Log line carries the gate as the entry wrote it and ``by`` as given."""
+    day = utc_day(today, "lift_gate()'s today")
+    gate = _one_gate(gate)
+    if not entries(text):
+        raise Refused("lift_gate takes one entry's text")
+    if first_word(entries(text)[0]["fields"].get("status")) in ARCHIVED_WORDS:
+        raise Refused(f"{entries(text)[0]['id']} is archived — a gate is lifted only on an open entry")
+    given = [k for k, v in (("answer", answer), ("evidence", evidence), ("suffix", suffix), ("override", override))
+             if v is not None]
+    by = " ".join(str(by or "").split())
+
+    def only(*allowed: str) -> None:
+        stray = [k for k in given if k not in allowed]
+        if stray:
+            raise Refused(f"lifting {gate} takes no {', '.join(stray)}")
+
+    def label() -> str:
+        said = _one_line("the answer", answer)
+        if not said:
+            raise Refused(f"lifting {gate} by a person's answer needs the answer")
+        if waiting_only(said):
+            raise Refused(f"{said!r} only keeps the gate waiting — it never lifts")
+        return said
+    on = {x.lower() for x in people or []}
+    if answered_by is not None and answered_by.lower() not in ANSWERED_BY:
+        raise Refused(f"Answered by is owner or any, not {answered_by!r}")
+    if gate.startswith("decision"):
+        person = gate[len("decision ("):-1]
+        if not is_person(by):
+            raise Refused(f"who lifts, {by!r}, is not a person's name")
+        if override is not None:
+            only("override")
+            why = _one_line("the override's why", override)
+            if not why:
+                raise Refused("an override lift needs its why")
+            written, value = _without(text, gate)
+            return _logged(text, "lift", value, [f"gate lifted: {written} — by {by}; override: {why}"], day)
+        only("answer", "suffix")
+        said = label()
+        tail = ""
+        if suffix is not None:
+            s = " ".join(str(suffix).split()).removeprefix("; ")
+            if not LIFT_SUFFIX_RE.fullmatch(s):
+                raise Refused(f"a suffix is board <repo>, no board item or shared board item left open, not {suffix!r}")
+            tail = f"; {s}"
+        if people is not None and (answered_by or "").lower() == "any":
+            if by.lower() not in on:
+                raise Refused(f"{by} is not on the board's People: ({', '.join(people)}) — only a listed person answers")
+        elif by.lower() != person.lower():
+            raise Refused(f"only {person} lifts {gate}, not {by} (the set route's, or a board without Answered by: any)")
+        written, value = _without(text, gate)
+        return _logged(text, "lift", value, [f"gate lifted: {written} — by {by}; answer \"{said}\"{tail}"], day)
+    if override is not None:
+        raise Refused(f"an override lifts a decision, not {gate}")
+    if gate.startswith("until"):
+        only()
+        if not LOG_TOKEN_RE.fullmatch(by):
+            raise Refused(f"who lifts, {by!r}, is a token of [A-Za-z0-9_.@/-]")
+        if day < gate[len("until "):]:
+            raise Refused(f"{gate} is not reached on {day}")
+        written, value = _without(text, gate)
+        return _logged(text, "lift", value, [f"gate lifted: {written} — by {by}; date reached"], day)
+    name = gate[len("event ("):-1]
+    if evidence is not None:
+        only("evidence")
+        if not LOG_TOKEN_RE.fullmatch(by):
+            raise Refused(f"the host, {by!r}, is a token of [A-Za-z0-9_.@/-]")
+        secs = [s for s in event_sections(text) if s["name"] == name]
+        chk = secs[0]["check"] if len(secs) == 1 and not secs[0]["problem"] else None
+        if chk is None:
+            raise Refused(f"the entry has no readable **Event ({name}):** section to say which check passed")
+        ev = " ".join(str(evidence).split())
+        m = (EVIDENCE_PR_RE if chk["type"] == "pr-merged" else EVIDENCE_AT_RE).fullmatch(ev)
+        want = "<repo>#<n>, the merged PR" if chk["type"] == "pr-merged" else "<repo>@<sha>, where it was read"
+        if not m or m.group("repo").lower() != chk["repo"].lower() \
+                or (chk["type"] == "pr-merged" and int(m.group("n")) != chk["n"]):
+            raise Refused(f"a {chk['type']} check's evidence is {want} of its own check, not {evidence!r}")
+        written, value = _without(text, gate)
+        return _logged(text, "lift", value, [f"gate lifted: {written} — by {by}; {chk['type']} passed; {ev}"], day)
+    only("answer")
+    said = label()
+    if people is None:
+        raise Refused(f"lifting {gate} by a person's answer needs the board's People:, who may answer it")
+    if not is_person(by) or by.lower() not in on:
+        raise Refused(f"{by} is not on the board's People: ({', '.join(people)}) — only a listed person answers")
+    written, value = _without(text, gate)
+    return _logged(text, "lift", value, [f"gate lifted: {written} — by {by}; answer \"{said}\""], day)
+
+
+def reassign_gate(text: str, frm: str, to: str, *, by: str, why: str, today: date | str) -> str:
+    """One open entry's text with ``decision (<frm>)`` replaced by ``decision (<to>)`` and the Log line
+    ``gate reassigned: decision (<frm>) → decision (<to>) — by <by>; <why>`` (v2.4, SPEC *Lifting a gate*: the
+    ``set`` route's reassign, which resets the gate's age). Refused: ``to`` the same person (in any case), an
+    entry that does not carry ``frm``'s decision or already carries ``to``'s, and an empty why. Whether ``to``
+    has a board is the consumer's to check."""
+    day = utc_day(today, "reassign_gate()'s today")
+    a, b, by = (" ".join(str(x or "").split()) for x in (frm, to, by))
+    for who in (a, b, by):
+        if not is_person(who):
+            raise Refused(f"{who!r} is not a person's name")
+    if a.lower() == b.lower():
+        raise Refused(f"a reassign names another person: decision ({a}) is already {b}'s")
+    said = _one_line("the reassign's why", why)
+    if not said:
+        raise Refused("a reassign needs its why")
+    old = parse_gates(entries(text)[0]["blocked_raw"])["old_form"] if entries(text) else None
+    if old and old[0].lower() == a.lower():
+        raise Refused(f"the entry's Blocked by holds decision ({a}) in the old form — migrate it first: set "
+                      "decision (<person>) alone, with its text in an **Ask:** section")
+    if not entries(text) or _carried(text, f"decision ({a})") is None:
+        raise Refused(f"the entry does not carry decision ({a}) on an open entry")
+    if _carried(text, f"decision ({b})") is not None:
+        raise Refused(f"the entry already waits on decision ({b}) — lift decision ({a}) instead")
+    written, value = _without(text, f"decision ({a})")
+    value = _written_blocked(", ".join(x for x in (value, f"decision ({b})") if x), entries(text)[0]["blocked_raw"])
+    return _logged(text, "reassign", value, [f"gate reassigned: {written} → decision ({b}) — by {by}; {said}"], day)
+
+
+def reassigns(text: str, gate: str) -> int:
+    """How many times the gate ``gate`` (as the entry carries it) was reassigned to reach it: the run of
+    ``gate reassigned`` Log lines leading to it, newest first, ending at a ``gate added`` or ``gate lifted`` of the
+    gate it has reached (v2.4; check() notes one past two)."""
+    n, cur = 0, _gate_key(gate)
+    for rec in reversed(log_lines(text)):
+        if rec["kind"] == "gate-reassigned" and _gate_key(rec["to"]) == cur:
+            n, cur = n + 1, _gate_key(rec["gate"])
+        elif rec["kind"] in ("gate-added", "gate-lifted") and _gate_key(rec["gate"]) == cur:
+            break  # the gate was added afresh (or lifted, before it): the run ends there
+    return n
+
+
+def decide_lift(item_line: str, entries: Mapping[str, str], label: str, by: str, today: date | str,
+                board_people: list[str] | None, answered_by: str | None) -> dict[str, str]:
+    """The decide lift's ledger half (v2.4, SPEC *The decide lift*): ``{id: new_text}`` for each entry the answer
+    ``label``, given by ``by``, changes, from the ``decide`` item ``item_line`` (the base board line) and
+    ``entries`` (id to base text: its Context entry and each `Parts:` id). ``board_people`` and
+    ``answered_by`` are the base board's `People:` (None: none, and its checks are skipped) and `Answered by:`
+    (None: ``owner``). Whichever gate the Context names, ``decision (<p>)`` or ``event (<name>)``:
+
+    - a lifting label (one of `Lifts:`, `Go` when it has none, compared in any case; never a waiting-only one)
+      lifts the gate through lift_gate() on the Context entry, if it carries it, and on each listed part that
+      does; each listed part that no longer does is logged on the Context entry as ``gate lift skipped``;
+    - a waiting-only label (`Keep waiting`, `Not yet`) logs ``kept waiting`` on each of those that still carries
+      it; for a decision, so does any other label; for an event, any other label writes nothing.
+
+    Refused: an item that is not a ``decide`` naming one entry and one gate; another repo's entry (its lift is
+    a tool PR there); a Context entry missing or archived; a `Parts:` id missing, of another repo, or not `Part
+    of` the Context entry; a gate's person not on `People:`; an answerer not on `People:`, or, for a decision
+    under ``owner``, not the gate's person."""
+    day = utc_day(today, "decide_lift()'s today")
+    got = parse_board(item_line if ITEM_RE.match(item_line) else "", warn=False)
+    if len(got) != 1 or got[0].kind != "decide":
+        raise Refused("decide_lift takes one open decide item line")
+    item = got[0]
+    ref, gate = _item_gate(item.text)
+    if ref is None or gate is None:
+        raise Refused("the item's Context names no one entry and one gate, decision (<person>) or event (<name>)")
+    gate = _one_gate(gate)
+    if "#" in ref:
+        raise Refused(f"{ref} is another repo's entry — its lift is a tool PR there, through lift_gate")
+    said = _one_line("the answer", label)
+    by = " ".join(str(by or "").split())
+    if not said:
+        raise Refused("the answer is empty")
+    if not is_person(by):
+        raise Refused(f"who answered, {by!r}, is not a person's name")
+    if answered_by is not None and answered_by.lower() not in ANSWERED_BY:
+        raise Refused(f"Answered by is owner or any, not {answered_by!r}")
+    on = {x.lower() for x in board_people or []}
+    person = gate[len("decision ("):-1] if gate.startswith("decision") else None
+    if board_people is not None:
+        if person is not None and person.lower() not in on:
+            raise Refused(f"the gate's person {person} is not on the board's People: ({', '.join(board_people)})")
+        if by.lower() not in on:
+            raise Refused(f"{by} is not on the board's People: ({', '.join(board_people)}) — only a listed person answers")
+    owner = board_people is None or (answered_by or "owner").lower() == "owner"
+    if person is not None and owner and by.lower() != person.lower():
+        raise Refused(f"only {person} answers for {gate} on a board whose Answered by is owner, not {by}")
+    by_num: dict[int, tuple[str, str]] = {}
+    for k, v in entries.items():
+        if _is_id(k):
+            by_num.setdefault(_num(k), (k, v))
+    if _num(ref) not in by_num or not _entries(by_num[_num(ref)][1]):
+        raise Refused(f"{ref}, the item's Context entry, is not among the entries given")
+    key, ctx_text = by_num[_num(ref)]
+    if first_word(_entries(ctx_text)[0]["fields"].get("status")) in ARCHIVED_WORDS:
+        raise Refused(f"{ref}, the item's Context entry, is archived — the answer lifts nothing; it takes review")
+    parts = []
+    for p in item.parts:
+        if "#" in p:
+            raise Refused(f"{p} is another repo's entry — a part is Part of its parent, in the same ledger")
+        if _num(p) not in by_num or not _entries(by_num[_num(p)][1]):
+            raise Refused(f"{p}, a part the item lists, is not among the entries given")
+        pe = _entries(by_num[_num(p)][1])[0]
+        par = parse_part_of(pe["part_of_raw"])[0]
+        if par is None or "#" in par or _num(par) != _num(ref):
+            raise Refused(f"{p}, a part the item lists, is not Part of {ref} — the snapshot does not match")
+        parts.append(by_num[_num(p)])
+    lifting = _lifting(said, item.lifts)
+    if not lifting and not waiting_only(said) and person is None:
+        return {}  # an event's work order ("Rewrite the check", "Drop the entry"): no ledger line
+    out: dict[str, str] = {}
+    targets = [(key, ctx_text), *parts]
+    skipped = []
+    for k, t in targets:
+        written = _carried(t, gate)
+        if written is None:
+            if lifting and (k, t) != (key, ctx_text):
+                skipped.append(_entries(t)[0]["id"])
+            continue
+        if lifting:
+            out[k] = lift_gate(t, gate, by, answer=said, today=day,
+                               people=board_people if board_people is not None else ([by] if person is None else None),
+                               answered_by="any" if not owner else None)
+        else:
+            out[k] = _logged(t, "answer", _entries(t)[0]["blocked_raw"],
+                             [f"kept waiting: {written} — by {by}; answer \"{said}\""], day)
+    if skipped:
+        spelled = _carried(ctx_text, gate) or gate
+        out[key] = _logged(out.get(key, ctx_text), "lift", _entries(out.get(key, ctx_text))[0]["blocked_raw"],
+                           [f"gate lift skipped: {s} no longer carries {spelled}" for s in skipped], day)
+    return out
+
+
+# ---------------------------------------------------------------------------------------------
+# Events (v2.4): an event gate's section and its typed check
+# ---------------------------------------------------------------------------------------------
+
+EVENT_NEAR_RE = re.compile(r"^event\s*\(", re.IGNORECASE)  # a lead read as an Event section's, to say what is wrong with it
+CHECK_LINE_RE = re.compile(r"^check:[ \t]+(?P<check>\S.*?)[ \t]*$")
+# The check types (SPEC *Events*): each type's arguments, as written after its name. A new type states
+# its four outcomes (CHECK_OUTCOMES) in SPEC and comes in a format PR.
+CHECK_TYPES = {"pr-merged": "<repo>#<n>", "file-contains": '<repo>[@<ref>] <path> "<text>"',
+               "ref-includes": "<repo>@<ref> <commit>"}
+CHECK_OUTCOMES = ("passed", "not yet", "impossible", "error")
+CHECK_N_RE = re.compile(r"[0-9]{1,18}")  # a forge's PR number; capped, so int() never meets a giant
+CHECK_COMMIT_RE = re.compile(r"[0-9a-f]{7,40}")
+REF_BAD_CHARS = set("~^:?*[\\ #%&=+")  # git's, revision syntax's, and URL or query syntax in a forge API call
+PATH_BAD_CHARS = set('*?[]#%"\\')  # a glob character, URL syntax in a forge path, the text's quote, a backslash
+CHECK_ARG_SEP_RE = re.compile(r"[ \t]+")  # arguments are separated by spaces and tabs, never other whitespace
+
+
+def _ref_problem(ref: str) -> str | None:
+    """Why ``ref`` is not a ref a check may name (git's ``check-ref-format --allow-onelevel`` rules, a
+    leading ``-``, ``..``, ``@{``, ``:``, any of ``^~?*[\\#%&=+``, whitespace or anything outside
+    printable ASCII), or None."""
+    if not ref:
+        return "an empty ref"
+    if ref.startswith("-"):
+        return f"the ref {ref!r} starts with - (it would read as an option)"
+    if ".." in ref or "@{" in ref or ref == "@":
+        return f"the ref {ref!r} holds .., @{{ or is @ (revision syntax)"
+    if any(c in REF_BAD_CHARS or not " " < c < "\x7f" for c in ref):
+        return (f"the ref {ref!r} holds a character it may not: one git refuses or revision, URL or query syntax "
+                "uses (~^:?*[\\#%&=+), whitespace, a control, or anything outside ASCII")
+    if ref.endswith(("/", ".")) or "//" in ref:
+        return f"the ref {ref!r} ends with / or ., or holds //"
+    if any(not part or part.startswith(".") or part.endswith(".lock") for part in ref.split("/")):
+        return f"the ref {ref!r} has a component that starts with . or ends with .lock"
+    return None
+
+
+def _path_problem(path: str) -> str | None:
+    """Why ``path`` is not a path a check may read (absolute, an empty, ``.``, ``..`` or ``.git`` segment, a
+    leading ``-``, a glob character, ``#``, ``%``, a quote, a backslash, whitespace, a control or anything
+    outside printable ASCII), or None."""
+    if not path:
+        return "an empty path"
+    if path.startswith("/"):
+        return f"the path {path!r} is absolute"
+    if path.startswith("-"):
+        return f"the path {path!r} starts with - (it would read as an option)"
+    segs = path.split("/")
+    if ".." in segs:
+        return f"the path {path!r} has a .. segment"
+    if any(x in ("", ".") or x.lower() == ".git" for x in segs):
+        return f"the path {path!r} has an empty, . or .git segment"
+    if any(c in PATH_BAD_CHARS or not " " < c < "\x7f" for c in path):
+        return (f"the path {path!r} holds a glob character, URL syntax (# or %), a quote, a backslash, "
+                "whitespace, a control, or anything outside ASCII")
+    return None
+
+
+def _repo_problem(repo: str) -> str | None:
+    return None if REPO_RE.fullmatch(repo) else \
+        f"the repo {repo!r} is not a name or /-separated components of ASCII [A-Za-z0-9_.-] (none . or .., none starting with -)"
+
+
+def parse_check(value: str) -> dict:
+    """One ``check:`` line's value read (v2.4, SPEC *Events*): ``{type, repo, …, problem}``. By type:
+    ``pr-merged`` gives ``n`` (an int); ``file-contains`` ``ref`` (None: the default branch), ``path`` and
+    ``text``; ``ref-includes`` ``ref`` and ``commit``. ``problem`` is None, or why ``check()`` refuses
+    it: an unknown type, a missing or extra argument, or an argument outside its confinement. Arguments
+    are separated by spaces; the text runs from its opening ``"`` to the line's last ``"`` and nothing
+    follows it. Text is matched literally by the host, never as a pattern."""
+    value = (value or "").strip(" \t")
+    kind, rest = (CHECK_ARG_SEP_RE.split(value, maxsplit=1) + [""])[:2]
+    out: dict = {"type": kind, "problem": None}
+
+    def bad(why: str) -> dict:
+        out["problem"] = why
+        return out
+    if kind not in CHECK_TYPES:
+        return bad(f"unknown check type {kind!r} — one of {', '.join(CHECK_TYPES)}")
+    text = None
+    if kind == "file-contains":
+        q = rest.find('"')
+        if q < 0 or rest.rfind('"') == q:
+            return bad('file-contains needs its text in quotes: file-contains <repo>[@<ref>] <path> "<text>"')
+        if rest[rest.rfind('"') + 1:].strip(" \t"):
+            return bad("nothing may follow the quoted text")
+        if not rest[:q].endswith((" ", "\t")):
+            return bad("the quoted text is an argument of its own: a space comes before its opening quote")
+        text, rest = rest[q + 1: rest.rfind('"')], rest[:q]
+        if not text.strip(" \t"):
+            return bad("the quoted text is empty")
+        if any(c < " " or c == "\x7f" for c in text):
+            return bad("the quoted text holds a control character")
+    args = [a for a in CHECK_ARG_SEP_RE.split(rest) if a]
+    want = {"pr-merged": 1, "file-contains": 2, "ref-includes": 2}[kind]
+    if len(args) != want:
+        return bad(f"{kind} takes {CHECK_TYPES[kind]}")
+    if kind == "pr-merged":
+        repo, sep, n = args[0].rpartition("#")
+        out.update(repo=repo)
+        if not sep:
+            return bad(f"pr-merged takes {CHECK_TYPES[kind]}")
+        if not CHECK_N_RE.fullmatch(n):
+            return bad(f"the PR number {n!r} is not 1 to 18 of [0-9]")
+        out["n"] = int(n)
+        return bad(_repo_problem(repo)) if _repo_problem(repo) else out
+    repo, at, ref = args[0].partition("@")
+    out.update(repo=repo, ref=ref if at else None)
+    if _repo_problem(repo):
+        return bad(_repo_problem(repo))
+    if kind == "ref-includes" and not at:
+        return bad(f"ref-includes takes {CHECK_TYPES[kind]}: the ref is required")
+    if at and _ref_problem(ref):
+        return bad(_ref_problem(ref))
+    if kind == "file-contains":
+        out.update(path=args[1], text=text)
+        return bad(_path_problem(args[1])) if _path_problem(args[1]) else out
+    out["commit"] = args[1]
+    if not CHECK_COMMIT_RE.fullmatch(args[1]):
+        return bad(f"the commit {args[1]!r} is not 7 to 40 of [0-9a-f]")
+    return out
+
+
+def parse_event_section(text: str) -> dict:
+    """One ``**Event (<name>):**`` section read (v2.4, SPEC *Events*): ``{name, words, check, problem,
+    first}`` (``first``: its first line as written; ``name`` None when its lead is not an Event's).
+    It is two lines: the lead and the event in plain words, then exactly one ``check: <type> <args>``
+    (``check`` is ``parse_check()``'s reading of it, or None). ``problem`` is None, or why ``check()``
+    refuses the section: a name outside ``[a-z0-9-]+``, no words, no ``check:`` line, more than one, a
+    line after it, words past the first line, or the check's own problem."""
+    lines = [ln.rstrip(" \t") for ln in text.replace("\r\n", "\n").split("\n")]
+    while lines and not lines[-1]:
+        lines.pop()
+    m = re.match(r"^\*\*Event \((?P<name>[^()]*)\):\*\*(?P<words>.*)$", lines[0] if lines else "")
+    out: dict = {"name": m.group("name") if m else None, "words": "", "check": None, "problem": None,
+                 "first": lines[0] if lines else ""}
+    if not m:
+        out["problem"] = "not an Event section: its lead is **Event (<name>):**"
+        return out
+    out["words"] = m.group("words").strip()
+    checks = [i for i, ln in enumerate(lines) if ln.startswith("check:")]
+    if not EVENT_NAME_RE.fullmatch(out["name"]):
+        out["problem"] = f"the event name {out['name']!r} is not [a-z0-9-]+"
+    elif not m.group("words").strip():
+        out["problem"] = "its first line says the event in plain words, after the lead"
+    elif not checks:
+        out["problem"] = "it has no check: line — the last line is check: <type> <args>"
+    elif len(checks) > 1:
+        out["problem"] = f"it has {len(checks)} check: lines — exactly one"
+    elif checks[0] != len(lines) - 1:
+        out["problem"] = "a line follows its check: line — the check is the section's last line"
+    elif checks[0] != 1:
+        out["problem"] = "its words run past the first line — the event in plain words is one line, the check the second"
+    else:
+        cm = CHECK_LINE_RE.match(lines[checks[0]])
+        out["check"] = parse_check(cm.group("check")) if cm else None
+        if out["check"] is None:
+            out["problem"] = "its check: line names no check — check: <type> <args>, a space after the colon"
+        elif out["check"]["problem"]:
+            out["problem"] = f"its check: {out['check']['problem']}"
+    return out
+
+
+def event_sections(text: str) -> list[dict]:
+    """Every ``**Event (…):**`` section of one entry's text, in order, each as ``parse_event_section()``
+    reads it."""
+    try:
+        body = _entry_parts(text)[2]
+    except Refused:
+        body = text.split("\n", 1)[1] if "\n" in text else ""
+    return [parse_event_section(t) for lead, t in _entry_sections(body.replace("\r\n", "\n"))
+            if lead is not None and EVENT_NEAR_RE.match(lead)]
+
+
+def event_problems(text: str) -> list[tuple[str, str, str]]:
+    """What ``check()`` says of one open entry's events (v2.4, SPEC *Events*): [(level, kind, sentence)].
+    ``event-section`` (error): an ``event (<name>)`` gate with no section, or two sections of one name;
+    ``event-check`` (error): a section ``parse_event_section()`` refuses; ``event-ungated`` (info): a
+    section whose gate is gone with no ``gate lifted: event (<name>)`` Log line to say why."""
+    found = entries(text)
+    gates = parse_gates(found[0]["blocked_raw"])["events"] if found else []
+    secs = event_sections(text)
+    out: list[tuple[str, str, str]] = []
+    names = [x["name"] for x in secs]
+    for n in dict.fromkeys(gates):
+        if n not in names:
+            out.append(("error", "event-section", f"Blocked by names event ({n}) and the entry has no "
+                        f"**Event ({n}):** section — its words, then check: <type> <args>"))
+    for n in dict.fromkeys(names):
+        if names.count(n) > 1:
+            out.append(("error", "event-section", f"it has {names.count(n)} **Event ({n}):** sections — one per "
+                        "name; a re-added gate reuses its section"))
+    try:
+        lifted = {r["gate"] for r in log_lines(text) if r["kind"] == "gate-lifted"}
+    except Refused:
+        lifted = set()
+    for x in secs:
+        if x["problem"]:
+            led = f"**Event ({x['name']}):**" if x["name"] is not None else repr(x["first"])
+            out.append(("error", "event-check", f"its {led} section: {x['problem']}"))
+        if x["problem"] and (x["name"] is None or not EVENT_NAME_RE.fullmatch(x["name"])):
+            continue  # its lead or name is refused already: no gate could name it
+        if x["name"] not in gates and f"event ({x['name']})" not in lifted:
+            out.append(("info", "event-ungated", f"its **Event ({x['name']}):** section has no event "
+                        f"({x['name']}) gate, and no gate lifted: event ({x['name']}) Log line says why"))
+    return out
+
+
+# ---------------------------------------------------------------------------------------------
+# The gate sweep (v2.4): what a host's periodic sweep files, closes and lifts — decided here, its I/O the host's
+# ---------------------------------------------------------------------------------------------
+
+COVER_STATES = ("open", "decided", "closed", "closed-decided")  # covers()'s states; the first two cover
+SWEEP_REASK_DAYS = 30  # the consumer's numbers' defaults (SPEC *The gate sweep*); the rules are the module's
+SWEEP_EVENT_AGE_DAYS = 30
+# Each sweep item's condition, by the fixed words its text carries (its head), tried in this order. A `decide`
+# item keyed to a decision gate and carrying none of them is the decision's own item: its condition is
+# `uncovered`.
+SWEEP_HEADS = (("no-board", "has no board"), ("broken", "Event check broken"),
+               ("impossible", "can no longer happen"), ("still", "Still waiting on"),
+               ("audit", "holds no decided item"))
+SWEEP_KINDS = {"no-board": "act", "broken": "act", "impossible": "decide", "still": "decide", "audit": "act",
+               "uncovered": "decide"}
+SWEEP_DECISION_ANSWERS = ("Go", "Not yet")
+SWEEP_IMPOSSIBLE_ANSWERS = ("Drop the gate", "Rewrite the check", "Drop the entry")
+SWEEP_STILL_ANSWERS = ("Keep waiting", "Drop the gate", "Rewrite the check")
+SWEEP_EVENT_LIFTS = ("Drop the gate",)
+
+
+def _board_name(board: Sequence) -> str:
+    """A board's name in the sweep's output: its origin's pick key, else its checkout basename."""
+    return origin_key(board[0] or "") or str(board[1])
+
+
+def _board_pick_key(board: Sequence) -> tuple:
+    """The person's-board pick order (SPEC *The gate sweep*): keyed boards bytewise by origin_key, then the
+    boards with no readable origin by lowercased basename."""
+    key = origin_key(board[0] or "")
+    return (0, key.encode()) if key else (1, str(board[1]).lower().encode())
+
+
+def _own_board(boards: Sequence[Sequence], repo: str) -> Sequence | None:
+    by_path = [b for b in boards if origin_path(b[0] or "") == repo.lower()]
+    return (by_path or [b for b in boards if str(b[1]).lower() == repo.lower()] or [None])[0]
+
+
+def _ours(ref: str | None, own: bool, repo: str) -> int | None:
+    """The number of this repo's entry ``ref`` names, read on a board (``own``: this repo's), or None: on this
+    repo's board a bare ``TD-n``, and on any board ``<repo>#TD-n`` naming this repo (case-insensitively)."""
+    if not ref:
+        return None
+    other, sep, tid = ref.rpartition("#")
+    if not sep:
+        return _num(ref) if own and _is_id(ref) else None
+    return _num(tid) if other.lower() == repo.lower() and _is_id(tid) else None
+
+
+def _sweep_context(text: str, own: bool, repo: str) -> tuple[int, str, str] | None:
+    """An item's Context read as the sweep keys it: (this repo's entry number, the gate's key, the qualifier
+    after the gate — ``""``, ``lift`` or ``board <repo>``, lowercased), or None when it names no entry of this
+    repo with one gate."""
+    ref, gate = _item_gate(text)
+    num = _ours(ref, own, repo)
+    if num is None or gate is None:
+        return None
+    c = CONTEXT_RE.search(_gate_body(text))
+    ctx = c.group("ctx") if c else ""
+    g = CONTEXT_ANY_GATE_RE.search(ctx)
+    qual = " ".join(ctx[g.end():].strip().rstrip(".").split()).lower() if g else ""
+    return num, _gate_key(gate), qual
+
+
+def _sweep_head(text: str) -> str | None:
+    return next((cond for cond, words in SWEEP_HEADS if words in text), None)
+
+
+def _read_boards(boards: Sequence[Sequence], repo: str) -> list[dict]:
+    """Every item of every board read, open and closed (the board's and its archive's), each with what the
+    sweep compares: {board, own, item, line (the open item's line as written, else None), state, ctx, head}."""
+    out = []
+    mine = _own_board(boards, repo)
+    for b in boards:
+        name, own = _board_name(b), b is mine
+        text, archive = str(b[2] or ""), str(b[3] or "")
+        lines = text.splitlines()
+        reads = [(it, lines[it.line - 1], "decided" if it.decided else "open") for it in parse_board(text, warn=False)]
+        reads += [(it, None, "closed-decided" if it.decided else "closed")
+                  for src in (text, archive) for it in parse_closed_items(src)]
+        for it, line, state in reads:
+            out.append({"board": name, "own": own, "item": it, "line": line, "state": state,
+                        "ctx": _sweep_context(it.text, own, repo), "head": _sweep_head(it.text),
+                        "people": board_people(text)})
+    return out
+
+
+def _names_entry(r: dict, num: int, gate_key: str, parent: int | None, repo: str) -> bool:
+    """Whether a read item names entry ``num`` and the gate, or its parent with the gate and the entry among
+    its `Parts:` snapshot."""
+    if r["ctx"] is None or r["ctx"][1] != gate_key or r["ctx"][2]:
+        return False
+    if r["ctx"][0] == num:
+        return True
+    return parent is not None and r["ctx"][0] == parent and any(
+        _ours(p, r["own"], repo) == num for p in r["item"].parts)
+
+
+def _covers(reads: list[dict], num: int, gate: str, parent: int | None, repo: str) -> list[dict]:
+    key = _gate_key(gate)
+    d = GATE_DECISION_RE.match(gate)
+    who = d.group("who").lower() if d else None
+    return [r for r in reads if r["item"].kind == "decide" and _names_entry(r, num, key, parent, repo)
+            and (who is None or who in {p.lower() for p in (r["people"] or [])})]
+
+
+def covers(entry_text: str, gate: str, boards: Sequence[Sequence], repo: str) -> list[tuple[str, BoardItem, str]]:
+    """The board items that ask about one entry's gate (v2.4, SPEC *The gate sweep*): each ``decide`` item whose
+    Context names the entry and the gate, or names the entry's parent (its ``Part of``) with the gate and the
+    entry among its ``Parts:``, on a board whose ``People:`` lists the gate's person (an event gate has no
+    person, so any board). ``boards`` is ``[(origin_url, basename, text, archive_text)]``; ``repo`` this repo's
+    ``origin_path`` (else its basename), which a ``<repo>#TD-n`` ref must name. On this repo's own board (its
+    origin path, else its basename, is ``repo``) a bare ``TD-n`` is this repo's. Returns ``[(board name, item,
+    state)]``, the board named by its ``origin_key``, else its basename, and the state ``open``, ``decided``
+    (open, with ``Decided:``), ``closed`` or ``closed-decided`` (closed, on the board or in its archive). Only
+    ``open`` and ``decided`` cover."""
+    ents = entries(entry_text)
+    if not ents:
+        raise Refused("covers() reads one entry's text, and this has no `## TD-n:` heading")
+    gate = _one_gate(gate)
+    parent, _ = parse_part_of(ents[0]["part_of_raw"])
+    return [(r["board"], r["item"], r["state"])
+            for r in _covers(_read_boards(boards, repo), _num(ents[0]["id"]), gate,
+                             _num(parent) if parent else None, repo)]
+
+
+def _entry_ask(text: str, title: str) -> str:
+    """The entry's Ask as one line: its ``**Ask:**`` section's words, else its title."""
+    try:
+        sections = _entry_sections(_entry_parts(text)[2])
+    except Refused:
+        sections = []
+    at = _keyed(sections, "ask")
+    if at:
+        words = " ".join(sections[at[0]][1].split())
+        words = words[len("**Ask:**"):].strip() if words.startswith("**Ask:**") else words
+        if words:
+            return words
+    return title
+
+
+def _answered_within(r: dict, today: date, days: int) -> bool:
+    """A read item answered without a lift within ``days`` of ``today``: its ``Decided:`` label does not lift
+    and its date is newer than the window."""
+    it = r["item"]
+    return bool(it.decided) and not _lifting(it.decided[0], it.lifts) and (today - it.decided[1]).days < days
+
+
+def _log(text: str) -> list[dict]:
+    """The entry's Log, or nothing when its body cannot be read (two Log sections, no heading)."""
+    try:
+        return log_lines(text) if text else []
+    except Refused:
+        return []
+
+
+def _kept_waiting_within(text: str, gate: str, today: date, days: int) -> bool:
+    key = _gate_key(gate)
+    for rec in _log(text):
+        if rec["kind"] == "kept-waiting" and _gate_key(rec["gate"]) == key and rec["date"]:
+            if (today - date.fromisoformat(rec["date"])).days < days:
+                return True
+    return False
+
+
+def _gone(reads_num: int, gate: str, parts: list[str], own: bool, repo: str,
+          open_texts: Mapping[int, str], known: set[int]) -> bool | None:
+    """Whether the gate is gone from an item's Context entry and every listed part: True, False, or None when
+    the Context entry is in neither the ledger nor the archive (its item is left for a person)."""
+    if reads_num not in known:
+        return None
+    nums = [reads_num] + [n for n in (_ours(p, own, repo) for p in parts) if n is not None]
+    return not any(_carried(open_texts.get(n), gate) for n in nums)
+
+
+def _outcome(results: Mapping, tid: str, name: str) -> tuple[str | None, str | None]:
+    """A check's (outcome, evidence) from ``results``: a bare outcome, or an ``(outcome, evidence)`` pair; an
+    empty pair, or none at all, is no outcome."""
+    got = results.get((tid, name))
+    if isinstance(got, (tuple, list)):
+        return (got[0] if got else None, got[1] if len(got) > 1 else None)
+    return (got, None)
+
+
+def _sweep_text(cond: str, tid: str, gate: str, extra: str = "") -> str:
+    name = gate[gate.index("(") + 1: -1] if "(" in gate else gate
+    return {"no-board": f"{gate} on {tid} has no board: no board read lists {name} in its People.",
+            "broken": f"Event check broken on {tid}: the check for {gate} errors.",
+            "impossible": f"{gate} on {tid} can no longer happen.",
+            "still": f"Still waiting on {gate} for {tid}?",
+            "audit": f"{tid}'s {gate} was lifted by an answer on {extra}'s board, which holds no decided item "
+                     f"for {tid}."}[cond]
+
+
+def _sweep_item(cond: str, tid: str, ref: str, gate: str, *, ask: str = "", title: str = "", extra: str = "",
+                reask_days: int = SWEEP_REASK_DAYS) -> dict:
+    """One item the sweep files, as ``item_line()``'s arguments (the host adds today, its Due:, session and
+    host): {text, context, kind, answers, default, detail, lifts}."""
+    kind = SWEEP_KINDS[cond]
+    ctx = f"{ref} {gate}" + (" board " + extra if cond == "audit" else "")
+    out: dict = {"text": ask if cond == "uncovered" else _sweep_text(cond, tid, gate, extra), "context": ctx,
+                 "kind": kind, "answers": None, "default": None, "detail": None, "lifts": None}
+    if cond == "uncovered":
+        name = gate[gate.index("(") + 1: -1]
+        out.update(answers=list(SWEEP_DECISION_ANSWERS), detail={
+            "context": f"{tid} ({title}) waits on {gate}, and no board item asked for it",
+            "question": ask,
+            "recommended": f"Only {name} can say: Go lifts the gate, and Not yet keeps it waiting, asked again "
+                           f"in {reask_days} days"})
+    elif cond == "impossible":
+        out.update(answers=list(SWEEP_IMPOSSIBLE_ANSWERS), lifts=list(SWEEP_EVENT_LIFTS), detail={
+            "context": f"The check for {gate} on {tid} says it can no longer happen",
+            "question": "Drop the gate, rewrite its check, or drop the entry?",
+            "recommended": "Only the person who knows why it waits can say"})
+    elif cond == "still":
+        out.update(answers=list(SWEEP_STILL_ANSWERS), default=0, lifts=list(SWEEP_EVENT_LIFTS), detail={
+            "context": f"{tid} has waited on {gate} for more than its age limit, and its check says not yet",
+            "question": "Keep waiting, drop the gate, or rewrite its check?",
+            "recommended": f"it is asked again in {reask_days} days"})
+    return out
+
+
+def sweep(entries: Iterable[str], boards: Sequence[Sequence], results: Mapping, today_utc: date | str,
+          today_local: date | str, reask_days: int = SWEEP_REASK_DAYS, event_age_days: int = SWEEP_EVENT_AGE_DAYS,
+          repo: str = "") -> dict:
+    """What one sweep of this repo's ledger does (v2.4, SPEC *The gate sweep*): ``{to_file: {board: [item]},
+    to_close: {board: [item key]}, lifts: [{id, gate, kind, evidence}]}``, each board named as ``covers()``
+    names it. It keeps no state: the boards and the ledger's Log are its state, so a second run over its own
+    writes files and closes nothing.
+
+    ``entries`` are this repo's ledger and archive texts (an entry is open unless its Status is an archived
+    one); ``boards`` ``[(origin_url, basename, text, archive_text)]``, this repo's own among them; ``results``
+    maps ``(TD-n, event name)`` to a check's outcome (``passed``, ``not yet``, ``impossible``, ``error``) or to
+    ``(outcome, evidence)``; ``today_utc`` dates the Log's ages and an ``until``, ``today_local`` the boards'
+    ``Decided:`` dates; ``repo`` is this repo's ``origin_path`` (else its basename). Each item filed is
+    ``item_line()``'s arguments, the host adding today, its Due:, session and host."""
+    today_u = date.fromisoformat(utc_day(today_utc, "today_utc"))
+    if isinstance(today_local, datetime):
+        today_local = today_local.date()  # the caller's own civil date: its zone is the caller's
+    today_l = date.fromisoformat(_civil_date(today_local.isoformat() if isinstance(today_local, date)
+                                             else today_local, "today_local is written"))
+    for what, n in (("reask_days", reask_days), ("event_age_days", event_age_days)):
+        if not isinstance(n, int) or isinstance(n, bool) or n < 0:
+            raise Refused(f"{what} is a whole number of days, not {n!r}")
+    if not isinstance(repo, str) or not REPO_RE.fullmatch(repo):
+        raise Refused(f"repo is this repo's origin path (owner/name) or its basename, not {repo!r}")
+    own = _own_board(boards, repo)
+    if own is None:
+        raise Refused(f"boards holds no board of {repo}: its own board is where event items go")
+    own_name = _board_name(own)
+    texts: dict[int, str] = {}
+    open_texts: dict[int, str] = {}
+    for t in entries:
+        for tid, body in _entry_texts(str(t or "")).items():
+            n = _num(tid)
+            if n in open_texts:
+                continue  # the ledger's open copy is read over an archived one
+            texts[n] = body
+            e = _entries(body)[0]
+            if first_word(e["fields"].get("status")) not in ARCHIVED_WORDS:
+                open_texts[n] = body
+    known = set(texts)
+    reads = _read_boards(boards, repo)
+    to_file: dict[str, list[dict]] = {}
+    to_close: dict[str, list[str]] = {}
+    lifts: list[dict] = []
+    filed: set[tuple] = set()
+
+    def add(board: str, num: int, gate: str, cond: str, item: dict, qual: str = "") -> None:
+        """File ``item`` unless this run already filed its identity (a gate written twice, a lift logged twice)."""
+        key = (board, num, _gate_key(gate), cond, qual)
+        if key not in filed:
+            filed.add(key)
+            to_file.setdefault(board, []).append(item)
+
+    def same(r: dict, num: int, gate: str, cond: str, qual: str = "") -> bool:
+        return (r["ctx"] == (num, _gate_key(gate), qual) and r["head"] == cond
+                and r["item"].kind == SWEEP_KINDS[cond])
+
+    def may_file(num: int, gate: str, cond: str, text: str, qual: str = "") -> bool:
+        """§1.2's one filing rule: no item of this identity open or decided on any board read, none answered
+        within the re-ask window, and no `kept waiting` line for the gate within it."""
+        mine = [r for r in reads if same(r, num, gate, cond, qual)]
+        if any(r["state"] in ("open", "decided") for r in mine):
+            return False
+        if any(_answered_within(r, today_l, reask_days) for r in mine):
+            return False
+        return not _kept_waiting_within(text, gate, today_u, reask_days)
+
+    for num in sorted(open_texts):
+        text = open_texts[num]
+        e = _entries(text)[0]
+        tid = e["id"]
+        parent, _ = parse_part_of(e["part_of_raw"])
+        pnum = _num(parent) if parent else None
+        for gate in gate_items(parse_gates(e["blocked_raw"])):
+            if gate.startswith("until "):
+                if date.fromisoformat(gate[len("until "):]) <= today_u:
+                    lift = {"id": tid, "gate": gate, "kind": "until", "evidence": "date reached"}
+                    if lift not in lifts:
+                        lifts.append(lift)
+                continue
+            if gate.startswith("decision "):
+                found = _covers(reads, num, gate, pnum, repo)
+                if any(r["state"] in ("open", "decided") for r in found):
+                    continue
+                if any(_answered_within(r, today_l, reask_days) for r in found):
+                    continue
+                if _kept_waiting_within(text, gate, today_u, reask_days):
+                    continue
+                who = gate[gate.index("(") + 1: -1].lower()
+                fit = [b for b in boards if who in {p.lower() for p in (board_people(str(b[2] or "")) or [])}]
+                pick = own if own in fit else (min(fit, key=_board_pick_key) if fit else None)
+                if pick is None:
+                    if may_file(num, gate, "no-board", text):
+                        add(own_name, num, gate, "no-board", _sweep_item("no-board", tid, tid, gate))
+                    continue
+                ref = tid if pick is own else f"{repo.lower()}#{tid}"
+                add(_board_name(pick), num, gate, "uncovered", _sweep_item(
+                    "uncovered", tid, ref, gate, ask=_entry_ask(text, e["title"]), title=e["title"],
+                    reask_days=reask_days))
+                continue
+            name = gate[len("event ("): -1]
+            got, evidence = _outcome(results, tid, name)
+            if got == "passed":
+                lift = {"id": tid, "gate": gate, "kind": "event", "evidence": evidence}
+                if lift not in lifts:  # an event written twice lifts once
+                    lifts.append(lift)
+                continue
+            cond = {"error": "broken", "impossible": "impossible"}.get(got or "")
+            if cond is None and got == "not yet":
+                try:
+                    age = gate_age(text, gate)
+                except Refused:
+                    age = None
+                cond = "still" if age is not None and (today_u - age).days > event_age_days else None
+            if cond and may_file(num, gate, cond, text):
+                add(own_name, num, gate, cond, _sweep_item(cond, tid, tid, gate, reask_days=reask_days))
+        for rec in _log(text):  # the `; board <repo>` audit: a cross-repo lift whose board shows no answer
+            if rec["kind"] != "gate-lifted" or not rec.get("suffix", "").startswith("; board "):
+                continue
+            there = rec["suffix"][len("; board "):]
+            if _audit_satisfied(reads, boards, there, repo, tid):
+                continue
+            gate = rec["gate"]
+            if may_file(num, gate, "audit", "", f"board {there.lower()}"):
+                add(own_name, num, gate, "audit", _sweep_item("audit", tid, tid, gate, extra=there),
+                    f"board {there.lower()}")
+
+    for r in reads:
+        if r["state"] not in ("open", "decided") or r["ctx"] is None:
+            continue
+        if _sweep_closes(r, reads, boards, results, open_texts, texts, known, repo):
+            keys = to_close.setdefault(r["board"], [])
+            k = item_key(r["line"])
+            if k not in keys:
+                keys.append(k)
+    return {"to_file": to_file, "to_close": to_close, "lifts": lifts}
+
+
+def _audit_satisfied(reads: list[dict], boards: Sequence[Sequence], there: str, repo: str, tid: str) -> bool:
+    """Whether the board a `; board <repo>` Log line names holds, open, closed or archived, an item with a
+    ``Decided:`` whose Context names ``<this repo>#TD-n``. A board not read holds nothing."""
+    named = _own_board(boards, there)
+    if named is None:
+        return False
+    name = _board_name(named)
+    want = f"{repo.lower()}#{tid}"
+    for r in reads:
+        if r["board"] != name or not r["item"].decided:
+            continue
+        ref, _ = _item_gate(r["item"].text)
+        if ref is not None and ref_key(ref) == want:
+            return True
+    return False
+
+
+def _sweep_closes(r: dict, reads: list[dict], boards: Sequence[Sequence], results: Mapping,
+                  open_texts: Mapping[int, str], texts: Mapping[int, str], known: set[int], repo: str) -> bool:
+    """The close rule (SPEC *The gate sweep*): whether the sweep closes one open item about this repo's entry."""
+    it, (num, gate_key, qual) = r["item"], r["ctx"]
+    _, gate = _item_gate(it.text)
+    if it.decided and not waiting_only(it.decided[0]) and not _lifting(it.decided[0], it.lifts):
+        return False  # a work order waits for whoever acts on it
+    if qual.startswith("board "):
+        if num not in known:
+            return False  # an entry in neither the ledger nor the archive: its item is left for a person
+        if r["head"] != "audit" or it.kind != "act" or not r["own"]:
+            return False
+        there = qual[len("board "):]
+        tid = _entries(texts[num])[0]["id"] if num in texts else _tid(num)
+        lines = [x for x in _log(texts.get(num, "")) if x["kind"] == "gate-lifted"
+                 and _gate_key(x["gate"]) == gate_key and x.get("suffix", "").lower() == f"; board {there}"]
+        return not lines or _audit_satisfied(reads, boards, there, repo, tid)
+    if qual not in ("", "lift"):
+        return False
+    gone = _gone(num, gate, it.parts, r["own"], repo, open_texts, known)
+    if gone is None:
+        return False
+    head = r["head"]
+    if qual == "lift":
+        return gone
+    if head == "no-board" and it.kind == "act":
+        text = texts.get(num, "")
+        parent, _ = parse_part_of(_entries(text)[0]["part_of_raw"]) if text else (None, None)
+        covered = any(x["state"] in ("open", "decided") for x in _covers(
+            reads, num, gate, _num(parent) if parent else None, repo))
+        return gone or covered
+    tid = _entries(texts[num])[0]["id"]
+    got = _outcome(results, tid, gate[len("event ("): -1])[0] if gate.startswith("event (") else None
+    if head == "broken" and it.kind == "act":
+        return gone or (got is not None and got != "error")
+    if head == "still" and it.kind == "decide":
+        return gone or got == "impossible"
+    if it.kind == "decide":
+        return gone
+    return False
+
+
+# ---------------------------------------------------------------------------------------------
+# The merge gate's verdicts (v2.4): the lift-PR verdict, the tripwire and the coverage check
+# ---------------------------------------------------------------------------------------------
+
+BOARD_PATH = "docs/user_attention.md"  # the paths a tree is read at (SPEC *The merge gate's verdicts*)
+BOARD_ARCHIVE_PATH = "docs/user_attention_archive.md"
+LEDGER_DIR = "docs/ledger"  # a v2 ledger; a tree with no file under it holds a v1 ledger at LEDGER_V1_PATH
+LEDGER_V1_PATH = "docs/technical_debt.md"
+COVERING = ("open", "decided")  # the covers() states that cover
+
+
+def _tree_ls(tree: Mapping[str, str]) -> Ls:
+    def ls(path: str) -> list[str] | None:
+        pre = path.rstrip("/") + "/"
+        under = [k[len(pre):] for k in tree if k.startswith(pre)]
+        return sorted(x for x in under if x and "/" not in x) if under else None
+    return ls
+
+
+def _tree_ledger(tree: Mapping[str, str]) -> tuple[dict[int, str], dict[int, str], bool]:
+    """(each open entry's text, each archived entry's text, both by number, and whether the ledger is v2) of
+    the ledger a tree holds. An entry the ledger's text holds with an archived Status counts as archived."""
+    ls = _tree_ls(tree)
+    v2 = ls(LEDGER_DIR) is not None
+    led, arch = load(LEDGER_DIR if v2 else LEDGER_V1_PATH, ls, lambda p: tree.get(p))
+    open_t: dict[int, str] = {}
+    closed_t: dict[int, str] = {}
+    for tid, body in _entry_texts(arch).items():
+        closed_t.setdefault(_num(tid), body)
+    for tid, body in _entry_texts(led).items():
+        e = _entries(body)[0]
+        (closed_t if first_word(e["fields"].get("status")) in ARCHIVED_WORDS else open_t).setdefault(_num(tid), body)
+    return open_t, closed_t, v2
+
+
+def _tree_board(tree: Mapping[str, str], repo: str) -> tuple[str, str, str, str]:
+    """This repo's own board as the sweep's board tuple, read from a tree."""
+    return ("", repo, str(tree.get(BOARD_PATH) or ""), str(tree.get(BOARD_ARCHIVE_PATH) or ""))
+
+
+def _check_repo(repo: object) -> None:
+    if not isinstance(repo, str) or not REPO_RE.fullmatch(repo):
+        raise Refused(f"repo is this repo's origin path (owner/name) or its basename, not {repo!r}")
+
+
+def _decisions(text: str | None) -> list[str]:
+    """The ``decision (<p>)`` gates the open entry ``text`` carries, as it writes them."""
+    if not text or not _entries(text):
+        return []
+    return [g for g in gate_items(parse_gates(_entries(text)[0]["blocked_raw"])) if GATE_DECISION_RE.match(g)]
+
+
+def _new_log(base: str | None, head: str) -> list[dict]:
+    """The head's Log lines the base did not have (compared as written, each once)."""
+    seen: dict[tuple, int] = {}
+    for r in log_lines(base) if base else []:
+        seen[(r["date"], r["text"])] = seen.get((r["date"], r["text"]), 0) + 1
+    out = []
+    for r in log_lines(head):
+        k = (r["date"], r["text"])
+        if seen.get(k):
+            seen[k] -= 1
+        else:
+            out.append(r)
+    return out
+
+
+def _board_line_reads(text: str) -> dict[str, list[tuple[str, BoardItem]]]:
+    """Every item line of a board's (or archive's) text by its item key: each (line, item), read open or closed."""
+    out: dict[str, list[tuple[str, BoardItem]]] = {}
+    for ln in text.splitlines():
+        if ITEM_RE.match(ln):
+            got = parse_board(ln, warn=False)
+        elif CLOSED_ITEM_RE.match(ln):
+            got = parse_closed_items(ln)
+        else:
+            continue
+        if got:
+            out.setdefault(item_key(ln), []).append((ln, got[0]))
+    return out
+
+
+def _lifted_close(line: str) -> bool:
+    m = CLOSED_ITEM_RE.match(line)
+    c = CLOSED_RE.search(m.group("text")) if m else None
+    return bool(c) and c.group(0).rstrip().endswith("— lifted.")
+
+
+def tripwire(base_tree: Mapping[str, str], head_tree: Mapping[str, str], subject: str, repo: str) -> list[tuple[str, str]]:
+    """The tripwire on a `decision (<p>)` removed (v2.4, SPEC *The merge gate's verdicts*): ``[(kind, text)]``,
+    each a removal the diff does not account for. It runs on every PR, the ``set by=`` route included. Trees map
+    each path to its text, the ledger and this repo's board and archive at SPEC's paths; only this repo's own
+    board is read, at the base and at the head, never another repo's, so the verdict is the same on every
+    machine. An entry that stays open and loses a `decision (<p>)` is accounted for by a ``gate reassigned`` or
+    ``override:`` line for it, or by a new ``gate lifted … answer`` line whose suffix fits the board:
+
+    - none: an item covering the gate at the base (covers(), state ``open`` or ``decided``) carries a new or
+      changed `Decided:` at the head, decided or closed, or, already decided, is newly closed ``— lifted.``;
+    - ``; no board item``: nothing covers it at the base nor at the head;
+    - ``; shared board item left open``: an item covering it at the base still covers it at the head, and
+      another entry it lists (its Context entry or a `Parts:` id) still carries the gate;
+    - ``; board <repo>``: ``<repo>`` names a repo other than this one.
+
+    A ``by`` other than the gate's person is flagged, unless the lift has no suffix, the base board says
+    `Answered by: any` and lists ``by`` on `People:`, and the covering item's head `Decided:` names ``by``.
+    Exempt: an entry the diff archives, and the migrate commit (its subject, ``ledger: migrate v<release> (<n>
+    entries)``). The tripwire is forgeable, and says so: a well-formed hand edit passes it, and review is the
+    backstop."""
+    _check_repo(repo)
+    if MIGRATE_SUBJECT_RE.match(subject or ""):
+        return []
+    b_open, _, _ = _tree_ledger(base_tree)
+    h_open, _, _ = _tree_ledger(head_tree)
+    b_board, h_board = _tree_board(base_tree, repo), _tree_board(head_tree, repo)
+    b_lines, h_lines = b_board[2].splitlines(), h_board[2].splitlines()  # as parse_board() numbers them
+    b_archived = set(b_board[3].splitlines())
+    h_reads = _board_line_reads("\n".join([*h_lines, *(x for x in h_board[3].splitlines() if x not in b_archived)]))
+    people = board_people(b_board[2])
+    anyone = (answered_by(b_board[2]) or "").lower() == "any"
+    flags: list[tuple[str, str]] = []
+    for num in sorted(b_open):
+        btext, htext = b_open[num], h_open.get(num)
+        if htext is None:
+            continue  # archived (exempt) or gone: the tripwire reads an entry that stays open
+        tid = _entries(htext)[0]["id"]
+        new = _new_log(btext, htext)
+        for gate in _decisions(btext):
+            key = _gate_key(gate)
+            if _carried(htext, gate) is not None:
+                continue
+            person = GATE_DECISION_RE.match(gate).group("who").strip()
+            if any((r["kind"] == "gate-reassigned" and _gate_key(r["gate"]) == key)
+                   or (r["kind"] == "gate-lifted" and r.get("via") == "override" and _gate_key(r["gate"]) == key)
+                   for r in new):
+                continue
+            lifts = [r for r in new if r["kind"] == "gate-lifted" and r.get("via") == "answer"
+                     and _gate_key(r["gate"]) == key]
+            if not lifts:
+                flags.append(("tripwire-unanswered", f"{tid} drops {gate} with no answer logged — a gate is lifted "
+                              "by its person's answer, reassigned (gate reassigned) or overridden (override:)"))
+                continue
+            rec = lifts[-1]
+            suffix, by = rec.get("suffix", ""), rec["by"]
+            cov_b = [(it, s) for _, it, s in covers(btext, gate, [b_board], repo) if s in COVERING]
+            cov_h = [(it, s) for _, it, s in covers(htext, gate, [h_board], repo) if s in COVERING]
+            answered_here = []  # the covering items the head answers: (base item, head line, head item)
+            for it, s in cov_b:
+                bl = b_lines[it.line - 1]
+                for hl, hit in h_reads.get(item_key(bl), []):
+                    closed = bool(CLOSED_ITEM_RE.match(hl))
+                    gained = hit.decided is not None and (hit.decided, hit.decided_by) != (it.decided, it.decided_by)
+                    newly_lifted = it.decided is not None and closed and _lifted_close(hl) and hit.decided is not None
+                    if gained or newly_lifted:
+                        answered_here.append((it, hl, hit))
+            if suffix.startswith("; board "):
+                there = suffix[len("; board "):]
+                if not REPO_RE.fullmatch(there) or there.lower() == repo.lower():
+                    flags.append(("tripwire-board", f"{tid} lifts {gate} on board {there}, which is this repo's own "
+                                  "— its answer is on this board, written as Decided:"))
+            elif suffix == "; no board item":
+                if cov_b or cov_h:
+                    flags.append(("tripwire-no-board-item", f"{tid} lifts {gate} with no board item, but an open "
+                                  "item on this repo's board asks it — answer that item"))
+            elif suffix == "; shared board item left open":
+                still = {item_key(b_lines[it.line - 1]) for it, _ in cov_b} & {
+                    item_key(h_lines[it.line - 1]) for it, _ in cov_h}
+                shared = False
+                for it, _ in cov_h:
+                    if item_key(h_lines[it.line - 1]) not in still:
+                        continue
+                    ref, _g = _item_gate(it.text)
+                    listed = [x for x in [ref, *it.parts] if x and "#" not in x and _num(x) != num]
+                    if any(_carried(h_open.get(_num(x)), gate) is not None for x in listed):
+                        shared = True
+                if not shared:
+                    flags.append(("tripwire-shared", f"{tid} lifts {gate} leaving a shared board item open, but no "
+                                  "item it covers still asks another listed entry"))
+            elif not answered_here:
+                flags.append(("tripwire-no-decided", f"{tid} lifts {gate}, and no item covering it on this repo's "
+                              "board gains a Decided: in the same diff"))
+            if by.lower() != person.lower():
+                ok = (not suffix and anyone and people is not None and by.lower() in {p.lower() for p in people}
+                      and any((hit.decided_by or "").lower() == by.lower() for _, _, hit in answered_here))
+                if not ok:
+                    flags.append(("tripwire-by", f"{tid} lifts {gate} by {by}, not {person} — only the gate's "
+                                  "person answers, or anyone listed on a board whose Answered by is any"))
+    return flags
+
+
+def uncovered_decisions(base_tree: Mapping[str, str], head_tree: Mapping[str, str], boards: Sequence[Sequence],
+                        repo: str) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+    """The merge gate's coverage check (v2.4, SPEC *The merge gate's verdicts*): ``(refusals, flags)``, each
+    ``[(kind, text)]``. ``boards`` are the other repos' boards read (the sweep's tuples); this repo's own board is
+    read from ``head_tree`` in place of any that names it. A `decision (<p>)` an open entry gains in the diff
+    is refused when this repo's board lists ``<p>`` on `People:` and no item on it covers the gate (covers(),
+    state ``open`` or ``decided``), and flagged when the board does not list ``<p>``, since its coverage then
+    depends on another repo's board, which not every machine reads. A new `decide` item on this repo's board
+    whose Context names a decision and none of whose answers lifts (one of its `Lifts:`, `Go` when it has none,
+    never a waiting-only one) is refused. Refusals rest on this repo's own board alone."""
+    _check_repo(repo)
+    own = _tree_board(head_tree, repo)
+    mine = _own_board(boards, repo)
+    reads = [own, *[b for b in boards if b is not mine]]
+    b_open, _, _ = _tree_ledger(base_tree)
+    h_open, _, _ = _tree_ledger(head_tree)
+    people = {p.lower() for p in board_people(own[2]) or []}
+    refusals: list[tuple[str, str]] = []
+    flags: list[tuple[str, str]] = []
+    for num in sorted(h_open):
+        htext = h_open[num]
+        tid = _entries(htext)[0]["id"]
+        for gate in _decisions(htext):
+            if _carried(b_open.get(num), gate) is not None:
+                continue
+            person = GATE_DECISION_RE.match(gate).group("who").strip()
+            cov = [(b, s) for b, _, s in covers(htext, gate, reads, repo) if s in COVERING]
+            if any(b == _board_name(own) for b, _ in cov):
+                continue
+            if person.lower() in people:
+                refusals.append(("decision-uncovered", f"{tid} gains {gate} and no open decide item on this repo's "
+                                 "board asks it — file the item in the same PR"))
+            else:
+                where = ", ".join(dict.fromkeys(b for b, _ in cov))
+                flags.append(("decision-elsewhere", f"{tid} gains {gate}, and this repo's board does not list {person}: "
+                              + (f"covered on {where}, which not every machine reads" if where else
+                                 "no board read covers it — the sweep files its item")))
+    base_keys = {item_key(ln) for ln in str(base_tree.get(BOARD_PATH) or "").splitlines()
+                 if ITEM_RE.match(ln) or CLOSED_ITEM_RE.match(ln)}
+    lines = own[2].splitlines()  # as parse_board() numbers them
+    for it in parse_board(own[2], warn=False):
+        ln = lines[it.line - 1]
+        if it.kind != "decide" or item_key(ln) in base_keys:
+            continue
+        _, gate = _item_gate(it.text)
+        if gate is None or not GATE_DECISION_RE.match(gate):
+            continue
+        if not any(_lifting(a, it.lifts) for a in it.answers):
+            refusals.append(("decision-no-lift", f"the new decide item on line {it.line} asks {gate} and none of "
+                             f"its answers lifts it ({' | '.join(it.lifts or ['Go'])})"))
+    return refusals, flags
+
+
+def _verdict_day(value: object, what: str) -> date:
+    return date.fromisoformat(utc_day(value, what))
+
+
+def lift_pr_verdict(base_tree: Mapping[str, str], head_tree: Mapping[str, str], files: Sequence[str], subject: str,
+                    commits: int, created_at: date | datetime | str, merged_at: date | datetime | str | None,
+                    repo: str) -> dict:
+    """The lift-PR verdict (v2.4, SPEC *The merge gate's verdicts*): ``{carve_out, flags, review}`` for a PR whose
+    one changed board item gains a `Decided:` and whose Context names a gate. ``carve_out`` is whether it is a
+    decide lift the person's answer reviews; else ``review`` names, as ``[(kind, text)]``, the first condition
+    that sends it to ordinary review. ``flags`` are tripwire()'s over the same trees.
+
+    Trees map paths to texts (SPEC's paths); ``files`` are the PR's changed paths, ``subject`` its commit's
+    subject, ``commits`` its commit count; ``created_at`` and ``merged_at`` (None while open) the forge's dates,
+    each a date or an aware datetime (taken as its UTC date). The carve-out needs: (a0) the base board declares
+    `People:`; (a) the subject's action is ``decide``; one commit; the board diff one item, which gains a
+    `Decided: <label> (by <p>)` and no other answer had, its head line ``edit_line(base line, "decide", label,
+    by, D, close=closes(…))`` byte for byte; (c) for this repo's entry, a v2 ledger whose changed files are
+    exactly those decide_lift() changes, each byte-equal to its result, every new Log line one date T, with T
+    within a day of ``created_at`` and not after the merge; for another repo's entry, the board alone, the
+    gate's person and the answerer on `People:`; and the `Decided:` date D within ``created_at − 1`` and the
+    merge (else ``created_at``) ``+ 1``. (d), a PR only, is the consumer's: this judges a PR."""
+    flags = tripwire(base_tree, head_tree, subject, repo)
+    created = _verdict_day(created_at, "created_at")
+    merged = None if merged_at is None else _verdict_day(merged_at, "merged_at")
+    if merged is not None and merged < created:
+        raise Refused(f"merged_at {merged} is before created_at {created}")
+    if isinstance(commits, bool) or not isinstance(commits, int) or commits < 0:
+        raise Refused(f"commits is the PR's commit count, not {commits!r}")
+    one = timedelta(days=1)
+
+    def review(kind: str, text: str) -> dict:
+        return {"carve_out": False, "flags": flags, "review": [(kind, text)]}
+    b_text, h_text = base_tree.get(BOARD_PATH), head_tree.get(BOARD_PATH)
+    if b_text is None or h_text is None:
+        return review("lift-no-board", f"the PR has no board at {BOARD_PATH} at its base and head")
+    b_lines, h_lines = str(b_text).split("\n"), str(h_text).split("\n")
+    diff = [n for n in range(max(len(b_lines), len(h_lines)))
+            if n >= len(b_lines) or n >= len(h_lines) or b_lines[n] != h_lines[n]]
+    if len(b_lines) != len(h_lines) or len(diff) != 1:
+        return review("lift-board-diff", "the board diff is not one item line changed in place")
+    end = "\r" if b_lines[diff[0]].endswith("\r") else ""
+    if h_lines[diff[0]].endswith("\r") != bool(end):
+        return review("lift-board-diff", "the answered line changes its line ending")
+    bl, hl = b_lines[diff[0]].removesuffix(end), h_lines[diff[0]].removesuffix(end)
+    if not ITEM_RE.match(bl) or not (ITEM_RE.match(hl) or CLOSED_ITEM_RE.match(hl)) or item_key(bl) != item_key(hl):
+        return review("lift-board-diff", "the changed board line is not one open item answered in place")
+    b_item = parse_board(bl, warn=False)[0]
+    h_item = (parse_board(hl, warn=False) if ITEM_RE.match(hl) else parse_closed_items(hl))[0]
+    ref, gate = _item_gate(b_item.text)
+    if h_item.decided is None:
+        return review("lift-not-answered", "the changed item gains no Decided:")
+    if gate is None or b_item.kind != "decide":
+        return review("lift-no-gate", "the answered item is not a decide whose Context names one entry and one gate")
+    if b_item.decided is not None:
+        return review("lift-reanswer", "the item was answered already — a re-answer takes ordinary review")
+    people = board_people(str(b_text))
+    if people is None:
+        return review("lift-a0", "the base board declares no People: line, so who may answer is unchecked")
+    if edit_action(subject or "") != "decide":
+        return review("lift-subject", f"the commit's subject is not a board decide: {subject!r}")
+    if commits != 1:
+        return review("lift-commits", f"a lift PR is one commit, squash-merged; this has {commits}")
+    label, d = h_item.decided
+    by = h_item.decided_by
+    if by is None:
+        return review("lift-no-by", "the Decided: names no answerer (by <person>)")
+    if not (created - one <= d <= (merged or created) + one):
+        return review("lift-decided-date", f"the Decided: date {d} is outside {created - one} .. {(merged or created) + one}")
+    answered = answered_by(str(b_text))
+    if "#" in ref:
+        other = ref.rpartition("#")[0]
+        if other.lower() == repo.lower():
+            return review("lift-own-ref", f"{ref} names this repo's entry as another repo's")
+        if list(files) != [BOARD_PATH]:
+            return review("lift-files", f"another repo's entry is answered on the board alone: {list(files)}")
+        on = {p.lower() for p in people}
+        person = GATE_DECISION_RE.match(gate).group("who").strip() if GATE_DECISION_RE.match(gate) else None
+        if person is not None and person.lower() not in on:
+            return review("lift-people", f"the gate's person {person} is not on the board's People:")
+        if by.lower() not in on:
+            return review("lift-people", f"{by} is not on the board's People:")
+        if person is not None and (answered or "owner").lower() == "owner" and by.lower() != person.lower():
+            return review("lift-people", f"only {person} answers {gate} on a board whose Answered by is owner")
+        entries_given: dict[str, str] = {}
+        result: dict[str, str] = {}
+    else:
+        b_open, b_closed, v2 = _tree_ledger(base_tree)
+        if not v2:
+            return review("lift-v1", "a v1 ledger's lift is not recomputed — it takes ordinary review")
+        entries_given = {}
+        for x in [ref, *b_item.parts]:
+            n = _num(x) if _is_id(x) else None
+            got = b_open.get(n, b_closed.get(n)) if n is not None else None
+            if got is not None:
+                entries_given[_entries(got)[0]["id"]] = got
+        ls = _tree_ls(base_tree)
+        h_ls = _tree_ls(head_tree)
+        days = set()
+        for f in files:
+            if f.startswith(LEDGER_DIR + "/") and f in base_tree and f in head_tree:
+                body = head_tree[f]
+                if _entries(body):
+                    days |= {r["date"] for r in _new_log(base_tree[f], body) if r["date"]}
+        if len(days) > 1:
+            return review("lift-log-date", f"the new Log lines carry more than one date: {sorted(days)}")
+        t = date.fromisoformat(days.pop()) if days else created
+        try:
+            result = decide_lift(bl, entries_given, label, by, t, people, answered)
+        except Refused as e:
+            return review("lift-refused", f"decide_lift refuses it: {e}")
+        if result and not (created - one <= t <= min(created + one, merged or created + one)):
+            return review("lift-log-date", f"the Log date {t} is outside {created - one} .. "
+                          f"{min(created + one, merged or created + one)}")
+        want = {BOARD_PATH}
+        for tid, text in result.items():
+            path = entry_path(LEDGER_DIR, tid, ls)
+            if path is None or path.startswith(LEDGER_DIR + "/" + LEDGER_ARCHIVE + "/") \
+                    or entry_path(LEDGER_DIR, tid, h_ls) != path:
+                return review("lift-files", f"{tid}'s file is not one open file at the base and head")
+            if head_tree.get(path) != text:
+                return review("lift-ledger", f"{path} is not what decide_lift writes, byte for byte")
+            want.add(path)
+        if len(list(files)) != len(set(files)) or set(files) != want:
+            return review("lift-files", f"the PR changes {sorted(set(files))}, and a lift changes {sorted(want)}")
+    try:
+        close = closes(bl, label, {**entries_given, **result})
+        line = edit_line(bl, "decide", answer=label, by=by, today=d, close=close)
+    except Refused as e:
+        return review("lift-board-line", f"the decide writer refuses the answer: {e}")
+    if line != hl:
+        return review("lift-board-line", "the answered line is not what the decide writer writes, byte for byte")
+    return {"carve_out": True, "flags": flags, "review": []}
 
 
 # ---------------------------------------------------------------------------------------------

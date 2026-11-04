@@ -1,0 +1,361 @@
+{
+ "ids_held": {
+  "a_newer_major_refused": {
+   "refused": "docs/ledger/README.md declares Ledgerboard: 3, newer than this module reads (2) — its ids are not read"
+  },
+  "a_v1_pair": {
+   "ok": [
+    1,
+    28,
+    110,
+    118
+   ]
+  },
+  "a_v2_directory": {
+   "ok": [
+    121,
+    160,
+    161
+   ]
+  }
+ },
+ "judge_takes": {
+  "a_hand_typed_id_fails": [
+   [
+    [
+     "id-untaken",
+     "TD-140 handed out by nobody: the counter gave no such id — take ids from the counter, and an id its fallback printed with its claim"
+    ]
+   ],
+   []
+  ],
+  "a_matching_nonce_passes": [
+   [],
+   []
+  ],
+  "a_missing_nonce_fails": [
+   [
+    [
+     "id-no-take",
+     "no **Id take:** on TD-125 (handed out by a1b2c3d4e5f6 on 2026-01-11 (1111111)) — write its take's nonce in the header"
+    ]
+   ],
+   []
+  ],
+  "a_nonce_of_no_take_fails": [
+   [
+    [
+     "id-take",
+     "TD-125's Id take names no take the counter holds — TD-125 was handed out by a1b2c3d4e5f6 on 2026-01-11 (1111111) — write the Id take of the take that gave this id"
+    ]
+   ],
+   []
+  ],
+  "a_range_nonce_passes_for_each": [
+   [],
+   []
+  ],
+  "an_entry_nonce_is_compared_exactly": [
+   [
+    [
+     "id-take",
+     "TD-125's Id take names no take the counter holds — TD-125 was handed out by a1b2c3d4e5f6 on 2026-01-11 (1111111) — write the Id take of the take that gave this id"
+    ]
+   ],
+   []
+  ],
+  "an_id_below_the_counter_warns": [
+   [],
+   [
+    [
+     "id-before-counter",
+     "TD-050 below the counter's first take (TD-125): older than the counter, not judged against it"
+    ]
+   ]
+  ],
+  "an_id_with_no_entry_given_is_not_judged": [
+   [],
+   []
+  ],
+  "an_unhashed_by_warns": [
+   [],
+   [
+    [
+     "id-by-unhashed",
+     "TD-128, TD-129 taken by a bare session id or an email address, which the counter publishes — take ids with a hashed by"
+    ]
+   ]
+  ],
+  "another_ids_nonce_fails_naming_both": [
+   [
+    [
+     "id-take",
+     "TD-125's Id take is the take of TD-126, TD-127 (grinder-z on 2026-01-12 (2222222)), not one of TD-125's (a1b2c3d4e5f6 on 2026-01-11 (1111111)) — write the Id take of the take that gave this id"
+    ]
+   ],
+   []
+  ],
+  "either_take_of_a_doubly_given_id_passes": [
+   [],
+   []
+  ],
+  "no_takes_judges_nothing": [
+   [],
+   []
+  ],
+  "taken_for_another_branch_warns": [
+   [],
+   [
+    [
+     "id-branch",
+     "taken for another branch: TD-130 (elsewhere)"
+    ]
+   ]
+  ],
+  "transition_a_doubly_given_id_names_each_by_once": [
+   [
+    [
+     "id-taken-by",
+     "TD-131 was handed to sam, lee, not zz — an id is the session's the counter handed it to; take this entry its own"
+    ]
+   ],
+   []
+  ],
+  "transition_a_fields_line_asks_for_no_taken_by": [
+   [],
+   []
+  ],
+  "transition_a_matching_nonce_needs_no_taken_by": [
+   [],
+   []
+  ],
+  "transition_a_matching_taken_by_warns": [
+   [],
+   [
+    [
+     "id-no-take",
+     "a matching **Taken by:** but no **Id take:** on TD-125 — write its take's nonce in the header"
+    ]
+   ]
+  ],
+  "transition_a_wrong_nonce_beside_a_matching_taken_by_fails": [
+   [
+    [
+     "id-take",
+     "TD-125's Id take is the take of TD-126, TD-127 (grinder-z on 2026-01-12 (2222222)), not one of TD-125's (a1b2c3d4e5f6 on 2026-01-11 (1111111)) — write the Id take of the take that gave this id"
+    ]
+   ],
+   []
+  ],
+  "transition_another_taken_by_fails": [
+   [
+    [
+     "id-taken-by",
+     "TD-125 was handed to a1b2c3d4e5f6, not b — an id is the session's the counter handed it to; take this entry its own"
+    ]
+   ],
+   []
+  ],
+  "transition_either_by_of_a_doubly_given_id_warns": [
+   [],
+   [
+    [
+     "id-no-take",
+     "a matching **Taken by:** but no **Id take:** on TD-131 — write its take's nonce in the header"
+    ]
+   ]
+  ],
+  "transition_neither_warns": [
+   [],
+   [
+    [
+     "id-no-taken-by",
+     "no **Id take:** or **Taken by:** on TD-125 — write its take's nonce in the header"
+    ]
+   ]
+  ]
+ },
+ "next_id": [
+  [
+   131,
+   []
+  ],
+  [
+   125,
+   [
+    "the counter's LAST is absent — ignored; the ledger, archive and floor decide"
+   ]
+  ],
+  [
+   29,
+   [
+    "the counter's LAST is not a number (x7) — ignored; the ledger, archive and floor decide"
+   ]
+  ],
+  [
+   201,
+   []
+  ],
+  [
+   1,
+   [
+    "the counter's LAST is not a number (٣) — ignored; the ledger, archive and floor decide"
+   ]
+  ],
+  [
+   1,
+   [
+    "the counter's LAST is absent — ignored; the ledger, archive and floor decide"
+   ]
+  ],
+  [
+   4,
+   [
+    "the counter's LAST is not a number (99999999999999999999) — ignored; the ledger, archive and floor decide"
+   ]
+  ]
+ ],
+ "parse_take": [
+  {
+   "branch": "main",
+   "by": "a1b2c3d4e5f6",
+   "host": "box-1",
+   "ids": [
+    125
+   ],
+   "take": "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a"
+  },
+  {
+   "branch": "td126-x",
+   "by": "grinder-z",
+   "ids": [
+    126,
+    127
+   ],
+   "take": "2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
+  },
+  {
+   "by": "kim",
+   "ids": [
+    128
+   ],
+   "take": "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c"
+  },
+  null,
+  null,
+  {
+   "ids": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100
+   ]
+  },
+  null,
+  null,
+  null,
+  {
+   "by": "x",
+   "ids": [
+    132
+   ]
+  },
+  null
+ ]
+}

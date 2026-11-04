@@ -1,5 +1,5 @@
 {
- "exit": 3,
+ "exit": 1,
  "out": {
   "action": "decide",
   "refused": "--by lee is not on the board's People: (pat)"

@@ -1,0 +1,33 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "archive",
+  "changes": [
+   {
+    "path": "ledger/TD-001.md",
+    "text": null
+   },
+   {
+    "path": "ledger/archive/TD-001.md",
+    "text": "## TD-001: The parser drops a trailing comment\n\n**Priority:** Medium\n**Type:** debt\n**Added:** 2026-01-02\n**Status:** Resolved 2026-01-15\n**Location:** `src/parse.py`\n\n**Why:** a comment at the end of a file is lost on a round trip; see [the parse notes](../../notes/parse.md#comments)\nand [the report](../TD-002.md).\n\n**Resolved:** 2026-01-15 (PR #12)\n\n**Log:**\n- 2026-01-15: archived: Resolved — the last comment is kept\n"
+   },
+   {
+    "path": "ledger/README.md",
+    "text": "# Ledger\n\nLedgerboard: 2\n\nFields: Owner = builder | designer\n\nThe parser bug is [TD-001](archive/TD-001.md).\n"
+   },
+   {
+    "path": "ledger/TD-002.md",
+    "text": "## TD-002: A report for the weekly totals\n\n**Priority:** Low\n**Type:** feature\n**Added:** 2026-01-03\n**Owner:** builder\n**Status:** Open\n**Blocked by:** TD-001\n\n**Why:** the totals are added up by hand each week; it waits on [the parser](archive/TD-001.md \"the parser bug\").\n"
+   }
+  ],
+  "id": "TD-001",
+  "moved": {
+   "from": "ledger/TD-001.md",
+   "to": "ledger/archive/TD-001.md"
+  },
+  "notes": [],
+  "rewired": [],
+  "subject": null,
+  "successor": null
+ }
+}

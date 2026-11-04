@@ -1,0 +1,8 @@
+{
+ "argv": [
+  "fmt",
+  "--ledger",
+  "technical_debt.md",
+  "--json"
+ ]
+}

@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "split",
+  "refused": "'## Summary' in the archive is not an entry — move it into an entry or the README first; nothing was split"
+ }
+}

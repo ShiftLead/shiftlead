@@ -1,0 +1,23 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "decide",
+  "changes": [
+   {
+    "path": "board.md",
+    "text": "# Attention board\n\nPeople: robin, sam\n\n## Needs the user\n\n- [x] decide 2026-01-12 (n/a) — Go on the export format? Context: TD-1 decision (robin). Due: 2026-01-20. Answers: Go (default) | Not yet. Decided: Go (by robin) (2026-01-15). Closed: 2026-01-15 — lifted.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n- [ ] decide 2026-01-12 (n/a) — Which format first? Context: TD-1 decision (robin). Due: 2026-01-20. Answers: CSV (default) | JSON | Not yet. Lifts: CSV | JSON.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** CSV — it is ready.\n- [ ] decide 2026-01-12 (n/a) — Go on the report suite? Context: TD-8 decision (robin). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go (default) | Not yet.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n- [ ] decide 2026-01-12 (n/a) — Go on the tool repo's exporter? Context: tools#TD-4 decision (robin). Due: 2026-01-20. Answers: Go (default) | Not yet.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n- [ ] decide 2026-01-12 (n/a) — Did the vendor ship? Context: TD-1 event (ships). Due: 2026-01-20. Answers: Go (default) | Keep waiting.\n  - **Context:** The gate waits on you.\n  - **Question:** Go?\n  - **Recommended:** Go — it is ready.\n- [ ] act 2026-01-12 (n/a) — Tag the release. Context: none. Due: 2026-01-20.\n"
+   },
+   {
+    "path": "ledger/TD-001.md",
+    "text": "## TD-001: Choose the export format\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (ships)\n\n**Why:** choose the export format is wanted.\n\n**Ask:** say go when it is ready.\n\n**Event (ships):** the vendor's tool ships its exporter.\ncheck: pr-merged acme/tools#3\n\n**Log:**\n- 2026-01-15: gate lifted: decision (Robin) — by robin; answer \"Go\"\n"
+   }
+  ],
+  "entries": [
+   "TD-001"
+  ],
+  "item_notes": [],
+  "line": 7,
+  "notes": [],
+  "subject": "ledgerboard: decide Go on the export format?: Go (session n/a)"
+ }
+}

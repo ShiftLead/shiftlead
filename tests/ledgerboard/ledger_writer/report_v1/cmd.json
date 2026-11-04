@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "--pickable",
+  "--ledger",
+  "technical_debt.md",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

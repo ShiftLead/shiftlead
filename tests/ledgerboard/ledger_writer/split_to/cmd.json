@@ -1,0 +1,10 @@
+{
+ "argv": [
+  "split",
+  "--ledger",
+  "docs/technical_debt.md",
+  "--to",
+  "docs/entries",
+  "--json"
+ ]
+}

@@ -1,0 +1,17 @@
+{
+ "argv": [
+  "set",
+  "TD-1",
+  "--priority",
+  "High",
+  "--location",
+  "",
+  "--field",
+  "Owner=builder",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

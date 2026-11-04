@@ -17,6 +17,7 @@
    "kind": "act",
    "lifts": null,
    "line": 5,
+   "notes": [],
    "overdue_days": 10,
    "parts": [],
    "refs": [
@@ -43,6 +44,9 @@
    "kind": "act",
    "lifts": null,
    "line": 6,
+   "notes": [
+    "hide-late: Hide until: 2026-01-20 is after Due: 2026-01-13, so the item stays hidden past its deadline"
+   ],
    "overdue_days": 2,
    "parts": [],
    "refs": [
@@ -69,6 +73,9 @@
    "kind": "act",
    "lifts": null,
    "line": 7,
+   "notes": [
+    "hide-spent: Hide until: 2026-01-15 has come, so it hides nothing; a snooze replaces it"
+   ],
    "overdue_days": 2,
    "parts": [],
    "refs": [
@@ -104,6 +111,9 @@
    "kind": "decide",
    "lifts": null,
    "line": 8,
+   "notes": [
+    "hide-spent: a decided item is never hidden, so Hide until: 2026-01-20 hides nothing"
+   ],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -139,6 +149,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 9,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -165,6 +176,7 @@
    "kind": "act",
    "lifts": null,
    "line": 10,
+   "notes": [],
    "overdue_days": 0,
    "parts": [],
    "refs": [
@@ -191,6 +203,7 @@
    "kind": "act",
    "lifts": null,
    "line": 11,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -217,6 +230,7 @@
    "kind": "act",
    "lifts": null,
    "line": 12,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -243,6 +257,7 @@
    "kind": "act",
    "lifts": null,
    "line": 13,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -269,6 +284,7 @@
    "kind": "watch",
    "lifts": null,
    "line": 14,
+   "notes": [],
    "overdue_days": 3,
    "parts": [],
    "refs": [
@@ -295,6 +311,7 @@
    "kind": "watch",
    "lifts": null,
    "line": 15,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -321,6 +338,9 @@
    "kind": "fyi",
    "lifts": null,
    "line": 16,
+   "notes": [
+    "hide-spent: Hide until: 2026-01-14 has come, so it hides nothing; a snooze replaces it"
+   ],
    "overdue_days": null,
    "parts": [],
    "refs": [],
@@ -345,6 +365,7 @@
    "kind": "fyi",
    "lifts": null,
    "line": 17,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [],
@@ -369,6 +390,7 @@
    "kind": "act",
    "lifts": null,
    "line": 18,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -401,6 +423,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 19,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -436,6 +459,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 20,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [

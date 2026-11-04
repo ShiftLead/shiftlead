@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "renumber",
+  "unusable": "TD-005 is archived (ledger/archive/TD-005.md): an archived entry is not renumbered"
+ }
+}

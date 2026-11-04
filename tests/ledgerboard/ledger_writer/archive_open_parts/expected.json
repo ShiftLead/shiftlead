@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "archive",
+  "refused": "⚠ TD-008: left the ledger while TD-009 is still Part of it — archive its parts first, or point their Part of at its new id or another parent"
+ }
+}

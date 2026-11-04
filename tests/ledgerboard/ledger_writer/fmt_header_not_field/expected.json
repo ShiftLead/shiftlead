@@ -1,0 +1,16 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "fmt",
+  "entries": 1,
+  "formatted": [],
+  "paths": [],
+  "refused": [
+   {
+    "path": "ledger/TD-001.md",
+    "why": "its header block holds a line that is not a field: 'the tool vendor owns this' — join it to its field's line, or move it below the header block, by hand"
+   }
+  ],
+  "subject": null
+ }
+}

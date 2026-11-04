@@ -1,5 +1,5 @@
 {
- "exit": 3,
+ "exit": 1,
  "out": {
   "action": "add",
   "refused": "a board line's text may not carry Context:, Parts:, Due:, Hide until:, Answers:, Lifts:, Decided: or Closed: — the reader would read it as the field; say it in other words"

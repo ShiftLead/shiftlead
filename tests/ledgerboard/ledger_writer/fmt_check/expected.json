@@ -1,0 +1,18 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "fmt",
+  "changes": [
+   {
+    "path": "ledger/TD-001.md",
+    "text": "## TD-001: The parser drops a trailing comment\n\n**Priority:** Medium\n**Type:** debt\n**Added:** 2026-01-02\n**Status:** Open\n**Location:** `src/parse.py`\n\n**Why:** a comment at the end of a file is lost on a round trip.\n\n**Fix:** keep the last comment.\n"
+   }
+  ],
+  "entries": 1,
+  "formatted": [
+   "ledger/TD-001.md"
+  ],
+  "refused": [],
+  "subject": null
+ }
+}

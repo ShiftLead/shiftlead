@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "reopen",
+  "unusable": "TD-001 is open (ledger/TD-001.md): only an archived entry is reopened"
+ }
+}

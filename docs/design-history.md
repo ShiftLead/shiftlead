@@ -2244,6 +2244,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-04 (TD-308, grinder-ao-1; met on a TD-297 press): the trail writes *pushed*, *answered in the terminal* and *the limit reset* from the record still standing (`_ended_by`), as the `how` list says. Until then each fell back to *resolved*, and an `unpushed` row that ended by a push read *resolved: resolved*.
 
 ## 5. Configuration
+- 2026-11-04 (TD-1370, grinder-ao-2): *The seams*' ledger — the vendored package is ledgerboard v2.4 (`__init__.py`, `board.py`, `ledger.py`), in the agent-cadence pin bump past agent-cadence#TD-215 (#84); the ledger is in v2.4's canonical form.
 - 2026-11-03 (TD-1330, grinder-ao-2): *The seams*' ledger — the one parser is vendored as the package `src/sessionorc/ledgerboard/` (v2.3) at the release the pinned tree's `scripts/ledgerboard/` names; the byte-equal single file is gone.
 - 2026-11-02 (TD-1302, the designer): `notify.push: {on, telegram, secrets}`; the devices are `~/.shiftlead/push.json`, never this file. Built by TD-1304.
 - 2026-10-29 (dev-cadence TD-191, dc-tds): `SEED` is `35b4b4a`: agent-cadence's first commit was rebuilt before it went public, after a second privacy read, so `183de9c` is no longer on any branch.

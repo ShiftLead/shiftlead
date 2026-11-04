@@ -1,0 +1,19 @@
+{
+ "argv": [
+  "new",
+  "--id",
+  "TD-3",
+  "--title",
+  "List the late entries",
+  "--priority",
+  "Medium",
+  "--why",
+  "why.md",
+  "--plan",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

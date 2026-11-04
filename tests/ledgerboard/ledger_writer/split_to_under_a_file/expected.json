@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "split",
+  "unusable": "notes.md/ledger: notes.md is a file, so the directory cannot be made"
+ }
+}

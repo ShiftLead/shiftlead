@@ -1,0 +1,16 @@
+# Ledger
+
+## TD-001: Choose the export format
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-01-02
+**Status:** Open
+**Blocked by:** decision (Robin), event (ships)
+
+**Why:** choose the export format is wanted.
+
+**Ask:** say go when it is ready.
+
+**Event (ships):** the vendor's tool ships its exporter.
+check: pr-merged acme/tools#3

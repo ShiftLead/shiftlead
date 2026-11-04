@@ -1,0 +1,20 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "fmt",
+  "entries": 3,
+  "formatted": [
+   "ledger/TD-001.md"
+  ],
+  "paths": [
+   "ledger/TD-001.md"
+  ],
+  "refused": [
+   {
+    "path": "ledger/TD-002.md",
+    "why": "its header block names 'Status' twice — keep one, by hand"
+   }
+  ],
+  "subject": null
+ }
+}

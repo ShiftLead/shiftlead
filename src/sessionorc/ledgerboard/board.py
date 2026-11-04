@@ -1,4 +1,4 @@
-# ledgerboard v2.3 sha256:9f6025cbc9757f6529b230ad78ee7e816b53dec470212dad60e63dcb6207d7fc
+# ledgerboard v2.4 sha256:ed91d5d1dd48431d73b16798f9524bfc1e7a3c975aaebcc081ca9b998f90c46e
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/board.py (vendored by agent-cadence as files/scripts/ledgerboard/board.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The board and rank writer: the module's board edits, read from and written to files (SPEC *The board writer*).
@@ -12,6 +12,7 @@
     python3 -m ledgerboard.board due     --board PATH --line N --expect HEAD --to D   (move Due: to D)
     python3 -m ledgerboard.board done    --board PATH --line N --expect HEAD [--why TEXT]
     python3 -m ledgerboard.board decide  --board PATH --line N --expect HEAD --answer TEXT [--by NAME]
+                                         [--ledger DIR | --board-only]
     python3 -m ledgerboard.board reply   --board PATH --line N --expect HEAD --text TEXT --by NAME
     python3 -m ledgerboard.board archive --board PATH --archive PATH
     python3 -m ledgerboard.board fmt     --board PATH
@@ -25,9 +26,13 @@ prints the commit subject the module gives and the paths it changed (``--json``:
 ``--plan`` prints the changes as JSON (each path with its new text) and writes nothing. It never runs
 git, the network or anything of a consumer's: the caller passes who replies or answers (``--by``), the date
 (``--today``, default the local clock) and the tool and session the subject names, and makes the
-commit itself.
+commit itself. A write that leaves an open line (``add``, ``snooze``, ``due``, ``decide``, ``reply``) also reports
+that line's notes (``item_notes()`` at ``--today``): ``item_notes`` in ``--json`` and ``--plan``, and on stderr as
+``line n: ℹ <note>`` otherwise; a note never changes the exit code.
 
-Exit: 0 written (or nothing to change); 1 a write failed (every file restored); 2 usage; 3 refused.
+Exit, the package's one table (``ledger.py`` shares it): 0 written (or nothing to change); 1 refused; 2 usage
+(a bad ``--today`` among it), or (``decide``) the ledger cannot be used as asked; 4 a write failed (every file restored). 3 is ``ledger.py``'s
+``needs`` and never the board writer's.
 """
 
 from __future__ import annotations
@@ -46,20 +51,27 @@ from . import (
     ITEM_RE,
     QUEUE_ACTIONS,
     Refused,
+    _item_gate,
+    answered_by,
     archive_closed,
     archive_subject,
     board_people,
     board_problems,
     canonical_item,
     closed_items,
+    closes,
+    decide_lift,
     decided_line,
     edit_line,
+    entries,
     is_item,
     is_person,
     item_line,
+    item_notes,
     item_record,
     load,
     parse_board,
+    parse_parts,
     people_problems,
     queue_subject,
     respace,
@@ -76,11 +88,12 @@ NEEDS = "## Needs the user"  # where an add goes by default (cadence's board con
 
 @dataclass
 class Plan:
-    """A write, built and not yet made: each path's new text, the commit subject, and what the action reports."""
+    """A write, built and not yet made: each path's new text (or None, removed), the commit subject, and what
+    the action reports."""
 
     action: str
     subject: str | None
-    changes: dict[str, str] = field(default_factory=dict)
+    changes: dict[str, str | None] = field(default_factory=dict)  # None: the file is removed
     info: dict = field(default_factory=dict)
 
     def as_json(self) -> dict:
@@ -107,12 +120,25 @@ def read(path: str, missing_ok: bool = False) -> str:
     return text
 
 
-def write(changes: Mapping[str, str]) -> list[str]:
-    """Write every path's new text, both or neither: each to a temporary file beside it, then each renamed
-    into place; when a rename fails, the files already replaced are put back and OSError is raised."""
+def write(changes: Mapping[str, str | None]) -> list[str]:
+    """Write every path's new text, or remove it (None), both or neither: each text to a temporary file beside
+    it (its directory made when missing), then each renamed into place, then each removal; when a step
+    fails, the files already replaced or removed are put back, the directories made are removed, and
+    OSError is raised."""
     temps: list[tuple[str, str]] = []
+    made: list[str] = []
     try:
         for path, text in changes.items():
+            if text is None:
+                continue
+            d = os.path.dirname(os.path.abspath(path))
+            missing = []
+            while not os.path.isdir(d):
+                missing.append(d)
+                d = os.path.dirname(d)
+            for m in reversed(missing):
+                os.mkdir(m)
+                made.append(m)
             fd, tmp = tempfile.mkstemp(prefix=".ledgerboard-", dir=os.path.dirname(os.path.abspath(path)))
             temps.append((path, tmp))
             with os.fdopen(fd, "w", encoding="utf-8", errors="surrogateescape", newline="") as f:
@@ -123,11 +149,11 @@ def write(changes: Mapping[str, str]) -> list[str]:
                 mask = os.umask(0)
                 os.umask(mask)
                 os.chmod(tmp, 0o666 & ~mask)
-        olds: dict[str, bytes | None] = {}
+        olds: dict[str, tuple[bytes, int] | None] = {}
         for p in changes:
             if os.path.exists(p):
                 with open(p, "rb") as f:
-                    olds[p] = f.read()
+                    olds[p] = (f.read(), os.stat(p).st_mode & 0o7777)
             else:
                 olds[p] = None
         done: list[str] = []
@@ -135,14 +161,29 @@ def write(changes: Mapping[str, str]) -> list[str]:
             for path, tmp in temps:
                 os.replace(tmp, path)
                 done.append(path)
+            for path, text in changes.items():
+                if text is None and olds[path] is not None:
+                    os.unlink(path)
+                    done.append(path)
         except OSError:
             for path in done:
                 if olds[path] is None:
                     os.unlink(path)
                 else:
                     with open(path, "wb") as f:
-                        f.write(olds[path])
+                        f.write(olds[path][0])
+                    os.chmod(path, olds[path][1])
             raise
+    except OSError:
+        for _, tmp in temps:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+        for m in reversed(made):
+            try:
+                os.rmdir(m)
+            except OSError:
+                pass
+        raise
     finally:
         for _, tmp in temps:
             if os.path.exists(tmp):
@@ -152,17 +193,21 @@ def write(changes: Mapping[str, str]) -> list[str]:
 
 # -- the actions, each a Plan ---------------------------------------------------------------------------
 
+class BadToday(Refused):
+    """A ``--today`` that is not a YYYY-MM-DD date: exit 2, as the ledger writer gives it."""
+
+
 def _today(today: str | date | None) -> date:
     if today is None:
         return date.today()  # noqa: DTZ011  # the board's dates are the local clock's (target design §1.1)
     if isinstance(today, date):
         return today
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", today):
-        raise Refused(f"--today is YYYY-MM-DD, not {today!r}")
+        raise BadToday(f"--today is YYYY-MM-DD, not {today!r}")
     try:
         return date.fromisoformat(today)
     except ValueError:
-        raise Refused(f"--today {today} is not a date") from None
+        raise BadToday(f"--today {today} is not a date") from None
 
 
 def items(board: str, today: str | date | None = None) -> list[dict]:
@@ -268,7 +313,14 @@ def plan_add(board: str, text: str, *, due: str | None = None, context: str | No
     _gate(board, old, out)
     first = (bare or new).split("\n", 1)[0].rstrip("\r")  # a person's words stay on the board, never in the subject
     msg = subject(tool, "append", ITEM_RE.match(first).group("text"))
-    return Plan("add", msg, {board: out}, {"line": at + 1})
+    return Plan("add", msg, {board: out}, {"line": at + 1, "item_notes": _line_notes(out, at + 1, _today(today))})
+
+
+def _line_notes(board: str, line: int, today: date) -> list[dict]:
+    """The notes (``item_notes()`` at `today`) of open item `line` as the write leaves the board, each naming its
+    line; ``[]`` when that line is no open item (a decide that closed it)."""
+    got = next((it for it in parse_board(board, warn=False) if it.line == line), None)
+    return [{"line": line, "note": n} for n in item_notes(got, today)] if got else []
 
 
 def _find(lines: list[str], line: int, expect: str) -> tuple[str, str]:
@@ -292,9 +344,12 @@ def _find(lines: list[str], line: int, expect: str) -> tuple[str, str]:
 def plan_edit(board: str, action: str, line: int, expect: str, *, to: str | None = None,
               why: str | None = None, answer: str | None = None, text: str | None = None,
               by: str | None = None, today: str | date | None = None, tool: str = TOOL,
-              session: str | None = None) -> Plan:
+              session: str | None = None, ledger: str | None = None, board_only: bool = False) -> Plan:
     """One of the five edits (``edit_line()``) of open item `line`, which must still start with `expect`; a
-    decide's `by`, who answered, as ``who_answered()`` resolves it."""
+    decide's `by`, who answered, as ``who_answered()`` resolves it. A decide on an item naming one entry and
+    one gate is the two-file decide lift (``_decide_ledger()``): the board line, closed per ``closes()``, and
+    the entries ``decide_lift()`` changes in ``ledger``, both or neither; ``board_only`` writes the board half
+    alone."""
     if action not in EDITS:
         raise Refused(f"an edit is one of {', '.join(EDITS)}, not {action!r}")
     day = _today(today)
@@ -308,13 +363,90 @@ def plan_edit(board: str, action: str, line: int, expect: str, *, to: str | None
     old = read(board)
     lines = old.splitlines(keepends=True)
     body, eol = _find(lines, line, expect)
+    if (ledger is not None or board_only) and action != "decide":
+        raise Refused("--ledger and --board-only are a decide's")
+    changes: dict[str, str | None] = {}
+    info: dict = {"line": line}
+    close = False
     if action == "decide":
         by = who_answered(old, by)
-    new = edit_line(body, action, to=when, answer=answer, why=why, reply=text, by=by, today=day)
+        close, changes, info = _decide_ledger(board, old, body, answer, by, day, ledger, board_only, today)
+        info = {"line": line, **info}
+    new = edit_line(body, action, to=when, answer=answer, why=why, reply=text, by=by, today=day, close=close)
     lines[line - 1] = new + eol
+    out = "".join(lines)
+    if action != "done":  # a done leaves no open line
+        info["item_notes"] = _line_notes(out, line, day)
     msg = subject(tool, action, ITEM_RE.match(body).group("text").strip(),
                   to=when, answer=answer, session=session)
-    return Plan(action, msg, {board: "".join(lines)}, {"line": line})
+    return Plan(action, msg, {board: out, **changes}, info)
+
+
+def _may_answer(board_text: str, gate_: str, by: str) -> None:
+    """``decide_lift()``'s People: and Answered by: checks, for an item it does not lift (another repo's entry):
+    the gate's person and who answered are on `People:`, and under `owner` a decision is answered by its person."""
+    people = board_people(board_text)
+    if people is None:
+        return
+    on = {x.lower() for x in people}
+    person = gate_[len("decision ("):-1] if gate_.startswith("decision") else None
+    if person is not None and person.lower() not in on:
+        raise Refused(f"the gate's person {person} is not on the board's People: ({', '.join(people)})")
+    if by.lower() not in on:
+        raise Refused(f"{by} is not on the board's People: ({', '.join(people)}) — only a listed person answers")
+    if person is not None and (answered_by(board_text) or "owner").lower() == "owner" and by.lower() != person.lower():
+        raise Refused(f"only {person} answers for {gate_} on a board whose Answered by is owner, not {by}")
+
+
+def _decide_ledger(board_path: str, board_text: str, body: str, label: str | None, by: str, day: date, ledger: str | None,
+                   board_only: bool, today: str | date | None) -> tuple[bool, dict[str, str | None], dict]:
+    """A decide's ledger half (v2.4, SPEC *The board writer*): (whether the answer closes the item, the ledger
+    files it changes, what it reports). An item whose Context names one bare ``TD-n`` and one gate is the
+    decide lift: ``decide_lift()`` on the ledger's base texts of that entry and its `Parts:`, judged as the
+    ledger writer judges a write, then ``closes()`` on the texts after. With ``board_only`` (the ``set by=``
+    route, which has written the ledger already) nothing is written there, and ``closes()`` reads the ledger as
+    it stands. An item naming another repo's entry is answered on the board alone and stays open."""
+    ref, gate_ = _item_gate(ITEM_RE.match(body).group("text").strip())
+    if ref is None or gate_ is None:
+        if ledger is not None or board_only:
+            raise Refused("--ledger and --board-only are for a decide item whose Context names one entry and one gate")
+        return closes(body, label or "", {}), {}, {}  # a waiting-only answer on a gate item still closes it
+    if "#" in ref:
+        if ledger is not None:
+            raise Refused(f"{ref} is another repo's entry: its lift is a tool PR there, so no --ledger here")
+        _may_answer(board_text, gate_, by)
+        return closes(body, label or "", {}), {}, {"entries": [], "board_only": True}
+    from . import ledger as L  # the ledger writer imports this module, so it is loaded here, when needed
+    beside = os.path.join(os.path.dirname(board_path) or ".", "ledger")
+    path = ledger or (beside if os.path.isdir(beside) else None)
+    if path is None:
+        raise Refused(f"the item lifts {gate_} on {ref}: pass --ledger (the v2 directory), or --board-only when "
+                      "the ledger is written already")
+    try:
+        led = L.Ledger.open(path)
+        L._writable(led)
+        ids = [ref, *[x for x in parse_parts(ITEM_RE.match(body).group("text")) if "#" not in x]]
+        found = {}
+        for x in ids:
+            try:
+                p, archived = led.entry_file(L.tid_of(x))
+            except Refused:
+                continue
+            if not archived:
+                found[entries(led.files[p])[0]["id"]] = p
+        base = {tid: led.files[p] for tid, p in found.items()}
+        if board_only:
+            return closes(body, label or "", base), {}, {"entries": [], "board_only": True}
+        ledger_day = L._today(today)
+        got = decide_lift(body, base, label or "", by, ledger_day, board_people(board_text), answered_by(board_text))
+        changes: dict[str, str | None] = {found[tid]: text for tid, text in got.items()}
+        notes = L.gate(led, changes, today=ledger_day) if changes else []
+    except L.Unusable as e:
+        raise L.Unusable(f"the ledger half: {e}") from None
+    except Refused as e:
+        raise Refused(f"the ledger half: {e}") from None
+    after = {**base, **got}
+    return closes(body, label or "", after), changes, {"entries": sorted(got), "notes": notes}
 
 
 def plan_archive(board: str, archive: str, *, tool: str = TOOL, session: str | None = None) -> Plan:
@@ -436,7 +568,8 @@ def build(a: argparse.Namespace) -> Plan:
             raise Refused("decide takes one --answer, the person's")
         answer = a.answer[0] if a.action == "decide" else None
         return plan_edit(a.board, a.action, a.line, a.expect, to=a.to, why=a.why, answer=answer,
-                         text=a.text, by=a.by, today=a.today, tool=a.tool, session=a.session)
+                         text=a.text, by=a.by, today=a.today, tool=a.tool, session=a.session,
+                         ledger=a.ledger, board_only=a.board_only or False)
     if a.action == "archive":
         return plan_archive(a.board, a.archive, tool=a.tool, session=a.session)
     if a.action == "fmt":
@@ -460,7 +593,7 @@ TAKES = {
     "snooze": {"board", "line", "expect", "to", "today", "tool", "session"},
     "due": {"board", "line", "expect", "to", "today", "tool", "session"},
     "done": {"board", "line", "expect", "why", "today", "tool", "session"},
-    "decide": {"board", "line", "expect", "answer", "by", "today", "tool", "session"},
+    "decide": {"board", "line", "expect", "answer", "by", "today", "tool", "session", "ledger", "board_only"},
     "reply": {"board", "line", "expect", "text", "by", "today", "tool", "session"},
     "archive": {"board", "archive", "tool", "session"},
     "fmt": {"board"},
@@ -473,7 +606,8 @@ NEEDS_OPT = {
     "reply": ("board", "line", "expect", "text", "by"), "archive": ("board", "archive"),
     "fmt": ("board",), "rank": ("rank", "queue"),
 }
-DEFAULTS = {"under": NEEDS, "tool": TOOL, "answer": [], "lift": [], "set": [], "drop": [], "fixed": []}
+DEFAULTS = {"under": NEEDS, "tool": TOOL, "answer": [], "lift": [], "set": [], "drop": [], "fixed": [],
+            "board_only": False}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -485,7 +619,10 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--action", dest="queue", help="rank: rank, join, prune or respace")
     ap.add_argument("--set", action="append", default=[], help="rank: TD-n=KEY, a line to set")
     ap.add_argument("--drop", action="append", default=[], help="rank: TD-n, a line to remove")
-    ap.add_argument("--ledger", help="rank --action respace: the ledger (a file or a v2 directory)")
+    ap.add_argument("--ledger", help="rank --action respace: the ledger (a file or a v2 directory); decide: the v2 "
+                                     "ledger the lift writes (default: ledger/ beside the board, when it is a directory)")
+    ap.add_argument("--board-only", action="store_true",
+                    help="decide: write the board half alone (the set by= route, whose ledger is written already)")
     ap.add_argument("--fixed", action="append", default=[],
                     help="rank --action respace: another repo's key sorted beside this file's (repeat)")
     ap.add_argument("--repo", help="rank --action respace: the last component of this repo's implicit keys")
@@ -525,7 +662,7 @@ def main(argv: list[str] | None = None) -> int:
              if k not in ("action", "plan", "json") and v is not None and v != DEFAULTS.get(k)}
     extra = sorted(given - TAKES[a.action])
     if extra:
-        ap.error(f"{a.action} does not take {', '.join('--' + e for e in extra)}")
+        ap.error(f"{a.action} does not take {', '.join('--' + e.replace('_', '-') for e in extra)}")
     missing = [o for o in NEEDS_OPT[a.action] if getattr(a, o) in (None, [])]
     if missing:
         ap.error(f"{a.action} needs {', '.join('--' + ('action' if o == 'queue' else o) for o in missing)}")
@@ -540,11 +677,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         plan = build(a)
     except Refused as e:
+        from . import ledger as L  # loaded here, as in decide: the ledger writer imports this module
+        code = 2 if isinstance(e, (BadToday, L.Unusable)) else 1  # 2 as ledger.py gives them
         if a.json or a.plan:
             print(json.dumps({"action": a.action, "refused": str(e)}, ensure_ascii=False))
         else:
             print(f"ledgerboard.board: refused: {e}", file=sys.stderr)
-        return 3
+        return code
     if a.plan:
         print(json.dumps(plan.as_json(), ensure_ascii=False))
         return 0
@@ -552,7 +691,7 @@ def main(argv: list[str] | None = None) -> int:
         paths = apply(plan)
     except OSError as e:
         print(f"ledgerboard.board: the write failed, every file restored: {e}", file=sys.stderr)
-        return 1
+        return 4
     if a.json:
         print(json.dumps({"action": plan.action, "subject": plan.subject, "paths": paths, **plan.info},
                          ensure_ascii=False))
@@ -563,6 +702,8 @@ def main(argv: list[str] | None = None) -> int:
             print(p)
         for r in plan.info.get("refused", []):
             print(f"line {r['line']}: kept: {r['why']}", file=sys.stderr)
+        for r in plan.info.get("item_notes", []):
+            print(f"line {r['line']}: ℹ {r['note']}", file=sys.stderr)
     return 0
 
 

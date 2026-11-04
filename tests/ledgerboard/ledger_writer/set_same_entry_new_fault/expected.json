@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "set",
+  "refused": "⚠ TD-002: owner 'reviewer' is not in the preamble's Fields: vocabulary (builder | designer)"
+ }
+}

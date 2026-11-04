@@ -25,6 +25,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 5,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -57,6 +58,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 6,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [
@@ -92,6 +94,7 @@
    "kind": "decide",
    "lifts": null,
    "line": 7,
+   "notes": [],
    "overdue_days": null,
    "parts": [],
    "refs": [

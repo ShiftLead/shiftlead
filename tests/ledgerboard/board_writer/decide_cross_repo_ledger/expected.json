@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "decide",
+  "refused": "tools#TD-4 is another repo's entry: its lift is a tool PR there, so no --ledger here"
+ }
+}

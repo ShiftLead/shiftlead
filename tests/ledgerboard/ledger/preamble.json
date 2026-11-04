@@ -1,0 +1,39 @@
+{
+ "blocked": [],
+ "check": [],
+ "check_since_empty": [],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000001",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-02",
+    "priority": "Low",
+    "status": "Open",
+    "type": "debt"
+   },
+   "id": "TD-001",
+   "key": "3|0|000001",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": true,
+   "priority": "Low",
+   "title": "A low entry",
+   "type": "debt"
+  }
+ ],
+ "flags": [],
+ "pickable": [
+  "TD-001"
+ ],
+ "rows": [
+  {
+   "id": "TD-001",
+   "priority": "Low",
+   "title": "A low entry"
+  }
+ ]
+}

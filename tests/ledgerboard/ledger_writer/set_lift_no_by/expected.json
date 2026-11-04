@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "set",
+  "refused": "removing decision (Robin) through set needs --by <person>: the gate's person, who answered (or --override with its why)"
+ }
+}

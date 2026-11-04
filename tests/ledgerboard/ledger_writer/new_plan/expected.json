@@ -1,0 +1,15 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "new",
+  "changes": [
+   {
+    "path": "ledger/TD-003.md",
+    "text": "## TD-003: List the late entries\n\n**Priority:** Medium\n**Added:** 2026-01-15\n**Status:** Open\n\n**Why:** the tool has no way to say which entries are late.\n"
+   }
+  ],
+  "id": "TD-003",
+  "notes": [],
+  "subject": null
+ }
+}

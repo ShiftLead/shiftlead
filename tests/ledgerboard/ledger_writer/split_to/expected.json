@@ -1,0 +1,20 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "split",
+  "archived": 1,
+  "open": 1,
+  "paths": [
+   "docs/entries/TD-001.md",
+   "docs/entries/archive/TD-005.md",
+   "docs/entries/README.md",
+   "docs/technical_debt.md",
+   "docs/technical_debt_archive.md",
+   "docs/entries/rank.yml",
+   "docs/technical_debt_rank.yml"
+  ],
+  "subject": null,
+  "to": "docs/entries",
+  "warnings": []
+ }
+}

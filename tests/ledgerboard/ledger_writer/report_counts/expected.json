@@ -1,0 +1,22 @@
+{
+ "exit": 0,
+ "out": {
+  "by": [
+   "priority",
+   "type"
+  ],
+  "counts": [
+   {
+    "count": 1,
+    "priority": "low",
+    "type": "feature"
+   },
+   {
+    "count": 1,
+    "priority": "medium",
+    "type": "debt"
+   }
+  ],
+  "flags": []
+ }
+}

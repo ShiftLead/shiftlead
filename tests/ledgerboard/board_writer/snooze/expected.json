@@ -2,6 +2,12 @@
  "exit": 0,
  "out": {
   "action": "snooze",
+  "item_notes": [
+   {
+    "line": 7,
+    "note": "hide-late: Hide until: 2026-01-29 is after Due: 2026-01-20, so the item stays hidden past its deadline"
+   }
+  ],
   "line": 7,
   "paths": [
    "board.md"

@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "archive",
+  "unusable": "--pr, --pointer and --as-is are a Resolved archive's: a superseded or dropped entry keeps its Why and Fix"
+ }
+}

@@ -1,0 +1,22 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "split",
+  "archived": 1,
+  "open": 1,
+  "paths": [
+   "docs/ledger/TD-001.md",
+   "docs/ledger/archive/TD-005.md",
+   "docs/ledger/README.md",
+   "docs/technical_debt.md",
+   "docs/technical_debt_archive.md",
+   "docs/ledger/rank.yml",
+   "docs/technical_debt_rank.yml"
+  ],
+  "subject": null,
+  "to": "docs/ledger",
+  "warnings": [
+   "#summary: an anchor into technical_debt.md, which the split removes — point it at the entry's file by hand (in a text from technical_debt.md)"
+  ]
+ }
+}

@@ -1,0 +1,459 @@
+{
+ "covers": [
+  [],
+  [
+   [
+    "example.com/acme/widgets",
+    "decide 2026-10-02 (n/a) — Should the parser accept tabs, for each part? Context: TD-210 decision (pat). Parts: TD-204. Due: 2026-11-10. Answers: Go | Not yet.",
+    "open"
+   ]
+  ],
+  [
+   [
+    "example.com/acme/widgets",
+    "decide 2026-10-02 (n/a) — Still waiting on event (gamma-ready) for TD-207? Context: TD-207 event (gamma-ready). Due: 2026-10-06. Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate. Decided: Keep waiting (by pat) (2026-10-05).",
+    "closed-decided"
+   ]
+  ],
+  [
+   [
+    "example.com/acme/widgets",
+    "decide 2026-10-02 (n/a) — Should the cache be cleared nightly? Context: TD-211 decision (pat). Due: 2026-10-20. Answers: Go | Not yet. Decided: Go (by pat) (2026-10-20).",
+    "closed-decided"
+   ]
+  ],
+  [
+   [
+    "example.com/acme/widgets",
+    "decide 2026-10-02 (n/a) — Should the report be weekly? Context: TD-213 decision (pat). Due: 2026-11-10. Answers: Go | Not yet | Drop it. Decided: Drop it (by pat) (2026-10-12).",
+    "decided"
+   ]
+  ]
+ ],
+ "refused": {
+  "a bad repo": {
+   "refused": "repo is this repo's origin path (owner/name) or its basename, not 'acme widgets'"
+  },
+  "a negative window": {
+   "refused": "reask_days is a whole number of days, not -1"
+  },
+  "no own board": {
+   "refused": "boards holds no board of acme/nowhere: its own board is where event items go"
+  }
+ },
+ "rerun": {
+  "lifts": [
+   {
+    "evidence": "date reached",
+    "gate": "until 2026-11-01",
+    "id": "TD-208",
+    "kind": "until"
+   },
+   {
+    "evidence": "acme/other#12",
+    "gate": "event (delta-ready)",
+    "id": "TD-209",
+    "kind": "event"
+   }
+  ],
+  "to_close": {},
+  "to_file": {}
+ },
+ "runs": {
+  "today": {
+   "lifts": [
+    {
+     "evidence": "date reached",
+     "gate": "until 2026-11-01",
+     "id": "TD-208",
+     "kind": "until"
+    },
+    {
+     "evidence": "acme/other#12",
+     "gate": "event (delta-ready)",
+     "id": "TD-209",
+     "kind": "event"
+    }
+   ],
+   "to_close": {
+    "example.com/acme/widgets": [
+     "- [ ] decide 2026-10-02 (n/a) — Should the search be fuzzy? Context: TD-214 decision (pat). Answers: Go | Not yet",
+     "- [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready)",
+     "- [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate",
+     "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
+     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta"
+    ]
+   },
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-201 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-201 (The widget's colour waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "Should the widget be blue rather than green?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the widget be blue rather than green?"
+     },
+     {
+      "answers": null,
+      "context": "TD-202 decision (lee)",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (lee) on TD-202 has no board: no board read lists lee in its People."
+     },
+     {
+      "answers": null,
+      "context": "TD-205 event (alpha-ready)",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "Event check broken on TD-205: the check for event (alpha-ready) errors."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-206 event (beta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (beta-ready) on TD-206 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (beta-ready) on TD-206 can no longer happen."
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-211 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-211 (A decision lifted, then added again ten days later) waits on decision (pat), and no board item asked for it",
+       "question": "Should the cache be cleared nightly?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the cache be cleared nightly?"
+     },
+     {
+      "answers": null,
+      "context": "TD-214 decision (pat) board acme/beta",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "TD-214's decision (pat) was lifted by an answer on acme/beta's board, which holds no decided item for TD-214."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-217 event (eta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (eta-ready) on TD-217 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (eta-ready) on TD-217 can no longer happen."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-218 event (theta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (theta-ready) on TD-218 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (theta-ready) on TD-218 can no longer happen."
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-219 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-219 (A decision written twice, and a gate lifted twice from a board this sweep does not read) waits on decision (pat), and no board item asked for it",
+       "question": "Should the archive be compressed?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the archive be compressed?"
+     },
+     {
+      "answers": null,
+      "context": "TD-219 decision (kim) board acme/other",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "TD-219's decision (kim) was lifted by an answer on acme/other's board, which holds no decided item for TD-219."
+     }
+    ],
+    "github.com/acme/beta": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "acme/widgets#TD-203 decision (kim)",
+      "default": null,
+      "detail": {
+       "context": "TD-203 (The importer waits on kim, who is on two other repos' boards) waits on decision (kim), and no board item asked for it",
+       "question": "Should the importer skip blank lines?",
+       "recommended": "Only kim can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the importer skip blank lines?"
+     }
+    ]
+   }
+  },
+  "two days later": {
+   "lifts": [
+    {
+     "evidence": "date reached",
+     "gate": "until 2026-11-01",
+     "id": "TD-208",
+     "kind": "until"
+    },
+    {
+     "evidence": "acme/other#12",
+     "gate": "event (delta-ready)",
+     "id": "TD-209",
+     "kind": "event"
+    }
+   ],
+   "to_close": {
+    "example.com/acme/widgets": [
+     "- [ ] decide 2026-10-02 (n/a) — Should the search be fuzzy? Context: TD-214 decision (pat). Answers: Go | Not yet",
+     "- [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready)",
+     "- [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate",
+     "- [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Answers: Go | Not yet",
+     "- [ ] act 2026-10-29 (n/a) — TD-215's decision (kim) was lifted by an answer on acme/beta's board, which holds no decided item for TD-215. Context: TD-215 decision (kim) board acme/beta"
+    ]
+   },
+   "to_file": {
+    "example.com/acme/widgets": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-201 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-201 (The widget's colour waits on pat) waits on decision (pat), and no board item asked for it",
+       "question": "Should the widget be blue rather than green?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the widget be blue rather than green?"
+     },
+     {
+      "answers": null,
+      "context": "TD-202 decision (lee)",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "decision (lee) on TD-202 has no board: no board read lists lee in its People."
+     },
+     {
+      "answers": null,
+      "context": "TD-205 event (alpha-ready)",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "Event check broken on TD-205: the check for event (alpha-ready) errors."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-206 event (beta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (beta-ready) on TD-206 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (beta-ready) on TD-206 can no longer happen."
+     },
+     {
+      "answers": [
+       "Keep waiting",
+       "Drop the gate",
+       "Rewrite the check"
+      ],
+      "context": "TD-207 event (gamma-ready)",
+      "default": 0,
+      "detail": {
+       "context": "TD-207 has waited on event (gamma-ready) for more than its age limit, and its check says not yet",
+       "question": "Keep waiting, drop the gate, or rewrite its check?",
+       "recommended": "it is asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "Still waiting on event (gamma-ready) for TD-207?"
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-211 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-211 (A decision lifted, then added again ten days later) waits on decision (pat), and no board item asked for it",
+       "question": "Should the cache be cleared nightly?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the cache be cleared nightly?"
+     },
+     {
+      "answers": null,
+      "context": "TD-214 decision (pat) board acme/beta",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "TD-214's decision (pat) was lifted by an answer on acme/beta's board, which holds no decided item for TD-214."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-217 event (eta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (eta-ready) on TD-217 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (eta-ready) on TD-217 can no longer happen."
+     },
+     {
+      "answers": [
+       "Drop the gate",
+       "Rewrite the check",
+       "Drop the entry"
+      ],
+      "context": "TD-218 event (theta-ready)",
+      "default": null,
+      "detail": {
+       "context": "The check for event (theta-ready) on TD-218 says it can no longer happen",
+       "question": "Drop the gate, rewrite its check, or drop the entry?",
+       "recommended": "Only the person who knows why it waits can say"
+      },
+      "kind": "decide",
+      "lifts": [
+       "Drop the gate"
+      ],
+      "text": "event (theta-ready) on TD-218 can no longer happen."
+     },
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "TD-219 decision (pat)",
+      "default": null,
+      "detail": {
+       "context": "TD-219 (A decision written twice, and a gate lifted twice from a board this sweep does not read) waits on decision (pat), and no board item asked for it",
+       "question": "Should the archive be compressed?",
+       "recommended": "Only pat can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the archive be compressed?"
+     },
+     {
+      "answers": null,
+      "context": "TD-219 decision (kim) board acme/other",
+      "default": null,
+      "detail": null,
+      "kind": "act",
+      "lifts": null,
+      "text": "TD-219's decision (kim) was lifted by an answer on acme/other's board, which holds no decided item for TD-219."
+     }
+    ],
+    "github.com/acme/beta": [
+     {
+      "answers": [
+       "Go",
+       "Not yet"
+      ],
+      "context": "acme/widgets#TD-203 decision (kim)",
+      "default": null,
+      "detail": {
+       "context": "TD-203 (The importer waits on kim, who is on two other repos' boards) waits on decision (kim), and no board item asked for it",
+       "question": "Should the importer skip blank lines?",
+       "recommended": "Only kim can say: Go lifts the gate, and Not yet keeps it waiting, asked again in 30 days"
+      },
+      "kind": "decide",
+      "lifts": null,
+      "text": "Should the importer skip blank lines?"
+     }
+    ]
+   }
+  }
+ }
+}
