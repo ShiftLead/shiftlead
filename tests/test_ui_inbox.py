@@ -2886,6 +2886,51 @@ def test_a_question_passed_up_reaches_the_page_as_the_askers_with_the_passers_re
     assert [(e["text"], e["answer"]) for e in picked] == [("keep the old name", 0)]
 
 
+@pytest.mark.integration
+def test_a_passed_up_ask_and_steer_are_each_drawn_under_their_own_heading_and_counted_alike(
+    client, tmp_path, monkeypatch, capsys
+):
+    """TD-1352 (§4.9b *Passing up keeps the thread and the asker*, §4.5a *Inbox row: passed up*): a passed-up
+    `ask` is in *Needs you*, counted; a passed-up `steer` in *Steering* with its time left, the passer's
+    recommendation and its rail kind *steering*, uncounted as any running `steer` is; the counts read, the
+    full read and `ao inbox --counts` count the same set."""
+    from sessionorc.client import LocalClient
+    from shiftlead import cli
+    from shiftlead.ui.app import INBOX_COUNTS
+
+    async def setup():
+        async with LocalClient() as person:
+            ids = []
+            for n in ("askr4", "passr4"):
+                got = await person.call(
+                    "create", name=n, dir=_own(tmp_path, n), adapter="agentshell", argv=["bash", "--norc"], team="ao-t4"
+                )
+                ids.append(got["id"])
+        w, tl = ids
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            a = (await wc.call("msg", to=tl, text="rename the flag?", kind="ask"))["entry"]
+            s = (await wc.call("msg", to=tl, text="split the module", kind="steer", default="keep it whole"))["entry"]
+            for q in (a, s):
+                await tc.call("pass_up", id=q["id"], recommend="keep the old shape", answers=["change it"])
+        return a["id"], s["id"]
+
+    aid, sid = asyncio.run(setup())
+    got = client.get("/api/person/inbox").json()
+    assert got["sections"]["needs"] == [aid] and got["sections"]["steering"] == [sid] and got["needs"] == 1
+    row = got["html"]["steering"]  # its one row
+    assert 'data-kind="steer" data-rkind="steering" data-section="steering"' in row
+    assert "passr4 recommends: keep the old shape" in row and "suggested by passr4" in row
+    assert 'data-rkind="questions" data-section="needs"' in got["html"]["needs"]
+    ui = client.get("/api/person/inbox?counts=1").json()
+    assert {k: ui[k] for k in INBOX_COUNTS} == {k: got[k] for k in INBOX_COUNTS}
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
+    monkeypatch.setattr(cli.service, "DEFAULT_PORT", _closed_port())  # no UI answers: counted locally (TD-634)
+    capsys.readouterr()
+    assert cli.main(["--json", "inbox", "--counts"]) == 0
+    local = json.loads(capsys.readouterr().out)
+    assert {k: local[k] for k in INBOX_COUNTS} == {k: ui[k] for k in INBOX_COUNTS} and local["needs"] == 1
+
+
 # -- design §4.5a **team header** → *answered for you* count (§4.9b; TD-075, the page half) --------
 
 ANSWERED_PROBE = (
@@ -3091,6 +3136,9 @@ def test_every_row_kind_has_its_rail_kind():
     assert rail_kind({"kind": "ask"}) == "questions"
     assert rail_kind({"kind": "note", "passed_up": "ao-t"}) == "questions"
     assert rail_kind({"kind": "steer"}) == "steering"
+    # a passed-up steer is drawn under *Steering* (§4.5a *Inbox row: passed up*), so it is of that kind (TD-1352)
+    assert rail_kind({"kind": "steer", "passed_up": "2026-11-04T10:00:00Z"}) == "steering"
+    assert rail_kind({"kind": "ask", "passed_up": "2026-11-04T10:00:00Z"}) == "questions"
     for k in ("note", "reply"):
         assert rail_kind({"kind": k}) == "notes"
     assert rail_kind({"row": "permission"}) == rail_kind({"row": "alarm_host"}) == "states"
