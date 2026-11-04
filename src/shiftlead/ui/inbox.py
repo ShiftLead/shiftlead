@@ -2241,10 +2241,10 @@ _FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>"
 
 
 def rail_kind(e: Mapping[str, Any]) -> str:
-    """A row's coarse kind (§4.5 screen 6 *The rail*): *questions* (an `ask`, a passed-up
-    question), *steering* (a `steer`), *session states* (every state row, alarms
-    included), *board items*, *notes* (a `note`, a `system` note, a reply, answered-for-you, an
-    outcome), *trail*."""
+    """A row's coarse kind (§4.5 screen 6 *The rail*): *questions* (an `ask`, a passed-up one
+    too), *steering* (a `steer`, a passed-up one too: its row is under *Steering*, §4.5a *Inbox row:
+    passed up*, TD-1352), *session states* (every state row, alarms included), *board items*,
+    *notes* (a `note`, a `system` note, a reply, answered-for-you, an outcome), *trail*."""
     row = e.get("row")
     if row == "board":
         return "board"
@@ -2254,10 +2254,10 @@ def rail_kind(e: Mapping[str, Any]) -> str:
         return "ledger"
     if row:
         return "states"
-    if e.get("kind") in PERSON_ASK_KINDS or e.get("passed_up"):
-        return "questions"
     if e.get("kind") == "steer":
         return "steering"
+    if e.get("kind") in PERSON_ASK_KINDS or e.get("passed_up"):
+        return "questions"
     return "notes"
 
 
