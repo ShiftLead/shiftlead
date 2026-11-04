@@ -57,10 +57,11 @@ def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None)
     if kind == "board":
         m = CONTEXT.search(str(e.get("text") or ""))
         refs = _refs(m.group(1)) if m else []
-        # a bare `TD-n` on a repo's board is that repo's entry (TD-1355): looked up bare, it resolves only where
-        # one repo alone holds the id on an open card, so a common number left the line off its own card
-        if name := str(e.get("repo_name") or ""):
-            refs = list(dict.fromkeys(r if "#" in r else f"{name}#{r}" for r in refs))
+        # a bare `TD-n` on a repo's board is that repo's entry first (TD-1355): looked up bare alone, it resolves
+        # only where one repo holds the id on an open card, so a common number left the line off its own card;
+        # one the repo has on no card is still looked up bare, which finds another repo's where it is unique
+        if (name := str(e.get("repo_name") or "")) and index:
+            refs = list(dict.fromkeys(f"{name}#{r}" if "#" not in r and f"{name}#{r}" in index else r for r in refs))
     elif kind == "red_pr":
         refs = _refs(f"{e.get('branch') or ''} {e.get('title') or ''}")
     elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
@@ -327,7 +328,10 @@ def attach(
             m["on_row"] for items in got.values() for m in items if rows[m["_n"]] == "board" and m["want"] in WANTS
         }
         for sec, items in got.items():
-            got[sec] = [m for m in items if not (rows[m["_n"]] == "ledger" and m["on_row"] in asked)]
+            # only the entry's own question goes: *with you* and *answered* are no question to draw over
+            got[sec] = [
+                m for m in items if not (rows[m["_n"]] == "ledger" and m["want"] in WANTS and m["on_row"] in asked)
+            ]
     for got in cards.values():
         for items in got.values():
             for m in items:
