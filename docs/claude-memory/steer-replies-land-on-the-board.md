@@ -9,4 +9,4 @@ On 2026-10-01 Paul answered two of the designer's steers (`m-23539eb2dcc8`, `m-4
 
 **Why:** a steer's bound would otherwise merge the default over a reply that was already given.
 
-**How to apply:** before merging anything at a bound, `git show origin/main:docs/user_attention.md | grep <steer id>` for every open steer; a reply tail ` — Paul, <date>: …` on the line is the answer. Close that line (`- [x]`) in the PR that carries the answer out, and send `ao msg person --outcome done --for <id>` after the merge. See [[designer-run-lessons-2026-09-28]].
+**How to apply:** before merging anything at a bound, `git show origin/main:docs/user_attention.md | grep <steer id>` for every open steer; a reply tail ` — Paul, <date>: …` on the line is the answer. Close that line (`ao board edit done --line <n> --expect … --why …`, never a typed `- [x]`) in the PR that carries the answer out, and send `ao msg person --outcome done --for <id>` after the merge. See [[designer-run-lessons-2026-09-28]].

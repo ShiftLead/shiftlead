@@ -16,7 +16,7 @@ Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgri
   UNSTABLE); `gh pr view N --json state` then still says OPEN. Poll
   `gh pr view N --json statusCheckRollup` for `SUCCESS` first. `gh pr checks` output has a
   space in the check name, so `awk '{print $2}'` is wrong.
-- Ledger and archive-tail conflicts, and the rebase right before the merge: cadence §2.5 (TD-137).
+- An entry's conflict: take main's copy and run the `ledger.py` command again on it; the rebase right before the merge: cadence §2.5.
 - The archive's label is cadence §2.8's and the review comment's shape is §4.9's; run
   `tests/test_ledger.py` before pushing even a doc-only ledger PR.
 - `pkill -f <pattern>` kills the wrapping shell when the pattern appears in the command line
@@ -55,10 +55,9 @@ Added 2026-09-22 (grinder-ao-1):
   verdict line yourself.
 - A TD number is taken on main between your write and your merge (2026-09-24: TD-126 filed by the
   anchor while a PR carrying its own TD-126 was open). Take every id, and a renumber's, from
-  `ao td reserve` (cadence §2.10), never from the highest `## TD-` read by hand; keep main's rows and
-  yours row-wise.
+  `ao td reserve` (cadence §2.10), never from the highest `## TD-` read by hand; a renumber is `agent-cadence run ledger.py renumber`.
 
-- Appending to the archive in Python: read into a variable first. `open(a,'w').write(open(a).read()+x)` truncates before it reads and leaves the archive holding one entry (2026-09-27, PR #677, caught by review).
+- An entry is archived by `agent-cadence run ledger.py archive TD-n`, never by a script appending to a file (on 2026-09-27 such a script truncated the v1 archive to one entry, PR #677).
 
 **Why:** these cost real time and one wrong PR state on the first run.
 **How to apply:** when scripting ledger moves or chaining merges in this repo, reuse these rules;
