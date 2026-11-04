@@ -16,7 +16,7 @@ Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgri
   UNSTABLE); `gh pr view N --json state` then still says OPEN. Poll
   `gh pr view N --json statusCheckRollup` for `SUCCESS` first. `gh pr checks` output has a
   space in the check name, so `awk '{print $2}'` is wrong.
-- Ledger and archive-tail conflicts, and the rebase right before the merge: cadence §2.5 (TD-137).
+- An entry's conflict: take main's copy and run the `ledger.py` command again on it; the rebase right before the merge: cadence §2.5.
 - The archive's label is cadence §2.8's and the review comment's shape is §4.9's; run
   `tests/test_ledger.py` before pushing even a doc-only ledger PR.
 - `pkill -f <pattern>` kills the wrapping shell when the pattern appears in the command line
