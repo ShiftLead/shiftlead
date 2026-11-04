@@ -57,6 +57,10 @@ def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None)
     if kind == "board":
         m = CONTEXT.search(str(e.get("text") or ""))
         refs = _refs(m.group(1)) if m else []
+        # a bare `TD-n` on a repo's board is that repo's entry (TD-1355): looked up bare, it resolves only where
+        # one repo alone holds the id on an open card, so a common number left the line off its own card
+        if name := str(e.get("repo_name") or ""):
+            refs = list(dict.fromkeys(r if "#" in r else f"{name}#{r}" for r in refs))
     elif kind == "red_pr":
         refs = _refs(f"{e.get('branch') or ''} {e.get('title') or ''}")
     elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
@@ -271,6 +275,7 @@ def attach(
     `answered`, no kind and no Start session, drawn *answered — waiting on <asker>* beside *with you*."""
     cards: dict[str, dict[str, list[Any]]] = {}
     mentioned: dict[str, dict[str, str]] = {}
+    rows: dict[int, str] = {}  # each item's row kind, by the order it was put (its `_n`, dropped at the end)
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
         want = want_of(e, sec)
@@ -282,8 +287,10 @@ def attach(
             want, kind = "answered", ""
         pr_row = e.get("row") in ("red_pr", "fork_pr")  # a PR's row starts no session (TD-1246, TD-1292)
         go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and not pr_row else {}
+        rows[len(rows)] = str(e.get("row") or "")  # its row kind, kept beside the item rather than drawn in it
         cards.setdefault(card, {}).setdefault(sec, []).append(
             {
+                "_n": len(rows) - 1,
                 "section": sec,
                 "id": str(mid or ""),
                 "item": ref,
@@ -313,6 +320,18 @@ def attach(
             for e in later or ():
                 if e.get("later_section") == "coming":
                     put(e, "needs", "coming", e.get("id"), _item_kind(e, "needs"))
+    # a board line that names an entry is the question itself and is drawn instead of the entry's own block
+    # (§4.5 screen 12 *Three verbs*, TD-1355): its answers and default are the ones pressed, and its line decided
+    for got in cards.values():
+        asked = {
+            m["on_row"] for items in got.values() for m in items if rows[m["_n"]] == "board" and m["want"] in WANTS
+        }
+        for sec, items in got.items():
+            got[sec] = [m for m in items if not (rows[m["_n"]] == "ledger" and m["on_row"] in asked)]
+    for got in cards.values():
+        for items in got.values():
+            for m in items:
+                del m["_n"]
     return {"cards": cards, "mentioned": mentioned}
 
 
