@@ -855,6 +855,34 @@ def test_delete_on_an_open_ask_declines_it_and_dismiss_strips_a_note(client, tmp
 
 
 @pytest.mark.integration
+def test_a_withdrawn_question_reads_withdrawn_by_its_sender_in_fyi_and_delete_removes_it(client, tmp_path):
+    """§4.10 *Withdrawing a question*, §4.5a *Inbox row: `note` and the rest of FYI* (TD-1382): a
+    question its sender took back leaves Needs you for FYI, *withdrawn by <sender>*; a Delete pressed
+    on a row drawn while it was open removes it and the page says *withdrawn by its sender — removed*."""
+    from sessionorc.client import LocalClient
+
+    sender = sender_session(client, tmp_path, name="taker")
+    ask = send(sender, text="merge PR 9?", kind="ask")["id"]
+    assert client.get("/api/person/inbox").json()["needs"] == 1
+
+    async def withdraw():
+        async with LocalClient(caller=sender) as c:
+            return await c.call("msg_withdraw", id=ask)
+
+    asyncio.run(withdraw())
+    got = client.get("/api/person/inbox").json()
+    assert got["needs"] == 0 and ask in got["sections"]["fyi"]
+    assert "withdrawn by taker" in got["html"]["fyi"]
+    r = client.post("/api/person/unmail", json={"msg": ask})
+    assert r.status_code == 200 and r.json()["declined"] is False and r.json()["closed_reason"] == "withdrawn"
+    assert ask not in [e["id"] for e in client.get("/api/person/inbox").json()["entries"]]
+    js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
+    assert 'res.closed_reason === "withdrawn" ? "withdrawn by its sender — removed"' in js
+    assert 'e.closed_reason === "withdrawn" ? "withdrawn"' in js  # AO.mailEntry's word
+    client.post(f"/api/sessions/{sender}/kill")
+
+
+@pytest.mark.integration
 def test_the_page_opens_the_session_a_row_is_about_only_while_its_record_is_here(client, tmp_path):
     """§4.5 screen 6: a row opens the session that needs the person — and when that record is gone
     the row is still readable, which is the whole reason the envelope carries its own `team` and

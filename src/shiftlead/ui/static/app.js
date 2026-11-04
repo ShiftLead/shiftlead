@@ -1702,7 +1702,11 @@
       if (orphanNote) say(orphanNote, true);
       else if (action === "message" || action === "reply") say(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
       if (action === "answer" && !orphanNote) say(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
-      if (action === "unmail") say(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
+      if (action === "unmail") {
+        say(res.declined ? "declined — the sender is told (design §4.10)"
+          : res.closed_reason === "withdrawn" ? "withdrawn by its sender — removed"
+          : "deleted from this inbox", true);
+      }
       if (["message", "reply", "answer", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
       if (action === "snooze") say(b.dataset.when === "now" ? "back in its section" : "snoozed — it comes back at that time; the sender is not told", true);
       if (action === "hand_look") {
@@ -1920,6 +1924,7 @@
         : e.closed_reason === "declined" ? "declined"
         : e.closed_reason === "asker_gone" ? "closed · the asker is gone"
         : e.closed_reason === "asked_person" ? "closed · the asker took it to the person"
+        : e.closed_reason === "withdrawn" ? "withdrawn"
         : e.closed_by ? `answered by ${esc(e.closed_by)}`
         : e.expired_at ? "expired"
         : e.paused_at ? "paused · the clock is stopped"

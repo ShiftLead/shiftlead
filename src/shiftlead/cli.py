@@ -3937,6 +3937,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
     (from 1) and sends that answer's own text, any words given following it after a blank line.
     Refusals print as the host agent words them."""
     words = list(args.words)
+    if args.withdraw:
+        return _withdraw(args, words)
     if (args.team or args.repo) and (args.pass_up or args.reply_to or args.pick is not None):
         # design §4.10 *A team or a repo as the address* (TD-1000): it opens a question, never answers one
         return fail(args, "--team and --repo address a new question: not with --reply-to, --pick or --pass-up", 2)
@@ -4211,6 +4213,43 @@ def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
             print(f"  {i}. {a}")
 
     return emit(args, got, prose)
+
+
+# every `ao msg` option but --json, as (flag, attribute): `--withdraw <id>` takes none of them (TD-1382)
+_WITHDRAW_ALONE = (
+    ("--kind", "kind"),
+    ("--about", "about"),
+    ("--reply-to", "reply_to"),
+    ("--team", "team"),
+    ("--repo", "repo"),
+    ("--default", "default"),
+    ("--bound", "bound"),
+    ("--cites", "cites"),
+    ("--pr", "pr"),
+    ("--subject", "subject"),
+    ("--verdict", "verdict"),
+    ("--answer", "answer"),
+    ("--pick", "pick"),
+    ("--shot", "shot"),
+    ("--outcome", "outcome"),
+    ("--for", "for_"),
+    ("--pass-up", "pass_up"),
+    ("--recommend", "recommend"),
+    ("--thread", "thread"),
+    ("--source", "source"),
+)
+
+
+def _withdraw(args: argparse.Namespace, words: list[str]) -> int:
+    """`ao msg --withdraw <id>` (design §4.10 *Withdrawing a question*, §4.7, TD-1382): take your own
+    open question to the person back, closed `withdrawn`. The id is its only word: no text, no
+    addressee, no other option. It addresses nobody, so it prints no *when it is read* line."""
+    if words:
+        return fail(args, "--withdraw takes the question's id alone: no text and no addressee", 2)
+    if extra := [flag for flag, attr in _WITHDRAW_ALONE if getattr(args, attr, None) not in (None, False, [])]:
+        return fail(args, f"--withdraw takes the question's id alone: {', '.join(extra)} does not apply", 2)
+    got = call_sync("msg_withdraw", id=args.withdraw)
+    return emit(args, got, lambda: print(f"{got['msg']} withdrawn: the person meets it in FYI"))
 
 
 def cmd_inbox(args: argparse.Namespace) -> int:
@@ -5362,6 +5401,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="pass a question you were asked to the person, as the asker's, with --recommend (once)",
     )
     p.add_argument("--recommend", metavar="LINE", help="with --pass-up: your one-line recommendation")
+    # design §4.10 *Withdrawing a question* (TD-1382): a sender takes back its own question to the person
+    p.add_argument(
+        "--withdraw",
+        metavar="ID",
+        help="take back your own open question to the person, closed as withdrawn (the id its only word)",
+    )
     p.add_argument(
         "--thread",
         metavar="ID",

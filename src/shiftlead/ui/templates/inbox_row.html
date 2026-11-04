@@ -373,8 +373,9 @@
 {%- endmacro %}
 
 {# What became of a question, in the words §4.10 gives each close path. Never a control. #}
-{% macro state_line(e) -%}
-{%- if e.closed_reason == 'lapsed' %}lapsed · the sender went with its default
+{% macro state_line(e, sender='') -%}
+{%- if e.closed_reason == 'withdrawn' %}withdrawn by {{ sender or e['from'] }}
+{%- elif e.closed_reason == 'lapsed' %}lapsed · the sender went with its default
 {%- elif e.closed_reason == 'go_with_it' %}closed · go with it
 {%- elif e.closed_reason == 'declined' %}declined · the sender was told
 {%- elif e.closed_reason == 'asker_gone' %}closed · the asker is gone
@@ -531,7 +532,7 @@
     *you said "merge it" → done: merged as #261* — and the reporting note is not a row of its own. -#}
 {%- if e.outcome %}{{ answer_given(e) }}{{ outcome_line(e) }}{% endif %}
 <div class="row gap wrap mfoot">
-  {%- set st = state_line(e) | trim %}
+  {%- set st = state_line(e, e.from_name or e['from']) | trim %}
   {%- if st %}<span class="st">{{ st }}</span>{% endif %}
   <span class="grow"></span>
   {%- if section != 'snoozed' %}{{ put_btn(e) }}{% endif %}  {#- FYI's door only, never from the fold (§4.5a) #}

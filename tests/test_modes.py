@@ -94,7 +94,7 @@ def test_home_owned_edits_the_mailbox_and_reports_are_refused_to_a_person_too():
     # and `identity_log` (review of PR #318): its mail, its debt and its trail are the home's
     for m in ("set_controllers", "set_grants", "set_stop", "set_mode", "keep", "suspend", "identity_log"):
         assert "waits for the link" in refusal(m, id="ao-x-w"), m
-    for m in ("msg", "inbox", "inbox_delete"):
+    for m in ("msg", "inbox", "inbox_delete", "msg_withdraw"):  # a withdraw too (TD-1382)
         assert "the mailbox is at the home" in refusal(m), m
         assert "the mailbox is at the home" in refusal(m, "ao-x-w"), m
     for m in ("progress", "finding", "doing"):  # `doing` is the third channel (§4.8, TD-074)

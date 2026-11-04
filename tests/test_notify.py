@@ -605,3 +605,22 @@ async def test_a_dismissed_restart_row_and_a_handed_entrys_blocked_outcome(agent
         agent.attention_snoozed.clear()
         agent.sessions.pop(s.id, None)
         agent.sessions.pop(h.id, None)
+
+
+async def test_an_ask_withdrawn_inside_the_hold_is_never_told(agent, sent, tmp_path):
+    """§4.10 *Withdrawing a question* (TD-1382): an `ask` its sender withdrew inside `NOTIFY_HOLD` is
+    closed, so its row is gone and nothing is sent, then or later."""
+    _on(link="")
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="idle", since=_z(t0))
+    ask = MailEntry(id="m-w1", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="oops", about="TD-1382")
+    agent.person_inbox.append(ask)
+    try:
+        await _pass(agent, t0 + timedelta(seconds=20))
+        ask.closed_reason, ask.closed_at = "withdrawn", _z(t0 + timedelta(seconds=30))
+        await _pass(agent, t0 + timedelta(seconds=61))
+        await _pass(agent, t0 + timedelta(seconds=600))
+        assert sent == []
+    finally:
+        agent.person_inbox[:] = [e for e in agent.person_inbox if e.id != "m-w1"]
+        agent.sessions.pop(s.id, None)

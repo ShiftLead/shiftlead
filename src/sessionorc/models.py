@@ -60,7 +60,16 @@ SYSTEM = "system"  # the third sender (design §4.10): the home saying what beca
 # How an entry closed (design §4.10 "One way of being closed"). `expired` is a session-to-session
 # `ask` whose bound ran out or whose addressee was closed or forgotten; `lapsed` is a `steer`
 # reaching its bound, where nothing failed.
-CLOSED_REASONS = ("replied", "declined", "asker_gone", "lapsed", "go_with_it", "expired", "asked_person")
+CLOSED_REASONS = (
+    "replied",
+    "declined",
+    "asker_gone",
+    "lapsed",
+    "go_with_it",
+    "expired",
+    "asked_person",
+    "withdrawn",  # its sender took it back: `ao msg --withdraw` (§4.10 *Withdrawing a question*, TD-1382)
+)
 
 # Who owns which field of a record (design §4.4a, §9 invariant 15): the node observes and enforces
 # on its host, the home holds the graph and intent, and identity is set once at create. Merges go
