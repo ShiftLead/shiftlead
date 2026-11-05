@@ -997,7 +997,7 @@ class InboxMixin:
         if e is None:
             raise RpcError(f"{id} is not an open entry of {name}'s ledger as the home last read it: reload the page")
         page = str(e.get("for_page") or "")
-        if road == "done" and str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
+        if road == "done" and str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER and page == "for-you":
             raise RpcError(f"{id} is yours to do: its own Done says what was done")
         graph = self._graph()
         mine = mail.as_person(caller, graph)

@@ -39,7 +39,7 @@ def test_start_is_the_one_owned_entry_else_the_first_decision_else_the_top_by_ke
         _entry(1, "top", Priority="High"),
         _entry(2, "a decision", Priority="High", Blocked_by="TD-001, decision (paul)"),
         _entry(3, "mine", Priority="Medium", Owner="paul", Blocked_by="TD-001, decision (paul)"),
-        # two `Owner: paul` entries, each gated (TD-1374): the first decision by key, an owned one
+        # two `Owner: paul` entries, each gated (TD-1374): no one owned entry, so the first decision by key
         _entry(10, "top", Priority="High"),
         _entry(11, "mine", Priority="High", Owner="paul", Blocked_by="TD-010, decision (paul)"),
         _entry(12, "mine too", Priority="High", Owner="paul", Blocked_by="TD-010, decision (paul)"),

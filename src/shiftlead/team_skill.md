@@ -258,8 +258,8 @@ One function reads the lane words against each entry's header lines (`lane_match
   *An entry names its team*) match no lane. `ao repo` says each, so a first start whose lane reads
   empty is read there first.
 - **The team's sums leave the person's entries out; a lane does not.** The team card's lane
-  lists, the Repo page and `ao repo` count an `Owner: paul` entry, or one blocked by
-  `decision (paul)`, as the person's and in none of the team's kinds — but a bare `free-pick`
+  lists, the Repo page and `ao repo` count an entry blocked by `decision (paul)` as the
+  person's (an `Owner: paul` alone holds nothing) and in none of the team's kinds — but a bare `free-pick`
   member's own pick, and its own count on the card, still take an `Owner: paul` build that is
   pickable. What the pages show is not the fence: block the entry (step 0b).
 

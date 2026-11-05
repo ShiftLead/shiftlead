@@ -115,7 +115,7 @@ def place(e: Mapping[str, Any], cols: list[dict[str, Any]]) -> tuple[str, str]:
 
 
 def _waits_on_you(e: Mapping[str, Any]) -> bool:
-    """For you's rule (§4.4 *The card's status*): `Owner: paul` or `decision (paul)`."""
+    """For you's rule (§4.4 *The card's status*): `decision (paul)` — an `Owner: paul` alone holds nothing (TD-1375)."""
     return e.get("for_page") == "for-you"
 
 
