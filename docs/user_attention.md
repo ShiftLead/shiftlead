@@ -10,6 +10,10 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-05 (n/a) — Should shiftlead design repo-qualified PRs for a team over an umbrella repo now (TD-943), or keep paired PRs? Answer as you answer guardians-devenv's line on paired PRs. Context: TD-943 decision (paul). Due: 2026-11-12. Answers: Design it | Paired PRs | Umbrella-only. Lifts: Design it | Paired PRs | Umbrella-only.
+  - **Context:** A team works one repo, so in an umbrella over sibling repos, --pr, held: and the PR readings see only the umbrella. guardians-devenv asks the same question on its own board (its TD-028): paired PRs, umbrella-only, or ask ShiftLead for repo-qualified PRs. This item follows that answer.
+  - **Question:** Design repo-qualified PRs now, or keep paired PRs or umbrella-only work?
+  - **Recommended:** Paired PRs: they work today, and only a second umbrella team would show the cost. The designer drops TD-943 to Low and re-gates it.
 - [x] decide 2026-11-05 (person) — An entry that waits on an until or event gate reads as waiting, not blocked: ShiftLead takes its waiting mark from the gates. Context: TD-1395. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05). Closed: 2026-11-05 — lifted: decision (paul) dropped from TD-1392, TD-1395, TD-1396, TD-1397 and TD-1398 (ledger.py set --by Paul), as Paul's Go of 2026-11-05 (#2955) meant.
 - [x] decide 2026-11-05 (person) — The briefs tell a session to write a wait as a gate in Blocked by, not the retired Waits line. Context: TD-1396. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05). Closed: 2026-11-05 — lifted: decision (paul) dropped from TD-1392, TD-1395, TD-1396, TD-1397 and TD-1398 (ledger.py set --by Paul), as Paul's Go of 2026-11-05 (#2955) meant.
 - [x] decide 2026-11-05 (person) — Four entries whose wait needs no new check move from their Waits line to a gate. Context: TD-1397. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05). Closed: 2026-11-05 — lifted: decision (paul) dropped from TD-1392, TD-1395, TD-1396, TD-1397 and TD-1398 (ledger.py set --by Paul), as Paul's Go of 2026-11-05 (#2955) meant.
