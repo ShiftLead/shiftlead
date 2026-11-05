@@ -20,6 +20,18 @@ from sessionorc.containers import ContainerError, ContainerNode, Runner
 
 pytestmark = pytest.mark.unit
 
+
+@pytest.fixture(autouse=True)
+def _writable_after(tmp_path):
+    """Every directory under the test's `tmp_path` is writable again at teardown, pass or fail (TD-1384): a test
+    here leaves trees read-only as the launcher does (`0o555`), and a directory left so makes pytest's base-temp
+    cleanup fail into a `garbage-*` directory, which a person's `rm -rf` cannot remove either."""
+    yield
+    for d, _, _ in os.walk(tmp_path, onerror=None):
+        p = Path(d)
+        if not p.is_symlink() and not os.access(p, os.W_OK | os.X_OK):
+            os.chmod(p, 0o755)
+
 # contractmatch's `.devcontainer/devcontainer.json`, in shape: a build with relative paths, a remote
 # user, the person's two bind mounts under /mounted (one carrying their credentials), VS Code
 # customizations, ports, a lifecycle command that assumes a mount's path exists.
@@ -418,9 +430,6 @@ def test_the_cache_script_puts_the_tree_where_the_launcher_reads_it_once(tmp_pat
     assert not (trees / ref / "stray.txt").exists() and not (trees / ref / src.name).exists()
     assert (trees / ref / "files" / "a.txt").read_text() == "a\n"
     assert not os.access(trees / ref / "files" / "a.txt", os.W_OK)
-    os.chmod(src / "files", 0o755)  # for pytest's own cleanup
-    for d in (trees / ref / "files", trees / ref):
-        os.chmod(d, 0o755)
 
 
 def test_a_pin_the_home_cannot_resolve_ships_nothing_and_is_said(home, tmp_path, monkeypatch):
