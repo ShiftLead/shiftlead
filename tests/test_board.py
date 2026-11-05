@@ -1709,7 +1709,7 @@ def test_a_go_on_a_gated_decide_lifts_the_gate_in_the_same_write(repo):
     _gated(repo)
     at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
     got = board.write_back(repo, at, GATED, "decide", answer="Go")
-    assert got["lifted"] == ["TD-190"]
+    assert got["entries"] == ["TD-190"]
     assert git(repo, "status", "--porcelain") == ""
     files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
     assert sorted(files) == ["docs/ledger/TD-190.md", "docs/user_attention.md"]
@@ -1726,10 +1726,26 @@ def test_a_not_yet_on_a_gated_decide_keeps_it_waiting_in_the_same_write(repo):
     _gated(repo)
     at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
     got = board.write_back(repo, at, GATED, "decide", answer="Not yet")
-    assert got["lifted"] == ["TD-190"]
+    assert got["entries"] == ["TD-190"]
     files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
     assert sorted(files) == ["docs/ledger/TD-190.md", "docs/user_attention.md"]
     entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
     assert "**Blocked by:** decision (paul)" in entry and "kept waiting: decision (paul)" in entry
     line = origin_board(repo).splitlines()[at - 1]
     assert line.startswith("- [x] ") and "Decided: Not yet" in line and "kept waiting" in line
+
+
+def test_a_go_on_another_repos_gated_entry_is_answered_on_the_board_alone(repo):
+    """An item naming another repo's entry is answered on the board alone and stays open: its lift is a tool PR
+    there (ledgerboard's `_decide_ledger`), so no ledger is passed and nothing beside the board lands."""
+    _gated(repo)
+    other = GATED.replace("Context: TD-190", "Context: other#TD-190")
+    (repo / board.BOARD).write_text(origin_board(repo).replace(GATED, other))
+    git(repo, "commit", "-qam", "another repo's")
+    git(repo, "push", "-q", "origin", "main")
+    at = origin_board(repo).splitlines().index(f"- [ ] {other}") + 1
+    got = board.write_back(repo, at, other, "decide", answer="Go")
+    assert "entries" not in got
+    files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
+    assert files == ["docs/user_attention.md"]
+    assert origin_board(repo).splitlines()[at - 1].startswith("- [ ] ")

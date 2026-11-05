@@ -628,7 +628,7 @@ def _write_back(
         return _find(_read_origin(t, want, rel), None, text) is not None
 
     landed = _land(root, t, want, msg, clock, still, also=also)
-    return {**landed, "line": at + 1, "text": text, "due": due, **({"lifted": plan.info["entries"]} if also else {})}
+    return {**landed, "line": at + 1, "text": text, "due": due, **({"entries": plan.info["entries"]} if also else {})}
 
 
 def _lift_ledger(t: Path, text: str) -> str | None:
