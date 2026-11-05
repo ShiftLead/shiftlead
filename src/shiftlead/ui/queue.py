@@ -94,23 +94,41 @@ def ledger_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | Non
     return {"home": "queue", "on_card": card, "on_row": row, "mentions": []}
 
 
+def line_names(e: Mapping[str, Any]) -> set[str]:
+    """The entries a board line's row names, `<repo>#TD-n`: each ref of its `Context:` and each id of its `Parts:`
+    (§4.4 *The card's status*, TD-1364), a bare `TD-n` read as the line's own repo's, as `item_home` reads it."""
+    m = CONTEXT.search(str(e.get("text") or ""))
+    name = str(e.get("repo_name") or "")
+    out: set[str] = set()
+    for r in [*(_refs(m.group(1)) if m else ()), *(x for p in e.get("parts") or () for x in _refs(p))]:
+        if "#" in r:
+            out.add(r)
+        elif name:
+            out.add(f"{name}#{r}")
+    return out
+
+
+def covered_by(row: Mapping[str, Any], names: set[str]) -> bool:
+    """Whether a ledger row (`ledger_for_you`'s) is covered by a line naming `names` (`line_names`): it is named,
+    or its `parent` — the entry it is `Part of`, which a row carries while it holds `decision (paul)` — is
+    (§4.4 *The card's status*, TD-1364)."""
+    mine = set(_refs(f"{row.get('name') or ''}#{row.get('id') or ''}"))
+    if row.get("parent"):
+        mine.add(str(row["parent"]))
+    return bool(mine & names)
+
+
 def asked_entries(lines: Iterable[Mapping[str, Any]]) -> set[str]:
     """The entries an open Decide or Do board line asks about (§4.5 screen 12 *Three verbs*, TD-1362): each
-    `<repo>#TD-n` its `Context:` names, a bare `TD-n` read as the line's own repo's, as `item_home` reads it.
-    Such a line is the entry's question itself, so the entry's own row is not drawn beside it."""
+    `<repo>#TD-n` it names (`line_names`: its `Context:` and its `Parts:`, TD-1364). Such a line is the entry's
+    question itself, so the entry's own row is not drawn beside it — nor a row it covers (`covered_by`)."""
     out: set[str] = set()
     for e in lines or ():
         if not isinstance(e, Mapping) or e.get("row") != "board" or e.get("decided"):
             continue
         if want_of(e, "needs") not in WANTS:
             continue
-        m = CONTEXT.search(str(e.get("text") or ""))
-        name = str(e.get("repo_name") or "")
-        for r in _refs(m.group(1)) if m else ():
-            if "#" in r:
-                out.add(r)
-            elif name:
-                out.add(f"{name}#{r}")
+        out |= line_names(e)
     return out
 
 
@@ -139,7 +157,7 @@ def split_later(
             home = ledger_home(e, index)
             if home["home"] == "queue":
                 moved.append({**e, **home, "later_section": "later"})
-            elif not (asked and set(_refs(f"{e.get('name') or ''}#{e.get('id') or ''}")) & asked):
+            elif not (asked and covered_by(e, asked)):
                 keep.append(e)
         if keep:
             groups.append({**g, "rows": keep})
@@ -306,6 +324,7 @@ def attach(
     cards: dict[str, dict[str, list[Any]]] = {}
     mentioned: dict[str, dict[str, str]] = {}
     rows: dict[int, str] = {}  # each item's row kind, by the order it was put (its `_n`, dropped at the end)
+    raw: dict[int, Mapping[str, Any]] = {}  # each item's row, by its `_n`: what a board line covers is read off it
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
         want = want_of(e, sec)
@@ -318,6 +337,7 @@ def attach(
         pr_row = e.get("row") in ("red_pr", "fork_pr")  # a PR's row starts no session (TD-1246, TD-1292)
         go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and not pr_row else {}
         rows[len(rows)] = str(e.get("row") or "")  # its row kind, kept beside the item rather than drawn in it
+        raw[len(rows) - 1] = e
         cards.setdefault(card, {}).setdefault(sec, []).append(
             {
                 "_n": len(rows) - 1,
@@ -352,14 +372,22 @@ def attach(
                     put(e, "needs", "coming", e.get("id"), _item_kind(e, "needs"))
     # a board line that names an entry is the question itself and is drawn instead of the entry's own block
     # (§4.5 screen 12 *Three verbs*, TD-1355): its answers and default are the ones pressed, and its line decided
+    # — and instead of the block of every member it covers (§4.4 *The card's status*, TD-1364): one named in its
+    # `Context:` or `Parts:`, or `Part of` one so named while it carries `decision (paul)`
     for got in cards.values():
-        asked = {
-            m["on_row"] for items in got.values() for m in items if rows[m["_n"]] == "board" and m["want"] in WANTS
-        }
+        lines = [m for items in got.values() for m in items if rows[m["_n"]] == "board" and m["want"] in WANTS]
+        asked = {m["on_row"] for m in lines}
+        names = set().union(*(line_names(raw[m["_n"]]) for m in lines)) if lines else set()
         for sec, items in got.items():
             # only the entry's own question goes: *with you* and *answered* are no question to draw over
             got[sec] = [
-                m for m in items if not (rows[m["_n"]] == "ledger" and m["want"] in WANTS and m["on_row"] in asked)
+                m
+                for m in items
+                if not (
+                    rows[m["_n"]] == "ledger"
+                    and m["want"] in WANTS
+                    and (m["on_row"] in asked or covered_by(raw[m["_n"]], names))
+                )
             ]
     for got in cards.values():
         for items in got.values():
