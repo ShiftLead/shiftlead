@@ -45,7 +45,7 @@ PRESS_WORDS: dict[str, bool] = {
 
 ID_RE = re.compile(r"[A-Za-z0-9_.@/-]+")
 RED_STATES = ("failure", "error")  # a commit status's words for red, as `promote.py` reads them
-_FAILED_LINE = re.compile(r"^FAILED (\S+)", re.M)  # pytest's short summary: `FAILED <node id> - …`
+_FAILED_LINE = re.compile(r"^FAILED ([^\s(]\S*)", re.M)  # pytest's `FAILED <node id> - …`, not `FAILED (errors=1)`
 _STATUS_TOKEN = re.compile(r"(?:^|\s)status (\S+)(?=\s|$)")  # a `precheck-fail` record's status id
 _MONTH_RE = re.compile(r"(\d{4})-(\d{2})\.jsonl")
 
@@ -266,8 +266,9 @@ def precheck_fails(
 ) -> list[tuple[datetime, str, str]]:
     """`(at, text, status id)` for each red status (`failure` or `error`) of a head's `cadence/precheck`
     list, oldest first, `at` the status's `created_at`. `label` is `<repo>#<n>` or `<repo>@main`. `own` is
-    the home's own run on main (`precheck.json`, `{sha, at, log}`): the first red status on its sha created
-    at or after the run began is its, and names the tests its log failed; any other status names none."""
+    the home's own run on main (`precheck.json`, `{sha, at, log, exit}`): where it exited red, the first red
+    status on its sha created at or after the run began is its, and names the tests its log failed; any other
+    status names none."""
     reds = []
     for s in statuses:
         if not isinstance(s, dict) or str(s.get("state") or "").lower() not in RED_STATES:
@@ -277,7 +278,9 @@ def precheck_fails(
             reds.append((at, str(s["id"])))
     reds.sort()
     mine = None
-    began = _parse((own or {}).get("at")) if (own or {}).get("sha") == sha else None
+    o = own or {}
+    failed = isinstance(o.get("exit"), int) and o["exit"] != 0  # a green or unseen run names no test
+    began = _parse(o.get("at")) if o.get("sha") == sha and failed else None
     if began is not None:
         mine = next((sid for at, sid in reds if at >= began), None)
     out = []

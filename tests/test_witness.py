@@ -95,6 +95,10 @@ async def test_a_press_is_recorded_with_its_repo_and_refused_for_an_unknown_word
         assert got["recorded"]
         got = await person.call("witness_press", word="host-rebuild", target="contractmatch")
         assert got["recorded"], "a word with no dir"
+        got = await person.call("witness_press", word="new-session", target="", dir=str(repo))
+        assert got["recorded"], "no team: the home names the repo"
+        with pytest.raises(AgentError, match="target names"):
+            await person.call("witness_press", word="host-rebuild", target="")
         for d in ("", str(tmp_path / "nowhere")):
             got = await person.call("witness_press", word="start", target="dc-grind", dir=d)
             assert got["recorded"] is None, "a press on a directory in no registered repo is not recorded"
@@ -104,6 +108,7 @@ async def test_a_press_is_recorded_with_its_repo_and_refused_for_an_unknown_word
     assert [(r["kind"], r["repo"], r["text"]) for r in recs] == [
         ("press", "shiftlead", "apply dc-grind"),
         ("press", "", "host-rebuild contractmatch"),
+        ("press", "shiftlead", "new-session shiftlead"),
     ]
 
 
@@ -247,17 +252,17 @@ def test_the_homes_own_run_on_main_names_its_failed_tests_and_no_other_status_do
     log = tmp_path / "precheck.log"
     log.write_text(
         "...\nFAILED tests/test_a.py::test_x - AssertionError\nFAILED tests/test_b.py::test_y[1]\n"
-        "FAILED tests/test_a.py::test_x - again\n 1 failed\n"
+        "FAILED tests/test_a.py::test_x - again\nFAILED (errors=1)\n 1 failed\n"
     )
-    own = {"sha": SHA, "at": "2026-11-04T10:05:00Z", "log": str(log)}
+    own = {"sha": SHA, "at": "2026-11-04T10:05:00Z", "log": str(log), "exit": 1}
     statuses = [_st(1, "failure", "2026-11-04T10:00:00Z"), _st(2, "failure", "2026-11-04T10:20:00Z")]
     got = [t for _, t, _ in witness.precheck_fails("shiftlead@main", SHA, statuses, own)]
     assert got == [
         "shiftlead@main a1b2c3d4e5f6 status 1",
         "shiftlead@main a1b2c3d4e5f6 status 2 tests/test_a.py::test_x tests/test_b.py::test_y[1]",
     ], "a run set elsewhere before the home's names none"
-    other = {**own, "sha": "f" * 40}
-    assert all(len(t.split()) == 4 for _, t, _ in witness.precheck_fails("shiftlead@main", SHA, statuses, other))
+    for other in ({**own, "sha": "f" * 40}, {**own, "exit": 0}, {**own, "exit": None}):  # another sha; green; unseen
+        assert all(len(t.split()) == 4 for _, t, _ in witness.precheck_fails("shiftlead@main", SHA, statuses, other))
 
 
 def _open_pr(n, head, state, started):
@@ -313,7 +318,7 @@ def test_mains_pass_reads_its_statuses_when_its_precheck_changed_and_names_its_o
     log = tmp_path / "p.log"
     log.write_text("FAILED tests/test_a.py::test_x - boom\n")
     monkeypatch.setattr(
-        promote, "precheck_run", lambda repo: {"sha": SHA, "at": "2026-11-04T09:00:00Z", "log": str(log)}
+        promote, "precheck_run", lambda repo: {"sha": SHA, "at": "2026-11-04T09:00:00Z", "log": str(log), "exit": 1}
     )
     reads: list[str] = []
     monkeypatch.setattr(

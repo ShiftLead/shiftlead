@@ -2745,7 +2745,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             **elsewhere,
         )
         if s.get("state") != "scheduled":  # a scheduled start starts nothing yet, so it is no press (§4.4)
-            await witness_press("new-session", team.strip() or Path(dir.strip()).name, dir.strip())
+            await witness_press("new-session", team.strip(), dir.strip())  # no team: the home names the repo
         # a scheduled record has no terminal yet: the Org shows its card with the *starts* note (§4.5a At)
         return RedirectResponse("/" if s.get("state") == "scheduled" else f"/focus/{s['id']}", status_code=303)
 

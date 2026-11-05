@@ -75,7 +75,7 @@ def test_the_forms_plain_start_is_witnessed_as_a_new_session_press(page):
     r = c.post("/new", data={"name": "w", "dir": str(tmp_path), "adapter": "shell"}, follow_redirects=False)
     assert r.status_code == 303
     assert [p for m, p in calls if m == "witness_press"] == [
-        {"word": "new-session", "target": tmp_path.name, "dir": str(tmp_path)}
+        {"word": "new-session", "target": "", "dir": str(tmp_path)}
     ]
 
 

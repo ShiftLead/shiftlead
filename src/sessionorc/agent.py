@@ -1135,7 +1135,10 @@ class HostAgent(
         if loop is None or loop.is_closed():
             log.warning("the witness log has no loop to take a precheck-fail record")
             return
-        loop.call_soon_threadsafe(self._witness_precheck, repo, text, status, at)
+        try:
+            loop.call_soon_threadsafe(self._witness_precheck, repo, text, status, at)
+        except RuntimeError:  # the loop closed after the check (the agent stopping): the reading goes on
+            log.warning("the witness log's loop closed before a precheck-fail record")
 
     def _witness_repo(self, dir: Any) -> str | None:
         """The registry name of the registered repo `dir` is in (`witness.repo_named`), else None."""
@@ -1152,7 +1155,7 @@ class HostAgent(
         if repo is None:
             log.info("press %s %s: %r is in no registered repo, so it is not witnessed", word, target, dir)
             return None
-        return self._witness("press", repo, f"{word} {target}")
+        return self._witness("press", repo, f"{word} {target or repo}")
 
     async def rpc_witness_press(
         self, word: Any = None, target: Any = None, dir: Any = None, caller: Any = None
@@ -1167,7 +1170,9 @@ class HostAgent(
             raise RpcError("witness_press runs at the home: a press is witnessed there alone (design §4.4)")
         if word not in witness.PRESS_WORDS:
             raise RpcError(f"witness_press: {word!r} is not a press word ({', '.join(witness.PRESS_WORDS)})")
-        if not isinstance(target, str) or not target.strip():
+        # a word that carries a `dir` may leave its target to the home: the repo it maps `dir` to (a New
+        # session with no team, whose directory may be a worktree, names its repo, never the worktree's name)
+        if not isinstance(target, str) or not (target.strip() or witness.PRESS_WORDS[word]):
             raise RpcError("witness_press: target names what was pressed on (design §4.4)")
         got = self._witness_press_of(str(word), target.strip(), dir)
         return {"recorded": got["id"] if got else None}
