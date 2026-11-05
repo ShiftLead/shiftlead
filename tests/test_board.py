@@ -1727,5 +1727,9 @@ def test_a_not_yet_on_a_gated_decide_keeps_it_waiting_in_the_same_write(repo):
     at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
     got = board.write_back(repo, at, GATED, "decide", answer="Not yet")
     assert got["lifted"] == ["TD-190"]
+    files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
+    assert sorted(files) == ["docs/ledger/TD-190.md", "docs/user_attention.md"]
     entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
     assert "**Blocked by:** decision (paul)" in entry and "kept waiting: decision (paul)" in entry
+    line = origin_board(repo).splitlines()[at - 1]
+    assert line.startswith("- [x] ") and "Decided: Not yet" in line and "kept waiting" in line
