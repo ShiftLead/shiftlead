@@ -240,9 +240,12 @@ def _gh(root: Path | str, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def prs(root: Path | str) -> list[dict[str, Any]]:
-    """The repo's pull requests, every state, as `[{number, state (open|merged|closed), head, files}]`."""
-    cp = _gh(root, "pr", "list", "--state", "all", "--limit", "300", "--json", "number,state,headRefName,files")
+def prs(root: Path | str, *narrow: str) -> list[dict[str, Any]]:
+    """The repo's pull requests, every state, as `[{number, state (open|merged|closed), head, files}]`: the
+    newest 300, or with `narrow` (`--head <branch>`, `--search <q>`) those it matches."""
+    cp = _gh(
+        root, "pr", "list", "--state", "all", "--limit", "300", *narrow, "--json", "number,state,headRefName,files"
+    )
     if cp.returncode != 0:
         raise SweepError(_words(cp, "gh pr list"))
     try:
@@ -282,6 +285,13 @@ def _ship(root: Path | str, tree: Path, branch: str, base: str, subject: str, bo
     return (cp.stdout.strip().splitlines() or [""])[-1]
 
 
+def _swept_about(root: Path | str, ctx: str) -> bool:
+    """Whether a `sweep/` PR open or merged names `Context: <ctx>` in its body — an item filed since the
+    clone last fetched (gate_sweep.py's `prs_naming` rule)."""
+    hits = prs(root, "--search", f'"Context: {ctx}" in:body')
+    return any(q["head"].startswith(SWEEP_BRANCH) and q["state"] in ("open", "merged") for q in hits)
+
+
 def _contexts(board: str, archive: str) -> set[str]:
     """Every item's `Context:` on the board and its archive, open or closed, folded as `gate_sweep.py` does."""
     text = board + "\n" + archive
@@ -304,15 +314,21 @@ def _lift(
 ) -> str:
     tid, gate = x["id"], x["gate"]
     branch, path, base = lift_branch(tid, gate), f"{LEDGER}/{tid}.md", p["base"]
-    mine = [q for q in opened if q["head"] == branch]
+    for q in opened:  # first, as gate_sweep.py: a lift another open PR already makes is never made again
+        if q["state"] == "open" and q["head"] != branch and path in q["files"]:
+            cp = _gh(root, "pr", "diff", str(q["number"]))
+            if cp.returncode == 0 and re.search(rf"^\+.*gate lifted: {re.escape(gate)} ", cp.stdout, re.M):
+                return f"lift {tid} {gate}: PR #{q['number']} already lifts it — nothing to do"
+    mine = [q for q in opened if q["head"] == branch] or prs(root, "--head", branch)  # an old one too
     if any(q["state"] == "open" for q in mine):
         return f"lift {tid} {gate}: PR #{mine[0]['number']} is open — nothing to do"
     if any(q["state"] == "merged" for q in mine):
         return f"lift {tid} {gate}: its PR merged and {base} still carries the gate — fetch, then sweep"
     if closed := [q for q in mine if q["state"] == "closed"]:
         ctx = f"{tid} {gate} lift"
-        if ctx.lower() in asked:
-            return f"lift {tid} {gate}: its PR #{closed[0]['number']} was closed unmerged — asked on the board already"
+        n = closed[0]["number"]
+        if ctx.lower() in asked or _swept_about(root, ctx):
+            return f"lift {tid} {gate}: its PR #{n} was closed unmerged — not reopened; asked on the board already"
         extra.append(
             {
                 "text": f"Lift of {gate} on {tid} was closed",
@@ -324,14 +340,7 @@ def _lift(
                 "lifts": None,
             }
         )
-        return (
-            f"lift {tid} {gate}: its PR #{closed[0]['number']} was closed unmerged — not reopened; an act item asks why"
-        )
-    for q in opened:
-        if q["state"] == "open" and path in q["files"]:
-            cp = _gh(root, "pr", "diff", str(q["number"]))
-            if cp.returncode == 0 and re.search(rf"^\+.*gate lifted: {re.escape(gate)} ", cp.stdout, re.M):
-                return f"lift {tid} {gate}: PR #{q['number']} already lifts it — nothing to do"
+        return f"lift {tid} {gate}: its PR #{n} was closed unmerged — not reopened; an act item asks why"
     with Tree(root, base, branch) as tree:
         args = ["lift", tid, "--gate", gate, "--by", by, "--ledger", str(tree / LEDGER)]
         if x.get("kind") == "event" and x.get("evidence"):

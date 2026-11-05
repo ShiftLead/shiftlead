@@ -1660,8 +1660,8 @@ class TickMixin:
                         r,
                         o,
                         today_utc=today,
-                        today_local=date.today(),
-                        by=by,  # noqa: DTZ011 — a board's date is the person's
+                        today_local=date.today(),  # noqa: DTZ011 — a board's date is the person's
+                        by=by,
                     )
                 )
                 if got is None:

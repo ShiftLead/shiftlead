@@ -172,7 +172,7 @@ def test_a_sweep_opens_a_lift_pr_and_a_board_pr_and_merges_neither(repo):
     lifted = _branch(root, "lift/TD-7/x-merged", "docs/ledger/TD-7.md")
     assert "event (x-merged)" not in lifted.split("**Why:**")[0], "the gate is gone from its Blocked by"
     assert "gate lifted: event (x-merged)" in lifted and "o/r#5" in lifted, "logged, with the check's evidence"
-    assert ("ledger.py", "lift", "TD-7", "--gate", "event (x-merged)", "--by", "kmaster") == ran[1][:7]
+    assert ran[1][:7] == ("ledger.py", "lift", "TD-7", "--gate", "event (x-merged)", "--by", "kmaster")
     board = _branch(root, f"sweep/{UTC.isoformat()}", "docs/user_attention.md")
     assert "Context: TD-8 decision (paul)" in board and "Should it go?" in board
     state = json.loads((root.parent / "r-origin.git" / "fake-gh.json").read_text())
@@ -278,3 +278,19 @@ async def test_a_failed_sweep_waits_for_the_next_day(agent, monkeypatch, caplog)
     await agent._sweep_pass(UTC)
     await agent._sweep_pass(UTC)
     assert ran == ["/r"] and "the gate sweep gave no reading — no origin/<default>" in caplog.text
+
+
+def test_a_closed_lift_asked_about_in_a_sweep_pr_not_yet_fetched_is_not_asked_again(repo):
+    """The act item went out in a sweep PR the forge merged and this clone has not fetched: the sweep PR's body
+    names its Context, so no second item is filed (gate_sweep.py's `prs_naming` rule)."""
+    root, _ = repo
+    gatesweep.sweep(root, [], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    state_file = root.parent / "r-origin.git" / "fake-gh.json"
+    state = json.loads(state_file.read_text())
+    state["prs"]["1"]["state"] = "closed"
+    state["prs"]["2"].update(state="merged", body="- file: [act] … — Context: TD-7 event (x-merged) lift")
+    state_file.write_text(json.dumps(state))
+    got, _ = gatesweep.sweep(root, [], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    assert got["applied"][0] == (
+        "lift TD-7 event (x-merged): its PR #1 was closed unmerged — not reopened; asked on the board already"
+    )

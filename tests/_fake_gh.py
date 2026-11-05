@@ -1,8 +1,9 @@
 """A stand-in for the forge's `gh` in the board write-back's tests (design §4.4, TD-264): `pr create`
 records a pull request against the bare origin the working directory's `origin` names, `pr merge
 --squash` squashes its branch onto the base there by pushing, as GitHub would, `pr view` reads its
-state, `pr list` lists them all, and `pr close` closes it. `FAKE_GH_FAIL=create|merge` makes that step fail; `merge-after`
-merges and fails the reply, and `merge-after-moved` also changes origin's board elsewhere right after;
+state, `pr list` lists them (`--head`, and a `--search` of one quoted phrase in the body, narrow it),
+and `pr close` closes it. `FAKE_GH_FAIL=create|merge` makes that step fail; `merge-after` merges and
+fails the reply, and `merge-after-moved` also changes origin's board elsewhere right after;
 `FAKE_GH_VIEW_FAIL` makes `pr view` fail. State lives beside the bare origin."""
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ def main(argv: list[str]) -> int:
             "base": opts["--base"],
             "head": opts["--head"],
             "title": opts["--title"],
+            "body": opts.get("--body", ""),
             "state": "open",
         }
         state_file.write_text(json.dumps(state))
@@ -85,9 +87,12 @@ def main(argv: list[str]) -> int:
         "pr",
         "list",
     ]:  # the gate sweep's read (TD-1376): every PR, as `--json number,state,headRefName,files`
+        opts = dict(zip(argv[2::2], argv[3::2], strict=False))
+        want = (opts.get("--search") or "").split('"')
         rows = [
             {"number": int(n), "state": pr["state"].upper(), "headRefName": pr["head"], "files": []}
             for n, pr in state["prs"].items()
+            if opts.get("--head") in (None, pr["head"]) and (len(want) < 2 or want[1] in pr.get("body", ""))
         ]
         print(json.dumps(rows))
         return 0
