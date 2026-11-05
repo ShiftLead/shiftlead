@@ -1185,7 +1185,7 @@ class HostAgent(
         repo is `repo` (omitted: any; `shiftlead` takes a record of no repo too). A home read: a node forwards
         it while its link is up and refuses it offline (`modes.HOME_READS`). Refused for a kind not in the
         table; nothing for age."""
-        if kind not in witness.KINDS:
+        if not isinstance(kind, str) or kind not in witness.KINDS:
             raise RpcError(f"host_log: {kind!r} is not a witness kind ({', '.join(witness.KINDS)})")
         try:
             when = datetime.fromisoformat(str(after).replace("Z", "+00:00")) if after else None
