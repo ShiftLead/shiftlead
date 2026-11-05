@@ -128,6 +128,17 @@ def test_a_bare_id_links_only_where_one_repo_carries_it_open(tmp_path):
     assert cards["alpha#TD-001"]["top"]["answered"] is not None, "a `<repo>#` ref links"
 
 
+def test_an_origin_path_ref_links_its_repos_member(tmp_path):
+    """TD-1371: `refs` reads `o/a#TD-n` whole, so the open members' index carries each repo's origin path too."""
+    a, ra = _held(tmp_path, "alpha", written=ANSWERED - timedelta(hours=2))
+    c, rc = _repo(tmp_path, "gamma", [_entry(1, "gamma's own TD-001", Priority="Low")])
+    _, cards = _top({a: ra, c: rc}, [_q("O/Alpha#TD-1")])
+    assert cards["alpha#TD-001"]["top"]["answered"] is not None, "an origin path links as the name does"
+    _, cards = _top({a: ra, c: rc}, [_q("o/gamma#TD-1")])
+    assert cards["alpha#TD-001"]["top"]["answered"] is None, "another repo's origin path does not"
+    assert queue.open_refs(["alpha#TD-001"], {"alpha": "o/alpha"})["o/alpha#TD-001"] == "alpha#TD-001"
+
+
 def test_with_you_wins_over_the_answered_word(tmp_path):
     root, r = _held(tmp_path, written=ANSWERED - timedelta(hours=2))
     mine = _rec("p", root, "TD-001", state="idle")

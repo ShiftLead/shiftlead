@@ -126,15 +126,19 @@ ANSWERED_DONE_FOR = timedelta(days=1)
 _GONE = ("exited", "closed")
 
 
-def open_refs(qids: Iterable[str]) -> dict[str, str]:
+def open_refs(qids: Iterable[str], origins: Mapping[str, str] | None = None) -> dict[str, str]:
     """The open members' index an answered question links through (§4.4 *The card's status*, TD-1316): each
-    `<repo>#TD-n` to itself, and the bare `TD-n` to it only where exactly one open member across the repos
-    carries it — two repos' `TD-n` link to neither."""
+    `<repo>#TD-n` to itself, `<origin path>#TD-n` to it where `origins` give the repo one (TD-1371), and the
+    bare `TD-n` to it only where exactly one open member across the repos carries it — two repos' `TD-n` link
+    to neither."""
     out: dict[str, str] = {}
     bare: dict[str, set[str]] = {}
     for q in qids:
         out[q] = q
-        bare.setdefault(q.partition("#")[2], set()).add(q)
+        name, _, tid = q.partition("#")
+        if path := (origins or {}).get(name):
+            out.setdefault(f"{path}#{tid}", q)
+        bare.setdefault(tid, set()).add(q)
     for tid, qs in bare.items():
         if len(qs) == 1:
             out[tid] = next(iter(qs))
@@ -521,7 +525,7 @@ def reading(
                     prs[q] = dict(pr)
                     break
 
-    linked = open_refs(open_)
+    linked = open_refs(open_, rs.origins)
 
     def row(q: str) -> dict[str, Any]:
         if q in open_:

@@ -2496,13 +2496,20 @@ def ledger_for_you(
     questions = [q for q in inbox or () if isinstance(q, Mapping)]
     states = {str(s.get("id")): str(s.get("state") or "") for s in fleet if s.get("id")}
     names = {str(s.get("id")): str(s.get("name") or s.get("id")) for s in fleet if s.get("id")}
+    readings = {
+        str(r.get("name") or Path(str(r.get("root") or k)).name): r
+        for k, r in (every if every is not None else repos or {}).items()
+        if isinstance(r, dict)
+    }
     linked = (
         queue_mod.open_refs(
-            queue_mod.qid(str(r.get("name") or Path(str(r.get("root") or k)).name), str(e.get("id")))
-            for k, r in (every if every is not None else repos or {}).items()
-            if isinstance(r, dict)
-            for e in (r.get("ledger") or {}).get("entries") or ()
-            if isinstance(e, dict) and e.get("id")
+            (
+                queue_mod.qid(n, str(e.get("id")))
+                for n, r in readings.items()
+                for e in (r.get("ledger") or {}).get("entries") or ()
+                if isinstance(e, dict) and e.get("id")
+            ),
+            {n: o for n, r in readings.items() if (o := lb.origin_path(str(r.get("remote") or "")))},
         )
         if questions
         else {}
