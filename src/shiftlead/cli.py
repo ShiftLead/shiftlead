@@ -2631,6 +2631,46 @@ def cmd_spend(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def cmd_host_log(args: argparse.Namespace) -> int:
+    """`ao host-log <kind> ["<text>"] --since <date> [--times N] [--repo R]` (design §4.7, §4.4 *The query*,
+    TD-1387): the home's witness log counted from 00:00 UTC of `--since` — the count, how far back the log
+    covers and the first N records, oldest first; exit 0 when the count reaches N, 1 when it does not, 2 when
+    refused. `--kinds` prints the kinds, each with its text and declared class; `--json` the answer whole."""
+    from sessionorc import witness
+
+    if args.kinds:
+        table = {k: dict(v) for k, v in witness.KINDS.items()}
+        if args.json:
+            print(json.dumps(table, indent=1))
+        else:
+            for k, v in table.items():
+                print(f"{k}  ({v['class']})  {v['text']}")
+        return 0
+    if not args.kind:
+        return fail(args, "ao host-log: name a kind, or --kinds for the table", 2)
+    if not args.since:
+        return fail(args, "ao host-log: --since <date> is required: the count runs from 00:00 UTC of it", 2)
+    try:
+        day = date.fromisoformat(args.since)
+    except ValueError:
+        return fail(args, f"ao host-log: --since {args.since!r} is not a date (YYYY-MM-DD)", 2)
+    if args.times < 1:
+        return fail(args, "ao host-log: --times is 1 or more", 2)
+    after = datetime(day.year, day.month, day.day, tzinfo=UTC).isoformat()
+    try:
+        got = call_sync("host_log", kind=args.kind, text=args.text or "", after=after, repo=args.repo)
+    except AgentError as e:
+        return fail(args, str(e), 2)
+    count = int(got.get("count") or 0)
+    if args.json:
+        print(json.dumps(got, indent=1))
+    else:
+        print(f"{count} {args.kind} since {day.isoformat()} (the log covers from {got.get('covers_from')})")
+        for r in (got.get("records") or [])[: args.times]:
+            print(f"  {r.get('id')}  {r.get('at')}  {r.get('repo') or '-'}  {r.get('text')}")
+    return 0 if count >= args.times else 1
+
+
 def record_spend(sessions: list[dict[str, Any]], call: Callable[..., Any]) -> dict[str, dict[str, Any]]:
     """Each record's seat-ledger figure for `ao status -v` (design §4.7, §4.4 *Spend per seat*, TD-831): the
     `seats` reading `by: record` today and this week, as `{day, week, past_200k, past_300k, unit}`, the two
@@ -5260,6 +5300,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--priority")
     p.add_argument("--id", help="the session to report for (default: your own, from SHIFTLEAD_SESSION)")
     p.set_defaults(fn=cmd_finding)
+
+    p = add("host-log", help="count the home's witness log since a date (design §4.4 The query, §4.7)")
+    p.add_argument("kind", nargs="?", help="the kind of record: `--kinds` lists them")
+    p.add_argument("text", nargs="?", default="", help="text the record contains, matched literally")
+    p.add_argument("--since", metavar="DATE", help="count from 00:00 UTC of this date, YYYY-MM-DD")
+    p.add_argument("--times", type=int, default=1, metavar="N", help="exit 0 when the count reaches N (default 1)")
+    p.add_argument("--repo", help="a registry name; omitted: any repo")
+    p.add_argument("--kinds", action="store_true", help="print the kinds, each with its text and class")
+    p.set_defaults(fn=cmd_host_log)
 
     p = add("board", help="a board line by its id (design §4.4 *A board line's id*, §4.7)")
     bsub = p.add_subparsers(dest="action", required=True)
