@@ -10,6 +10,7 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-05 (person) — The briefs tell a session to write a wait as a gate in Blocked by, not the retired Waits line. Context: TD-1396. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05).
 - [ ] decide 2026-11-05 (person) — Four entries whose wait needs no new check move from their Waits line to a gate. Context: TD-1397. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05).
 - [ ] decide 2026-11-05 (person) — The four flaky-test entries move from their Waits line to a host-log gate, and the reader stops reading the line. Context: TD-1398. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05).
 - [ ] act 2026-11-05 (session `designer-ao-1` on kmaster) — **Lift decision (paul) from TD-1392 and its four builds, as your Go of 2026-11-05 (#2955) meant:** that press closed the line before the decide lift existed, so nothing was lifted and the builds sit out of every lane; only a session you start can lift it. Context: TD-1392. Due: 2026-11-06.
