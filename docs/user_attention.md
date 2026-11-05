@@ -10,6 +10,7 @@ People: paul
 
 ## Needs the user
 
+- [ ] decide 2026-11-05 (person) — An entry that waits on an until or event gate reads as waiting, not blocked: ShiftLead takes its waiting mark from the gates. Context: TD-1395. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05).
 - [ ] decide 2026-11-05 (person) — The briefs tell a session to write a wait as a gate in Blocked by, not the retired Waits line. Context: TD-1396. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05).
 - [ ] decide 2026-11-05 (person) — Four entries whose wait needs no new check move from their Waits line to a gate. Context: TD-1397. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05).
 - [ ] decide 2026-11-05 (person) — The four flaky-test entries move from their Waits line to a host-log gate, and the reader stops reading the line. Context: TD-1398. Due: 2026-11-05. Decided: go ahead (by paul) (2026-11-05).
