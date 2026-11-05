@@ -1,0 +1,166 @@
+{
+ "count_host_log": {
+  "at_the_first_instant_counted": {
+   "ok": {
+    "count": 1,
+    "evidence": "team-events/rec-1",
+    "outcome": "passed"
+   }
+  },
+  "count_not_capped": {
+   "ok": {
+    "count": 3,
+    "evidence": "team-events/a",
+    "outcome": "passed"
+   }
+  },
+  "equal_records_one_token": {
+   "ok": {
+    "count": 2,
+    "evidence": "team-events@20260111T100000Z",
+    "outcome": "passed"
+   }
+  },
+  "evidence_80_char_id": {
+   "ok": {
+    "count": 1,
+    "evidence": "team-events/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "outcome": "passed"
+   }
+  },
+  "evidence_81_char_id_falls_back": {
+   "ok": {
+    "count": 1,
+    "evidence": "team-events@20260111T100000Z",
+    "outcome": "passed"
+   }
+  },
+  "evidence_bad_id_falls_back": {
+   "ok": {
+    "count": 3,
+    "evidence": "team-events@20260111T100000Z",
+    "outcome": "passed"
+   }
+  },
+  "evidence_id_with_segments": {
+   "ok": {
+    "count": 1,
+    "evidence": "team-events/2026/01/rec-9",
+    "outcome": "passed"
+   }
+  },
+  "evidence_time_when_no_id": {
+   "ok": {
+    "count": 1,
+    "evidence": "team-events@20260116T093000Z",
+    "outcome": "passed"
+   }
+  },
+  "kind_must_match_exactly": {
+   "ok": {
+    "count": 0,
+    "evidence": null,
+    "outcome": "not yet"
+   }
+  },
+  "no_kind_counts_any_kind": {
+   "ok": {
+    "count": 2,
+    "evidence": "team-events/a",
+    "outcome": "passed"
+   }
+  },
+  "no_records": {
+   "ok": {
+    "count": 0,
+    "evidence": null,
+    "outcome": "not yet"
+   }
+  },
+  "on_the_day_of_since_not_counted": {
+   "ok": {
+    "count": 0,
+    "evidence": null,
+    "outcome": "not yet"
+   }
+  },
+  "one_record_passes": {
+   "ok": {
+    "count": 1,
+    "evidence": "team-events/rec-1",
+    "outcome": "passed"
+   }
+  },
+  "public_only_counts_public": {
+   "ok": {
+    "count": 1,
+    "evidence": "team-events/b",
+    "outcome": "passed"
+   }
+  },
+  "public_only_nothing_public": {
+   "ok": {
+    "count": 0,
+    "evidence": null,
+    "outcome": "not yet"
+   }
+  },
+  "refused_at_without_a_zone": {
+   "refused": "a record's at is an aware datetime, not '2026-01-11T10:00:00'"
+  },
+  "refused_bad_since": {
+   "refused": "since needs today's date as YYYY-MM-DD, not '2026-1-10'"
+  },
+  "refused_check_with_a_problem": {
+   "refused": "count_host_log takes parse_check()'s record of a host-log check with no problem"
+  },
+  "refused_not_host_log": {
+   "refused": "count_host_log takes parse_check()'s record of a host-log check with no problem"
+  },
+  "text_literal_case_sensitive": {
+   "ok": {
+    "count": 0,
+    "evidence": null,
+    "outcome": "not yet"
+   }
+  },
+  "ties_by_id_none_first": {
+   "ok": {
+    "count": 3,
+    "evidence": "team-events/B",
+    "outcome": "passed"
+   }
+  },
+  "times_met": {
+   "ok": {
+    "count": 4,
+    "evidence": "team-events/c",
+    "outcome": "passed"
+   }
+  },
+  "times_not_met": {
+   "ok": {
+    "count": 2,
+    "evidence": null,
+    "outcome": "not yet"
+   }
+  }
+ },
+ "first_instant": {
+  "2026-01-10": {
+   "ok": "2026-01-11T00:00:00+00:00"
+  },
+  "2026-02-28": {
+   "ok": "2026-03-01T00:00:00+00:00"
+  },
+  "2026-1-1": {
+   "refused": "since needs today's date as YYYY-MM-DD, not '2026-1-1'"
+  },
+  "2026-12-31": {
+   "ok": "2027-01-01T00:00:00+00:00"
+  },
+  "2028-02-28": {
+   "ok": "2028-02-29T00:00:00+00:00"
+  }
+ }
+}

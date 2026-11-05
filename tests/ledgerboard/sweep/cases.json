@@ -1,35 +1,122 @@
 {
  "repo": "acme/widgets",
  "boards": [
-  {"url": "git@example.com:acme/widgets.git", "basename": "widgets", "board": "widgets.md", "archive": null},
-  {"url": "https://user:tok@github.com:443/acme/beta.git", "basename": "beta", "board": "beta.md", "archive": "beta.archive.md"},
-  {"url": "git@gitlab.example:acme/alpha", "basename": "alpha", "board": "alpha.md", "archive": null}
+  {
+   "url": "git@example.com:acme/widgets.git",
+   "basename": "widgets",
+   "board": "widgets.md",
+   "archive": null
+  },
+  {
+   "url": "https://user:tok@github.com:443/acme/beta.git",
+   "basename": "beta",
+   "board": "beta.md",
+   "archive": "beta.archive.md"
+  },
+  {
+   "url": "git@gitlab.example:acme/alpha",
+   "basename": "alpha",
+   "board": "alpha.md",
+   "archive": null
+  }
  ],
  "results": [
-  ["TD-205", "alpha-ready", "error"],
-  ["TD-206", "beta-ready", "impossible"],
-  ["TD-207", "gamma-ready", "not yet"],
-  ["TD-209", "delta-ready", "passed", "acme/other#12"],
-  ["TD-212", "eps-ready", "impossible"],
-  ["TD-216", "zeta-ready", "not yet"],
-  ["TD-217", "eta-ready", "impossible"],
-  ["TD-218", "theta-ready", "impossible"]
+  [
+   "TD-205",
+   "alpha-ready",
+   "error"
+  ],
+  [
+   "TD-206",
+   "beta-ready",
+   "impossible"
+  ],
+  [
+   "TD-207",
+   "gamma-ready",
+   "not yet"
+  ],
+  [
+   "TD-209",
+   "delta-ready",
+   "passed",
+   "acme/other#12"
+  ],
+  [
+   "TD-212",
+   "eps-ready",
+   "impossible"
+  ],
+  [
+   "TD-216",
+   "zeta-ready",
+   "not yet"
+  ],
+  [
+   "TD-217",
+   "eta-ready",
+   "impossible"
+  ],
+  [
+   "TD-218",
+   "theta-ready",
+   "impossible"
+  ],
+  [
+   "TD-222",
+   "iota-ready",
+   "passed",
+   "team-events/rec-0042"
+  ]
  ],
  "runs": [
-  {"name": "today", "today_utc": "2026-11-03", "today_local": "2026-11-03"},
-  {"name": "two days later", "today_utc": "2026-11-05", "today_local": "2026-11-05"}
+  {
+   "name": "today",
+   "today_utc": "2026-11-03",
+   "today_local": "2026-11-03"
+  },
+  {
+   "name": "two days later",
+   "today_utc": "2026-11-05",
+   "today_local": "2026-11-05"
+  }
  ],
  "rerun": "today",
  "covers": [
-  ["TD-201", "decision (pat)"],
-  ["TD-204", "decision (pat)"],
-  ["TD-207", "event (gamma-ready)"],
-  ["TD-211", "decision (PAT)"],
-  ["TD-213", "decision (pat)"]
+  [
+   "TD-201",
+   "decision (pat)"
+  ],
+  [
+   "TD-204",
+   "decision (pat)"
+  ],
+  [
+   "TD-207",
+   "event (gamma-ready)"
+  ],
+  [
+   "TD-211",
+   "decision (PAT)"
+  ],
+  [
+   "TD-213",
+   "decision (pat)"
+  ]
  ],
  "refused": [
-  {"name": "no own board", "repo": "acme/nowhere"},
-  {"name": "a negative window", "repo": "acme/widgets", "reask_days": -1},
-  {"name": "a bad repo", "repo": "acme widgets"}
+  {
+   "name": "no own board",
+   "repo": "acme/nowhere"
+  },
+  {
+   "name": "a negative window",
+   "repo": "acme/widgets",
+   "reask_days": -1
+  },
+  {
+   "name": "a bad repo",
+   "repo": "acme widgets"
+  }
  ]
 }

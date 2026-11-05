@@ -54,6 +54,12 @@
     "gate": "event (delta-ready)",
     "id": "TD-209",
     "kind": "event"
+   },
+   {
+    "evidence": "team-events/rec-0042",
+    "gate": "event (iota-ready)",
+    "id": "TD-222",
+    "kind": "event"
    }
   ],
   "to_close": {},
@@ -72,6 +78,12 @@
      "evidence": "acme/other#12",
      "gate": "event (delta-ready)",
      "id": "TD-209",
+     "kind": "event"
+    },
+    {
+     "evidence": "team-events/rec-0042",
+     "gate": "event (iota-ready)",
+     "id": "TD-222",
      "kind": "event"
     }
    ],
@@ -260,6 +272,12 @@
      "evidence": "acme/other#12",
      "gate": "event (delta-ready)",
      "id": "TD-209",
+     "kind": "event"
+    },
+    {
+     "evidence": "team-events/rec-0042",
+     "gate": "event (iota-ready)",
+     "id": "TD-222",
      "kind": "event"
     }
    ],

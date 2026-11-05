@@ -1,0 +1,96 @@
+{
+ "blocked": [
+  "TD-702",
+  "TD-701"
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-701",
+   "kind": "below-header",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-701: its Blocked by line is below the header block — read anyway; move it up (cadence.md §2.12)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-702",
+   "kind": "gate-reassigned-often",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-702: decision (Sam) was reassigned 3 times — is the decision stuck?"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-701",
+   "kind": "below-header",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-701: its Blocked by line is below the header block — read anyway; move it up (cadence.md §2.12)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-702",
+   "kind": "gate-reassigned-often",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-702: decision (Sam) was reassigned 3 times — is the decision stuck?"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [
+    "decision (Sam)"
+   ],
+   "card_key": "2|0|000702",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (Sam)",
+    "priority": "Medium"
+   },
+   "id": "TD-702",
+   "key": "2|0|000702",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A decision reassigned three times, after the entry above",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "decision (Alex)"
+   ],
+   "card_key": "3|0|000701",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "decision (Alex)",
+    "priority": "Low"
+   },
+   "id": "TD-701",
+   "key": "3|0|000701",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "A decision gate written below the header block",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-701",
+   "kind": "below-header",
+   "level": "info",
+   "text": "ℹ TD-701: its Blocked by line is below the header block — read anyway; move it up (cadence.md §2.12)"
+  }
+ ],
+ "pickable": [],
+ "rows": []
+}

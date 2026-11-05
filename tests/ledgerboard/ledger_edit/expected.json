@@ -113,6 +113,122 @@
   }
  },
  "check": {
+  "host_log_dated_anew": [
+   {
+    "field": "event",
+    "id": "TD-301",
+    "kind": "event-undated",
+    "level": "info",
+    "standing": true,
+    "text": "ℹ TD-301: its event (apply) gate's host-log check has no gate added: event (apply) Log line to count from (none, or a gate lifted after the last)"
+   },
+   {
+    "field": "event",
+    "id": "TD-302",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-302: its event (apply) gate's host-log check has no gate added: event (apply) Log line to count from (none, or a gate lifted after the last)"
+   },
+   {
+    "field": "event",
+    "id": "TD-303",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-303: its event (apply) gate's host-log wait is new or changed, and no gate added: event (apply) Log line dated today dates it anew"
+   },
+   {
+    "field": "event",
+    "id": "TD-304",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-304: its event (apply) gate's host-log check has no gate added: event (apply) Log line to count from (none, or a gate lifted after the last)"
+   },
+   {
+    "field": "event",
+    "id": "TD-305",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-305: its event (apply) gate's host-log wait is new or changed, and no gate added: event (apply) Log line dated today dates it anew"
+   },
+   {
+    "field": "event",
+    "id": "TD-306",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-306: its event (apply) gate's host-log wait is new or changed, and no gate added: event (apply) Log line dated today dates it anew"
+   },
+   {
+    "field": "event",
+    "id": "TD-307",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-307: its event (apply) gate's host-log wait is new or changed, and no gate added: event (apply) Log line dated today dates it anew"
+   },
+   {
+    "field": "event",
+    "id": "TD-308",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-308: its event (apply) gate's host-log wait is new or changed, and no gate added: event (apply) Log line dated today dates it anew"
+   },
+   {
+    "field": "event",
+    "id": "TD-312",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-312: its event (apply) gate's host-log wait is new or changed, and no gate added: event (apply) Log line dated today dates it anew"
+   },
+   {
+    "field": "event",
+    "id": "TD-313",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-313: its event (apply) gate's host-log wait is new or changed, and no gate added: event (apply) Log line dated today dates it anew"
+   },
+   {
+    "field": "event",
+    "id": "TD-316",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-316: its event (apply) gate's host-log wait is new or changed, and no gate added: event (apply) Log line dated today dates it anew"
+   }
+  ],
+  "host_log_no_old": [
+   {
+    "field": "event",
+    "id": "TD-301",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-301: its event (apply) gate's host-log check has no gate added: event (apply) Log line to count from (none, or a gate lifted after the last)"
+   },
+   {
+    "field": "event",
+    "id": "TD-302",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-302: its event (apply) gate's host-log check has no gate added: event (apply) Log line to count from (none, or a gate lifted after the last)"
+   },
+   {
+    "field": "event",
+    "id": "TD-304",
+    "kind": "event-undated",
+    "level": "error",
+    "standing": false,
+    "text": "⚠ TD-304: its event (apply) gate's host-log check has no gate added: event (apply) Log line to count from (none, or a gate lifted after the last)"
+   }
+  ],
   "log_flags_no_old": [
    {
     "field": "log",
@@ -250,6 +366,15 @@
   "crlf_note": {
    "ok": "## TD-067: CRLF\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** w\n\n**Log:**\n- 2026-01-20: read through CRLF\n"
   },
+  "edit_a_refused_check_logs_nothing": {
+   "ok": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log Team \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n"
+  },
+  "edit_a_section_of_no_carried_gate_logs_nothing": {
+   "ok": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (docs):** the docs team's next message.\ncheck: host-log team-events kind msg \"docs\"\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n"
+  },
+  "edit_adds_a_host_log_section_for_a_carried_gate": {
+   "ok": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply), event (docs)\n\n**Why:** w\n\n**Event (docs):** the docs team's next message.\ncheck: host-log team-events kind msg \"docs\"\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n- 2026-01-20: gate added: event (docs)\n"
+  },
   "edit_adds_a_section_before_the_log": {
    "ok": "## TD-081: Notes written into the Status before the Log\n\n**Priority:** Low\n**Added:** 2026-01-02 found while building TD-80\n**Status:** Open 2026-01-04: half built 2026-01-06: the rest built — was: Resolved 2026-01-03: done too soon — was: Open\n\n**Why:** a reason.\n\n**Related:** TD-80.\n\n**Log:**\n- 2026-01-03: an earlier line\n- 2026-01-05: a later line\n"
   },
@@ -268,8 +393,14 @@
   "edit_fix_after_reopen": {
    "ok": "## TD-062: An archived entry\n\n**Priority:** Low\n**Status:** Open\n\n**Why:** a reason.\n\n**Fix:** fix it again.\n\n**Resolved:** 2026-01-05 (PR #7) — `docs/thing.md`\n\n**Log:**\n- 2026-01-05: built\n- 2026-01-20: reopened — it broke\n"
   },
+  "edit_redates_a_changed_host_log_check": {
+   "ok": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press times 2 \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n- 2026-01-20: gate added: event (apply)\n"
+  },
   "edit_refused_bold_paragraph": {
    "refused": "after the edit the entry would not read back as meant, with the rest unchanged — rephrase it, or edit by hand"
+  },
+  "edit_refused_changed_host_log_check_without_today": {
+   "refused": "edit makes event (apply)'s host-log check a new wait, which the Log dates — pass today (v2.5)"
   },
   "edit_refused_the_log": {
    "refused": "the Log is written by its writers (note, archive, reopen), never replaced by edit"
@@ -277,8 +408,20 @@
   "edit_refused_two_named": {
    "refused": "the body has 2 sections named 'Note' — edit it by hand"
   },
+  "edit_spacing_only_logs_nothing": {
+   "ok": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log  team-events  kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n"
+  },
+  "edit_to_host_log_from_another_type": {
+   "ok": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n- 2026-01-20: gate added: event (apply)\n"
+  },
   "edit_why": {
    "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** a new reason.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+  },
+  "edit_why_with_today": {
+   "ok": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** another reason\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n"
+  },
+  "edit_words_only_logs_nothing": {
+   "ok": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the build team's next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n"
   },
   "note": {
    "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12\n**Blocked by:** TD-012\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-12: half built\n- 2026-01-20: the second half built\n"
@@ -323,7 +466,7 @@
    "refused": "note needs today's date as YYYY-MM-DD, not '20260120'"
   },
   "refused_today_on_an_undated_action": {
-   "refused": "set takes no today"
+   "refused": "renumber takes no today"
   },
   "refused_unknown_action": {
    "refused": "unknown action close"
@@ -377,22 +520,55 @@
    "ok": "## TD-083: An archived Status with no date of its own\n\n**Priority:** Low\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** a reason.\n\n**Resolved:** 2026-01-09 (PR #5)\n\n**Log:**\n- 2026-01-09: built in the first pass\n- 2026-01-20: reopened — not done\n"
   },
   "set_blocked_by_canonical_order": {
-   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-4, decision (kim), until 2026-02-01\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-4, decision (kim), until 2026-02-01\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-20: gate added: decision (kim)\n- 2026-01-20: gate added: until 2026-02-01\n"
+  },
+  "set_drops_a_gate_logs_nothing": {
+   "ok": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n"
   },
   "set_fields": {
    "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** High\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012\n**Waits:** the next run\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n"
   },
+  "set_keeps_a_gate_without_today": {
+   "ok": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n"
+  },
+  "set_logs_a_repeated_gate_once": {
+   "ok": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, decision (kim), decision (Lee), decision (LEE)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n- 2026-01-20: gate added: decision (Lee)\n"
+  },
+  "set_logs_each_gate_it_adds": {
+   "ok": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, decision (Kim), until 2026-02-01, event (ships)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n- 2026-01-20: gate added: until 2026-02-01\n- 2026-01-20: gate added: event (ships)\n"
+  },
+  "set_makes_the_log_for_a_gate": {
+   "ok": "## TD-040: An entry written by hand, its fields out of order\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-10\n**Owner:** builder\n**Status:** Open 2026-01-12: half built\n**Blocked by:** TD-012, decision (kim)\n**Location:** `src/thing.py`\n**Tracker:** ABC-123\n**Pickable:** no\n\nSome words before the first lead, kept as they are.\n\n**Why:** the reason, in two paragraphs.\n\nThe second paragraph of the Why.\n\n**Fix (to design):** a qualified lead is its own section.\n\n**Fix:** the steps:\n- one\n- two\n\n**Location:** a body lead named like a field is a body section.\n\n```\n**Done when:** inside a fence, not a lead\n```\n\n**Done when** the steps are done.\n\n**Related:** TD-012.\n\n**Log:**\n- 2026-01-20: gate added: decision (kim)\n"
+  },
   "set_migrates_old_form": {
-   "ok": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat), until 2026-02-01\n\n**Why:** w\n\n**Ask:** the board's 2026-01-03 item\n"
+   "ok": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat), until 2026-02-01\n\n**Why:** w\n\n**Ask:** the board's 2026-01-03 item\n\n**Log:**\n- 2026-01-20: gate added: until 2026-02-01\n"
+  },
+  "set_migrates_old_form_no_today": {
+   "ok": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat)\n\n**Why:** w\n\n**Ask:** the board's 2026-01-03 item\n"
+  },
+  "set_no_gate_with_today": {
+   "ok": "## TD-121: An entry with a gate\n\n**Priority:** High\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n"
   },
   "set_other_field_keeps_old_form": {
    "ok": "## TD-120: An entry in the old form\n\n**Priority:** High\n**Blocked by:** TD-3, decision (pat) — the board's 2026-01-03 item\n\n**Why:** w\n"
   },
+  "set_readds_a_dropped_gate": {
+   "ok": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n- 2026-01-20: gate added: decision (kim)\n"
+  },
+  "set_refused_bad_today": {
+   "refused": "set needs today's date as YYYY-MM-DD, not '2026-1-20'"
+  },
   "set_refused_field_twice": {
    "refused": "set names one field twice"
   },
+  "set_refused_gate_on_a_log_not_last": {
+   "refused": "a section follows the entry's Log, which is the body's last — move it above the Log, by hand"
+  },
   "set_refused_gate_on_old_form": {
    "refused": "the entry's Blocked by is in the old form, whose text would swallow until 2026-02-01 — migrate it first: set decision (<person>) alone, with its text in an **Ask:** section"
+  },
+  "set_refused_gate_without_today": {
+   "refused": "set adds until 2026-02-01, which the Log dates — pass today (v2.5)"
   },
   "set_refused_old_form": {
    "refused": "Blocked by in the old form (decision (kim) with text after it) is read but never written — write decision (<person>) and put the text in an **Ask:** section"
@@ -453,6 +629,7 @@
  },
  "log": {
   "date_then_punctuation_is_prose": {
+   "gate_added": {},
    "gate_age": {},
    "log_lines": [],
    "log_problems": [],
@@ -461,6 +638,13 @@
    }
   },
   "every_shape": {
+   "gate_added": {
+    "decision (Lee)": null,
+    "decision (kim)": "2026-01-02",
+    "event (other)": null,
+    "event (tool-v3)": null,
+    "until 2026-03-01": null
+   },
    "gate_age": {
     "decision (Lee)": "2026-01-06",
     "decision (kim)": "2026-01-05",
@@ -611,7 +795,158 @@
     "ok": "## TD-080: An entry whose Log holds every writer shape\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Kim), until 2026-03-01, event (tool-v3)\n\n**Why:** a reason.\n\n**Ask:** go or not?\n\n**Log:**\n- 2026-01-02: filed by Kim, session plan-7, while other-repo#TD-4: \"file the \"tool\" entry\"\n- 2026-01-02: gate added: decision (Kim)\n- 2026-01-03: gate added: until 2026-03-01\n- 2026-01-04: gate added: event (tool-v3)\n- 2026-01-05: kept waiting: decision (Kim) — by Kim; answer \"Not yet\"\n- 2026-01-06: gate reassigned: decision (Kim) → decision (Lee) — by Kim; away a month\n- 2026-01-07: gate lifted: decision (Lee) — by Lee; answer \"Go\"; board other-repo\n- 2026-01-07: gate lifted: decision (Lee) — by Kim; override: Lee is away\n- 2026-01-08: gate lifted: event (tool-v3) — by box-1; pr-merged passed; tool#31\n- 2026-01-08: gate lifted: event (tool-v3) — by Kim; answer \"Drop it\"\n- 2026-01-09: gate lifted: until 2026-03-01 — by box-1; date reached\n- 2026-01-09: gate lift skipped: TD-81 no longer carries decision (Kim)\n- 2026-01-10: archived: Dropped — nothing needs it\n- 2026-01-11: reopened — it is needed after all\n- 2026-01-11: was: Built 2026-01-10: half of it\n- 2026-01-12: note: was: a lifted note that would read as a writer line\n- 2026-01-12: a tool of the future wrote this: unknown, kept byte for byte\n- 2026-01-13: gate lifted: by hand, in no shape\n"
    }
   },
+  "gate_added": {
+   "gate_added": {
+    "decision (KIM)": "2026-01-05",
+    "event (docs)": null,
+    "event (late)": "2026-01-10",
+    "event (never)": null,
+    "event (none-added)": null,
+    "event (tool-v3)": "2026-01-07",
+    "until 2026-03-01": "2026-01-04"
+   },
+   "gate_age": {
+    "decision (KIM)": "2026-01-05",
+    "event (docs)": "2026-01-08",
+    "event (late)": "2026-01-12",
+    "event (never)": "2026-01-02",
+    "event (none-added)": "2026-01-11",
+    "event (tool-v3)": "2026-01-07",
+    "until 2026-03-01": "2026-01-09"
+   },
+   "log_lines": [
+    {
+     "date": "2026-01-02",
+     "gate": "decision (kim)",
+     "kind": "gate-added",
+     "text": "gate added: decision (kim)"
+    },
+    {
+     "date": "2026-01-04",
+     "gate": "until 2026-03-01",
+     "kind": "gate-added",
+     "text": "gate added: until 2026-03-01"
+    },
+    {
+     "date": "2026-01-05",
+     "gate": "decision (Kim)",
+     "kind": "gate-added",
+     "text": "gate added: decision (Kim)"
+    },
+    {
+     "date": "2026-01-06",
+     "gate": "event (tool-v3)",
+     "kind": "gate-added",
+     "text": "gate added: event (tool-v3)"
+    },
+    {
+     "by": "box-1",
+     "check": "pr-merged",
+     "date": "2026-01-07",
+     "evidence": "tool#31",
+     "gate": "event (tool-v3)",
+     "kind": "gate-lifted",
+     "text": "gate lifted: event (tool-v3) — by box-1; pr-merged passed; tool#31",
+     "via": "check"
+    },
+    {
+     "date": "2026-01-07",
+     "gate": "event (tool-v3)",
+     "kind": "gate-added",
+     "text": "gate added: event (tool-v3)"
+    },
+    {
+     "date": "2026-01-08",
+     "gate": "event (docs)",
+     "kind": "gate-added",
+     "text": "gate added: event (docs)"
+    },
+    {
+     "by": "Kim",
+     "date": "2026-01-09",
+     "gate": "event (docs)",
+     "kind": "gate-lifted",
+     "label": "Go",
+     "text": "gate lifted: event (docs) — by Kim; answer \"Go\"",
+     "via": "answer"
+    },
+    {
+     "by": "Kim",
+     "date": "2026-01-09",
+     "gate": "until 2026-03-01",
+     "kind": "kept-waiting",
+     "label": "Keep waiting",
+     "text": "kept waiting: until 2026-03-01 — by Kim; answer \"Keep waiting\""
+    },
+    {
+     "date": "2026-01-12",
+     "gate": "event (late)",
+     "kind": "gate-added",
+     "text": "gate added: event (late)"
+    },
+    {
+     "date": "2026-01-10",
+     "gate": "event (late)",
+     "kind": "gate-added",
+     "text": "gate added: event (late)"
+    },
+    {
+     "by": "Kim",
+     "date": "2026-01-11",
+     "gate": "event (none-added)",
+     "kind": "kept-waiting",
+     "label": "Keep waiting",
+     "text": "kept waiting: event (none-added) — by Kim; answer \"Keep waiting\""
+    }
+   ],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-082: An entry whose gates were added, lifted and added again\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Kim), until 2026-03-01, event (tool-v3), event (docs), event (late)\n\n**Why:** a reason.\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n- 2026-01-04: gate added: until 2026-03-01\n- 2026-01-05: gate added: decision (Kim)\n- 2026-01-06: gate added: event (tool-v3)\n- 2026-01-07: gate lifted: event (tool-v3) — by box-1; pr-merged passed; tool#31\n- 2026-01-07: gate added: event (tool-v3)\n- 2026-01-08: gate added: event (docs)\n- 2026-01-09: gate lifted: event (docs) — by Kim; answer \"Go\"\n- 2026-01-09: kept waiting: until 2026-03-01 — by Kim; answer \"Keep waiting\"\n- 2026-01-12: gate added: event (late)\n- 2026-01-10: gate added: event (late)\n- 2026-01-11: kept waiting: event (none-added) — by Kim; answer \"Keep waiting\"\n"
+   }
+  },
+  "gate_added_reopened": {
+   "gate_added": {
+    "event (ships)": "2026-01-02"
+   },
+   "gate_age": {
+    "event (ships)": "2026-01-02"
+   },
+   "log_lines": [
+    {
+     "date": "2026-01-02",
+     "kind": "filed",
+     "session": "plan-7",
+     "text": "filed by Kim, session plan-7: \"file it\"",
+     "who": "Kim",
+     "words": "file it"
+    },
+    {
+     "date": "2026-01-02",
+     "gate": "event (ships)",
+     "kind": "gate-added",
+     "text": "gate added: event (ships)"
+    },
+    {
+     "date": "2026-01-05",
+     "kind": "archived",
+     "text": "archived: Dropped — not wanted",
+     "why": "not wanted",
+     "word": "Dropped"
+    },
+    {
+     "date": "2026-01-09",
+     "kind": "reopened",
+     "text": "reopened — wanted after all",
+     "why": "wanted after all"
+    }
+   ],
+   "log_problems": [],
+   "status_notes_to_log": {
+    "ok": "## TD-083: A reopened entry whose gate survived\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (ships)\n\n**Why:** a reason.\n\n**Log:**\n- 2026-01-02: filed by Kim, session plan-7: \"file it\"\n- 2026-01-02: gate added: event (ships)\n- 2026-01-05: archived: Dropped — not wanted\n- 2026-01-09: reopened — wanted after all\n"
+   }
+  },
   "in_progress": {
+   "gate_added": {},
    "gate_age": {},
    "log_lines": [],
    "log_problems": [],
@@ -620,6 +955,9 @@
    }
   },
   "legacy_status": {
+   "gate_added": {
+    "decision (Kim)": null
+   },
    "gate_age": {
     "decision (Kim)": "2026-01-03"
    },
@@ -641,6 +979,9 @@
    }
   },
   "log_not_last": {
+   "gate_added": {
+    "decision (Kim)": null
+   },
    "gate_age": {
     "decision (Kim)": "2026-01-02"
    },
@@ -671,6 +1012,7 @@
    }
   },
   "superseded_by_with_no_date": {
+   "gate_added": {},
    "gate_age": {},
    "log_lines": [],
    "log_problems": [],
@@ -679,6 +1021,7 @@
    }
   },
   "undated_status": {
+   "gate_added": {},
    "gate_age": {},
    "log_lines": [],
    "log_problems": [],
@@ -687,6 +1030,9 @@
    }
   },
   "unknown_status": {
+   "gate_added": {
+    "decision (Kim)": null
+   },
    "gate_age": {
     "decision (Kim)": "2026-01-02"
    },
@@ -697,6 +1043,7 @@
    }
   },
   "was_takes_the_resolved_date": {
+   "gate_added": {},
    "gate_age": {},
    "log_lines": [],
    "log_problems": [],

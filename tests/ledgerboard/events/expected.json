@@ -1,7 +1,7 @@
 {
  "parse_check": {
   "": {
-   "problem": "unknown check type '' — one of pr-merged, file-contains, ref-includes",
+   "problem": "unknown check type '' — one of pr-merged, file-contains, ref-includes, host-log",
    "type": ""
   },
   "file-contains\ta\tp.md\t\"x\"": {
@@ -244,6 +244,282 @@
    "text": "x",
    "type": "file-contains"
   },
+  "host-log": {
+   "problem": "host-log needs its text in quotes: host-log <source> [kind <kind>] [times <N>] \"<text>\"",
+   "type": "host-log"
+  },
+  "host-log \"x\"": {
+   "problem": "the quoted text is an argument of its own: a space comes before its opening quote",
+   "type": "host-log"
+  },
+  "host-log -x \"x\"": {
+   "kind": null,
+   "problem": "the source '-x' is not 1 to 40 of [a-z0-9-], not starting with - (a name, never a path)",
+   "source": "-x",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log /var/log/x \"x\"": {
+   "kind": null,
+   "problem": "the source '/var/log/x' is not 1 to 40 of [a-z0-9-], not starting with - (a name, never a path)",
+   "source": "/var/log/x",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log Syslog \"x\"": {
+   "kind": null,
+   "problem": "the source 'Syslog' is not 1 to 40 of [a-z0-9-], not starting with - (a name, never a path)",
+   "source": "Syslog",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log a_b \"x\"": {
+   "kind": null,
+   "problem": "the source 'a_b' is not 1 to 40 of [a-z0-9-], not starting with - (a name, never a path)",
+   "source": "a_b",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb kind abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \"x\"": {
+   "kind": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "problem": null,
+   "source": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \"x\"": {
+   "kind": null,
+   "problem": "the source 'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' is not 1 to 40 of [a-z0-9-], not starting with - (a name, never a path)",
+   "source": "abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log ci \"test_x failed\"": {
+   "kind": null,
+   "problem": null,
+   "source": "ci",
+   "text": "test_x failed",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log kind \"x\"": {
+   "kind": null,
+   "problem": null,
+   "source": "kind",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s\t\"x\"": {
+   "kind": null,
+   "problem": null,
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s  kind  k  times  2  \"x\"": {
+   "kind": "k",
+   "problem": null,
+   "source": "s",
+   "text": "x",
+   "times": 2,
+   "type": "host-log"
+  },
+  "host-log s \" \"": {
+   "problem": "the quoted text is empty",
+   "type": "host-log"
+  },
+  "host-log s \"\"": {
+   "problem": "the quoted text is empty",
+   "type": "host-log"
+  },
+  "host-log s \"a\tb\"": {
+   "problem": "the quoted text holds a control character",
+   "type": "host-log"
+  },
+  "host-log s \"say \"hi\" now\"": {
+   "kind": null,
+   "problem": null,
+   "source": "s",
+   "text": "say \"hi\" now",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s \"x\" times 2": {
+   "problem": "nothing may follow the quoted text",
+   "type": "host-log"
+  },
+  "host-log s 2 \"x\"": {
+   "kind": null,
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\"",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s Times 2 \"x\"": {
+   "kind": null,
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\": kind, then times, each once, in that order",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s extra \"x\"": {
+   "kind": null,
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\"",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s kind \"x\"": {
+   "kind": null,
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\"",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s kind K \"x\"": {
+   "kind": null,
+   "problem": "the kind 'K' is not 1 to 40 of [a-z0-9-], not starting with -",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s kind a kind b \"x\"": {
+   "kind": "a",
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\": kind, then times, each once, in that order",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s kind abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb \"x\"": {
+   "kind": null,
+   "problem": "the kind 'abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' is not 1 to 40 of [a-z0-9-], not starting with -",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s kind k times \"x\"": {
+   "kind": null,
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\"",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s kind times \"x\"": {
+   "kind": "times",
+   "problem": null,
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s times \"x\"": {
+   "kind": null,
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\"",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s times 0 \"x\"": {
+   "kind": null,
+   "problem": "the count '0' is not 1 to 999, with no leading zero",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s times 01 \"x\"": {
+   "kind": null,
+   "problem": "the count '01' is not 1 to 999, with no leading zero",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s times 1000 \"x\"": {
+   "kind": null,
+   "problem": "the count '1000' is not 1 to 999, with no leading zero",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s times 2 kind k \"x\"": {
+   "kind": null,
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\": kind, then times, each once, in that order",
+   "source": "s",
+   "text": "x",
+   "times": 2,
+   "type": "host-log"
+  },
+  "host-log s times 999 \"x\"": {
+   "kind": null,
+   "problem": null,
+   "source": "s",
+   "text": "x",
+   "times": 999,
+   "type": "host-log"
+  },
+  "host-log s twice 2 \"x\"": {
+   "kind": null,
+   "problem": "host-log takes <source> [kind <kind>] [times <N>] \"<text>\": kind, then times, each once, in that order",
+   "source": "s",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log s x": {
+   "problem": "host-log needs its text in quotes: host-log <source> [kind <kind>] [times <N>] \"<text>\"",
+   "type": "host-log"
+  },
+  "host-log team-events kind precheck-fail \"x\"": {
+   "kind": "precheck-fail",
+   "problem": null,
+   "source": "team-events",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log team-events kind press times 2 \"Apply nightly-build\"": {
+   "kind": "press",
+   "problem": null,
+   "source": "team-events",
+   "text": "Apply nightly-build",
+   "times": 2,
+   "type": "host-log"
+  },
+  "host-log team-events times 1 \"x\"": {
+   "kind": null,
+   "problem": null,
+   "source": "team-events",
+   "text": "x",
+   "times": 1,
+   "type": "host-log"
+  },
+  "host-log times times 3 \"x\"": {
+   "kind": null,
+   "problem": null,
+   "source": "times",
+   "text": "x",
+   "times": 3,
+   "type": "host-log"
+  },
   "pr-merged -x#1": {
    "n": 1,
    "problem": "the repo '-x' is not a name or /-separated components of ASCII [A-Za-z0-9_.-] (none . or .., none starting with -)",
@@ -288,6 +564,10 @@
    "repo": "",
    "type": "pr-merged"
   },
+  "pr-merged acme/tools#1 \"x\"": {
+   "problem": "pr-merged takes <repo>#<n>",
+   "type": "pr-merged"
+  },
   "pr-merged acme/tools#1 extra": {
    "problem": "pr-merged takes <repo>#<n>",
    "type": "pr-merged"
@@ -305,7 +585,7 @@
    "type": "pr-merged"
   },
   "pr-merged a#1": {
-   "problem": "unknown check type 'pr-merged\\xa0a#1' — one of pr-merged, file-contains, ref-includes",
+   "problem": "unknown check type 'pr-merged\\xa0a#1' — one of pr-merged, file-contains, ref-includes, host-log",
    "type": "pr-merged a#1"
   },
   "ref-includes a@a+b abcdef1": {
@@ -426,6 +706,10 @@
    "repo": "acme/tools",
    "type": "ref-includes"
   },
+  "ref-includes acme/tools@main abcdef1 \"x\"": {
+   "problem": "ref-includes takes <repo>@<ref> <commit>",
+   "type": "ref-includes"
+  },
   "ref-includes acme/tools@main ghijklm": {
    "commit": "ghijklm",
    "problem": "the commit 'ghijklm' is not 7 to 40 of [0-9a-f]",
@@ -441,7 +725,7 @@
    "type": "ref-includes"
   },
   "url-up https://example.invalid/": {
-   "problem": "unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes",
+   "problem": "unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes, host-log",
    "type": "url-up"
   }
  },
@@ -452,6 +736,20 @@
    "name": "Ships",
    "problem": "the event name 'Ships' is not [a-z0-9-]+",
    "words": "the vendor ships."
+  },
+  "**Event (applied):** the next Apply of the build team.\ncheck: host-log team-events kind press \"Apply nightly-build\"": {
+   "check": {
+    "kind": "press",
+    "problem": null,
+    "source": "team-events",
+    "text": "Apply nightly-build",
+    "times": 1,
+    "type": "host-log"
+   },
+   "first": "**Event (applied):** the next Apply of the build team.",
+   "name": "applied",
+   "problem": null,
+   "words": "the next Apply of the build team."
   },
   "**Event (ships):**\ncheck: pr-merged acme/tools#3": {
    "check": null,

@@ -1,0 +1,417 @@
+{
+ "first_instant": [
+  "2026-01-10",
+  "2026-02-28",
+  "2028-02-28",
+  "2026-12-31",
+  "2026-1-1"
+ ],
+ "count_host_log": [
+  {
+   "name": "one_record_passes",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T09:30:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "rec-1"
+    }
+   ]
+  },
+  {
+   "name": "on_the_day_of_since_not_counted",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-10T23:59:59Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "rec-1"
+    }
+   ]
+  },
+  {
+   "name": "at_the_first_instant_counted",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T00:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "rec-1"
+    }
+   ]
+  },
+  {
+   "name": "times_met",
+   "check": "host-log team-events times 3 \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-12T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "c"
+    },
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "a"
+    },
+    {
+     "at": "2026-01-13T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "d"
+    },
+    {
+     "at": "2026-01-11T12:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "b"
+    }
+   ]
+  },
+  {
+   "name": "times_not_met",
+   "check": "host-log team-events times 3 \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "a"
+    },
+    {
+     "at": "2026-01-12T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "b"
+    }
+   ]
+  },
+  {
+   "name": "kind_must_match_exactly",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "Press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "a"
+    },
+    {
+     "at": "2026-01-11T11:00:00Z",
+     "kind": null,
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "b"
+    },
+    {
+     "at": "2026-01-11T12:00:00Z",
+     "kind": "msg",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "c"
+    }
+   ]
+  },
+  {
+   "name": "no_kind_counts_any_kind",
+   "check": "host-log team-events \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": null,
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "a"
+    },
+    {
+     "at": "2026-01-11T11:00:00Z",
+     "kind": "msg",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "b"
+    }
+   ]
+  },
+  {
+   "name": "text_literal_case_sensitive",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "apply dc-grind",
+     "public": true,
+     "id": "a"
+    },
+    {
+     "at": "2026-01-11T11:00:00Z",
+     "kind": "press",
+     "text": "App.y",
+     "public": true,
+     "id": "b"
+    },
+    {
+     "at": "2026-01-11T12:00:00Z",
+     "kind": "press",
+     "text": null,
+     "public": true,
+     "id": "c"
+    }
+   ]
+  },
+  {
+   "name": "public_only_counts_public",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "public_only": true,
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": false,
+     "id": "a"
+    },
+    {
+     "at": "2026-01-11T11:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "b"
+    }
+   ]
+  },
+  {
+   "name": "public_only_nothing_public",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "public_only": true,
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": false,
+     "id": "a"
+    }
+   ]
+  },
+  {
+   "name": "ties_by_id_none_first",
+   "check": "host-log team-events times 2 \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "b"
+    },
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "B"
+    },
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true
+    }
+   ]
+  },
+  {
+   "name": "equal_records_one_token",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true
+    },
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true
+    }
+   ]
+  },
+  {
+   "name": "count_not_capped",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "a"
+    },
+    {
+     "at": "2026-01-12T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "b"
+    },
+    {
+     "at": "2026-01-13T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "c"
+    }
+   ]
+  },
+  {
+   "name": "evidence_time_when_no_id",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-16T09:30:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true
+    }
+   ]
+  },
+  {
+   "name": "evidence_80_char_id",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   ]
+  },
+  {
+   "name": "evidence_81_char_id_falls_back",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+    }
+   ]
+  },
+  {
+   "name": "evidence_bad_id_falls_back",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "a/../b"
+    },
+    {
+     "at": "2026-01-12T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "a b"
+    },
+    {
+     "at": "2026-01-13T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "a//b"
+    }
+   ]
+  },
+  {
+   "name": "evidence_id_with_segments",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00Z",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true,
+     "id": "2026/01/rec-9"
+    }
+   ]
+  },
+  {
+   "name": "no_records",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": []
+  },
+  {
+   "name": "refused_check_with_a_problem",
+   "check": "host-log Team \"Apply\"",
+   "since": "2026-01-10",
+   "records": []
+  },
+  {
+   "name": "refused_not_host_log",
+   "check": "pr-merged acme/tools#1",
+   "since": "2026-01-10",
+   "records": []
+  },
+  {
+   "name": "refused_at_without_a_zone",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-01-10",
+   "records": [
+    {
+     "at": "2026-01-11T10:00:00",
+     "kind": "press",
+     "text": "Apply nightly-build",
+     "public": true
+    }
+   ]
+  },
+  {
+   "name": "refused_bad_since",
+   "check": "host-log team-events kind press \"Apply\"",
+   "since": "2026-1-10",
+   "records": []
+  }
+ ]
+}

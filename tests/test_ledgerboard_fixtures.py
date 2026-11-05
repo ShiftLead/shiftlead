@@ -1,6 +1,6 @@
 """The vendored ledgerboard (ADR 2026-10-12 *How ledgerboard is consumed*, design §8, TD-585, TD-1330): the
 wheel's package `src/sessionorc/ledgerboard/` (the module as `__init__.py`, its board writer `board.py`) is an
-intact release — the one `tests/ledgerboard/MANIFEST` names — each file byte-equal to `scripts/ledgerboard/` in
+intact release — the one `tests/ledgerboard.vendored` names — each file byte-equal to `scripts/ledgerboard/` in
 the agent-cadence tree this repo pins (dev-cadence TD-129), every vendored file is as
 `scripts/vendor_ledgerboard.sh` wrote it, and the release's own fixtures pass against it."""
 
@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 WHEEL = ROOT / "src" / "sessionorc" / "ledgerboard"
 PACKAGE_FILES = ("__init__.py", "board.py", "ledger.py")
 FIXTURES = ROOT / "tests" / "ledgerboard"
-MANIFEST = FIXTURES / "MANIFEST"
+MANIFEST = ROOT / "tests" / "ledgerboard.vendored"  # beside the fixtures: their own MANIFEST is the release's (TD-1415)
 
 
 def _manifest() -> tuple[str, dict[str, str]]:
@@ -62,7 +62,7 @@ def test_every_vendored_file_is_as_vendored():
     _, files = _manifest()
     assert {f"src/sessionorc/ledgerboard/{n}" for n in PACKAGE_FILES} <= set(files)
     assert any(f.startswith("tests/ledgerboard/") for f in files)
-    on_disk = {str(f.relative_to(ROOT)) for f in FIXTURES.rglob("*") if f.is_file() and f != MANIFEST}
+    on_disk = {str(f.relative_to(ROOT)) for f in FIXTURES.rglob("*") if f.is_file()}
     on_disk -= {f for f in on_disk if "__pycache__" in f}
     assert on_disk == {f for f in files if f.startswith("tests/ledgerboard/")}, "a fixture the MANIFEST does not list"
     drift = [f for f, h in files.items() if hashlib.sha256((ROOT / f).read_bytes()).hexdigest() != h]

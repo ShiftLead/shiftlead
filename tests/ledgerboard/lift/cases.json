@@ -647,6 +647,62 @@
    "evidence": "acme/other@0123abc"
   },
   {
+   "name": "event_host_log_id",
+   "file": "TD-532",
+   "gate": "event (docs-message)",
+   "by": "box-1",
+   "evidence": "team-events/rec-0042"
+  },
+  {
+   "name": "event_host_log_time",
+   "file": "TD-532",
+   "gate": "event (docs-message)",
+   "by": "box-1",
+   "evidence": "team-events@20260116T093000Z"
+  },
+  {
+   "name": "event_host_log_space_refused",
+   "file": "TD-532",
+   "gate": "event (docs-message)",
+   "by": "box-1",
+   "evidence": "a b"
+  },
+  {
+   "name": "event_host_log_colon_refused",
+   "file": "TD-532",
+   "gate": "event (docs-message)",
+   "by": "box-1",
+   "evidence": "x:y"
+  },
+  {
+   "name": "event_host_log_no_source_refused",
+   "file": "TD-532",
+   "gate": "event (docs-message)",
+   "by": "box-1",
+   "evidence": "rec-0042"
+  },
+  {
+   "name": "event_host_log_other_source_refused",
+   "file": "TD-532",
+   "gate": "event (docs-message)",
+   "by": "box-1",
+   "evidence": "syslog/rec-0042"
+  },
+  {
+   "name": "event_host_log_dotdot_refused",
+   "file": "TD-532",
+   "gate": "event (docs-message)",
+   "by": "box-1",
+   "evidence": "team-events/../x"
+  },
+  {
+   "name": "event_host_log_not_a_time_refused",
+   "file": "TD-532",
+   "gate": "event (docs-message)",
+   "by": "box-1",
+   "evidence": "team-events@banana"
+  },
+  {
    "name": "event_person",
    "file": "TD-530",
    "gate": "event (vendor-ships)",

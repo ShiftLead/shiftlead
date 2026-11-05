@@ -17,7 +17,12 @@ pytestmark = pytest.mark.unit
 
 TESTS = pathlib.Path(__file__).parent
 # A script run by hand on a scratch home, never collected: it keeps its home to be read afterwards.
-EXEMPT = {TESTS / "conformance" / "fixtures" / "claude-code" / "captured" / "subagent-permission" / "probe.py"}
+# ledgerboard's own fixture runner, vendored (scripts/vendor_ledgerboard.sh owns it, TD-1415): its one `mkstemp` writes
+# the release's MANIFEST in the fixtures directory itself, not /tmp, and replaces it, in a mode no test runs.
+EXEMPT = {
+    TESTS / "conformance" / "fixtures" / "claude-code" / "captured" / "subagent-permission" / "probe.py",
+    TESTS / "ledgerboard" / "run.py",
+}
 
 
 def _name(call: ast.Call) -> str:

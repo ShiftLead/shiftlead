@@ -1,4 +1,4 @@
-# ledgerboard v2.4 sha256:adb606e780c4e79c21d611bd949fe9dbd07cf248f0fea416651574eb3a16d04f
+# ledgerboard v2.5 sha256:c689f65e1988a4e5097955a151c0c54b2aa84eca2981c146dca4d427a7e497aa
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/ledger.py (vendored by agent-cadence as files/scripts/ledgerboard/ledger.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger writer: the module's ledger edits, read from and written to files (SPEC *The ledger writer*).
@@ -513,9 +513,10 @@ def plan_edit(led: Ledger, action: str, tid: str, *, fields: Mapping[str, str] |
         raise Unusable(f"{action} takes no gate route: --by, --answer, --override and --why are set's")
     if action == "set":
         lifted = _gate_route(text, dict(fields or {}), day, **route)
-        out = edit_entry(lifted, "set", fields=dict(fields or {}))
+        out = edit_entry(lifted, "set", fields=dict(fields or {}), today=day)  # v2.5: dates a gate it adds
     else:
-        kw: dict = {"words": words, "today": day} if action == "note" else {"section": section, "words": words}
+        kw: dict = {"words": words} if action == "note" else {"section": section, "words": words}
+        kw["today"] = day  # note's date; edit's (v2.5) only to date a host-log check it makes a new wait
         out = edit_entry(text, action, **kw)
     if out == text:
         return Plan(action, None, {}, {"id": entries(out)[0]["id"], "notes": []})
@@ -993,7 +994,8 @@ def _write_parser(cmd: str) -> argparse.ArgumentParser:
             ap.add_argument("--gate", required=True, help='the gate: "decision (<person>)", "event (<name>)" or "until D"')
             ap.add_argument("--by", required=True, help="who lifts it: a person, or a host's token with --evidence or until")
             ap.add_argument("--answer", help="a person's lifting answer (a decision, or an event from a sweep item)")
-            ap.add_argument("--evidence", help="a host's event lift: <repo>#<n> (pr-merged) or <repo>@<sha>")
+            ap.add_argument("--evidence", help="a host's event lift: <repo>#<n> (pr-merged), <repo>@<sha> (file-contains, ref-includes), "
+                                                    "or <source>/<id> or <source>@<YYYYMMDDTHHMMSSZ> (host-log)")
             _board_flags(ap)
             ap.add_argument("--people", help="the board's People:, comma-separated")
             ap.add_argument("--answered-by", choices=("owner", "any"), help="the board's Answered by:")

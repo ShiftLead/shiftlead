@@ -694,6 +694,39 @@
       "refuse": [
         "**Event (ships):** the vendor ships.\ncheck: file-contains a b.md \"xy\""
       ]
+    },
+    "host-log": {
+      "accept": [
+        "**Event (applied):** the next Apply.\ncheck: host-log team-events kind press times 2 \"Apply nightly-build\""
+      ],
+      "refuse": [
+        "**Event (applied):** the next Apply.\ncheck: host-log team-events times 2 kind press \"x\""
+      ]
+    },
+    "source": {
+      "accept": [
+        "**Event (applied):** the next Apply.\ncheck: host-log ci \"x\""
+      ],
+      "refuse": [
+        "**Event (applied):** the next Apply.\ncheck: host-log -ci \"x\""
+      ]
+    },
+    "token": {
+      "accept": [
+        "**Event (applied):** the next Apply.\ncheck: host-log s kind precheck-fail \"x\""
+      ],
+      "refuse": [
+        "**Event (applied):** the next Apply.\ncheck: host-log s kind Press \"x\""
+      ]
+    },
+    "count": {
+      "accept": [
+        "**Event (applied):** the next Apply.\ncheck: host-log s times 999 \"x\""
+      ],
+      "refuse": [
+        "**Event (applied):** the next Apply.\ncheck: host-log s times 0 \"x\"",
+        "**Event (applied):** the next Apply.\ncheck: host-log s times 1000 \"x\""
+      ]
     }
   }
 }

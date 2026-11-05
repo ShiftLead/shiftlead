@@ -8,6 +8,7 @@ People: pat
 - [ ] decide 2026-10-02 (n/a) — Should the report be weekly? Context: TD-213 decision (pat). Due: 2026-11-10. Answers: Go | Not yet | Drop it. Decided: Drop it (by pat) (2026-10-12).
 - [ ] decide 2026-10-02 (n/a) — Should the search be fuzzy? Context: TD-214 decision (pat). Due: 2026-11-10. Answers: Go | Not yet.
 - [ ] act 2026-10-26 (n/a) — Event check broken on TD-216: the check for event (zeta-ready) errors. Context: TD-216 event (zeta-ready). Due: 2026-11-10.
+- [ ] act 2026-10-26 (n/a) — Event check broken on TD-223: the check for event (kappa-ready) errors. Context: TD-223 event (kappa-ready). Due: 2026-11-10.
 - [ ] decide 2026-10-02 (n/a) — Still waiting on event (eta-ready) for TD-217? Context: TD-217 event (eta-ready). Due: 2026-11-10. Answers: Keep waiting (default) | Drop the gate | Rewrite the check. Lifts: Drop the gate.
 - [ ] decide 2026-10-02 (n/a) — Should the old form go? Context: TD-220 decision (pat). Due: 2026-11-10. Answers: Go | Not yet.
 - [ ] decide 2026-10-02 (n/a) — Should the unknown one go? Context: TD-299 decision (pat). Due: 2026-11-10. Answers: Go | Not yet.
