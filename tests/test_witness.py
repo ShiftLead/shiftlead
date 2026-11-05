@@ -1,11 +1,15 @@
-"""The home's witness log (design §4.4 *The home keeps a log of what it witnesses*, TD-1386): the log's files,
-ids, start and months kept, `witness_press` and the places that send it."""
+"""The home's witness log (design §4.4 *The home keeps a log of what it witnesses*, TD-1386, TD-1390): the
+log's files, ids, start and months kept, a record's `<repo>` id, `witness_press` and the places that send it,
+and the host file."""
 
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import re
 import threading
+import tomllib
 from datetime import UTC, datetime
 
 import pytest
@@ -27,14 +31,26 @@ def test_a_record_is_one_line_of_its_months_file_and_reads_in_at_order(tmp_path)
     assert a and a["text"] == "apply t x" and a["kind"] == "press" and a["repo"] == "r"
     assert a["at"] == "2026-11-04T12:00:00Z" and a["id"].startswith("w-20261104T120000Z-") and len(a["id"]) == 23
     assert witness.ID_RE.fullmatch(a["id"])
-    late = witness.append("press", "", "host-rebuild n", datetime(2026, 10, 30, tzinfo=UTC), root=d)
+    late = witness.append("press", "o/r", "host-rebuild n", datetime(2026, 10, 30, tzinfo=UTC), root=d)
     assert late and (d / "2026-10.jsonl").is_file() and (d / "2026-11.jsonl").is_file(), "a late record: its month"
-    assert witness.append("press", "", "x", datetime(2026, 8, 31, tzinfo=UTC), root=d) is None, "before start"
+    assert witness.append("press", "o/r", "x", datetime(2026, 8, 31, tzinfo=UTC), root=d) is None, "before start"
     with (d / "2026-11.jsonl").open("a") as f:
         f.write("not json\n")
     assert [r["id"] for r in witness.records(d)] == [late["id"], a["id"]], "sorted by at, the bad line skipped"
     with pytest.raises(ValueError, match="not a witness kind"):
-        witness.append("msg", "", "x", T0, root=d)
+        witness.append("msg", "o/r", "x", T0, root=d)
+    for empty in ("", "  "):
+        with pytest.raises(ValueError, match="names the repo"):
+            witness.append("press", empty, "x", T0, root=d)
+
+
+def test_at_is_written_within_the_readers_subset(tmp_path):
+    """TD-045 rule 12: `YYYY-MM-DDTHH:MM[:SS[.ffffff]]Z`."""
+    d = tmp_path / "w"
+    witness.ensure_start(datetime(2026, 1, 1, tzinfo=UTC), root=d)
+    subset = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?Z")
+    for at in (T0, datetime(2026, 11, 4, 12, 0, 5, 123456, tzinfo=UTC)):
+        assert subset.fullmatch(witness.append("press", "o/r", "x y", at, root=d)["at"])
 
 
 def test_a_colliding_id_is_drawn_again(tmp_path, monkeypatch):
@@ -42,8 +58,8 @@ def test_a_colliding_id_is_drawn_again(tmp_path, monkeypatch):
     witness.ensure_start(datetime(2026, 1, 1, tzinfo=UTC), root=d)
     tails = iter(["abcd", "abcd", "abcd", "beef"])
     monkeypatch.setattr(witness.secrets, "token_hex", lambda n: next(tails))
-    one = witness.append("press", "", "a x", T0, root=d)
-    two = witness.append("press", "", "b x", T0, root=d)
+    one = witness.append("press", "o/r", "a x", T0, root=d)
+    two = witness.append("press", "o/r", "b x", T0, root=d)
     assert one["id"].endswith("-abcd") and two["id"].endswith("-beef")
 
 
@@ -55,12 +71,10 @@ def test_the_prune_keeps_thirteen_months_counted_from_the_calendar(tmp_path):
     assert witness.boundary(T0) == datetime(2025, 11, 1, tzinfo=UTC)
     assert witness.prune(T0, root=d) == ["2025-10.jsonl"]
     assert sorted(f.name for f in d.iterdir()) == ["2025-11.jsonl", "2025-12.jsonl", "2026-11.jsonl"]
-    witness.ensure_start(datetime(2026, 3, 1, tzinfo=UTC), root=d)
-    assert witness.covers_from(T0, root=d) == datetime(2026, 3, 1, tzinfo=UTC), "the later of start and boundary"
 
 
-def test_the_log_is_in_the_nightly_tarball():
-    assert "witnessed" in agent_common.BACKUP_MEMBERS
+def test_the_log_and_its_host_file_are_in_the_nightly_tarball():
+    assert "witnessed" in agent_common.BACKUP_MEMBERS and "host-log.toml" in agent_common.BACKUP_MEMBERS
 
 
 def test_a_directory_maps_to_its_registered_repo_through_a_symlink(tmp_path):
@@ -68,10 +82,12 @@ def test_a_directory_maps_to_its_registered_repo_through_a_symlink(tmp_path):
     (repo / ".claude" / "worktrees" / "g").mkdir(parents=True)
     (tmp_path / "link").symlink_to(repo)
     roots = [str(repo), str(tmp_path / "other")]
-    assert witness.repo_named(str(tmp_path / "link"), roots) == "shiftlead"
-    assert witness.repo_named(str(repo / ".claude" / "worktrees" / "g"), roots) == "shiftlead"
+    assert witness.repo_named(str(tmp_path / "link"), roots) == (str(repo), "shiftlead")
+    assert witness.repo_named(str(repo / ".claude" / "worktrees" / "g"), roots) == (str(repo), "shiftlead")
     assert witness.repo_named(str(tmp_path / "elsewhere"), roots) is None
     assert witness.repo_named("", roots) is None and witness.repo_named(None, roots) is None
+    # a symlinked registered root matches, and is given as registered (as the repo facts key it)
+    assert witness.repo_named(str(repo / "src"), [str(tmp_path / "link")]) == (str(tmp_path / "link"), "link")
 
 
 def test_witness_press_is_the_persons_own_and_the_homes_alone():
@@ -79,8 +95,12 @@ def test_witness_press_is_the_persons_own_and_the_homes_alone():
     assert "witness_press" in modes.HOME_ONLY, "refused when forwarded from a node"
 
 
-def _registered(agent, repo) -> None:
+ORIGIN = "git@github.com:Org/ShiftLead.git"
+
+
+def _registered(agent, repo, remote: str = ORIGIN) -> None:
     agent._witness_repo = lambda d: witness.repo_named(d, [str(repo)])
+    agent._repos[str(repo)] = {"name": repo.name, "root": str(repo), "remote": remote}
 
 
 @pytest.mark.integration
@@ -106,17 +126,51 @@ async def test_a_press_is_recorded_with_its_repo_and_refused_for_an_unknown_word
             await person.call("witness_press", word="relaunch", target="x")
     recs = witness.records()
     assert [(r["kind"], r["repo"], r["text"]) for r in recs] == [
-        ("press", "shiftlead", "apply dc-grind"),
-        ("press", "", "host-rebuild contractmatch"),
-        ("press", "shiftlead", "new-session shiftlead"),
-    ]
+        ("press", "org/shiftlead", "apply dc-grind"),
+        ("press", "shiftlead/shiftlead", "host-rebuild contractmatch"),
+        ("press", "org/shiftlead", "new-session shiftlead"),
+    ], "the repo's lowercased origin path in `repo`, its registry name in the text; no dir: OWN_REPO"
+
+
+@pytest.mark.integration
+async def test_a_press_reads_the_origin_once_off_the_loop_where_the_reading_has_none(agent, tmp_path, monkeypatch):
+    from sessionorc import reports
+
+    repo = tmp_path / "shiftlead"
+    repo.mkdir()
+    origins = {"": "", "x": "https://github.com/o/Other.git"}
+    reads: list[tuple[str, bool]] = []
+    loop_thread = threading.get_ident()
+
+    def git_origin(root):
+        reads.append((root, threading.get_ident() != loop_thread))
+        return origins["x"]
+
+    monkeypatch.setattr(reports, "git_origin", git_origin)
+    agent._witness_repo = lambda d: witness.repo_named(d, [str(repo)])
+    agent._repos.pop(str(repo), None)
+    assert await agent._witness_press_of("apply", "t", str(repo)), "no reading: read off the loop"
+    agent._repos[str(repo)] = {"root": str(repo), "remote": ""}
+    assert await agent._witness_press_of("start", "t", str(repo)), "an empty remote: read again"
+    assert reads == [(str(repo), True), (str(repo), True)]
+    agent._repos[str(repo)] = {"root": str(repo), "remote": ORIGIN}
+    assert await agent._witness_press_of("apply", "u", str(repo))
+    assert len(reads) == 2, "the reading's remote is the id's, with no read"
+    assert [r["repo"] for r in witness.records()] == ["o/other", "o/other", "org/shiftlead"]
+    origins["x"] = ""
+    agent._repos.pop(str(repo))
+    assert await agent._witness_press_of("apply", "v", str(repo)) is None, "no readable origin: nothing recorded"
+    assert len(witness.records()) == 3
 
 
 @pytest.mark.integration
 async def test_a_node_writes_no_record_and_refuses_the_press(agent):
     agent.mode = "node"
     try:
-        assert agent._witness("press", "", "apply x") is None
+        assert agent._witness("press", "o/r", "apply x") is None
+        witness.host_file().unlink()
+        agent._witness_begin()
+        assert not witness.host_file().exists(), "a node keeps no host file"
         with pytest.raises(Exception, match="runs at the home"):
             await agent.rpc_witness_press(word="host-rebuild", target="n")
     finally:
@@ -126,9 +180,9 @@ async def test_a_node_writes_no_record_and_refuses_the_press(agent):
 
 @pytest.mark.integration
 async def test_a_record_from_a_detached_writer_lands_whole_beside_one_from_the_loop(agent):
-    t = threading.Thread(target=lambda: agent._witness_soon("press", "", "host-rebuild a" + " x" * 200))
+    t = threading.Thread(target=lambda: agent._witness_soon("press", "o/r", "host-rebuild a" + " x" * 200))
     t.start()
-    agent._witness("press", "", "host-rebuild b")
+    agent._witness("press", "o/r", "host-rebuild b")
     t.join()
     await asyncio.sleep(0)
     texts = sorted(r["text"][:14] for r in witness.records())
@@ -162,10 +216,10 @@ async def test_push_on_is_witnessed_for_a_new_endpoint_and_not_for_a_renewal_nam
         await person.call("push_subscribe", endpoint="https://p.example.com/1", keys=keys, key=public)
         await person.call("push_subscribe", endpoint="https://p.example.com/2", keys=keys, key=public, replaces=one)
         await person.call("push_subscribe", endpoint="https://p.example.com/3", keys=keys, key=public, replaces="gone")
-    assert [r["text"] for r in witness.records()] == [
-        f"push-on {one}",
-        f"push-on {push_mod.device_id('https://p.example.com/3')}",
-    ], "a renewal it cannot name reads as a new device"
+    assert [(r["repo"], r["text"]) for r in witness.records()] == [
+        (witness.OWN_REPO, f"push-on {one}"),
+        (witness.OWN_REPO, f"push-on {push_mod.device_id('https://p.example.com/3')}"),
+    ], "a renewal it cannot name reads as a new device; an install's event is tied to OWN_REPO"
 
 
 def test_the_press_helper_sends_the_word_and_swallows_a_refusal():
@@ -295,18 +349,21 @@ def test_the_open_pr_read_reads_a_heads_statuses_when_its_precheck_changed(tmp_p
     emit = lambda repo, text, sid, at: got.append((repo, text, sid, at))  # noqa: E731
     repo = tmp_path / "shiftlead"
     repo.mkdir()
-    one = reports.pr_reading(repo, T0, emit=emit)
+    none = reports.pr_reading(repo, T0, emit=emit)
+    assert reads == [] and none["open"][0]["precheck_seen"] is None, "no origin, no id: the list is not read"
+    remote = "git@github.com:O/ShiftLead.git"
+    one = reports.pr_reading(repo, T0, emit=emit, remote=remote)
     assert reads == [SHA] and got == [
-        ("shiftlead", "shiftlead#7 a1b2c3d4e5f6 status 12", "12", datetime(2026, 11, 4, 10, tzinfo=UTC))
-    ]
-    two = reports.pr_reading(repo, T0, old=one, emit=emit)
+        ("o/shiftlead", "shiftlead#7 a1b2c3d4e5f6 status 12", "12", datetime(2026, 11, 4, 10, tzinfo=UTC))
+    ], "the record's repo is the id, its text the registry name"
+    two = reports.pr_reading(repo, T0, old=one, emit=emit, remote=remote)
     assert reads == [SHA], "an unchanged precheck is not read again"
     prs[0]["statusCheckRollup"][0].update(state="SUCCESS", startedAt="2026-11-04T10:40:00Z")
     answer[0] = "HTTP 502"
-    three = reports.pr_reading(repo, T0, old=two, emit=emit)
+    three = reports.pr_reading(repo, T0, old=two, emit=emit, remote=remote)
     assert reads == [SHA, SHA] and three["open"][0]["precheck_seen"] is None, "unread: read again next time"
     answer[0] = [_st(12, "failure", "2026-11-04T10:00:00Z"), _st(14, "success", "2026-11-04T10:40:00Z")]
-    reports.pr_reading(repo, T0, old=three, emit=emit)
+    reports.pr_reading(repo, T0, old=three, emit=emit, remote=remote)
     assert reads == [SHA] * 3 and len(got) == 2, "12 is handed again (the loop drops it), 14 is green"
     reports.pr_reading(repo, T0)
     assert reads == [SHA] * 3, "no writer, no read"
@@ -327,10 +384,10 @@ def test_mains_pass_reads_its_statuses_when_its_precheck_changed_and_names_its_o
         lambda d, sha, timeout=30.0: reads.append(sha) or [_st(5, "failure", "2026-11-04T10:00:00Z")],
     )
     got: list = []
-    emit = lambda repo, text, sid, at: got.append(text)  # noqa: E731
-    r = {"main": SHA, "origin": "git@github.com:o/shiftlead.git"}
+    emit = lambda repo, text, sid, at: got.append((repo, text))  # noqa: E731
+    r = {"main": SHA, "origin": "git@github.com:O/ShiftLead.git"}
     promote.witness_main(tmp_path, "shiftlead", r, {}, "failure 5 2026-11-04T10:00:00Z", emit)
-    assert got == ["shiftlead@main a1b2c3d4e5f6 status 5 tests/test_a.py::test_x"]
+    assert got == [("o/shiftlead", "shiftlead@main a1b2c3d4e5f6 status 5 tests/test_a.py::test_x")]
     assert r["precheck_seen"] == "failure 5 2026-11-04T10:00:00Z"
     promote.witness_main(tmp_path, "shiftlead", dict(r), r, r["precheck_seen"], emit)
     assert reads == [SHA], "an unchanged status is not read again"
@@ -376,121 +433,93 @@ async def test_the_agent_writes_a_precheck_fail_once_and_a_node_none(agent):
         agent.mode = "home"
 
 
-# ── the query (TD-1387) ─────────────────────────────────────────────────────────────────────────────
+# ── the host file (TD-1390) ──────────────────────────────────────────────────────────────────────
 
 
-def _log(tmp_path):
-    d = tmp_path / "w"
-    witness.ensure_start(datetime(2026, 9, 1, tzinfo=UTC), root=d)
-    for at, kind, repo, text in [
-        (datetime(2026, 10, 10, tzinfo=UTC), "press", "shiftlead", "apply dc-grind"),
-        (datetime(2026, 11, 3, tzinfo=UTC), "press", "", "host-rebuild contractmatch"),
-        (datetime(2026, 11, 2, tzinfo=UTC), "press", "agent-cadence", "start dc-grind"),  # late: read in at order
-        (datetime(2026, 11, 1, tzinfo=UTC), "precheck-fail", "shiftlead", "shiftlead@main abc status 7 t.py::x"),
-        (datetime(2026, 10, 20, tzinfo=UTC), "press", "shiftlead", "Apply a.b"),
-    ]:
-        witness.append(kind, repo, text, at, root=d)
-    return d
+def test_kinds_carry_a_public_flag_and_no_class():
+    assert all("class" not in v and v["public"] is True for v in witness.KINDS.values())
+    assert witness.public_kinds() == ["precheck-fail", "press"]
 
 
-def _texts(got):
-    return [r["text"] for r in got["records"]]
+def test_the_host_file_is_written_once_and_left_as_the_person_edited_it(tmp_path):
+    store = tmp_path / "home"
+    witness.ensure_start(T0, root=store / "witnessed")
+    assert witness.ensure_host_file(store) is True
+    text = witness.host_file(store).read_text()
+    flat = text.replace("\n# ", " ")
+    assert text.startswith("# ") and 'table you add replaces [repos."*"] for that repo whole' in flat
+    got = tomllib.loads(text)
+    here = str((store / "witnessed").resolve())
+    assert got["repos"]["*"] == {
+        "profiles": [],
+        "sources": {"witnessed": {"path": here, "public_kinds": ["precheck-fail", "press"]}},
+    }
+    assert got["allow"] == [{"root": here, "visibility": "private", "require_repo": True}]
+    assert witness.host_file_problem(store) is None
+    witness.host_file(store).write_text("# mine\n")
+    assert witness.ensure_host_file(store) is False and witness.host_file(store).read_text() == "# mine\n"
+    assert not list(store.glob(".host-log.toml.*")), "no temporary file left"
 
 
-def test_the_query_counts_after_an_instant_literally_case_sensitively_and_by_repo(tmp_path):
-    d = _log(tmp_path)
-
-    def q(text="", after=datetime(2026, 10, 15, tzinfo=UTC), repo=None, kind="press"):
-        return witness.query(kind, text, after, repo, now=T0, root=d)
-
-    got = q()
-    assert got["count"] == 3 and _texts(got) == ["Apply a.b", "start dc-grind", "host-rebuild contractmatch"]
-    assert got["covers_from"] == "2026-09-01T00:00:00Z", "start, later than the boundary"
-    assert _texts(q("dc-grind")) == ["start dc-grind"] and q("apply")["count"] == 0, "case-sensitive"
-    assert _texts(q("a.b")) == ["Apply a.b"] and q("a*b")["count"] == 0 and q("Apply.a")["count"] == 0, "literal"
-    assert q(after=datetime(2026, 11, 3, tzinfo=UTC))["count"] == 1, "at or after: inclusive"
-    assert _texts(q(repo="agent-cadence")) == ["start dc-grind"]
-    assert _texts(q(repo="shiftlead")) == ["Apply a.b", "host-rebuild contractmatch"], "no repo ties to shiftlead"
-    assert q(repo="contractmatch")["count"] == 0, "a record of no repo is no other repo's"
-    assert q(kind="precheck-fail", after=datetime(2026, 1, 1, tzinfo=UTC))["count"] == 1
-    with pytest.raises(ValueError, match="not a witness kind"):
-        q(kind="msg")
-
-
-def test_covers_from_before_and_after_a_prune(tmp_path):
-    d = tmp_path / "w"
-    witness.ensure_start(datetime(2025, 1, 1, tzinfo=UTC), root=d)
-    witness.append("press", "", "host-rebuild a", datetime(2025, 6, 1, tzinfo=UTC), root=d)
-    old = witness.query("press", "", datetime(2025, 1, 1, tzinfo=UTC), now=datetime(2026, 1, 5, tzinfo=UTC), root=d)
-    assert old["covers_from"] == "2025-01-01T00:00:00Z" and old["count"] == 1
-    later = datetime(2026, 11, 4, tzinfo=UTC)
-    witness.prune(later, root=d)
-    got = witness.query("press", "", datetime(2025, 1, 1, tzinfo=UTC), now=later, root=d)
-    assert got == {"count": 0, "covers_from": "2025-11-01T00:00:00Z", "records": []}, "nothing refused for age"
-
-
-def test_host_log_is_a_home_read_forwarded_while_the_link_is_up_and_refused_offline():
-    from sessionorc import identity
-
-    assert "host_log" in modes.HOME_READS and "host_log" in identity.READS
-    assert "host_log" not in modes.HOME_EDITS and "host_log" not in modes.HOME_ONLY
-    for caller in (None, "ao-x"):
-        why = modes.offline_refusal("host_log", caller, {}, host="laptop", home="kmaster")
-        assert why and "kmaster (home) is unreachable" in why
+@pytest.mark.parametrize("odd", ['q"uote', "back\\slash", "caf\u00e9", "del\x7fete"])
+def test_a_store_path_is_escaped_as_a_toml_basic_string(tmp_path, odd):
+    store = tmp_path / odd
+    witness.ensure_start(T0, root=store / "witnessed")
+    assert witness.ensure_host_file(store)
+    got = tomllib.loads(witness.host_file(store).read_text(encoding="utf-8"))
+    assert got["allow"][0]["root"] == str((store / "witnessed").resolve())
+    assert "\x7f" not in witness.host_file(store).read_text(encoding="utf-8")
 
 
 @pytest.mark.integration
-async def test_the_home_answers_host_log_to_a_session_and_to_a_node(agent):
-    agent._witness("press", "", "host-rebuild contractmatch")
-    after = datetime(2026, 1, 1, tzinfo=UTC).isoformat()
-    got = await agent.rpc_host_log(kind="press", text="contractmatch", after=after, repo="shiftlead")
-    assert got["count"] == 1 and got["records"][0]["text"] == "host-rebuild contractmatch"
-    fwd = await agent._forwarded(
-        "laptop", {"rpc": "host_log", "params": {"kind": "press", "after": after}, "caller": "ao-x-w", "token": ""}
-    )
-    assert fwd["result"]["count"] == 1, fwd
-    with pytest.raises(Exception, match="not a witness kind"):
-        await agent.rpc_host_log(kind="msg", after=after)
-    with pytest.raises(Exception, match="after is the instant"):
-        await agent.rpc_host_log(kind="press")
+async def test_a_store_path_not_valid_utf8_writes_no_file_and_warns_at_each_start(agent, caplog, monkeypatch):
+    from sessionorc import paths
+
+    store = paths.home() / "bad\udcff"
+    store.mkdir()
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(store))
+    assert paths.home() == store
+    assert witness.ensure_host_file(store) is False and not witness.host_file(store).exists()
+    for _ in range(2):
+        with caplog.at_level(logging.WARNING, logger="sessionorc.agent"):
+            caplog.clear()
+            agent._witness_begin()
+        assert (store / "witnessed").is_dir() and not witness.host_file(store).exists()
+        assert any("host file" in r.getMessage() and "absent" in r.getMessage() for r in caplog.records)
 
 
-def test_ao_host_log_exits_0_1_and_2(monkeypatch, capsys):
+def test_a_warning_when_no_root_covers_the_current_witnessed(tmp_path):
+    store = tmp_path / "home"
+    witness.ensure_start(T0, root=store / "witnessed")
+    f = witness.host_file(store)
+    assert "absent" in witness.host_file_problem(store)
+    f.write_text("not [toml")
+    assert "does not parse" in witness.host_file_problem(store)
+    f.write_text('[repos."*"]\nprofiles = []\n')
+    assert "no [[allow]]" in witness.host_file_problem(store)
+    f.write_text('[[allow]]\nroot = "/elsewhere/witnessed"\nvisibility = "private"\n')
+    why = witness.host_file_problem(store)
+    assert "/elsewhere/witnessed" in why and str((store / "witnessed").resolve()) in why
+    f.write_text(f"[[allow]]\nroot = {witness.toml_string(str(store))}\n")
+    assert witness.host_file_problem(store) is None, "a root widened to the store covers it"
+
+
+@pytest.mark.integration
+async def test_the_home_writes_its_host_file_at_its_start(agent):
+    assert witness.host_file().is_file() and witness.host_file_problem() is None
+
+
+# ── the query is gone (TD-1390) ─────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.integration
+async def test_host_log_and_ao_host_log_are_gone(agent, capsys):
+    from sessionorc import identity
     from shiftlead import cli
 
-    asked = []
-    rec = {"id": "w-20261104T120000Z-abcd", "at": "2026-11-04T12:00:00Z", "repo": "", "text": "host-rebuild n"}
-
-    def call(method, **kw):
-        asked.append((method, kw))
-        if kw["kind"] == "down":
-            raise cli.AgentUnavailable("no host agent")
-        if kw["kind"] == "msg":
-            raise AgentError("host_log: 'msg' is not a witness kind (precheck-fail, press)")
-        return {"count": 1, "covers_from": "2026-11-01T00:00:00Z", "records": [rec]}
-
-    monkeypatch.setattr(cli, "call_sync", call)
-
-    def run(*argv):
-        try:
-            return cli.main(["host-log", *argv])
-        except SystemExit as e:
-            return e.code
-
-    assert run("press", "host-rebuild", "--since", "2026-11-04") == 0
-    assert asked[-1] == (
-        "host_log",
-        {"kind": "press", "text": "host-rebuild", "after": "2026-11-04T00:00:00+00:00", "repo": None},
-    )
-    out = capsys.readouterr().out
-    assert "1 press since 2026-11-04" in out and rec["id"] in out
-    assert run("press", "--since", "2026-11-04", "--times", "2", "--repo", "shiftlead") == 1
-    assert asked[-1][1]["repo"] == "shiftlead"
-    assert run("msg", "--since", "2026-11-04") == 2
-    assert run("press") == 2, "--since is required"
-    monkeypatch.setattr(cli, "_agent_answers", lambda: False)
-    assert run("down", "--since", "2026-11-04") == 3, "a host agent that is down exits 3, never 2 (refused)"
-    capsys.readouterr()
-    assert run("--kinds") == 0 and "precheck-fail  (public)" in capsys.readouterr().out
-    assert run("press", "--since", "2026-11-04", "--json") == 0
-    assert json.loads(capsys.readouterr().out)["count"] == 1
+    assert "host_log" not in modes.HOME_READS and "host_log" not in identity.READS
+    assert not hasattr(agent, "rpc_host_log") and not hasattr(witness, "query")
+    assert not hasattr(witness, "covers_from")
+    with pytest.raises(SystemExit) as e:
+        cli.main(["host-log", "press", "--since", "2026-11-04"])
+    assert e.value.code == 2 and "invalid choice" in capsys.readouterr().err

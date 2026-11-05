@@ -415,10 +415,11 @@ async def test_send_to_reviewer_hands_a_look_to_the_seat_and_its_outcome_brings_
         from sessionorc import witness
 
         agent._witness_repo = lambda d: witness.repo_named(d, [str(tmp_path)])
+        agent._repos[str(tmp_path)] = {"root": str(tmp_path), "remote": "git@github.com:O/Repo.git"}
         got = await person.call("inbox_hand", msg=look, seat=seat)
         assert got["to"] == seat and got["msg"] == look
-        # the press, witnessed inside the RPC (§4.4, TD-1386): its repo the sender's checkout's
-        assert [(r["repo"], r["text"]) for r in witness.records()] == [(tmp_path.name, f"send-to-reviewer {look}")]
+        # the press, witnessed inside the RPC (§4.4, TD-1386, TD-1390): its repo the sender's checkout's id
+        assert [(r["repo"], r["text"]) for r in witness.records()] == [("o/repo", f"send-to-reviewer {look}")]
         rec = agent.sessions[seat]
         h = next(e for e in rec.inbox if e.id == got["handed"])
         assert (h.kind, h.from_, h.text, h.about) == ("ask", PERSON, "the row?", "TD-292")

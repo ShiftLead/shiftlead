@@ -8,6 +8,7 @@ twelve before it. A record of a kind not in `KINDS` is never written."""
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
@@ -23,18 +24,21 @@ from sessionorc import paths
 log = logging.getLogger(__name__)
 
 WITNESS_KEEP_MONTHS = 13  # the current month and the twelve before it (a constant, not a setting)
-# the registry name of the repo the package is built from: a record of no repo (an install's event, a host's
-# rebuild, push turned on) is tied to it by the query and the check alike (§4.4 *The query*, TD-1387)
-OWN_REPO = "shiftlead"
+# the `<repo>` id (ledgerboard SPEC v2.4: the origin's path, lowercased) of the repo the package is built
+# from: an event of the install rather than of a repo it services (a host's rebuild, push turned on) is
+# written tied to it (§4.4 *A repo's id*, TD-1390)
+OWN_REPO = "shiftlead/shiftlead"
 
-# Each kind's text and the most private class of repo its records may be answered for (TD-045 rule 7).
-KINDS: dict[str, dict[str, str]] = {
+# Each kind's text, and whether its records may count for a public ledger: the host file's `public_kinds`
+# is written from the flags (§4.4 *The kinds*, *The host file*; TD-045 rule 11).
+KINDS: dict[str, dict[str, Any]] = {
     "precheck-fail": {
         "text": "<repo>#<n> or <repo>@main, the head's first 12 hex, status <id>, then the failing tests it holds",
-        "class": "public",
+        "public": True,
     },
-    "press": {"text": "<word> <target>", "class": "public"},
+    "press": {"text": "<word> <target>", "public": True},
 }
+HOST_FILE = "host-log.toml"  # the host file (rule 9), in the home's store: written once, then the person's
 
 # The press words (`witness_press`), each saying whether it carries a `dir` the record's repo is mapped from.
 PRESS_WORDS: dict[str, bool] = {
@@ -108,13 +112,6 @@ def boundary(now: datetime | None = None) -> datetime:
     return datetime(i // 12, i % 12 + 1, 1, tzinfo=UTC)
 
 
-def covers_from(now: datetime | None = None, root: Path | None = None) -> datetime:
-    """How far back the log covers: the later of `start` and the retention boundary."""
-    b = boundary(now)
-    s = start(root)
-    return max(b, s) if s is not None else b
-
-
 def read_month(f: Path) -> list[dict[str, Any]]:
     """A month file's records; an unreadable line is skipped."""
     out: list[dict[str, Any]] = []
@@ -152,9 +149,13 @@ def new_id(at: datetime, taken: Iterable[str] = ()) -> str:
 
 def append(kind: str, repo: str, text: str, at: datetime | None = None, root: Path | None = None) -> dict | None:
     """Write one record — the one entry point, run on the agent's loop. None, and nothing written, for a
-    kind not in `KINDS`, an `at` before `start`, or a log with no `start` yet. `text` is one line."""
+    kind not in `KINDS`, an `at` before `start`, or a log with no `start` yet; a ValueError for a kind not
+    in `KINDS` or an empty `repo` (the `<repo>` id the record counts for, §4.4 *A repo's id*). `text` is one
+    line."""
     if kind not in KINDS:
         raise ValueError(f"{kind!r} is not a witness kind ({', '.join(KINDS)})")
+    if not isinstance(repo, str) or not repo.strip():
+        raise ValueError(f"a {kind} record names the repo it belongs to (its <repo> id)")
     when = _utc(at or datetime.now(UTC))
     begun = start(root)
     if begun is None or when < begun:
@@ -165,7 +166,7 @@ def append(kind: str, repo: str, text: str, at: datetime | None = None, root: Pa
         "id": new_id(when, taken),
         "at": _iso(when),
         "kind": kind,
-        "repo": repo or "",
+        "repo": repo.strip(),
         "text": " ".join(str(text).split()),
     }
     f.parent.mkdir(parents=True, exist_ok=True)
@@ -193,24 +194,25 @@ def prune(now: datetime | None = None, root: Path | None = None) -> list[str]:
     return sorted(gone)
 
 
-def repo_named(dir: Any, roots: Iterable[str]) -> str | None:
-    """The registry name (the root's basename) of the registered repo `dir` is in — its real path matched
-    against each root's — else None; an empty `dir` is in none."""
+def repo_named(dir: Any, roots: Iterable[str]) -> tuple[str, str] | None:
+    """`(root, name)` of the registered repo `dir` is in — its real path matched against each root's real
+    path — `root` the registered string as given (as the repo facts key it, never its real path) and `name`
+    its basename (the registry name, for a record's text); else None. An empty `dir` is in none."""
     if not isinstance(dir, str) or not dir.strip():
         return None
     try:
         here = Path(os.path.realpath(dir))
     except (OSError, ValueError):
         return None
-    best: Path | None = None
+    best: tuple[Path, str] | None = None
     for r in roots:
         try:
             root = Path(os.path.realpath(r))
         except (OSError, ValueError):
             continue
-        if (here == root or here.is_relative_to(root)) and (best is None or len(root.parts) > len(best.parts)):
-            best = root
-    return best.name if best is not None else None
+        if (here == root or here.is_relative_to(root)) and (best is None or len(root.parts) > len(best[0].parts)):
+            best = (root, str(r))
+    return (best[1], Path(best[1]).name) if best is not None else None
 
 
 # ── the `precheck-fail` writer (§4.4 *The kinds*, TD-1386 slice 2) ─────────────────────────────────
@@ -293,40 +295,100 @@ def precheck_fails(
     return out
 
 
-# ── the query (§4.4 *The query*, TD-1387) ───────────────────────────────────────────────────────────
+# ── the host file (§4.4 *The host file*, TD-045 rule 9, TD-1390) ────────────────────────────────────
+
+_HOST_COMMENT = """\
+# The witness log's host file (shiftlead design §4.4 *The host file*; ledgerboard TD-045 rule 9), written
+# once by the home at its start when absent and never again: it is yours to edit. A [repos."<repo>"] table
+# you add replaces [repos."*"] for that repo whole: give it `public_kinds` and `path` again, or a public
+# ledger's gates read *error* and the repo file's ~/.shiftlead/witnessed applies. Delete this file and the
+# home writes it again at its next start.
+"""
 
 
-def query(
-    kind: str,
-    text: str,
-    after: datetime,
-    repo: str | None = None,
-    now: datetime | None = None,
-    root: Path | None = None,
-) -> dict[str, Any]:
-    """`{count, covers_from, records}`: the records of `kind` with `at` at or after `after` whose `text`
-    contains `text` literally and case-sensitively (an empty one matches every record) and whose `repo` is
-    `repo` (None or empty: any) — or empty, when `repo` is `OWN_REPO` — oldest first by `at`. Refused (a
-    ValueError) only for a kind not in `KINDS`; nothing for age: the caller compares `covers_from`."""
-    if kind not in KINDS:
-        raise ValueError(f"{kind!r} is not a witness kind ({', '.join(KINDS)})")
-    after = _utc(after)
-    first = _month_index(after)
-    d = root or directory()
-    files = sorted(f for f in d.glob("*.jsonl") if _MONTH_RE.fullmatch(f.name)) if d.is_dir() else []
-    got = []
-    for f in files:
-        m = _MONTH_RE.fullmatch(f.name)
-        if m and int(m[1]) * 12 + int(m[2]) - 1 < first:
-            continue  # a month wholly before `after`: nothing in it can match
-        for r in read_month(f):
-            at = _parse(r.get("at"))
-            if r.get("kind") != kind or at is None or at < after or text not in str(r.get("text") or ""):
-                continue
-            rr = str(r.get("repo") or "")
-            if repo and rr != repo and not (repo == OWN_REPO and not rr):
-                continue
-            got.append((at, r))
-    got.sort(key=lambda p: p[0])
-    records_ = [r for _, r in got]
-    return {"count": len(records_), "covers_from": _iso(covers_from(now, root)), "records": records_}
+def public_kinds() -> list[str]:
+    """The kinds whose records may count for a public ledger (`KINDS`' `public` flag), in table order."""
+    return [k for k, v in KINDS.items() if v.get("public")]
+
+
+def toml_string(s: str) -> str:
+    """`s` as a TOML basic string: escaped as JSON escapes it (`\\"`, `\\\\`, control characters), which
+    TOML reads the same, and U+007F, which JSON leaves bare and TOML refuses, as `\\u007F`. A UnicodeError
+    for a string that cannot be encoded as UTF-8 (a path's undecodable bytes, held as surrogates)."""
+    s.encode("utf-8")
+    return json.dumps(s, ensure_ascii=False).replace("\x7f", "\\u007F")
+
+
+def host_file(store: Path | None = None) -> Path:
+    return (store or paths.home()) / HOST_FILE
+
+
+def host_text(witnessed: Path) -> str:
+    """What the home writes: every repo served (`[repos."*"]`), `witnessed` at the log's real folder with
+    the public kinds, and that folder the one allowed root, `private` and `require_repo`."""
+    where = toml_string(str(witnessed))
+    kinds = ", ".join(toml_string(k) for k in public_kinds())
+    return (
+        f"{_HOST_COMMENT}\n"
+        f'[repos."*"]\nprofiles = []\n\n'
+        f'[repos."*".sources.witnessed]\npath = {where}\npublic_kinds = [{kinds}]\n\n'
+        f'[[allow]]\nroot = {where}\nvisibility = "private"\nrequire_repo = true\n'
+    )
+
+
+def ensure_host_file(store: Path | None = None) -> bool:
+    """Write the host file when it is absent, whole or not at all (a temporary file renamed), and never
+    rewrite it: True when this call wrote it. A store path that cannot be encoded as UTF-8 writes none (the
+    start's check then warns)."""
+    store = store or paths.home()
+    f = host_file(store)
+    if f.exists() or f.is_symlink():
+        return False
+    witnessed = Path(os.path.realpath(store / "witnessed"))
+    try:
+        text = host_text(witnessed)
+    except UnicodeError:
+        log.warning("the witness log's host file is not written: the store path %r is not valid UTF-8", str(store))
+        return False
+    tmp = f.with_name(f".{HOST_FILE}.{secrets.token_hex(4)}.tmp")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, f)
+    except OSError:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
+    return True
+
+
+def host_file_problem(store: Path | None = None) -> str | None:
+    """Why the host file allows no reading of the current `witnessed/` — absent, unparseable, no
+    `[[allow]]`, or no root covering it (equal to or a parent of its real path) — naming the file's roots
+    and the folder; None when one root covers it."""
+    import tomllib
+
+    store = store or paths.home()
+    f = host_file(store)
+    here = Path(os.path.realpath(store / "witnessed"))
+    if not f.is_file():
+        return f"{f} is absent, so every host-log gate reads error (current witnessed/: {here})"
+    try:
+        data = tomllib.loads(f.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as e:
+        return f"{f} does not parse ({e}), so every host-log gate reads error (current witnessed/: {here})"
+    allow = data.get("allow")
+    if not isinstance(allow, list) or not allow:
+        return f"{f} has no [[allow]], so every host-log gate reads error (current witnessed/: {here})"
+    roots: list[str] = []
+    for a in allow:
+        r = a.get("root") if isinstance(a, dict) else None
+        if not isinstance(r, str):
+            continue
+        roots.append(r)
+        try:
+            root = Path(os.path.realpath(os.path.expanduser(r)))
+        except (OSError, ValueError):
+            continue
+        if here == root or here.is_relative_to(root):
+            return None
+    return f"no [[allow]] root in {f} covers the current witnessed/ {here} (its roots: {', '.join(roots) or 'none'})"

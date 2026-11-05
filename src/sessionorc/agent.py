@@ -40,6 +40,7 @@ from sessionorc import (
     containers,
     hosts,
     identity,
+    ledgerboard,
     link,
     mail,
     naming,
@@ -913,11 +914,7 @@ class HostAgent(
             sock.unlink()
         self.tmux.ensure_server()
         self._witness_loop = asyncio.get_running_loop()
-        if self.mode == "home":  # where the witness log begins (§4.4 *The home keeps a log*, TD-1386)
-            try:
-                witness.ensure_start()
-            except OSError as e:
-                log.warning("the witness log's start could not be written: %s", e)
+        self._witness_begin()
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
         # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
         server = await asyncio.start_unix_server(self._handle_conn, sock=_bound(sock), limit=link.FRAME_LIMIT)
@@ -1098,6 +1095,24 @@ class HostAgent(
         got = self._queue_ranked(self._queue or {"cards": [], "completed": [], "other_work": [], "at": None})
         return reports.omitted(got, omit) if omit else got
 
+    def _witness_begin(self) -> None:
+        """At the home's start: where the witness log begins (`witnessed/start`, TD-1386), then its host file,
+        written once when absent and the person's after (§4.4 *The host file*, TD-1390) — tried even when the
+        start could not be written — and a warning when it allows no reading of the current `witnessed/`.
+        A node keeps neither."""
+        if self.mode != "home":
+            return
+        try:
+            witness.ensure_start()
+        except OSError as e:
+            log.warning("the witness log's start could not be written: %s", e)
+        try:
+            witness.ensure_host_file()
+        except OSError as e:
+            log.warning("the witness log's host file could not be written: %s", e)
+        if problem := witness.host_file_problem():
+            log.warning("the witness log's host file: %s", problem)
+
     def _witness(self, kind: str, repo: str | None, text: str, at: datetime | None = None) -> dict[str, Any] | None:
         """One record in the home's witness log (§4.4 *The home keeps a log of what it witnesses*, TD-1386),
         on the loop: a node writes none, and a writer's failure is a log line that never fails its act."""
@@ -1140,22 +1155,39 @@ class HostAgent(
         except RuntimeError:  # the loop closed after the check (the agent stopping): the reading goes on
             log.warning("the witness log's loop closed before a precheck-fail record")
 
-    def _witness_repo(self, dir: Any) -> str | None:
-        """The registry name of the registered repo `dir` is in (`witness.repo_named`), else None."""
+    def _witness_repo(self, dir: Any) -> tuple[str, str] | None:
+        """`(root, registry name)` of the registered repo `dir` is in (`witness.repo_named`), else None."""
         return witness.repo_named(dir, hosts.local_host().repos())
 
-    def _witness_press_of(self, word: str, target: str, dir: Any) -> dict[str, Any] | None:
-        """A `press` record for `word` on `target`: a word that carries a `dir` whose repo is no registered
-        one's is not recorded (§4.4 *The record's `repo`*)."""
+    async def _repo_id(self, root: str) -> str | None:
+        """A registered root's `<repo>` id (§4.4 *A repo's id*, TD-1390): the vendored `origin_path()` of the
+        repo facts reading's `remote` for it, or, where the reading has none yet or an empty one, of one
+        `git_origin` read off the loop; None when the origin gives no id."""
+        remote = str((self._repos.get(root) or {}).get("remote") or "")
+        if not remote:
+            remote = await asyncio.to_thread(reports.git_origin, root)
+        return ledgerboard.origin_path(remote) if remote else None
+
+    async def _witness_press_of(self, word: str, target: str, dir: Any) -> dict[str, Any] | None:
+        """A `press` record for `word` on `target`: a word that carries a `dir` is tied to the `<repo>` id of
+        the registered repo it is in, and not recorded where it is in none or its origin gives no id; a word
+        with none to `witness.OWN_REPO` (§4.4 *The record's `repo`*)."""
         try:  # called after the act committed (inside `inbox_hand`, `push_subscribe`): it never fails it
-            repo = self._witness_repo(dir) if witness.PRESS_WORDS[word] else ""
-        except Exception:  # noqa: BLE001 — the registry unreadable: no record, the act stands
-            log.exception("press %s %s: the registry could not be read, so it is not witnessed", word, target)
+            if not witness.PRESS_WORDS[word]:
+                return self._witness("press", witness.OWN_REPO, f"{word} {target}")
+            got = self._witness_repo(dir)
+            if got is None:
+                log.info("press %s %s: %r is in no registered repo, so it is not witnessed", word, target, dir)
+                return None
+            root, name = got
+            rid = await self._repo_id(root)
+        except Exception:  # noqa: BLE001 — the registry or origin unreadable: no record, the act stands
+            log.exception("press %s %s: its repo could not be read, so it is not witnessed", word, target)
             return None
-        if repo is None:
-            log.info("press %s %s: %r is in no registered repo, so it is not witnessed", word, target, dir)
+        if not rid:
+            log.info("press %s %s: %s has no readable origin, so it is not witnessed", word, target, root)
             return None
-        return self._witness("press", repo, f"{word} {target or repo}")
+        return self._witness("press", rid, f"{word} {target or name}")
 
     async def rpc_witness_press(
         self, word: Any = None, target: Any = None, dir: Any = None, caller: Any = None
@@ -1174,31 +1206,8 @@ class HostAgent(
         # session with no team, whose directory may be a worktree, names its repo, never the worktree's name)
         if not isinstance(target, str) or not (target.strip() or witness.PRESS_WORDS[word]):
             raise RpcError("witness_press: target names what was pressed on (design §4.4)")
-        got = self._witness_press_of(str(word), target.strip(), dir)
+        got = await self._witness_press_of(str(word), target.strip(), dir)
         return {"recorded": got["id"] if got else None}
-
-    async def rpc_host_log(
-        self, kind: Any = None, text: Any = "", after: Any = None, repo: Any = None
-    ) -> dict[str, Any]:
-        """The witness log's query (§4.4 *The query*, TD-1387): `{count, covers_from, records}` — the records
-        of `kind` at or after `after` (an instant, required) whose text contains `text` literally, and whose
-        repo is `repo` (omitted: any; `shiftlead` takes a record of no repo too). A home read: a node forwards
-        it while its link is up and refuses it offline (`modes.HOME_READS`). Refused for a kind not in the
-        table; nothing for age."""
-        if not isinstance(kind, str) or kind not in witness.KINDS:
-            raise RpcError(f"host_log: {kind!r} is not a witness kind ({', '.join(witness.KINDS)})")
-        try:
-            when = datetime.fromisoformat(str(after).replace("Z", "+00:00")) if after else None
-        except ValueError:
-            when = None
-        if when is None:
-            raise RpcError("host_log: after is the instant to count from, as ISO 8601 (design §4.4 The query)")
-        if text is not None and not isinstance(text, str):
-            raise RpcError("host_log: text is a string, matched literally")
-        if repo is not None and not isinstance(repo, str):
-            raise RpcError("host_log: repo is a registry name")
-        got = await asyncio.to_thread(witness.query, str(kind), text or "", when, repo or None)
-        return got
 
     async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty

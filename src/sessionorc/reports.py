@@ -349,9 +349,12 @@ def witness_prechecks(
 ) -> bool:
     """Read `sha`'s precheck statuses and hand each red one to `emit` — `(repo, text, status id, at)`, run
     on the agent's loop, which drops one already recorded — as a `precheck-fail` record; False when the
-    list could not be read, so the next reading asks again."""
+    list could not be read, so the next reading asks again. `repo` is the record's `<repo>` id (§4.4 *A
+    repo's id*); with none the list is not read, deliberately, and False keeps the next reading asking."""
     from sessionorc import witness  # the log's own module: imported where its writer runs
 
+    if not repo:
+        return False
     got = precheck_statuses(directory, sha, timeout)
     if isinstance(got, str):
         return False
@@ -1073,8 +1076,8 @@ def pr_reading(
         was = olds.get(p["number"]) or {}
         moved = was.get("head") != p["head"] or was.get("precheck_seen") != p.get("precheck_seen")
         if emit is not None and p.get("precheck_seen") and p["head"] and moved:
-            name = Path(directory).name
-            if not witness_prechecks(directory, f"{name}#{p['number']}", p["head"], emit, name, timeout=timeout):
+            name, rid = Path(directory).name, lb.origin_path(remote) if remote else None
+            if not witness_prechecks(directory, f"{name}#{p['number']}", p["head"], emit, rid or "", timeout=timeout):
                 p["precheck_seen"] = None  # unread: the next reading reads it again
         _sync_flag(directory, p, was, timeout)
         if p.get("sync"):

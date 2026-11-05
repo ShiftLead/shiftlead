@@ -436,7 +436,7 @@ class NotifyMixin:
         # push on, witnessed (§4.4, TD-1386): an endpoint new to the home whose post names no held device in
         # `replaces` — a renewal the page could not name reads as a new device and is recorded
         if got not in held and not (replaces and str(replaces) in held):
-            self._witness_press_of("push-on", got, None)
+            await self._witness_press_of("push-on", got, None)
         return {"id": got}
 
     async def rpc_push_unsubscribe(self, id: Any = None, caller: Any = None) -> dict[str, Any]:
