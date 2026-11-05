@@ -482,6 +482,8 @@ def kept_waiting_of(section: str) -> dict[str, str]:
     compared as ledgerboard does (spaces folded, lower case) — `{"decision (paul)": "2026-11-04"}` — or {}
     (design §4.4 *The card's status*, TD-1368). Read from the Log itself, never `gate_age`, which also counts
     `gate added` and a reassignment; an entry whose Log cannot be read has none."""
+    if "kept waiting:" not in section:
+        return {}  # most entries: no Log line to parse on every ledger read
     try:
         lines = lb.log_lines(section)
     except Exception:  # noqa: BLE001 — an entry ledgerboard refuses has no Log to read
