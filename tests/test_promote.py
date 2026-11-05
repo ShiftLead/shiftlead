@@ -421,7 +421,7 @@ async def test_an_unserved_repo_is_promoted_by_no_pass(agent, checkout, monkeypa
     monkeypatch.setattr(agent, "_promote_auto", lambda: {"repo": True})
     seen: list[dict] = []
 
-    def survey(roots, prev, full, auto, now, fetched=None):
+    def survey(roots, prev, full, auto, now, fetched=None, **kw):
         seen.append(dict(auto))
         return {}, [], {}
 

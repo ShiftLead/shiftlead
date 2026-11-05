@@ -14,7 +14,7 @@ import json
 import os
 import re
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -302,6 +302,62 @@ PRECHECK_CONTEXT = "cadence/precheck"  # the commit status agent-cadence's `prec
 def prechecked(rollup: Any) -> bool:
     """Whether a `statusCheckRollup` carries a `PRECHECK_CONTEXT` status, whatever its state (TD-1036)."""
     return any(isinstance(c, dict) and c.get("context") == PRECHECK_CONTEXT for c in rollup or [])
+
+
+def precheck_seen(rollup: Any) -> str | None:
+    """The rollup's `PRECHECK_CONTEXT` status as the witness log compares it between readings — its state
+    and `startedAt` (or `createdAt`) — or None when it carries none (§4.4 *The kinds*, TD-1386)."""
+    for c in rollup if isinstance(rollup, list) else []:
+        if isinstance(c, dict) and c.get("context") == PRECHECK_CONTEXT:
+            return f"{c.get('state') or ''} {c.get('startedAt') or c.get('createdAt') or ''}".strip()
+    return None
+
+
+def precheck_statuses(directory: Path | str, sha: str, timeout: float = 30.0) -> list[dict[str, Any]] | str:
+    """Every `PRECHECK_CONTEXT` status ever set on `sha` — the forge's `commits/<sha>/statuses`, 100 a page
+    with every page followed, never the combined `status` that holds the latest alone — or why it could not
+    be read (§4.4 *The kinds*, `precheck-fail`, TD-1386)."""
+    jq = f'.[] | select(.context == "{PRECHECK_CONTEXT}") | {{id, state, created_at, target_url}} | @json'
+    try:
+        cp = subprocess.run(
+            ["gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/statuses?per_page=100", "--paginate", "--jq", jq],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"gh could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200]
+    out: list[dict[str, Any]] = []
+    for line in (cp.stdout or "").splitlines():
+        try:
+            got = json.loads(line)
+        except json.JSONDecodeError:
+            return "gh api printed something that is not the commit statuses"
+        if isinstance(got, dict):
+            out.append(got)
+    return out
+
+
+def witness_prechecks(
+    directory: Path | str,
+    label: str,
+    sha: str,
+    emit: Callable[[str, str, str, datetime], None],
+    repo: str,
+    own: dict[str, Any] | None = None,
+    timeout: float = 30.0,
+) -> bool:
+    """Read `sha`'s precheck statuses and hand each red one to `emit` — `(repo, text, status id, at)`, run
+    on the agent's loop, which drops one already recorded — as a `precheck-fail` record; False when the
+    list could not be read, so the next reading asks again."""
+    from sessionorc import witness  # the log's own module: imported where its writer runs
+
+    got = precheck_statuses(directory, sha, timeout)
+    if isinstance(got, str):
+        return False
+    for at, text, sid in witness.precheck_fails(label, sha, got, own):
+        emit(repo, text, sid, at)
+    return True
 
 
 # what a `done` reads of one PR (TD-637); `isCrossRepository`, whether it is a fork's (TD-1285)
@@ -693,6 +749,7 @@ def _gh_prs(
         if fields == OPEN_PR_FIELDS:
             row["checks"], row["failing"] = fold_checks(p.get("statusCheckRollup"))
             row["prechecked"] = prechecked(p.get("statusCheckRollup"))  # `ao pr wait`'s *none* (TD-1036)
+            row["precheck_seen"] = precheck_seen(p.get("statusCheckRollup"))  # the witness log's (TD-1386)
             if row["checks"] == "red":  # what `pr_reading` reads for jobs that never started (TD-686)
                 row["failing_items"] = failing_items(p.get("statusCheckRollup"))[0]
             row["merge_state"] = str(p.get("mergeStateStatus") or "").upper()
@@ -957,6 +1014,7 @@ def pr_reading(
     old: dict[str, Any] | None = None,
     held: list[str] | None = None,
     remote: str = "",
+    emit: Callable[[str, str, str, datetime], None] | None = None,
 ) -> dict[str, Any]:
     """The repo's pull requests as the Repo facet counts them (design §4.4 *Repo facts*, TD-176): three
     `gh` reads — the open PRs, every PR updated in the longest window, and the windows' counts — kept as `open` (oldest
@@ -976,7 +1034,10 @@ def pr_reading(
     keeps its jobs' verdicts as `jobs` (`classify_failing`, TD-686). `held` is the repo's held key
     (`held.repo_key`): each open PR but a sync PR carries `held`, the paths of it the key names, read
     once per head and key (`_held_flags`, TD-789). `remote` is the checkout's origin URL: on GitLab
-    the reading is `_gitlab_reading`'s, on another forge an error (`forge_of`, TD-940)."""
+    the reading is `_gitlab_reading`'s, on another forge an error (`forge_of`, TD-940). `emit` is the witness
+    log's `precheck-fail` writer (§4.4 *The kinds*, TD-1386): an open PR whose `cadence/precheck` changed
+    since `old` (a new head, another state or `startedAt`) has its head's statuses read and each red one
+    handed to it; a GitHub repo's alone."""
     if not Path(directory).is_dir():
         return {"error": f"{directory} is not a directory here"}
     forge, where = forge_of(remote)  # the origin the caller read; none given reads as GitHub
@@ -1010,6 +1071,11 @@ def pr_reading(
             kept = was.get("red_since") if p["checks"] == "red" or was.get("conflicting") else None
             p["red_since"] = kept or now.isoformat()
         was = olds.get(p["number"]) or {}
+        moved = was.get("head") != p["head"] or was.get("precheck_seen") != p.get("precheck_seen")
+        if emit is not None and p.get("precheck_seen") and p["head"] and moved:
+            name = Path(directory).name
+            if not witness_prechecks(directory, f"{name}#{p['number']}", p["head"], emit, name, timeout=timeout):
+                p["precheck_seen"] = None  # unread: the next reading reads it again
         _sync_flag(directory, p, was, timeout)
         if p.get("sync"):
             # one waiting on CI that never started counts from the reading it conflicts (TD-686)

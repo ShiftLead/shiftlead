@@ -44,6 +44,9 @@ PRESS_WORDS: dict[str, bool] = {
 }
 
 ID_RE = re.compile(r"[A-Za-z0-9_.@/-]+")
+RED_STATES = ("failure", "error")  # a commit status's words for red, as `promote.py` reads them
+_FAILED_LINE = re.compile(r"^FAILED ([^\s(]\S*)", re.M)  # pytest's `FAILED <node id> - …`, not `FAILED (errors=1)`
+_STATUS_TOKEN = re.compile(r"(?:^|\s)status (\S+)(?=\s|$)")  # a `precheck-fail` record's status id
 _MONTH_RE = re.compile(r"(\d{4})-(\d{2})\.jsonl")
 
 
@@ -205,3 +208,83 @@ def repo_named(dir: Any, roots: Iterable[str]) -> str | None:
         if (here == root or here.is_relative_to(root)) and (best is None or len(root.parts) > len(best.parts)):
             best = root
     return best.name if best is not None else None
+
+
+# ── the `precheck-fail` writer (§4.4 *The kinds*, TD-1386 slice 2) ─────────────────────────────────
+
+_recorded: dict[str, tuple[tuple[int, int], set[str]]] = {}  # a month file's status ids, by its size and mtime
+
+
+def recorded_statuses(f: Path) -> set[str]:
+    """The status ids the `precheck-fail` records of month file `f` name, each a whole token (`status 12`
+    is never `status 123`): read on demand and cached while the file stands unchanged."""
+    try:
+        st = f.stat()
+    except OSError:
+        return set()
+    key = (st.st_size, st.st_mtime_ns)
+    hit = _recorded.get(str(f))
+    if hit and hit[0] == key:
+        return hit[1]
+    ids = {
+        m[1]
+        for r in read_month(f)
+        if r.get("kind") == "precheck-fail"
+        for m in _STATUS_TOKEN.finditer(str(r.get("text") or ""))
+    }
+    _recorded[str(f)] = (key, ids)
+    return ids
+
+
+def append_precheck_fail(
+    repo: str, text: str, status: Any, at: datetime, now: datetime | None = None, root: Path | None = None
+) -> dict | None:
+    """One red precheck status's record, unless it is already recorded — its id a whole token in the month
+    file of its `created_at`, the file its record would be in, so a restart writes nothing twice — or it was
+    created before the retention boundary (writing it would recreate a pruned month) or before `start`."""
+    when = _utc(at)
+    if when < boundary(now) or str(status) in recorded_statuses(month_file(when, root)):
+        return None
+    return append("precheck-fail", repo, text, when, root)
+
+
+def failing_tests(log_path: Any) -> list[str]:
+    """Every pytest node id a precheck run's log names on a `FAILED <id>` line, in order, once each."""
+    try:
+        text = Path(str(log_path)).read_text(encoding="utf-8", errors="replace")
+    except (OSError, ValueError):
+        return []
+    out: list[str] = []
+    for m in _FAILED_LINE.finditer(text):
+        if m[1] not in out:
+            out.append(m[1])
+    return out
+
+
+def precheck_fails(
+    label: str, sha: str, statuses: Iterable[Any], own: dict[str, Any] | None = None
+) -> list[tuple[datetime, str, str]]:
+    """`(at, text, status id)` for each red status (`failure` or `error`) of a head's `cadence/precheck`
+    list, oldest first, `at` the status's `created_at`. `label` is `<repo>#<n>` or `<repo>@main`. `own` is
+    the home's own run on main (`precheck.json`, `{sha, at, log, exit}`): where it exited red, the first red
+    status on its sha created at or after the run began is its, and names the tests its log failed; any other
+    status names none."""
+    reds = []
+    for s in statuses:
+        if not isinstance(s, dict) or str(s.get("state") or "").lower() not in RED_STATES:
+            continue
+        at = _parse(s.get("created_at"))
+        if at is not None and s.get("id") is not None:
+            reds.append((at, str(s["id"])))
+    reds.sort()
+    mine = None
+    o = own or {}
+    failed = isinstance(o.get("exit"), int) and o["exit"] != 0  # a green or unseen run names no test
+    began = _parse(o.get("at")) if o.get("sha") == sha and failed else None
+    if began is not None:
+        mine = next((sid for at, sid in reds if at >= began), None)
+    out = []
+    for at, sid in reds:
+        tests = failing_tests(own.get("log")) if own and sid == mine else []
+        out.append((at, " ".join([label, sha[:12], f"status {sid}", *tests]), sid))
+    return out
