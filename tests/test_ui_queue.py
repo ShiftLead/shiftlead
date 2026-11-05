@@ -286,9 +286,7 @@ def test_the_summary_bar_replaces_the_sentence_and_its_widths_are_the_browsers(t
     assert [s["flex"] for s in bar] == [max(k, 231 * 0.012) for k in (2, 60, 169)] and bar[0]["flex"] > 2
     assert [s["key"] for s in summary_bar({**g, "waiting": (0, 0)}, 171)] == ["in_progress", "up_next"]
     assert summary_bar({k: (0, 0) for k in g}, 0) == []
-    assert (
-        repr(summary_bar({"up_next": (2, 0)}, 250)[0]["flex"]) == "3"
-    )  # the floor, whole: `3` as the browser prints it
+    assert repr(summary_bar({"up_next": (2, 0)}, 250)[0]["flex"]) == "3"  # the floor, whole: `3` as the browser prints it
     js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "AO.qBarFlex = (n, total) => Math.max(n, total * 0.012);" in js
     html = client(monkeypatch, tmp_path, fake(queue())).get("/queue").text
