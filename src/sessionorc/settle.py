@@ -19,6 +19,7 @@ from typing import Any
 
 import yaml
 
+from sessionorc import ledger as ledger_mod
 from sessionorc import paths
 from sessionorc import settings as settings_mod
 from sessionorc.store import _atomic_write
@@ -88,35 +89,60 @@ def _kind(entry: dict[str, Any]) -> str:
 
 
 def mark_waits(entries: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
-    """Each entry's `waiting: {on, until}` while its `**Waits:**` line stands (design §4.4 *What a wait
-    does*, TD-716), dropping a stale one: an `until` stands while the home's local date is before its
-    date — one that names no date waits with no end — and an `event` while the line is there. It needs
-    no record and no `settle:` span, so a repo with neither, or a clock that cannot be written, still
-    marks waits. Returns `entries`."""
-    today = now.astimezone().date().isoformat()
+    """Each entry's `waiting: {on, until, name, why}` while its wait stands (design §4.4 *What a wait does*,
+    TD-716, TD-1395), dropping a stale one. **From its gates** (`gates`, the reader's `ledger.gates_of`) when
+    what keeps it from pickable is only its `until` and `event` gates (`ledger.only_gated`): `on` `until`
+    while its date is after the home's UTC day, else `event` while one stands — `name` its first event's and
+    `why` that event's Event line. A gate-only entry none of whose gates stands any more (an `until` whose
+    UTC day has come in a carried reading) reads pickable with them removed, before the sweep removes them.
+    **Else from a `**Waits:**` line** still standing (`waits`): an `until` while the UTC day is before its
+    date — one that names no date waits with no end — and an `event` while the line is there, `why` its
+    words. It needs no record and no `settle:` span, so a repo with neither, or a clock that cannot be
+    written, still marks waits. Returns `entries`."""
+    today = now.astimezone(UTC).date().isoformat()
     for e in entries:
         e.pop("waiting", None)
+        g = e.get("gates")
+        if isinstance(g, dict) and ledger_mod.only_gated(e):
+            until = sorted(d for d in g.get("until") or [] if str(d) > today)
+            events = [x for x in g.get("events") or [] if isinstance(x, dict)]
+            ev = events[0] if events else {}
+            name, why = str(ev.get("name") or ""), str(ev.get("why") or "")
+            if until:
+                e["waiting"] = {"on": "until", "until": until[0], "name": name, "why": why}
+                continue
+            if events:
+                e["waiting"] = {"on": "event", "until": "", "name": name, "why": why}
+                continue
+            if e.get("pickable") == "no":  # its day has come since the reading: the gates read as lifted
+                e["blocked_by"], e["pickable"] = (
+                    [b for b in e.get("blocked_by") or [] if not ledger_mod.is_gate(b)],
+                    "yes",
+                )
         w = e.get("waits")
         if not isinstance(w, dict) or w.get("on") not in ("until", "event"):
             continue
         date = str(w.get("date") or "")
         if w["on"] == "until" and date and date <= today:
             continue  # its day has begun: the line reads as unwritten
-        e["waiting"] = {"on": w["on"], "until": date}
+        e["waiting"] = {"on": w["on"], "until": date, "name": "", "why": str(w.get("why") or "")}
     return entries
 
 
 def wait_refusal(entry: dict[str, Any] | None) -> str | None:
-    """Why a declared claim on a waiting entry is refused (design §4.4 *What a wait does*, TD-716), or
-    None: *TD-463 waits until 2026-10-16*, *TD-685 waits: the next cadence-sync PR*. `--force` passes
-    it, since the session may know the event has come; that session's PR removes the line."""
+    """Why a declared claim on a waiting entry is refused (design §4.4 *What a wait does*, TD-716, TD-1395),
+    or None: *TD-463 waits until 2026-10-16*, *TD-463 waits on event (flake-again)*, or, from a `Waits:`
+    line, *TD-685 waits: the next cadence-sync PR*. `--force` passes it, since the session may know the
+    event has come; that session's PR drops the `until` or lifts the event gate (or removes the line)."""
     if not isinstance(entry, dict) or not isinstance(entry.get("waiting"), dict):
         return None
-    i, w = str(entry.get("id") or ""), entry.get("waits") if isinstance(entry.get("waits"), dict) else {}
-    if entry["waiting"].get("on") == "until" and entry["waiting"].get("until"):
-        said = f"{i} waits until {entry['waiting']['until']}"
+    i, w = str(entry.get("id") or ""), entry["waiting"]
+    if w.get("on") == "until" and w.get("until"):
+        said = f"{i} waits until {w['until']}"
+    elif w.get("name"):
+        said = f"{i} waits on event ({w['name']})"
     else:
-        said = f"{i} waits: {w.get('why') or entry['waiting'].get('on') or 'an event'}"
+        said = f"{i} waits: {w.get('why') or w.get('on') or 'an event'}"
     return f"{said} (design §4.4 *An entry says what it waits for*); claim it anyway with --force if the wait is over"
 
 

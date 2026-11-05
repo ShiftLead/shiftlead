@@ -101,6 +101,31 @@ def waits_of(value: str) -> dict[str, str] | None:
     return {"on": first, "date": date, "why": rest.strip().lstrip("—–-").strip()}
 
 
+def is_gate(item: str) -> bool:
+    """Whether one `blocked_by` item is an `until` or `event` gate as ledgerboard writes it (design §4.4 *An
+    entry says what it waits for*, TD-1395): what the page kind reads past, and a wait, never a block."""
+    g = lb.parse_gates(item)
+    return bool(g["until"] or g["events"]) and not (g["ids"] or g["decisions"] or g["bad"] or g["retired"])
+
+
+def gates_of(blocked_raw: str | None, section: str) -> dict[str, Any] | None:
+    """An entry's `until` and `event` gates (design §4.4 *An entry says what it waits for*, TD-1395), read
+    through ledgerboard's `parse_gates`: `{until: [dates], events: [{name, why}]}`, `why` the first line of
+    the entry's `**Event (<name>):**` section ('' for none); None when its `Blocked by:` holds neither.
+    `section` is the entry's text from its heading."""
+    g = lb.parse_gates(blocked_raw)
+    if not (g["until"] or g["events"]):
+        return None
+    words = {s["name"]: s["words"] for s in lb.event_sections(section) if s.get("name")}
+    return {"until": list(g["until"]), "events": [{"name": n, "why": words.get(n, "")} for n in g["events"]]}
+
+
+def only_gated(entry: Mapping[str, Any]) -> bool:
+    """Whether what keeps an entry from pickable is at most its `until` and `event` gates (TD-1395): no open
+    id, no decision, no unreadable item and no open part."""
+    return not entry.get("parts_open") and all(is_gate(str(b)) for b in entry.get("blocked_by") or [])
+
+
 def until_of(blocked_raw: str | None) -> str:
     """The words after a `decision (<who>)` item's dash, as written — what the Queue card's row reads as
     *held until <them>* (design §4.5 screen 12, §4.5a *Queue card: what needs the person*, TD-795);
@@ -276,7 +301,8 @@ def kind_of(entry: dict[str, Any]) -> str:
     """The page's kind for an entry (§4.4 *Repo facts*, TD-418), tested in this order so each has
     one: *for you* — what waits on the person, and only that (TD-367): blocked by `decision (paul)`
     (an Owner holds nothing, TD-1375); *blocked* — `Blocked by:` holds any item other than a `decision (…)` (an open
-    id, a cross-repo or unreadable one), whatever the Kind and whatever decision stands beside it;
+    id, a cross-repo or unreadable one), whatever the Kind and whatever decision stands beside it — an `until`
+    or `event` gate aside, which the kinds read past so they count what a waiting entry is (TD-1395);
     or some open entry names it in `Part of:` (`parts_open`, TD-1130);
     *design* — `Kind: design-first` (a decision owed to the designer is that `Kind:`, TD-1296); *live check* —
     `Kind: live-check`, its build live or not; *pickable* — pickable, `Kind: build` or none;
@@ -285,13 +311,14 @@ def kind_of(entry: dict[str, Any]) -> str:
     an unblocked `Kind: decision` that is not the person's among it."""
     if decided_by(entry, PERSON_OWNER):
         return "for-you"
-    if any(not b.startswith("decision (") for b in entry.get("blocked_by") or []) or entry.get("parts_open"):
+    blocks = [b for b in entry.get("blocked_by") or [] if not is_gate(b)]  # read past a wait (TD-1395)
+    if any(not b.startswith("decision (") for b in blocks) or entry.get("parts_open"):
         return "blocked"
     if entry.get("kind") == "design-first":
         return "design"
     if entry.get("kind") == "live-check":
         return "live-check"
-    if entry.get("pickable") == "yes" and entry.get("kind") in ("", "build"):
+    if (entry.get("pickable") == "yes" or only_gated(entry)) and entry.get("kind") in ("", "build"):
         return "pickable"
     if entry.get("kind") == "evaluation":
         return "evaluation"
@@ -444,8 +471,13 @@ def in_lanes(
 
 
 def _unwaited(entry: dict[str, Any]) -> dict[str, Any]:
-    """The entry as a lane would read it once its wait ends (TD-716): its `waiting` mark dropped."""
-    return {k: v for k, v in entry.items() if k != "waiting"}
+    """The entry as a lane would read it once its wait ends (TD-716): its `waiting` mark dropped, and one kept
+    from pickable by its `until` and `event` gates alone read pickable with them removed (TD-1395), as
+    ledgerboard gives it `pickable: no` with them in `blocked_by`."""
+    out = {k: v for k, v in entry.items() if k != "waiting"}
+    if entry.get("gates") and only_gated(entry):
+        out["blocked_by"], out["pickable"] = [], "yes"
+    return out
 
 
 def _word_matches(word: str, entry: dict[str, Any]) -> bool:
@@ -523,8 +555,9 @@ def entries(
     PRs its line names, and `live`, `yes` when `live` says every one of them is live and `no`
     otherwise — no callable, no PR named (§4.9b, TD-323). `sig` is a hash of the entry's section text,
     which the home's settle clock compares (§4.4 *A new entry settles before it is pickable*, TD-710).
-    An entry whose header block carries a `**Waits:**` line has `waits` (`waits_of`, TD-716); whether it
-    still waits is the home's clock's, its `waiting` mark (`settle`). An entry whose Log carries a `kept
+    An entry whose header block carries a `**Waits:**` line has `waits` (`waits_of`, TD-716), and one whose
+    `Blocked by:` holds an `until` or `event` gate has `gates` (`gates_of`, TD-1395); whether it still waits
+    is the home's clock's, its `waiting` mark (`settle.mark_waits`). An entry whose Log carries a `kept
     waiting` line has `kept_waiting`, the newest such line's date by gate (`kept_waiting_of`, TD-1368). `team`
     is its `**Team:**` line's first word ('' for none), and `needs_team: {why}` marks an entry `team_need`
     finds lacking (§4.4 *An entry names its team*, TD-730).
@@ -577,6 +610,8 @@ def entries(
         }
         if waits := waits_of(read["fields"].get("waits", "")):  # the header block's line alone (§4.4)
             e["waits"] = waits
+        if gates := gates_of(read["blocked_raw"], t[m.start() : nxt.start() if nxt else len(t)]):
+            e["gates"] = gates  # what `settle.mark_waits` reads a wait from (§4.4, TD-1395)
         if e["kind"] == "live-check":
             e["built"] = built(fields.get("kind", ""))
             e["live"] = "yes" if live is not None and e["built"] and all(live(n) for n in e["built"]) else "no"

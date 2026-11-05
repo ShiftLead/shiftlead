@@ -1340,22 +1340,38 @@ WAIT_CLAMP = 40  # the Repo page's *waits: <words>*, clamped; the whole line is 
 
 def wait_words(e: Mapping[str, Any], short: bool = False) -> str:
     """What an entry whose wait stands waits for (design §4.4 *An entry says what it waits for*, §4.7
-    `ao repo`, §4.5a *Repo page: waits mark*, TD-716): *waits until 2026-10-16* (`short`: *waits until
-    10-16*), else *waits: <the line's words>* (`short`: clamped); '' while it does not wait. Read from
-    the home's `waiting` mark, so a date passed says nothing."""
+    `ao repo`, §4.5a *Repo page: waits mark*, TD-716, TD-1395): *waits until 2026-10-16* (`short`: *waits
+    until 10-16*), else *waits: <its Event line's words, or the Waits line's>* (`short`: clamped); '' while
+    it does not wait. Read from the home's `waiting` mark, so a date passed says nothing."""
     w = e.get("waiting")
     if not isinstance(w, dict):
         return ""
     if w.get("on") == "until" and (date := str(w.get("until") or "")):
         return f"waits until {date[5:] if short else date}"
-    why = str((e.get("waits") or {}).get("why") or "") or ("no date" if w.get("on") == "until" else "an event")
+    why = (
+        str(w.get("why") or "")
+        or str((e.get("waits") or {}).get("why") or "")
+        or (f"event ({w['name']})" if w.get("name") else "")
+        or ("no date" if w.get("on") == "until" else "an event")
+    )
     if short and len(why) > WAIT_CLAMP:
         why = why[: WAIT_CLAMP - 1].rstrip() + "…"
     return f"waits: {why}"
 
 
 def wait_line(e: Mapping[str, Any]) -> str:
-    """The entry's `**Waits:**` line, whole, as the Repo page's waits mark shows it on hover (TD-716)."""
+    """What the Repo page's waits mark shows on hover (TD-716, TD-1395): the gates that hold, each event with
+    its Event line whole, *until 2026-11-20; event (flake-again) — the test fails again*; else the entry's
+    `**Waits:**` line whole."""
+    w, g = e.get("waiting"), e.get("gates")
+    if isinstance(w, dict) and isinstance(g, dict) and ledger_mod.only_gated(e):  # the wait is the gates'
+        said = [f"until {w['until']}"] if w.get("on") == "until" and w.get("until") else []
+        said += [
+            f"event ({x.get('name')})" + (f" — {x['why']}" if x.get("why") else "")
+            for x in g.get("events") or []
+            if isinstance(x, dict)
+        ]
+        return "; ".join(said)
     w = e.get("waits") or {}
     if not isinstance(w, dict) or not w.get("on"):
         return ""

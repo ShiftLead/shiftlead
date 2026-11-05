@@ -19,8 +19,8 @@ from shiftlead.ui import org
 from shiftlead.ui import repo as repo_ui
 
 NOW = datetime.now(UTC)
-TOMORROW = (NOW.astimezone().date() + timedelta(days=1)).isoformat()
-LATER = (NOW.astimezone().date() + timedelta(days=9)).isoformat()
+TOMORROW = (NOW.date() + timedelta(days=1)).isoformat()
+LATER = (NOW.date() + timedelta(days=9)).isoformat()
 GRINDER = ["free-pick", "owner:grinder"]
 
 

@@ -468,6 +468,8 @@ def reading(
     # ledgerboard cannot read
     for e in open_.values():
         for b in e.get("blocked_by") or []:
+            if ledger_mod.is_gate(b):
+                continue  # an `until` or `event` gate is a wait, never past reach (TD-1395)
             if m := re.fullmatch(r"decision \((.+)\)", b):
                 far = m.group(1).strip().lower() != PERSON
             elif re.fullmatch(r"TD-\d+", b):
@@ -812,8 +814,8 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
             return True
         if e.get("kind") == "live-check" and e.get("live") != "yes":
             return True
-        # blocked only by open ids
-        ids = list(e.get("blocked_by") or [])
+        # blocked only by open ids (a gate is the `waiting` mark's, TD-1395)
+        ids = [b for b in e.get("blocked_by") or [] if not ledger_mod.is_gate(b)]
         # an open part counts as an open id its parent is blocked by (TD-1130)
         return bool(ids or e.get("parts_open")) and all(not b.startswith("decision (") for b in ids)
 
@@ -877,7 +879,9 @@ def _wait(
             day = date.fromisoformat(str(w["until"]))
             words = f"{day:%b} {day.day}"
             return {"column": words, "phrase": f"waits until {words}", "id": q}
-        why = str((open_[q].get("waits") or {}).get("why") or "") if isinstance(open_[q].get("waits"), Mapping) else ""
+        why = str(w.get("why") or "")  # the Event line's words, or the Waits line's (TD-1395)
+        if not why and isinstance(open_[q].get("waits"), Mapping):
+            why = str(open_[q]["waits"].get("why") or "")
         return {"column": "event", "phrase": f"waits on {why}" if why else "waits on an event", "id": q}
 
     leaves = sorted((q for q in rest if of_its_own(q)), key=by_key)
