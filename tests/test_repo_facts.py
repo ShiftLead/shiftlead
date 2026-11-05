@@ -42,6 +42,7 @@ LEDGER = """# Technical debt
 **Priority:** Low
 **Owner:** paul (the call is his)
 **Kind:** evaluation
+**Blocked by:** decision (paul)
 
 ## TD-013: a decision
 

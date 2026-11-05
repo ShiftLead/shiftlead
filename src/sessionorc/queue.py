@@ -625,10 +625,9 @@ def _state(
     `owner` (`Owner: paul`) or `decision` (`decision (paul)`) — when it waits on them, which draws no word, and
     the person's own session where one holds such an entry: the first by id of its claims' records with
     `unattended: false`, whose name the word *with you in <name>* carries (TD-1281). The row keeps its need."""
+    # `Owner: paul` holds nothing (TD-1375): the gate is the need, and the Owner says it is the person's to do
     need = (
-        "owner"
-        if str(e.get("owner") or "").lower() == PERSON
-        else "decision"
+        ("owner" if str(e.get("owner") or "").lower() == PERSON else "decision")
         if ledger_mod.decided_by(dict(e), PERSON)
         else None
     )
@@ -777,10 +776,11 @@ def _card(
 
 def _start(members: list[str], open_: Mapping[str, Mapping[str, Any]], keyed: Mapping[str, str], top: str) -> str:
     """The entry a **Start session** on the card starts on (§4.4 *One owner*, TD-912): its one `Owner: paul`
-    entry, else its first `decision (paul)` entry by key, else the top entry — by key alone, never by what
-    is claimed, so two presses choose the same entry."""
+    entry that waits on the person (`decision (paul)`: an Owner alone holds nothing, TD-1375), else its first
+    `decision (paul)` entry by key, else the top entry — by key alone, never by what is claimed, so two presses
+    choose the same entry."""
     by_key = sorted(members, key=lambda q: _key_sort(keyed[q], q))
-    owned = [q for q in by_key if str(open_[q].get("owner") or "").lower() == PERSON]
+    owned = [q for q in by_key if str(open_[q].get("owner") or "").lower() == PERSON and _own(open_[q])]
     if len(owned) == 1:
         return owned[0]
     return next((q for q in by_key if ledger_mod.decided_by(dict(open_[q]), PERSON)), top)
@@ -825,8 +825,9 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
 
 
 def _own(e: Mapping[str, Any]) -> bool:
-    """The person's own member (§4.4 *Waiting*): `Owner: paul` or `Blocked by: decision (paul)`."""
-    return str(e.get("owner") or "").lower() == PERSON or ledger_mod.decided_by(dict(e), PERSON)
+    """The person's own member (§4.4 *Waiting*): `Blocked by: decision (paul)` — an `Owner: paul` alone holds
+    nothing (TD-1375)."""
+    return ledger_mod.decided_by(dict(e), PERSON)
 
 
 def _wait(

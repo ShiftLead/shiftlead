@@ -274,8 +274,8 @@ def decided_by(entry: dict[str, Any], who: str) -> bool:
 
 def kind_of(entry: dict[str, Any]) -> str:
     """The page's kind for an entry (§4.4 *Repo facts*, TD-418), tested in this order so each has
-    one: *for you* — what waits on the person, and only that (TD-367): `Owner: paul`, or blocked by
-    `decision (paul)`; *blocked* — `Blocked by:` holds any item other than a `decision (…)` (an open
+    one: *for you* — what waits on the person, and only that (TD-367): blocked by `decision (paul)`
+    (an Owner holds nothing, TD-1375); *blocked* — `Blocked by:` holds any item other than a `decision (…)` (an open
     id, a cross-repo or unreadable one), whatever the Kind and whatever decision stands beside it;
     or some open entry names it in `Part of:` (`parts_open`, TD-1130);
     *design* — `Kind: design-first` (a decision owed to the designer is that `Kind:`, TD-1296); *live check* —
@@ -283,7 +283,7 @@ def kind_of(entry: dict[str, Any]) -> str:
     *evaluation* — `Kind: evaluation`, which no lane takes since the anchor seat is retired (§4.9b
     *No anchor seat*), so `flags` names each; else *other*, a residue that should be empty (`flags`),
     an unblocked `Kind: decision` that is not the person's among it."""
-    if str(entry.get("owner") or "").lower() == PERSON_OWNER or decided_by(entry, PERSON_OWNER):
+    if decided_by(entry, PERSON_OWNER):
         return "for-you"
     if any(not b.startswith("decision (") for b in entry.get("blocked_by") or []) or entry.get("parts_open"):
         return "blocked"

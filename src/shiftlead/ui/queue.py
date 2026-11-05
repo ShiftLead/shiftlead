@@ -220,7 +220,7 @@ READ_LINES = {"answered": "answered for you", "waiting": "waiting on them", "fyi
 def want_of(e: Mapping[str, Any], sec: str) -> str:
     """An attached item's want (§4.5 screen 12 *Three wants*): `decide` — an `ask`, a `steer` running or
     paused, a `decide` or `look` board line, a `decision (paul)` entry; `do` — an `act` board line (TD-1066: Done
-    its answer), an `Owner: paul` entry, a red PR nobody holds, and what else needs the person (a blocked
+    its answer), a gated `Owner: paul` entry, a red PR nobody holds, and what else needs the person (a blocked
     outcome); `read` — what is answered, waits on others or is for reading. A fourth, `with_you` — the person's
     entry their own session holds, no want (TD-1281) — is `attach`'s, read from the card, never from the row."""
     if sec in READ_LINES:

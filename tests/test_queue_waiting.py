@@ -29,9 +29,9 @@ HELD = {"held": {"at": NOW.isoformat()}}
 
 def test_blocked_only_by_the_persons_entry_is_up_next_and_beside_an_open_id_it_waits_on_that_id(tmp_path):
     cards = _read(tmp_path, [
-        _entry(1, "the person's", Priority="High", Owner="paul"),
+        _entry(1, "the person's", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
         _entry(2, "after it alone", Priority="High", Blocked_by="TD-001"),
-        _entry(11, "the person's too", Priority="Medium", Owner="paul"),
+        _entry(11, "the person's too", Priority="Medium", Owner="paul", Blocked_by="decision (paul)"),
         _entry(12, "an event", Priority="Medium", Waits="event — the next promote"),
         _entry(13, "after both", Priority="Medium", Blocked_by="TD-011, TD-012"),
     ])  # fmt: skip

@@ -141,7 +141,7 @@ def test_each_row_state_word(tmp_path):
         _entry(7, "waits on an event", Priority="High"),
         _entry(8, "after another", Priority="High", Blocked_by="TD-009"),
         _entry(9, "ready", Priority="High"),
-        _entry(10, "the person's", Priority="High", Owner="paul"),
+        _entry(10, "the person's", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
         _entry(11, "a decision of the person's", Priority="High", Blocked_by="decision (paul) — when I say"),
         _entry(12, "stalled holder", Priority="High"),
         _entry(13, "red nobody holds", Priority="High"),
@@ -186,7 +186,7 @@ def test_each_row_state_word(tmp_path):
 
 def test_the_cards_status_by_need_and_a_designers_decision_item_reads_blocked(tmp_path):
     root, r = _repo(tmp_path, "r", [
-        _entry(1, "the person's, beside a stalled one", Priority="High", Owner="paul"),
+        _entry(1, "the person's, beside a stalled one", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
         _entry(2, "stalled", Priority="High", Blocked_by="TD-001"),
         _entry(3, "someone else's decision", Priority="High", Blocked_by="decision (techlead)"),
         _entry(4, "waits", Priority="High", Waits="event — a thing"),
@@ -203,7 +203,7 @@ def test_the_cards_status_by_need_and_a_designers_decision_item_reads_blocked(tm
     assert status == {"TD-001": "needs you", "TD-003": "blocked", "TD-004": "waiting", "TD-006": "blocked",
                       "TD-007": "blocked"}  # fmt: skip
     # without the person's member, the stalled one leads
-    ents["TD-001"]["owner"] = "grinder"
+    ents["TD-001"]["owner"], ents["TD-001"]["blocked_by"] = "grinder", []
     status = {
         c["top"]["id"]: c["status"] for c in _cards({root: r}, [_rec("w", root, "TD-002", state="idle")])["cards"]
     }
@@ -289,7 +289,7 @@ def test_review_findings_designer_item_archived_claim_no_hold_one_flag(tmp_path)
     root, r = _repo(tmp_path, "r", [
         _entry(1, "open", Priority="High", Owner="grinder", Waits="event — a thing"),
         _entry(2, "after it and the designer", Priority="High", Blocked_by="TD-001, decision (designer)"),
-        _entry(3, "the person's, held", Priority="High", Owner="paul"),
+        _entry(3, "the person's, held", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
         _entry(4, "unclaimed, high", Priority="High", Owner="grinder"),
         _entry(5, "low", Priority="Low", Owner="grinder"),
         _entry(6, "low too", Priority="Low", Owner="grinder", Blocked_by="TD-005"),
@@ -437,3 +437,20 @@ def test_an_origin_path_ref_finds_its_card(tmp_path):
     assert index["o/a#TD-001"] == index["a#TD-001"]
     rs = queue._Repos({"r1": {**a[1], "name": "a"}, "r2": {**a[1], "name": "b", "remote": "git@h.example:g/o/a"}})
     assert (rs.resolve("o/a"), rs.resolve("g/o/a"), rs.resolve("O/A"), rs.resolve("x/a")) == ("a", "b", "a", None)
+
+
+def test_an_owner_alone_holds_nothing(tmp_path):
+    """TD-1375 (design §4.4 *Repo facts*, *The card's status*): `Owner: paul` says who moves an entry next and
+    holds nothing — with no `decision (paul)` it is not *for you*, its row needs nothing and it is not the
+    person's own; with the gate it is the person's to do (`owner`), and the gate alone is a decision."""
+    root, r = _repo(tmp_path, "r", [
+        _entry(1, "owned, no gate", Priority="High", Owner="paul"),
+        _entry(2, "owned and gated", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
+        _entry(3, "gated", Priority="High", Owner="grinder", Blocked_by="decision (paul)"),
+    ])  # fmt: skip
+    ents = {e["id"]: e for e in r["ledger"]["entries"]}
+    assert [ents[i]["for_page"] for i in ("TD-001", "TD-002", "TD-003")] == ["pickable", "for-you", "for-you"]
+    assert not queue._own(ents["TD-001"]) and queue._own(ents["TD-002"])
+    cards = _by_id(_cards({root: r}, []))
+    assert [cards[f"r#TD-00{n}"]["top"]["needs"] for n in (1, 2, 3)] == [None, "owner", "decision"]
+    assert cards["r#TD-001"]["status"] != "needs you"

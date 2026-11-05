@@ -38,14 +38,14 @@ def test_start_is_the_one_owned_entry_else_the_first_decision_else_the_top_by_ke
         # one `Owner: paul` entry beside a decision: the owned one
         _entry(1, "top", Priority="High"),
         _entry(2, "a decision", Priority="High", Blocked_by="TD-001, decision (paul)"),
-        _entry(3, "mine", Priority="Medium", Owner="paul", Blocked_by="TD-001"),
-        # two `Owner: paul` entries: the first decision by key
+        _entry(3, "mine", Priority="Medium", Owner="paul", Blocked_by="TD-001, decision (paul)"),
+        # two `Owner: paul` entries, each gated (TD-1374): no one owned entry, so the first decision by key
         _entry(10, "top", Priority="High"),
-        _entry(11, "mine", Priority="High", Owner="paul", Blocked_by="TD-010"),
-        _entry(12, "mine too", Priority="High", Owner="paul", Blocked_by="TD-010"),
+        _entry(11, "mine", Priority="High", Owner="paul", Blocked_by="TD-010, decision (paul)"),
+        _entry(12, "mine too", Priority="High", Owner="paul", Blocked_by="TD-010, decision (paul)"),
         _entry(13, "a later decision", Priority="Low", Blocked_by="TD-010, decision (paul)"),
         _entry(14, "the first decision", Priority="Medium", Blocked_by="TD-010, decision (paul)"),
-        # two owned and no decision: the top entry
+        # two owned and no decision: an Owner alone holds nothing (TD-1375), so the top entry
         _entry(20, "top", Priority="High"),
         _entry(21, "mine", Priority="High", Owner="paul", Blocked_by="TD-020"),
         _entry(22, "mine too", Priority="High", Owner="paul", Blocked_by="TD-020"),
@@ -59,7 +59,7 @@ def test_start_is_the_one_owned_entry_else_the_first_decision_else_the_top_by_ke
     start = {k: c["start"] for k, c in cards.items()}
     assert start == {
         "r#TD-001": "r#TD-003",
-        "r#TD-010": "r#TD-014",
+        "r#TD-010": "r#TD-011",
         "r#TD-020": "r#TD-020",
         "r#TD-030": "r#TD-030",
         "r#TD-040": "r#TD-041",
@@ -68,7 +68,7 @@ def test_start_is_the_one_owned_entry_else_the_first_decision_else_the_top_by_ke
     assert {k: c["start"] for k, c in _read(tmp_path / "again", [
         _entry(1, "top", Priority="High"),
         _entry(2, "a decision", Priority="High", Blocked_by="TD-001, decision (paul)"),
-        _entry(3, "mine", Priority="Medium", Owner="paul", Blocked_by="TD-001"),
+        _entry(3, "mine", Priority="Medium", Owner="paul", Blocked_by="TD-001, decision (paul)"),
     ]).items()} == {"r#TD-001": "r#TD-003"}  # fmt: skip
 
 
@@ -76,8 +76,8 @@ def test_the_cards_ids_are_its_decide_and_do_entries_then_the_rest_in_key_order(
     cards = _read(tmp_path, [
         _entry(10, "top", Priority="High"),
         _entry(11, "a low decision", Priority="Low", Blocked_by="TD-010, decision (paul)"),
-        _entry(12, "mine", Priority="High", Owner="paul", Blocked_by="TD-010"),
-        _entry(13, "mine, an old clock mark", Priority="High", Owner="paul", Blocked_by="TD-010"),
+        _entry(12, "mine", Priority="High", Owner="paul", Blocked_by="TD-010, decision (paul)"),
+        _entry(13, "mine, an old clock mark", Priority="High", Owner="paul", Blocked_by="TD-010, decision (paul)"),
         _entry(14, "a build", Priority="Medium", Blocked_by="TD-010"),
     ], TD_013={"held": {"at": NOW.isoformat()}})  # fmt: skip
     mine, rest = card_entries(cards["r#TD-010"])

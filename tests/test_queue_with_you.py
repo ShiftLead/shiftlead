@@ -29,7 +29,8 @@ def _one(tmp_path, **fields: str):
 
 
 def test_the_persons_own_session_on_their_decision_reads_with_you_and_the_card_ready(tmp_path):
-    for fields, need in (({"Blocked_by": "decision (paul)"}, "decision"), ({"Owner": "paul"}, "owner")):
+    gated = {"Blocked_by": "decision (paul)"}
+    for fields, need in ((gated, "decision"), ({"Owner": "paul", **gated}, "owner")):
         sub = tmp_path / need
         sub.mkdir()
         root, r = _one(sub, **fields)
@@ -59,7 +60,7 @@ def test_an_unattended_claim_keeps_needs_you_and_the_interactive_one_is_the_hold
 
 def test_an_old_held_mark_on_an_entry_the_persons_session_claims_reads_with_you(tmp_path):
     """TD-1297: a `held` mark the clock no longer writes is read as nothing."""
-    root, r = _one(tmp_path, Owner="paul")
+    root, r = _one(tmp_path, Owner="paul", Blocked_by="decision (paul)")
     r["ledger"]["entries"][0]["held"] = {"at": NOW.isoformat(), "why": "after Friday"}
     t = _by_id(_cards({root: r}, [_mine("p", root, "TD-001")]))["r#TD-001"]["top"]
     assert t["state"] == "with you in p" and t["with_you"] == "p"
@@ -67,7 +68,7 @@ def test_an_old_held_mark_on_an_entry_the_persons_session_claims_reads_with_you(
 
 def test_a_non_top_row_with_you_is_grey_on_its_spine_and_in_its_parents_meter(tmp_path):
     root, r = _repo(tmp_path, "r", [
-        _entry(1, "the parent", Priority="High", Owner="paul"),
+        _entry(1, "the parent", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
         _entry(2, "a part", Priority="High", Part_of="TD-001", Blocked_by="decision (paul)"),
     ])  # fmt: skip
     q = _cards({root: r}, [_mine("p", root, "TD-002")])
@@ -89,7 +90,7 @@ def test_a_non_top_row_with_you_is_grey_on_its_spine_and_in_its_parents_meter(tm
 
 
 def test_an_idle_interactive_holder_with_a_red_pr_is_not_stalled(tmp_path):
-    root, r = _one(tmp_path, Owner="paul")
+    root, r = _one(tmp_path, Owner="paul", Blocked_by="decision (paul)")
     pr = {"number": 7, "branch": "td1-x", "checks": "red", "red_since": (NOW - timedelta(days=3)).isoformat()}
     r["prs"]["open"] = [pr]
     c = _by_id(_cards({root: r}, [_mine("p", root, "TD-001")]))["r#TD-001"]

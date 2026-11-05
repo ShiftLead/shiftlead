@@ -2472,7 +2472,7 @@ def ledger_for_you(
     that wait on you*, §4.5a **Inbox row: ledger entry**, TD-368, TD-565): the entries §4.4 *Repo
     facts* sorts *for you* in the home's repo facts (`repos`, keyed by checkout, in the registry's
     order), one group per repo with any, each in the Repo page's order (priority, then id). A row is
-    a mail row's shape — `row: "ledger"`, its `kind` (*ledger · yours* for `Owner: paul`, *ledger ·
+    a mail row's shape — `row: "ledger"`, its `kind` (*ledger · yours* for a gated `Owner: paul`, *ledger ·
     your decision* for a `decision (paul)` item), `name` the repo, `team`, `at` its `Added:` date and
     `added` its words, `pri`, `held`, `title`, `detail`, `answers`, `default` (the default's text),
     `root` and `url`, and for **Start session** (TD-678) the entry's `type`, `why` (`yours` or

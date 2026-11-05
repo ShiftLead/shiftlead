@@ -32,6 +32,7 @@ LEDGER = """# Technical debt
 
 **Priority:** Medium
 **Owner:** paul
+**Blocked by:** decision (paul)
 
 ## TD-013: a check whose build is live
 

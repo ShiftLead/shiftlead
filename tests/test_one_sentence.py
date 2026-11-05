@@ -68,10 +68,10 @@ def test_a_press_matches_the_whole_line_or_its_label():
 
 def test_a_ledger_entry_carries_its_ask_and_its_answers_consequences():
     text = (
-        "## TD-060: pick one\n\n**Priority:** Low\n**Owner:** paul\n\n"
+        "## TD-060: pick one\n\n**Priority:** Low\n**Owner:** paul\n**Blocked by:** decision (paul)\n\n"
         "**Why:** the reason.\n\n**Ask:** Which account should the walk\nsign in with?\n\n"
         "**Answers:** The team's (default) — one login for all | Yours — your quota.\n\n"
-        "## TD-061: no ask\n\n**Owner:** paul\n\n**Why:** x\n"
+        "## TD-061: no ask\n\n**Owner:** paul\n**Blocked by:** decision (paul)\n\n**Why:** x\n"
     )
     asked, bare = ledger.entries(text)
     assert asked["ask"] == "Which account should the walk sign in with?"
