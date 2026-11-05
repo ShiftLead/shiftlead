@@ -65,7 +65,11 @@ def refs(text: Any) -> list[str]:
     """The entries a text names, in order, each once: `TD-n` with its number as the ledger writes it, and an
     origin path's `<repo>` lowercased, as ledgerboard compares it (TD-1371)."""
     seen: list[str] = []
-    for repo, n in TD_REF.findall(str(text or "")):
+    text = str(text or "")
+    for m in TD_REF.finditer(text):
+        repo, n = m.group(1) or "", m.group(2)
+        if repo and m.start(1) and text[m.start(1) - 1] == "/":
+            repo = repo.rpartition("/")[2]  # a link's path (`/repo/<name>#TD-n`, a URL): its last part, as before
         repo = repo.lower() if "/" in repo else repo
         ref = f"{repo}#TD-{int(n):03d}" if repo else f"TD-{int(n):03d}"
         if ref not in seen:

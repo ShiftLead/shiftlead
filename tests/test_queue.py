@@ -432,6 +432,7 @@ def test_an_origin_path_ref_finds_its_card(tmp_path):
     q = _cards(dict([a]))
     assert q["origins"] == {"a": "o/a"}
     assert queue.refs("see O/A#TD-1 and a#TD-2, grp/sub/x#TD-3") == ["o/a#TD-001", "a#TD-002", "grp/sub/x#TD-003"]
+    assert queue.refs("/repo/a#TD-1 https://h/repo/a#TD-1") == ["a#TD-001"], "a link's path: its last part"
     index = queue.card_index(q)
     assert index["o/a#TD-001"] == index["a#TD-001"]
     rs = queue._Repos({"r1": {**a[1], "name": "a"}, "r2": {**a[1], "name": "b", "remote": "git@h.example:g/o/a"}})
