@@ -266,3 +266,12 @@ def test_the_repo_pages_for_you_reads_answered_and_an_unread_inbox_draws_it_as_b
     assert WORD in html and "you answered · in designer's ask" in html
     plain = _route_client(tmp_path, monkeypatch, inbox_fails=True).get("/repo/r")
     assert plain.status_code == 200 and 'href="/repo/r#TD-60"' in plain.text and WORD not in plain.text
+
+
+def test_ledger_for_you_links_a_question_about_the_origin_path(tmp_path):
+    """TD-1371: a question about `<origin path>#TD-n` links to the repo whose `remote` has that path."""
+    repos = _repos(tmp_path, "r", "s")
+    for r in repos.values():
+        r["remote"] = f"git@github.com:O/{r['name']}.git"
+    rows = _rows(repos, [_ask("o/r#TD-60")])
+    assert [r["answered"] is not None for r in rows] == [True, False], "r's member alone, by its origin path"
