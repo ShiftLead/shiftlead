@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -236,14 +237,14 @@ def test_a_merge_the_forge_refuses_closes_the_pr_and_names_a_moved_line(repo, mo
     # the line itself moved on origin while the press was out: the merge fails, and says so
     real = board._land
 
-    def land(root, t, want, msg, clock, still):
+    def land(root, t, want, msg, clock, still, **kw):
         other = Path(str(t) + "-other")
         git(repo, "clone", "-q", str(bare), str(other))
         b = other / board.BOARD
         b.write_text(b.read_text().replace(f"- [ ] {ITEM}", f"- [x] {ITEM}"))
         git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "done elsewhere")
         git(other, "push", "-q", "origin", "main")
-        return real(root, t, want, msg, clock, still)
+        return real(root, t, want, msg, clock, still, **kw)
 
     monkeypatch.setattr(board, "_land", land)
     with pytest.raises(board.Refused, match="no longer holds this item"):
@@ -251,13 +252,13 @@ def test_a_merge_the_forge_refuses_closes_the_pr_and_names_a_moved_line(repo, mo
     # origin moved elsewhere in between — another file — refuses nothing: the squash lands on it
     monkeypatch.delenv("FAKE_GH_FAIL")
 
-    def land_elsewhere(root, t, want, msg, clock, still):
+    def land_elsewhere(root, t, want, msg, clock, still, **kw):
         other = Path(str(t) + "-third")
         git(repo, "clone", "-q", str(bare), str(other))
         (other / "other.txt").write_text("moved on\n")
         git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "elsewhere")
         git(other, "push", "-q", "origin", "main")
-        return real(root, t, want, msg, clock, still)
+        return real(root, t, want, msg, clock, still, **kw)
 
     monkeypatch.setattr(board, "_land", land_elsewhere)
     git(repo, "fetch", "-q", "origin")
@@ -1123,12 +1124,12 @@ def test_a_squash_refused_for_a_neighbouring_lines_change_is_made_again_on_origi
     # the line beside the edit: the next item for a Done on the first, the first item for an add above it
     near, edited = ("- [ ] n/a — undated.", "n/a — undated, edited.") if press == "done" else (ITEM, "Look again.")
 
-    def land(root, t, want, msg, clock, still):
+    def land(root, t, want, msg, clock, still, **kw):
         calls.append(msg)
         if len(calls) == 1:
             new = f"{near} {edited}" if press == "add" else f"- [ ] {edited}"
             _push_elsewhere(repo, tmp_path / "other", lambda s: s.replace(near, new))
-        return real(root, t, want, msg, clock, still)
+        return real(root, t, want, msg, clock, still, **kw)
 
     monkeypatch.setattr(board, "_land", land)
     if press == "done":
@@ -1181,14 +1182,14 @@ def test_no_second_press_when_the_forge_cannot_say_or_origin_moved_off_the_board
     monkeypatch.setenv("FAKE_GH_FAIL", "merge")
     real, calls = board._land, []
 
-    def land(root, t, want, msg, clock, still):
+    def land(root, t, want, msg, clock, still, **kw):
         calls.append(msg)
         other = tmp_path / f"other-{len(calls)}"
         git(repo, "clone", "-q", git(repo, "remote", "get-url", "origin"), str(other))
         (other / "other.txt").write_text(f"moved {len(calls)}\n")
         git(other, "-c", "user.name=o", "-c", "user.email=o@x", "commit", "-qam", "elsewhere")
         git(other, "push", "-q", "origin", "main")
-        return real(root, t, want, msg, clock, still)
+        return real(root, t, want, msg, clock, still, **kw)
 
     monkeypatch.setattr(board, "_land", land)
     with pytest.raises(board.Refused, match="origin could not be reached"):
@@ -1670,3 +1671,61 @@ def test_the_inbox_reads_needs_you_so_a_hidden_item_is_the_snoozed_folds_alone()
         assert len(drawn) == shown and drawn[-1]["text"].startswith("n/a — undated")
         assert len(hz["snoozed"]) == 2 - shown
     assert "Due: 2026-09-22. Hide until: 2026-10-01." in hidden  # its deadline stands
+
+
+GATED = (
+    "decide 2026-11-05 (session `grinder-ao-2` on kmaster) — **Go on TD-190?** Say. Context: TD-190 decision (paul). "
+    "Due: 2026-11-06. Answers: Go | Not yet."
+)
+GATED_ENTRY = """## TD-190: A window to keep
+
+**Priority:** Low
+**Added:** 2026-11-01
+**Owner:** paul
+**Status:** Open
+**Blocked by:** decision (paul)
+
+**Ask:** Go on TD-190?
+
+**Why:** a test's.
+"""
+
+
+def _gated(repo: Path) -> None:
+    """A v2 ledger with one entry gated on the person, and the board's decide item that covers it, on origin."""
+    (repo / "docs" / "ledger").mkdir()
+    (repo / "docs" / "ledger" / "README.md").write_text("# Ledger\n\nLedgerboard: 2\n")
+    (repo / "docs" / "ledger" / "TD-190.md").write_text(GATED_ENTRY)
+    (repo / board.BOARD).write_text(BOARD_TEXT.replace("## Needs", "People: paul\n\n## Needs") + f"- [ ] {GATED}\n")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "gated")
+    git(repo, "push", "-q", "origin", "main")
+
+
+def test_a_go_on_a_gated_decide_lifts_the_gate_in_the_same_write(repo):
+    """TD-1375 (design §4.4 *Board write-back*): a lifting answer on a decide item whose Context names one entry
+    and one gate is ledgerboard v2.4's decide lift — the board line closed and the entry's gate lifted, its Log
+    dated the UTC day, landed as one commit; the checkout is never written."""
+    _gated(repo)
+    at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
+    got = board.write_back(repo, at, GATED, "decide", answer="Go")
+    assert got["lifted"] == ["TD-190"]
+    assert git(repo, "status", "--porcelain") == ""
+    files = on_origin(repo, "show", "--name-only", "--format=", "origin/main").split()
+    assert sorted(files) == ["docs/ledger/TD-190.md", "docs/user_attention.md"]
+    entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
+    assert "**Blocked by:**" not in entry
+    day = datetime.now(UTC).date().isoformat()
+    assert f"- {day}: gate lifted: decision (paul)" in entry
+    line = origin_board(repo).splitlines()[at - 1]
+    assert line.startswith("- [x] ") and "Decided: Go" in line  # the lift closes the item (ledgerboard's closes())
+
+
+def test_a_not_yet_on_a_gated_decide_keeps_it_waiting_in_the_same_write(repo):
+    """A waiting-only answer logs *kept waiting* on the entry, which keeps its gate, and closes the item."""
+    _gated(repo)
+    at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
+    got = board.write_back(repo, at, GATED, "decide", answer="Not yet")
+    assert got["lifted"] == ["TD-190"]
+    entry = on_origin(repo, "show", "origin/main:docs/ledger/TD-190.md")
+    assert "**Blocked by:** decision (paul)" in entry and "kept waiting: decision (paul)" in entry

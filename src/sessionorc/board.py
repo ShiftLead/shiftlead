@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import gitinfo, ledgerboard, paths, workorders
+from sessionorc import ledger as ledger_mod
 from sessionorc.ledgerboard import board as lb_board
 
 BOARD = workorders.BOARD
@@ -408,8 +409,10 @@ def _land(
     rel: str | None = None,
     body: str = PR_BODY,
     prefix: str = "board",
+    also: list[str] | tuple[str, ...] = (),
 ) -> dict[str, Any]:
-    """Commit the tree's board (or the file at `rel`: a rank file, §4.4 *A move lands*) and land it on
+    """Commit the tree's board (or the file at `rel`: a rank file, §4.4 *A move lands*), and the files `also`
+    names beside it (a decide lift's ledger entries, TD-1375), and land them on
     `origin/<want>` by the one road the forge's rule allows (§4.4): a branch of the host agent's own, a PR
     it opens and squash-merges at once. A refused merge closes the PR and deletes the branch, and refuses
     the press as a moved line when `still()` — origin's board read again — no longer holds the item, else
@@ -426,6 +429,7 @@ def _land(
         "--only",
         "--",
         rel,
+        *also,
         timeout=clock.left("git commit"),
     )
     if cp.returncode != 0:
@@ -601,15 +605,18 @@ def _write_back(
     by = author(root) if action == "reply" else ""
     # ShiftLead's own checks first (the item word for word, a decide on a decided line, a field's name)
     edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer)
+    lifts = None
     if action == "decide":
         by = answerer(root, "".join(lines)) or ""
+        lifts = _lift_ledger(t, text)
     plan = _plan(
         lb_board.plan_edit, str(path), action, at + 1, text,
         to=due if action in ("snooze", "due") else None, answer=answer or None, text=reply or None,
-        by=by or None, tool=TOOL,
+        by=by or None, tool=TOOL, ledger=lifts,
     )  # fmt: skip
     msg = message(text, action, due, answer=answer)
     _apply(plan)
+    also = sorted(os.path.relpath(p, t) for p in plan.changes if Path(p).resolve() != path.resolve())
     if _read_lines(path)[at] == lines[at]:
         # the edit changed nothing — a *now* whose date the line already holds (the day turned under an open
         # page, so it was no longer hidden): nothing is landed, and the press is answered as done (TD-1349)
@@ -620,7 +627,20 @@ def _write_back(
     def still() -> bool:
         return _find(_read_origin(t, want, rel), None, text) is not None
 
-    return {**_land(root, t, want, msg, clock, still), "line": at + 1, "text": text, "due": due}
+    landed = _land(root, t, want, msg, clock, still, also=also)
+    return {**landed, "line": at + 1, "text": text, "due": due, **({"lifted": plan.info["entries"]} if also else {})}
+
+
+def _lift_ledger(t: Path, text: str) -> str | None:
+    """The ledger a decide on the item `text` writes beside its board line (§4.4 *Board write-back*, TD-1375):
+    the tree's ledger, where the item's Context names one of this repo's entries and one gate — ledgerboard
+    v2.4's decide lift, which lifts the gate on a lifting answer, or logs *kept waiting*, in the same write as
+    the board line — else None, a decide on the board alone. A v1 ledger is passed as it is, and ledgerboard
+    refuses the lift there in its own words."""
+    ref, gate = ledgerboard._item_gate(text)
+    if ref is None or gate is None or "#" in ref:
+        return None
+    return str(t / ledger_mod.ledger_path(t))
 
 
 def _ahead(root: Path, want: str, line: int | None, text: str) -> bool:
