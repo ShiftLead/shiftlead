@@ -252,8 +252,9 @@ One function reads the lane words against each entry's header lines (`lane_match
   say so under *The lane* in the worker's brief.
 - **An entry can sit in a lane and still not be taken**: one **settling** (new, inside its Kind's
   `settle:` window — by default only `design-first`, 5m; a Kind no layer lists settles not at all;
-  design §4.4 *A new entry settles before it is pickable*), one **waiting** (a `**Waits:**` line naming a date or an event, §4.4 *An entry says
-  what it waits for*), and one that **needs a team** (`needs_team`: its `Team:` names no team the
+  design §4.4 *A new entry settles before it is pickable*), one **waiting** (an `until <date>` or `event (<name>)` gate in its `**Blocked by:**`, and
+  nothing else holding it, §4.4 *An entry says what it waits for*; the retired `**Waits:**` line reads the same
+  until it moves), and one that **needs a team** (`needs_team`: its `Team:` names no team the
   ledger's `Fields:` line declares, or it names none where that line declares two or more, §4.4
   *An entry names its team*) match no lane. `ao repo` says each, so a first start whose lane reads
   empty is read there first.
