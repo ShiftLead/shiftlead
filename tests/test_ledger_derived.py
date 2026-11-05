@@ -238,7 +238,9 @@ def test_the_page_kinds_in_order():
     def kind(block: str, live=None) -> str:
         return ledger.entries(f"## TD-040: x\n\n{block}\n\n## TD-041: open\n", live=live)[0]["for_page"]
 
-    assert kind("**Owner:** paul") == "for-you"
+    # an Owner says who moves an entry next and holds nothing (TD-1375): the gate is what waits on the person
+    assert kind("**Owner:** paul") == "pickable"
+    assert kind("**Owner:** paul\n**Blocked by:** decision (paul)") == "for-you"
     assert kind("**Kind:** design-first\n**Blocked by:** decision (Paul)") == "for-you"
     assert kind("**Kind:** build\n**Blocked by:** TD-041, decision (paul)") == "for-you"  # the person's first
     # *blocked*: any item other than a decision, whatever the Kind and whatever decision stands beside it
@@ -279,8 +281,8 @@ def test_the_page_kinds_in_order():
 
 
 def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_no_case_of_its_own():
-    """TD-367/TD-368, design §4.4 *Repo facts* and §6 rule 6: *for you* is `Owner: paul` or a
-    `decision (paul)`, any case; a decision owed to the designer is `Kind: design-first`, so a build on
+    """TD-367/TD-368, design §4.4 *Repo facts* and §6 rule 6: *for you* is a `decision (paul)`, any case —
+    `Owner: paul` alone holds nothing (TD-1375), so an evaluation the person owns is an *evaluation*; a decision owed to the designer is `Kind: design-first`, so a build on
     `decision (designer)` is *other* like any decision not the person's (TD-1296); a `Kind: decision`
     that is not the person's and a build on `decision (anchor)` are *other* since the anchor seat is
     retired (TD-757), and in no grinder or designer lane."""
@@ -294,7 +296,7 @@ def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_no_case_
     )
     got = {e["id"]: e for e in ledger.entries(text)}
     assert {i: e["for_page"] for i, e in got.items()} == {
-        "TD-050": "for-you",
+        "TD-050": "evaluation",
         "TD-051": "for-you",
         "TD-052": "other",
         "TD-053": "other",
@@ -337,7 +339,8 @@ def test_a_for_you_entry_carries_added_answers_and_detail():
     ` (default)` marked — none when two are, as the board's reader gives it), and no other entry's."""
     fix = "\n".join(f"{n}. step" for n in range(1, 30))
     text = (
-        "## TD-050: mine\n\n**Priority:** Low\n**Added:** 2026-10-07 (the designer)\n**Owner:** paul\n\n"
+        "## TD-050: mine\n\n**Priority:** Low\n**Added:** 2026-10-07 (the designer)\n**Owner:** paul\n"
+        "**Blocked by:** decision (paul)\n\n"
         "**Why:** the reason,\nover two lines.\n\n**Fix:**\n" + fix + "\n\n"
         "**Answers:** At the reset (default) | A fixed \\| time | Not now (default).\n\n"
         "## TD-051: a build\n\n**Owner:** grinder\n**Added:** 2026-10-07\n\n**Why:** x\n\n**Answers:** a | b\n\n"

@@ -283,7 +283,7 @@ def kind_of(entry: dict[str, Any]) -> str:
     *evaluation* — `Kind: evaluation`, which no lane takes since the anchor seat is retired (§4.9b
     *No anchor seat*), so `flags` names each; else *other*, a residue that should be empty (`flags`),
     an unblocked `Kind: decision` that is not the person's among it."""
-    if str(entry.get("owner") or "").lower() == PERSON_OWNER or decided_by(entry, PERSON_OWNER):
+    if decided_by(entry, PERSON_OWNER):
         return "for-you"
     if any(not b.startswith("decision (") for b in entry.get("blocked_by") or []) or entry.get("parts_open"):
         return "blocked"

@@ -165,7 +165,7 @@ def _ledger(tmp_path):
             _entry(1, "a design", Priority="Medium", Kind="design-first"),
             _entry(2, "its build", Priority="Medium", Part_of="TD-001"),
             _entry(3, "a lone design", Priority="Medium", Kind="design-first"),
-            _entry(4, "yours, blocked", Priority="Medium", Owner="paul", Blocked_by="TD-005"),
+            _entry(4, "yours, blocked", Priority="Medium", Owner="paul", Blocked_by="TD-005, decision (paul)"),
             _entry(5, "free", Priority="Medium"),
         ],
     )

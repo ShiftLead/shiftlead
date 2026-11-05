@@ -44,7 +44,7 @@ def test_two_teams_mark_an_untagged_lane_entry_and_an_unknown_one_and_nothing_el
         _entry(3, "db"),
         _entry(4, extra="**Blocked by:** TD-099\n"),  # blocked: a lane does not take it yet
         _entry(5, kind="evaluation"),
-        _entry(6, owner="paul"),  # for you
+        _entry(6, owner="paul", extra="**Blocked by:** decision (paul)\n"),  # for you
         _entry(7, kind="design-first"),  # design: a lane takes it
         _entry(8, kind="live-check #1"),  # live check: a lane takes it
     )
