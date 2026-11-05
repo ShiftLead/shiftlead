@@ -3584,6 +3584,9 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
     taken_line = got.get("taken_by_line") or None  # an older home answers neither key
     if taken_line:
         print(f"write `{taken_line}` in each entry's header (cadence §2.10)", file=sys.stderr)
+    take_line = got.get("id_take_line") or None  # a home from before TD-1363 answers neither id_take key
+    if take_line:
+        print(f"write `{take_line}` in each entry's header", file=sys.stderr)
     out = {
         "repo": got.get("repo"),
         "ids": got.get("ids") or [],
@@ -3593,6 +3596,8 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
         "warnings": got.get("warnings") or [],
         "taken_by": got.get("taken_by") or None,
         "taken_by_line": taken_line,
+        "id_take": got.get("id_take") or None,
+        "id_take_line": take_line,
         "question": got.get("question") or None,  # an older home answers no question
     }
     if getattr(args, "td_alias", False):  # the old name (TD-1200): its bare ids, and its new name said once
@@ -5309,7 +5314,8 @@ def build_parser() -> argparse.ArgumentParser:
             "--json",
             action="store_true",
             default=argparse.SUPPRESS,
-            help="{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line}",
+            help="{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line, id_take, id_take_line, "
+            "question}",
         )
         q.add_argument(
             "--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)"

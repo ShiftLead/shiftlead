@@ -180,17 +180,30 @@ def taken_by_line(script: Path, root: str, rel: str, taken_by: str | None) -> st
     declares no field vocabulary, by the vendored `declared()`, of a directory its `README.md`'s preamble as
     `load()` heads its text (TD-1145). A missing or non-literal sibling, or a ledger that cannot be read (a
     faulted v2 ledger among them), gives None."""
-    if not taken_by:
+    return _field_line(script, root, rel, "Taken by", taken_by)
+
+
+def id_take_line(script: Path, root: str, rel: str, id_take: str | None) -> str | None:
+    """`**Id take:** <nonce>`, the line each new entry writes once the script answers `id_take` (agent-cadence
+    TD-188's step 3, design §4.4 *Its answer*, TD-1363), by `taken_by_line`'s own `writable` test applied to the
+    `Id take` field: a cadence field since ledgerboard v2.2, so written in a ledger that declares a vocabulary too;
+    None where `id_take` is null or the sibling ledgerboard lacks the field and the ledger declares one."""
+    return _field_line(script, root, rel, "Id take", id_take)
+
+
+def _field_line(script: Path, root: str, rel: str, field: str, value: str | None) -> str | None:
+    """`**<field>:** <value>` where the ledger beside `script` accepts the field (`taken_by_line`'s test), else None."""
+    if not value:
         return None
     package = script.parent / "ledgerboard" / "__init__.py"
     fields = _cadence_fields(package if package.is_file() else script.parent / "ledgerboard.py")
     if fields is None:
         return None
-    if "taken by" not in fields:
+    if field.lower() not in fields:
         text = ledger_mod.read_pair(rel, ledger_mod.fs_io(root))[1]
         if text is None or ledgerboard.declared(text)[0]:
             return None
-    return f"**Taken by:** {taken_by}"
+    return f"**{field}:** {value}"
 
 
 def _cadence_fields(path: Path) -> tuple[str, ...] | None:
@@ -303,7 +316,8 @@ class IdsMixin:
         record of who was given them. `by` is the dispatcher's caller, never a parameter. Returns `{repo,
         origin, ids, unread}`, `unread` the lines naming the open PRs that
         could not be read, and `reserved`, `why`, `warnings` and `taken_by` the script's, `taken_by_line` the
-        header line to write where the ledger accepts it (on the home's own road `reserved` is true, `why`
+        header line to write where the ledger accepts it, `id_take` and `id_take_line` the same for the take's
+        nonce (on the home's own road `reserved` is true, `why`
         empty, `warnings` none and both null), and `question` the script's filing question where the repo sets
         `review-outcomes` on (§4.4 *The filing question*, TD-1282), else null. `branch` is the caller's directory's
         (§4.4 *The branch*), checked and passed to a script that takes it; the home's own road drops it."""
@@ -327,6 +341,7 @@ class IdsMixin:
                 ids, unread = await self._ids_give(root, key, count, start, caller)
                 got = {"ids": ids, "unread": unread, "reserved": True, "why": "", "warnings": []}
                 got |= {"taken_by": None, "taken_by_line": None, "question": None}
+                got |= {"id_take": None, "id_take_line": None}
         finally:
             lock.release()
         for line in [*got["unread"], *got["warnings"]] + ([] if got["reserved"] else [f"not reserved: {got['why']}"]):
@@ -418,6 +433,8 @@ class IdsMixin:
         refs = [str(r) for r in res.get("unread") or [] if str(r).strip()]
         taken_by = res.get("taken_by") if isinstance(res.get("taken_by"), str) and res["taken_by"] else None
         line = await asyncio.to_thread(taken_by_line, script, root, led, taken_by)
+        id_take = res.get("id_take") if isinstance(res.get("id_take"), str) and res["id_take"] else None
+        take_line = await asyncio.to_thread(id_take_line, script, root, led, id_take)
         last = ((err or "").strip().splitlines() or [""])[-1].strip()
         question = last if last.startswith(FILING_QUESTION) else None  # review-outcomes on: the script asked
         return {
@@ -428,6 +445,8 @@ class IdsMixin:
             "warnings": [str(w) for w in res.get("warnings") or [] if str(w).strip()],
             "taken_by": taken_by,
             "taken_by_line": line,
+            "id_take": id_take,
+            "id_take_line": take_line,
             "question": question,
         }
 
