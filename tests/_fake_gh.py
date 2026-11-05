@@ -96,6 +96,9 @@ def main(argv: list[str]) -> int:
         ]
         print(json.dumps(rows))
         return 0
+    if argv[:2] == ["repo", "view"]:  # the gate sweep's visibility read (TD-1376): `--json visibility --jq …`
+        print(state.get("visibility", "PRIVATE"))
+        return 0
     if argv[:2] == ["pr", "diff"]:
         return 0
     if argv[:2] == ["pr", "close"]:
