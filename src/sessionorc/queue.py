@@ -285,8 +285,12 @@ def covers(
     `Part of` one of those while it carries `decision (paul)`."""
     named = {q for r in [*line_refs, *parts] if (q := _line_qid(str(r), repo, refs_open))}
     out = set(named)
+    if not named:
+        return out
     for q, e in entries.items():
-        if q not in named and parent_qid(e) in named and ledger_mod.decided_by(dict(e), PERSON):
+        if q in named or not (e.get("part_of") or e.get("part_of_raw")):
+            continue
+        if parent_qid(e) in named and ledger_mod.decided_by(dict(e), PERSON):
             out.add(q)
     return out
 
@@ -298,13 +302,15 @@ def open_decided_covers(
 ) -> set[str]:
     """Every entry an open decided board line covers (`covers`), over every board the home reads (`boards` by repo
     name, each `{items}`): such an entry's line is its row now, *Waiting on them* while it waits on its session
-    (§4.5 screen 6, TD-565, TD-1364). A decided `fyi` line is no work order and covers nothing."""
+    (§4.5 screen 6, TD-565, TD-1364). A decided `fyi` line is no work order and covers nothing; any other decided
+    line is a work order whoever wrote it, as the home's own press writes `(by <its person>)`."""
     out: set[str] = set()
     for repo, bl in boards.items():
         for b in bl or ():
             for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
-                if isinstance(it, Mapping) and it.get("decided") and it.get("kind") != "fyi":
-                    out |= covers(it.get("refs") or (), it.get("parts") or (), repo, entries, refs_open)
+                if not isinstance(it, Mapping) or not it.get("decided") or it.get("kind") == "fyi":
+                    continue
+                out |= covers(it.get("refs") or (), it.get("parts") or (), repo, entries, refs_open)
     return out
 
 
@@ -414,7 +420,8 @@ def board_hold(
         kept = _civil((member.get("kept_waiting") or {}).get(_GATE))
         if kept is None or today >= kept + timedelta(days=REASK_DAYS):
             return None  # no `kept waiting` date inside `reask_days`: its test has ended
-        return {"kind": "board", "until": (kept + timedelta(days=REASK_DAYS)).isoformat(), "line": line}
+        until = (kept + timedelta(days=REASK_DAYS)).isoformat()
+        return {"kind": "board", "until": until, "closed_at": ln["decided"], "line": line}
     if why.startswith("lifted"):
         return None
     at = _civil(ln["closed"].get("date") if ln["closed"] else None)

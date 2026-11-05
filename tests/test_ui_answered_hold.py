@@ -402,3 +402,11 @@ def test_open_decided_covers_reads_every_board(tmp_path):
     opens = {"r#TD-060": {"id": "TD-60", "repo": "r"}, "r#TD-062": {**_build(), "repo": "r"}}
     got = queue.open_decided_covers({"s": [{"items": [_line("r#TD-60")]}]}, opens, queue.open_refs(opens, {}))
     assert got == {"r#TD-060", "r#TD-062"}
+
+
+def test_a_kept_wait_keeps_its_age(tmp_path):
+    repos = _board_repos(tmp_path, carried=[_carried("TD-60", why="kept waiting.", to=())])
+    (r,) = repos.values()
+    r["ledger"]["entries"][0]["kept_waiting"] = {"decision (paul)": DECIDED}
+    (row,) = _rows(repos, [])
+    assert row["answered"]["age"] == "1d" and "on the board, 1d ago — it waits until 2026-11-14" in _render(row)
