@@ -2234,7 +2234,9 @@ def _td_world(world, monkeypatch, *, seat=True, declared=None):
             return {root: {"name": "shiftlead", "root": root, "ledger": {"declared_teams": declared}}}
         assert method == "entry_add", method
         handed.append(params)
-        if "teams" not in params:  # a session's call for another repo (TD-995): resolved at the home
+        if "teams" not in params:  # a call by name, resolved at the home (a session's, TD-995; a node's, TD-1404)
+            if params["repo"] not in ("samscrape", "contractmatch"):  # the home's registry
+                raise cli.AgentError(f"no registered repo is {params['repo']!r} (the home's repos registry lists 2)")
             return {"id": "m-1", "to": "ao-seat", "repo": params["repo"], "type": params["type"]}
         if not params["teams"]:
             raise cli.AgentError("no team services shiftlead: there is no techlead seat to hand it to (design §4.10)")
@@ -2282,7 +2284,8 @@ def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkey
         assert cli.main(["td", "add", "--repo", said, "words"]) == 0, said
         assert handed[-1]["repo"] == str(tmp_path / "shiftlead")
     assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 1  # the registry calls it `link`
-    assert "no registered repo is named 'shiftlead'" in capsys.readouterr().err
+    # a name the local registry lacks goes to the home (TD-1404), whose registry refuses it here
+    assert "no registered repo is 'shiftlead'" in capsys.readouterr().err and "teams" not in handed[-1]
 
 
 def test_td_add_team_hands_to_that_teams_seat_and_a_blank_one_takes_the_ledgers_order(world, capsys, monkeypatch):
@@ -2356,6 +2359,33 @@ def test_td_add_runs_from_the_persons_own_shell_and_a_session_names_another_repo
     }
 
 
+def test_td_add_from_a_persons_shell_on_a_node_sends_another_repo_by_name(world, capsys, monkeypatch):
+    """§4.7 *Entries* (TD-1404): the person's own call for a repo the local registry has no name for — a
+    node's registry holds only its own repos — is sent with `repo` as typed and `team` where given, with no
+    `teams` and no `org.yml` read, and the home resolves the repo and its seat; the call is still handed.
+    A name the home does not know is refused in the home's words."""
+    tmp_path, handed = _td_world(world, monkeypatch)
+
+    def no_org():
+        raise AssertionError("a call by name reads no org.yml")
+
+    monkeypatch.setattr(cli, "_org_here", no_org)
+    assert cli.main(["td", "add", "--repo", "samscrape", "--priority", "high", "parse the feed"]) == 0
+    assert handed[-1] == {
+        "repo": "samscrape",
+        "type": "debt",
+        "text": "parse the feed",
+        "team": "",
+        "priority": "high",
+    }
+    assert capsys.readouterr().out.startswith("m-1 handed to ao-seat (samscrape, debt)")
+    assert cli.main(["td", "add", "--repo", "samscrape", "--team", "ss-grind", "more"]) == 0
+    assert handed[-1]["team"] == "ss-grind"
+    capsys.readouterr()
+    assert cli.main(["td", "add", "--repo", "elsewhere", "words"]) == 1
+    assert "no registered repo is 'elsewhere'" in capsys.readouterr().err
+
+
 def test_td_add_says_when_standard_input_cannot_be_read(world, capsys, monkeypatch):
     tmp_path, handed = _td_world(world, monkeypatch)
 
@@ -2395,8 +2425,8 @@ def test_td_add_is_refused_in_words_where_the_forms_button_is_disabled(world, ca
     assert "ao-grind has no techlead seat" in capsys.readouterr().err
     assert cli.main(["td", "add", "--repo", "ao-api", "words"]) == 1  # registered, and no team's project holds it
     assert "no team services" in capsys.readouterr().err
-    assert cli.main(["td", "add", "--repo", "nowhere", "words"]) == 1
-    assert "no registered repo is named 'nowhere'" in capsys.readouterr().err and len(handed) == 2
+    assert cli.main(["td", "add", "--repo", "nowhere", "words"]) == 1  # refused at the home (TD-1404)
+    assert "no registered repo is 'nowhere'" in capsys.readouterr().err and len(handed) == 3
     # a seat the team defines whose repo has no checkout on its host: the form's own reason
     tmp_path, handed = _td_world(world, monkeypatch)
     doc = org_doc(tmp_path)

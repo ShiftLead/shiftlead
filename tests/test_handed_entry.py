@@ -285,6 +285,33 @@ async def test_entry_add_is_refused_in_words(agent, tmp_path):
             await person.call("entry_add", **{**ok, "teams": [{"team": "ao-grind", "seat": ""}]})
 
 
+@pytest.mark.integration
+async def test_entry_add_by_name_with_no_teams_hands_to_the_repos_question_seat(agent, tmp_path):
+    """The person's shell on a node (§4.7 *Entries*, TD-1404): its registry has no such repo and it reads no
+    `org.yml`, so the call carries the name and no `teams`; the home resolves the repo in its registry and the
+    seat from its records, as a session's call is, and the entry is still the person's, handed. A name the
+    home's registry lacks is refused there."""
+    repo = tmp_path / "shiftlead"
+    repo.mkdir()
+    _registry(tmp_path, repo)
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _seat_session(person, tmp_path)
+        rec = agent.sessions[sid]
+        rec.team, rec.repo, rec.seat = "ao-grind", str(repo), {"trigger": "asks", "tags": True}
+        agent.store.save(rec)
+        got = await person.call("entry_add", repo="shiftlead", type="debt", text="from the node", priority="high")
+        assert (got["to"], got["team"], got["repo"], got["priority"]) == (sid, "ao-grind", "shiftlead", "high")
+        e = next(e for e in rec.inbox if e.id == got["id"])
+        assert e.kind == "ask" and e.from_ == PERSON and e.handed and e.bound is None
+        assert e.entry == {"repo": "shiftlead", "type": "debt", "team": "", "priority": "high"}
+        picked = await person.call("entry_add", repo="shiftlead", type="debt", text="picked", team="ao-grind")
+        assert next(e for e in rec.inbox if e.id == picked["id"]).entry["team"] == "ao-grind"
+        with pytest.raises(AgentError, match="no registered repo is 'samscrape'"):
+            await person.call("entry_add", repo="samscrape", type="debt", text="x")
+        await person.call("kill", id=sid)
+
+
 # -- slice 3: closed by its outcome — `--for`, `--thread` and the person's Dismiss -------------------
 
 

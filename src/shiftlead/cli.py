@@ -3766,7 +3766,9 @@ def cmd_td_add(args: argparse.Namespace) -> int:
     person's own shell is the person*, TD-580) — but for a session's call for **another repo** (TD-995,
     §4.7 *Entries*): sent with `repo` as typed and `team` where given, reading no registry and no
     `org.yml`, which a node does not have, and resolved at the home as `ao msg --repo` is. A session
-    with no `--repo` is refused here before its standard input is read: the repo it runs in is its own."""
+    with no `--repo` is refused here before its standard input is read: the repo it runs in is its own. The
+    person's call for a repo the local registry lacks (a node's, TD-1404) is sent the same way, by name with no
+    teams, and the home resolves the repo and its seat; it is still handed."""
     session = (sid := os.environ.get("SHIFTLEAD_SESSION")) and not mailmod.person_shell(
         Session.from_dict(call_sync("get", id=sid))
     )
@@ -3786,7 +3788,22 @@ def cmd_td_add(args: argparse.Namespace) -> int:
             priority=args.priority,
         )
         return emit(args, got, lambda: _entry_prose(got, got.get("to")))
-    root = _td_repo(args.repo)[1]
+    try:
+        root = _td_repo(args.repo)[1]
+    except AgentError:
+        if not args.repo:
+            raise
+        # the person's shell on a node, whose registry holds only its own repos (TD-1404): the name as typed,
+        # resolved at the home with its seat, which refuses a name it does not know
+        got = call_sync(
+            "entry_add",
+            repo=args.repo,
+            type=args.type,
+            text=_entry_words(args),
+            team=args.team or "",
+            priority=args.priority,
+        )
+        return emit(args, got, lambda: _entry_prose(got, got.get("to"), "handed to"))
     try:
         org = _org_here()
     except ValueError as e:

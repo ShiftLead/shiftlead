@@ -428,6 +428,9 @@ class InboxMixin:
         the form's **Team** pick or `--team` (TD-730, TD-764), hands to that team's seat and is
         `entry.team`; blank, the first team with a seat takes it and `entry.team` is empty. `priority`,
         the form's **Priority** pick or `--priority` (TD-851), is `entry.priority`, `medium` when absent.
+        `teams` absent (None) is the person's shell on a node whose registry has no such repo and which reads
+        no `org.yml` (§4.7 *Entries*, TD-1404): `repo` is a name, resolved in the home's registry, and the seat
+        is the repo's question seat (`team` choosing), as a session's call resolves it — still handed.
         Refused in words: no such repo, no team services it, a picked team that does not, no techlead
         seat to hand to, an unknown type or priority, empty text. Returns
         `{id, to, team, repo, type, priority, read_when}`, `team` the team handed to.
@@ -454,22 +457,30 @@ class InboxMixin:
         words = str(text or "").strip()
         if not words:
             raise RpcError("the entry has no words: say what it is — a title is enough")
-        servicing = [t for t in teams or () if isinstance(t, dict) and str(t.get("team") or "").strip()]
-        if not servicing:
-            raise RpcError(f"no team services {name}: there is no techlead seat to hand it to (design §4.10)")
         pick = str(team or "").strip()
-        if pick:
-            to = next((t for t in servicing if str(t["team"]).strip().casefold() == pick.casefold()), None)
-            if to is None:
-                names = ", ".join(str(t["team"]).strip() for t in servicing)
-                raise RpcError(f"{pick} does not service {name}: its teams are {names} (design §4.10)")
-            pick = str(to["team"]).strip()
-        else:  # a blank pick: the first team with a techlead seat, in the order the caller gives them
-            to = next((t for t in servicing if str(t.get("seat") or "").strip()), servicing[0])
-        team = str(to["team"]).strip()
-        seat = str(to.get("seat") or "").strip()
-        if not seat:
-            raise RpcError(f"{team} has no techlead seat: there is nobody to hand the entry to (design §4.9b)")
+        if teams is None:
+            # the person's shell on a node, whose registry has no such repo and which has no `org.yml`
+            # (§4.7 *Entries*, TD-1404): the seat is resolved from the records, as a session's call is
+            found_seat = await self._question_seat(team=pick, repo=name)
+            team = str(found_seat.team or "").strip()
+            pick = team if pick else ""
+            seat = self._address(found_seat)
+        else:
+            servicing = [t for t in teams if isinstance(t, dict) and str(t.get("team") or "").strip()]
+            if not servicing:
+                raise RpcError(f"no team services {name}: there is no techlead seat to hand it to (design §4.10)")
+            if pick:
+                to = next((t for t in servicing if str(t["team"]).strip().casefold() == pick.casefold()), None)
+                if to is None:
+                    names = ", ".join(str(t["team"]).strip() for t in servicing)
+                    raise RpcError(f"{pick} does not service {name}: its teams are {names} (design §4.10)")
+                pick = str(to["team"]).strip()
+            else:  # a blank pick: the first team with a techlead seat, in the order the caller gives them
+                to = next((t for t in servicing if str(t.get("seat") or "").strip()), servicing[0])
+            team = str(to["team"]).strip()
+            seat = str(to.get("seat") or "").strip()
+            if not seat:
+                raise RpcError(f"{team} has no techlead seat: there is nobody to hand the entry to (design §4.9b)")
         folder = await asyncio.to_thread(agent_common.draft_folder, draft, "entry_add") if draft else None
         sent = await self._msg(PERSON, words, [seat], "ask", None, None, None, None)
         mid = (sent.get("entry") or {}).get("id")
