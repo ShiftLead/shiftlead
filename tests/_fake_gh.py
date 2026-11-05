@@ -1,7 +1,7 @@
 """A stand-in for the forge's `gh` in the board write-back's tests (design §4.4, TD-264): `pr create`
 records a pull request against the bare origin the working directory's `origin` names, `pr merge
 --squash` squashes its branch onto the base there by pushing, as GitHub would, `pr view` reads its
-state, and `pr close` closes it. `FAKE_GH_FAIL=create|merge` makes that step fail; `merge-after`
+state, `pr list` lists them all, and `pr close` closes it. `FAKE_GH_FAIL=create|merge` makes that step fail; `merge-after`
 merges and fails the reply, and `merge-after-moved` also changes origin's board elsewhere right after;
 `FAKE_GH_VIEW_FAIL` makes `pr view` fail. State lives beside the bare origin."""
 
@@ -80,6 +80,18 @@ def main(argv: list[str]) -> int:
             print("no pull requests found", file=sys.stderr)
             return 1
         print(pr["state"].upper())  # what `--json state --jq .state` prints
+        return 0
+    if argv[:2] == [
+        "pr",
+        "list",
+    ]:  # the gate sweep's read (TD-1376): every PR, as `--json number,state,headRefName,files`
+        rows = [
+            {"number": int(n), "state": pr["state"].upper(), "headRefName": pr["head"], "files": []}
+            for n, pr in state["prs"].items()
+        ]
+        print(json.dumps(rows))
+        return 0
+    if argv[:2] == ["pr", "diff"]:
         return 0
     if argv[:2] == ["pr", "close"]:
         state["prs"][argv[2]]["state"] = "closed"

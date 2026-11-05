@@ -28,7 +28,7 @@ import sys
 import time
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -718,6 +718,11 @@ class HostAgent(
         self._conventions_read_at = datetime.min.replace(tzinfo=UTC)
         # and the `(root, line)` info lines it logged while their condition lasts, each logged once (TD-1046)
         self._conventions_quiet: set[tuple[str, str]] = set()
+        # the event runner (TD-1376): the detached gate sweep, the UTC day each root was last swept, and the
+        # `(root, why)` lines it logged while their condition lasts, each logged once
+        self._sweep_task: asyncio.Task[None] | None = None
+        self._swept_on: dict[str, date] = {}
+        self._sweep_quiet: set[tuple[str, str]] = set()
         # rule 11 (TD-258): the detached read of merged PRs against `held:`, when it last ran, what
         # was settled (address, the record's `created`, PR) and when each PR was last tried
         self._held_task: asyncio.Task[None] | None = None
