@@ -70,6 +70,9 @@ def test_a_node_with_no_live_session_goes_on_as_before(world, capsys, action):
     assert run(action, "cm") == 0
     assert world["touched"] == [(action, "cm")]
     assert json.loads(capsys.readouterr().out)["ended"] == []
+    # a rebuild is a press, witnessed at the home with no repo (§4.4, TD-1386); a forget is none
+    presses = [p for m, p in world["calls"] if m == "witness_press"]
+    assert presses == ([{"word": "host-rebuild", "target": "cm"}] if action == "rebuild" else [])
 
 
 @pytest.mark.parametrize("action", ["rebuild", "forget"])

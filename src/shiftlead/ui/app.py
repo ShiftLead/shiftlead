@@ -2744,8 +2744,18 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             **start_fields(at, unattended == "on"),
             **elsewhere,
         )
+        if s.get("state") != "scheduled":  # a scheduled start starts nothing yet, so it is no press (§4.4)
+            await witness_press("new-session", team.strip() or Path(dir.strip()).name, dir.strip())
         # a scheduled record has no terminal yet: the Org shows its card with the *starts* note (§4.5a At)
         return RedirectResponse("/" if s.get("state") == "scheduled" else f"/focus/{s['id']}", status_code=303)
+
+    async def witness_press(word: str, target: str, dir: str) -> None:
+        """The New session form's Start, witnessed at the home (§4.4 *The home keeps a log of what it
+        witnesses*, `witness_press`, TD-1386), after the session was created; a refusal is swallowed."""
+        try:
+            await call("witness_press", word=word, target=target, dir=dir)
+        except Exception:  # noqa: BLE001 — the press is recorded or not; the session stands
+            log.info("new-session %s: the press was not witnessed", target)
 
     async def member_submit(
         team: str, line: str, keep: bool, name: str, prompt: str, lane: str, profile: str
@@ -2783,6 +2793,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         made = got.get("created")
         made = [made] if isinstance(made, dict) else list(made or []) + list(got.get("adopted") or [])
         sid = next((r.get("id") for r in made if isinstance(r, dict) and r.get("id")), None)
+        where = next((str(r.get("dir")) for r in made if isinstance(r, dict) and r.get("dir")), "")
+        if sid:
+            await witness_press("new-session", team, where)
         return RedirectResponse(f"/focus/{sid}" if sid else "/", status_code=303)
 
     @app.post("/shell")

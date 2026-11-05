@@ -41,7 +41,9 @@ def page(tmp_path, monkeypatch):
         async def call(self, method, **params):
             calls.append((method, params))
             if method == "create":
-                return rec(start_at=params.get("start_at"))
+                return rec(start_at=params.get("start_at"), state="scheduled" if params.get("start_at") else "idle")
+            if method == "witness_press":
+                return {"recorded": None}
             if method == "set_start":
                 return rec(start_at=AT if params["start_at"] != "now" else datetime.now(UTC).isoformat())
             if method == "seen":
@@ -60,10 +62,21 @@ def test_the_at_field_schedules_and_lands_on_the_org(page):
     assert r.status_code == 303 and r.headers["location"] == "/"
     (made,) = [p for m, p in calls if m == "create"]
     assert made["start_at"].endswith("Z") and made["unattended"] is True
+    assert not [m for m, _ in calls if m == "witness_press"], "a scheduled start starts nothing yet: no press"
     r = c.post(
         "/new", data={"name": "w", "dir": str(tmp_path), "adapter": "shell", "at": "+2h"}, follow_redirects=False
     )
     assert r.status_code == 400 and "pick a role that runs unattended" in r.text
+
+
+def test_the_forms_plain_start_is_witnessed_as_a_new_session_press(page):
+    """§4.4 *The home keeps a log of what it witnesses* (TD-1386): the form's Start, after the create."""
+    c, calls, tmp_path = page
+    r = c.post("/new", data={"name": "w", "dir": str(tmp_path), "adapter": "shell"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert [p for m, p in calls if m == "witness_press"] == [
+        {"word": "new-session", "target": tmp_path.name, "dir": str(tmp_path)}
+    ]
 
 
 def test_start_now_and_the_notes_time_go_to_set_start(page):

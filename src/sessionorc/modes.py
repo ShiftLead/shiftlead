@@ -80,6 +80,7 @@ HOME_EDITS = frozenset(
         "relaunch",
         "notify_test",
         "ci_rerun",
+        "witness_press",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the
@@ -146,7 +147,9 @@ PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox", "inbox_delete"
 # any host are read by a caller at the home, for a team start there — `_forwarded` refuses it. The
 # New session form's two reads join it (TD-293): they name another host's sessions and worktrees,
 # and a person at a node starts nothing on a third host; and Add entry's branch test (TD-1064).
-HOME_ONLY = frozenset({"host_branch", "host_files", "host_occupancy", "host_worktrees"})
+# `witness_press` (§4.4 *The home keeps a log of what it witnesses*, TD-1386) joins it: a press is witnessed at
+# the home alone, and the call names no `id` for `PERSON_NODE_BOUND` to bound.
+HOME_ONLY = frozenset({"host_branch", "host_files", "host_occupancy", "host_worktrees", "witness_press"})
 
 
 def offline_refusal(
