@@ -10,42 +10,42 @@ People: paul
 
 ## Needs the user
 
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Will you run a Claude Code session in a throwaway profile that prints a long reply, then drag, put away and resize its Focus window, so a session can compare tmux's scrollback before and after and count the lines cut off? Context: TD-794. Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
+- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Will you run a Claude Code session in a throwaway profile that prints a long reply, then drag, put away and resize its Focus window, so a session can compare tmux's scrollback before and after and count the lines cut off? Context: TD-794 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
   - **Context:** The ledger entry is: The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept, and no refresh can mend them.
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Will you run a Claude Code session in a throwaway profile that prints a long reply, then drag, put away and resize its Focus window, so a session can compare tmux's scrollback before and after and count the lines cut off?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Once projects are headings over repos (TD-722), will you put samscrape and contractmatch under one ContractMatch project in `org.yml`? Context: TD-723. Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
+- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Once projects are headings over repos (TD-722), will you put samscrape and contractmatch under one ContractMatch project in `org.yml`? Context: TD-723 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
   - **Context:** The ledger entry is: Backfill TD-722: samscrape and contractmatch under one ContractMatch project.
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Once projects are headings over repos (TD-722), will you put samscrape and contractmatch under one ContractMatch project in `org.yml`?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Will you give ShiftLead a Telegram bot and a Doppler config of its own (`shiftlead/prd`), so its notes stop going through samscrape's bot? Context: TD-673. Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
+- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Will you give ShiftLead a Telegram bot and a Doppler config of its own (`shiftlead/prd`), so its notes stop going through samscrape's bot? Context: TD-673 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
   - **Context:** The ledger entry is: ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own.
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Will you give ShiftLead a Telegram bot and a Doppler config of its own (`shiftlead/prd`), so its notes stop going through samscrape's bot?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — When you want mail kept and searchable past its 12 hours, or inbox counts across thousands of entries, should the host agent move mail and session records into one SQLite file of its own? Context: TD-131. Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
+- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — When you want mail kept and searchable past its 12 hours, or inbox counts across thousands of entries, should the host agent move mail and session records into one SQLite file of its own? Context: TD-131 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
   - **Context:** The ledger entry is: Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours.
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** When you want mail kept and searchable past its 12 hours, or inbox counts across thousands of entries, should the host agent move mail and session records into one SQLite file of its own?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Will you finish the look-and-feel pass on your design canvas (the Org page, the Inbox page and the state icons), so a design round can build from it? Context: TD-071. Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
+- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Will you finish the look-and-feel pass on your design canvas (the Org page, the Inbox page and the state icons), so a design round can build from it? Context: TD-071 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
   - **Context:** The ledger entry is: Org page review, 2026-09-18 — what was built, and the ideas that were not.
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Will you finish the look-and-feel pass on your design canvas (the Org page, the Inbox page and the state icons), so a design round can build from it?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Will you run one attended Claude Code launch in a fresh worktree of a repo whose main checkout is trusted, to see whether the trust dialog still appears? Context: TD-005. Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
+- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Will you run one attended Claude Code launch in a fresh worktree of a repo whose main checkout is trusted, to see whether the trust dialog still appears? Context: TD-005 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
   - **Context:** The ledger entry is: `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json`.
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Will you run one attended Claude Code launch in a fresh worktree of a repo whose main checkout is trusted, to see whether the trust dialog still appears?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Once the review rounds converge and the three parts are built, will you use Focus on your phone for a real session and say whether it is the phone view you want? Context: TD-003. Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
+- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — Once the review rounds converge and the three parts are built, will you use Focus on your phone for a real session and say whether it is the phone view you want? Context: TD-003 decision (paul). Due: 2026-11-19. Answers: Yes | Not yet. Lifts: Yes.
   - **Context:** The ledger entry is: Phone layout: Focus as one screen — the terminal, the strip, the key bar and the input bar, everything else in sheets.
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Once the review rounds converge and the three parts are built, will you use Focus on your phone for a real session and say whether it is the phone view you want?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — File the five build slices of TD-964 (the end of a session on Focus, second round) for the grinders? Context: TD-964. Due: 2026-11-12. Answers: File the builds (default) | Keep it held. Lifts: File the builds.
+- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — File the five build slices of TD-964 (the end of a session on Focus, second round) for the grinders? Context: TD-964 decision (paul). Due: 2026-11-12. Answers: File the builds (default) | Keep it held. Lifts: File the builds.
   - **Context:** TD-964 is designed and reviewed (seven rounds, READY), and you lifted its hold on 2026-10-22 saying the build slices may be picked.
     - No build entries were ever filed, and the entry still names you as its owner, so no session picks it up.
     - Owner is about to stop holding an entry (TD-1375), so TD-1374 gates every entry you own with decision (paul); this one is put to you rather than left looking as if it waits.
