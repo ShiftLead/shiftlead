@@ -497,7 +497,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      appears in the checkout's reading only after it (a person's session checking out a ledger branch) is
      told once, as any new id is, though its note's *read the ledger on `origin/main`* will not
      find it there — the ledger read is the checkout's file; where the history cannot be read, the
-     reading at that tick. **A lane word matches by the entry's header, never its prose**: with
+     reading at that tick. **A work order is never in the first write**: a decided line or a red PR's
+     order that sat unclaimed while its member declared is told on the next tick — save one the member
+     itself reported `done` (a `pr:<n>` by its ref or a `done`'s `pr`) while the reading that holds it,
+     the board reading's `at` for a line and the PR reading's for a PR, was taken no later than that
+     `done`: it is kept out of `lane_seen`, untold, so the line or PR the member just closed, still in a
+     reading up to `REPOS_EVERY` old, is not told back to it after each `none`, and a reading taken
+     after the `done` that still holds it (the close did not land) tells it once (TD-1389). **A lane word matches by the entry's header, never its prose**: with
      pickable derived (§4.4 *Repo facts*), `design-first` is a pickable entry with `Kind:
      design-first` — a decision owed to the designer is that `Kind:`, never a `decision (designer)`
      item (TD-1296), and a decision on an entry's `Blocked by:` matches no lane: the person's,
