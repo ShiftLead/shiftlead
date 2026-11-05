@@ -1464,8 +1464,9 @@ def _civil(v: Any) -> date | None:
 
 # §4.5 screen 6 *A board item the person answered waits on them* (TD-303, built by TD-305): an
 # answered row waits under *Waiting on them* until this many civil days from the answer's date, and
-# then comes back to where it would be drawn unanswered, saying nobody has acted
-BOARD_WAIT_DAYS = 3
+# then comes back to where it would be drawn unanswered, saying nobody has acted — `sessionorc`'s, where the
+# Queue's board hold reads it too (TD-1368)
+BOARD_WAIT_DAYS = queue_mod.BOARD_WAIT_DAYS
 
 
 def board_answered(it: Mapping[str, Any], today: str) -> dict[str, Any]:
