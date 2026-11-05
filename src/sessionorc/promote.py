@@ -32,7 +32,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import build, cadence, gitinfo, paths, reports
+from sessionorc import build, cadence, gitinfo, ledgerboard, paths, reports
 
 PROMOTE_EVERY = 300.0  # seconds between full readings: the reports' cadence (§6)
 PROMOTE_WATCH = 15.0  # seconds between `check` reads while a run is in flight
@@ -816,7 +816,9 @@ def witness_main(
         return
     if old.get("main") == sha and old.get("precheck_seen") == seen:
         return
-    if not reports.witness_prechecks(root, f"{repo}@main", sha, emit, repo, own=precheck_run(repo), timeout=GH_TIMEOUT):
+    rid = ledgerboard.origin_path(str(r.get("origin") or "")) or ""  # the record's `<repo>` id (§4.4, TD-1390)
+    own = precheck_run(repo)
+    if not reports.witness_prechecks(root, f"{repo}@main", sha, emit, rid, own=own, timeout=GH_TIMEOUT):
         r["precheck_seen"] = None
 
 

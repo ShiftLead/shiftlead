@@ -82,7 +82,6 @@ Mutating — each one is a decision, so check the state first:
   your own record (`--id`: another's), never overwritten by derivation (§9 invariant 10). A slice
   merged, the entry still yours: `ao progress done <ref> --pr <n> --slice`, before the next slice or a `restart`; the last is a plain `done`. Out of work? `ao progress none --why "<the search>"` **before** you exit (§4.9a).
 - `ao doing "<one line>"` — what you are doing **now** (§4.8): your card shows it, with its age, in place of your terminal's last lines. Say it when you claim and whenever it changes.
-- `ao host-log <kind> ["<text>"] --since <date> [--times N] [--repo R]` — has the home witnessed it (§4.4 *The home keeps a log of what it witnesses*)? The count of a kind's records since 00:00 UTC of the date, how far back the log covers, and the first N; exit 0 when it reaches N, 1 when not; `--kinds` lists the kinds.
 - `ao keys <id> Key…` — raw keys, not for dialogs, menus, or another agent's composer; `ao focus <id>` attaches a terminal: for people, not for you.
 
 Every command that takes an id also takes a bare **name** (design §4.1), resolved to the one

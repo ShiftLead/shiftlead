@@ -301,6 +301,7 @@ BACKUP_MEMBERS = (
     "profiles.yml",
     "settings.yml",
     "witnessed",  # the witness log (§4.4 *The home keeps a log of what it witnesses*, TD-1386)
+    "host-log.toml",  # its host file, the person's once written (§4.4 *The host file*, TD-1390)
 )
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 # The usage endpoint is the fallback, asked on demand (design §4.4 *Usage*, TD-233 slice 3): an

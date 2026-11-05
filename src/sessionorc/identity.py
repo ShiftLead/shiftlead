@@ -59,7 +59,6 @@ READS = frozenset(
         "gate",
         "sweep_switch",
         "seats",
-        "host_log",
         "adapters",
         "ping",
         "whoami",
