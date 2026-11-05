@@ -23,6 +23,9 @@ from sessionorc import paths
 log = logging.getLogger(__name__)
 
 WITNESS_KEEP_MONTHS = 13  # the current month and the twelve before it (a constant, not a setting)
+# the registry name of the repo the package is built from: a record of no repo (an install's event, a host's
+# rebuild, push turned on) is tied to it by the query and the check alike (§4.4 *The query*, TD-1387)
+OWN_REPO = "shiftlead"
 
 # Each kind's text and the most private class of repo its records may be answered for (TD-045 rule 7).
 KINDS: dict[str, dict[str, str]] = {
@@ -288,3 +291,42 @@ def precheck_fails(
         tests = failing_tests(own.get("log")) if own and sid == mine else []
         out.append((at, " ".join([label, sha[:12], f"status {sid}", *tests]), sid))
     return out
+
+
+# ── the query (§4.4 *The query*, TD-1387) ───────────────────────────────────────────────────────────
+
+
+def query(
+    kind: str,
+    text: str,
+    after: datetime,
+    repo: str | None = None,
+    now: datetime | None = None,
+    root: Path | None = None,
+) -> dict[str, Any]:
+    """`{count, covers_from, records}`: the records of `kind` with `at` at or after `after` whose `text`
+    contains `text` literally and case-sensitively (an empty one matches every record) and whose `repo` is
+    `repo` (None or empty: any) — or empty, when `repo` is `OWN_REPO` — oldest first by `at`. Refused (a
+    ValueError) only for a kind not in `KINDS`; nothing for age: the caller compares `covers_from`."""
+    if kind not in KINDS:
+        raise ValueError(f"{kind!r} is not a witness kind ({', '.join(KINDS)})")
+    after = _utc(after)
+    first = _month_index(after)
+    d = root or directory()
+    files = sorted(f for f in d.glob("*.jsonl") if _MONTH_RE.fullmatch(f.name)) if d.is_dir() else []
+    got = []
+    for f in files:
+        m = _MONTH_RE.fullmatch(f.name)
+        if m and int(m[1]) * 12 + int(m[2]) - 1 < first:
+            continue  # a month wholly before `after`: nothing in it can match
+        for r in read_month(f):
+            at = _parse(r.get("at"))
+            if r.get("kind") != kind or at is None or at < after or text not in str(r.get("text") or ""):
+                continue
+            rr = str(r.get("repo") or "")
+            if repo and rr != repo and not (repo == OWN_REPO and not rr):
+                continue
+            got.append((at, r))
+    got.sort(key=lambda p: p[0])
+    records_ = [r for _, r in got]
+    return {"count": len(records_), "covers_from": _iso(covers_from(now, root)), "records": records_}

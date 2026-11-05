@@ -374,3 +374,123 @@ async def test_the_agent_writes_a_precheck_fail_once_and_a_node_none(agent):
         assert agent._witness_precheck("shiftlead", "shiftlead#9 abc status 1", "1", at) is None
     finally:
         agent.mode = "home"
+
+
+# ── the query (TD-1387) ─────────────────────────────────────────────────────────────────────────────
+
+
+def _log(tmp_path):
+    d = tmp_path / "w"
+    witness.ensure_start(datetime(2026, 9, 1, tzinfo=UTC), root=d)
+    for at, kind, repo, text in [
+        (datetime(2026, 10, 10, tzinfo=UTC), "press", "shiftlead", "apply dc-grind"),
+        (datetime(2026, 11, 3, tzinfo=UTC), "press", "", "host-rebuild contractmatch"),
+        (datetime(2026, 11, 2, tzinfo=UTC), "press", "agent-cadence", "start dc-grind"),  # late: read in at order
+        (datetime(2026, 11, 1, tzinfo=UTC), "precheck-fail", "shiftlead", "shiftlead@main abc status 7 t.py::x"),
+        (datetime(2026, 10, 20, tzinfo=UTC), "press", "shiftlead", "Apply a.b"),
+    ]:
+        witness.append(kind, repo, text, at, root=d)
+    return d
+
+
+def _texts(got):
+    return [r["text"] for r in got["records"]]
+
+
+def test_the_query_counts_after_an_instant_literally_case_sensitively_and_by_repo(tmp_path):
+    d = _log(tmp_path)
+
+    def q(text="", after=datetime(2026, 10, 15, tzinfo=UTC), repo=None, kind="press"):
+        return witness.query(kind, text, after, repo, now=T0, root=d)
+
+    got = q()
+    assert got["count"] == 3 and _texts(got) == ["Apply a.b", "start dc-grind", "host-rebuild contractmatch"]
+    assert got["covers_from"] == "2026-09-01T00:00:00Z", "start, later than the boundary"
+    assert _texts(q("dc-grind")) == ["start dc-grind"] and q("apply")["count"] == 0, "case-sensitive"
+    assert _texts(q("a.b")) == ["Apply a.b"] and q("a*b")["count"] == 0 and q("Apply.a")["count"] == 0, "literal"
+    assert q(after=datetime(2026, 11, 3, tzinfo=UTC))["count"] == 1, "at or after: inclusive"
+    assert _texts(q(repo="agent-cadence")) == ["start dc-grind"]
+    assert _texts(q(repo="shiftlead")) == ["Apply a.b", "host-rebuild contractmatch"], "no repo ties to shiftlead"
+    assert q(repo="contractmatch")["count"] == 0, "a record of no repo is no other repo's"
+    assert q(kind="precheck-fail", after=datetime(2026, 1, 1, tzinfo=UTC))["count"] == 1
+    with pytest.raises(ValueError, match="not a witness kind"):
+        q(kind="msg")
+
+
+def test_covers_from_before_and_after_a_prune(tmp_path):
+    d = tmp_path / "w"
+    witness.ensure_start(datetime(2025, 1, 1, tzinfo=UTC), root=d)
+    witness.append("press", "", "host-rebuild a", datetime(2025, 6, 1, tzinfo=UTC), root=d)
+    old = witness.query("press", "", datetime(2025, 1, 1, tzinfo=UTC), now=datetime(2026, 1, 5, tzinfo=UTC), root=d)
+    assert old["covers_from"] == "2025-01-01T00:00:00Z" and old["count"] == 1
+    later = datetime(2026, 11, 4, tzinfo=UTC)
+    witness.prune(later, root=d)
+    got = witness.query("press", "", datetime(2025, 1, 1, tzinfo=UTC), now=later, root=d)
+    assert got == {"count": 0, "covers_from": "2025-11-01T00:00:00Z", "records": []}, "nothing refused for age"
+
+
+def test_host_log_is_a_home_read_forwarded_while_the_link_is_up_and_refused_offline():
+    from sessionorc import identity
+
+    assert "host_log" in modes.HOME_READS and "host_log" in identity.READS
+    assert "host_log" not in modes.HOME_EDITS and "host_log" not in modes.HOME_ONLY
+    for caller in (None, "ao-x"):
+        why = modes.offline_refusal("host_log", caller, {}, host="laptop", home="kmaster")
+        assert why and "kmaster (home) is unreachable" in why
+
+
+@pytest.mark.integration
+async def test_the_home_answers_host_log_to_a_session_and_to_a_node(agent):
+    agent._witness("press", "", "host-rebuild contractmatch")
+    after = datetime(2026, 1, 1, tzinfo=UTC).isoformat()
+    got = await agent.rpc_host_log(kind="press", text="contractmatch", after=after, repo="shiftlead")
+    assert got["count"] == 1 and got["records"][0]["text"] == "host-rebuild contractmatch"
+    fwd = await agent._forwarded(
+        "laptop", {"rpc": "host_log", "params": {"kind": "press", "after": after}, "caller": "ao-x-w", "token": ""}
+    )
+    assert fwd["result"]["count"] == 1, fwd
+    with pytest.raises(Exception, match="not a witness kind"):
+        await agent.rpc_host_log(kind="msg", after=after)
+    with pytest.raises(Exception, match="after is the instant"):
+        await agent.rpc_host_log(kind="press")
+
+
+def test_ao_host_log_exits_0_1_and_2(monkeypatch, capsys):
+    from shiftlead import cli
+
+    asked = []
+    rec = {"id": "w-20261104T120000Z-abcd", "at": "2026-11-04T12:00:00Z", "repo": "", "text": "host-rebuild n"}
+
+    def call(method, **kw):
+        asked.append((method, kw))
+        if kw["kind"] == "down":
+            raise cli.AgentUnavailable("no host agent")
+        if kw["kind"] == "msg":
+            raise AgentError("host_log: 'msg' is not a witness kind (precheck-fail, press)")
+        return {"count": 1, "covers_from": "2026-11-01T00:00:00Z", "records": [rec]}
+
+    monkeypatch.setattr(cli, "call_sync", call)
+
+    def run(*argv):
+        try:
+            return cli.main(["host-log", *argv])
+        except SystemExit as e:
+            return e.code
+
+    assert run("press", "host-rebuild", "--since", "2026-11-04") == 0
+    assert asked[-1] == (
+        "host_log",
+        {"kind": "press", "text": "host-rebuild", "after": "2026-11-04T00:00:00+00:00", "repo": None},
+    )
+    out = capsys.readouterr().out
+    assert "1 press since 2026-11-04" in out and rec["id"] in out
+    assert run("press", "--since", "2026-11-04", "--times", "2", "--repo", "shiftlead") == 1
+    assert asked[-1][1]["repo"] == "shiftlead"
+    assert run("msg", "--since", "2026-11-04") == 2
+    assert run("press") == 2, "--since is required"
+    monkeypatch.setattr(cli, "_agent_answers", lambda: False)
+    assert run("down", "--since", "2026-11-04") == 3, "a host agent that is down exits 3, never 2 (refused)"
+    capsys.readouterr()
+    assert run("--kinds") == 0 and "precheck-fail  (public)" in capsys.readouterr().out
+    assert run("press", "--since", "2026-11-04", "--json") == 0
+    assert json.loads(capsys.readouterr().out)["count"] == 1

@@ -112,8 +112,9 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # say *no PRs*, and the truth is *not known from here*.
 # `queue`: the Queue's reading (§4.4, TD-769); `shape`: the teams' shape (§4.4 *Team shape*, TD-834); `seats`: the
 # seat ledger's (§4.4 *Spend per seat*, TD-830)
-# `pr_wait`: `ao pr wait`, a block on the PRs' reading (§4.7, TD-940)
-HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats", "pr_wait"})
+# `pr_wait`: `ao pr wait`, a block on the PRs' reading (§4.7, TD-940); `host_log`: the witness log's query (§4.4
+# *The home keeps a log of what it witnesses*, TD-1387), the home's file alone
+HOME_READS = frozenset({"repos", "doing_log", "queue", "shape", "seats", "pr_wait", "host_log"})
 # The calls that mean to block (§4.10, §4.7 *ao pr wait*): each holds a connection of its own, which
 # a closed client cancels (`_serve_wait`), and a node forwards it with no bound but its own
 BLOCKING = frozenset({"wait", "pr_wait"})

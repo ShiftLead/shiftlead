@@ -1177,6 +1177,29 @@ class HostAgent(
         got = self._witness_press_of(str(word), target.strip(), dir)
         return {"recorded": got["id"] if got else None}
 
+    async def rpc_host_log(
+        self, kind: Any = None, text: Any = "", after: Any = None, repo: Any = None
+    ) -> dict[str, Any]:
+        """The witness log's query (§4.4 *The query*, TD-1387): `{count, covers_from, records}` — the records
+        of `kind` at or after `after` (an instant, required) whose text contains `text` literally, and whose
+        repo is `repo` (omitted: any; `shiftlead` takes a record of no repo too). A home read: a node forwards
+        it while its link is up and refuses it offline (`modes.HOME_READS`). Refused for a kind not in the
+        table; nothing for age."""
+        if not isinstance(kind, str) or kind not in witness.KINDS:
+            raise RpcError(f"host_log: {kind!r} is not a witness kind ({', '.join(witness.KINDS)})")
+        try:
+            when = datetime.fromisoformat(str(after).replace("Z", "+00:00")) if after else None
+        except ValueError:
+            when = None
+        if when is None:
+            raise RpcError("host_log: after is the instant to count from, as ISO 8601 (design §4.4 The query)")
+        if text is not None and not isinstance(text, str):
+            raise RpcError("host_log: text is a string, matched literally")
+        if repo is not None and not isinstance(repo, str):
+            raise RpcError("host_log: repo is a registry name")
+        got = await asyncio.to_thread(witness.query, str(kind), text or "", when, repo or None)
+        return got
+
     async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty
         `ao doing` calls and each doer's newest five (TD-702), oldest first — `{team, id, text, at}`
