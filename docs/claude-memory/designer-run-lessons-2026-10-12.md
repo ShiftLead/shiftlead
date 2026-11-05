@@ -13,7 +13,7 @@ Three things from the TD-577 round (PR #1554, 2026-10-12):
 
 Later the same day (TD-584, TD-578, TD-580, TD-581; PRs #1567, #1568, #1575, #1577):
 
-- (retired: a v1 single-file ledger's id order) Since TD-1195 a new entry is its own `docs/ledger/TD-NNN.md`, typed with the header line `ao td reserve` prints and closed with `agent-cadence run ledger.py fmt TD-n` until `ledger.py new` files here (TD-1360).
+- (retired: a v1 single-file ledger's id order) Since TD-1195 a new entry is its own `docs/ledger/TD-NNN.md`, filed under the id `ao td reserve` gives with `agent-cadence run ledger.py new --id TD-n` (TD-1360).
 - **`ao msg --shot` rides only on a steer or an ask to `person`**; to the techlead it is refused (*a look is the person's*). A design with a mockup sends its steer to the person with the shot.
 - **Take the id from `ao td reserve` right before committing** (cadence §2.10, [[td-ids-live-in-pr-diffs]]), never from the highest TD read by hand: TD-593 was used twice on main (#1569 and #1568; #1574 renumbered TD-578's build to TD-597), and TD-594 was taken on main by #1570 while #1575 held it, so that build became TD-596. A renumber after a rebase is `agent-cadence run ledger.py renumber` to a new number from `ao td reserve`.
 

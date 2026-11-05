@@ -6,7 +6,7 @@ metadata:
 ---
 
 On 2026-10-26 #2391 merged *Pin agent-cadence* (dev-cadence TD-129's rollout): `docs/cadence.toml` gained a `[agent-cadence]` table (`source`, `ref`) and the synced copies under `scripts/` were removed. `python3 scripts/ledger.py --check` now fails with *No such file or directory*. The commands are:
-- `agent-cadence run ledger.py --check` (add `--since origin/main` for a new entry's `Taken by`);
+- `agent-cadence run ledger.py --check` (add `--since origin/main` for a new entry's `Id take`);
 - `agent-cadence run precheck.py --pr N` (the merge gate since TD-1035);
 - `agent-cadence run check_cadence.py --pr N`.
 The launcher is `~/.local/share/shiftlead-venv/bin/agent-cadence`, on PATH, and runs the pinned tree from `~/.cache/agent-cadence/`. `agent-cadence path <file>` prints where a doc lives (cadence.md, procedures/).
