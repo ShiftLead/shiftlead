@@ -241,7 +241,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   - **the ledger**, in ledgerboard format at `ledger:` — a file, or a v2 directory of one file per entry
     (§4.4 *Either layout*; default `docs/ledger` where that is a directory, else `docs/technical_debt.md`) — the format
     `ShiftLead/ledgerboard`'s `SPEC.md` defines and its package reads — the one parser,
-    vendored as `src/sessionorc/ledgerboard/` (v2.4, TD-1370) at the release the pinned tree's
+    vendored as `src/sessionorc/ledgerboard/` (v2.5, TD-1415) at the release the pinned tree's
     `scripts/ledgerboard/` names (§8 *Which side a thing lives on*).
 
   **agent-cadence's own repo is its source**, not a consumer: a checkout whose root holds `files/` and `sync.sh` or, once

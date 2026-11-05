@@ -3,6 +3,8 @@
 
     python3 fixtures/run.py [--module PATH] [--write]
     python3 fixtures/run.py --check-header [--module PATH]
+    python3 fixtures/run.py --stamp <x.y>
+    (cd fixtures && git ls-files -z) | python3 fixtures/run.py --check-tracked
 
 ``--module`` is the copy to test (default: ../ledgerboard/ beside this directory), so a consumer
 that vendors the package and these fixtures checks its own copy. It is the package's directory,
@@ -12,7 +14,11 @@ the module instead of comparing — for the ledgerboard repo only, after a delib
 review the diff. ``--check-header`` checks only the first line of every ``*.py`` file in the
 package: a release's ``# ledgerboard v<x.y> sha256:<hex>`` whose hash is that of every byte after
 the first line, the same release in each (exit 1 when one is not a release header, its hash does
-not match, or two name different releases). Stdlib only.
+not match, or two name different releases). It then checks this set's ``MANIFEST`` (v2.5): the release it
+names and the sha256 of every other file here, which must match, with no file missing or added, and the same
+release as the package (exit 1 on any difference). ``--stamp <x.y>`` writes that ``MANIFEST`` for this set,
+and ``--check-tracked`` compares its paths with the NUL-separated paths on stdin (what git tracks, which
+``release.sh`` pipes in; this file runs no git); ``release.sh`` runs both. Stdlib only.
 
 Fixtures, each an invented input and its expected JSON:
 - ``ledger/<case>.md`` (+ ``<case>.archive.md``, optional ``<case>.resolve.json`` mapping a
@@ -37,6 +43,8 @@ Fixtures, each an invented input and its expected JSON:
   ordered and keyed, through every edit, ``item_line(lifts=)`` and the item gate.
 - ``archive/<case>.board.md`` and ``<case>.archive.md`` → ``<case>.json`` (v2.3): ``archive_closed()`` of the
   two, read as bytes, or its refusal.
+- ``ledger/belowheader.md`` (TD-049): a ``decision`` gate below the header block — ``check()`` gives its ℹ and
+  reads on, where v2.4 raised, so the next entry's reassign note still comes.
 - ``ledger/parts.md`` (v2.1): ``Part of`` — a parent with open and with archived parts, the order,
   and each check; ``components()`` of it joins through the field.
 - ``ledger_edit/cases.json`` (+ the entry files it names) → ``ledger_edit/expected.json`` (v2.2): one
@@ -45,7 +53,8 @@ Fixtures, each an invented input and its expected JSON:
   each is refused; and ``check()``'s Part of flags of a ledger before and after an archive
   (``check/``), ``archive-open-parts`` among them. From v2.4, the Log: ``entry_text(filed=)``, the
   writers' Log lines, and per ``log`` case ``log_lines()``, ``log_problems()``, ``status_notes_to_log()``
-  and ``gate_age()`` of each gate the case names. Also from v2.4, ``archive_plan()`` of each ``archive_plan`` case
+  and ``gate_age()`` of each gate the case names (from v2.5 ``gate_added()`` too, and a ``set`` step takes the
+  case's own ``today`` when it gives one). Also from v2.4, ``archive_plan()`` of each ``archive_plan`` case
   (``plan/``: a supersede, its chain, each refusal, a chain ending in a Status word this reader does not know
   among them), the Dropped archive, and ``rename_ref`` keeping one copy.
 - ``ledger/supersede.md`` (v2.4): an archived blocker's Status read — Resolved, Superseded (by an open entry, a
@@ -54,6 +63,10 @@ Fixtures, each an invented input and its expected JSON:
 - ``ledger/unknownstatus.md`` (v2.4, TD-039): an archived blocker whose Status word this reader does not know keeps
   the block and is flagged — here and through the resolver, at a chain's end, and each edge of the word rule: prose,
   punctuation kept on the word, a first run that strips to nothing, no first run, a known word in capitals, ``Open``.
+- ``host-log-pure/cases.json`` → ``host-log-pure/expected.json`` (v2.5): a ``host-log`` check counted with no file —
+  ``first_instant()`` of each date, and ``count_host_log()`` of each case's records (``at`` written
+  ``YYYY-MM-DDTHH:MM:SSZ``, read with ``strptime``, never ``fromisoformat``, which refuses ``Z`` on 3.10), or why it
+  is refused.
 - ``verdict/cases.json`` → ``verdict/expected.json`` (v2.4): the merge gate's verdicts — ``lift_pr_verdict()``,
   ``tripwire()`` and ``uncovered_decisions()`` of each case's trees: ``base/`` under each case's
   ``cases/<name>/base/``, then its ``cases/<name>/head/`` over that, less its ``delete`` paths.
@@ -107,9 +120,10 @@ import json
 import os
 import re
 import shutil
+import stat
 import sys
 import tempfile
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -151,6 +165,231 @@ def headers_problem(path: Path) -> str | None:
     if len(releases) > 1:
         return f"the files name different releases: {', '.join(sorted(releases))}"
     return None
+
+
+# The set's release (v2.5, TD-040): fixtures/MANIFEST, a release line and `<sha256>  <path>` for every other
+# file of the set, sorted by the path's UTF-8 bytes. `--stamp` writes it, `--check-header` checks it beside the
+# package's headers and `--check-tracked` compares it with what git tracks (piped in: this file runs no git).
+MANIFEST = "MANIFEST"
+RELEASE_LINE_RE = re.compile(r"# ledgerboard v([0-9]+\.[0-9]+) fixtures")
+RELEASE_ARG_RE = re.compile(r"[0-9]+\.[0-9]+")
+ENTRY_HEAD_RE = re.compile(r"[0-9a-f]{64}  ")
+NO_MANIFEST = "no MANIFEST — this set names no release (a set from before v2.5 is its tag's)"
+NOT_A_FILE = "MANIFEST is not a file"
+NOT_LF_TEXT = "MANIFEST is not UTF-8 text with LF line endings and a final LF"
+
+
+def _odd(path: str) -> str | None:
+    """Why a relative path cannot be a manifest line's path (its name not UTF-8, or a newline, CR or
+    backslash in it), or None."""
+    try:
+        os.fsencode(path).decode("utf-8")
+    except UnicodeDecodeError:
+        return "a name that is not UTF-8"
+    if any(c in path for c in "\n\r\\"):
+        return "a path holding a newline, a carriage return or a backslash"
+    return None
+
+
+def _shown(path: str) -> str:
+    """A path as a problem line writes it: its ``repr`` when it is odd (``_odd``), else as it stands."""
+    return repr(path) if _odd(path) else path
+
+
+def _bkey(path: str) -> bytes:
+    return os.fsencode(path)
+
+
+def _walk(root: Path) -> tuple[dict[str, Path], dict[str, str]]:
+    """The set on disk: ``({path: file}, {path: problem})`` — every regular file under ``root`` but the
+    top-level ``MANIFEST`` and anything under a ``__pycache__`` directory, by its ``/``-joined relative
+    path, and each entry refused (not a regular file, a name not UTF-8, an odd path), one problem each.
+    No symbolic link is followed; a link named ``__pycache__`` is a link, refused, not pruned."""
+    files: dict[str, Path] = {}
+    refused: dict[str, str] = {}
+    top = str(root)
+    def unreadable(err: OSError) -> None:  # a directory the walk cannot read is never silently left out
+        raise err
+    for d, dirnames, filenames in os.walk(top, onerror=unreadable, followlinks=False):
+        rel_dir = os.path.relpath(d, top)
+        parts = [] if rel_dir == "." else rel_dir.split(os.sep)
+        if not parts:
+            dirnames[:] = [n for n in dirnames if n != MANIFEST]
+            filenames[:] = [n for n in filenames if n != MANIFEST]
+        keep = []
+        for n in dirnames:
+            rel = "/".join([*parts, n])
+            if os.path.islink(os.path.join(d, n)):
+                refused[rel] = "not a regular file"
+            elif n != "__pycache__":
+                keep.append(n)
+        dirnames[:] = keep
+        for n in filenames:
+            rel = "/".join([*parts, n])
+            full = os.path.join(d, n)
+            if not stat.S_ISREG(os.lstat(full).st_mode):
+                refused[rel] = "not a regular file"
+            elif _odd(rel):
+                refused[rel] = _odd(rel)
+            else:
+                files[rel] = Path(full)
+    return files, refused
+
+
+def _refused_lines(refused: dict[str, str]) -> list[str]:
+    return [f"{p!r}: {why}" for p, why in sorted(refused.items(), key=lambda kv: _bkey(kv[0]))]
+
+
+def manifest_text(root: Path, release: str) -> str:
+    """The manifest of the set at ``root`` for ``release``; ValueError (its ``args[0]`` the list of
+    problems) when the set holds an entry the manifest cannot list."""
+    files, refused = _walk(root)
+    if refused:
+        raise ValueError(_refused_lines(refused))
+    lines = [f"{hashlib.sha256(files[p].read_bytes()).hexdigest()}  {p}\n" for p in sorted(files, key=_bkey)]
+    return f"# ledgerboard v{release} fixtures\n" + "".join(lines)
+
+
+def _read_manifest(root: Path) -> tuple[list[str], bool, str | None, list[tuple[str, str]]]:
+    """``(problems, stopped, release, entries)`` of the manifest file itself (rule 3's first four bullets):
+    ``stopped`` when a problem leaves nothing more to check."""
+    m = root / MANIFEST
+    if not os.path.lexists(m):
+        return [NO_MANIFEST], True, None, []
+    if not stat.S_ISREG(os.lstat(m).st_mode):
+        return [NOT_A_FILE], True, None, []
+    raw = m.read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        text = None
+    if text is None or not raw or b"\r" in raw or not raw.endswith(b"\n") or b"\n\n" in raw:
+        return [NOT_LF_TEXT], True, None, []
+    lines = text.split("\n")[:-1]
+    head = RELEASE_LINE_RE.fullmatch(lines[0])
+    if not head:
+        return [f"MANIFEST's first line is not a release line: {lines[0]!r}"], True, None, []
+    problems: list[str] = []
+    entries: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    prev: str | None = None
+    for n, line in enumerate(lines[1:], start=2):
+        if len(line) <= 66 or not ENTRY_HEAD_RE.match(line[:66]):
+            problems.append(f"MANIFEST line {n} is not '<sha256>  <path>': {line!r}")
+            continue
+        path = line[66:]
+        if path in seen:
+            problems.append(f"MANIFEST lists {path} twice")
+            continue
+        if prev is not None and _bkey(path) < _bkey(prev):
+            problems.append(f"MANIFEST line {n} is out of order")
+        seen.add(path)
+        prev = path
+        entries.append((line[:64], path))
+    return problems, False, head.group(1), entries
+
+
+def manifest_file_problems(root: Path) -> list[str]:
+    """The manifest file's own problems: none there, not a file, not LF text, a bad first line, and each
+    malformed, repeated or out-of-order line."""
+    return _read_manifest(root)[0]
+
+
+def manifest_entries(root: Path) -> list[tuple[str, str]]:
+    """``(sha256, path)`` of each well-formed later line, the first of each path, in file order; ``[]`` when
+    a problem stops the check."""
+    return _read_manifest(root)[3]
+
+
+def manifest_release(root: Path) -> str | None:
+    """The ``<x.y>`` the manifest names, when the file has no problem of its own; else None."""
+    problems, _, release, _ = _read_manifest(root)
+    return None if problems else release
+
+
+def manifest_problems(root: Path) -> list[str]:
+    """Every problem of the set's manifest but the release mismatch, each without its ``fixtures: ``
+    prefix: the file's own, then each entry refused on disk, then each file missing, added or edited."""
+    problems, stopped, _, entries = _read_manifest(root)
+    if stopped:
+        return problems
+    files, refused = _walk(root)
+    problems += _refused_lines(refused)
+    listed = dict((p, h) for h, p in entries)
+    diff = []
+    for p in sorted(set(listed) | set(files), key=_bkey):
+        if p in refused:
+            continue
+        if p not in files:
+            diff.append(f"{p}: in MANIFEST but missing")
+        elif p not in listed:
+            diff.append(f"{p}: not in MANIFEST — added after its release")
+        elif hashlib.sha256(files[p].read_bytes()).hexdigest() != listed[p]:
+            diff.append(f"{p}: its sha256 does not match MANIFEST — edited after its release")
+    return problems + diff
+
+
+def _stamp(release: str) -> int:
+    m = HERE / MANIFEST
+    if os.path.lexists(m) and not stat.S_ISREG(os.lstat(m).st_mode):
+        print(f"fixtures: {NOT_A_FILE}", file=sys.stderr)
+        return 1
+    try:
+        text = manifest_text(HERE, release)
+    except ValueError as why:
+        for p in why.args[0]:
+            print(f"fixtures: {p}", file=sys.stderr)
+        return 1
+    fd, tmp = tempfile.mkstemp(prefix=".MANIFEST.", dir=HERE)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(text.encode("utf-8"))
+        umask = os.umask(0)
+        os.umask(umask)
+        os.chmod(tmp, 0o666 & ~umask)  # mkstemp's 0600 would make a copy unreadable to others
+        os.replace(tmp, m)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+    print(f"stamped fixtures v{release} ({text.count(chr(10)) - 1} files)")
+    return 0
+
+
+def _check_tracked() -> int:
+    problems = manifest_file_problems(HERE)
+    if problems:
+        for p in problems:
+            print(f"fixtures: {p}", file=sys.stderr)
+        return 1
+    raw = sys.stdin.buffer.read().split(b"\0")
+    if raw and raw[-1] == b"":
+        raw.pop()
+    tracked = {os.fsdecode(b) for b in raw}
+    tracked = {p for p in tracked if p != MANIFEST and "__pycache__" not in p.split("/")[:-1]}
+    listed = {p for _, p in manifest_entries(HERE)}
+    diff = sorted(tracked ^ listed, key=_bkey)
+    for p in diff:
+        print(f"fixtures/ differs from what git tracks: {_shown(p)}", file=sys.stderr)
+    return 1 if diff else 0
+
+
+def _check_header(module: Path) -> int:
+    why = headers_problem(module)
+    package = None if why else package_files(module)[0].read_bytes().split(b" ", 3)[2].decode()
+    print(f"header: {why}" if why else f"header: ok ({package})")
+    problems = manifest_problems(HERE)
+    for p in problems:
+        print(f"fixtures: {p}")
+    release = manifest_release(HERE)
+    bad = bool(why or problems)
+    if not problems:
+        if not why and f"v{release}" != package:
+            print(f"fixtures: MANIFEST names v{release}, the package {package}")
+            bad = True
+        else:
+            print(f"fixtures: ok (v{release}, {len(manifest_entries(HERE))} files)")
+    return 1 if bad else 0
 
 
 def load(path: Path):
@@ -320,7 +559,8 @@ def ledger_edit_cases(L, spec: dict, root: Path = HERE) -> dict:
         t = text(c)
         return {"log_lines": L.log_lines(t), "log_problems": [list(x) for x in L.log_problems(t)],
                 "status_notes_to_log": _refused(lambda: L.status_notes_to_log(t)),
-                "gate_age": {g: L.gate_age(t, g) for g in c["gates"]}}
+                "gate_age": {g: L.gate_age(t, g) for g in c["gates"]},
+                **({"gate_added": {g: L.gate_added(t, g) for g in c["gates"]}} if hasattr(L, "gate_added") else {})}
 
     def plan(c):  # v2.4: what an archive leaves its dependents
         if not hasattr(L, "archive_plan"):
@@ -335,8 +575,9 @@ def ledger_edit_cases(L, spec: dict, root: Path = HERE) -> dict:
         def run():
             out = text(c)
             for st in c["steps"]:
-                dated = st["action"] in ("note", "archive", "reopen")  # the others take no date
-                args = {"today": c.get("today", spec["today"])} if dated else {}
+                dated = st["action"] in ("note", "archive", "reopen")  # these require a date
+                args = ({"today": c.get("today", spec["today"])} if dated
+                        else {"today": c["today"]} if st["action"] in ("set", "edit") and "today" in c else {})  # v2.5: their own
                 out = L.edit_entry(out, st["action"], **{**args, **st["args"]})
             return out
         return _refused(run)
@@ -346,7 +587,7 @@ def ledger_edit_cases(L, spec: dict, root: Path = HERE) -> dict:
                                                      old=text({"file": c["old"]}) if c.get("old") else None,
                                                      today=spec["today"])
                                   if r["kind"] in ("archive-open-parts", "part-of-archived", "part-of-unknown",
-                                                   "log-not-last", "log-line")]
+                                                   "log-not-last", "log-line", "event-undated")]
                       for c in spec["check"]},
             "entry_text": {c["name"]: _refused(lambda c=c: L.entry_text(
                 c["id"], c["title"], c["fields"],
@@ -466,6 +707,24 @@ def sweep_cases(L, spec: dict, root: Path = HERE) -> dict:
             ents, boards, results, "2026-11-03", "2026-11-03", repo=c["repo"],
             **{k: c[k] for k in ("reask_days", "event_age_days") if k in c})) for c in spec["refused"]},
     }
+
+
+def host_log_cases(L, spec: dict) -> dict:
+    """A host-log check counted over records (v2.5): ``first_instant()`` and ``count_host_log()``, no file read."""
+    if not hasattr(L, "count_host_log"):
+        return {"missing": "the module has no count_host_log — older than v2.5"}
+
+    def rec(r):
+        at = r.get("at")
+        if isinstance(at, str) and at.endswith("Z"):
+            at = datetime.strptime(at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        return {**r, "at": at}
+
+    def count(c):
+        return _refused(lambda: L.count_host_log([rec(r) for r in c["records"]], L.parse_check(c["check"]),
+                                                 c["since"], public_only=c.get("public_only", False)))
+    return {"first_instant": {d: _refused(lambda d=d: L.first_instant(d).isoformat()) for d in spec["first_instant"]},
+            "count_host_log": {c["name"]: count(c) for c in spec["count_host_log"]}}
 
 
 def verdict_cases(L, spec: dict, root: Path = HERE) -> dict:
@@ -625,23 +884,39 @@ def cases(L, root: Path):
     yield root / "ids" / "expected.json", ids_cases(L, spec)
     spec = json.loads((root / "sweep" / "cases.json").read_text(encoding="utf-8"))
     yield root / "sweep" / "expected.json", sweep_cases(L, spec, root)
+    spec = json.loads((root / "host-log-pure" / "cases.json").read_text(encoding="utf-8"))
+    yield root / "host-log-pure" / "expected.json", host_log_cases(L, spec)
     spec = json.loads((root / "verdict" / "cases.json").read_text(encoding="utf-8"))
     yield root / "verdict" / "expected.json", verdict_cases(L, spec, root)
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    ap.add_argument("--module", type=Path, default=HERE.parent / "ledgerboard",
-                    help="the package directory to test (or a single module file)")
-    ap.add_argument("--write", action="store_true", help="regenerate the expected JSON (ledgerboard repo only)")
-    ap.add_argument("--check-header", action="store_true", help="check only the release header of each package file")
+    ap.add_argument("--module", type=Path, default=None,
+                    help="the package directory to test (or a single module file; default ../ledgerboard)")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--write", action="store_true", help="regenerate the expected JSON (ledgerboard repo only)")
+    mode.add_argument("--check-header", action="store_true",
+                      help="check the release header of each package file and this set's MANIFEST")
+    mode.add_argument("--stamp", metavar="X.Y", help="write this set's MANIFEST for release X.Y")
+    mode.add_argument("--check-tracked", action="store_true",
+                      help="compare MANIFEST's paths with the NUL-separated paths on stdin (git ls-files -z)")
     a = ap.parse_args(argv)
+    for flag, on in (("--stamp", a.stamp is not None), ("--check-tracked", a.check_tracked)):
+        if on and a.module is not None:
+            print(f"--module is not used with {flag}", file=sys.stderr)
+            return 2
+    if a.stamp is not None:
+        if not RELEASE_ARG_RE.fullmatch(a.stamp):
+            print("usage: --stamp <major.minor>", file=sys.stderr)
+            return 2
+        return _stamp(a.stamp)
+    if a.check_tracked:
+        return _check_tracked()
+    module = a.module if a.module is not None else HERE.parent / "ledgerboard"
     if a.check_header:
-        why = headers_problem(a.module)
-        print(f"header: {why}" if why else
-              f"header: ok ({package_files(a.module)[0].read_bytes().split(b' ', 3)[2].decode()})")
-        return 1 if why else 0
-    L = load(a.module)
+        return _check_header(module)
+    L = load(module)
     bad = 0
     n = 0
     for path, got in cases(L, HERE):

@@ -1,0 +1,13 @@
+{
+ "argv": [
+  "set",
+  "TD-2",
+  "--blocked-by",
+  "until 2026-02-01, TD-001",
+  "--ledger",
+  "ledger",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

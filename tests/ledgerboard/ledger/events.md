@@ -72,3 +72,27 @@ check: file-contains acme/tools ../secrets "key"
 
 **Event (Bad-Name):** a name outside the grammar.
 check: pr-merged acme/tools#1
+
+## TD-206: Host-log gates, dated and not (v2.5)
+
+**Priority:** Low
+**Added:** 2026-01-10
+**Blocked by:** event (dated), event (undated), event (readded), event (merged)
+
+**Event (dated):** the build team's next Apply.
+check: host-log team-events kind press "Apply nightly-build"
+
+**Event (undated):** a precheck failing on the parser's test.
+check: host-log ci times 2 "test_parse failed"
+
+**Event (readded):** the next message from the docs team.
+check: host-log team-events kind msg "docs"
+
+**Event (merged):** the vendor ships.
+check: pr-merged acme/tools#4
+
+**Log:**
+- 2026-01-10: gate added: event (merged)
+- 2026-01-12: gate added: event (dated)
+- 2026-01-12: gate added: event (readded)
+- 2026-01-13: gate lifted: event (readded) — by box-1; host-log passed; team-events/rec-7

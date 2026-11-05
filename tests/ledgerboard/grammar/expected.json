@@ -207,7 +207,7 @@
    },
    {
     "accepted": false,
-    "why": "its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes"
+    "why": "its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes, host-log"
    }
   ],
   "check-line": [
@@ -232,6 +232,20 @@
    {
     "accepted": false,
     "why": "its check: the commit 'ABCDEF0' is not 7 to 40 of [0-9a-f]"
+   }
+  ],
+  "count": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the count '0' is not 1 to 999, with no leading zero"
+   },
+   {
+    "accepted": false,
+    "why": "its check: the count '1000' is not 1 to 999, with no leading zero"
    }
   ],
   "digit": [
@@ -296,6 +310,16 @@
    {
     "accepted": false,
     "why": "its check: the commit 'ABCDEF1' is not 7 to 40 of [0-9a-f]"
+   }
+  ],
+  "host-log": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: host-log takes <source> [kind <kind>] [times <N>] \"<text>\": kind, then times, each once, in that order"
    }
   ],
   "path": [
@@ -428,6 +452,16 @@
     "why": "its check: the repo 'a/..' is not a name or /-separated components of ASCII [A-Za-z0-9_.-] (none . or .., none starting with -)"
    }
   ],
+  "source": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the source '-ci' is not 1 to 40 of [a-z0-9-], not starting with - (a name, never a path)"
+   }
+  ],
   "text-char": [
    {
     "accepted": true,
@@ -436,6 +470,16 @@
    {
     "accepted": false,
     "why": "its check: the quoted text holds a control character"
+   }
+  ],
+  "token": [
+   {
+    "accepted": true,
+    "why": null
+   },
+   {
+    "accepted": false,
+    "why": "its check: the kind 'Press' is not 1 to 40 of [a-z0-9-], not starting with -"
    }
   ]
  },

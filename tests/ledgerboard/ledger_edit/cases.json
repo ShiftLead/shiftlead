@@ -900,11 +900,9 @@
    "file": "reordered.md",
    "steps": [
     {
-     "action": "set",
+     "action": "renumber",
      "args": {
-      "fields": {
-       "Priority": "High"
-      },
+      "new": "TD-41",
       "today": "2026-01-20"
      }
     }
@@ -1085,7 +1083,8 @@
       }
      }
     }
-   ]
+   ],
+   "today": "2026-01-20"
   },
   {
    "name": "set_refused_old_form",
@@ -1142,6 +1141,28 @@
       }
      }
     }
+   ],
+   "today": "2026-01-20"
+  },
+  {
+   "name": "set_migrates_old_form_no_today",
+   "text": "## TD-120: An entry in the old form\n\n**Priority:** Medium\n**Blocked by:** TD-3, decision (pat) — the board's 2026-01-03 item\n\n**Why:** w\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (pat)"
+      }
+     }
+    },
+    {
+     "action": "edit",
+     "args": {
+      "section": "Ask",
+      "words": "the board's 2026-01-03 item"
+     }
+    }
    ]
   },
   {
@@ -1153,6 +1174,285 @@
      "args": {
       "fields": {
        "Priority": "High"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_logs_each_gate_it_adds",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (Kim), event (ships), until 2026-02-01"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_makes_the_log_for_a_gate",
+   "file": "reordered.md",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-012, decision (kim)"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_gate_without_today",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (kim), until 2026-02-01"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_keeps_a_gate_without_today",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "decision (Kim)"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_drops_a_gate_logs_nothing",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_readds_a_dropped_gate",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3"
+      }
+     }
+    },
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (kim)"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_logs_a_repeated_gate_once",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (kim), decision (Lee), Decision (LEE)"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_redates_a_changed_host_log_check",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Event (apply)",
+      "words": "the next Apply.\ncheck: host-log team-events kind press times 2 \"Apply\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_refused_changed_host_log_check_without_today",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Event (apply)",
+      "words": "the next Apply.\ncheck: host-log team-events \"Apply\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_spacing_only_logs_nothing",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Event (apply)",
+      "words": "the next Apply.\ncheck: host-log  team-events  kind press \"Apply\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_words_only_logs_nothing",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Event (apply)",
+      "words": "the build team's next Apply.\ncheck: host-log team-events kind press \"Apply\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_adds_a_host_log_section_for_a_carried_gate",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply), event (docs)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Event (docs)",
+      "words": "the docs team's next message.\ncheck: host-log team-events kind msg \"docs\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_a_section_of_no_carried_gate_logs_nothing",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Event (docs)",
+      "words": "the docs team's next message.\ncheck: host-log team-events kind msg \"docs\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_a_refused_check_logs_nothing",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Event (apply)",
+      "words": "the next Apply.\ncheck: host-log Team \"Apply\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_to_host_log_from_another_type",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: pr-merged acme/tools#4\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Event (apply)",
+      "words": "the next Apply.\ncheck: host-log team-events kind press \"Apply\""
+     }
+    }
+   ]
+  },
+  {
+   "name": "edit_why_with_today",
+   "text": "## TD-122: An entry waiting on a host's log\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** event (apply)\n\n**Why:** w\n\n**Event (apply):** the next Apply.\ncheck: host-log team-events kind press \"Apply\"\n\n**Log:**\n- 2026-01-02: gate added: event (apply)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "edit",
+     "args": {
+      "section": "Why",
+      "words": "another reason"
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_no_gate_with_today",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Priority": "High"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_bad_today",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n",
+   "today": "2026-1-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Priority": "High"
+      }
+     }
+    }
+   ]
+  },
+  {
+   "name": "set_refused_gate_on_a_log_not_last",
+   "text": "## TD-121: An entry with a gate\n\n**Priority:** Medium\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** TD-3, Decision (kim)\n\n**Why:** w\n\n**Log:**\n- 2026-01-02: gate added: decision (kim)\n\n**Related:** TD-3.\n",
+   "today": "2026-01-20",
+   "steps": [
+    {
+     "action": "set",
+     "args": {
+      "fields": {
+       "Blocked by": "TD-3, decision (kim), event (ships)"
       }
      }
     }
@@ -1253,6 +1553,17 @@
    "name": "log_flags_no_old",
    "ledger": "check/log_after.md",
    "archive": ""
+  },
+  {
+   "name": "host_log_dated_anew",
+   "ledger": "check/hostlog_after.md",
+   "archive": "",
+   "old": "check/hostlog_before.md"
+  },
+  {
+   "name": "host_log_no_old",
+   "ledger": "check/hostlog_after.md",
+   "archive": ""
   }
  ],
  "log": [
@@ -1312,6 +1623,26 @@
    "name": "was_takes_the_resolved_date",
    "text": "## TD-092: x\n\n**Added:** 2026-09-01\n**Status:** Open 2026-11-01: looked again — was: Resolved: built\n\n**Why:** w\n\n**Resolved:** 2026-10-01 (PR #3)\n",
    "gates": []
+  },
+  {
+   "name": "gate_added",
+   "file": "gate_added.md",
+   "gates": [
+    "decision (KIM)",
+    "until 2026-03-01",
+    "event (tool-v3)",
+    "event (docs)",
+    "event (late)",
+    "event (none-added)",
+    "event (never)"
+   ]
+  },
+  {
+   "name": "gate_added_reopened",
+   "file": "gate_added_reopened.md",
+   "gates": [
+    "event (ships)"
+   ]
   }
  ],
  "archive_plan": [

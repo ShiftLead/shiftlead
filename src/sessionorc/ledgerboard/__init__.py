@@ -1,4 +1,4 @@
-# ledgerboard v2.4 sha256:b31d544b2d40f6071b3c70aafb46174a1c65ca1507dec2ea7fc5861cfc22ce19
+# ledgerboard v2.5 sha256:be6215e12d99ab26049a7f5bc0b64722ca88b3d34e0526dbdc3419398dbdb74a
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/__init__.py (vendored by agent-cadence as files/scripts/ledgerboard/__init__.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
@@ -808,23 +808,29 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
     ``archive-open-parts``, naming the parts — never standing, since only this edit made it. Each
     open entry's Log (v2.4) adds ``log-not-last`` and ``log-line`` (``log_problems()``), standing when the
     entry's whole text is unchanged; an archived entry's Log is not read. Each open entry's events (v2.4)
-    add ``event-section``, ``event-check`` and ``event-ungated`` (``event_problems()``), scoped the same way, and
+    add ``event-section``, ``event-check``, ``event-ungated`` and (v2.5) ``event-undated`` (``event_problems()``, given
+    each entry's old text when ``old`` is given), scoped the same way, and
     ``gate-reassigned-often`` (info) for a decision reassigned more than twice to reach it (``reassigns()``).
     ``today`` is ``pickable()``'s (v2.4): the UTC date, required."""
     recs = [dict(r, standing=False)
             for r in pickable(ledger, archive, resolve, undeclared=True, rank_text=rank_text,
                               today=today)["flag_recs"]]
     texts = _entry_texts(ledger)
+    old_texts = _entry_texts(old) if old is not None else {}
+    day = utc_day(today, "check()'s today")
     for tid, text in texts.items():
         for kind, why in log_problems(text):
             recs.append({"level": "error", "id": tid, "field": "log", "kind": kind, "text": f"⚠ {tid}: {why}",
                          "standing": False})
-        for level, kind, why in event_problems(text):
+        for level, kind, why in event_problems(text, old_texts.get(tid, "") if old is not None else None, day):
             recs.append({"level": level, "id": tid, "field": "event", "kind": kind,
                          "text": f"{'⚠' if level == 'error' else 'ℹ'} {tid}: {why}", "standing": False})
         e = entries(text)
         for gate in (gate_items(parse_gates(e[0]["blocked_raw"])) if e else []):
-            n = reassigns(text, gate) if gate.startswith("decision") else 0
+            try:  # an entry _entry_parts() refuses (a field below its header block) has its ℹ already
+                n = reassigns(text, gate) if gate.startswith("decision") else 0
+            except Refused:
+                n = 0
             if n > 2:
                 recs.append({"level": "info", "id": tid, "field": "blocked by", "kind": "gate-reassigned-often",
                              "text": f"ℹ {tid}: {gate} was reassigned {n} times — is the decision stuck?",
@@ -833,7 +839,6 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
         return recs
     before = {e["id"]: e["fields"] for e in entries(old)}
     changed = {e["id"] for e in entries(ledger) if before.get(e["id"]) != e["fields"]}
-    old_texts = _entry_texts(old)
     rewritten = {t for t, x in texts.items() if old_texts.get(t) != x}  # a Log flag's scope: the whole entry
     decl_changed = declarations(old) != declarations(ledger)
     for r in recs:
@@ -848,7 +853,7 @@ def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | 
 
 
 LOG_KINDS = ("log-not-last", "log-line")  # check()'s flags on an entry's Log (v2.4)
-EVENT_KINDS = ("event-section", "event-check", "event-ungated")  # check()'s flags on an entry's events (v2.4)
+EVENT_KINDS = ("event-section", "event-check", "event-ungated", "event-undated")  # check()'s flags on an entry's events (v2.4; event-undated v2.5)
 TEXT_KINDS = LOG_KINDS + EVENT_KINDS + ("ask-missing", "gate-reassigned-often")  # flags that read the body: scoped by the entry's whole text
 
 
@@ -3333,6 +3338,7 @@ _ENTRY_ARGS = {"set": {"fields"}, "note": {"words"}, "edit": {"section", "words"
                "archive": {"why", "pr", "pointer", "as_is", "superseded_by", "dropped"}, "reopen": {"why"},
                "renumber": {"new"}, "rename_ref": {"old", "new"}}  # each action's keyword arguments
 _DATED_ACTIONS = ("note", "archive", "reopen")  # the actions that write today's date
+_TODAY_ACTIONS = _DATED_ACTIONS + ("set", "edit")  # also take today (v2.5): set and edit only to date a gate
 PR_IN_TEXT_RE = re.compile(r"#\d+")  # a consumer reads the first `#<digits>` of a Resolved line as its PR
 ISO_DAY_RE = re.compile(r"\d{4}-\d{2}-\d{2}")  # the one form a date is written in
 
@@ -3631,6 +3637,26 @@ def gate_age(text: str, gate: str) -> date | None:
     return date.fromisoformat(added.group(0)) if added else None
 
 
+def gate_added(text: str, gate: str) -> date | None:
+    """When ``gate`` (as written in Blocked by) was added, on one entry (v2.5, SPEC *The Log*): the date of
+    the last ``gate added`` Log line for it in the Log's order (never by date), compared as ``gate_age()``
+    compares; None when there is none, or when a ``gate lifted`` line for it follows that line. Unlike
+    ``gate_age()``, it never falls back, and a Log that cannot be read gives None."""
+    key, found = _gate_key(gate), None
+    try:
+        recs = log_lines(text)
+    except Refused:  # a Log no reader can read (an entry canonical() refuses, two Logs): no day to count from
+        return None
+    for rec in recs:
+        if rec["date"] is None or rec["kind"] not in ("gate-added", "gate-lifted") or _gate_key(rec["gate"]) != key:
+            continue
+        found = rec["date"] if rec["kind"] == "gate-added" else None
+    try:
+        return date.fromisoformat(found) if found else None
+    except ValueError:  # a line shaped as a date that is no day (2026-02-30): no day to count from
+        return None
+
+
 def utc_day(value: object, what: str) -> str:
     """A ledger date as ``YYYY-MM-DD`` (SPEC: every ledger date is the UTC date): a date, or a
     ``YYYY-MM-DD`` string, as given; an aware datetime turned into its UTC date. Refused: a naive
@@ -3788,7 +3814,8 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
 
     - ``set`` (``fields``: {name: value}; an empty value removes the field); a Blocked by (v2.4) is
       written with its ids first, then its gates in the canonical order, and refused in the old form,
-      or when it adds a gate to an entry whose Blocked by still holds the old form;
+      or when it adds a gate to an entry whose Blocked by still holds the old form; from v2.5 each gate
+      it adds that the entry did not carry is logged ``- <today>: gate added: <gate>`` in that order;
     - ``note`` (``words``): the Status's notes lifted into the Log (``status_notes_to_log``), then
       ``- <today>: <words>`` appended to it; refused for words that begin with a Log writer's prefix;
     - ``edit`` (``section``, ``words``): that named section's paragraphs replaced by ``words``, its lead
@@ -3810,7 +3837,10 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
       Blocked by, Part of and a Log ``filed by`` line's ``while``; a Blocked by that then names an id twice
       keeps its first copy (v2.4).
 
-    ``today`` is the caller's date, taken by note, archive and reopen only (none is read here): a date,
+    ``today`` is the caller's date, required by note, archive and reopen, and taken by set and edit (v2.5),
+    which require it only to date a gate: set's Blocked by adding one, or edit making a carried gate's
+    Event section a new or changed ``host-log`` check, which appends ``gate added: event (<name>)`` (none is
+    read here): a date,
     ``YYYY-MM-DD``, or an aware datetime, written as its UTC date; a naive datetime is refused. A writer
     that appends to the Log refuses one that is not the body's last section. Every edit is refused for an entry
     ``canonical()`` refuses, and unless the result reads back exactly the change meant — the id,
@@ -3822,10 +3852,10 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
                             ("pr", pr), ("pointer", pointer), ("as_is", as_is or None),
                             ("superseded_by", superseded_by), ("new", new), ("old", old),
                             ("dropped", dropped or None)) if v is not None}
-    stray = sorted(given - _ENTRY_ARGS[action]) + (["today"] if today is not None and action not in _DATED_ACTIONS else [])
+    stray = sorted(given - _ENTRY_ARGS[action]) + (["today"] if today is not None and action not in _TODAY_ACTIONS else [])
     if stray:
         raise Refused(f"{action} takes no {', '.join(stray)}")
-    day = utc_day(today, action) if action in _DATED_ACTIONS else ""
+    day = utc_day(today, action) if action in _DATED_ACTIONS or today is not None else ""
     m, header, body = _entry_parts(canonical(text))
     tid, title = m.group(1), m.group(3).strip()
     title_read = entries(canonical(text))[0]["title"]  # as the reader reads it: an HTML comment dropped
@@ -3845,7 +3875,21 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
                 continue
             value = _one_line(f"the {name} field", value)
             if field_key(name) == "blocked by":
-                value = _written_blocked(value, _value(header, "blocked by"))
+                current = _value(header, "blocked by")
+                value = _written_blocked(value, current)
+                was = parse_gates(current)
+                had = {_gate_key(x) for x in gate_items(was)} | (
+                    {_gate_key(f"decision ({was['old_form'][0]})")} if was["old_form"] else set())
+                added = []
+                for x in gate_items(parse_gates(value)):  # a gate named twice is logged once, as first written
+                    if _gate_key(x) not in had:
+                        had.add(_gate_key(x))
+                        added.append(x)
+                if added and not day:
+                    raise Refused(f"set adds {', '.join(added)}, which the Log dates — pass today (v2.5)")
+                if added:
+                    sections = _log_insert(sections, [(day, f"gate added: {x}") for x in added], by_date=False)
+                    body_changed = True
             fm = FIELD_RE.match(f"**{name}:** {value}")
             if not fm or fm.group(1) != name or fm.group(2) != value:
                 raise Refused(f"{name!r}: {value!r} would not read back as one field")
@@ -3871,6 +3915,7 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
         at = _keyed(sections, _section_key(name))
         if len(at) > 1:
             raise Refused(f"the body has {len(at)} sections named {name!r} — edit it by hand")
+        before = parse_event_section(sections[at[0]][1]) if at else None
         if at:
             sections[at[0]] = (sections[at[0]][0], f"**{sections[at[0]][0]}** {said}")
         else:
@@ -3878,6 +3923,15 @@ def edit_entry(text: str, action: str, *, today: date | str | None = None, field
             ends = sorted(_keyed(sections, "done when") + _keyed(sections, "related") + _keyed(sections, "log"))
             pos = why_at[0] + 1 if why_at else ends[0] if ends else len(sections)
             sections.insert(pos, (f"{name}:", f"**{name}:** {said}"))
+        after = parse_event_section(sections[at[0] if at else pos][1])
+        carried = parse_gates(_value(header, "blocked by"))["events"]
+        if after["name"] in carried and not after["problem"] and after["check"]["type"] == "host-log" and (
+                before is None or before["problem"] or before["check"]["type"] != "host-log"
+                or _host_log_key(before["check"]) != _host_log_key(after["check"])):  # a changed question: a new wait
+            gate = f"event ({after['name']})"
+            if not day:
+                raise Refused(f"edit makes {gate}'s host-log check a new wait, which the Log dates — pass today (v2.5)")
+            sections = _log_insert(sections, [(day, f"gate added: {gate}")], by_date=False)
         body_changed = True
     elif action == "archive":
         said = _one_line("the archive's why", why)
@@ -4172,6 +4226,16 @@ EVIDENCE_AT_RE = re.compile(rf"(?P<repo>{REPO})@(?P<sha>[0-9a-f]{{7,40}})")
 LOG_TOKEN_RE = re.compile(LOG_TOKEN)
 
 
+def _host_log_evidence_ok(ev: str, source: str) -> bool:
+    """A ``host-log`` lift's evidence (v2.5): a token of ``[A-Za-z0-9_.@/-]+``, the check's own source then ``/``
+    and an id holding no empty, ``.`` or ``..`` segment, or ``@`` and ``YYYYMMDDTHHMMSSZ`` (its shape, not the calendar)."""
+    if not LOG_TOKEN_RE.fullmatch(ev):
+        return False
+    if ev.startswith(f"{source}@"):
+        return bool(HOST_LOG_AT_RE.fullmatch(ev[len(source) + 1:]))
+    return ev.startswith(f"{source}/") and all(x not in ("", ".", "..") for x in ev[len(source) + 1:].split("/"))
+
+
 def _one_gate(gate: object) -> str:
     """``gate`` as the writers write it — ``decision (<person>)``, ``until YYYY-MM-DD`` or ``event (<name>)`` —
     or Refused."""
@@ -4272,9 +4336,11 @@ def lift_gate(text: str, gate: str, by: str, *, answer: str | None = None, evide
       board's `People:`) and ``answered_by`` ``any`` are passed, when it is anyone listed. Or ``override``
       (its why, required), when ``by`` may be any person: ``override: <why>``;
     - ``event (<name>)`` lifted by a person: ``answer``, with ``by`` on ``people``, which is then required;
-    - ``event (<name>)`` lifted by a host: ``evidence``, ``<repo>#<n>`` for a ``pr-merged`` check or
-      ``<repo>@<sha>`` for the others, of the check's own repo (and PR), the check type read from the entry's
-      Event section; ``by`` is the host's token;
+    - ``event (<name>)`` lifted by a host: ``evidence``, ``<repo>#<n>`` for a ``pr-merged`` check,
+      ``<repo>@<sha>`` for ``file-contains`` and ``ref-includes``, of the check's own repo (and PR), or (v2.5)
+      for ``host-log`` the check's own source then ``/`` and the record's id (no empty, ``.`` or ``..``
+      segment) or ``@`` and its UTC time as ``YYYYMMDDTHHMMSSZ``; the check type read from the entry's Event
+      section; ``by`` is the host's token;
     - ``until D``: none of them; ``today`` (the UTC date) must have reached D.
 
     An emptied Blocked by is removed; the Log line carries the gate as the entry wrote it and ``by`` as given."""
@@ -4349,6 +4415,12 @@ def lift_gate(text: str, gate: str, by: str, *, answer: str | None = None, evide
         if chk is None:
             raise Refused(f"the entry has no readable **Event ({name}):** section to say which check passed")
         ev = " ".join(str(evidence).split())
+        if chk["type"] == "host-log":
+            if not _host_log_evidence_ok(ev, chk["source"]):
+                raise Refused(f"a host-log check's evidence is {chk['source']}/<record id> or "
+                              f"{chk['source']}@<YYYYMMDDTHHMMSSZ>, of its own source, not {evidence!r}")
+            written, value = _without(text, gate)
+            return _logged(text, "lift", value, [f"gate lifted: {written} — by {by}; host-log passed; {ev}"], day)
         m = (EVIDENCE_PR_RE if chk["type"] == "pr-merged" else EVIDENCE_AT_RE).fullmatch(ev)
         want = "<repo>#<n>, the merged PR" if chk["type"] == "pr-merged" else "<repo>@<sha>, where it was read"
         if not m or m.group("repo").lower() != chk["repo"].lower() \
@@ -4510,13 +4582,18 @@ CHECK_LINE_RE = re.compile(r"^check:[ \t]+(?P<check>\S.*?)[ \t]*$")
 # The check types (SPEC *Events*): each type's arguments, as written after its name. A new type states
 # its four outcomes (CHECK_OUTCOMES) in SPEC and comes in a format PR.
 CHECK_TYPES = {"pr-merged": "<repo>#<n>", "file-contains": '<repo>[@<ref>] <path> "<text>"',
-               "ref-includes": "<repo>@<ref> <commit>"}
+               "ref-includes": "<repo>@<ref> <commit>",
+               "host-log": '<source> [kind <kind>] [times <N>] "<text>"'}  # v2.5: answered by a host's reader
 CHECK_OUTCOMES = ("passed", "not yet", "impossible", "error")
 CHECK_N_RE = re.compile(r"[0-9]{1,18}")  # a forge's PR number; capped, so int() never meets a giant
 CHECK_COMMIT_RE = re.compile(r"[0-9a-f]{7,40}")
 REF_BAD_CHARS = set("~^:?*[\\ #%&=+")  # git's, revision syntax's, and URL or query syntax in a forge API call
 PATH_BAD_CHARS = set('*?[]#%"\\')  # a glob character, URL syntax in a forge path, the text's quote, a backslash
 CHECK_ARG_SEP_RE = re.compile(r"[ \t]+")  # arguments are separated by spaces and tabs, never other whitespace
+HOST_LOG_TOKEN_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")  # a host-log source or kind (v2.5): a name, never a path
+HOST_LOG_TIMES_RE = re.compile(r"[1-9][0-9]{0,2}")  # a host-log count: 1 to 999, no leading zero
+HOST_LOG_AT_RE = re.compile(r"[0-9]{8}T[0-9]{6}Z")  # a host-log evidence's time, YYYYMMDDTHHMMSSZ (its shape only)
+HOST_LOG_ID_MAX = 80  # the longest record id the evidence carries; a longer one falls back to the record's time
 
 
 def _ref_problem(ref: str) -> str | None:
@@ -4568,7 +4645,8 @@ def _repo_problem(repo: str) -> str | None:
 def parse_check(value: str) -> dict:
     """One ``check:`` line's value read (v2.4, SPEC *Events*): ``{type, repo, …, problem}``. By type:
     ``pr-merged`` gives ``n`` (an int); ``file-contains`` ``ref`` (None: the default branch), ``path`` and
-    ``text``; ``ref-includes`` ``ref`` and ``commit``. ``problem`` is None, or why ``check()`` refuses
+    ``text``; ``ref-includes`` ``ref`` and ``commit``; ``host-log`` (v2.5, no ``repo``) ``source``, ``kind`` (None
+    when absent), ``times`` (an int, 1 when absent) and ``text``. ``problem`` is None, or why ``check()`` refuses
     it: an unknown type, a missing or extra argument, or an argument outside its confinement. Arguments
     are separated by spaces; the text runs from its opening ``"`` to the line's last ``"`` and nothing
     follows it. Text is matched literally by the host, never as a pattern."""
@@ -4582,10 +4660,10 @@ def parse_check(value: str) -> dict:
     if kind not in CHECK_TYPES:
         return bad(f"unknown check type {kind!r} — one of {', '.join(CHECK_TYPES)}")
     text = None
-    if kind == "file-contains":
+    if kind in ("file-contains", "host-log"):  # the two types whose last argument is quoted text
         q = rest.find('"')
         if q < 0 or rest.rfind('"') == q:
-            return bad('file-contains needs its text in quotes: file-contains <repo>[@<ref>] <path> "<text>"')
+            return bad(f'{kind} needs its text in quotes: {kind} {CHECK_TYPES[kind]}')
         if rest[rest.rfind('"') + 1:].strip(" \t"):
             return bad("nothing may follow the quoted text")
         if not rest[:q].endswith((" ", "\t")):
@@ -4596,6 +4674,8 @@ def parse_check(value: str) -> dict:
         if any(c < " " or c == "\x7f" for c in text):
             return bad("the quoted text holds a control character")
     args = [a for a in CHECK_ARG_SEP_RE.split(rest) if a]
+    if kind == "host-log":
+        return _host_log_args(out, args, text)
     want = {"pr-merged": 1, "file-contains": 2, "ref-includes": 2}[kind]
     if len(args) != want:
         return bad(f"{kind} takes {CHECK_TYPES[kind]}")
@@ -4622,6 +4702,33 @@ def parse_check(value: str) -> dict:
     out["commit"] = args[1]
     if not CHECK_COMMIT_RE.fullmatch(args[1]):
         return bad(f"the commit {args[1]!r} is not 7 to 40 of [0-9a-f]")
+    return out
+
+
+def _host_log_args(out: dict, args: list[str], text: str) -> dict:
+    """A ``host-log`` check's arguments before its text (v2.5): the source, then optionally ``kind`` and its token,
+    then optionally ``times`` and its count, in that order — one, three or five tokens."""
+    out.update(source=args[0] if args else None, kind=None, times=1, text=text)
+    shape = f"host-log takes {CHECK_TYPES['host-log']}"
+    if len(args) not in (1, 3, 5):
+        out["problem"] = shape
+        return out
+    if not HOST_LOG_TOKEN_RE.fullmatch(args[0]):
+        out["problem"] = f"the source {args[0]!r} is not 1 to 40 of [a-z0-9-], not starting with - (a name, never a path)"
+        return out
+    rest = args[1:]
+    if rest and rest[0] == "kind":
+        if not HOST_LOG_TOKEN_RE.fullmatch(rest[1]):
+            out["problem"] = f"the kind {rest[1]!r} is not 1 to 40 of [a-z0-9-], not starting with -"
+            return out
+        out["kind"], rest = rest[1], rest[2:]
+    if rest and rest[0] == "times":
+        if not HOST_LOG_TIMES_RE.fullmatch(rest[1]):
+            out["problem"] = f"the count {rest[1]!r} is not 1 to 999, with no leading zero"
+            return out
+        out["times"], rest = int(rest[1]), rest[2:]
+    if rest:
+        out["problem"] = f"{shape}: kind, then times, each once, in that order"
     return out
 
 
@@ -4676,11 +4783,15 @@ def event_sections(text: str) -> list[dict]:
             if lead is not None and EVENT_NEAR_RE.match(lead)]
 
 
-def event_problems(text: str) -> list[tuple[str, str, str]]:
+def event_problems(text: str, old_text: str | None = None, today: date | str | None = None
+                   ) -> list[tuple[str, str, str]]:
     """What ``check()`` says of one open entry's events (v2.4, SPEC *Events*): [(level, kind, sentence)].
     ``event-section`` (error): an ``event (<name>)`` gate with no section, or two sections of one name;
     ``event-check`` (error): a section ``parse_event_section()`` refuses; ``event-ungated`` (info): a
-    section whose gate is gone with no ``gate lifted: event (<name>)`` Log line to say why."""
+    section whose gate is gone with no ``gate lifted: event (<name>)`` Log line to say why; ``event-undated``
+    (error, v2.5): a gate whose section's check is ``host-log`` with no ``gate added`` day (``gate_added()``),
+    or, given ``old_text`` (the entry before an edit, ``""`` for none) and ``today``, whose wait the edit
+    changed and did not date anew (SPEC *Events*)."""
     found = entries(text)
     gates = parse_gates(found[0]["blocked_raw"])["events"] if found else []
     secs = event_sections(text)
@@ -4707,7 +4818,115 @@ def event_problems(text: str) -> list[tuple[str, str, str]]:
         if x["name"] not in gates and f"event ({x['name']})" not in lifted:
             out.append(("info", "event-ungated", f"its **Event ({x['name']}):** section has no event "
                         f"({x['name']}) gate, and no gate lifted: event ({x['name']}) Log line says why"))
+    for n in dict.fromkeys(gates):
+        chk = _host_log_check(secs, n)
+        if chk is None:
+            continue
+        gate = f"event ({n})"
+        if gate_added(text, gate) is None:
+            out.append(("error", "event-undated", f"its {gate} gate's host-log check has no gate added: {gate} Log "
+                        "line to count from (none, or a gate lifted after the last)"))
+        elif old_text is not None and today is not None and _wait_changed(old_text, n, chk) \
+                and not _dated_anew(old_text, text, gate, utc_day(today, "today")):
+            out.append(("error", "event-undated", f"its {gate} gate's host-log wait is new or changed, and no "
+                        f"gate added: {gate} Log line dated today dates it anew"))
     return out
+
+
+def _host_log_check(secs: list[dict], name: str) -> dict | None:
+    """The ``host-log`` check of the one readable ``**Event (<name>):**`` section, as ``lift_gate`` reads it, or None."""
+    mine = [x for x in secs if x["name"] == name]
+    if len(mine) != 1 or mine[0]["problem"] or mine[0]["check"] is None or mine[0]["check"]["type"] != "host-log":
+        return None
+    return mine[0]["check"]
+
+
+def _host_log_key(chk: dict) -> tuple:
+    return chk["source"], chk["kind"], chk["times"], chk["text"]
+
+
+def _wait_changed(old_text: str, name: str, chk: dict) -> bool:
+    """Whether, against the entry's old text, ``event (<name>)`` is newly carried, or its ``host-log`` check is new,
+    became ``host-log`` or changed its source, kind, count or text (v2.5): spacing alone is no change."""
+    found = entries(old_text) if old_text else []
+    if not found or name not in parse_gates(found[0]["blocked_raw"])["events"]:
+        return True
+    was = _host_log_check(event_sections(old_text), name)
+    return was is None or _host_log_key(was) != _host_log_key(chk)
+
+
+def _dated_anew(old_text: str, text: str, gate: str, today: str) -> bool:
+    """A changed wait dated anew (v2.5, SPEC *Events*): (a) the gate's ``gate added`` lines in the new Log, as
+    (date, gate) pairs in Log order, are its old ones followed by at least one more, the last dated L; (b) floor
+    ≤ L ≤ today, the floor the old Log's latest readable date, else the entry's Added date, else none, lowered
+    to today when after it; (c) with an old ``gate added`` line for the gate (the last dated P), L is today or
+    after P. An old or new Log that cannot be read is never dated anew."""
+    key = _gate_key(gate)
+    try:
+        old_recs = log_lines(old_text) if old_text and entries(old_text) else []
+        new_recs = log_lines(text)
+    except Refused:
+        return False
+
+    def added(recs: list[dict]) -> list[tuple[str, str]]:
+        return [(r["date"], key) for r in recs if r["kind"] == "gate-added" and _gate_key(r["gate"]) == key]
+    was, now = added(old_recs), added(new_recs)
+    if len(now) <= len(was) or now[:len(was)] != was:
+        return False
+    last = now[-1][0]
+    dates = [r["date"] for r in old_recs if r["date"] is not None]
+    if dates:
+        floor = max(dates)
+    else:
+        m = ISO_DAY_RE.search(_value(_entry_parts(text)[1], "added") or "")
+        floor = m.group(0) if m else None
+    if floor is not None and floor > today:
+        floor = today
+    if (floor is not None and last < floor) or last > today:
+        return False
+    return not was or last == today or last > was[-1][0]
+
+
+def first_instant(since: date | str) -> datetime:
+    """The first instant a ``host-log`` check counts (v2.5, SPEC *Host-log checks*): 00:00 UTC of the day after
+    ``since`` (``gate_added()``'s date, or ``YYYY-MM-DD``), an aware datetime."""
+    day = date.fromisoformat(utc_day(since, "since"))
+    return datetime(day.year, day.month, day.day, tzinfo=timezone.utc) + timedelta(days=1)
+
+
+def _host_log_token(source: str, rec: Mapping) -> str:
+    rid = rec.get("id")
+    if isinstance(rid, str) and len(rid) <= HOST_LOG_ID_MAX and _host_log_evidence_ok(f"{source}/{rid}", source):
+        return f"{source}/{rid}"
+    return f"{source}@{rec['at'].astimezone(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+
+
+def count_host_log(records: Iterable[Mapping], chk: Mapping, since: date | str, *, public_only: bool) -> dict:
+    """A ``host-log`` check counted over the records a reader yields (v2.5, SPEC *Host-log checks*):
+    ``{"outcome": "passed" | "not yet", "count", "evidence"}``. A record ``{at, kind, text, id, public}`` counts when
+    ``at`` is at or after ``first_instant(since)``, its ``kind`` equals the check's (when it names one), its
+    ``text`` (a string) contains the check's text, and, with ``public_only``, ``public`` is true. ``count`` is
+    every counted record; passed when it reaches the check's ``times``, the evidence the N-th by ``at``, then
+    ``id`` (none first). Refused: ``chk`` not a ``host-log`` record without a problem, a record whose ``at`` is
+    not an aware datetime. Reading errors are the reader's, which this cannot see."""
+    if not isinstance(chk, Mapping) or chk.get("type") != "host-log" or chk.get("problem"):
+        raise Refused("count_host_log takes parse_check()'s record of a host-log check with no problem")
+    start = first_instant(since)
+    counted = []
+    for rec in records:
+        at = rec.get("at")
+        if not isinstance(at, datetime) or at.tzinfo is None or at.utcoffset() is None:
+            raise Refused(f"a record's at is an aware datetime, not {at!r}")
+        txt = rec.get("text")
+        if (at >= start and isinstance(txt, str) and chk["text"] in txt
+                and (chk["kind"] is None or rec.get("kind") == chk["kind"])
+                and (not public_only or rec.get("public") is True)):
+            counted.append(rec)
+    counted.sort(key=lambda r: (r["at"], (0, "") if r.get("id") is None else (1, str(r.get("id")))))
+    n = chk["times"]
+    passed = len(counted) >= n
+    return {"outcome": "passed" if passed else "not yet", "count": len(counted),
+            "evidence": _host_log_token(chk["source"], counted[n - 1]) if passed else None}
 
 
 # ---------------------------------------------------------------------------------------------

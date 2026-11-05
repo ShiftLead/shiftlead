@@ -165,3 +165,17 @@ Ledgerboard: 2
 - 2026-10-10: gate lifted: decision (kim) — by kim; answer "Go"; board acme/other
 - 2026-10-12: gate added: decision (kim)
 - 2026-10-20: gate lifted: decision (kim) — by kim; answer "Go"; board acme/other
+
+## TD-222: A host-log event whose check passed (v2.5)
+
+**Priority:** Low
+**Added:** 2026-10-01
+**Status:** Open
+**Blocked by:** event (iota-ready)
+
+## TD-223: A host-log event no host answers, with a broken-check item open (v2.5)
+
+**Priority:** Low
+**Added:** 2026-10-01
+**Status:** Open
+**Blocked by:** event (kappa-ready)

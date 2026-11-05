@@ -286,6 +286,30 @@
   "event_host_file": {
    "ok": "## TD-531: Waits on a line in another repo's file\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n**Blocked by:** TD-9, until 2026-03-01\n\n**Why:** the pin must move first.\n\n**Event (pin-bumped):** the consumer pins the new release.\ncheck: file-contains acme/app docs/pin.toml \"version = 2.4\"\n\n**Log:**\n- 2026-01-15: gate lifted: event (pin-bumped) — by box-1; file-contains passed; Acme/App@0123abc\n"
   },
+  "event_host_log_colon_refused": {
+   "refused": "a host-log check's evidence is team-events/<record id> or team-events@<YYYYMMDDTHHMMSSZ>, of its own source, not 'x:y'"
+  },
+  "event_host_log_dotdot_refused": {
+   "refused": "a host-log check's evidence is team-events/<record id> or team-events@<YYYYMMDDTHHMMSSZ>, of its own source, not 'team-events/../x'"
+  },
+  "event_host_log_id": {
+   "ok": "## TD-532: Waits on a message the host witnesses\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n\n**Why:** the docs team must say the page is ready.\n\n**Event (docs-message):** the docs team's message that the page is ready.\ncheck: host-log team-events kind msg \"x\"\n\n**Log:**\n- 2026-01-05: gate added: event (docs-message)\n- 2026-01-15: gate lifted: event (docs-message) — by box-1; host-log passed; team-events/rec-0042\n"
+  },
+  "event_host_log_no_source_refused": {
+   "refused": "a host-log check's evidence is team-events/<record id> or team-events@<YYYYMMDDTHHMMSSZ>, of its own source, not 'rec-0042'"
+  },
+  "event_host_log_not_a_time_refused": {
+   "refused": "a host-log check's evidence is team-events/<record id> or team-events@<YYYYMMDDTHHMMSSZ>, of its own source, not 'team-events@banana'"
+  },
+  "event_host_log_other_source_refused": {
+   "refused": "a host-log check's evidence is team-events/<record id> or team-events@<YYYYMMDDTHHMMSSZ>, of its own source, not 'syslog/rec-0042'"
+  },
+  "event_host_log_space_refused": {
+   "refused": "a host-log check's evidence is team-events/<record id> or team-events@<YYYYMMDDTHHMMSSZ>, of its own source, not 'a b'"
+  },
+  "event_host_log_time": {
+   "ok": "## TD-532: Waits on a message the host witnesses\n\n**Priority:** Low\n**Type:** debt\n**Added:** 2026-01-05\n**Status:** Open\n\n**Why:** the docs team must say the page is ready.\n\n**Event (docs-message):** the docs team's message that the page is ready.\ncheck: host-log team-events kind msg \"x\"\n\n**Log:**\n- 2026-01-05: gate added: event (docs-message)\n- 2026-01-15: gate lifted: event (docs-message) — by box-1; host-log passed; team-events@20260116T093000Z\n"
+  },
   "event_host_other_pr_refused": {
    "refused": "a pr-merged check's evidence is <repo>#<n>, the merged PR of its own check, not 'acme/tools#43'"
   },

@@ -5,7 +5,8 @@
 # Copies, from ShiftLead/ledgerboard at <tag> (v2.3 or later: the package):
 #   ledgerboard/*.py -> src/sessionorc/ledgerboard/   (the wheel's copy: container nodes have no scripts/)
 #   fixtures/        -> tests/ledgerboard/            (tooling: never synced)
-# and writes tests/ledgerboard/MANIFEST (the tag, its commit, a sha256 per file). The package also
+# and writes tests/ledgerboard.vendored (the tag, its commit, a sha256 per file), beside the fixtures and not
+# in them: from v2.5 the release's own fixtures/MANIFEST is checked by its run.py, so it stays as shipped (TD-1415). The package also
 # ships in agent-cadence, and this repo runs the pinned tree's (`docs/cadence.toml`'s [agent-cadence],
 # TD-129; `agent-cadence path scripts/ledgerboard/__init__.py`) — run this in the agent-cadence bump PR
 # that brings a new release, with the tag the pinned copy's header names, so
@@ -45,8 +46,8 @@ cp -R "$TMP/fixtures" "$ROOT/tests/ledgerboard"
     echo "# Written by scripts/vendor_ledgerboard.sh — do not edit by hand."
     echo "tag: $tag"
     echo "commit: $commit"
-    (cd "$ROOT" && find src/sessionorc/ledgerboard tests/ledgerboard -type f ! -name MANIFEST ! -path '*/__pycache__/*' | LC_ALL=C sort \
+    (cd "$ROOT" && find src/sessionorc/ledgerboard tests/ledgerboard -type f ! -path '*/__pycache__/*' | LC_ALL=C sort \
         | while read -r f; do echo "file: $f $(sha256sum "$f" | cut -d' ' -f1)"; done)
-} > "$ROOT/tests/ledgerboard/MANIFEST"
+} > "$ROOT/tests/ledgerboard.vendored"
 python3 "$ROOT/tests/ledgerboard/run.py" --module "$ROOT/src/sessionorc/ledgerboard"
 echo "vendored ledgerboard $tag ($commit) into the wheel — commit it with the agent-cadence bump PR that brought it"

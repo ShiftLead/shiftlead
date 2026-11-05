@@ -3,7 +3,8 @@
   "TD-201",
   "TD-202",
   "TD-204",
-  "TD-205"
+  "TD-205",
+  "TD-206"
  ],
  "check": [
   {
@@ -60,7 +61,7 @@
    "kind": "event-check",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-205: its **Event (unknown):** section: its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes"
+   "text": "⚠ TD-205: its **Event (unknown):** section: its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes, host-log"
   },
   {
    "field": "event",
@@ -85,6 +86,22 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-205: its **Event (Bad-Name):** section: the event name 'Bad-Name' is not [a-z0-9-]+"
+  },
+  {
+   "field": "event",
+   "id": "TD-206",
+   "kind": "event-undated",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-206: its event (undated) gate's host-log check has no gate added: event (undated) Log line to count from (none, or a gate lifted after the last)"
+  },
+  {
+   "field": "event",
+   "id": "TD-206",
+   "kind": "event-undated",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-206: its event (readded) gate's host-log check has no gate added: event (readded) Log line to count from (none, or a gate lifted after the last)"
   }
  ],
  "check_since_empty": [
@@ -142,7 +159,7 @@
    "kind": "event-check",
    "level": "error",
    "standing": false,
-   "text": "⚠ TD-205: its **Event (unknown):** section: its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes"
+   "text": "⚠ TD-205: its **Event (unknown):** section: its check: unknown check type 'url-up' — one of pr-merged, file-contains, ref-includes, host-log"
   },
   {
    "field": "event",
@@ -167,6 +184,22 @@
    "level": "error",
    "standing": false,
    "text": "⚠ TD-205: its **Event (Bad-Name):** section: the event name 'Bad-Name' is not [a-z0-9-]+"
+  },
+  {
+   "field": "event",
+   "id": "TD-206",
+   "kind": "event-undated",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-206: its event (undated) gate's host-log check has no gate added: event (undated) Log line to count from (none, or a gate lifted after the last)"
+  },
+  {
+   "field": "event",
+   "id": "TD-206",
+   "kind": "event-undated",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-206: its event (readded) gate's host-log check has no gate added: event (readded) Log line to count from (none, or a gate lifted after the last)"
   }
  ],
  "declared": {},
@@ -272,6 +305,30 @@
    "pickable": false,
    "priority": "Low",
    "title": "Sections the reader refuses",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "event (dated)",
+    "event (undated)",
+    "event (readded)",
+    "event (merged)"
+   ],
+   "card_key": "3|0|000206",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-10",
+    "blocked by": "event (dated), event (undated), event (readded), event (merged)",
+    "priority": "Low"
+   },
+   "id": "TD-206",
+   "key": "3|0|000206",
+   "part_of": null,
+   "parts_gates": {},
+   "parts_open": [],
+   "pickable": false,
+   "priority": "Low",
+   "title": "Host-log gates, dated and not (v2.5)",
    "type": "debt"
   }
  ],
