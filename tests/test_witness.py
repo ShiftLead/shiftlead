@@ -463,6 +463,8 @@ def test_ao_host_log_exits_0_1_and_2(monkeypatch, capsys):
 
     def call(method, **kw):
         asked.append((method, kw))
+        if kw["kind"] == "down":
+            raise cli.AgentUnavailable("no host agent")
         if kw["kind"] == "msg":
             raise AgentError("host_log: 'msg' is not a witness kind (precheck-fail, press)")
         return {"count": 1, "covers_from": "2026-11-01T00:00:00Z", "records": [rec]}
@@ -486,6 +488,8 @@ def test_ao_host_log_exits_0_1_and_2(monkeypatch, capsys):
     assert asked[-1][1]["repo"] == "shiftlead"
     assert run("msg", "--since", "2026-11-04") == 2
     assert run("press") == 2, "--since is required"
+    monkeypatch.setattr(cli, "_agent_answers", lambda: False)
+    assert run("down", "--since", "2026-11-04") == 3, "a host agent that is down exits 3, never 2 (refused)"
     capsys.readouterr()
     assert run("--kinds") == 0 and "precheck-fail  (public)" in capsys.readouterr().out
     assert run("press", "--since", "2026-11-04", "--json") == 0

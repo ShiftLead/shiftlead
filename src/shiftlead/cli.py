@@ -2659,6 +2659,8 @@ def cmd_host_log(args: argparse.Namespace) -> int:
     after = datetime(day.year, day.month, day.day, tzinfo=UTC).isoformat()
     try:
         got = call_sync("host_log", kind=args.kind, text=args.text or "", after=after, repo=args.repo)
+    except AgentUnavailable:
+        raise  # a host agent that is down exits 3 as every ao call (§4.7), never 2 (refused)
     except AgentError as e:
         return fail(args, str(e), 2)
     count = int(got.get("count") or 0)
