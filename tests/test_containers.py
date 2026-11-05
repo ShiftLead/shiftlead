@@ -27,10 +27,16 @@ def _writable_after(tmp_path):
     here leaves trees read-only as the launcher does (`0o555`), and a directory left so makes pytest's base-temp
     cleanup fail into a `garbage-*` directory, which a person's `rm -rf` cannot remove either."""
     yield
-    for d, _, _ in os.walk(tmp_path, onerror=None):
-        p = Path(d)
-        if not p.is_symlink() and not os.access(p, os.W_OK | os.X_OK):
-            os.chmod(p, 0o755)
+
+    def restore(d: Path) -> None:  # made writable before it is listed, so a `0o000` one is walked too
+        if d.is_symlink() or not d.is_dir():
+            return
+        if not os.access(d, os.R_OK | os.W_OK | os.X_OK):
+            os.chmod(d, 0o755)
+        for child in d.iterdir():
+            restore(child)
+
+    restore(tmp_path)
 
 
 # contractmatch's `.devcontainer/devcontainer.json`, in shape: a build with relative paths, a remote
