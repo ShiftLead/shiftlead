@@ -282,7 +282,8 @@ def test_the_page_kinds_in_order():
 
 def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_no_case_of_its_own():
     """TD-367/TD-368, design §4.4 *Repo facts* and §6 rule 6: *for you* is a `decision (paul)`, any case —
-    `Owner: paul` alone holds nothing (TD-1375), so an evaluation the person owns is an *evaluation*; a decision owed to the designer is `Kind: design-first`, so a build on
+    `Owner: paul` alone holds nothing (TD-1375), so an evaluation the person owns is an *evaluation*; a
+    decision owed to the designer is `Kind: design-first`, so a build on
     `decision (designer)` is *other* like any decision not the person's (TD-1296); a `Kind: decision`
     that is not the person's and a build on `decision (anchor)` are *other* since the anchor seat is
     retired (TD-757), and in no grinder or designer lane."""

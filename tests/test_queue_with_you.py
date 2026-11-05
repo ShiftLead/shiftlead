@@ -29,7 +29,8 @@ def _one(tmp_path, **fields: str):
 
 
 def test_the_persons_own_session_on_their_decision_reads_with_you_and_the_card_ready(tmp_path):
-    for fields, need in (({"Blocked_by": "decision (paul)"}, "decision"), ({"Owner": "paul", "Blocked_by": "decision (paul)"}, "owner")):
+    gated = {"Blocked_by": "decision (paul)"}
+    for fields, need in ((gated, "decision"), ({"Owner": "paul", **gated}, "owner")):
         sub = tmp_path / need
         sub.mkdir()
         root, r = _one(sub, **fields)
