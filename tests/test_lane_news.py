@@ -548,6 +548,63 @@ async def test_a_decided_line_a_live_sibling_holds_is_seen_untold_and_its_drop_i
             await person.call("kill", id=s)
 
 
+async def test_a_work_order_the_member_closed_is_no_news_until_a_reading_after_the_close_still_holds_it(
+    agent, tmp_path
+):
+    """TD-1389 (design §6 rule 6): a member that reported `done board:<key>` — or `done` on a red PR's
+    order, by its ref or its `pr` — and declared out of work, while the reading holding the order was
+    taken before that `done`, is told nothing, and the order stays out of `lane_seen`; a reading taken
+    after the `done` that still holds it (the close did not land) is told once."""
+    from sessionorc import workorders
+
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+
+    def z(t: datetime) -> str:
+        return t.isoformat().replace("+00:00", "Z")
+
+    line, red, other = (
+        workorders.entry({"id": i, "title": i, "decided": {"text": "go"}}) for i in ("board:aa", "pr:7", "board:bb")
+    )
+    async with LocalClient() as person:
+        sid = await _finished(agent, person, tmp_path, "w", ["free-pick"], [_e("TD-001")])
+        rec = agent.sessions[sid]
+        closed = z(now - timedelta(minutes=1))
+        rec.progress = [
+            ProgressEntry(ref="board:aa", status="done", pr=6, at=closed),
+            ProgressEntry(ref="TD-001", status="done", pr=7, at=closed),
+            ProgressEntry(ref="board:bb", status="done", at="never"),
+        ]
+        before = z(now - timedelta(minutes=2))
+        facts = agent._repos[str(tmp_path)]
+        facts.update(
+            work_orders={"orders": [line, other], "at": before},
+            prs={"open": [], "at": before},
+            pr_orders={"orders": [red]},
+        )
+        await agent._lane_news(rec, now)
+        notes = _notes(agent, sid)
+        assert len(notes) == 1 and "board:bb —" in notes[0], "a done whose instant cannot be read is none"
+        assert "board:aa" not in notes[0] and "pr:7" not in notes[0]
+        assert rec.lane_seen["ids"] == ["TD-001", "board:bb"], "untold and unseen"
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        assert len(_notes(agent, sid)) == 1, "the same reading: still no news"
+        facts["prs"] = {"open": [], "at": z(now)}
+        await agent._lane_news(rec, now + timedelta(minutes=2))
+        assert (
+            len(_notes(agent, sid)) == 2
+            and "pr:7 —" in _notes(agent, sid)[1]
+            and "board:aa" not in _notes(agent, sid)[1]
+        ), "a PR reading after the done that still holds it is news; the board's is still older"
+        facts["work_orders"] = {**facts["work_orders"], "at": z(now)}
+        await agent._lane_news(rec, now + timedelta(minutes=3))
+        assert len(_notes(agent, sid)) == 3 and "board:aa —" in _notes(agent, sid)[2]
+        await agent._lane_news(rec, now + timedelta(minutes=4))
+        assert len(_notes(agent, sid)) == 3, "told once"
+        assert rec.lane_seen["ids"] == ["TD-001", "board:bb", "pr:7", "board:aa"]
+        await person.call("kill", id=sid)
+
+
 async def test_an_entry_still_settling_is_told_only_once_it_settles(agent, tmp_path):
     """TD-710, §4.4 *A new entry settles before it is pickable*: the home marks an entry `settling` in the
     reading, and rule 6 reads the mark as no lane's, so the news waits for it to settle."""

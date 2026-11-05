@@ -1780,6 +1780,10 @@ class TickMixin:
         if pruned is not s.lane_seen:
             s.lane_seen = pruned
             self._save(s)
+        # a work order the member itself closed is no news while the reading that holds it predates the
+        # close (TD-1389): untold and unseen, so a reading after the `done` that still holds it is told
+        closed = self._closed_untold(s, new, facts)
+        new = [i for i in new if i not in closed]
         seen = set(s.lane_seen.get("ids") or [])
         drops = self._lane_drops(s, [i for i in ids if i in seen])
         if not (new or drops) or s.state in ("exited", "closed") or s.suspended:
@@ -1813,6 +1817,41 @@ class TickMixin:
         )
         self._save(s)
         log.info("%s: told of %s new in its lane", self._address(s), count)
+
+    @staticmethod
+    def _closed_untold(s: Session, ids: list[str], facts: Mapping[str, Any]) -> set[str]:
+        """Of `ids`, the work orders `s` itself reported `done` (design §6 rule 6, TD-1389) whose reading was
+        taken no later than that `done` — a `board:<key>` the board reading's `work_orders.at`, a `pr:<n>`
+        the PR reading's `prs.at` (a `done` naming the PR in its `pr` counts too) — so the line or PR the
+        member just closed, still in a reading up to `REPOS_EVERY` old, is not told back to it as news. A
+        reading with no instant predates every `done`; a `done` whose instant cannot be read is none."""
+
+        def instant(v: Any) -> datetime | None:
+            try:
+                at = _parse(str(v))
+            except (ValueError, TypeError):
+                return None
+            return at if at.tzinfo else at.replace(tzinfo=UTC)
+
+        board_at = instant((facts.get("work_orders") or {}).get("at"))
+        prs_at = instant((facts.get("prs") or {}).get("at"))
+        out: set[str] = set()
+        for i in ids:
+            if i.startswith(workorders.PREFIX):
+                read, n = board_at, None
+            elif i.startswith(workorders.PR_PREFIX):
+                read, n = prs_at, i[len(workorders.PR_PREFIX) :]
+            else:
+                continue
+            done = [
+                at
+                for e in s.progress
+                if e.status == "done" and (e.ref == i or (n is not None and str(e.pr) == n))
+                if (at := instant(e.at)) is not None
+            ]
+            if done and (read is None or read <= max(done)):
+                out.add(i)
+        return out
 
     def _ledger_then(self, s: Session, root: str, rel: str, at: datetime) -> tuple[Any, str, Any]:
         """The ledger's entries as `origin/<default>` held them before `at`, what was read, and its tip read as
