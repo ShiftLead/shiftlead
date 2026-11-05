@@ -245,3 +245,13 @@ def test_answered_hold_reads_no_board_where_its_caller_passes_none(tmp_path):
     got = queue.answered_hold(e, [], {}, {"r#TD-001": "r#TD-001"}, NOW, boards={"r": r["boards"]["boards"]})
     assert got is not None and got["asker"] == "a pick"
     assert ledger.decided_by(e, "paul")
+
+
+@pytest.mark.unit
+def test_the_orders_holder_names_the_wait_before_a_covered_members_holder(tmp_path):
+    root, r = _setup(tmp_path, [_entry(1, "the held one", **HELD)], _open("TD-001"))
+    key = r["boards"]["boards"][0]["items"][0]["key"]
+    member, order = _worker("ao-r-alpha", "TD-001"), _worker("ao-r-zulu", key)
+    for rec in (member, order):
+        rec.repo = rec.dir = root
+    assert _row(_read({root: r}, [member, order]), "r#TD-001")["state"] == "answered — waiting on zulu"
