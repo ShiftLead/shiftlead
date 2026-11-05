@@ -220,12 +220,96 @@ def test_a_check_with_no_answer_is_left_out_and_a_failed_check_run_is_no_reading
     )
 
 
-def test_another_repos_board_is_left_for_the_second_slice(repo, tmp_path):
+@pytest.fixture
+def other(repo, tmp_path):
+    """`repo` with no `People:` on its own board, and a second registered repo `x` whose board names the person:
+    sweep() files `r`'s uncovered person gate there (TD-229)."""
     root, _ = repo
-    p = {"own": "r", "base": "origin/main", "lifts": [], "to_file": {"github.com/o/x": [{}]}, "to_close": {}}
+    (root / "docs" / "user_attention.md").write_text("# Needs\n\n## Needs the user\n\n")
+    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qam", "no people")
+    _git("-C", str(root), "push", "-q", "origin", "main")
+    x = tmp_path / "x"
+    (x / "docs").mkdir(parents=True)
+    (x / "docs" / "user_attention.md").write_text(BOARD)
+    _git("init", "-q", "-b", "main", str(x))
+    _git("-C", str(x), "add", "-A")
+    _git("-C", str(x), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "seed")
+    with_origin(x)
+    return root, x
+
+
+def _forge(root: Path) -> dict:
+    return json.loads((root.parent / f"{root.name}-origin.git" / "fake-gh.json").read_text())
+
+
+def _set_forge(root: Path, **kw) -> None:
+    f = root.parent / f"{root.name}-origin.git" / "fake-gh.json"
+    state = json.loads(f.read_text()) if f.exists() else {"prs": {}}
+    f.write_text(json.dumps({**state, **kw}))
+
+
+def test_another_repos_board_gets_one_notices_pr_there_with_qualified_ids(other):
+    root, x = other
+    got, why = gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    assert why is None, why
+    (line,) = [a for a in got["applied"] if a.startswith("board ") and "x" in a.split(":")[0]]
+    assert line.endswith("opened https://github.com/o/r/pull/1"), got["applied"]
+    slug = got["repo"].replace("/", "-").strip("-")
+    (pr,) = _forge(x)["prs"].values()
+    assert pr["head"] == f"notices/{slug}-sweep-{UTC.isoformat()}"
+    assert pr["state"] == "open", "opened there, merged by none"
+    board = _branch(x, pr["head"], "docs/user_attention.md")
+    assert f"Context: {got['repo']}#TD-8" in board, board
+    assert _git("-C", str(x), "branch", "--list", "notices/*") == "", "no local branch is left in that clone"
+    assert len(_git("-C", str(x), "worktree", "list").splitlines()) == 1, "no worktree is left there"
+
+
+def test_a_second_sweep_files_nothing_there_while_the_first_notices_pr_is_open(other):
+    root, x = other
+    gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    got, _ = gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    (line,) = [a for a in got["applied"] if "from this repo is open there" in a]
+    assert "#1" in line and len(_forge(x)["prs"]) == 1
+
+
+def test_an_open_notices_pr_older_than_the_newest_300_still_holds_the_next(other):
+    """The one-open rule reads open PRs alone: an open one past the newest 300 of every state still counts."""
+    root, x = other
+    gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    state = _forge(x)
+    for n in range(2, 303):
+        state["prs"][str(n)] = {"base": "main", "head": f"other-{n}", "title": "t", "body": "", "state": "merged"}
+    _set_forge(x, prs=state["prs"])
+    got, _ = gatesweep.sweep(root, [x], today_utc=date(2026, 11, 6), today_local=date(2026, 11, 6), by="kmaster")
+    assert any("from this repo is open there" in a for a in got["applied"]), got["applied"]
+    assert len(_forge(x)["prs"]) == 302
+
+
+def test_a_closed_or_merged_notices_pr_and_another_repos_sweep_branch_hold_nothing(other):
+    root, x = other
+    gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    state = _forge(x)
+    state["prs"]["1"]["state"] = "merged"
+    state["prs"]["2"] = {"base": "main", "head": "notices/x-sweep-sweep-2026-11-05", "title": "t", "body": "",
+                         "state": "open"}  # fmt: skip
+    _set_forge(x, prs=state["prs"])
+    got, _ = gatesweep.sweep(root, [x], today_utc=date(2026, 11, 6), today_local=date(2026, 11, 6), by="kmaster")
+    assert any(a.endswith("pull/3") for a in got["applied"]), got["applied"]
+
+
+def test_a_board_more_visible_than_this_repo_is_not_written(other):
+    root, x = other
+    _set_forge(x, visibility="PUBLIC")
+    got, _ = gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    assert any("not written — it is public, more visible than this repo (private)" in a for a in got["applied"])
+    assert _forge(x)["prs"] == {}
+
+
+def test_a_board_with_no_registered_clone_is_said_not_done(repo):
+    root, _ = repo
+    p = {"own": "r", "repo": "o/r", "base": "origin/main", "lifts": [], "to_file": {"o/x": [{}]}, "to_close": {}}
     assert gatesweep.apply(root, p, today_utc=UTC, today_local=LOCAL, by="kmaster") == [
-        "board github.com/o/x: not done — another repo's board is written by hand until TD-1376's second slice "
-        "(1 to file, 0 to close)"
+        "board o/x: not done — no registered clone of it (1 to file, 0 to close)"
     ]
 
 

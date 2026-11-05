@@ -15,8 +15,10 @@ branch names and idempotence rules so a by-hand sweep and the home never write t
   closes one PR on `sweep/<UTC date>`. The home opens them and merges none: they take ordinary review
   (cadence §2.14, §4). A lift whose PR is open, merged, or already made by another open PR is not made
   again; one whose PR was closed unmerged is never reopened, and an `act` item asks why, once; nothing more
-  is filed while an earlier `sweep/` PR is open. Items for another repo's board are not written yet (said in
-  the run's lines; TD-1376's second slice).
+  is filed while an earlier `sweep/` PR is open. Items for another registered repo's board go to that repo as one
+  PR on `notices/<this repo>-sweep-<UTC date>`, from a worktree of its clone: nothing while an earlier one from
+  this repo is open there, and nothing on a board more visible than this repo (its items carry this repo's
+  words), each said in the run's lines.
 
 `due`, `lift_branch` and `summary` are pure; the rest shells out and is called in a thread."""
 
@@ -201,6 +203,7 @@ def plan(root: Path | str, others: list[Path | str], *, today_utc: date, today_l
     url = own[0]
     repo = lb.origin_path(url) or Path(root).name
     boards, seen = [own], {lb.origin_key(url) or str(Path(root).resolve())}
+    roots: dict[str, str] = {}  # each other board's clone, by the name sweep() files it under
     for other in others:
         key = lb.origin_key(origin_url(other)) or str(Path(other).resolve())
         if key in seen:
@@ -208,6 +211,7 @@ def plan(root: Path | str, others: list[Path | str], *, today_utc: date, today_l
         if (b := board_of(other)) is not None:
             seen.add(key)
             boards.append(b)
+            roots.setdefault(lb.origin_key(b[0]) or b[1], str(other))
     with Tree(root, base) as tree:
         rows = checks(tree)
     results = {(r["id"], r["name"]): (r.get("outcome"), r.get("evidence")) for r in rows if r.get("outcome")}
@@ -220,6 +224,7 @@ def plan(root: Path | str, others: list[Path | str], *, today_utc: date, today_l
         "base": base,
         "own": lb.origin_key(url) or Path(root).name,
         "boards": [lb.origin_key(b[0]) or b[1] for b in boards],
+        "roots": roots,
         "checks": rows,
         **out,
     }
@@ -240,11 +245,12 @@ def _gh(root: Path | str, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def prs(root: Path | str, *narrow: str) -> list[dict[str, Any]]:
-    """The repo's pull requests, every state, as `[{number, state (open|merged|closed), head, files}]`: the
-    newest 300, or with `narrow` (`--head <branch>`, `--search <q>`) those it matches."""
+def prs(root: Path | str, *narrow: str, state: str = "all") -> list[dict[str, Any]]:
+    """The repo's pull requests in `state` (`all` or `open`), as `[{number, state (open|merged|closed), head,
+    files}]`: the newest 300, or with `narrow` (`--head <branch>`, `--search <q>`) those it matches. A one-open
+    rule reads `open`, so an open PR older than the newest 300 of every state still counts."""
     cp = _gh(
-        root, "pr", "list", "--state", "all", "--limit", "300", *narrow, "--json", "number,state,headRefName,files"
+        root, "pr", "list", "--state", state, "--limit", "300", *narrow, "--json", "number,state,headRefName,files"
     )
     if cp.returncode != 0:
         raise SweepError(_words(cp, "gh pr list"))
@@ -362,6 +368,44 @@ def _lift(
     return f"lift {tid} {gate}: opened {url}"
 
 
+def _write_board(path: str, items: list[dict], keys: list[str], today_local: date, by: str, why: str) -> int:
+    """File `items` on, and close the open items keyed `keys` on, the board at `path` through the vendored
+    writer, each item due today under the session `SESSION`; how many it closed."""
+    for it in items:
+        lb_board.apply(
+            lb_board.plan_add(
+                path,
+                it["text"],
+                due=today_local.isoformat(),
+                context=it["context"],
+                kind=it["kind"],
+                answers=it["answers"],
+                default=it["default"],
+                detail=it["detail"],
+                lifts=it["lifts"],
+                session=SESSION,
+                host=by,
+                today=today_local,
+                tool="gate-sweep",
+            )
+        )
+    closed = 0
+    for key in keys:  # one at a time: each close may move the lines below it
+        text = lb_board.read(path)
+        lines = text.splitlines()
+        for it in lb.parse_board(text, warn=False):
+            raw = lines[it.line - 1]
+            if lb.item_key(raw) == key:
+                m = lb.ITEM_RE.match(raw)
+                expect = m.group("text")[:60] if m else raw.strip()[:60]
+                lb_board.apply(
+                    lb_board.plan_edit(path, "done", it.line, expect, today=today_local, why=why, tool="gate-sweep")
+                )
+                closed += 1
+                break
+    return closed
+
+
 def _own_board(
     root: Path | str,
     p: dict[str, Any],
@@ -372,7 +416,7 @@ def _own_board(
     today_local: date,
     by: str,
 ) -> str:
-    earlier = [q for q in opened if q["state"] == "open" and q["head"].startswith(SWEEP_BRANCH)]
+    earlier = [q for q in prs(root, state="open") if q["head"].startswith(SWEEP_BRANCH)]
     if earlier:
         return (
             f"board: an earlier sweep PR #{earlier[0]['number']} is open — {len(items)} to file, "
@@ -381,46 +425,7 @@ def _own_board(
     branch = f"{SWEEP_BRANCH}{today_utc.isoformat()}"
     with Tree(root, p["base"], branch) as tree:
         board = str(tree / lb.BOARD_PATH)
-        for it in items:
-            lb_board.apply(
-                lb_board.plan_add(
-                    board,
-                    it["text"],
-                    due=today_local.isoformat(),
-                    context=it["context"],
-                    kind=it["kind"],
-                    answers=it["answers"],
-                    default=it["default"],
-                    detail=it["detail"],
-                    lifts=it["lifts"],
-                    session=SESSION,
-                    host=by,
-                    today=today_local,
-                    tool="gate-sweep",
-                )
-            )
-        closed = 0
-        for key in keys:  # one at a time: each close may move the lines below it
-            text = lb_board.read(board)
-            lines = text.splitlines()
-            for it in lb.parse_board(text, warn=False):
-                raw = lines[it.line - 1]
-                if lb.item_key(raw) == key:
-                    m = lb.ITEM_RE.match(raw)
-                    expect = m.group("text")[:60] if m else raw.strip()[:60]
-                    lb_board.apply(
-                        lb_board.plan_edit(
-                            board,
-                            "done",
-                            it.line,
-                            expect,
-                            today=today_local,
-                            why="the gate sweep: its condition no longer holds",
-                            tool="gate-sweep",
-                        )
-                    )
-                    closed += 1
-                    break
+        closed = _write_board(board, items, keys, today_local, by, "the gate sweep: its condition no longer holds")
         subject = f"board: gate sweep {today_utc.isoformat()} — {len(items)} filed, {closed} closed (TD-1376)"
         body = "\n".join(
             ["The home's gate sweep (design §4.4, TD-1376) on this repo's own board.", ""]
@@ -432,25 +437,120 @@ def _own_board(
     return f"board: opened {url}"
 
 
+NOTICES_BRANCH = "notices/"  # a PR on another repo's board: notices/<this repo>-sweep-<UTC date> (gate_sweep.py's)
+# a repo's visibility on its forge, least visible first: an item never goes to a board more visible than its words' repo
+VISIBILITY = {"PRIVATE": 0, "INTERNAL": 1, "PUBLIC": 2}
+
+
+def visibility(root: Path | str) -> str:
+    """The repo's visibility on its forge (`gh repo view`), `PRIVATE`, `INTERNAL` or `PUBLIC`; SweepError when
+    it cannot be read — an unread visibility writes nothing."""
+    cp = _gh(root, "repo", "view", "--json", "visibility", "--jq", ".visibility")
+    got = cp.stdout.strip().upper()
+    if cp.returncode != 0 or got not in VISIBILITY:
+        raise SweepError(_words(cp, "gh repo view") if cp.returncode != 0 else f"visibility {got or 'unread'}")
+    return got
+
+
+def _qualify(repo: str, it: dict[str, Any]) -> dict[str, Any]:
+    """The item with a bare `TD-n` in its words and detail written `<repo>#TD-n`, the id its `Context:` names:
+    on another repo's board a bare id is that repo's own (gate_sweep.py's rule)."""
+    m = re.match(r"\S+#(TD-\d+)\b", str(it.get("context") or ""))
+    if not m:
+        return it
+    bare = re.compile(rf"(?<![#\w]){re.escape(m.group(1))}\b")
+
+    def fix(x: str) -> str:
+        return bare.sub(f"{repo.lower()}#{m.group(1)}", x)
+
+    detail = it.get("detail")
+    if isinstance(detail, dict):
+        detail = {k: [fix(x) for x in v] if isinstance(v, list) else fix(v) for k, v in detail.items()}
+    return {**it, "text": fix(str(it["text"])), "detail": detail or None}
+
+
+def _other_board(
+    root: Path | str,
+    p: dict[str, Any],
+    board: str,
+    there: str | None,
+    items: list[dict],
+    keys: list[str],
+    today_utc: date,
+    today_local: date,
+    by: str,
+) -> str:
+    """File `items` on, and close `keys` on, another registered repo's `board` by one PR in that repo, as the
+    pinned `gate_sweep.py` does (cadence §2.14, TD-229): a temporary worktree of its clone `there` at its
+    `origin/<default>`, the branch `notices/<this repo>-sweep-<UTC date>`, opened on its forge and merged by none.
+    Nothing while an earlier such PR from this repo is open there, and nothing on a board more visible than this
+    repo, since its items carry this repo's entries' words. One line: what was done."""
+    n = f"{len(items)} to file, {len(keys)} to close"
+    if not there:
+        return f"board {board}: not done — no registered clone of it ({n})"
+    mine, theirs = visibility(root), visibility(there)
+    if VISIBILITY[theirs] > VISIBILITY[mine]:
+        return (
+            f"board {board}: not written — it is {theirs.lower()}, more visible than this repo ({mine.lower()}), "
+            f"and its items carry this repo's entries' words ({n})"
+        )
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", p["repo"]).strip("-")
+    prefix = f"{NOTICES_BRANCH}{slug}-sweep-"
+    mark = re.compile(rf"{re.escape(prefix)}\d{{4}}-\d\d-\d\d$")  # never a notices branch of a repo named <x>-sweep
+    earlier = [q for q in prs(there, state="open") if mark.match(q["head"])]
+    if earlier:
+        return f"board {board}: an earlier sweep PR #{earlier[0]['number']} from this repo is open there — {n} wait"
+    base = ledger_mod.default_ref(there)
+    if base is None:
+        return f"board {board}: not done — its clone has no origin/<default> ({n})"
+    branch = f"{prefix}{today_utc.isoformat()}"
+    with Tree(there, base, branch) as tree:
+        path = str(tree / lb.BOARD_PATH)
+        closed = _write_board(path, [_qualify(p["repo"], it) for it in items], keys, today_local, by,
+                              f"the gate sweep of {p['repo']}: its condition no longer holds")  # fmt: skip
+        subject = f"board: {p['repo']}'s gate sweep {today_utc.isoformat()} — {len(items)} filed, {closed} closed"
+        body = "\n".join(
+            [
+                f"The home's gate sweep of {p['repo']} (design §4.4, TD-1376) found items that belong on this "
+                "repo's board, whose `People:` names the person.",
+                "",
+            ]
+            + [f"- file: [{it['kind']}] {it['text']} — Context: {it['context']}" for it in items]
+            + [f"- close: {k}" for k in keys]
+            + ["", "Review it like any PR (cadence §4)."]
+        )
+        url = _ship(there, tree, branch, base.removeprefix("origin/"), subject, body)
+    return f"board {board}: opened {url}"
+
+
 def apply(root: Path | str, p: dict[str, Any], *, today_utc: date, today_local: date, by: str) -> list[str]:
-    """Make the plan's writes: each lift its own PR, this repo's board items and closes one sweep PR. One line
-    each of what was done or skipped; a step that fails stops only itself."""
+    """Make the plan's writes: each lift its own PR, this repo's board items and closes one sweep PR, then each
+    other registered repo's board one notices PR there. One line each of what was done or skipped; a step that
+    fails stops only itself."""
     said: list[str] = []
-    others = sorted({*p["to_file"], *p["to_close"]} - {p["own"]})
-    for board in others:
-        n, k = len(p["to_file"].get(board, [])), len(p["to_close"].get(board, []))
-        if n or k:
-            said.append(
-                f"board {board}: not done — another repo's board is written by hand until TD-1376's "
-                f"second slice ({n} to file, {k} to close)"
-            )
     items, keys = list(p["to_file"].get(p["own"], [])), list(p["to_close"].get(p["own"], []))
-    if not (p["lifts"] or items or keys):
-        return said
+    if p["lifts"] or items or keys:
+        said += _apply_own(root, p, items, keys, today_utc, today_local, by)
+    for board in sorted({*p["to_file"], *p["to_close"]} - {p["own"]}):
+        got, ks = list(p["to_file"].get(board, [])), list(p["to_close"].get(board, []))
+        if got or ks:
+            there = (p.get("roots") or {}).get(board)
+            try:
+                said.append(_other_board(root, p, board, there, got, ks, today_utc, today_local, by))
+            except Exception as e:  # noqa: BLE001 — one board's failure never stops another's
+                said.append(f"board {board}: not done — {e}")
+    return said
+
+
+def _apply_own(
+    root: Path | str, p: dict[str, Any], items: list[dict], keys: list[str], today_utc: date, today_local: date, by: str
+) -> list[str]:
+    """The lifts and this repo's own board (`apply`)."""
+    said: list[str] = []
     try:
         opened = prs(root)
     except (SweepError, OSError, subprocess.SubprocessError) as e:
-        return [*said, f"not done — {e}"]
+        return [f"not done — {e}"]
     own = board_of(root)
     asked = _contexts(own[2], own[3]) if own else set()
     extra: list[dict] = []

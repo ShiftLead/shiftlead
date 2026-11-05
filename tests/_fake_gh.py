@@ -92,9 +92,14 @@ def main(argv: list[str]) -> int:
         rows = [
             {"number": int(n), "state": pr["state"].upper(), "headRefName": pr["head"], "files": []}
             for n, pr in state["prs"].items()
-            if opts.get("--head") in (None, pr["head"]) and (len(want) < 2 or want[1] in pr.get("body", ""))
+            if opts.get("--head") in (None, pr["head"])
+            and (len(want) < 2 or want[1] in pr.get("body", ""))
+            and opts.get("--state") in (None, "all", pr["state"])
         ]
         print(json.dumps(rows))
+        return 0
+    if argv[:2] == ["repo", "view"]:  # the gate sweep's visibility read (TD-1376): `--json visibility --jq …`
+        print(state.get("visibility", "PRIVATE"))
         return 0
     if argv[:2] == ["pr", "diff"]:
         return 0
