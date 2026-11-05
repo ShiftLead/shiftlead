@@ -18,6 +18,7 @@ from sessionorc.client import AgentError
 from shiftlead.ui.inbox import horizon_left, inbox_sections, rail_rows
 from shiftlead.ui.queue import (
     apply_picks,
+    asked_entries,
     attach,
     card_index,
     filter_chips,
@@ -285,7 +286,9 @@ def test_the_summary_bar_replaces_the_sentence_and_its_widths_are_the_browsers(t
     assert [s["flex"] for s in bar] == [max(k, 231 * 0.012) for k in (2, 60, 169)] and bar[0]["flex"] > 2
     assert [s["key"] for s in summary_bar({**g, "waiting": (0, 0)}, 171)] == ["in_progress", "up_next"]
     assert summary_bar({k: (0, 0) for k in g}, 0) == []
-    assert repr(summary_bar({"up_next": (2, 0)}, 250)[0]["flex"]) == "3"  # the floor, whole: `3` as the browser prints it
+    assert (
+        repr(summary_bar({"up_next": (2, 0)}, 250)[0]["flex"]) == "3"
+    )  # the floor, whole: `3` as the browser prints it
     js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "AO.qBarFlex = (n, total) => Math.max(n, total * 0.012);" in js
     html = client(monkeypatch, tmp_path, fake(queue())).get("/queue").text
@@ -378,11 +381,30 @@ def test_a_board_line_naming_a_held_entry_is_on_its_own_repos_card_in_the_entrys
     assert [m["html"] for m in mine["cards"]["db#TD-20"]["needs"]] == ["ledger:db:TD-20", "k1"]
     told = attach({"needs": [{**line, **on}]}, drawn, [{**held, "answered": {"asker": "g"}}])["cards"]["db#TD-20"]
     assert [m["html"] for m in told["needs"]] == ["ledger:db:TD-20", "k1"]
-    # a bare id that one repo alone holds on a card is still found from another repo's board
+    # a bare id is the line's own repo's alone (TD-1400): one only another repo holds on a card leaves it off
     assert item_home({**line, "repo_name": "s", "text": "Context: TD-9."}, two)["on_row"] == "s#TD-9"
-    assert item_home({**line, "repo_name": "db", "text": "Context: TD-9."}, two)["on_row"] == "s#TD-9"
+    assert item_home({**line, "repo_name": "db", "text": "Context: TD-9."}, two)["home"] == "inbox"
+    assert item_home({**line, "repo_name": None, "text": "Context: TD-9."}, two)["on_row"] == "s#TD-9"
     fyi = attach({"fyi": [{**line, "kind": "fyi", **on}]}, drawn, [held])["cards"]["db#TD-20"]
     assert [m["html"] for m in fyi["needs"]] == ["ledger:db:TD-20"]  # a line for reading asks nothing in its place
+
+
+def test_a_board_lines_bare_ref_its_repo_holds_only_archived_never_homes_on_another_repos_card():
+    """TD-1400 (§4.5 screen 12 *Where a row is drawn*): contractmatch's line naming its own archived TD-051 is not
+    drawn on ledgerboard#TD-051's card; it homes on the first of its refs an open card holds, the rest its
+    mentions, and `asked_entries` names the same entries."""
+    index = {"ledgerboard#TD-051": ("ledgerboard#TD-051", "ledgerboard#TD-051"), "TD-051": ("ledgerboard#TD-051",
+             "ledgerboard#TD-051"), "contractmatch#TD-017": ("contractmatch#TD-017", "contractmatch#TD-017"),
+             "TD-017": ("contractmatch#TD-017", "contractmatch#TD-017")}  # fmt: skip
+    line = {"row": "board", "id": "b", "key": "k", "kind": "decide", "repo_name": "contractmatch",
+            "text": "**Works?** Context: TD-051 (archived), TD-017. Due: 2026-10-29."}  # fmt: skip
+    got = item_home(line, index)
+    assert got == {"home": "queue", "on_card": "contractmatch#TD-017", "on_row": "contractmatch#TD-017", "mentions": []}
+    assert item_home({**line, "text": "Context: TD-051 (archived)."}, index)["home"] == "inbox"
+    assert asked_entries([line]) == {"contractmatch#TD-051", "contractmatch#TD-017"}
+    both = {**index, "contractmatch#TD-051": ("contractmatch#TD-051", "contractmatch#TD-051")}
+    assert item_home(line, both)["on_row"] == "contractmatch#TD-051"
+    assert item_home(line, both)["mentions"] == ["contractmatch#TD-017"]
 
 
 def test_a_question_about_a_td_is_on_its_card_and_still_counted():
