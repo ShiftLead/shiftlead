@@ -168,3 +168,14 @@ def test_a_queue_card_whose_member_waits_on_an_event_is_waiting_with_its_event_l
     assert one["group"] == "waiting" and one["status"] == "waiting", "a gate gives no `unreachable`"
     assert one["wait"] == {"column": "event", "phrase": "waits on the test fails again in a precheck", "id": "r#TD-011"}
     assert two["group"] == "waiting" and two["wait"]["phrase"] == "waits until Jan 30"
+
+
+def test_a_waits_line_beside_a_lifted_until_hovers_its_line():
+    head = "## TD-001: entry 1\n\n**Priority:** Medium\n**Owner:** grinder\n**Kind:** build\n"
+    text = (
+        head
+        + "**Waits:** event — a sync\n**Status:** Open\n"
+        + f"**Blocked by:** until {TODAY.isoformat()}\n\n**Why:** a reason.\n"
+    )
+    got = _read(text)["TD-001"]
+    assert got["waiting"]["on"] == "event" and teamrun.wait_line(got) == "Waits: event — a sync"

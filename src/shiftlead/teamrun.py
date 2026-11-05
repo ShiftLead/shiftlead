@@ -1364,7 +1364,13 @@ def wait_line(e: Mapping[str, Any]) -> str:
     its Event line whole, *until 2026-11-20; event (flake-again) — the test fails again*; else the entry's
     `**Waits:**` line whole."""
     w, g = e.get("waiting"), e.get("gates")
-    if isinstance(w, dict) and isinstance(g, dict) and ledger_mod.only_gated(e):  # the wait is the gates'
+    from_gates = (
+        isinstance(w, dict)
+        and isinstance(g, dict)
+        and ledger_mod.only_gated(e)
+        and (bool(w.get("name")) or (w.get("on") == "until" and w.get("until") in (g.get("until") or ())))
+    )  # the wait is the gates', not a `Waits:` line standing beside a lifted one
+    if from_gates:
         said = [f"until {w['until']}"] if w.get("on") == "until" and w.get("until") else []
         said += [
             f"event ({x.get('name')})" + (f" — {x['why']}" if x.get("why") else "")
