@@ -27,7 +27,8 @@ MODULE_WRITES = {"os": {"replace", "rename", "remove", "unlink"}, "shutil": {"mo
 
 
 def _writes(fn: ast.AST) -> list[tuple[int, str]]:
-    """The file writes in `fn`'s body: a `Path` write, an `open` for writing, an `os`/`shutil` move or copy."""
+    """The file writes in `fn`'s body: a `Path` write, an `open` for writing, an `os`/`shutil` move or copy, and
+    a call whose arguments name `ledger.py` (a writer run as a command by the code's own choosing)."""
     out: list[tuple[int, str]] = []
     for n in ast.walk(fn):
         if not isinstance(n, ast.Call):
@@ -42,20 +43,39 @@ def _writes(fn: ast.AST) -> list[tuple[int, str]]:
         ):
             out.append((n.lineno, f"{f.value.id}.{f.attr}"))
         elif (isinstance(f, ast.Name) and f.id == "open") or (isinstance(f, ast.Attribute) and f.attr == "open"):
-            mode = n.args[1] if len(n.args) > 1 else next((k.value for k in n.keywords if k.arg == "mode"), None)
+            at = 0 if isinstance(f, ast.Attribute) else 1  # `Path.open(mode)`, `open(file, mode)`
+            mode = n.args[at] if len(n.args) > at else next((k.value for k in n.keywords if k.arg == "mode"), None)
             if isinstance(mode, ast.Constant) and isinstance(mode.value, str) and set(mode.value) & set("wax+"):
                 out.append((n.lineno, f"open({mode.value!r})"))
+        if any(
+            isinstance(c, ast.Constant) and isinstance(c.value, str) and "ledger.py" in c.value
+            for a in (*n.args, *(k.value for k in n.keywords))
+            for c in ast.walk(a)
+        ):
+            out.append((n.lineno, "runs ledger.py"))
     return out
 
 
 def _ledger_writers(path: Path, text: str) -> list[str]:
-    """Each function in `text` that names a ledger's files and writes a file: `path:line name (writes)`."""
+    """Each function in `text`, and the module's own top-level statements, that names a ledger's files and writes
+    a file: `path:line name (writes)`. A lexical tripwire, not a proof: a path built from parts (`'docs' / 'ledger'`)
+    or handed in from another function is not seen, so review still reads a new writer. The Queue's rank file
+    (`board._land_rank`) is written from `ledgerboard.set_rank`'s text by a `rel` it is handed: no entry text."""
+    tree = ast.parse(text)
+    top = [s for s in tree.body if not isinstance(s, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)]
+    units: list[tuple[str, int, list[ast.AST], str]] = [
+        ("<module>", 1, top, "\n".join(ast.get_source_segment(text, s) or "" for s in top))
+    ]
+    units += [
+        (fn.name, fn.lineno, [fn], ast.get_source_segment(text, fn) or "")
+        for fn in ast.walk(tree)
+        if isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef)
+    ]
     found = []
-    for fn in ast.walk(ast.parse(text)):
-        if isinstance(fn, ast.FunctionDef | ast.AsyncFunctionDef):
-            w = _writes(fn)
-            if w and LEDGER_NAMES.search(ast.get_source_segment(text, fn) or ""):
-                found.append(f"{path}:{fn.lineno} {fn.name} ({', '.join(x for _, x in w)})")
+    for name, line, nodes, seg in units:
+        w = [x for node in nodes for x in _writes(node)]
+        if w and LEDGER_NAMES.search(seg):
+            found.append(f"{path}:{line} {name} ({', '.join(x for _, x in w)})")
     return found
 
 
@@ -68,11 +88,16 @@ def test_the_scan_finds_a_ledger_write():
         "def also(root):\n"
         "    with open(f'{root}/docs/ledger/TD-002.md', 'a') as fh:\n"
         "        fh.write('x')\n"
+        "def path_open(root):\n"
+        "    (root / 'docs/ledger/TD-003.md').open('w').write('x')\n"
+        "def runs(root):\n"
+        "    subprocess.run(['agent-cadence', 'run', 'ledger.py', 'note', 'TD-004', 'x'], cwd=root / 'docs/ledger')\n"
         "def fine(root):\n"
         "    return (root / ledger.ledger_path(root)).read_text()\n"
+        "Path('docs/ledger/TD-005.md').write_text('x')\n"
     )
     got = _ledger_writers(Path("x.py"), text)
-    assert [g.split()[1] for g in got] == ["bad", "also"]
+    assert [g.split()[1] for g in got] == ["<module>", "bad", "also", "path_open", "runs"]
 
 
 def test_no_code_writes_ledger_text_by_its_own_file_handling():
