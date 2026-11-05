@@ -32,6 +32,7 @@ def _writable_after(tmp_path):
         if not p.is_symlink() and not os.access(p, os.W_OK | os.X_OK):
             os.chmod(p, 0o755)
 
+
 # contractmatch's `.devcontainer/devcontainer.json`, in shape: a build with relative paths, a remote
 # user, the person's two bind mounts under /mounted (one carrying their credentials), VS Code
 # customizations, ports, a lifecycle command that assumes a mount's path exists.
