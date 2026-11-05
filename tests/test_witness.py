@@ -473,19 +473,21 @@ def test_a_store_path_is_escaped_as_a_toml_basic_string(tmp_path, odd):
 
 @pytest.mark.integration
 async def test_a_store_path_not_valid_utf8_writes_no_file_and_warns_at_each_start(agent, caplog, monkeypatch):
-    from sessionorc import paths
+    """The store's undecodable bytes are held as surrogates; fed through `host_text`, not made on disk."""
+    from pathlib import Path
 
-    store = paths.home() / "bad\udcff"
-    store.mkdir()
-    monkeypatch.setenv("SHIFTLEAD_HOME", str(store))
-    assert paths.home() == store
-    assert witness.ensure_host_file(store) is False and not witness.host_file(store).exists()
+    with pytest.raises(UnicodeError):
+        witness.toml_string("bad\udcff")
+    real = witness.host_text
+    monkeypatch.setattr(witness, "host_text", lambda w: real(Path(str(w) + "\udcff")))
+    witness.host_file().unlink()
     for _ in range(2):
-        with caplog.at_level(logging.WARNING, logger="sessionorc.agent"):
+        with caplog.at_level(logging.WARNING, logger="sessionorc"):
             caplog.clear()
             agent._witness_begin()
-        assert (store / "witnessed").is_dir() and not witness.host_file(store).exists()
-        assert any("host file" in r.getMessage() and "absent" in r.getMessage() for r in caplog.records)
+        assert not witness.host_file().exists()
+        msgs = [r.getMessage() for r in caplog.records]
+        assert any("not valid UTF-8" in m for m in msgs) and any("host file" in m and "absent" in m for m in msgs)
 
 
 def test_a_warning_when_no_root_covers_the_current_witnessed(tmp_path):
