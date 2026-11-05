@@ -3536,7 +3536,7 @@ def cmd_td_next(args: argparse.Namespace) -> int:
     registered name, or by its origin's `owner/repo` when checkouts of different origins share that name; an open PR
     the home could not read is said on standard error, and so are an id not reserved on origin's counter and each of
     the script's warnings (TD-970), the exit still 0. The branch of the directory it runs in goes with the call when
-    that directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Taken by:**` line,
+    that directory is a checkout of the repo named (§4.4 *The branch*, TD-1089), and the take's `**Id take:**` line,
     where the home gives one, is said on standard error, and so, last, is the script's filing question where the repo
     sets `review-outcomes` on (TD-1282)."""
     if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
@@ -3581,9 +3581,6 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
         print(f"not reserved on origin's counter: {got.get('why') or 'the script did not say why'}", file=sys.stderr)
     for line in got.get("warnings") or ():
         print(line, file=sys.stderr)
-    taken_line = got.get("taken_by_line") or None  # an older home answers neither key
-    if taken_line:
-        print(f"write `{taken_line}` in each entry's header (cadence §2.10)", file=sys.stderr)
     take_line = got.get("id_take_line") or None  # a home from before TD-1363 answers neither id_take key
     if take_line:
         print(f"write `{take_line}` in each entry's header", file=sys.stderr)
@@ -3595,7 +3592,6 @@ def _td_next_send(args: argparse.Namespace, name: str, branch: str = "") -> int:
         "why": got.get("why") or "",
         "warnings": got.get("warnings") or [],
         "taken_by": got.get("taken_by") or None,
-        "taken_by_line": taken_line,
         "id_take": got.get("id_take") or None,
         "id_take_line": take_line,
         "question": got.get("question") or None,  # an older home answers no question
@@ -5316,8 +5312,7 @@ def build_parser() -> argparse.ArgumentParser:
             "--json",
             action="store_true",
             default=argparse.SUPPRESS,
-            help="{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line, id_take, id_take_line, "
-            "question}",
+            help="{repo, ids, unread, reserved, why, warnings, taken_by, id_take, id_take_line, question}",
         )
         q.add_argument(
             "--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)"
