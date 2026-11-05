@@ -254,15 +254,14 @@ def test_another_repos_board_gets_one_notices_pr_there_with_qualified_ids(other)
     assert why is None, why
     (line,) = [a for a in got["applied"] if a.startswith("board ") and "x" in a.split(":")[0]]
     assert line.endswith("opened https://github.com/o/r/pull/1"), got["applied"]
-    branch = f"notices/{got['repo']}-sweep-{UTC.isoformat()}".replace("/", "/", 1)
+    slug = got["repo"].replace("/", "-").strip("-")
     (pr,) = _forge(x)["prs"].values()
-    assert pr["head"].startswith("notices/") and pr["head"].endswith(f"-sweep-{UTC.isoformat()}")
+    assert pr["head"] == f"notices/{slug}-sweep-{UTC.isoformat()}"
     assert pr["state"] == "open", "opened there, merged by none"
     board = _branch(x, pr["head"], "docs/user_attention.md")
     assert f"Context: {got['repo']}#TD-8" in board, board
     assert _git("-C", str(x), "branch", "--list", "notices/*") == "", "no local branch is left in that clone"
     assert len(_git("-C", str(x), "worktree", "list").splitlines()) == 1, "no worktree is left there"
-    assert branch  # the branch is named for this repo
 
 
 def test_a_second_sweep_files_nothing_there_while_the_first_notices_pr_is_open(other):
@@ -271,6 +270,31 @@ def test_a_second_sweep_files_nothing_there_while_the_first_notices_pr_is_open(o
     got, _ = gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
     (line,) = [a for a in got["applied"] if "from this repo is open there" in a]
     assert "#1" in line and len(_forge(x)["prs"]) == 1
+
+
+def test_an_open_notices_pr_older_than_the_newest_300_still_holds_the_next(other):
+    """The one-open rule reads open PRs alone: an open one past the newest 300 of every state still counts."""
+    root, x = other
+    gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    state = _forge(x)
+    for n in range(2, 303):
+        state["prs"][str(n)] = {"base": "main", "head": f"other-{n}", "title": "t", "body": "", "state": "merged"}
+    _set_forge(x, prs=state["prs"])
+    got, _ = gatesweep.sweep(root, [x], today_utc=date(2026, 11, 6), today_local=date(2026, 11, 6), by="kmaster")
+    assert any("from this repo is open there" in a for a in got["applied"]), got["applied"]
+    assert len(_forge(x)["prs"]) == 302
+
+
+def test_a_closed_or_merged_notices_pr_and_another_repos_sweep_branch_hold_nothing(other):
+    root, x = other
+    gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    state = _forge(x)
+    state["prs"]["1"]["state"] = "merged"
+    state["prs"]["2"] = {"base": "main", "head": "notices/x-sweep-sweep-2026-11-05", "title": "t", "body": "",
+                         "state": "open"}  # fmt: skip
+    _set_forge(x, prs=state["prs"])
+    got, _ = gatesweep.sweep(root, [x], today_utc=date(2026, 11, 6), today_local=date(2026, 11, 6), by="kmaster")
+    assert any(a.endswith("pull/3") for a in got["applied"]), got["applied"]
 
 
 def test_a_board_more_visible_than_this_repo_is_not_written(other):

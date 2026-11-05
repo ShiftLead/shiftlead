@@ -245,11 +245,12 @@ def _gh(root: Path | str, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def prs(root: Path | str, *narrow: str) -> list[dict[str, Any]]:
-    """The repo's pull requests, every state, as `[{number, state (open|merged|closed), head, files}]`: the
-    newest 300, or with `narrow` (`--head <branch>`, `--search <q>`) those it matches."""
+def prs(root: Path | str, *narrow: str, state: str = "all") -> list[dict[str, Any]]:
+    """The repo's pull requests in `state` (`all` or `open`), as `[{number, state (open|merged|closed), head,
+    files}]`: the newest 300, or with `narrow` (`--head <branch>`, `--search <q>`) those it matches. A one-open
+    rule reads `open`, so an open PR older than the newest 300 of every state still counts."""
     cp = _gh(
-        root, "pr", "list", "--state", "all", "--limit", "300", *narrow, "--json", "number,state,headRefName,files"
+        root, "pr", "list", "--state", state, "--limit", "300", *narrow, "--json", "number,state,headRefName,files"
     )
     if cp.returncode != 0:
         raise SweepError(_words(cp, "gh pr list"))
@@ -415,7 +416,7 @@ def _own_board(
     today_local: date,
     by: str,
 ) -> str:
-    earlier = [q for q in opened if q["state"] == "open" and q["head"].startswith(SWEEP_BRANCH)]
+    earlier = [q for q in prs(root, state="open") if q["head"].startswith(SWEEP_BRANCH)]
     if earlier:
         return (
             f"board: an earlier sweep PR #{earlier[0]['number']} is open — {len(items)} to file, "
@@ -465,7 +466,7 @@ def _qualify(repo: str, it: dict[str, Any]) -> dict[str, Any]:
     detail = it.get("detail")
     if isinstance(detail, dict):
         detail = {k: [fix(x) for x in v] if isinstance(v, list) else fix(v) for k, v in detail.items()}
-    return {**it, "text": fix(str(it["text"])), "detail": detail}
+    return {**it, "text": fix(str(it["text"])), "detail": detail or None}
 
 
 def _other_board(
@@ -496,7 +497,7 @@ def _other_board(
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", p["repo"]).strip("-")
     prefix = f"{NOTICES_BRANCH}{slug}-sweep-"
     mark = re.compile(rf"{re.escape(prefix)}\d{{4}}-\d\d-\d\d$")  # never a notices branch of a repo named <x>-sweep
-    earlier = [q for q in prs(there) if q["state"] == "open" and mark.match(q["head"])]
+    earlier = [q for q in prs(there, state="open") if mark.match(q["head"])]
     if earlier:
         return f"board {board}: an earlier sweep PR #{earlier[0]['number']} from this repo is open there — {n} wait"
     base = ledger_mod.default_ref(there)
@@ -523,26 +524,33 @@ def _other_board(
 
 
 def apply(root: Path | str, p: dict[str, Any], *, today_utc: date, today_local: date, by: str) -> list[str]:
-    """Make the plan's writes: each lift its own PR, this repo's board items and closes one sweep PR. One line
-    each of what was done or skipped; a step that fails stops only itself."""
+    """Make the plan's writes: each lift its own PR, this repo's board items and closes one sweep PR, then each
+    other registered repo's board one notices PR there. One line each of what was done or skipped; a step that
+    fails stops only itself."""
     said: list[str] = []
-    others = sorted({*p["to_file"], *p["to_close"]} - {p["own"]})
-    for board in others:
+    items, keys = list(p["to_file"].get(p["own"], [])), list(p["to_close"].get(p["own"], []))
+    if p["lifts"] or items or keys:
+        said += _apply_own(root, p, items, keys, today_utc, today_local, by)
+    for board in sorted({*p["to_file"], *p["to_close"]} - {p["own"]}):
         got, ks = list(p["to_file"].get(board, [])), list(p["to_close"].get(board, []))
         if got or ks:
+            there = (p.get("roots") or {}).get(board)
             try:
-                said.append(
-                    _other_board(root, p, board, (p.get("roots") or {}).get(board), got, ks, today_utc, today_local, by)
-                )
-            except (SweepError, lb.Refused, OSError, subprocess.SubprocessError) as e:
+                said.append(_other_board(root, p, board, there, got, ks, today_utc, today_local, by))
+            except Exception as e:  # noqa: BLE001 — one board's failure never stops another's
                 said.append(f"board {board}: not done — {e}")
-    items, keys = list(p["to_file"].get(p["own"], [])), list(p["to_close"].get(p["own"], []))
-    if not (p["lifts"] or items or keys):
-        return said
+    return said
+
+
+def _apply_own(
+    root: Path | str, p: dict[str, Any], items: list[dict], keys: list[str], today_utc: date, today_local: date, by: str
+) -> list[str]:
+    """The lifts and this repo's own board (`apply`)."""
+    said: list[str] = []
     try:
         opened = prs(root)
     except (SweepError, OSError, subprocess.SubprocessError) as e:
-        return [*said, f"not done — {e}"]
+        return [f"not done — {e}"]
     own = board_of(root)
     asked = _contexts(own[2], own[3]) if own else set()
     extra: list[dict] = []
