@@ -255,6 +255,108 @@ def board_items(content: str, today: date) -> list[dict[str, Any]]:
     return out
 
 
+_ID = rf"(?:{ledgerboard.REPO}#)?TD-\d+"
+# a `Closed:` reason's leading *carried to* ids (§4.4 *The boards*, TD-1368): joined only by `,`, `and` or `&`,
+# ending at the first other word, dash or sentence end — *carried to TD-9 — see TD-4* is TD-9
+_JOIN = r"(?:\s*,\s*(?:(?:and|&)\s+)?|\s+(?:and|&)\s+)"
+CARRIED_RE = re.compile(rf"^[\s—–-]*[Cc]arried to\s+(?P<ids>{_ID}(?:{_JOIN}{_ID})*)")
+_ID_RE = re.compile(_ID)
+# the archive's file beside the board's (§4.4 *The boards*): `<board stem>_archive.md`
+ARCHIVE_SUFFIX = "_archive"
+# an archive read, by its path: (what it was read at — its mtime and size, or origin's blob — and its text)
+_ARCHIVES: dict[str, tuple[Any, str | None]] = {}
+
+
+def archive_rel(board: Path) -> Path:
+    """The board archive's path beside `board`'s: `docs/user_attention.md` → `docs/user_attention_archive.md`."""
+    return board.with_name(f"{board.stem}{ARCHIVE_SUFFIX}{board.suffix}")
+
+
+def _archive_local(path: Path) -> str | None:
+    """The archive file's text, re-read only when its mtime or size moved; None where there is none."""
+    k = str(path)
+    try:
+        st = path.stat()
+    except OSError:
+        _ARCHIVES.pop(k, None)
+        return None
+    at = ("file", st.st_mtime_ns, st.st_size)
+    got = _ARCHIVES.get(k)
+    if got is not None and got[0] == at:
+        return got[1]
+    try:
+        text: str | None = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        text = None
+    _ARCHIVES[k] = (at, text)
+    return text
+
+
+def _archive_origin(root: Path, at: str, rel: Path) -> str | None:
+    """The archive's text at `at` (`origin/<default>`), re-read only when its blob moved; None where origin
+    holds none or git cannot say."""
+    k = f"{root}::{at}:{rel.as_posix()}"
+    try:
+        sha = _git(root, ["rev-parse", "-q", "--verify", f"{at}:{rel.as_posix()}"], READ_TIMEOUT)
+        if sha.returncode != 0:
+            _ARCHIVES.pop(k, None)
+            return None
+        blob = sha.stdout.decode().strip()
+        got = _ARCHIVES.get(k)
+        if got is not None and got[0] == ("blob", blob):
+            return got[1]
+        shown = _git(root, ["cat-file", "blob", blob], READ_TIMEOUT)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    text = shown.stdout.decode("utf-8", errors="replace") if shown.returncode == 0 else None
+    _ARCHIVES[k] = (("blob", blob), text)
+    return text
+
+
+def carried_to(reason: str) -> list[str]:
+    """The ids a `Closed:` reason's leading *carried to* lists, as written, each once — [] for any other reason
+    (§4.4 *The boards*, TD-1368)."""
+    m = CARRIED_RE.match(reason)
+    return list(dict.fromkeys(x.group(0) for x in _ID_RE.finditer(m.group("ids")))) if m else []
+
+
+def carried(content: str, archive: str | None = None) -> list[dict[str, Any]]:
+    """The closed decided lines that may still hold a member (§4.4 *The boards* `carried`, *The card's status*,
+    TD-1368): every closed `decide` line with a `Decided:` whose `Context:` names an entry, of the board's text and
+    then its archive's, as `{key, ref, decided, decided_by, closed, to, at, refs, parts}` — `ref` the `Context:`'s
+    first entry ref, `refs` all of them (gate words after a ref read past), `parts` its `Parts:` ids, `closed`
+    `{date, why}` (the reason after the date's dash, '' for none), `to` the reason's *carried to* ids, and `at` one
+    index over every line of both files — the board's line, then the archive's after the board's last."""
+    out: list[dict[str, Any]] = []
+    base = 0
+    for text in (content, archive or ""):
+        lines = text.splitlines()
+        for it in ledgerboard.parse_closed_items(text):
+            if it.kind != "decide" or it.decided is None:
+                continue
+            refs = [r for r in ledgerboard.item_refs(it.text) if _ID_RE.fullmatch(r)]
+            row = ledgerboard.CLOSED_ITEM_RE.match(lines[it.line - 1]) if 0 < it.line <= len(lines) else None
+            c = ledgerboard.CLOSED_RE.search(row.group("text")) if row else None
+            if not refs or c is None:
+                continue
+            why = c.group(0)[c.end("date") - c.start() :].strip().lstrip("—–-").strip()
+            out.append(
+                {
+                    "key": ref("", it.text),
+                    "ref": refs[0],
+                    "decided": {"text": it.decided[0], "date": it.decided[1].isoformat()},
+                    "decided_by": it.decided_by,
+                    "closed": {"date": c.group("date"), "why": why},
+                    "to": carried_to(why),
+                    "at": base + it.line,
+                    "refs": refs,
+                    "parts": list(it.parts),
+                }
+            )
+        base += len(lines)
+    return out
+
+
 def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | None = None) -> dict[str, Any]:
     """The repo's board as the host agent keeps it (design §4.4 *Each reading has one owner*, *The
     boards*, TD-615), read in-process through ledgerboard (TD-585): `{boards: [...], today}`, each
@@ -269,6 +371,9 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
     `board` reads that file in place of the checkout's, named as the checkout's board read from
     origin: the host agent's own tree after a write-back (`board.tree_dir`), which is origin's head
     with the press landed, so the press is in the reading before the checkout pulls it.
+
+    `carried` (§4.4 *The boards*, TD-1368) is the board's closed decided lines and its archive's (`carried`), the
+    archive read from the same copy as the board — origin's where origin's board is the one read.
 
     `swept` (§4.9b *The sweep*, TD-1090) is the stamp of origin's copy, whichever copy is shown: written
     only by a read against origin — `{at, deep_at}` (`swept`), or None when origin holds no board — and
@@ -289,6 +394,15 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
         items = board_items(content, today)
     except (OSError, UnicodeDecodeError) as e:
         return {"error": f"{path} could not be read ({type(e).__name__})"}
+    # the archive from the same copy as the board: origin's where the board is origin's (TD-1368)
+    if found is not None and found.content is not None and found.source:
+        arch = _archive_origin(root, found.source, archive_rel(rel))
+    else:
+        arch = _archive_local(archive_rel(path))
+    try:
+        held = carried(content, arch)
+    except Exception:  # noqa: BLE001 — a line ledgerboard cannot read holds nothing; the board still reads
+        held = []
     b: dict[str, Any] = {
         "label": root.name,
         "board": str(checkout),
@@ -298,6 +412,7 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
         "fetch_case": found.case if found is not None else None,
         "fetch_why": found.why if found is not None else None,
         "items": items,
+        "carried": held,
     }
     if found is not None and found.case != "skipped":
         b["swept"] = swept(found.theirs) if found.theirs is not None else None

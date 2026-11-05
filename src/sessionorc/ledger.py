@@ -477,6 +477,26 @@ def team_need(entry: dict[str, Any], teams: Collection[str]) -> str:
     return ""
 
 
+def kept_waiting_of(section: str) -> dict[str, str]:
+    """The newest `kept waiting: <gate> — by …` Log line's date of one entry's section, by gate, the gate
+    compared as ledgerboard does (spaces folded, lower case) — `{"decision (paul)": "2026-11-04"}` — or {}
+    (design §4.4 *The card's status*, TD-1368). Read from the Log itself, never `gate_age`, which also counts
+    `gate added` and a reassignment; an entry whose Log cannot be read has none."""
+    if "kept waiting:" not in section:
+        return {}  # most entries: no Log line to parse on every ledger read
+    try:
+        lines = lb.log_lines(section)
+    except Exception:  # noqa: BLE001 — an entry ledgerboard refuses has no Log to read
+        return {}
+    out: dict[str, str] = {}
+    for ln in lines:
+        if ln.get("kind") == "kept-waiting" and ln.get("date") and ln.get("gate"):
+            gate = " ".join(str(ln["gate"]).split()).lower()
+            if str(ln["date"]) > out.get(gate, ""):
+                out[gate] = str(ln["date"])
+    return out
+
+
 def entries(
     text: str,
     archive: str | None = None,
@@ -504,9 +524,10 @@ def entries(
     otherwise — no callable, no PR named (§4.9b, TD-323). `sig` is a hash of the entry's section text,
     which the home's settle clock compares (§4.4 *A new entry settles before it is pickable*, TD-710).
     An entry whose header block carries a `**Waits:**` line has `waits` (`waits_of`, TD-716); whether it
-    still waits is the home's clock's, its `waiting` mark (`settle`). `team` is its `**Team:**` line's first
-    word ('' for none), and `needs_team: {why}` marks an entry `team_need` finds lacking (§4.4 *An entry
-    names its team*, TD-730).
+    still waits is the home's clock's, its `waiting` mark (`settle`). An entry whose Log carries a `kept
+    waiting` line has `kept_waiting`, the newest such line's date by gate (`kept_waiting_of`, TD-1368). `team`
+    is its `**Team:**` line's first word ('' for none), and `needs_team: {why}` marks an entry `team_need`
+    finds lacking (§4.4 *An entry names its team*, TD-730).
     **The rank** (§4.4 *The Queue*, TD-769): `rank_text` is the rank file's text beside the ledger
     (`lb.rank_path`; None, no lines) and `repo` the implicit key's last part, so each entry carries its
     `key` — its rank line's, else its implicit key — `lined` (it has a line), its card's `card_key`, and
@@ -568,6 +589,8 @@ def entries(
         e["added"] = added.group(0) if added else ""
         body = t[m.end() : nxt.start() if nxt else len(t)]
         e["detail"] = detail_of(body)
+        if kept := kept_waiting_of(t[m.start() : nxt.start() if nxt else len(t)]):
+            e["kept_waiting"] = kept  # the newest `kept waiting` date per gate (§4.4 *The card's status*, TD-1368)
         if e["for_page"] == "for-you":
             e["answers"], e["consequences"], e["default"] = answers_of(fields.get("answers", ""))
             e["ask"] = ask_of(body)  # its one sentence (§4.10 *An item leads with one sentence*, TD-913)
