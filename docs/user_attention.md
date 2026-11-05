@@ -52,7 +52,7 @@ People: paul
     - It names you as its owner. Owner is about to stop holding an entry (TD-1375), so TD-1374 gated it with decision (paul), and this item is how you release it.
   - **Question:** Once the review rounds converge and the three parts are built, will you use Focus on your phone for a real session and say whether it is the phone view you want?
   - **Recommended:** only you can know: Yes lifts the gate and the entry goes ahead; Not yet keeps it waiting on you.
-- [ ] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — File the five build slices of TD-964 (the end of a session on Focus, second round) for the grinders? Context: TD-964 decision (paul). Due: 2026-11-12. Answers: File the builds (default) | Keep it held. Lifts: File the builds.
+- [x] decide 2026-11-05 (session `grinder-ao-2` on kmaster) — File the five build slices of TD-964 (the end of a session on Focus, second round) for the grinders? Context: TD-964 decision (paul). Due: 2026-11-12. Answers: File the builds (default) | Keep it held. Lifts: File the builds. Decided: File the builds (by paul) (2026-11-05). Closed: 2026-11-05 — lifted.
   - **Context:** TD-964 is designed and reviewed (seven rounds, READY), and you lifted its hold on 2026-10-22 saying the build slices may be picked.
     - No build entries were ever filed, and the entry still names you as its owner, so no session picks it up.
     - Owner is about to stop holding an entry (TD-1375), so TD-1374 gates every entry you own with decision (paul); this one is put to you rather than left looking as if it waits.
