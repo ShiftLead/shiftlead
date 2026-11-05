@@ -265,9 +265,66 @@ def _line_qid(ref: str, repo: str, refs_open: Mapping[str, str]) -> str | None:
     return refs_open.get(got[0]) or got[0]
 
 
+def parent_qid(member: Mapping[str, Any]) -> str | None:
+    """The `<repo>#TD-n` of the entry `member` (an open entry with its `repo`) names in its `Part of:`, or None."""
+    repo = str(member.get("repo") or "")
+    par = lb.parse_part_of(member.get("part_of_raw"))[0] if member.get("part_of_raw") else member.get("part_of")
+    return qid(repo, str(par)) if par else None
+
+
+def covers(
+    line_refs: Iterable[Any],
+    parts: Iterable[Any],
+    repo: str,
+    entries: Mapping[str, Mapping[str, Any]],
+    refs_open: Mapping[str, str],
+) -> set[str]:
+    """The entries a board line **covers** (§4.4 *The card's status*, TD-1364), as `<repo>#TD-n`: each its `Context:`
+    refs (`line_refs`) or `Parts:` ids name — a bare `TD-n` its own board's repo's (`repo`), a qualified one through
+    the open members' index — and each open entry of `entries` (by `<repo>#TD-n`, each with its `repo`) that is
+    `Part of` one of those while it carries `decision (paul)`."""
+    named = {q for r in [*line_refs, *parts] if (q := _line_qid(str(r), repo, refs_open))}
+    out = set(named)
+    if not named:
+        return out
+    for q, e in entries.items():
+        if q in named or not (e.get("part_of") or e.get("part_of_raw")):
+            continue
+        if parent_qid(e) in named and ledger_mod.decided_by(dict(e), PERSON):
+            out.add(q)
+    return out
+
+
+def open_decided_covers(
+    boards: Mapping[str, Iterable[Mapping[str, Any]]],
+    entries: Mapping[str, Mapping[str, Any]],
+    refs_open: Mapping[str, str],
+    *,
+    person_only: bool = False,
+) -> set[str]:
+    """Every entry an open decided board line covers (`covers`), over every board the home reads (`boards` by repo
+    name, each `{items}`): such an entry's line is its row now, *Waiting on them* while it waits on its session
+    (§4.5 screen 6, TD-565, TD-1364). A decided `fyi` line is no work order and covers nothing; any other decided
+    line is a work order whoever wrote it, as the home's own press writes `(by <its person>)` — save with
+    `person_only`, the rows' read, which skips a line `Decided:` by someone else as `board_hold` does, so the
+    Inbox hides no row the Queue still asks about."""
+    out: set[str] = set()
+    for repo, bl in boards.items():
+        for b in bl or ():
+            for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
+                if not isinstance(it, Mapping) or not it.get("decided") or it.get("kind") == "fyi":
+                    continue
+                by = str(it.get("decided_by") or "").strip().lower()
+                if person_only and by and by != PERSON:
+                    continue
+                out |= covers(it.get("refs") or (), it.get("parts") or (), repo, entries, refs_open)
+    return out
+
+
 def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict[str, Any]]:
     """Every `decide` line of the boards, open (`items`) and closed (`carried`), as one shape: `{repo, key, open,
-    decided, by, refs, parts, closed, to, at, session}` — `decided` None for an open line not yet answered."""
+    decided, said, by, refs, parts, closed, to, at, session}` — `decided` None for an open line not yet answered,
+    `said` its `Decided:` words."""
     out: list[dict[str, Any]] = []
     for repo, bl in boards.items():
         for b in bl or ():
@@ -279,6 +336,7 @@ def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict
                 d = it.get("decided") if isinstance(it.get("decided"), Mapping) else None
                 out.append({"repo": repo, "key": str(it.get("key") or ""), "open": True,
                             "decided": str(d.get("date") or "") if d else None, "by": it.get("decided_by"),
+                            "said": str(d.get("text") or "") if d else "",
                             "refs": [str(r) for r in it.get("refs") or () if refs(r)],
                             "parts": [str(p) for p in it.get("parts") or ()], "closed": None, "to": [],
                             "at": int(it.get("line") or 0), "session": str(it.get("session") or "")})  # fmt: skip
@@ -287,6 +345,7 @@ def _board_lines(boards: Mapping[str, Iterable[Mapping[str, Any]]]) -> list[dict
                     continue
                 out.append({"repo": repo, "key": str(c.get("key") or ""), "open": False,
                             "decided": str(c["decided"].get("date") or ""), "by": c.get("decided_by"),
+                            "said": str(c["decided"].get("text") or ""),
                             "refs": [str(r) for r in c.get("refs") or ()],
                             "parts": [str(p) for p in c.get("parts") or ()],
                             "closed": dict(c.get("closed") or {}), "to": [str(t) for t in c.get("to") or ()],
@@ -320,10 +379,8 @@ def board_hold(
     Log date plus `REASK_DAYS`; one closed in other words while a live claim holds a covered member, within
     `BOARD_WAIT_DAYS` of its `Closed:`. `{kind: "board", asker, closed_at, outcome: None, line: {key, open, to}}`,
     `asker` a record's id, `TD-m` or *a pick*; a kept-waiting one `{kind: "board", until, line}`, no `asker`."""
-    repo = str(member.get("repo") or "")
-    me = qid(repo, str(member.get("id") or ""))
-    par = lb.parse_part_of(member.get("part_of_raw"))[0] if member.get("part_of_raw") else member.get("part_of")
-    parent = qid(repo, str(par)) if par else None
+    me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
+    parent = parent_qid(member)
     today = now.astimezone().date()  # the board's dates are civil dates, local
     picked: tuple[tuple[Any, ...], dict[str, Any], list[str]] | None = None
     for ln in _board_lines(boards):
@@ -341,7 +398,7 @@ def board_hold(
     if picked is None:
         return None
     _, ln, covered = picked
-    line = {"key": ln["key"], "open": ln["open"], "to": list(ln["to"])}
+    line = {"key": ln["key"], "open": ln["open"], "to": list(ln["to"]), "said": ln["said"]}
     held = next((claims[q] for q in covered if q in claims), None)  # a covered member's holder, the member first
     if ln["open"]:
         asker = claims.get(ln["key"]) or held or live.get(ln["session"]) or "a pick"
@@ -370,7 +427,8 @@ def board_hold(
         kept = _civil((member.get("kept_waiting") or {}).get(_GATE))
         if kept is None or today >= kept + timedelta(days=REASK_DAYS):
             return None  # no `kept waiting` date inside `reask_days`: its test has ended
-        return {"kind": "board", "until": (kept + timedelta(days=REASK_DAYS)).isoformat(), "line": line}
+        until = (kept + timedelta(days=REASK_DAYS)).isoformat()
+        return {"kind": "board", "until": until, "closed_at": ln["decided"], "line": line}
     if why.startswith("lifted"):
         return None
     at = _civil(ln["closed"].get("date") if ln["closed"] else None)

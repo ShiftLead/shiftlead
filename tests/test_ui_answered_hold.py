@@ -275,3 +275,140 @@ def test_ledger_for_you_links_a_question_about_the_origin_path(tmp_path):
         r["remote"] = f"git@github.com:O/{r['name']}.git"
     rows = _rows(repos, [_ask("o/r#TD-60")])
     assert [r["answered"] is not None for r in rows] == [True, False], "r's member alone, by its origin path"
+
+
+# ---- TD-1368 slice 3: a board answer on the Inbox's *Later*, *For you* and the Queue card's item ----
+
+DECIDED = "2026-10-15"  # the day before NOW
+
+
+def _line(*refs, parts=(), decided=True, kind="decide", line=3) -> dict:
+    """An open board item, as the boards reading carries it."""
+    got = {"text": "Go", "date": DECIDED} if decided else None
+    return {"kind": kind, "key": f"k{line}", "line": line, "refs": list(refs), "parts": list(parts),
+            "decided": got, "decided_by": None, "session": ""}  # fmt: skip
+
+
+def _carried(*refs, why="carried to TD-61", to=("TD-61",), closed=DECIDED) -> dict:
+    """A closed decided line, as the boards reading's `carried` holds it."""
+    return {"key": "kc", "ref": refs[0], "decided": {"text": "Go", "date": DECIDED}, "decided_by": None,
+            "closed": {"date": closed, "why": why}, "to": list(to), "at": 9, "refs": list(refs),
+            "parts": []}  # fmt: skip
+
+
+def _board_repos(tmp_path, items=(), carried=(), extra=()) -> dict:
+    repos = _repos(tmp_path, "r")
+    (r,) = repos.values()
+    r["ledger"]["entries"] += list(extra)
+    r["boards"] = {"boards": [{"items": list(items), "carried": list(carried)}]}
+    return repos
+
+
+def _build(id="TD-62", part_of="TD-60", **kw) -> dict:
+    """A `decision (paul)` build `Part of` TD-60, for the person."""
+    return {"for_page": "for-you", "priority": "medium", "id": id, "title": "a build", "part_of": part_of,
+            "blocked_by": ["decision (paul)"], "added": "2026-10-10", **kw}  # fmt: skip
+
+
+def _ids(repos, inbox=(), fleet=FLEET) -> list[str]:
+    return [r["id"] for r in _rows(repos, list(inbox), fleet)]
+
+
+def test_an_open_decided_line_covering_an_entry_takes_its_row(tmp_path):
+    # named, named second, listed in Parts:, or the parent of a held build: no ledger row while the line is open
+    assert _ids(_board_repos(tmp_path, [_line("TD-60")], extra=[_build()])) == []
+    assert _ids(_board_repos(tmp_path, [_line("TD-1", "TD-62")], extra=[_build()])) == ["TD-60"]
+    assert _ids(_board_repos(tmp_path, [_line("TD-1", parts=["TD-62"])], extra=[_build()])) == ["TD-60"]
+    # a build not held for the person is not covered by its parent's line
+    free = _build(blocked_by=[])
+    assert _ids(_board_repos(tmp_path, [_line("TD-60")], extra=[free])) == ["TD-62"]
+    # an undecided line, or a decided fyi, leaves the rows (the undecided one is drawn in their place, below)
+    assert _ids(_board_repos(tmp_path, [_line("TD-60", decided=False)], extra=[_build()])) == ["TD-60", "TD-62"]
+    assert _ids(_board_repos(tmp_path, [_line("TD-60", kind="fyi")])) == ["TD-60"]
+
+
+def test_a_line_on_another_repos_board_covers_that_repos_entry(tmp_path):
+    repos = _repos(tmp_path, "r", "s")
+    by = {r["name"]: r for r in repos.values()}
+    by["s"]["boards"] = {"boards": [{"items": [_line("r#TD-60")]}]}
+    assert [(r["name"], r["id"]) for r in _rows(repos, [])] == [("s", "TD-60")]
+
+
+def test_a_closed_carried_line_draws_the_row_answered_with_its_foot(tmp_path):
+    to = {"id": "TD-61", "title": "the carried work", "for_page": "pickable", "added": DECIDED, "owner": "grinder"}
+    (row,) = _rows(_board_repos(tmp_path, carried=[_carried("TD-60")], extra=[to]), [])
+    a = row["answered"]
+    assert a["kind"] == "board" and a["asker"] == "TD-061" and a["board"]["to"] == ["TD-61"] and a["age"] == "1d"
+    html = _render(row)
+    assert '<span class="st qans">answered — waiting on TD-061</span>' in html
+    assert "you answered “Go” on the board, 1d ago — carried to TD-61" in html
+    assert "its answers" not in html and ">Start session<" not in html
+    assert ">Lift the hold</button>" in html.split('class="more qdots"')[1]
+    # on the card, the same item
+    card = _render(row, mode="card", home="queue")
+    assert "carried to TD-61" in card and "Answer…" not in card
+    # TD-61 archived: no hold, the need again
+    (row,) = _rows(_board_repos(tmp_path, carried=[_carried("TD-60")]), [])
+    assert row["answered"] is None
+
+
+def test_a_line_closed_in_other_words_names_its_holder_acting_on_it(tmp_path):
+    claim = {"ref": "TD-60", "status": "claimed", "at": (NOW - timedelta(hours=1)).isoformat()}
+    fleet = [{**FLEET[0], "repo": str(tmp_path / "r"), "unattended": True, "progress": [claim]}]
+    repos = _board_repos(tmp_path, carried=[_carried("TD-60", why="done in #9", to=())])
+    (row,) = _rows(repos, [], fleet)
+    assert row["answered"]["name"] == "designer"
+    assert "you answered “Go” on the board, 1d ago — designer acts on it" in _render(row)
+    # nobody holds it: the need again
+    assert _rows(repos, [], [{**fleet[0], "progress": []}])[0]["answered"] is None
+
+
+def test_a_kept_waiting_member_reads_waits_until_its_date(tmp_path):
+    repos = _board_repos(tmp_path, carried=[_carried("TD-60", why="kept waiting.", to=())])
+    (r,) = repos.values()
+    r["ledger"]["entries"][0]["kept_waiting"] = {"decision (paul)": DECIDED}
+    (row,) = _rows(repos, [])
+    assert row["answered"]["until"] == "2026-11-14"
+    html = _render(row)
+    assert '<span class="st qans">waits until 2026-11-14</span>' in html and "answered — waiting" not in html
+    assert "its answers" not in html
+
+
+def test_an_undecided_covering_line_stands_in_the_rows_place_on_later_and_the_card(tmp_path):
+    from shiftlead.ui.queue import asked_entries, split_later
+
+    (row,) = _rows(_board_repos(tmp_path, extra=[_build()]), [])[1:]  # TD-62, the build
+    assert row["parent"] == "r#TD-060"
+    line = {"row": "board", "repo_name": "r", "text": "Lift it? Context: TD-1.", "parts": []}
+    assert asked_entries([{**line, "text": "Lift it? Context: TD-60."}]) == {"r#TD-060"}
+    assert asked_entries([{**line, "parts": ["TD-62"]}]) == {"r#TD-001", "r#TD-062"}
+    lf = {"groups": [{"repo": "r", "rows": [row]}]}
+    for e in ({**line, "text": "Lift it? Context: TD-60."}, {**line, "parts": ["TD-62"]}):
+        kept, *_ = split_later(lf, [e], {})
+        assert kept["n"] == 0, e
+    kept, *_ = split_later(lf, [line], {})
+    assert kept["n"] == 1, "a line naming neither leaves the row"
+    # on a card: the line drawn on the card takes the block of the build it covers
+    item = {**row, "home": "queue", "on_card": "r#TD-60", "on_row": "r#TD-62", "later_section": "later"}
+    board = {**line, "text": "Lift it? Context: TD-60.", "id": "b1", "home": "queue", "on_card": "r#TD-60",
+             "on_row": "r#TD-60", "kind": "decide"}  # fmt: skip
+    got = attach({"needs": [board]}, lambda e, sec: Markup(""), [item])
+    assert [m["id"] for m in got["cards"]["r#TD-60"]["needs"]] == ["b1"], "the build's block gives way"
+
+
+def test_open_decided_covers_reads_every_board(tmp_path):
+    from sessionorc import queue
+
+    opens = {"r#TD-060": {"id": "TD-60", "repo": "r"}, "r#TD-062": {**_build(), "repo": "r"}}
+    got = queue.open_decided_covers({"s": [{"items": [_line("r#TD-60")]}]}, opens, queue.open_refs(opens, {}))
+    assert got == {"r#TD-060", "r#TD-062"}
+
+
+def test_a_kept_wait_keeps_its_age(tmp_path):
+    other = {**_line("TD-60"), "decided_by": "alice"}
+    assert _ids(_board_repos(tmp_path, [other])) == ["TD-60"], "not the person's answer: the row stays, as on the Queue"
+    repos = _board_repos(tmp_path, carried=[_carried("TD-60", why="kept waiting.", to=())])
+    (r,) = repos.values()
+    r["ledger"]["entries"][0]["kept_waiting"] = {"decision (paul)": DECIDED}
+    (row,) = _rows(repos, [])
+    assert row["answered"]["age"] == "1d" and "on the board, 1d ago — it waits until 2026-11-14" in _render(row)

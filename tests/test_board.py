@@ -1446,6 +1446,10 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
             "name": "repo", "root": root,
             "ledger": {"entries": [entry("TD-7"), entry("TD-8"), entry("TD-9"), entry("TD-10")]},
             "work_orders": stale,
+            # the line itself, which `ledger_decide`'s check reads (covers, TD-1368)
+            "boards": {"boards": [{"items": [
+                {"kind": "decide", "refs": ["repo#TD-7"], "decided": stale["orders"][0]["decided"]}
+            ]}]},
         }
     }  # fmt: skip
     link = tmp_path / "link"

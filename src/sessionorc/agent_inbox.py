@@ -25,6 +25,7 @@ from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
+from sessionorc import queue as queue_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
@@ -950,11 +951,7 @@ class InboxMixin:
         )
         if e is None:
             raise RpcError(f"{id} no longer waits on you in {name}'s ledger: reload the Inbox")
-        if any(
-            id in (o.get("refs") or []) or f"{name}#{id}" in (o.get("refs") or [])
-            for o in ((view.get("work_orders") or {}).get("orders") or [])
-            if isinstance(o, dict)
-        ):
+        if queue_mod.qid(name, id) in self._decided_covers():
             raise RpcError(f"{id} is already decided on {name}'s board: its session acts on it")
         answers = [str(a) for a in e.get("answers") or () if str(a).strip()]
         d = e.get("default")
@@ -988,6 +985,21 @@ class InboxMixin:
         finally:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
+
+    def _decided_covers(self) -> set[str]:
+        """Every `<repo>#TD-n` an open decided line on any board the home reads covers — names it, names the entry
+        it is `Part of` while it carries `decision (paul)`, or lists it in `Parts:` (§4.4 *The card's status*,
+        TD-1364): such an entry is answered already, and `ledger_decide` refuses a second answer."""
+        readings = {str(r.get("name") or Path(root).name): r for root, r in self._repos.items() if isinstance(r, dict)}
+        opens = {
+            queue_mod.qid(n, str(e.get("id"))): {**e, "repo": n}
+            for n, r in readings.items()
+            for e in (r.get("ledger") or {}).get("entries") or ()
+            if isinstance(e, dict) and e.get("id")
+        }
+        origins = {n: o for n, r in readings.items() if (o := ledgerboard.origin_path(str(r.get("remote") or "")))}
+        boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in readings.items()}
+        return queue_mod.open_decided_covers(boards, opens, queue_mod.open_refs(opens, origins))
 
     async def _ledger_road(
         self, root: str, name: str, view: dict[str, Any], id: str, road: str, words: str, caller: Any

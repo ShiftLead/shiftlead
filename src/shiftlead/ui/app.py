@@ -242,6 +242,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _added_words,  # noqa: F401
     _ahead_words,  # noqa: F401
     _answered_of,  # noqa: F401
+    _board_age,  # noqa: F401
     _board_holder,  # noqa: F401
     _board_named,  # noqa: F401
     _board_order,  # noqa: F401
@@ -253,6 +254,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _gh_user_type,  # noqa: F401
     _gh_user_type_read,  # noqa: F401
     _held_answered,  # noqa: F401
+    _hold_inputs,  # noqa: F401
     _needs_key,  # noqa: F401
     _next_due,  # noqa: F401
     _order_teams,  # noqa: F401

@@ -182,16 +182,22 @@ def test_a_ledger_rows_answers_go_with_it_and_reply(tmp_path, monkeypatch):
     assert 'data-act="ledger_reply"' in t002 and "Go with it" not in t002 and "this entry's answers" not in t002
 
 
+def _decided_board(*refs: list[str], parts: tuple[str, ...] = ()) -> dict:
+    """A board reading of one open decided `decide` line per `refs` list, its `Context:` those refs."""
+    items = [{"kind": "decide", "refs": list(r), "parts": list(parts), "decided": {"text": "Go", "date": "2026-10-01"}}
+             for r in refs]  # fmt: skip
+    return {"boards": [{"items": items}]}
+
+
 def test_an_entry_an_open_decided_line_names_leaves_later(tmp_path):
-    """§4.5 screen 6 (TD-565): once the reading lists an open decided line whose `Context:` names
-    the entry — the repo's work orders' `refs`, bare or `<repo>#` — its row leaves *Later*; another
+    """§4.5 screen 6 (TD-565, TD-1364): once the reading lists an open decided line whose `Context:` names
+    the entry — the board's items' `refs`, bare or `<repo>#` — its row leaves *Later*; another
     repo's id of the same number does not take it."""
     from shiftlead.ui.app import ledger_for_you
 
     repos = _repos(tmp_path)
     a = str(tmp_path / "agentorc")
-    repos[a]["work_orders"] = {"orders": [{"id": "board:1", "refs": ["TD-133"]}, {"refs": ["agentorc#TD-002"]},
-                                          {"refs": ["samscrape#TD-156"]}]}  # fmt: skip
+    repos[a]["boards"] = _decided_board(["TD-133"], ["agentorc#TD-002"], ["samscrape#TD-156"])
     rows = ledger_for_you(repos, [], {})["groups"][0]["rows"]
     assert [r["id"] for r in rows] == ["TD-156", "TD-319"]
 
@@ -208,7 +214,7 @@ def test_an_old_held_mark_on_an_entry_a_decided_line_names_draws_no_row(tmp_path
     a = str(tmp_path / "agentorc")
     by = {e["id"]: e for e in repos[a]["ledger"]["entries"]}
     by["TD-133"]["held"] = {"at": (now - timedelta(hours=2)).isoformat()}
-    repos[a]["work_orders"] = {"orders": [{"id": "board:1", "refs": ["TD-133"]}]}
+    repos[a]["boards"] = _decided_board(["TD-133"])
     rows = ledger_for_you(repos, [], {}, now)["groups"][0]["rows"]
     assert "TD-133" not in [r["id"] for r in rows]
     assert all(r["kind"] in ("ledger · yours", "ledger · your decision") for r in rows)

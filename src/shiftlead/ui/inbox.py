@@ -1741,6 +1741,7 @@ def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = N
                     **board_answered(it, today),
                     "session": str(it.get("session") or ""),
                     "refs": [str(x) for x in it.get("refs") or () if str(x).strip()],
+                    "parts": [str(x) for x in it.get("parts") or () if str(x).strip()],  # what it covers (TD-1364)
                     "due_error": bool(it.get("due_error")),
                     "ahead": ""
                     if board_due_now(it) and not hidden
@@ -2502,37 +2503,31 @@ def ledger_for_you(
         for k, r in (every if every is not None else repos or {}).items()
         if isinstance(r, dict)
     }
-    linked = (
-        queue_mod.open_refs(
-            (
-                queue_mod.qid(n, str(e.get("id")))
-                for n, r in readings.items()
-                for e in (r.get("ledger") or {}).get("entries") or ()
-                if isinstance(e, dict) and e.get("id")
-            ),
-            {n: o for n, r in readings.items() if (o := lb.origin_path(str(r.get("remote") or "")))},
-        )
-        if questions
-        else {}
+    opens = {
+        queue_mod.qid(n, str(e.get("id"))): {**e, "repo": n}
+        for n, r in readings.items()
+        for e in (r.get("ledger") or {}).get("entries") or ()
+        if isinstance(e, dict) and e.get("id")
+    }
+    linked = queue_mod.open_refs(
+        opens, {n: o for n, r in readings.items() if (o := lb.origin_path(str(r.get("remote") or "")))}
     )
+    boards, claims, alive = _hold_inputs(readings, fleet, now)
+    # an entry an open decided line covers has been answered: that line is its row now, a *Waiting on them* row
+    # while it waits on its session (TD-565) — names it, names its parent while it carries `decision (paul)`, or
+    # lists it in `Parts:`, on any board the home reads (§4.4 *The card's status*, TD-1364)
+    covered = queue_mod.open_decided_covers(boards, opens, linked, person_only=True)
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():
         if not isinstance(r, dict):
             continue
         name = str(r.get("name") or Path(str(r.get("root") or root)).name)
-        # an entry an open decided line names has been answered: that line is its row now, a
-        # *Waiting on them* row while it waits on its session (TD-565)
-        decided = {
-            str(ref).rsplit("#", 1)[-1]
-            for o in ((r.get("work_orders") or {}).get("orders") or [])
-            if isinstance(o, dict)
-            for ref in o.get("refs") or ()
-            if "#" not in str(ref) or str(ref).rsplit("#", 1)[0] == name
-        }
         entries = [
             e
             for e in ((r.get("ledger") or {}).get("entries") or [])
-            if isinstance(e, dict) and e.get("for_page") == "for-you" and e.get("id") not in decided
+            if isinstance(e, dict)
+            and e.get("for_page") == "for-you"
+            and queue_mod.qid(name, str(e.get("id"))) not in covered
         ]
         if not entries:
             continue
@@ -2566,8 +2561,18 @@ def ledger_for_you(
             ok = isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers)
             added = str(e.get("added") or "")
             got_q = (
-                queue_mod.answered_hold({**e, "repo": name}, questions, states, linked, now)
-                if questions and not owner
+                queue_mod.answered_hold(
+                    {**e, "repo": name},
+                    questions,
+                    states,
+                    linked,
+                    now,
+                    boards=boards,
+                    claims=claims,
+                    entries=opens,
+                    live=alive,
+                )  # fmt: skip
+                if not owner
                 else None
             )
             rows.append(
@@ -2600,6 +2605,11 @@ def ledger_for_you(
                     or bool(e.get("parts_open")),  # an open part counts as an open blocker (TD-1130)
                     "builds_open": ledger_mod.builds_open(e),
                     "url": f"/repo/{quote(name)}#{quote(e['id'])}",
+                    # the entry it is `Part of` while it carries `decision (paul)`: a line naming that one covers
+                    # this row too (`queue.covered_by`, §4.4 *The card's status*, TD-1364)
+                    "parent": (queue_mod.parent_qid({**e, "repo": name}) or "")
+                    if ledger_mod.decided_by(dict(e), queue_mod.PERSON)
+                    else "",
                     "answered": _held_answered(got_q, questions, names, now) if got_q else None,
                 }
             )
@@ -2607,12 +2617,83 @@ def ledger_for_you(
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}
 
 
+def _hold_inputs(
+    readings: Mapping[str, Mapping[str, Any]], fleet: Collection[Mapping[str, Any]], now: datetime
+) -> tuple[dict[str, list[Any]], dict[str, str], dict[str, str]]:
+    """What a board answer's hold reads (`queue.answered_hold`, §4.4 *The card's status*, TD-1368), as the Queue's
+    reading builds it: the boards by repo name, each live unattended record's unexpired claims — `board:<key>` and
+    `<repo>#TD-n`, the person's own sessions left out — to its id, and the live records by id and name."""
+    boards = {n: list((r.get("boards") or {}).get("boards") or ()) for n, r in readings.items()}
+    by_root: dict[Path, str] = {}
+    for n, r in readings.items():
+        try:
+            by_root[Path(str(r.get("root") or n)).resolve()] = n
+        except OSError:
+            continue
+    claims: dict[str, str] = {}
+    alive: dict[str, str] = {}
+    for s in sorted(fleet, key=lambda s: str(s.get("id") or "")):
+        if not s.get("id") or s.get("state") in ("exited", "closed"):
+            continue
+        sid = str(s["id"])
+        alive.setdefault(sid, sid)
+        alive.setdefault(str(s.get("name") or sid), sid)
+        if not s.get("unattended"):
+            continue
+        try:
+            home = by_root.get(Path(str(s.get("repo") or "")).resolve()) if s.get("repo") else None
+        except OSError:
+            home = None
+        for p in s.get("progress") or ():
+            if not isinstance(p, Mapping) or p.get("status") != "claimed":
+                continue
+            ref, at = str(p.get("ref") or ""), queue_mod._aware(p.get("at"))
+            if at is None or now - at >= mail_mod.LEASE_TTL:
+                continue
+            if ref.startswith(workorders_mod.PREFIX):
+                claims.setdefault(ref, sid)
+            elif home and re.fullmatch(r"TD-\d+", ref):
+                claims.setdefault(queue_mod.qid(home, ref), sid)
+    return boards, claims, alive
+
+
+def _board_age(day: Any, now: datetime) -> str:
+    """A board answer's age from its `Decided:` date, a civil date: *3d*, or "" on the day itself."""
+    try:
+        d = date.fromisoformat(str(day or "")[:10])
+    except ValueError:
+        return ""
+    days = (now.astimezone().date() - d).days
+    return f"{days}d" if days > 0 else ""
+
+
 def _held_answered(
     got: Mapping[str, Any], questions: list[Mapping[str, Any]], names: Mapping[str, str], now: datetime
 ) -> dict[str, Any]:
     """A ledger row's `answered` (§4.5 screen 12 *Three wants*, TD-1316) from `answered_hold`'s: its asker's name,
     the question's kind, `words` — what the question's row says of the answer (`_owing`'s `answer_given`, else its
-    `answer_how`) — `age`, the answer's, and `outcome`, its `done` outcome where one is sent."""
+    `answer_how`) — `age`, the answer's, and `outcome`, its `done` outcome where one is sent. A board answer's
+    (`kind: board`, TD-1368) carries `board`, the line's `{key, open, to}`, and `words` *you answered "<its
+    `Decided:` words>" on the board*, its age the `Decided:` date's; a kept-waiting one `until`, its date."""
+    if got.get("kind") == "board":
+        line = got.get("line") if isinstance(got.get("line"), Mapping) else {}
+        asker = str(got.get("asker") or "")
+        said = str(line.get("said") or "")
+        return {
+            "mid": "",
+            "asker": asker,
+            "name": names.get(asker, asker),
+            "kind": "board",
+            "words": f"you answered \u201c{said}\u201d on the board" if said else "you answered on the board",
+            "age": _board_age(got.get("closed_at"), now),
+            "outcome": None,
+            "until": str(got.get("until") or ""),
+            "board": {
+                "key": str(line.get("key") or ""),
+                "open": bool(line.get("open")),
+                "to": list(line.get("to") or ()),
+            },
+        }
     q = next((x for x in questions if x.get("id") == got.get("mid")), {})
     given = str(q.get("answer_given") or "")
     outcome = got.get("outcome") if isinstance(got.get("outcome"), Mapping) else None

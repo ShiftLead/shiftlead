@@ -75,7 +75,8 @@ def test_an_open_decided_line_holds_its_member_while_open_naming_its_holder(tmp_
         rec.repo = rec.dir = root
         row = _row(_read({root: r}, [rec]), "r#TD-001")
         assert row["state"] == "answered — waiting on grinder" and row["needs"] == "decision", refs
-        assert row["answered"]["kind"] == "board" and row["answered"]["line"] == {"key": key, "open": True, "to": []}
+        assert row["answered"]["kind"] == "board"
+        assert row["answered"]["line"] == {"key": key, "open": True, "to": [], "said": "Go"}
         assert row["answered"]["closed_at"] == "2026-10-15" and "mid" not in row["answered"]
     c = _by_id(_read({root: r}))["r#TD-001"]
     assert c["top"]["state"] == "answered — waiting on a pick" and c["status"] != "needs you"
