@@ -76,6 +76,17 @@ def _no_real_repos_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     monkeypatch.setattr(hosts, "AGENT_CADENCE_ROSTER", str(tmp_path / "no-roster" / "repos.txt"))
 
 
+@pytest.fixture(autouse=True)
+def _no_real_gate_sweep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The event runner (TD-1376) runs the pinned `gate_sweep.py --apply` in every registered root once a
+    day, which asks the forge and opens PRs. A test never runs it: every root reads as not sweepable, and a
+    test of the sweep itself puts back `gatesweep.ELIGIBLE` / `gatesweep.SWEEP`, the real functions."""
+    from sessionorc import gatesweep
+
+    monkeypatch.setattr(gatesweep, "eligible", lambda root: (False, "tests run no gate sweep"))
+    monkeypatch.setattr(gatesweep, "sweep", lambda *a, **k: (None, "tests run no gate sweep"))
+
+
 CHILD = HERE / "_agent_child.py"
 FAST_TICK = 0.3
 

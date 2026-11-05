@@ -14,7 +14,7 @@ import re
 import shutil
 import time
 from collections.abc import Callable, Collection, Mapping
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +33,7 @@ from sessionorc import balance as balance_mod
 from sessionorc import brief as brief_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import conventions as conventions_mod
+from sessionorc import gatesweep as gatesweep_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import promote as promote_mod
@@ -774,6 +775,11 @@ class TickMixin:
         ) and now - self._conventions_read_at > DERIVE_EVERY:
             self._conventions_read_at = now  # rule 12: the script runs git, so detached as well
             self._conventions_task = asyncio.create_task(self._conventions_pass(records))
+        if self._sweep_task is None or self._sweep_task.done():
+            today = now.astimezone(UTC).date()
+            if any(gatesweep_mod.due(self._swept_on.get(r), today) for r in self._repos):
+                # the event runner (TD-1376): the sweep asks the forge and opens PRs, so detached as well
+                self._sweep_task = asyncio.create_task(self._sweep_pass(today))
         if (self._held_task is None or self._held_task.done()) and now - self._held_read_at > DERIVE_EVERY:
             self._held_read_at = now  # rule 11: one `gh pr view` a merged PR, so detached as well
             self._held_task = asyncio.create_task(self._held_pass(records, now))
@@ -1625,6 +1631,45 @@ class TickMixin:
             log.exception("the conventions pass failed")
         finally:
             await self._push_changes()
+
+    async def _sweep_pass(self, today: date) -> None:
+        """The event runner (design §4.4 *An entry says what it waits for*, TD-1376), detached: once a UTC day,
+        each registered root the home can sweep (`gatesweep.eligible`: pinned, a split ledger, a tree that
+        holds the scripts) is swept in a thread, one root at a time, every registered root's board read beside
+        its own (`gatesweep.sweep`). Its lifts and board items arrive as PRs the home opens and never merges;
+        the reading is logged, never stored. A root is marked swept for the day whatever its run said, so a
+        failing one is tried again tomorrow, not every tick; why a root is not swept is logged once while it
+        lasts (`_sweep_quiet`)."""
+        by = re.sub(r"[^A-Za-z0-9_.@/-]", "-", self.host) or "host"  # who lifts, in the Log: a token
+        try:
+            roots = list(self._repos)
+            for root in roots:
+                if not gatesweep_mod.due(self._swept_on.get(root), today):
+                    continue
+                self._swept_on[root] = today
+                ok, why = await asyncio.to_thread(gatesweep_mod.eligible, root)
+                if not ok:
+                    if (root, str(why)) not in self._sweep_quiet:
+                        self._sweep_quiet.add((root, str(why)))
+                        log.info("%s: no gate sweep — %s", root, why)
+                    continue
+                self._sweep_quiet = {(r, w) for r, w in self._sweep_quiet if r != root}
+                others = [r for r in roots if r != root and Path(r).is_dir()]
+                got, why = await asyncio.to_thread(
+                    lambda r=root, o=others: gatesweep_mod.sweep(
+                        r,
+                        o,
+                        today_utc=today,
+                        today_local=date.today(),  # noqa: DTZ011 — a board's date is the person's
+                        by=by,
+                    )
+                )
+                if got is None:
+                    log.warning("%s: the gate sweep gave no reading — %s", root, why)
+                    continue
+                log.info("%s: gate sweep — %s", root, gatesweep_mod.summary(got))
+        except Exception:  # noqa: BLE001 — a detached task: log it, and tomorrow's pass tries again
+            log.exception("the gate sweep pass failed")
 
     def _conventions_once(self, root: str, line: str) -> None:
         """Rule 12's info line for `root`, logged once while it lasts (TD-1046)."""

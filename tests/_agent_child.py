@@ -17,7 +17,7 @@ from datetime import timedelta
 
 from _stubs import AgentShellStub, HookFedStub
 
-from sessionorc import adapters, hosts
+from sessionorc import adapters, gatesweep, hosts
 from sessionorc import agent_common as agent_mod
 from sessionorc.agent import HostAgent, serve_until_signal
 from sessionorc.tmux import Tmux
@@ -27,6 +27,8 @@ async def _run(socket_name: str) -> None:
     # never the person's agent-cadence roster: the home reads repo facts (`gh`, git) for every repo
     # on it (design §4.4 *Repo facts*), as conftest's `_no_real_repos_registry` says for this process
     hosts.AGENT_CADENCE_ROSTER = os.path.join(os.environ["SHIFTLEAD_HOME"], "no-roster", "repos.txt")
+    # never the real gate sweep (TD-1376), which opens PRs on the forge: conftest's `_no_real_gate_sweep`
+    gatesweep.eligible = lambda root: (False, "tests run no gate sweep")
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
     adapters.register(AgentShellStub())  # test-only, a shell that counts as an agent
