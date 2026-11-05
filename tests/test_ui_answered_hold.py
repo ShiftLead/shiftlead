@@ -405,6 +405,8 @@ def test_open_decided_covers_reads_every_board(tmp_path):
 
 
 def test_a_kept_wait_keeps_its_age(tmp_path):
+    other = {**_line("TD-60"), "decided_by": "alice"}
+    assert _ids(_board_repos(tmp_path, [other])) == ["TD-60"], "not the person's answer: the row stays, as on the Queue"
     repos = _board_repos(tmp_path, carried=[_carried("TD-60", why="kept waiting.", to=())])
     (r,) = repos.values()
     r["ledger"]["entries"][0]["kept_waiting"] = {"decision (paul)": DECIDED}

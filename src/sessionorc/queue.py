@@ -299,16 +299,23 @@ def open_decided_covers(
     boards: Mapping[str, Iterable[Mapping[str, Any]]],
     entries: Mapping[str, Mapping[str, Any]],
     refs_open: Mapping[str, str],
+    *,
+    person_only: bool = False,
 ) -> set[str]:
     """Every entry an open decided board line covers (`covers`), over every board the home reads (`boards` by repo
     name, each `{items}`): such an entry's line is its row now, *Waiting on them* while it waits on its session
     (§4.5 screen 6, TD-565, TD-1364). A decided `fyi` line is no work order and covers nothing; any other decided
-    line is a work order whoever wrote it, as the home's own press writes `(by <its person>)`."""
+    line is a work order whoever wrote it, as the home's own press writes `(by <its person>)` — save with
+    `person_only`, the rows' read, which skips a line `Decided:` by someone else as `board_hold` does, so the
+    Inbox hides no row the Queue still asks about."""
     out: set[str] = set()
     for repo, bl in boards.items():
         for b in bl or ():
             for it in (b.get("items") or ()) if isinstance(b, Mapping) else ():
                 if not isinstance(it, Mapping) or not it.get("decided") or it.get("kind") == "fyi":
+                    continue
+                by = str(it.get("decided_by") or "").strip().lower()
+                if person_only and by and by != PERSON:
                     continue
                 out |= covers(it.get("refs") or (), it.get("parts") or (), repo, entries, refs_open)
     return out

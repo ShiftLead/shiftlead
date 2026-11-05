@@ -2516,7 +2516,7 @@ def ledger_for_you(
     # an entry an open decided line covers has been answered: that line is its row now, a *Waiting on them* row
     # while it waits on its session (TD-565) — names it, names its parent while it carries `decision (paul)`, or
     # lists it in `Parts:`, on any board the home reads (§4.4 *The card's status*, TD-1364)
-    covered = queue_mod.open_decided_covers(boards, opens, linked)
+    covered = queue_mod.open_decided_covers(boards, opens, linked, person_only=True)
     groups: list[dict[str, Any]] = []
     for root, r in (repos or {}).items():
         if not isinstance(r, dict):
