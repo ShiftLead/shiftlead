@@ -196,7 +196,7 @@ def test_a_clock_that_cannot_be_written_marks_no_settling_says_so_and_still_mark
     with caplog.at_level("WARNING", logger="shiftlead.agent"):
         TickMixin._settle(str(root), "https://github.com/o/r.git", got, T0, fresh=True)  # does not raise (TD-719)
     assert all("settling" not in e and "held" not in e for e in got)  # entries go at once
-    assert _by_id(got)["TD-002"]["waiting"] == {"on": "event", "until": ""}  # a wait needs no clock
+    assert _by_id(got)["TD-002"]["waiting"]["on"] == "event"  # a wait needs no clock
     assert "the settle clock of" in caplog.text and "could not be kept" in caplog.text
 
 

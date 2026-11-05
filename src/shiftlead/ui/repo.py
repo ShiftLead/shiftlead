@@ -402,7 +402,8 @@ def ledger_lists(
     where the ledger was not read and the lanes could not be (`lanes` None or the entries unread).
     An entry the home's settle clock withholds carries `settle`, *settles in 7m*, drawn with no press
     (§4.5a *Repo page: settles in 7m on an entry*, TD-710); one whose wait stands carries `wait`, *waits
-    until 10-16* or *waits: <words>*, and `wait_line`, its `Waits:` line whole (TD-716); `held` is the
+    until 10-16* or *waits: <words>*, and `wait_line`, its gates with their Event lines or its `Waits:` line
+    whole (TD-716, TD-1395), and its `blocked_by` drops the gates the mark says; `held` is the
     claim's, as ever."""
     now = now or datetime.now(UTC)
     held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
@@ -435,6 +436,8 @@ def ledger_lists(
                     # what it waits for (§4.5a *Repo page: waits mark*, TD-716): the line whole on hover
                     "wait": teamrun.wait_words(e, short=True),
                     "wait_line": teamrun.wait_line(e),
+                    # ids and decisions alone: the waits mark says the gate (§4.5a *Repo page: waits mark*, TD-1395)
+                    "blocked_by": [b for b in e.get("blocked_by") or [] if not ledger.is_gate(str(b))],
                     **({"flag": LEDGER_FLAGS[key]} if key in LEDGER_FLAGS else {}),
                     "builds": builds.get(e["id"]),
                     "builds_of": builds_of.get(e["id"], []),

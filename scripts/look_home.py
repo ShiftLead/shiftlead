@@ -74,6 +74,7 @@ LEDGER = """# Technical debt
 |---|---|---|---|
 | TD-001 | A fixture entry | Medium | Open |
 | TD-002 | A fixture entry for you | Low | Open |
+| TD-003 | A fixture entry that waits on an event | Low | Open |
 
 ## TD-001: A fixture entry
 
@@ -104,6 +105,24 @@ LEDGER = """# Technical debt
 **Fix:** nothing to fix; its Why and Fix are the row's *details*.
 
 **Answers:** Keep it (default) | Drop it.
+
+**Done when:** never.
+
+## TD-003: A fixture entry that waits on an event
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-11-05
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** event (fixture-event)
+**Location:** nowhere
+
+**Why:** an entry that waits on an event gate, so the Repo page draws its waits mark (TD-1395).
+
+**Event (fixture-event):** the fixture's event happens
+check: pr-merged o/fixture#1
 
 **Done when:** never.
 """

@@ -121,4 +121,4 @@ def test_v2_writes_the_fixture_ledger_as_a_directory_the_reader_reads(tmp_path):
     assert (repo / "docs" / "ledger" / "README.md").is_file() and not (repo / "docs" / "technical_debt.md").exists()
     assert ledger.ledger_path(repo) == "docs/ledger"
     got = ledger.reading(repo, datetime.now(UTC), with_history=False)
-    assert {e["id"] for e in got["entries"]} == {"TD-001", "TD-002"}
+    assert {e["id"] for e in got["entries"]} == {"TD-001", "TD-002", "TD-003"}

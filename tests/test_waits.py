@@ -13,7 +13,7 @@ from sessionorc import ledger, settle
 from sessionorc.client import AgentError, LocalClient
 
 NOW = datetime.now(UTC)
-TODAY = NOW.astimezone().date()
+TODAY = NOW.date()  # a wait's day is a UTC day (TD-1395)
 TOMORROW = (TODAY + timedelta(days=1)).isoformat()
 GRINDER = ["free-pick", "owner:grinder"]
 
@@ -50,9 +50,9 @@ def test_the_line_is_read_from_the_header_block_alone():
 
 def test_a_wait_stands_until_its_day_and_an_event_until_the_line_goes():
     got = _read(_entry(1, f"until {TOMORROW} — CI"), _entry(2, "event — a sync"), _entry(3, "until no date"))
-    assert got["TD-001"]["waiting"] == {"on": "until", "until": TOMORROW}
-    assert got["TD-002"]["waiting"] == {"on": "event", "until": ""}
-    assert got["TD-003"]["waiting"] == {"on": "until", "until": ""}, "no date: it waits with no end"
+    assert got["TD-001"]["waiting"] == {"on": "until", "until": TOMORROW, "name": "", "why": "CI"}
+    assert got["TD-002"]["waiting"] == {"on": "event", "until": "", "name": "", "why": "a sync"}
+    assert got["TD-003"]["waiting"] == {"on": "until", "until": "", "name": "", "why": "no date"}, "no end"
     later = settle.mark_waits(list(got.values()), NOW + timedelta(days=1))
     assert [e["id"] for e in later if e.get("waiting")] == ["TD-002", "TD-003"], "its day has begun"
     assert _read(_entry(1, f"until {TODAY.isoformat()} — today"))["TD-001"].get("waiting") is None
@@ -82,7 +82,7 @@ def test_a_wait_is_marked_with_no_settle_record():
     """A repo with no `settle:` and no clock record still marks waits (`mark` over an empty record)."""
     entries = ledger.entries("# Ledger\n\n" + _entry(1, "event — a sync"))
     settle.mark(entries, "o/nothing-recorded", {}, NOW)
-    assert entries[0]["waiting"] == {"on": "event", "until": ""}
+    assert entries[0]["waiting"] == {"on": "event", "until": "", "name": "", "why": "a sync"}
 
 
 @pytest.mark.integration
