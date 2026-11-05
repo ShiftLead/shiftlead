@@ -1124,7 +1124,11 @@ class HostAgent(
     def _witness_press_of(self, word: str, target: str, dir: Any) -> dict[str, Any] | None:
         """A `press` record for `word` on `target`: a word that carries a `dir` whose repo is no registered
         one's is not recorded (§4.4 *The record's `repo`*)."""
-        repo = self._witness_repo(dir) if witness.PRESS_WORDS[word] else ""
+        try:  # called after the act committed (inside `inbox_hand`, `push_subscribe`): it never fails it
+            repo = self._witness_repo(dir) if witness.PRESS_WORDS[word] else ""
+        except Exception:  # noqa: BLE001 — the registry unreadable: no record, the act stands
+            log.exception("press %s %s: the registry could not be read, so it is not witnessed", word, target)
+            return None
         if repo is None:
             log.info("press %s %s: %r is in no registered repo, so it is not witnessed", word, target, dir)
             return None
