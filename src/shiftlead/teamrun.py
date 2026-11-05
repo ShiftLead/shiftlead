@@ -893,6 +893,7 @@ def start(
     # the definition starts interactive carries `controllers: [lead]` that can never fire. The list
     # is set and the start stands — it is a fact about the definition — but it is said out loud.
     out_of_reach = [x.name for x in plan.members if not x.unattended] if lead_id else []
+    witness_press(call, "start", name, team_dir(plan))
     # TD-042: a brief that names one run cannot start the next. The start stands — the brief is
     # prose and the judgement is the author's — but it is said out loud, like `out_of_reach`.
     return plan, {
@@ -1616,7 +1617,23 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
             out["skipped"].append(row)
             continue
         out["applied"].append(row)
+    if out["applied"]:
+        witness_press(call, "apply", name, team_dir(plan))
     return out
+
+
+def team_dir(plan: teams.Plan) -> str:
+    """The team's checkout, a press's `dir` (§4.4 *The home keeps a log of what it witnesses*): its first
+    launch's `dir`, empty for a team that launches nothing."""
+    return str(plan.launches[0].dir) if plan.launches else ""
+
+
+def witness_press(call: Call, word: str, target: str, dir: str = "") -> None:
+    """Tell the home the person pressed `word` on `target` (§4.4, `witness_press`, TD-1386), after the act
+    succeeded. A refusal — a session's own run of the same command, an older home — is swallowed: the act
+    stands whatever the log took."""
+    with contextlib.suppress(Exception):  # the press is recorded or not; the act it records stands
+        call("witness_press", word=word, target=target, **({"dir": dir} if dir else {}))
 
 
 def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str, Any]]) -> list[dict[str, Any]]:

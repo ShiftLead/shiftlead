@@ -427,11 +427,16 @@ class NotifyMixin:
         agent_common.person_only(caller, "turn push on for a device", "§4.10", self._graph())
         self._push_home("push_subscribe")
         doc = push_mod.load()
+        held = {str(d.get("id")) for d in doc.get("devices") or () if isinstance(d, dict)}
         try:
             got = push_mod.subscribe(doc, endpoint, keys, label, key, now_iso(), replaces)
         except ValueError as e:
             raise RpcError(f"push_subscribe: {e} (design §4.10)") from None
         push_mod.save(doc)
+        # push on, witnessed (§4.4, TD-1386): an endpoint new to the home whose post names no held device in
+        # `replaces` — a renewal the page could not name reads as a new device and is recorded
+        if got not in held and not (replaces and str(replaces) in held):
+            self._witness_press_of("push-on", got, None)
         return {"id": got}
 
     async def rpc_push_unsubscribe(self, id: Any = None, caller: Any = None) -> dict[str, Any]:

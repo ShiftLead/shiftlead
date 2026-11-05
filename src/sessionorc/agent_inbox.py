@@ -187,6 +187,9 @@ class InboxMixin:
         self._mark(e.id, snoozed_for=mid, looked_by=None)  # an earlier reading is not this one's
         await self._push_changes()
         log.info("inbox_hand: look %s handed to %s as %s", e.id, to, mid)
+        # the press, witnessed inside the person-only RPC (§4.4, TD-1386): its repo the sender's checkout's
+        sender = self._graph().get(str(e.from_ or ""))
+        self._witness_press_of("send-to-reviewer", e.id, getattr(sender, "dir", None))
         return {"id": PERSON, "msg": e.id, "handed": mid, "to": to, "read_when": self._entry_read_when(to)}
 
     async def rpc_inbox_dismiss(self, msg: list[str] | str, caller: Any = None) -> dict[str, Any]:

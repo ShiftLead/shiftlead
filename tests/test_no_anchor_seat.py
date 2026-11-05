@@ -113,6 +113,10 @@ def test_a_start_writes_no_anchor_and_every_session_takes_a_worktree(tmp_path, m
     assert not any(p["name"] == "t-anchor" or p.get("role") == "anchor" for p in made)
     assert all(p["worktree"] == p["name"] for p in made)  # no session in the checkout itself (§9 invariant 2)
     assert all("held_reason" not in p for p in made)
+    # the Start, witnessed at the home with the team's checkout (§4.4, TD-1386): `start` alone, never `apply`
+    assert [p for m, p in calls if m == "witness_press"] == [
+        {"word": "start", "target": "t", "dir": str(p.launches[0].dir)}
+    ]
     assert not any(n.startswith("t-anchor") for n in out["notes"])
 
 
@@ -240,6 +244,8 @@ def test_apply_creates_a_seat_the_run_lacks_in_a_worktree_under_the_manager(tmp_
     assert made["name"] == "tl" and "held" not in made and "held_reason" not in made
     assert made["controllers"] == ["ao-alpha-lead"] and made["worktree"] == "tl"
     assert [r["line"] for r in got["applied"]] == ["tl: starts"]
+    presses = [p for m, p in calls if m == "witness_press"]
+    assert presses == [{"word": "apply", "target": "t", "dir": str(teams.plan(org, "t", HOST).launches[0].dir)}]
 
 
 def test_apply_creates_a_manager_on_call_the_run_lacks_held(tmp_path, monkeypatch):

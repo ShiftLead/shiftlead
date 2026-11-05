@@ -26,6 +26,7 @@ from sessionorc import (
     naming,
     paths,
     reports,
+    witness,
     workorders,
 )
 from sessionorc import balance as balance_mod
@@ -287,6 +288,14 @@ class TickMixin:
             if day != self._backed_up and (self._backup_task is None or self._backup_task.done()):
                 self._backed_up = day  # tried once a day: a failure is a log line and tomorrow's retry
                 self._backup_task = asyncio.create_task(self._backup(day))
+            month = datetime.now(UTC).strftime("%Y-%m")
+            if month != self._witness_pruned:  # the first tick of each UTC month (§4.4, TD-1386)
+                self._witness_pruned = month
+                try:
+                    if gone := witness.prune():
+                        log.info("the witness log's months past the kept ones removed: %s", ", ".join(gone))
+                except OSError as e:
+                    log.warning("pruning the witness log failed: %s", e)
         if self.mode == "home" and (self._repos_task is None or self._repos_task.done()):
             # detached as the usage refresh is: `gh` talks to the network (§4.4 *Repo facts*)
             self._repos_task = asyncio.create_task(self._refresh_repos())

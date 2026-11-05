@@ -292,7 +292,16 @@ FILE_CAP = 256 * 1024
 # relative to SHIFTLEAD_HOME — the org's records and the files that say what the org is — and how
 # many days are kept. Nothing else: never a node's `env`, a token, a run log or a socket.
 BACKUP_KEEP = 7
-BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml", "settings.yml")
+BACKUP_MEMBERS = (
+    "sessions",
+    "remote",
+    "person_inbox.json",
+    "org.yml",
+    "hosts.yml",
+    "profiles.yml",
+    "settings.yml",
+    "witnessed",  # the witness log (§4.4 *The home keeps a log of what it witnesses*, TD-1386)
+)
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 # The usage endpoint is the fallback, asked on demand (design §4.4 *Usage*, TD-233 slice 3): an
 # account is asked only when its reading is older than `USAGE_FRESH`, at most once per

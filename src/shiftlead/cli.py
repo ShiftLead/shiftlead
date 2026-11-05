@@ -4505,6 +4505,8 @@ def cmd_host(args: argparse.Namespace) -> int:
                 return refused
         if args.action in ("up", "rebuild"):
             out = containers.host_up(args.name, rebuild=args.action == "rebuild")
+            if args.action == "rebuild":  # the press, witnessed at the home (§4.4, TD-1386); a session's refused
+                teamrun.witness_press(call_sync, "host-rebuild", args.name)
             if ended is not None:
                 out["ended"] = ended
             return emit(

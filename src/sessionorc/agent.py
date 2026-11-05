@@ -45,6 +45,7 @@ from sessionorc import (
     naming,
     paths,
     reports,
+    witness,
     work,
 )
 from sessionorc import balance as balance_mod
@@ -899,6 +900,8 @@ class HostAgent(
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
         self._oversize: set[str] = set()  # ids whose view is past the line limit, logged once each
         self._backed_up = ""  # the local date of the last nightly tarball tried (a home only)
+        self._witness_pruned = ""  # the UTC month the witness log was last pruned in (§4.4, TD-1386)
+        self._witness_loop: asyncio.AbstractEventLoop | None = None
         self._backup_task: asyncio.Task[None] | None = None
 
     # -- lifecycle ------------------------------------------------------------------------------
@@ -909,6 +912,12 @@ class HostAgent(
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
         self.tmux.ensure_server()
+        self._witness_loop = asyncio.get_running_loop()
+        if self.mode == "home":  # where the witness log begins (§4.4 *The home keeps a log*, TD-1386)
+            try:
+                witness.ensure_start()
+            except OSError as e:
+                log.warning("the witness log's start could not be written: %s", e)
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)
         # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
         server = await asyncio.start_unix_server(self._handle_conn, sock=_bound(sock), limit=link.FRAME_LIMIT)
@@ -1088,6 +1097,60 @@ class HostAgent(
         node, or a home before its first tick, serves an empty reading."""
         got = self._queue_ranked(self._queue or {"cards": [], "completed": [], "other_work": [], "at": None})
         return reports.omitted(got, omit) if omit else got
+
+    def _witness(self, kind: str, repo: str | None, text: str, at: datetime | None = None) -> dict[str, Any] | None:
+        """One record in the home's witness log (§4.4 *The home keeps a log of what it witnesses*, TD-1386),
+        on the loop: a node writes none, and a writer's failure is a log line that never fails its act."""
+        if self.mode != "home":
+            return None
+        try:
+            return witness.append(kind, repo or "", text, at)
+        except (OSError, ValueError) as e:
+            log.warning("the witness log could not take a %s record: %s", kind, e)
+            return None
+
+    def _witness_soon(self, kind: str, repo: str | None, text: str, at: datetime | None = None) -> None:
+        """`_witness` from a detached thread: the record is handed to the loop, so two never interleave."""
+        loop = self._witness_loop
+        if loop is None or loop.is_closed():
+            log.warning("the witness log has no loop to take a %s record", kind)
+            return
+        loop.call_soon_threadsafe(self._witness, kind, repo, text, at)
+
+    def _witness_repo(self, dir: Any) -> str | None:
+        """The registry name of the registered repo `dir` is in (`witness.repo_named`), else None."""
+        return witness.repo_named(dir, hosts.local_host().repos())
+
+    def _witness_press_of(self, word: str, target: str, dir: Any) -> dict[str, Any] | None:
+        """A `press` record for `word` on `target`: a word that carries a `dir` whose repo is no registered
+        one's is not recorded (§4.4 *The record's `repo`*)."""
+        try:  # called after the act committed (inside `inbox_hand`, `push_subscribe`): it never fails it
+            repo = self._witness_repo(dir) if witness.PRESS_WORDS[word] else ""
+        except Exception:  # noqa: BLE001 — the registry unreadable: no record, the act stands
+            log.exception("press %s %s: the registry could not be read, so it is not witnessed", word, target)
+            return None
+        if repo is None:
+            log.info("press %s %s: %r is in no registered repo, so it is not witnessed", word, target, dir)
+            return None
+        return self._witness("press", repo, f"{word} {target}")
+
+    async def rpc_witness_press(
+        self, word: Any = None, target: Any = None, dir: Any = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """The person pressed a control (§4.4 *The home keeps a log of what it witnesses*, `press`, TD-1386):
+        sent by the place that composed the press, after the act succeeded. A person's own, at the home alone:
+        refused to a session, refused at a node and when forwarded from one (`modes.HOME_ONLY`), and for a word
+        not in `witness.PRESS_WORDS`. `{recorded}`: the record's id, or null where its repo is no registered
+        one's."""
+        agent_common.person_only(caller, "record a press", "§4.4", self._graph())
+        if self.mode != "home":
+            raise RpcError("witness_press runs at the home: a press is witnessed there alone (design §4.4)")
+        if word not in witness.PRESS_WORDS:
+            raise RpcError(f"witness_press: {word!r} is not a press word ({', '.join(witness.PRESS_WORDS)})")
+        if not isinstance(target, str) or not target.strip():
+            raise RpcError("witness_press: target names what was pressed on (design §4.4)")
+        got = self._witness_press_of(str(word), target.strip(), dir)
+        return {"recorded": got["id"] if got else None}
 
     async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty

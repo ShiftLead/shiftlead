@@ -96,6 +96,8 @@ def test_start_makes_a_run_only_member_from_the_line(world, client):  # noqa: F8
     assert made["unattended"] is True and made["supervised"] is True and made["team"] == "dc-grind"
     assert made["prompt"] == got["prompt"] and made["prompt_from"], "the line's brief, its source kept"
     assert not [m for m, _ in fleet.calls if m == "set_settings"], "a run-only start writes no setting"
+    (press,) = [p for m, p in fleet.calls if m == "witness_press"]  # §4.4, TD-1386
+    assert (press["word"], press["target"]) == ("new-session", "dc-grind") and press["dir"]
 
 
 def test_what_the_person_typed_over_the_line_is_the_records_for_its_run(world, client):  # noqa: F811
