@@ -23,7 +23,7 @@ from __future__ import annotations
 import hashlib
 import re
 import subprocess
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
@@ -752,12 +752,27 @@ def default_ref(root: Path | str, timeout: float = 10.0) -> str | None:
     return None
 
 
+def pick_repo[K](repo: str, paths: Mapping[K, str], names: Mapping[K, str] | None = None) -> K | None:
+    """The one checkout a `<repo>` names (§4.4 *Repo facts*, ledgerboard's target design §3.2, TD-1371): a `<repo>`
+    with a `/` is an origin path (`owner/name`, deeper for a nested group) and matches a checkout's `paths` value —
+    its lowercased `origin_path` — exactly, else, where no checkout's path equals it, as the last components of one;
+    a bare `<repo>` matches a checkout's directory name in `names`. Case is folded. None for no checkout, or two."""
+    want = repo.lower().strip("/")
+    if "/" in want:
+        hits = [k for k, p in paths.items() if p and p == want]
+        if not hits:
+            hits = [k for k, p in paths.items() if p and p.endswith("/" + want)]
+    else:
+        hits = [k for k, n in (names or {}).items() if n.lower() == want]
+    return hits[0] if len(hits) == 1 else None
+
+
 class Registry:
     """Resolves `<repo>#TD-NNN` through the home's registry (§4.4 *Repo facts*: the host's
-    `repos()`), as the script's roster does: `<repo>` is a checkout's directory name and `owner/name`
-    its origin; that checkout's ledger (`ledger_path`, either layout) and its archive are read at
-    `origin/<default>`, or in the working tree where that ref is missing. Each repo is read once, and
-    only when asked; a name two checkouts share, a checkout not listed, a ledger that cannot be read or
+    `repos()`), as the script's roster does: `<repo>` is a checkout's directory name, or its origin's
+    path, exact before suffix (`pick_repo`); that checkout's ledger (`ledger_path`, either layout) and its
+    archive are read at `origin/<default>`, or in the working tree where that ref is missing. Each repo is read
+    once, and only when asked; a name two checkouts share, a checkout not listed, a ledger that cannot be read or
     is a faulted v2 directory (`v2_faults`), or an id in neither file is `unresolved`, which keeps the
     block. Each answer is ledgerboard's `(state, why)`, `why` empty unless it is unresolved (TD-585)."""
 
@@ -768,18 +783,15 @@ class Registry:
         self._origins: dict[Path, str] = {}
 
     def _origin(self, root: Path) -> str:
+        """The checkout's origin path (ledgerboard's `origin_path`, lowercased), "" where it has no readable origin."""
         if root not in self._origins:
-            url = (_git(root, "remote", "get-url", "origin") or "").strip().lower()
-            self._origins[root] = url.removesuffix("/").removesuffix(".git")
+            self._origins[root] = lb.origin_path((_git(root, "remote", "get-url", "origin") or "").strip()) or ""
         return self._origins[root]
 
     def _find(self, repo: str) -> Path | None:
-        name = repo.lower()
-        if "/" in name:
-            hits = [r for r in self.roots if self._origin(r).endswith(("/" + name, ":" + name))]
-        else:
-            hits = [r for r in self.roots if r.name.lower() == name]
-        return hits[0] if len(hits) == 1 else None
+        if "/" in repo:
+            return pick_repo(repo, {r: self._origin(r) for r in self.roots})
+        return pick_repo(repo, {}, {r: r.name for r in self.roots})
 
     def _repo(self, root: Path) -> tuple[set[str], set[str]] | None:
         if root not in self._read:

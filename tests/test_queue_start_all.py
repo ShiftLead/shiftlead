@@ -162,3 +162,16 @@ def test_an_items_press_and_an_inbox_press_keep_their_own_sentences(tmp_path, mo
     assert prompt.startswith("I opened this session from the Queue about m-41, on the card around TD-9")
     _, prompt = _press(tmp_path / "b", monkeypatch, _asks("m-41", "m-42"))
     assert prompt.startswith("I opened this session from the Inbox to work TD-9")
+
+
+def test_a_header_press_counts_a_question_about_the_origin_path(tmp_path, monkeypatch):
+    """TD-1371: the press rebuilds the card index with the reading's `origins`, so a question about
+    `<origin path>#TD-n` is counted among *waits on me* as one about `<repo>#TD-n` is."""
+    asks = [entry("m-41", "ask", from_="ao-samscrape-manager-sam", about="O/Samscrape#TD-12", text="which?")]
+    repo, c, created = _start_world(
+        tmp_path, monkeypatch, fleet=[MANAGER], queue={**_q(), "origins": {"samscrape": "o/samscrape"}}, inbox=asks
+    )
+    r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-009", "card": CID})
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert "samscrape#TD-012, samscrape#TD-009, m-41; the rest" in kw["prompt"]

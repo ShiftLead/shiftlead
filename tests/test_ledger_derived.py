@@ -167,6 +167,26 @@ def test_a_name_two_checkouts_share_keeps_the_block(tmp_path):
     assert (state, "neither" in why) == ("unresolved", True), "an id in neither file, and it says so"
 
 
+def test_an_origin_path_resolves_exact_before_suffix(tmp_path):
+    """TD-1371 (ledgerboard's target design §3.2): two roots whose origins end alike — `o/lib` on GitHub and
+    `grp/o/lib` on another forge — each resolve their own `<repo>#TD-n` by the exact path, case folded, where a
+    suffix match took both and kept the block; a suffix still names the one root whose path ends with it."""
+    flat = _repo(tmp_path / "a" / "lib", "# L\n", "# A\n\n## TD-002: archived in o/lib\n")
+    deep = _repo(tmp_path / "b" / "lib", "# L\n\n## TD-002: open in grp/o/lib\n", "# A\n")
+    subprocess.run(["git", "-C", str(flat), "remote", "add", "origin", "git@github.com:O/Lib.git"], check=True)
+    subprocess.run(["git", "-C", str(deep), "remote", "add", "origin", "https://u:t@gitlab.example:8443/grp/o/lib/"],
+                   check=True)  # fmt: skip
+    both = ledger.Registry([str(flat), str(deep)])
+    assert both("o/lib#TD-002") == ("archived", ""), "o/lib is flat's path exactly, though deep's ends with it"
+    assert both("O/LIB#TD-2") == ("archived", ""), "case folded"
+    assert both("grp/o/lib#TD-002") == ("open", "")
+    assert ledger.Registry([str(deep)])("o/lib#TD-002") == ("open", ""), "no exact path: the one suffix match"
+    state, why = both("lib#TD-002")
+    assert state == "unresolved" and "registry" in why, "a bare name two checkouts share keeps the block"
+    assert ledger.pick_repo("x/lib", {1: "a/x/lib", 2: "b/x/lib"}) is None, "two suffix matches: neither"
+    assert ledger.pick_repo("lib", {1: "o/lib"}) is None, "a bare name is a directory name, never a path"
+
+
 def test_an_id_headed_twice_is_blocked_by_what_blocks_either():
     """TD-585 slice 6: ledgerboard keys its reading by id, so a repeated heading takes both sections'
     blockers — the safe direction — never the last section's alone."""

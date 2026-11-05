@@ -423,3 +423,17 @@ def test_part_of_edge_cases_a_cycle_the_tops_archived_parent_and_a_card_of_waiti
         ("TD-070", None, 1),
         ("TD-073", "s#TD-070", 2),
     ]
+
+
+def test_an_origin_path_ref_finds_its_card(tmp_path):
+    """TD-1371: `refs` reads a `<repo>` that is an origin path, lowercased; the reading carries each repo's
+    origin path, so the card index answers `o/a#TD-n` as it answers `a#TD-n`; `_Repos` resolves exact first."""
+    a = _repo(tmp_path, "a", [_entry(1, "one")])
+    q = _cards(dict([a]))
+    assert q["origins"] == {"a": "o/a"}
+    assert queue.refs("see O/A#TD-1 and a#TD-2, grp/sub/x#TD-3") == ["o/a#TD-001", "a#TD-002", "grp/sub/x#TD-003"]
+    assert queue.refs("/repo/a#TD-1 https://h/repo/a#TD-1") == ["a#TD-001"], "a link's path: its last part"
+    index = queue.card_index(q)
+    assert index["o/a#TD-001"] == index["a#TD-001"]
+    rs = queue._Repos({"r1": {**a[1], "name": "a"}, "r2": {**a[1], "name": "b", "remote": "git@h.example:g/o/a"}})
+    assert (rs.resolve("o/a"), rs.resolve("g/o/a"), rs.resolve("O/A"), rs.resolve("x/a")) == ("a", "b", "a", None)

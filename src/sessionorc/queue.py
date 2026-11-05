@@ -56,14 +56,21 @@ def qid(repo: str, tid: str) -> str:
     return f"{repo}#{ledger_mod._norm(tid)}"
 
 
-# an entry named in a mail item, a board line's `Context:` or a PR's title: `TD-n`, or `<repo>#TD-n`
-TD_REF = re.compile(r"(?<![\w-])(?:([\w.-]+)#)?TD-(\d+)\b")
+# an entry named in a mail item, a board line's `Context:` or a PR's title: `TD-n`, or `<repo>#TD-n`, the
+# `<repo>` a checkout's name or its origin's path (`owner/name`, deeper for a nested group; TD-1371)
+TD_REF = re.compile(r"(?<![\w-])(?:([\w.-]+(?:/[\w.-]+)*)#)?TD-(\d+)\b")
 
 
 def refs(text: Any) -> list[str]:
-    """The entries a text names, in order, each once: `TD-n` with its number as the ledger writes it."""
+    """The entries a text names, in order, each once: `TD-n` with its number as the ledger writes it, and an
+    origin path's `<repo>` lowercased, as ledgerboard compares it (TD-1371)."""
     seen: list[str] = []
-    for repo, n in TD_REF.findall(str(text or "")):
+    text = str(text or "")
+    for m in TD_REF.finditer(text):
+        repo, n = m.group(1) or "", m.group(2)
+        if repo and m.start(1) and text[m.start(1) - 1] == "/":
+            repo = repo.rpartition("/")[2]  # a link's path (`/repo/<name>#TD-n`, a URL): its last part, as before
+        repo = repo.lower() if "/" in repo else repo
         ref = f"{repo}#TD-{int(n):03d}" if repo else f"TD-{int(n):03d}"
         if ref not in seen:
             seen.append(ref)
@@ -73,10 +80,12 @@ def refs(text: Any) -> list[str]:
 def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
     """The open cards' entries (§4.5 screen 6 *Where a row is drawn*): each `<repo>#TD-n` a card holds —
     its top entry and every row, an open card's archived rows among them — to `(card id, row qid)`, and
-    the bare `TD-n` too where one repo alone holds it. An entry on a completed card, or on none, is in
-    no card: the item that names it stays in the Inbox."""
+    the bare `TD-n` too where one repo alone holds it, and `<origin path>#TD-n` where the reading's `origins`
+    give the repo one (TD-1371). An entry on a completed card, or on none, is in no card: the item that names
+    it stays in the Inbox."""
     out: dict[str, tuple[str, str]] = {}
     bare: dict[str, set[str]] = {}
+    origins = (reading or {}).get("origins") or {}
     for c in (reading or {}).get("cards") or []:
         if not isinstance(c, Mapping) or not c.get("top"):
             continue
@@ -86,7 +95,10 @@ def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
             if "#" not in q or not got:
                 continue
             out.setdefault(got[0], (str(c["id"]), q))
-            bare.setdefault(got[0].partition("#")[2], set()).add(got[0])
+            name, _, tid = got[0].partition("#")
+            if path := origins.get(name):
+                out.setdefault(f"{path}#{tid}", (str(c["id"]), q))
+            bare.setdefault(tid, set()).add(got[0])
     for tid, qs in bare.items():
         if len(qs) == 1:
             out[tid] = out[next(iter(qs))]
@@ -114,15 +126,19 @@ ANSWERED_DONE_FOR = timedelta(days=1)
 _GONE = ("exited", "closed")
 
 
-def open_refs(qids: Iterable[str]) -> dict[str, str]:
+def open_refs(qids: Iterable[str], origins: Mapping[str, str] | None = None) -> dict[str, str]:
     """The open members' index an answered question links through (§4.4 *The card's status*, TD-1316): each
-    `<repo>#TD-n` to itself, and the bare `TD-n` to it only where exactly one open member across the repos
-    carries it — two repos' `TD-n` link to neither."""
+    `<repo>#TD-n` to itself, `<origin path>#TD-n` to it where `origins` give the repo one (TD-1371), and the
+    bare `TD-n` to it only where exactly one open member across the repos carries it — two repos' `TD-n` link
+    to neither."""
     out: dict[str, str] = {}
     bare: dict[str, set[str]] = {}
     for q in qids:
         out[q] = q
-        bare.setdefault(q.partition("#")[2], set()).add(q)
+        name, _, tid = q.partition("#")
+        if path := (origins or {}).get(name):
+            out.setdefault(f"{path}#{tid}", q)
+        bare.setdefault(tid, set()).add(q)
     for tid, qs in bare.items():
         if len(qs) == 1:
             out[tid] = next(iter(qs))
@@ -286,17 +302,12 @@ class _Repos:
             name = str(r.get("name") or Path(str(root)).name)
             self.by_name[name] = r
             self.roots[name] = str(r.get("root") or root)
-            self.origins[name] = str(r.get("remote") or "").lower().removesuffix("/").removesuffix(".git")
+            self.origins[name] = lb.origin_path(str(r.get("remote") or "")) or ""
 
     def resolve(self, repo: str) -> str | None:
-        """The name of the one reading a `<repo>` of an item names: a checkout's directory name, or
-        `owner/name` of its origin; none, or two, is None."""
-        want = repo.lower()
-        if "/" in want:
-            hits = [n for n, o in self.origins.items() if o.endswith(("/" + want, ":" + want))]
-        else:
-            hits = [n for n in self.by_name if n.lower() == want]
-        return hits[0] if len(hits) == 1 else None
+        """The name of the one reading a `<repo>` of an item names: a checkout's directory name, or its
+        origin's path, exact before suffix (`ledger.pick_repo`, TD-1371); none, or two, is None."""
+        return ledger_mod.pick_repo(repo, self.origins, {n: n for n in self.by_name})
 
     def of_record(self, rec: Any) -> str | None:
         """The reading a record works in: its `repo`, the checkout's root."""
@@ -361,7 +372,7 @@ def reading(
     doing: Mapping[str, list[Mapping[str, Any]]] | None = None,
     questions: Iterable[Any] = (),
 ) -> dict[str, Any]:
-    """The `queue` reading (§4.4 *The Queue*): `{cards, completed, other_work, at}`.
+    """The `queue` reading (§4.4 *The Queue*): `{cards, completed, other_work, origins, at}`.
 
     `repos` are the home's repo readings by root; `records` the live graph's `Session`s (an ended one
     holds nothing); `waiting` the ids of sessions that wait on a question (the person's, or a reader
@@ -383,7 +394,8 @@ def reading(
     `passed_over`. Cards are in key order, In progress first.
     **Completed** cards (`ids`, `top`, `titles`, `closed`, `pr`) are the archive's components no open
     entry touches, closed within `COMPLETED_WINDOW`, newest first. `other_work` is each live claim that
-    names no open entry (`board:<key>`, a PR naming none), with its holder."""
+    names no open entry (`board:<key>`, a PR naming none), with its holder. `origins` maps each repo's name to its
+    origin path, for a repo with a readable origin (`card_index`, TD-1371)."""
     rs = _Repos(repos)
     records = list(records)
     # every record's state by id, ended ones too: an answered question's asker exited or closed is gone (TD-1316)
@@ -513,7 +525,7 @@ def reading(
                     prs[q] = dict(pr)
                     break
 
-    linked = open_refs(open_)
+    linked = open_refs(open_, rs.origins)
 
     def row(q: str) -> dict[str, Any]:
         if q in open_:
@@ -592,6 +604,7 @@ def reading(
         "cards": cards,
         "completed": _completed(archived, open_, names_open, closed_at, xref, now),
         "other_work": other,
+        "origins": {n: o for n, o in rs.origins.items() if o},
         "at": now.isoformat(),
     }
 
