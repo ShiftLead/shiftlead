@@ -161,7 +161,7 @@ async def test_count_gives_ids_in_a_row_and_the_record_keeps_who(home, gh, tmp_p
     got = await home.rpc_td_next(repo="shiftlead", count=3, caller="ao-w")
     assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-005", "TD-006", "TD-007"],
                    "unread": [], "reserved": True, "why": "", "warnings": [], "taken_by": None,
-                   "taken_by_line": None, "id_take": None, "id_take_line": None,
+                   "id_take": None, "id_take_line": None,
                    "question": None}  # fmt: skip
     rec = json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]
     assert rec["last"] == 7 and [(g["id"], g["by"]) for g in rec["given"]] == [
@@ -390,7 +390,7 @@ def test_the_cli_sends_a_symlinked_checkouts_registered_name(tmp_path, monkeypat
     assert json.loads(capsys.readouterr().out) == {"repo": "shiftlead", "ids": ["TD-001", "TD-002"],
                                                    "unread": ["open PR #3 not read: x"], "reserved": True,
                                                    "why": "", "warnings": [], "taken_by": None,
-                                                   "taken_by_line": None, "id_take": None, "id_take_line": None,
+                                                   "id_take": None, "id_take_line": None,
                    "question": None}  # fmt: skip
 
 
@@ -533,7 +533,7 @@ async def test_the_script_road_passes_the_floor_by_count_and_ledger_and_records_
     got = await home.rpc_td_next(repo="shiftlead", count=2, caller="ao-w")
     assert got == {"repo": "shiftlead", "origin": "shiftlead/shiftlead", "ids": ["TD-041", "TD-042"], "unread": [],
                    "reserved": True, "why": "", "warnings": [], "taken_by": None,
-                   "taken_by_line": None, "id_take": None, "id_take_line": None,
+                   "id_take": None, "id_take_line": None,
                    "question": None}  # fmt: skip
     seen = json.loads(log.read_text())
     assert seen["argv"] == ["--count", "2", "--by", "ao-w", "--floor", "40", "--ledger", LEDGER, "--archive", ARCHIVE,
@@ -744,7 +744,7 @@ def test_the_offline_refusal_names_the_script():
     assert "scripts/ledger_next_id.py" in why
 
 
-# -- TD-1089: the caller's branch, and the take's `**Taken by:**` line (§4.4 *The branch*, *Its answer*) ----------
+# -- TD-1089: the caller's branch (§4.4 *The branch*, *Its answer*) -------------------------------------------------
 
 
 @pytest.mark.integration
@@ -772,10 +772,10 @@ async def test_a_branch_git_would_not_name_is_refused(home, gh, tmp_path):
 
 
 @pytest.mark.integration
-async def test_the_homes_own_road_drops_the_branch_and_answers_both_null(home, gh, tmp_path):
+async def test_the_homes_own_road_drops_the_branch_and_answers_no_take(home, gh, tmp_path):
     _one(tmp_path, gh)
     got = await home.rpc_td_next(repo="shiftlead", branch="td1089-td-next")
-    assert got["ids"] == ["TD-003"] and (got["taken_by"], got["taken_by_line"]) == (None, None)
+    assert got["ids"] == ["TD-003"] and (got["taken_by"], got["id_take"], got["id_take_line"]) == (None, None, None)
 
 
 # -- TD-1282: the filing question review-outcomes asks (§4.4 *Its answer*, *The filing question*) -----------------
@@ -810,7 +810,7 @@ def test_the_cli_prints_the_question_after_the_ids_and_nothing_without_one(tmp_p
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     _register()
     reply = {"repo": "shiftlead", "ids": ["TD-005"], "unread": [], "reserved": True, "why": "", "warnings": [],
-             "taken_by": None, "taken_by_line": None, "question": QUESTION}  # fmt: skip
+             "taken_by": None, "question": QUESTION}  # fmt: skip
     monkeypatch.setattr(cli, "call_sync", lambda m, **p: reply)
     monkeypatch.chdir(tmp_path)
     for verb, ids in (("reserve", "reserved TD-005\n"), ("next", "TD-005\n")):
@@ -832,38 +832,27 @@ SIBLING = 'CADENCE_FIELDS = ("priority", "type", "added", "status", "blocked by"
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize(
-    ("ledger", "sibling", "line"),
-    [
-        (FIELDS, SIBLING, False),  # a non-cadence vocabulary, as ShiftLead's ledger declares
-        (_ledger(1), SIBLING, True),  # no Fields: line
-        (FIELDS, SIBLING.replace('"location")', '"location", "taken by")'), True),  # ledgerboard defines it
-        (_ledger(1), SIBLING.replace('"location")', '"location", "taken by")'), True),
-        (FIELDS.replace("paul\n", "paul; Taken by = ao-w\n"), SIBLING, False),  # its own vocabulary: judge()'s no
-        (_ledger(1), None, False),  # no sibling
-        (_ledger(1), "CADENCE_FIELDS = tuple(['taken by'])\n", False),  # not a literal
-    ],
-)
-async def test_the_taken_by_line_is_given_where_the_ledger_accepts_it(home, gh, tmp_path, ledger, sibling, line):
+@pytest.mark.parametrize("ledger", [FIELDS, _ledger(1)])
+async def test_no_taken_by_line_is_given_and_taken_by_is_information(home, gh, tmp_path, ledger):
+    """TD-1360 (design §4.4 *Its answer*): the pinned gate reads `Id take` alone (agent-cadence TD-188's step 4),
+    so the home gives no `**Taken by:**` line — not even where ledgerboard defines the field — and the script's
+    `taken_by` is passed on as it says it, information only."""
     root = _one(tmp_path, gh, files={LEDGER: ledger, ARCHIVE: _ledger()})
     _stub(root, taken_by="ao-w")
-    if sibling is not None:
-        (root / "scripts" / "ledgerboard.py").write_text(sibling)
+    (root / "scripts" / "ledgerboard.py").write_text(SIBLING.replace('"location")', '"location", "taken by")'))
     got = await home.rpc_td_next(repo="shiftlead", caller="ao-w")
-    assert got["taken_by"] == "ao-w" and got["taken_by_line"] == ("**Taken by:** ao-w" if line else None)
+    assert got["taken_by"] == "ao-w" and "taken_by_line" not in got
 
 
 @pytest.mark.integration
-async def test_no_taken_by_is_no_line_and_an_unreadable_ledger_is_none(home, gh, tmp_path):
+async def test_an_unreadable_ledger_gives_no_id_take_line(home, gh, tmp_path):
     root = _one(tmp_path, gh, files={LEDGER: _ledger(1), ARCHIVE: _ledger()})
     (root / "scripts").mkdir()
-    (root / "scripts" / "ledgerboard.py").write_text(SIBLING)
-    _stub(root)  # a script that answers no taken_by
-    assert (await home.rpc_td_next(repo="shiftlead"))["taken_by_line"] is None
-    _stub(root, taken_by="ao-w")
+    (root / "scripts" / "ledgerboard.py").write_text(SIBLING)  # before v2.2: the ledger decides
+    _stub(root, id_take=NONCE)
     (root / LEDGER).unlink()
     got = await home.rpc_td_next(repo="shiftlead")
-    assert got["taken_by"] == "ao-w" and got["taken_by_line"] is None
+    assert got["id_take"] == NONCE and got["id_take_line"] is None
 
 
 NONCE = "0123456789abcdef0123456789abcdef"
@@ -881,16 +870,16 @@ V22 = SIBLING.replace('"location")', '"location", "part of", "escaped from", "id
         (_ledger(1), None, False),  # no sibling
     ],
 )
-async def test_the_id_take_line_is_given_by_the_taken_by_lines_test(home, gh, tmp_path, ledger, sibling, line):
-    """TD-1363 (design §4.4 *Its answer*): the script's `id_take` is answered, and `id_take_line` by the same
-    `writable` test as `taken_by_line`, applied to the `Id take` field."""
+async def test_the_id_take_line_is_given_where_the_ledger_accepts_it(home, gh, tmp_path, ledger, sibling, line):
+    """TD-1363 (design §4.4 *Its answer*): the script's `id_take` is answered, and `id_take_line` by `judge()`'s
+    `writable` test applied to the `Id take` field; never a `taken_by_line` (TD-1360)."""
     root = _one(tmp_path, gh, files={LEDGER: ledger, ARCHIVE: _ledger()})
     _stub(root, taken_by="ao-w", id_take=NONCE)
     if sibling is not None:
         (root / "scripts" / "ledgerboard.py").write_text(sibling)
     got = await home.rpc_td_next(repo="shiftlead", caller="ao-w")
     assert got["id_take"] == NONCE and got["id_take_line"] == (f"**Id take:** {NONCE}" if line else None)
-    assert got["taken_by_line"] == ("**Taken by:** ao-w" if line and ledger != FIELDS else None)
+    assert "taken_by_line" not in got
 
 
 @pytest.mark.integration
@@ -975,7 +964,9 @@ def test_an_unregistered_owner_repo_sends_the_branch_of_its_own_checkout(tmp_pat
 
 
 @pytest.mark.unit
-def test_the_cli_says_the_taken_by_line_on_stderr_and_an_older_home_gives_both_null(tmp_path, monkeypatch, capsys):
+def test_the_cli_says_no_taken_by_line_even_from_a_home_that_answers_one(tmp_path, monkeypatch, capsys):
+    """TD-1360: a home from before it still answers `taken_by_line`; the CLI says nothing of it and gives no such
+    key, and `taken_by` stays the script's, null from an older home."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     _register()
     monkeypatch.chdir(tmp_path)
@@ -984,16 +975,15 @@ def test_the_cli_says_the_taken_by_line_on_stderr_and_an_older_home_gives_both_n
     for json_flag in ([], ["--json"]):
         assert cli.main([*json_flag, "td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
         out, err = capsys.readouterr()
-        assert "write `**Taken by:** ao-w` in each entry's header (cadence §2.10)" in err
-        assert out == "TD-007\n" if not json_flag else json.loads(out)["taken_by_line"] == "**Taken by:** ao-w"
-    reply = {"ids": ["TD-008"], "unread": [], "taken_by": "ao-w", "taken_by_line": None}
-    monkeypatch.setattr(cli, "call_sync", lambda m, **p: reply)
-    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
-    assert "Taken by" not in capsys.readouterr().err
+        assert "Taken by" not in err
+        if json_flag:
+            got = json.loads(out)
+            assert got["taken_by"] == "ao-w" and "taken_by_line" not in got
+        else:
+            assert out == "TD-007\n"
     monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"ids": ["TD-009"], "unread": []})  # an older home
     assert cli.main(["--json", "td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
-    got = json.loads(capsys.readouterr().out)
-    assert (got["taken_by"], got["taken_by_line"]) == (None, None)
+    assert json.loads(capsys.readouterr().out)["taken_by"] is None
 
 
 # -- TD-1145: a v2 ledger (§4.4 *Either layout*, *A ledger entry's id is handed out by the home*) ------------------
@@ -1082,14 +1072,14 @@ async def test_a_tree_older_than_its_v2_reader_is_refused_in_the_seams_words(hom
         ("# Ledger\n", False),
     ],
 )
-async def test_a_v2_ledgers_taken_by_line_reads_its_readme(home, gh, tmp_path, readme, line):
+async def test_a_v2_ledgers_id_take_line_reads_its_readme(home, gh, tmp_path, readme, line):
     """The preamble is `README.md`'s, as `load()` heads its text; a README with no `Ledgerboard: 2` is a faulted
     v2 ledger, which cannot be read, so it gives none."""
     root = _one(tmp_path, gh, files=_v2(readme=readme))
-    _stub(root, taken_by="ao-w")
-    (root / "scripts" / "ledgerboard.py").write_text(SIBLING)
+    _stub(root, id_take=NONCE)
+    (root / "scripts" / "ledgerboard.py").write_text(SIBLING)  # before v2.2: the preamble decides
     got = await home.rpc_td_next(repo="shiftlead", caller="ao-w")
-    assert got["taken_by_line"] == ("**Taken by:** ao-w" if line else None)
+    assert got["id_take_line"] == (f"**Id take:** {NONCE}" if line else None)
 
 
 # -- TD-1201: `ao td reserve`, and `ao td next` its old name (§4.7 *Entries*, TD-1200) ------------------------------
@@ -1165,5 +1155,5 @@ def test_the_help_says_reserve_spends_and_next_is_its_old_name(capsys):
     with pytest.raises(SystemExit):
         cli.main(["td", "reserve", "--help"])
     text = " ".join(capsys.readouterr().out.split())
-    keys = "{repo, ids, unread, reserved, why, warnings, taken_by, taken_by_line, id_take, id_take_line, question}"
+    keys = "{repo, ids, unread, reserved, why, warnings, taken_by, id_take, id_take_line, question}"
     assert keys in text and "--held" not in text

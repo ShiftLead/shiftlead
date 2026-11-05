@@ -120,10 +120,9 @@ full conventions in `docs/cadence.md` (the pinned tree's: `agent-cadence path ca
    on [docs/user_attention.md](docs/user_attention.md), each with a `Due:` date matched to its
    urgency. **Both files are written only through the helpers, never typed** (design §4.4 *A session
    writes the ledger and the board only through the helpers*): a change to an entry is
-   `agent-cadence run ledger.py set|note|edit|archive|reopen|renumber`, and `agent-cadence run ledger.py
-   fmt TD-n` closes the one line no helper wrote; a new entry takes its id from `ao td reserve` and,
-   until agent-cadence#TD-188 lets `ledger.py new` file here (TD-1360), is typed with the header line
-   `ao td reserve` prints and then `ledger.py fmt TD-n`. A board line is `agent-cadence run board_edit.py
+   `agent-cadence run ledger.py set|note|edit|archive|reopen|renumber`; a new entry takes its id from
+   `ao td reserve` and is filed under it with `agent-cadence run ledger.py new --id TD-n` (its header
+   fields as flags, `--why`, `--fix` and `--done-when` from files). A board line is `agent-cadence run board_edit.py
    add --board docs/user_attention.md --no-commit` (with a `Due:` or a `Context:`; `add --help` lists the
    rest), and a change to one its `done`, `snooze` or `due` with `--no-commit`, or `ao board edit
    done|snooze`; a `decide` or a `reply` is Paul's. Commit a helper's result in your own PR. Due items are printed
