@@ -1117,6 +1117,26 @@ class HostAgent(
             return
         loop.call_soon_threadsafe(self._witness, kind, repo, text, at)
 
+    def _witness_precheck(self, repo: str, text: str, status: str, at: datetime) -> dict[str, Any] | None:
+        """A red precheck status's `precheck-fail` record, on the loop, unless its status id is already
+        recorded in its month (`witness.append_precheck_fail`): a node writes none, a failure is a log line."""
+        if self.mode != "home":
+            return None
+        try:
+            return witness.append_precheck_fail(repo, text, status, at)
+        except (OSError, ValueError) as e:
+            log.warning("the witness log could not take a precheck-fail record: %s", e)
+            return None
+
+    def _witness_precheck_soon(self, repo: str, text: str, status: str, at: datetime) -> None:
+        """`_witness_precheck` from a reading's thread (the repo facts', the promote pass's): handed to the
+        loop, so the check for a status already recorded and its append are one step."""
+        loop = self._witness_loop
+        if loop is None or loop.is_closed():
+            log.warning("the witness log has no loop to take a precheck-fail record")
+            return
+        loop.call_soon_threadsafe(self._witness_precheck, repo, text, status, at)
+
     def _witness_repo(self, dir: Any) -> str | None:
         """The registry name of the registered repo `dir` is in (`witness.repo_named`), else None."""
         return witness.repo_named(dir, hosts.local_host().repos())

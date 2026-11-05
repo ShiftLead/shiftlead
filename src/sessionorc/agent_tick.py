@@ -13,7 +13,7 @@ import os
 import re
 import shutil
 import time
-from collections.abc import Collection, Mapping
+from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -3440,7 +3440,10 @@ class TickMixin:
             full = {r for r in todo if due or r not in self._repos}
             live = self._live_commits() if self._promotes_read else None  # None: unknown (TD-516)
             read, keys = self._read_repos, self._held_keys(roots)
-            got = await asyncio.to_thread(read, todo, prev, full, roots, live, ledgers, boards, keys) if todo else {}
+            emit = self._witness_precheck_soon
+            got = {}
+            if todo:
+                got = await asyncio.to_thread(read, todo, prev, full, roots, live, ledgers, boards, keys, emit)
             if due:
                 self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
             if boards:
@@ -3736,6 +3739,7 @@ class TickMixin:
         ledgers: set[str] | None = None,
         boards: bool = False,
         keys: dict[str, list[str]] | None = None,
+        emit: Callable[[str, str, str, datetime], None] | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. A root in
         `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
@@ -3747,7 +3751,8 @@ class TickMixin:
         host agent started — is unknown, not *not live*: each live check keeps the `live` its last
         reading gave it (§6 rule 6, TD-516), so a restart never takes one out of a lane and brings
         it back as new. A promote pass that keeps failing keeps it unknown, and nothing goes live
-        while it does. `keys` is each root's held key (`_held_keys`): the thread has no records."""
+        while it does. `keys` is each root's held key (`_held_keys`): the thread has no records. `emit` is the
+        witness log's `precheck-fail` writer, handed to the PR reading (`reports.pr_reading`, TD-1386)."""
         now = datetime.now(UTC)
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
@@ -3762,7 +3767,7 @@ class TickMixin:
                 led = ledgers is None or root in ledgers or "ledger" not in old
                 out[root] = TickMixin._read_repo(
                     root, old, root in full, now, by_remote, resolve, reader, ledger=led, boards=boards,
-                    held=(keys or {}).get(root), roster=registry if registry is not None else roots,
+                    held=(keys or {}).get(root), roster=registry if registry is not None else roots, emit=emit,
                 )  # fmt: skip
                 if live is None:  # no promote reading yet since the start: unknown is not *not live* (TD-516)
                     _carry_live(out[root], old)
@@ -3814,6 +3819,7 @@ class TickMixin:
         boards: bool = False,
         held: list[str] | None = None,
         roster: list[str] | None = None,
+        emit: Callable[[str, str, str, datetime], None] | None = None,
     ) -> dict[str, Any]:
         """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
         pass, so two checkouts of one remote are one `gh` read. `ledger` False keeps the last
@@ -3837,7 +3843,7 @@ class TickMixin:
             if remote and remote in by_remote:
                 prs = by_remote[remote]
             else:
-                fresh = reports.pr_reading(root, now, old=prs, held=held, remote=remote)
+                fresh = reports.pr_reading(root, now, old=prs, held=held, remote=remote, emit=emit)
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs

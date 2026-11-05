@@ -24,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Callable
 from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
@@ -62,6 +63,7 @@ FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failu
 # the verdicts on main's head's failing jobs, by checkout: `{head, read}` (`reports.classify_failing`,
 # TD-686) — one sha's per checkout, so a job is read once and a new head reads afresh
 _jobs: dict[str, dict[str, Any]] = {}
+_seen: dict[str, str | None] = {}  # main's precheck status as `read_checks` last read it, by root (TD-1386)
 
 
 def block(root: str | Path) -> dict[str, str] | None:
@@ -238,7 +240,9 @@ def read_checks(root: str | Path, sha: str, keep: bool = True) -> tuple[str, str
     (then no `checks_not_run`); `precheck` is what the status read found — `absent`, `success`, `failure`,
     `pending` or `unread` — and None where `precheck` is unset or `docs/cadence.toml` does not parse (the
     reading `unknown` with that why). `keep=False` (a rollback's commit) neither reads `precheck` nor reads
-    or replaces main's kept verdicts. Only a checkout whose `origin` is GitHub reads its jobs."""
+    or replaces main's kept verdicts. Only a checkout whose `origin` is GitHub reads its jobs. Main's read
+    (`keep`) leaves in `_seen` the `cadence/precheck` status's state, id and `updated_at`, as the witness log
+    compares them between passes (§4.4 *The kinds*, TD-1386), or None where the head carries none."""
     command, toml_why = None, None
     if keep:
         from sessionorc import board  # the checkout's default branch, as the pull reads it
@@ -266,6 +270,9 @@ def read_checks(root: str | Path, sha: str, keep: bool = True) -> tuple[str, str
         mine = [s for s in statuses if s.get("context") == PRECHECK_CONTEXT]
         state = str(mine[0].get("state") or "") if mine else ""  # newest first, one per context
         precheck = "failure" if state == "error" else state if state in ("success", "failure", "pending") else "absent"
+        if keep:
+            top = mine[0] if mine else {}
+            _seen[str(root)] = f"{state} {top.get('id')} {top.get('updated_at') or ''}".strip() if mine else None
     if not runs and not statuses and precheck != "absent":
         return "unknown", f"no check runs on {sha[:7]}", None, precheck
     failing = [r for r in runs if r.get("status") == "completed" and r.get("conclusion") in FAILED]
@@ -790,6 +797,29 @@ def precheck_on_main(root: str | Path, repo: str, r: dict[str, Any], now: dateti
     r["checks"], r["checks_why"], r["prechecking"] = "pending", f"prechecking {sha[:7]}", sha
 
 
+def witness_main(
+    root: str | Path,
+    repo: str,
+    r: dict[str, Any],
+    old: dict[str, Any],
+    seen: str | None,
+    emit: Callable[[str, str, str, datetime], None] | None,
+) -> None:
+    """The witness log's `precheck-fail` on main (§4.4 *The kinds*, TD-1386): where main's head carries a
+    `cadence/precheck` that changed since the last pass (a new head, or another state, id or `updated_at`),
+    its status list is read and each red one handed to `emit`, the home's own run's (`precheck.json` on that
+    sha) naming the tests its log failed. Kept on the reading as `precheck_seen`; None when the list could
+    not be read, so the next pass reads it again. A GitHub checkout's alone."""
+    sha = r.get("main")
+    r["precheck_seen"] = seen
+    if emit is None or not seen or not sha or not reports.GITHUB_ORIGIN.search(str(r.get("origin") or "")):
+        return
+    if old.get("main") == sha and old.get("precheck_seen") == seen:
+        return
+    if not reports.witness_prechecks(root, f"{repo}@main", sha, emit, repo, own=precheck_run(repo), timeout=GH_TIMEOUT):
+        r["precheck_seen"] = None
+
+
 # -- one pass over the registry (the home's tick, detached) ---------------------------------------
 
 
@@ -1070,6 +1100,7 @@ def survey(
     auto: dict[str, bool],
     now: datetime,
     fetched: dict[str, str] | None = None,
+    emit: Callable[[str, str, str, datetime], None] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], list[str], dict[str, str]]:
     """One pass, in a thread: every registered checkout whose `.shiftlead.yml` carries `promote:`,
     keyed by the repo's name — `(readings, notes, bad)`. `full` takes all three readings (the
@@ -1078,7 +1109,7 @@ def survey(
     preconditions hold and main has settled or been ahead for `PROMOTE_MAX_WAIT`. `notes` are the
     *promoted …* lines for the person inbox; `bad` names each checkout whose block could not be
     used, with why. `fetched` holds the pull's fetch of main for each root it fetched this pass
-    (`pulls`), which `read_main` reuses."""
+    (`pulls`), which `read_main` reuses. `emit` is the witness log's `precheck-fail` writer (`witness_main`)."""
     readings: dict[str, dict[str, Any]] = {}
     notes: list[str] = []
     bad: dict[str, str] = {}
@@ -1103,9 +1134,11 @@ def survey(
                 r.pop(k, None)
             r.update(main)
             if r.get("main"):
+                _seen.pop(str(root), None)
                 r["checks"], why, r["checks_not_run"], r["precheck"] = read_checks(root, r["main"])
                 r["checks_why"] = why or None
                 r["origin"] = reports.git_origin(root)  # whose account `ci_not_run` groups it under (TD-686)
+                witness_main(root, repo, r, old, _seen.pop(str(root), None), emit)
             r["at"] = stamp
         if full or first or r["inflight"]:
             sha, why = read_live(root, b["check"])

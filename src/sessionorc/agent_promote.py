@@ -45,7 +45,14 @@ class PromoteMixin:
                         promote_mod.pulls, roots, pull_on, occupied, datetime.now(UTC)
                     )
                 readings, notes, bad = await asyncio.to_thread(
-                    promote_mod.survey, roots, dict(self._promotes), full, auto, datetime.now(UTC), fetched
+                    promote_mod.survey,
+                    roots,
+                    dict(self._promotes),
+                    full,
+                    auto,
+                    datetime.now(UTC),
+                    fetched,
+                    emit=self._witness_precheck_soon,
                 )
             if full:
                 self._promote_read_at = time.monotonic()  # after the read: one that raised is retried next tick
