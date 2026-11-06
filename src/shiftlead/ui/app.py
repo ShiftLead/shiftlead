@@ -87,6 +87,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     card_order,  # noqa: F401
     card_slot,  # noqa: F401
     closed_keep,  # noqa: F401
+    fill_words,  # noqa: F401
     flow_mark,  # noqa: F401
     gated_view,  # noqa: F401
     group_place,  # noqa: F401

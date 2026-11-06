@@ -199,6 +199,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     claim_draft,  # noqa: F401
     closer_of,
     draft_folder,  # noqa: F401
+    fill_lapses,  # noqa: F401
     idle_from,  # noqa: F401
     launch_params,  # noqa: F401
     limit_is_modal,  # noqa: F401
