@@ -1125,7 +1125,7 @@ def test_the_mode_is_a_word_on_the_card_and_its_toggle_is_in_more(tmp_path, monk
     worker, mine = card.render(s=view(_card())), card.render(s=view(_card(unattended=False)))
     head = worker.split('class="sc-foot"')[0]
     assert 'data-act="mode"' not in head and 'class="meta mode"' in head
-    assert '<button data-act="mode" data-id="ao-w" class="on">Switch to interactive</button>' in worker
+    assert '<button data-act="mode" data-via="card" data-id="ao-w" class="on">Switch to interactive</button>' in worker
     assert ICON_PATHS["person"] in mine.split('class="meta mode mine"')[1].split("</span>")[0]
     assert ">Switch to unattended</button>" in mine
 

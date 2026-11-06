@@ -1501,7 +1501,8 @@
       let body = {};
       // The Focus header's toggle carries the mode it is drawn for (TD-096: it is re-drawn in place
       // from the pushed delta, and `.btn.on` is a style); a card's *more* entry carries `.on`.
-      if (action === "mode") body = { unattended: "unattended" in b.dataset ? b.dataset.unattended !== "1" : !b.classList.contains("on") };
+      // its `via` names the control for the mode's stamp (§4.5 *A taken-over member*, TD-1439)
+      if (action === "mode") body = { unattended: "unattended" in b.dataset ? b.dataset.unattended !== "1" : !b.classList.contains("on"), via: b.dataset.via || null };
       // design §4.5a: **Drop** on a claimed progress item, and the grants chip (§4.8, TD-028 step 4)
       if (action === "drop") body = { ref: b.dataset.ref };
       if (action === "wrapup") body = { key: AO.mintKey() };  // one per press: a repeat types it once (TD-806)
@@ -7555,7 +7556,7 @@
         $("#workingage").textContent = dg && dg.age ? `says · ${dg.age} ago` : "";
       }
       const mm = $("#fmodemenu"); if (mm) mm.hidden = v.mode_place !== "menu";
-      const fm = $("#fmode"); if (fm) fm.textContent = v.unattended ? "unattended" : "interactive";
+      const fm = $("#fmode"); if (fm) fm.textContent = v.mode_line || (v.unattended ? "unattended" : "interactive");
       // no composer on an unattended session, nor on an ended one, which has nothing to send to (TD-964, TD-1405)
       const noComposer = !!v.unattended || v.state === "exited" || v.state === "closed";
       const cp = $("#composer"); if (cp) cp.classList.toggle("hidden", noComposer);

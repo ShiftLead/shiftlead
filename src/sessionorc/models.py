@@ -135,6 +135,9 @@ HOME_OWNED = frozenset(
         "role",
         "lane",
         "unattended",
+        "mode_at",
+        "mode_by",
+        "mode_via",
         "run_until",
         "start_at",
         "supervised",
@@ -1067,6 +1070,13 @@ class Session:
     kept: dict[str, Any] | None = None
     confidence: Confidence = "scraped"
     unattended: bool = False
+    # Who last changed the mode, when and from which control (design §4.5 *A taken-over member*, §4.4a,
+    # TD-1439): `mode_at` the change's time (a start's: the record's `created`), `mode_by` `person` or the
+    # calling session's id (None on a start), `mode_via` one of `focus`, `card`, `inbox`, `cli`, or `start`
+    # (None when the press named none). Stamped by `set_mode` on a real change and by every start; the home's.
+    mode_at: str | None = None
+    mode_by: str | None = None
+    mode_via: str | None = None
     created: str = field(default_factory=now_iso)
     tail: list[str] = field(default_factory=list)
     # The session's name as its tool holds it (design §4.5a **title**, §4.3 `title()`, TD-074):

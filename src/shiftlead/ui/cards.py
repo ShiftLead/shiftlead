@@ -606,6 +606,7 @@ def view(
     # session is gone keeps its entry and shows as its bare id: §4.8 surfaces it rather than
     # silently releasing the worker.
     by_id = {o.get("id"): o for o in (fleet or [])}
+    d["mode_line"] = mode_line(s, by_id)  # Focus's Session card *mode* row (§4.5 *A taken-over member*, TD-1439)
     # `controllers` stays exactly as the record has it — a list of ids, the same shape
     # `ao status --json` prints. The display form goes under its own name, so nothing downstream
     # has to know which of two shapes it was handed (review 2026-09-13).
@@ -709,6 +710,39 @@ def pill_title(d: Mapping[str, Any], ending: str = "") -> str:
     if d.get("confidence") == "tick":
         return "observed by the host agent, not reported by the tool"
     return "reported by the tool"
+
+
+# The words for a mode change's control on the Session card's *mode* row (§4.5 *A taken-over member*, TD-1439)
+MODE_VIA_WORDS = {
+    "focus": "from Focus",
+    "card": "from its card",
+    "inbox": "from the Inbox",
+    "cli": "by `ao mode`",
+    "start": "from its start",
+}
+
+
+def mode_line(s: Mapping[str, Any], by_id: Mapping[Any, Mapping[str, Any]] | None = None) -> str:
+    """Focus's Session card *mode* row (design §4.5 *A taken-over member*, §4.5a, TD-1439): the mode
+    word and, on an agent's record, its stamp — *interactive since 14:02 · by you from Focus*; *by* the
+    session's name for a session, nobody on a start (*unattended since 09:10 · from its start*), the
+    control's words left out when none; *since before this was recorded* with no stamp. A record with
+    no agent: the bare word."""
+    word = "unattended" if s.get("unattended") else "interactive"
+    if s.get("agent") is False:
+        return word
+    at = _clock(s.get("mode_at"))
+    if not at:
+        return f"{word} since before this was recorded"
+    by = s.get("mode_by")
+    who = ""
+    if by == "person":
+        who = "by you"
+    elif by:
+        who = f"by {(by_id or {}).get(by, {}).get('name') or by}"
+    via = MODE_VIA_WORDS.get(str(s.get("mode_via") or ""), "")
+    tail = " ".join(x for x in (who, via) if x)
+    return f"{word} since {at}" + (f" · {tail}" if tail else "")
 
 
 def _clock(iso: Any) -> str:

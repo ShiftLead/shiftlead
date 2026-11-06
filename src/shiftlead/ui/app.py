@@ -67,6 +67,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     FLOW_ACTS,  # noqa: F401
     FLOW_RENAMES,  # noqa: F401
     FLOWS,  # noqa: F401
+    MODE_VIA_WORDS,  # noqa: F401
     NO_TEAM,  # noqa: F401
     NODE_RESTART,  # noqa: F401
     SHELL_CMD_CUT,  # noqa: F401
@@ -93,6 +94,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     group_place,  # noqa: F401
     held_words,  # noqa: F401
     host_volatile,  # noqa: F401
+    mode_line,  # noqa: F401
     next_act,  # noqa: F401
     pill_title,  # noqa: F401
     pr_repo,  # noqa: F401
@@ -3610,7 +3612,8 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True, key=body.get("key"))
         elif action == "mode":
             on = bool(body.get("unattended"))
-            s = await call("set_mode", id=sid, unattended=on, **teams.gate_prompts(on))  # §6's two texts
+            via = body.get("via") if isinstance(body.get("via"), str) else None  # the press's control (TD-1439)
+            s = await call("set_mode", id=sid, unattended=on, via=via, **teams.gate_prompts(on))  # §6's two texts
             due = _instant(s.get("run_until"))
             if s.get("unattended") and due is not None and due <= datetime.now(UTC):
                 # **Hand back** (design §4.5a, TD-096): a stop time that fell due while the person held

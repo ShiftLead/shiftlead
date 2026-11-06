@@ -194,6 +194,9 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "cre
 # only the `kill`. `modes.HOME_EDITS` is the other table, and `suspend` **is** in that one: a node
 # asked to suspend forwards the whole act here, or its mark would be wiped by the home's next copy.
 HOME_EDITS = frozenset({"set_mode", "set_stop", "set_start", "set_grants", "set_controllers", "keep"})
+# The controls a mode change may name as its `via` (design §4.5 *A taken-over member*, TD-1439): Focus,
+# a card's more ▾, an Inbox row, `ao mode`. A start stamps `start` itself; any other word is dropped.
+MODE_VIAS = frozenset({"focus", "card", "inbox", "cli"})
 # What the home reads from the node whose name is the record's `host` (§4.4a, step 4b.1): a pane's
 # screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
@@ -259,9 +262,10 @@ def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[
 # a node — less `sends`, which every pane's own node writes first (a send runs there) and the merge
 # unions, and less `superseded_by`, which each end writes for itself: the node when a resume there
 # supersedes a record, the home when the successor's report says so (`supersedes`, node-owned;
-# `_take_supersession`, TD-057).
+# `_take_supersession`, TD-057). Less the mode's stamp too, display only and stamped on the home's copy
+# alone (§4.5 *A taken-over member*, TD-1439): no policy at the node reads it.
 INTENT_FIELDS = HOME_OWNED - frozenset(
-    {"inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "superseded_by"}
+    {"inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "superseded_by", "mode_at", "mode_by", "mode_via"}
 )
 
 
