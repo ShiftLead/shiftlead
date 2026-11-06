@@ -1733,7 +1733,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      in-memory entry's `gate_dir`. The gate file's `expect` is the head the rows judged.
      **Step 5.** `_sync_merge` pops `gate_dir` first, before any return, so it is never written to the
      reading, and removes the directory in a `finally` that covers every exit. The pass's call from
-     `judge` to `_sync_merge` is wrapped so a cancelled pass removes it too. Then, in order:
+     `judge` to `_sync_merge` is wrapped so a cancelled pass removes it too. A cancel that lands while
+     `judge` still runs in its thread drops its result, and that one directory is left in the system's
+     temporary directory: accepted, as small and harmless. Then, in order:
        - the sync-off and holder checks, unchanged;
        - `forge.py squash-message <n> --gate <dir>/gate --out <dir>` under `GATE_TIMEOUT`, since it makes
          paginated `gh api` reads;
@@ -1745,16 +1747,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `squash-message` refusal is *no reading* with its words, counted as step 4's are. The scripts run
      with `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL` and `AGENT_MODEL_FILE` removed from their
      environment, so the squash ends in `Merged-by: shiftlead-sync`. It never names the person's
-     `user.name` and never a model, since the home runs none. `shiftlead-sync` and step 3's `sync-check`
-     are the same policy's two names: one signs the comment on a gate it ran, the other the merge it
-     made. **Whether the tree composes** is `cadence.composes(root)` (§5 *The seams*, TD-1418), read on
+     `user.name` and never a model, since the home runs none. `shiftlead-sync` and `sync-check`, which
+     signs step 4's BLOCK, are the same policy's two names: one signs the gate it failed, the other the
+     merge it made. **Whether the tree composes** is `cadence.composes(root)` (§5 *The seams*, TD-1418), read on
      the registry checkout's current pin before step 4's gate.
        - *Yes:* the line above.
        - *No:* a tree read whose `scripts/forge.py` does not name `squash-message`, which is a pin older
          than agent-cadence TD-233. Step 4's gate runs without `--trailers`, and the merge is as before,
          `gh pr merge <n> --squash --match-head-commit <head>` with no body. So the bump that first
-         brings `squash-message` in is merged bare. It comes before the repo's first `Merged-by:`, the
-         weekly read's cutoff, and is never listed.
+         brings `squash-message` in is merged bare. Where no `Merged-by:` commit precedes it on the
+         default branch, the weekly read's cutoff, it is never listed; where one does (a session merged
+         through the line first), it is listed once, as the cost of the bump.
        - *Unreadable:* the tree could not be resolved or read. That is *no reading* with its words,
          counted, never taken as *no*.
      `--trailers` is older than `squash-message` in agent-cadence (#141, then #143), so a tree that
