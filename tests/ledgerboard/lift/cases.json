@@ -9,7 +9,10 @@
   "archived": "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: TD-550 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.",
   "missing_part": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-599. Due: 2026-01-20. Answers: Go | Not yet.",
   "cross_repo": "- [ ] decide 2026-01-06 (session `w-1`) — Go? Context: acme/app#TD-12 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.",
-  "act": "- [ ] act 2026-01-06 (session `w-1`) — Look at it. Context: TD-500. Due: 2026-01-20."
+  "act": "- [ ] act 2026-01-06 (session `w-1`) — Look at it. Context: TD-500. Due: 2026-01-20.",
+  "go_parts_archived": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-506. Due: 2026-01-20. Answers: Go | Not yet.",
+  "go_event_archived": "- [ ] decide 2026-01-06 (session `w-1`) — Did the release ship? Context: TD-508 event (ships). Parts: TD-509. Due: 2026-01-20. Answers: Drop the gate | Keep waiting. Lifts: Drop the gate.",
+  "go_parts_spelled": "- [ ] decide 2026-01-06 (session `w-1`) — Go on the parts? Context: TD-500 decision (pat). Parts: TD-501, TD-6. Due: 2026-01-20. Answers: Go | Not yet."
  },
  "decide_lift": [
   {
@@ -474,6 +477,142 @@
     "pat"
    ],
    "answered_by": "everyone"
+  },
+  {
+   "name": "archived_part_skipped",
+   "line": "go_parts_archived",
+   "entries": [
+    "TD-500",
+    "TD-501"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null,
+   "archived": [
+    "TD-506"
+   ]
+  },
+  {
+   "name": "archived_part_kept_waiting",
+   "line": "go_parts_archived",
+   "entries": [
+    "TD-500",
+    "TD-501"
+   ],
+   "label": "Not yet",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null,
+   "archived": [
+    "TD-506"
+   ]
+  },
+  {
+   "name": "archived_part_no_input",
+   "line": "go_parts_archived",
+   "entries": [
+    "TD-500",
+    "TD-501"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null
+  },
+  {
+   "name": "archived_part_also_open",
+   "line": "go_parts_archived",
+   "entries": [
+    "TD-500",
+    "TD-501",
+    "TD-506"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null,
+   "archived": [
+    "TD-506"
+   ]
+  },
+  {
+   "name": "archived_context_refused",
+   "line": "go_parts_archived",
+   "entries": [
+    "TD-501",
+    "TD-506"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null,
+   "archived": [
+    "TD-500"
+   ]
+  },
+  {
+   "name": "archived_member_ignored",
+   "line": "go_parts_archived",
+   "entries": [
+    "TD-500",
+    "TD-501"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null,
+   "archived": [
+    "TD-506",
+    "x",
+    "other#TD-506"
+   ]
+  },
+  {
+   "name": "archived_part_skipped_event",
+   "line": "go_event_archived",
+   "entries": [
+    "TD-508"
+   ],
+   "label": "Drop the gate",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null,
+   "archived": [
+    "TD-509"
+   ]
+  },
+  {
+   "name": "archived_part_two_spellings",
+   "line": "go_parts_spelled",
+   "entries": [
+    "TD-500",
+    "TD-501"
+   ],
+   "label": "Go",
+   "by": "pat",
+   "people": [
+    "pat"
+   ],
+   "answered_by": null,
+   "archived": [
+    "TD-006",
+    "TD-6"
+   ]
   }
  ],
  "lift_gate": [
@@ -957,6 +1096,11 @@
    "line": "event",
    "label": "Drop the gate",
    "after": "event_drop_the_gate"
+  },
+  {
+   "line": "go_parts_archived",
+   "label": "Go",
+   "after": "archived_part_skipped"
   }
  ],
  "close": [

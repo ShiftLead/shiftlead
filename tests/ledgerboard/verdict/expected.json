@@ -180,6 +180,36 @@
    "flags": [],
    "review": []
   },
+  "a decide lift that edits the archived part": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-files",
+     "the PR changes ['docs/ledger/TD-160.md', 'docs/ledger/TD-161.md', 'docs/ledger/archive/TD-162.md', 'docs/user_attention.md'], and a lift changes ['docs/ledger/TD-160.md', 'docs/ledger/TD-161.md', 'docs/user_attention.md']"
+    ]
+   ]
+  },
+  "a decide lift whose Context is archived": {
+   "carve_out": false,
+   "flags": [],
+   "review": [
+    [
+     "lift-refused",
+     "decide_lift refuses it: TD-160, the item's Context entry, is archived — the answer lifts nothing; it takes review"
+    ]
+   ]
+  },
+  "a decide lift with a Resolved part in the open directory": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
+  "a decide lift with an archived part": {
+   "carve_out": true,
+   "flags": [],
+   "review": []
+  },
   "a finished lift left open": {
    "carve_out": false,
    "flags": [],

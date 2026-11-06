@@ -1,0 +1,30 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--kind",
+  "decide",
+  "--text",
+  "Go on the report suite's builds?",
+  "--context",
+  "TD-4 decision (robin)",
+  "--due",
+  "2026-01-20",
+  "--answer",
+  "Go",
+  "--answer",
+  "Not yet",
+  "--default",
+  "0",
+  "--detail",
+  "{\"context\": \"The report suite's design is done.\", \"question\": \"Go on its two builds\", \"recommended\": \"its rounds ended\"}",
+  "--parts",
+  "TD-9,TD-10",
+  "--ledger",
+  "led",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

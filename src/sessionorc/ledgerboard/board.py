@@ -1,4 +1,4 @@
-# ledgerboard v2.5 sha256:ed91d5d1dd48431d73b16798f9524bfc1e7a3c975aaebcc081ca9b998f90c46e
+# ledgerboard v2.6 sha256:c2d1e631392f22a5f59565ce900de9c5a2a0f2557c3bd53e9da4580e539be68b
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard/board.py (vendored by agent-cadence as files/scripts/ledgerboard/board.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The board and rank writer: the module's board edits, read from and written to files (SPEC *The board writer*).
@@ -8,6 +8,7 @@
                                          [--answer A]... [--default N] [--lift A]... [--detail JSON]
                                          [--session S [--host H]] [--said WORDS --by NAME]
                                          [--decided WORDS [--by NAME]] [--under HEADING]
+                                         [--parts TD-a,TD-b]... [--ledger DIR]   (a decide's snapshot)
     python3 -m ledgerboard.board snooze  --board PATH --line N --expect HEAD --to D   (hide until D)
     python3 -m ledgerboard.board due     --board PATH --line N --expect HEAD --to D   (move Due: to D)
     python3 -m ledgerboard.board done    --board PATH --line N --expect HEAD [--why TEXT]
@@ -31,7 +32,7 @@ that line's notes (``item_notes()`` at ``--today``): ``item_notes`` in ``--json`
 ``line n: ℹ <note>`` otherwise; a note never changes the exit code.
 
 Exit, the package's one table (``ledger.py`` shares it): 0 written (or nothing to change); 1 refused; 2 usage
-(a bad ``--today`` among it), or (``decide``) the ledger cannot be used as asked; 4 a write failed (every file restored). 3 is ``ledger.py``'s
+(a bad ``--today`` among it), or (``decide`` and ``add --parts``) the ledger cannot be used as asked; 4 a write failed (every file restored). 3 is ``ledger.py``'s
 ``needs`` and never the board writer's.
 """
 
@@ -72,6 +73,7 @@ from . import (
     load,
     parse_board,
     parse_parts,
+    parts_problems,
     people_problems,
     queue_subject,
     respace,
@@ -273,14 +275,21 @@ def plan_add(board: str, text: str, *, due: str | None = None, context: str | No
              detail: Mapping | None = None, session: str | None = None, host: str | None = None,
              decided: str | None = None, said: str | None = None, by: str | None = None,
              under: str | None = NEEDS, today: str | date | None = None, tool: str = TOOL,
-             hide_until: str | None = None, lifts: Sequence[str] | None = None) -> Plan:
+             hide_until: str | None = None, lifts: Sequence[str] | None = None,
+             parts: Sequence[str] | None = None, ledger: str | None = None) -> Plan:
     """A new item at the top of the section `under` names (``item_line()``); with `said`, a question that
     was already answered, `by` and its words following the text as ` — <by>, <today>: <said>` (the
     subject keeps them out); with `decided`, an item already decided by the person (``decided_line()``:
-    `text` its title, `context` its ref, `by` who answered, as ``who_answered()`` resolves it)."""
+    `text` its title, `context` its ref, `by` who answered, as ``who_answered()`` resolves it). With `parts`
+    (v2.6), a decide's `Parts:` snapshot (``item_line(parts=)``), checked against the ledger (`ledger`, else
+    ``ledger/`` beside the board when it is a directory) by ``parts_problems()`` before the board's gate."""
     day = _today(today).isoformat()
     bare = None
+    if ledger is not None and parts is None:
+        raise Refused("--ledger on an add is the ledger a --parts snapshot is checked against: give --parts too")
     if decided is not None:
+        if parts is not None:
+            raise Refused("--parts is a decide's snapshot, asked as a question: a decided item takes none")
         if any(v is not None for v in (due, kind, detail, session, host, said, hide_until, lifts)):
             raise Refused("a decided item takes its title, context, answers, default, words and who gave them alone")
         new = decided_line(text, context or "", list(answers or []), default, decided, day,
@@ -295,11 +304,14 @@ def plan_add(board: str, text: str, *, due: str | None = None, context: str | No
         def compose(t: str) -> str:
             return item_line(t, due, day, session, host, context, kind=kind,
                              answers=list(answers) if answers is not None else None, default=default, detail=detail,
-                             hide_until=hide_until, lifts=list(lifts) if lifts is not None else None)
+                             hide_until=hide_until, lifts=list(lifts) if lifts is not None else None,
+                             parts=list(parts) if parts is not None else None)
 
         new = compose(words)
         if said is not None:
             bare = compose(text)
+        if parts is not None:
+            _check_parts(board, new, ledger)
     old = read(board)
     lines = old.splitlines(keepends=True)
     nl = "\r\n" if "\r\n" in old else "\n"
@@ -314,6 +326,39 @@ def plan_add(board: str, text: str, *, due: str | None = None, context: str | No
     first = (bare or new).split("\n", 1)[0].rstrip("\r")  # a person's words stay on the board, never in the subject
     msg = subject(tool, "append", ITEM_RE.match(first).group("text"))
     return Plan("add", msg, {board: out}, {"line": at + 1, "item_notes": _line_notes(out, at + 1, _today(today))})
+
+
+def _check_parts(board_path: str, new: str, ledger: str | None) -> None:
+    """A new item's `Parts:` snapshot against the ledger (v2.6, SPEC *The board writer*): the ledger found
+    (`ledger`, else ``ledger/`` beside the board when it is a directory; none is Refused), opened as a decide's
+    ledger half opens it (one that cannot be used is Unusable, exit 2), and the open and archived texts of the
+    Context entry and of each part handed to ``parts_problems()``, the archived ones named in ``archived``;
+    Refused, with every problem, when it names any."""
+    from . import ledger as L  # the ledger writer imports this module, so it is loaded here, when needed
+    beside = os.path.join(os.path.dirname(board_path) or ".", "ledger")
+    path = ledger or (beside if os.path.isdir(beside) else None)
+    if path is None:
+        raise Refused("a --parts snapshot is checked against the ledger: pass --ledger (the v2 directory), or "
+                      "keep it as ledger/ beside the board")
+    led = L.Ledger.open(path)
+    L._writable(led)
+    text = ITEM_RE.match(new.split("\n", 1)[0]).group("text")
+    ref, _ = _item_gate(text)
+    texts: dict[str, str] = {}
+    gone: list[str] = []
+    for x in [ref, *parse_parts(text)]:
+        try:
+            p, archived = led.entry_file(L.tid_of(x))
+        except Refused:
+            continue  # in neither directory, or no id the ledger holds (TD-0): parts_problems() says missing
+        got = entries(led.files[p])
+        tid = got[0]["id"] if got else L.tid_of(x)
+        texts.setdefault(tid, led.files[p])
+        if archived:
+            gone.append(tid)
+    problems = parts_problems(new, texts, gone)
+    if problems:
+        raise Refused("the snapshot does not match the ledger: " + "; ".join(problems))
 
 
 def _line_notes(board: str, line: int, today: date) -> list[dict]:
@@ -402,8 +447,8 @@ def _decide_ledger(board_path: str, board_text: str, body: str, label: str | Non
                    board_only: bool, today: str | date | None) -> tuple[bool, dict[str, str | None], dict]:
     """A decide's ledger half (v2.4, SPEC *The board writer*): (whether the answer closes the item, the ledger
     files it changes, what it reports). An item whose Context names one bare ``TD-n`` and one gate is the
-    decide lift: ``decide_lift()`` on the ledger's base texts of that entry and its `Parts:`, judged as the
-    ledger writer judges a write, then ``closes()`` on the texts after. With ``board_only`` (the ``set by=``
+    decide lift: ``decide_lift()`` on the ledger's base texts of that entry and its `Parts:` (a listed id only the
+    archive holds passed as an id in ``archived``, never as a text, v2.6), judged as the ledger writer judges a write, then ``closes()`` on the texts after. With ``board_only`` (the ``set by=``
     route, which has written the ledger already) nothing is written there, and ``closes()`` reads the ledger as
     it stands. An item naming another repo's entry is answered on the board alone and stays open."""
     ref, gate_ = _item_gate(ITEM_RE.match(body).group("text").strip())
@@ -427,18 +472,23 @@ def _decide_ledger(board_path: str, board_text: str, body: str, label: str | Non
         L._writable(led)
         ids = [ref, *[x for x in parse_parts(ITEM_RE.match(body).group("text")) if "#" not in x]]
         found = {}
+        gone = []  # each listed id only the archive holds, as its heading spells it: an id, never a text (v2.6)
         for x in ids:
             try:
                 p, archived = led.entry_file(L.tid_of(x))
             except Refused:
                 continue
-            if not archived:
-                found[entries(led.files[p])[0]["id"]] = p
+            tid = entries(led.files[p])[0]["id"]
+            if archived:
+                gone.append(tid)
+            else:
+                found[tid] = p
         base = {tid: led.files[p] for tid, p in found.items()}
         if board_only:
             return closes(body, label or "", base), {}, {"entries": [], "board_only": True}
         ledger_day = L._today(today)
-        got = decide_lift(body, base, label or "", by, ledger_day, board_people(board_text), answered_by(board_text))
+        got = decide_lift(body, base, label or "", by, ledger_day, board_people(board_text), answered_by(board_text),
+                          archived=gone)
         changes: dict[str, str | None] = {found[tid]: text for tid, text in got.items()}
         notes = L.gate(led, changes, today=ledger_day) if changes else []
     except L.Unusable as e:
@@ -549,8 +599,25 @@ def _pairs(sets: Sequence[str], drops: Sequence[str]) -> dict[str, str | None]:
     return out
 
 
+def _parts_given(values: Sequence[str]) -> list[str] | None:
+    """The ids of every ``--parts`` value, each split on ``,`` and each piece trimmed; None when none was given.
+    An empty piece (``TD-9,``) is refused."""
+    if not values:
+        return None
+    out = []
+    for v in values:
+        for piece in v.split(","):
+            if not piece.strip():
+                raise Refused(f"--parts {v!r} holds an empty piece: give TD-a,TD-b")
+            out.append(piece.strip())
+    return out
+
+
 def build(a: argparse.Namespace) -> Plan:
     if a.action == "add":
+        if a.parts and a.decided is not None:  # step 1's order (SPEC *The board writer*): ahead of the pieces
+            raise Refused("--parts is a decide's snapshot, asked as a question: a decided item takes none")
+        parts = _parts_given(a.parts)
         detail = None
         if a.detail is not None:
             try:
@@ -562,7 +629,7 @@ def build(a: argparse.Namespace) -> Plan:
         return plan_add(a.board, a.text, due=a.due, context=a.context, kind=a.kind, hide_until=a.hide_until,
                         answers=a.answer or None, default=a.default, lifts=a.lift or None, detail=detail, session=a.session,
                         host=a.host, decided=a.decided, said=a.said, by=a.by, under=a.under,
-                        today=a.today, tool=a.tool)
+                        today=a.today, tool=a.tool, parts=parts, ledger=a.ledger)
     if a.action in EDITS:
         if a.action == "decide" and len(a.answer) != 1:
             raise Refused("decide takes one --answer, the person's")
@@ -589,7 +656,7 @@ def build(a: argparse.Namespace) -> Plan:
 TAKES = {
     "list": {"board", "today"},
     "add": {"board", "text", "due", "context", "kind", "answer", "default", "detail", "session", "host",
-            "decided", "said", "by", "under", "today", "tool", "hide_until", "lift"},
+            "decided", "said", "by", "under", "today", "tool", "hide_until", "lift", "parts", "ledger"},
     "snooze": {"board", "line", "expect", "to", "today", "tool", "session"},
     "due": {"board", "line", "expect", "to", "today", "tool", "session"},
     "done": {"board", "line", "expect", "why", "today", "tool", "session"},
@@ -606,8 +673,8 @@ NEEDS_OPT = {
     "reply": ("board", "line", "expect", "text", "by"), "archive": ("board", "archive"),
     "fmt": ("board",), "rank": ("rank", "queue"),
 }
-DEFAULTS = {"under": NEEDS, "tool": TOOL, "answer": [], "lift": [], "set": [], "drop": [], "fixed": [],
-            "board_only": False}
+DEFAULTS = {"under": NEEDS, "tool": TOOL, "answer": [], "lift": [], "parts": [], "set": [], "drop": [],
+            "fixed": [], "board_only": False}
 
 
 def parser() -> argparse.ArgumentParser:
@@ -620,7 +687,8 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--set", action="append", default=[], help="rank: TD-n=KEY, a line to set")
     ap.add_argument("--drop", action="append", default=[], help="rank: TD-n, a line to remove")
     ap.add_argument("--ledger", help="rank --action respace: the ledger (a file or a v2 directory); decide: the v2 "
-                                     "ledger the lift writes (default: ledger/ beside the board, when it is a directory)")
+                                     "ledger the lift writes; add --parts: the v2 ledger the snapshot is checked "
+                                     "against (decide and add: default ledger/ beside the board, when it is a directory)")
     ap.add_argument("--board-only", action="store_true",
                     help="decide: write the board half alone (the set by= route, whose ledger is written already)")
     ap.add_argument("--fixed", action="append", default=[],
@@ -634,6 +702,9 @@ def parser() -> argparse.ArgumentParser:
                     help="decide: the person's answer; add: one of the item's answers (repeat)")
     ap.add_argument("--lift", action="append", default=[],
                     help="add: a decide's answer that lifts its gate (repeat; none means Go)")
+    ap.add_argument("--parts", action="append", default=[],
+                    help="add: a decide's Parts: snapshot, TD-a,TD-b (repeat; each part Part of the Context's "
+                         "entry and carrying its gate)")
     ap.add_argument("--text", help="add: the item's text; reply: the reply's words")
     ap.add_argument("--by", help="reply, add --said: who says it; decide, add --decided: who answered (the one name "
                     "on the board's People: when it lists one)")

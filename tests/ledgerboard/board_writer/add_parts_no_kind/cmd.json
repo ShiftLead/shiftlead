@@ -1,0 +1,18 @@
+{
+ "argv": [
+  "add",
+  "--board",
+  "board.md",
+  "--text",
+  "Go on the report suite's builds?",
+  "--context",
+  "TD-4 decision (robin)",
+  "--due",
+  "2026-01-20",
+  "--parts",
+  "TD-9,TD-10",
+  "--today",
+  "2026-01-15",
+  "--json"
+ ]
+}

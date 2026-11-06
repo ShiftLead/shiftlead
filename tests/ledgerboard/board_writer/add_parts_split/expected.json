@@ -1,0 +1,12 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "add",
+  "item_notes": [],
+  "line": 7,
+  "paths": [
+   "board.md"
+  ],
+  "subject": "ledgerboard: append Go on the report suite's builds? (session n/a)"
+ }
+}
