@@ -355,6 +355,8 @@ NOTICE_RE = re.compile(r"<(task-notification|system-reminder)>.*?</\1>", re.S)
 COMMAND_RE = re.compile(r"<command-name>\s*(.*?)\s*</command-name>", re.S)
 COMMAND_ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.S)
 STDOUT_RE = re.compile(r"<local-command-stdout>(.*?)</local-command-stdout>", re.S)
+# a paste the tool wraps in the prompt (the composer's send, a long paste): its text is what was typed, the tags are not
+PASTE_RE = re.compile(r'<pasted_content id="[^"]*">\n?(.*?)\n?</pasted_content(?: id="[^"]*")?>', re.S)
 
 
 def _first_line(text: str) -> str:
@@ -372,6 +374,7 @@ def _typed(text: str) -> str | None:
         line = "/" + name.group(1).lstrip("/")
         return f"{line} {args.group(1).strip()}".rstrip() if args else line
     rest = NOTICE_RE.sub("", text)  # the tool's notices and reminders are no part of what was typed
+    rest = PASTE_RE.sub(lambda m: m.group(1), rest)
     return rest.strip("\n") if rest.strip() else None
 
 

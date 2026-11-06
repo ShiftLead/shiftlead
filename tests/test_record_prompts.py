@@ -73,6 +73,16 @@ def test_the_read_leaves_out_what_no_person_typed_and_draws_a_slash_command_as_t
 
 
 @pytest.mark.unit
+def test_a_pasted_prompt_reads_as_its_text_without_the_tools_tags(tmp_path):
+    p = tmp_path / "t.jsonl"
+    pasted = '\n\n<pasted_content id="2e9d">\nLets file a TD\nsecond line\n\n</pasted_content id="2e9d">\n'
+    _write(p, [_user("T1", pasted), _user("T2", 'see <pasted_content id="a1">x\ny</pasted_content> here')])
+    a, b = transcript_mod.prompts(p)[0]
+    assert (a.text, a.drawn) == ("Lets file a TD\nsecond line", "❯ Lets file a TD")
+    assert b.text == "see x\ny here"
+
+
+@pytest.mark.unit
 def test_the_read_cuts_text_at_300_and_drawn_at_40_marking_a_whole_line(tmp_path):
     p = tmp_path / "t.jsonl"
     forty, more = "x" * 40, "y" * 41
