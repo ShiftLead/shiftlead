@@ -4444,6 +4444,262 @@ def _counts(args: argparse.Namespace) -> int:
     return _counts_line(args, got)
 
 
+# ── ao card: one Queue card whole (design §4.7 *`ao card`*, TD-1411, built by TD-1414) ──────────
+NO_UI_CARD = (
+    "no UI answers on this host: a card's attachments are the UI's (§4.4) — start it, "
+    "or ask from a terminal outside ShiftLead"
+)
+UI_CARD_WAIT = 30.0  # seconds: a cold card reads the queue, the inbox, the board and the ledger
+MAIL_WORDS_CUT = "its words are the person's to read"
+CARD_NOT_MAIL = ("board", "ledger", "red_pr", "fork_pr")  # `shiftlead.ui.queue.NOT_MAIL`, which needs the [ui] extra
+
+
+class _CardRefusal(Exception):
+    """A refusal of `ao card`, in §4.7's words, with its exit code."""
+
+    def __init__(self, words: str, code: int = 1) -> None:
+        super().__init__(words)
+        self.words, self.code = words, code
+
+
+class _NoUI(Exception):
+    """Nothing answers at the UI's address: a failure to connect, never a status."""
+
+
+def _ui_card(base: str, id: str) -> dict[str, Any]:
+    """The UI's `/api/queue/card?id=<id>` (§4.7 *`ao card`*): the card with no mail's words. Raises `_NoUI` where
+    nothing answers, `_CardRefusal` for the UI's refusals and for an answer that is not the card endpoint's."""
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    url = f"{base.rstrip('/')}/api/queue/card?id={urllib.parse.quote(id, safe='')}"
+    no_endpoint = _CardRefusal(f"no card endpoint at {base}")
+
+    def error_of(body: bytes) -> str | None:
+        try:
+            got = json.loads(body)
+        except ValueError:
+            return None
+        return str(got["error"]) if isinstance(got, dict) and got.get("error") else None
+
+    try:
+        # no proxy: a pane's `http_proxy` would take a loopback read elsewhere and lose the UI
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(url, timeout=UI_CARD_WAIT) as r:  # a loopback URL, or --ui's
+            body = r.read()
+    except urllib.error.HTTPError as e:
+        if e.code == 503:
+            raise _CardRefusal("host agent unreachable", 3) from e
+        words = error_of(e.read()) if e.code in (404, 400, 502) else None
+        raise (_CardRefusal(words) if words else no_endpoint) from e
+    except urllib.error.URLError as e:
+        if isinstance(e.reason, TimeoutError):
+            raise _CardRefusal(f"the UI did not answer in {UI_CARD_WAIT:.0f} s") from e
+        raise _NoUI(str(e.reason)) from e
+    except TimeoutError as e:
+        raise _CardRefusal(f"the UI did not answer in {UI_CARD_WAIT:.0f} s") from e
+    except OSError as e:  # a refused or reset connection
+        raise _NoUI(str(e)) from e
+    try:
+        got = json.loads(body)
+    except ValueError:
+        raise no_endpoint from None
+    if not isinstance(got, dict) or not any(k in got for k in ("card", "completed", "ambiguous")):
+        raise no_endpoint
+    return got
+
+
+def _local_card(id: str) -> dict[str, Any] | None:
+    """The card built in-process (§4.7 *`ao card`*, from the person's own terminal): `Readings.card` with the mail
+    whole, its `inbox` read naming `person`."""
+    try:
+        from shiftlead.ui.app import CardRefused, Readings
+    except ImportError as e:  # the card is the UI's: an install without the `[ui]` extra has none
+        raise _CardRefusal(f"ao card needs the [ui] extra ({e})") from e
+    try:
+        return asyncio.run(Readings().card(id, words=True))
+    except CardRefused as e:
+        if e.kind == "down":
+            raise _CardRefusal(e.why or "host agent unreachable", 3) from e
+        if e.kind == "no_queue":
+            raise _CardRefusal(f"the home did not serve the Queue: {e.why}") from e
+        raise _CardRefusal(e.why) from e
+
+
+def _answer_lines(answers: Any, default: Any, consequences: Any = ()) -> list[str]:
+    """Each answer on its own line, the default marked (once) and, where it has one, its consequence."""
+    out: list[str] = []
+    cons = list(consequences or ())
+    for i, a in enumerate(answers or ()):
+        a = str(a)
+        if default and a == str(default) and not a.rstrip().lower().endswith("(default)"):
+            a += " (default)"
+        c = str(cons[i]) if i < len(cons) and cons[i] else ""
+        out.append(f"- {a}" + (f" — {c}" if c else ""))
+    return out
+
+
+def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
+    """One attached item as a block (§4.7 *Each item's block*): its first line, then its body indented."""
+    row = x.get("row") if isinstance(x.get("row"), Mapping) else {}
+    which = str(row.get("row") or "")
+    mail = which not in CARD_NOT_MAIL
+    kind = {"red_pr": "red PR", "fork_pr": "fork PR"}.get(which) or str(row.get("kind") or "")
+    head = [str(x.get("item") or row.get("id") or "")]
+    if kind:
+        head.append(kind)
+    if mail and (row.get("from_name") or row.get("from")):
+        head.append(f"from {row.get('from_name') or row.get('from')}")
+    if mail and row.get("at"):
+        head.append(_card_time(row["at"]))
+    if x.get("on_row"):
+        head.append(f"on {x['on_row']}")
+    if which == "board":
+        head.append(f"board of {row.get('repo_name') or x.get('repo') or ''}".rstrip())
+    tied = x.get("tied") if isinstance(x.get("tied"), Mapping) else None
+    if tied:
+        head.append(f"tied by {tied.get('by')}: {tied.get('ref')}")
+    if which == "board" and row.get("due"):
+        head.append(f"due {row['due']}")
+    if mail and cut:
+        head.append(MAIL_WORDS_CUT)
+    body: list[str] = []
+    if which == "board":
+        card = row.get("card") if isinstance(row.get("card"), Mapping) else {}
+        body += [str(card.get(k) or "") for k in ("sentence", "leads", "context")]
+        body += [str(row.get("detail") or ""), *_answer_lines(row.get("answers"), row.get("default"))]
+    elif which == "ledger":
+        body += [str(row.get(k) or "") for k in ("title", "ask", "detail")]
+        body += _answer_lines(row.get("answers"), row.get("default"), row.get("consequences"))
+    elif which in ("red_pr", "fork_pr"):
+        body += [str(row.get("title") or ""), str(row.get("text") or "")]
+    elif not cut:
+        if row.get("handed_row"):
+            entry = row.get("entry") if isinstance(row.get("entry"), Mapping) else {}
+            body.append(str(entry.get("title") or ""))
+        else:
+            body += [str(row.get("subject") or ""), str(row.get("text") or "")]
+            body += _answer_lines(row.get("answers"), row.get("default"))
+    lines = ["  " + " · ".join(h for h in head if h)]
+    for b in body:
+        lines += ["    " + ln if ln.strip() else "" for ln in b.strip("\n").splitlines()] if b.strip() else []
+    return lines
+
+
+def _card_time(at: Any) -> str:
+    """A message's time as §4.7's example writes it, `2026-11-05 14:12`; anything unparsable as it is."""
+    try:
+        return datetime.fromisoformat(str(at)).strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return str(at)
+
+
+def _card_row_line(r: Mapping[str, Any]) -> str:
+    """One row of the card's `Part of:` tree (§4.7 *The rows*), indented by its depth."""
+    holder = r.get("holder") if isinstance(r.get("holder"), Mapping) else None
+    state = str(r.get("state") or "")
+    rest = [state] if state else [f"needs you ({r['needs']})"] if r.get("needs") else []
+    name = str(holder.get("name") or holder.get("id") or "") if holder else ""
+    if name and name not in state:
+        rest.append(name)
+    if r.get("pr") and not r.get("archived"):
+        rest.append(f"PR #{r['pr']}")
+    rest += [f"after {a}" for a in r.get("after") or ()]
+    if r.get("archived") and r.get("resolved"):
+        rest.append(str(r["resolved"]))
+    first = "  ".join(str(v) for v in (r.get("qid"), r.get("priority"), r.get("page")) if v)
+    return "  " * (1 + int(r.get("depth") or 0)) + first + ("  " + " · ".join(rest) if rest else "")
+
+
+def _card_text(got: Mapping[str, Any], cut: bool | None = None) -> list[str]:
+    """`ao card`'s text form (§4.7 *What it prints*): the header, the rows with every fold opened, the wants with
+    each item's block, then what the items mention."""
+    card = got.get("card") or {}
+    top = card.get("top") or {}
+    cut = got.get("mail") == "ids" if cut is None else cut or got.get("mail") == "ids"
+    group = str(card.get("group") or "")
+    where: list[str] = []
+    if group == "up_next":
+        places = [p for p in card.get("places") or () if isinstance(p, Mapping)]
+        if len(places) > 1:
+            where.append("up next " + ", ".join(f"{p.get('n')} in {p.get('repo')}" for p in places))
+        elif places or card.get("place"):
+            where.append(f"up next {places[0].get('n') if places else card.get('place')}")
+        else:
+            where.append("up next")
+    elif group == "waiting":
+        where.append("waiting")
+        wait = card.get("wait") if isinstance(card.get("wait"), Mapping) else {}
+        if wait.get("phrase"):
+            where.append(str(wait["phrase"]))
+        would = [p for p in card.get("would_be") or () if isinstance(p, Mapping)]
+        if would:
+            where.append(", ".join(f"would be {p.get('n')} in {p.get('repo')}" for p in would))
+    elif group:
+        where.append(group.replace("_", " "))
+    if card.get("status"):
+        where.append(str(card["status"]))
+    where.append(f"{card.get('done') or 0}/{card.get('of') or 0} done")
+    if card.get("start"):
+        where.append(f"start {card['start']}")
+    lines = [f"{card.get('id')} — {top.get('title') or ''}", " · ".join(where), "rows"]
+    lines += [_card_row_line(r) for r in [top, *(card.get("rows") or ())] if isinstance(r, Mapping)]
+    wants = got.get("wants") or {}
+    groups: list[tuple[str, list[Any]]] = [("decide", wants.get("decide") or []), ("do", wants.get("do") or [])]
+    read = wants.get("read") or {}
+    labels = {"answered": "answered for you", "waiting": "waiting on them", "fyi": "fyi"}  # `READ_LINES`
+    groups += [(labels.get(k, k), read.get(k) or []) for k in (*labels, *(k for k in read if k not in labels))]
+    groups += [("with you", wants.get("with_you") or []), ("answered", wants.get("answered") or [])]
+    for label, items in groups:
+        if items:
+            lines.append(f"{label} {len(items)}")
+            for x in items:
+                lines += _card_item_lines(x, cut)
+    mentioned = got.get("mentioned") or {}
+    if mentioned:
+        lines.append("mentioned")
+        for qid, items in mentioned.items():
+            lines.append(f"  {qid}")
+            for m in items:
+                words = " ".join(str(m.get("words") or "").split())
+                words = words if len(words) <= 100 else words[:99] + "…"
+                lines.append("    " + " · ".join(str(v) for v in (m.get("item"), m.get("kind"), words) if v))
+    return lines
+
+
+def cmd_card(args: argparse.Namespace) -> int:
+    """`ao card <id> [--ui <url>] [--json]` (design §4.7 *`ao card`*, TD-1411, built by TD-1414): the whole Queue
+    card that holds `<id>`, with everything the Queue attached to it. Under a pane or with `--ui` it reads the UI's
+    `/api/queue/card`, which carries no mail's words; from the person's own terminal it builds the card in-process
+    with `Readings.card`, the mail whole. Read-only."""
+    base = args.ui or f"http://127.0.0.1:{service.DEFAULT_PORT}"
+    try:
+        if args.ui or os.environ.get("SHIFTLEAD_SESSION"):
+            try:
+                got = _ui_card(base, args.ref)
+            except _NoUI:
+                raise _CardRefusal(f"no UI answers at {args.ui}" if args.ui else NO_UI_CARD) from None
+        else:
+            got = _local_card(args.ref)
+        if got is None:
+            raise _CardRefusal(f"no open card holds {args.ref}")
+        if got.get("ambiguous"):
+            raise _CardRefusal(f"{args.ref} is in more than one repo: {', '.join(map(str, got['ambiguous']))}")
+        if isinstance(got.get("completed"), Mapping):
+            done = got["completed"]
+            pr = f", #{done['pr']}" if done.get("pr") else ""
+            raise _CardRefusal(f"{args.ref} is on a completed card: closed {done.get('closed')}{pr}")
+    except _CardRefusal as e:
+        return fail(args, e.words, e.code)
+    if args.json:
+        print(json.dumps(got, indent=1, default=str))  # its rows carry dates
+        return 0
+    # the cut follows the road taken, whatever a UI answers (§4.7: the UI road carries no mail's words)
+    print("\n".join(_card_text(got, cut=bool(args.ui or os.environ.get("SHIFTLEAD_SESSION")))))
+    return 0
+
+
 def cmd_decide(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)
     if s.get("permission_channel") is False:
@@ -5170,6 +5426,18 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--list", action="store_true", help="the cards in rank order, In progress first")
     p.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
     p.set_defaults(fn=cmd_rank)
+
+    p = add("card", help="one Queue card whole, with every item the Queue attached to it; read-only (design §4.7)")
+    # `ref`, never `id`: `_run` resolves an `id` as a session name
+    p.add_argument(
+        "ref",
+        metavar="id",
+        help="any entry the card holds: <repo>#TD-n, a bare TD-n one repo holds, or <origin path>#TD-n",
+    )
+    p.add_argument(
+        "--ui", metavar="URL", help="the UI to ask (default under a pane: http://127.0.0.1:<the UI's port>; TD-1414)"
+    )
+    p.set_defaults(fn=cmd_card)
 
     p = add("promote", help="make a repo's main live, a person's press; `ao promote status` reads (design §6)")
     p.add_argument(
