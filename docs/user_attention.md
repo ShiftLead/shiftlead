@@ -18,7 +18,7 @@ People: paul
   - **Context:** TD-1430 is a build of TD-1423's design (the home's stamp, its words, ao inbox and ao pr held's reading), held with it by decision (paul) while TD-1423's end-of-rounds item, beside this one, is open. Each build carries its own hold, and a board item can name only one entry's here, so each has its own item.
   - **Question:** Go with TD-1430 once TD-1423's design is accepted?
   - **Recommended:** Go — it follows the design as written.
-- [ ] decide 2026-11-05 (session `designer-ao-1` on kmaster) — Go with TD-1431, a build of TD-1423's design, once TD-1423's end-of-rounds item is answered Go? Context: TD-1431 decision (paul). Due: 2026-11-08. Answers: Go (default) | Not yet.
+- [x] decide 2026-11-05 (session `designer-ao-1` on kmaster) — Go with TD-1431, a build of TD-1423's design, once TD-1423's end-of-rounds item is answered Go? Context: TD-1431 decision (paul). Due: 2026-11-08. Answers: Go (default) | Not yet. Decided: Go (by paul) (2026-11-05). Closed: 2026-11-05 — lifted.
   - **Context:** TD-1431 is a build of TD-1423's design (the Inbox line and the briefs), held with it by decision (paul) while TD-1423's end-of-rounds item, beside this one, is open. Each build carries its own hold, and a board item can name only one entry's here, so each has its own item.
   - **Question:** Go with TD-1431 once TD-1423's design is accepted?
   - **Recommended:** Go — it follows the design as written.
