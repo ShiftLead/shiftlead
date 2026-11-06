@@ -1416,11 +1416,18 @@ def cmd_at(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: {start_note(s) or 'starts on the next tick'}"))
 
 
+# `ao restart`'s words on a seat at its fill ceiling, and the Inbox row's toast (§4.7, §4.5a, TD-1422)
+SEAT_CLEARED = "fills exhausted cleared — rule 3 fills it when it is due"
+
+
 def cmd_restart(args: argparse.Namespace) -> int:
     """`ao restart <session>` (design §4.7, §6 rule 2 *A person's restart*, TD-250): the person's
     press in a terminal. The host agent refuses it to a session and makes every other refusal by
     name before anything is touched; the reply is the new record, printed as `ao status` prints one."""
     s = call_sync("restart", id=resolve(args.id))
+    if s.get("seat") is not None:
+        # a seat at its fill ceiling: cleared, nothing created — the reply is the seat's own view (TD-1422)
+        return emit(args, s, lambda: print(f"{s.get('name') or s['id']} · {SEAT_CLEARED}"))
     return emit(args, s, lambda: print(status_line(s)))
 
 

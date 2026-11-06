@@ -2550,6 +2550,11 @@ def test_ao_restart_prints_the_new_records_line_and_a_refusal_in_the_agents_word
     assert json.loads(capsys.readouterr().out)["restarts"][0]["why"] == "person"
     assert cli.main(["restart", "ao-x-dirty"]) == 1
     assert "w has work left: 2 uncommitted" in capsys.readouterr().err
+    # a seat at its fill ceiling comes back as itself, cleared (§4.7, TD-1429)
+    seat = {**new, "id": "ao-x-tl", "name": "tl", "state": "closed", "seat": {"trigger": "asks"}}
+    monkeypatch.setattr(cli, "call_sync", lambda method, **params: seat)
+    assert cli.main(["restart", "ao-x-tl"]) == 0
+    assert capsys.readouterr().out == "tl · fills exhausted cleared — rule 3 fills it when it is due\n"
     manager = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/manager.md").read_text()
     assert "on the board once — the person's press is the Inbox row's Restart, or `ao restart <id>`." in manager
 

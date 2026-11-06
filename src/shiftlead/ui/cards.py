@@ -1077,7 +1077,8 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         if d["restart_ceiling"].get("held"):
             full = (
                 f"{text}: the host agent filled this seat and the ones beside it as often as it will, twice running "
-                "(design §6) — it is yours now: Resume it, or Forget it"
+                "(design §6) — it is yours now: Restart it from its Inbox row or `ao restart`, Resume it, "
+                "or Forget it"
             )
         else:
             full = (

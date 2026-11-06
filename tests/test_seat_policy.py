@@ -12,7 +12,7 @@ from conftest import park_ticks
 
 from sessionorc import agent_notify, reports
 from sessionorc.agent import FILL_CEILING, FILL_WINDOW, SEAT_ASK_LINGER, SEAT_IDLE_GRACE, SEAT_PR_WAIT
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import PR_CLOSED, MailEntry, ProgressEntry, Session
 
 pytestmark = pytest.mark.integration
@@ -259,6 +259,51 @@ async def test_a_trip_whose_fills_all_postdate_a_lapse_is_held_and_one_counting_
                 assert ra.restart_ceiling and ra.restart_ceiling.get("held"), "a held mark never lapses"
             for sid in (a, b):
                 await person.call("kill", id=sid)
+
+
+async def test_a_persons_restart_clears_a_seats_fill_ceiling_and_its_next_fill_goes_past_the_count(agent, tmp_path):
+    """§6 rule 2 *A person's restart* on a seat at its fill ceiling (TD-1429): the mark and `fill_lapsed`
+    cleared, `restarts` the one `{why: person}`, no record created; the next tick fills the due seat though
+    its fellows hold six fills in the hour, and the fill after that is counted. Any other seat is refused
+    as before; a suspended or superseded seat at the ceiling gets that refusal first."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        a = await _seat(person, tmp_path, name="a", controllers=["ao-x-mgr"])
+        b = await _seat(person, tmp_path, name="b", controllers=["ao-x-mgr"])
+        plain = await _seat(person, tmp_path, name="p", controllers=["ao-p-mgr"])
+        for sid in (a, b, plain):
+            _end(agent, sid)
+        with pytest.raises(AgentError, match="p is a seat: rule 3 fills it when it is due"):
+            await person.call("restart", id=plain)
+        ra = agent.sessions[a]
+        ra.restart_ceiling = {"at": _iso(now), "count": 6, "why": "fill", "held": True}
+        ra.fill_lapsed = {"at": _iso(now - timedelta(minutes=50))}
+        agent.sessions[b].restarts = [{"at": _iso(now - ago), "why": "fill"} for ago in _mins(FILL_CEILING)]
+        ra.suspended = {"at": _iso(now), "why": "alarm"}
+        with pytest.raises(AgentError, match="a is suspended"):
+            await person.call("restart", id=a)
+        ra.suspended = None
+        ra.superseded_by = "a-2"
+        with pytest.raises(AgentError, match="a was resumed as a-2"):
+            await person.call("restart", id=a)
+        ra.superseded_by = None
+        view = await person.call("restart", id=a)
+        assert view["id"] == a and view["seat"] is not None and agent.sessions[a] is ra, "nothing created"
+        assert ra.restart_ceiling is None and ra.fill_lapsed is None
+        assert [e["why"] for e in ra.restarts] == ["person"]
+        ra.seat_due = {"at": _iso(now), "by": "every"}
+        await agent._keep_running(now)
+        new = agent.sessions[a]
+        assert new is not ra, "filled past its fellows' six"
+        assert [e["why"] for e in new.restarts] == ["person", "fill"] and new.restart_ceiling is None
+        _end(agent, a)
+        new.seat_due = {"at": _iso(now), "by": "every"}
+        await agent._keep_running(now)
+        assert agent.sessions[a] is new, "the fill after that is counted: seven in the hour"
+        assert new.restart_ceiling and new.restart_ceiling["why"] == "fill"
+        for sid in (a, b, plain):
+            await person.call("kill", id=sid)
 
 
 async def test_an_asks_seat_lingers_fifteen_minutes_idle_and_a_team_seat_closes_at_the_grace(agent, tmp_path):

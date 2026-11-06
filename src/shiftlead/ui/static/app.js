@@ -1689,7 +1689,9 @@
       const res = await act(id, action2 || action, body);
       if (key === "board_decide") answered(`decided: ${body.answer} · ${AO.today()}`);
       if (action === "restart") {
-        say(`restarted from its launch record, as it was started — ${res.unattended ? "unattended" : "attended"}`, true);
+        // a seat at its fill ceiling: cleared, nothing started — `ao restart`'s words (§4.5a, TD-1422)
+        say(res.seat ? `${res.seat} · fills exhausted cleared — rule 3 fills it when it is due`
+          : `restarted from its launch record, as it was started — ${res.unattended ? "unattended" : "attended"}`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       }
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) { AO.handRing(c); c.remove(); } if (location.pathname.startsWith("/focus/") && !AO.poppedId) location.href = "/"; }

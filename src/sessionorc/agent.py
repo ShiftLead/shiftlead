@@ -199,6 +199,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     claim_draft,  # noqa: F401
     closer_of,
     draft_folder,  # noqa: F401
+    fill_ceiling,  # noqa: F401
     fill_lapses,  # noqa: F401
     idle_from,  # noqa: F401
     launch_params,  # noqa: F401
@@ -2573,6 +2574,15 @@ class HostAgent(
         now = datetime.now(UTC)
         params = self._restart_check(s, now)
         entry: dict[str, Any] = {"at": now_iso(), "why": "person"}
+        if s.seat is not None:
+            # a seat at its fill ceiling (§6 rule 3, TD-1422): the mark cleared, nothing created — rule 3
+            # fills it when its cause is next due, past its fellows' count, once (`_fill`)
+            s.restart_ceiling = s.fill_lapsed = None
+            s.restarts = [entry]
+            self._save(s)
+            await self._push_changes()
+            log.info("%s: the person cleared its fill ceiling — rule 3 fills it when it is due", self._address(s))
+            return self._view(s)
         read = await self._refill_prompt(s, params, entry)  # before the close: a read that raises touches nothing
         if s.state == "idle":  # a restart keeps the worktree: the new run takes up its directory and branch
             if s.host == self.host:
@@ -2764,8 +2774,6 @@ class HostAgent(
         """`restart`'s refusals, each by name (design §6 rule 2 *A person's restart*), and the launch
         record as `create`'s arguments when none applies. Nothing is changed here."""
         rule = "(design §6 rule 2)"
-        if s.seat is not None:
-            raise RpcError(f"{s.name} is a seat: rule 3 fills it when it is due, and Resume is the way to it {rule}")
         if s.suspended:
             raise RpcError(
                 f"{s.name} is suspended over an identity alarm: only a person's Resume or Forget lifts that, "
@@ -2775,6 +2783,13 @@ class HostAgent(
             raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to restart {rule}")
         if s.state == "scheduled":
             raise RpcError(f"{s.name} is scheduled and has not started: `ao at {s.id} now` starts it {rule}")
+        if s.seat is not None:
+            if agent_common.fill_ceiling(s.restart_ceiling):
+                # a seat at its fill ceiling (§6 rule 3 *The ceiling is a rate, not a stop*, TD-1422): the
+                # restart clears the mark and creates nothing, so nothing below refuses it — the fill waits
+                # on the gate as any fill does
+                return {}
+            raise RpcError(f"{s.name} is a seat: rule 3 fills it when it is due, and Resume is the way to it {rule}")
         if isinstance(s.closed_for, dict) and s.closed_for.get("why") == "run_ended":
             raise RpcError(
                 f"{s.name}: its run ended: start the team, or add one from the form (design §4.9, §6 rule 2)"

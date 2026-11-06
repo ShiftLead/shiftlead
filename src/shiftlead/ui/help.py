@@ -369,7 +369,8 @@ HELP: tuple[Help, ...] = (
             "started so, on a fresh prompt and with its mail. Press it when the host agent will not restart a "
             "member by itself and you want it working again. It is not Resume, which brings the conversation "
             "back attended, under you. It is refused, saying what is left, while its checkout holds "
-            "uncommitted or unpushed work."
+            "uncommitted or unpushed work. On a seat at its fill ceiling it clears the mark and starts nothing: "
+            "the host agent fills the seat when it is next due."
         ),
     ),
     Help(
