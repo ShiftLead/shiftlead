@@ -1898,14 +1898,15 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     for piece in ("fgrants", "fcontrollers", "fstopset"):
         assert piece in session_html, piece  # read at a session's start, rarely pressed after: the folded card
     # Session folded; Ready to close folded too on this unattended team member, and Close session
-    # not offered — its team closes it (§4.5 *Whose session it is*); an own session has both open
+    # not offered — its team closes it (§4.5 *Whose session it is*); since TD-964 an own session's
+    # Ready to close starts folded as well, its value on the summary
     assert 'data-side="session">' in html and 'data-side="ready">' in html and 'id="fclose"' in html
     assert "hidden" in html[html.index('id="fready"') - 80 : html.index('id="fready"')] and not v["own"]
     own = view({**v_src, "unattended": False})
     html = templates.get_template("focus.html").render(
         s={**own, "grants_all": [], "ready": [], "ready_ok": True}, host="h", active="Sessions"
     )
-    assert own["own"] and 'data-side="ready" open>' in html
+    assert own["own"] and 'data-side="ready">' in html and 'data-side="ready" open' not in html
     # the Working card's heading reads *says · <age> ago*, the words alone in its body (TD-156) —
     # the age is measured against now, so the shape is what is pinned, not the number
     assert ">says · " in working_html and " ago</span>" in working_html and "· says ·" not in working_html

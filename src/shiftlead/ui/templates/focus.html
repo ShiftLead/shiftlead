@@ -335,8 +335,8 @@
        in progress, in review (a claim with a PR), done, dropped — so a claim in review never reads as
        one not started. The explanation is the heading's **i** mark, read before a press; **Drop**
        sits behind the panel's **more ▾**, on in-progress claims only, its confirm naming the cost. #}
-    {% if s.agent %}<details class="card pad side reports hidden" data-side="reports" id="reportscard" data-pr-base="{{ pr_base or '' }}" data-pr-marks='{{ (pr_marks or {}) | tojson }}' data-name="{{ s.name }}" open>
-      <summary class="row gap"><span class="h2">Reports</span><span class="meta" id="reportscount"></span>
+    {% if s.agent %}<details class="card pad side reports hidden" data-side="reports" id="reportscard" data-pr-base="{{ pr_base or '' }}" data-pr-marks='{{ (pr_marks or {}) | tojson }}' data-name="{{ s.name }}">
+      <summary class="row gap"><span class="h2">Reports</span><span class="meta sumval" id="reportscount"></span>
         <button class="imark" type="button" id="i-reports" aria-controls="info-reports" aria-expanded="false" aria-describedby="info-reports" aria-label="About Reports" title="What the session declared, and what the agent derived from its branch and PRs (dashed), grouped by state. A claim with a PR is in review, not in progress. Drop, under more ▾, lets go of a claim that has no PR yet.">i</button>
       </summary>
       <p class="note secinfo" id="info-reports" hidden>What the session declared, and what the agent derived from its branch and PRs (dashed), grouped by state. A claim with a PR is <b>in review</b>, not in progress. <b>Drop</b>, under <b>more ▾</b>, lets go of a claim that has no PR yet: the lease ends and the session is told.</p>
@@ -347,8 +347,8 @@
     {# design §4.5a Focus side panel **Inbox** (§4.10): what others addressed to this session,
        beside Reports (what it declared). Bodies are fetched through the `inbox` RPC as a person's
        read, which marks nothing; the pushed record only says when to fetch again. #}
-    <details class="card pad side inbox hidden" data-side="inbox" id="inboxcard" open>
-      <summary class="row gap"><span class="h2">Inbox</span><span class="meta" id="inboxcount"></span></summary>
+    <details class="card pad side inbox hidden" data-side="inbox" id="inboxcard">
+      <summary class="row gap"><span class="h2">Inbox</span><span class="meta sumval" id="inboxcount"></span></summary>
       <div id="inboxlist"></div>
       <div class="note">Mail addressed to this session. Opening it here marks nothing read — only the session's own <code>ao inbox</code> does. Reply goes to the sender's inbox; delete removes this session's copy only.</div>
     </details>{% endif %}
@@ -368,10 +368,11 @@
       <div class="note">The sessions this one may act on. It needs both the grant and a place in each session's controllers (design §4.8).</div>
       </div>
     </details>{% endif %}
-    {# open on the person's own session, folded on a team member (TD-156, Paul: *a user will presume
-       the team members behave correctly and close when they are supposed to*) #}
-    {% if s.agent %}<details class="card pad side" data-side="ready"{% if s.own %} open{% endif %}>
-      <summary class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm{% if not s.own %} hidden{% endif %}" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped unless that would lose something." title="{{ help_title('close') }}" disabled>Close session</button></summary>
+    {# folded on every session (TD-964; until then open on the person's own), its value on the summary:
+       ✓, or the first failing check and +n for the rest, in amber — and not drawn on a `closed` record,
+       which has nothing left to close (an `exited` one keeps it: Close still kills its pane) #}
+    {% if s.agent and s.state != 'closed' %}<details class="card pad side" data-side="ready">
+      <summary class="row gap"><span class="h2">Ready to close</span><span class="meta mono small sumval" id="readysum"></span><span class="grow"></span><button class="btn sm{% if not s.own %} hidden{% endif %}" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped unless that would lose something." title="{{ help_title('close') }}" disabled>Close session</button></summary>
       <div class="checks" id="checks"></div>
       <div class="note">{% if s.own %}Closing is your act; the checklist only says when it is ready.{% else %}A team member is closed by its team's Wind down or Start once these pass; Close this one alone is under more ▾.{% endif %}</div>
     </details>{% endif %}
@@ -379,8 +380,10 @@
        the grants and controllers chips included, which the header carried until this review; the
        editor button at the right of its summary line, seen folded, the one place Focus draws it,
        beside the recent files it opens (design §4.5a *Session card: VS Code*, TD-525) #}
+    {# its summary the model (TD-964), the tool alone until one is read, tool · account · model on hover;
+       the heading never shrinks for it — the value is cut with … first #}
     <details class="card pad side" data-side="session">
-      <summary class="row gap"><span class="h2">Session</span><span class="meta mono small">{{ s.profile_line }}</span>{% if s.editor %}<span class="grow"></span><a class="btn sm link editor" id="feditor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}</summary>
+      <summary class="row gap"><span class="h2">Session</span><span class="meta mono small sumval" id="fmodel" title="{{ s.profile_line }}">{{ s.model_short }}</span>{% if s.editor %}<span class="grow"></span><a class="btn sm link editor" id="feditor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}</summary>
       <dl class="kv">
         <dt>profile</dt><dd class="mono small">{{ s.profile_line }}</dd>
         {% if s.context_line and s.agent %}<dt>context</dt><dd title="what this session's last turn sent (design §6 rule 5)"{% if s.context_over %} class="context over"{% endif %}>{{ s.context_line }}{% if s.context_bound %}, bound {{ s.context_bound }}{% endif %}</dd>{% endif %}
