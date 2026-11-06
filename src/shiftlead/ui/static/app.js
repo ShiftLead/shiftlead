@@ -1274,6 +1274,117 @@
   // `qrow:<qid>` / `qhead:<qid>`, so a state kept for a row is never drawn on the header, nor the other way
   AO.qKey = (t) => `${t.classList.contains("qhead") ? "qhead" : "qrow"}:${t.dataset.qid}`;
   AO.qFind = (k) => { const i = k.indexOf(":"); return document.querySelector(`.${k.slice(0, i)}[data-qid="${CSS.escape(k.slice(i + 1))}"]`); };
+  // §4.5 screen 6 rule 4 *A Queue card's own state follows the press* (TD-1436, built by TD-1461): a press that takes an
+  // item out of a card's Decide or Do block takes one off that block's number in the pill and the heading in the
+  // press's frame; a pill left with neither drops, and the card is drawn plain unless its ledger status is itself
+  // *needs you* (`data-lneed`), which keeps its look and draws *Needs you* where the pill was. The keep,
+  // `AO.inflight["qcard:<id>"]`, holds the items' own keys per block and the card as drawn before the first press.
+  // `pill()`'s format (`queue_row.html`), mirrored: *Decide n · Do n*, a nought part left out with its ` · `
+  AO.qPillText = (d, n) => [d ? `Decide ${d}` : "", n ? `Do ${n}` : ""].filter(Boolean).join(" · ");
+  const Q_BLOCKS = ["decide", "do"], Q_WORD = { decide: "Decide", do: "Do" };
+  const qBlock = (card, b) => [...card.querySelectorAll(".qsec[data-sec]")].find((s) => s.dataset.sec === b && s.closest(".qcard") === card) || null;
+  const qHeadLine = (card) => card.querySelector(".qhead .qright");
+  // the card as drawn: the pill's numbers, each block's heading number, its status, edge and look
+  AO.qcardRead = function (card) {
+    const pill = card.querySelector(".qwpill"), t = pill ? pill.textContent : "";
+    const num = (re) => { const m = re.exec(t); return m ? Number(m[1]) : 0; };
+    const hd = {};
+    Q_BLOCKS.forEach((b) => {
+      const s = qBlock(card, b), h = s && s.querySelector(".qsech span"), m = h && /\((\d+)\)/.exec(h.textContent);
+      if (m) hd[b] = Number(m[1]);
+    });
+    return { decide: num(/Decide (\d+)/), do: num(/Do (\d+)/), hd, status: card.dataset.status || "",
+      cls: card.className.split(/\s+/).filter((c) => /^(edge-|st-)/.test(c) || c === "wants") };
+  };
+  // the card drawn from its record less the keys the keep holds
+  AO.qcardDraw = function (card, rec) {
+    const off = (b) => (rec.keys[b] || []).length, was = rec.was;
+    const d = Math.max(0, was.decide - off("decide")), n = Math.max(0, was.do - off("do"));
+    Q_BLOCKS.forEach((b) => {
+      const s = qBlock(card, b), h = s && s.querySelector(".qsech span");
+      if (h && was.hd[b] !== undefined) h.textContent = `${Q_WORD[b]} (${Math.max(0, was.hd[b] - off(b))})`;
+    });
+    let pill = card.querySelector(".qwpill");
+    const said = card.querySelector(".qstatus[data-qdrawn]"), lneed = card.dataset.lneed !== undefined;
+    if (d || n) {
+      if (!pill) {
+        pill = document.createElement("span"); pill.className = "qstatus needsyou qwpill";
+        pill.setAttribute("title", "what on this card waits on you: Decide and Do items");
+        const line = qHeadLine(card), first = line && line.querySelector(".qstatus");
+        if (said) said.before(pill); else if (first) first.before(pill); else if (line) line.appendChild(pill);
+      }
+      pill.textContent = AO.qPillText(d, n);
+      if (said) said.remove();
+      // the look, the edge and the status back from the record
+      card.className.split(/\s+/).filter((c) => /^(edge-|st-)/.test(c) || c === "wants").forEach((c) => card.classList.remove(c));
+      was.cls.forEach((c) => card.classList.add(c));
+      card.dataset.status = was.status;
+      return;
+    }
+    if (pill) {
+      if (lneed && !said) {
+        const s = document.createElement("span"); s.className = "qstatus needsyou"; s.dataset.qdrawn = "1"; s.textContent = "Needs you";
+        pill.before(s);
+      }
+      pill.remove();
+    }
+    if (lneed) return;  // the card's ledger need keeps its look: only the re-read can tell it is met
+    // drawn plain: its edge the group's, as `card_edge` orders it, and no status word
+    const g = (card.className.match(/\bg-([\w-]+)/) || [])[1];
+    card.className.split(/\s+/).filter((c) => /^edge-/.test(c)).forEach((c) => card.classList.remove(c));
+    card.classList.remove("st-needs-you", "wants");
+    card.classList.add(g === "waiting" ? "edge-waiting" : g === "in_progress" ? "edge-working" : "edge-ended");
+    card.dataset.status = "";
+  };
+  const qRecount = () => { if (typeof AO.qRecount === "function") AO.qRecount(); };
+  // the press (called before the row leaves): the row's block and card, the key taken off; null where it takes nothing
+  AO.qcardOff = function (row, key) {
+    const sec = row && key ? row.closest(".qsec[data-sec]") : null, card = sec && sec.closest(".qcard");
+    if (!card || !Q_BLOCKS.includes(sec.dataset.sec) || !card.dataset.card) return null;
+    const k = `qcard:${card.dataset.card}`;
+    const rec = AO.inflight[k] || (AO.inflight[k] = { kind: "qcard", keys: { decide: [], do: [] }, was: AO.qcardRead(card) });
+    if (!rec.keys[sec.dataset.sec].includes(key)) rec.keys[sec.dataset.sec].push(key);
+    AO.qcardDraw(card, rec);
+    qRecount();
+    return k;
+  };
+  // a refusal: that press's key out of every card's keep, each card redrawn from its record less the keys still held
+  AO.qcardBack = function (key) {
+    Object.keys(AO.inflight).filter((k) => k.startsWith("qcard:")).forEach((k) => {
+      const rec = AO.inflight[k];
+      if (!Q_BLOCKS.some((b) => rec.keys[b].includes(key))) return;
+      Q_BLOCKS.forEach((b) => { rec.keys[b] = rec.keys[b].filter((x) => x !== key); });
+      const card = document.querySelector(`.qcard[data-card="${CSS.escape(k.slice(6))}"]`);
+      if (card) AO.qcardDraw(card, rec);
+      if (!Q_BLOCKS.some((b) => rec.keys[b].length)) delete AO.inflight[k];
+    });
+    qRecount();
+  };
+  // a key is live while the item's own keep is: present, within its minute, and — a board line drawn decided or
+  // replied — while the fresh row does not already draw the result from the board
+  const qKeyLive = (key, row) => {
+    const f = AO.inflight[key];
+    if (!f || (f.until && Date.now() > f.until)) return false;
+    return !((f.kind === "decided" || f.kind === "reply") && row && !AO.redraw(row, f));
+  };
+  // a re-read (before `AO.restoreRowErrs`, which takes a left row out of the fresh lists): each card's record renewed
+  // from the fresh card, a live key still drawn in its Decide or Do block taken off again, any other key let go
+  AO.qcardReapply = function (root) {
+    if (!root) return;
+    Object.keys(AO.inflight).filter((k) => k.startsWith("qcard:")).forEach((k) => {
+      const rec = AO.inflight[k];
+      const card = root.querySelector(`.qcard[data-card="${CSS.escape(k.slice(6))}"]`);
+      const keys = { decide: [], do: [] };
+      Q_BLOCKS.forEach((b) => rec.keys[b].forEach((key) => {
+        const s = card && qBlock(card, b), row = s && [...s.querySelectorAll(".mailrow[data-msg]")].find((r) => r.dataset.msg === key);
+        if (row && qKeyLive(key, row)) keys[b].push(key);
+      }));
+      rec.keys = keys;
+      if (!Q_BLOCKS.some((b) => keys[b].length)) { delete AO.inflight[k]; return; }
+      rec.was = AO.qcardRead(card);
+      AO.qcardDraw(card, rec);
+    });
+  };
 
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy]");
@@ -1320,6 +1431,8 @@
     const fresh = () => (row && row.isConnected ? row : msgOf ? document.querySelector(`.mailrow[data-msg="${CSS.escape(msgOf)}"]`) : null);
     const pressed = (text) => {
       if (!row || !row.isConnected) return;
+      // a Queue card's own state follows the press (TD-1461): taken before the row leaves; a board Reply takes nothing
+      if (r4 && key !== "board_reply") AO.qcardOff(row, msgOf);
       delete AO.pressErrs[row.dataset.msg];
       const err = row.querySelector(".rowerr"); if (err) { err.hidden = true; err.textContent = ""; }
       const verb = AO.pressVerb(key);
@@ -1352,7 +1465,7 @@
       AO.drawQState(qt, text, true);
       AO.inflight[qkey] = { kind: "qrow", text };
       delete AO.pressErrs[qled];
-      $$(`.mailrow[data-msg="${CSS.escape(qled)}"]`).forEach((r) => { AO.handRing(r); r.remove(); });
+      $$(`.mailrow[data-msg="${CSS.escape(qled)}"]`).forEach((r) => { AO.qcardOff(r, qled); AO.handRing(r); r.remove(); });
       AO.inflight[qled] = { leaves: true, verb: AO.pressVerb(key), kind: "left" };
       waiting = AO.toast(text, true, null, true);
     };
@@ -1769,6 +1882,7 @@
         say(words);
         const t = AO.qFind(qkey); if (t) AO.unDrawQState(t);
         AO.pressErrs[qled] = words; delete AO.inflight[qled];
+        AO.qcardBack(qled);  // the card's pill, look and summary back at once (TD-1461)
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
@@ -1781,6 +1895,7 @@
         say(words);
         if (msgOf) {
           AO.pressErrs[msgOf] = words;
+          AO.qcardBack(msgOf);  // the card's pill, look and summary back at once (TD-1461)
           const r = fresh();
           if (r && drawn) { AO.unDraw(r); const er = r.querySelector(".rowerr"); if (er) { er.textContent = words; er.hidden = false; } }
         }
@@ -4868,10 +4983,13 @@
     // each card's find text, built once per card drawn: at load, and for the cards a re-read swaps in (TD-892)
     const finds = new WeakMap();
     const cardFind = (el) => { if (!finds.has(el)) finds.set(el, AO.qFindText(AO.qCardRows(el))); return finds.get(el); };
+    const card = (el) => ({ kind: "card", status: el.dataset.status || "",
+      repos: (el.dataset.repos || "").split(" ").filter(Boolean), find: cardFind(el) });
+    // a press's recount (TD-1461): the summary bar, the legend and the switch's number alone, never the picks' pass —
+    // the card stays shown until the next apply
+    AO.qRecount = () => { if (filters) AO.qDrawSummary(filters, lists, picks, AO.qFiltered(picks), (el, p) => AO.qPass(card(el), p, teams)); };
     function applyPicks() {
       const filtered = AO.qFiltered(picks);
-      const card = (el) => ({ kind: "card", status: el.dataset.status || "",
-        repos: (el.dataset.repos || "").split(" ").filter(Boolean), find: cardFind(el) });
       $$(".qgroup .qcard", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass(card(el), picks, teams)));
       $$(".qdline", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass({ kind: "line", repos: [el.dataset.repo || ""], find: el.dataset.find || "" }, picks, teams)));
       $$(".qother", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass({ kind: "other" }, picks, teams)));
@@ -5045,6 +5163,7 @@
           const errs = AO.rowErrs(lists), on = document.activeElement;
           const ring = on && on.matches && on.matches(".mailrow[data-msg]") && lists.contains(on) ? on.dataset.msg : "";
           lists.innerHTML = await res.text();
+          AO.qcardReapply(lists);  // a card's press still out (TD-1461), before the item's own keep takes a left row out
           AO.restoreRowErrs(lists, errs);
           const back = ring && $(`.mailrow[data-msg="${CSS.escape(ring)}"]`, lists);
           if (back) back.focus({ preventScroll: true });

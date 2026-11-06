@@ -871,6 +871,9 @@ def queue_view(
             {
                 **c,
                 "status": status,
+                # the ledger's own *needs you*, before the mail raises it: a press never draws such a card plain, since
+                # its top entry carries no mark of its own need (§4.5 screen 6 rule 4, TD-1461)
+                "lneed": str(c.get("status") or "") == "needs you",
                 "edge": card_edge(str(c.get("group") or ""), status, wants),
                 "top": top,
                 "rows": rows,
