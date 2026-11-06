@@ -33,7 +33,8 @@
    same `project` badge (§4.10; TD-582) — for a `manager: person` team the first is the only edge
    between members, and the second is the only one between teams. Its question-seat edge admits an `ask`
    from anywhere in the org to a record whose `seat` has `trigger: asks` — a field a start writes, as it
-   writes `team`, never a role (TD-995). It gates mail only; nothing that acts keys on `team` or `project`.
+   writes `team`, never a role (TD-995); the answer to such an `ask` passes by an edge of its own, which
+   reads the thread and no badge (TD-1435). It gates mail only; nothing that acts keys on `team` or `project`.
    The edge between the person's own sessions (TD-1042) is not part of the exception: it reads
    the sender's `by_person`, `kind`, `unattended`, `seat` and `controllers` (and, for a record before
    the field, `supervised`); of the target (whose agent the send path checks first) its `seat`'s trigger and, when the sender names a
