@@ -1750,8 +1750,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      of its own), so the squash ends in `Merged-by: shiftlead-sync`. It never names the person's
      `user.name` and never a model, since the home runs none. `shiftlead-sync` and `sync-check`, which
      signs step 4's BLOCK, are the same policy's two names: one signs the gate it failed, the other the
-     merge it made. **Whether the tree composes** is `cadence.composes(root)` (§5 *The seams*, TD-1418), read on
-     the registry checkout's current pin before step 4's gate.
+     merge it made. **Whether the tree composes** is `cadence.composes(root)` (TD-1419), read on
+     the registry checkout's current pin before step 4's gate. It is `cadence.tree(root)`, the resolve the
+     gate's own reads use (a subprocess under `TREE_TIMEOUT`, its answer cached for `TREE_FOR`), and then
+     whether that payload's `scripts/forge.py` names `squash-message`.
        - *Yes:* the line above.
        - *No:* a tree read whose `scripts/forge.py` does not name `squash-message`, which is a pin older
          than agent-cadence TD-233. Step 4's gate runs without `--trailers`, and the merge is as before,
@@ -1759,7 +1761,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
          brings `squash-message` in is merged bare. Where no `Merged-by:` commit precedes it on the
          default branch, the weekly read's cutoff, it is never listed; where one does (a session merged
          through the line first), it is listed once, as the cost of the bump.
-       - *Unreadable:* the tree could not be resolved or read. That is *no reading* with its words,
+       - *Unreadable:* `cadence.tree` gave `(None, why)`, or the file could not be read. That is *no reading* with its words,
          counted, never taken as *no*.
      `--trailers` is older than `squash-message` in agent-cadence (#141, then #143), so a tree that
      composes also takes the flag. A merge is followed by a `system`
