@@ -402,6 +402,15 @@
 {%- if e.review_seat %}<button class="btn sm ghost" data-act="hand_look" data-id="person" data-msg="{{ e.id }}" data-team="{{ e.team or '' }}" data-name="{{ e.review_name }}" title="hand this look to {{ e.review_name }}, {{ e.team }}'s techlead, to read: it is set aside until the seat reports, and comes back with its reading above the answers">Send to reviewer</button>{% endif %}
 {%- endmacro %}
 
+{# §4.5a **Inbox row: taken up** (§4.9b *Why it did not answer*, TD-1431): an `ask` or a `steer` its asker took
+   up from a session that did not answer carries the home's `unanswered` stamp; one line, labelled with who and
+   the read's time — the words are what held then, not what holds now — drawn as text. A press the words name is
+   the one on that session's own row, never a button here. -#}
+{% macro not_answered_line(e) -%}
+{%- set na = not_answered(e) %}
+{%- if na %}<div class="st dflt notanswered" title="why the session it was first put to did not answer, as the home read it when the question was taken up (design §4.9b)"><span class="nalabel">not answered by {{ na.name }} (as read at {{ na.at }}):</span> {{ na.words }}</div>{% endif %}
+{%- endmacro %}
+
 {# The seat's reading brought back on the look (`looked_by`, §4.5a **Send to reviewer**): its outcome
    line, drawn above the answers as text — the answer is still the person's one press. #}
 {% macro looked_by(e) -%}
@@ -421,6 +430,7 @@
 {% macro ask(e, section) -%}
 {{ head(e) }}
 {{ body(e) }}
+{{ not_answered_line(e) }}
 {{ recommends(e) }}
 {{ looked_by(e) }}
 {%- set whole = card_whole(mode, e) %}
@@ -448,6 +458,7 @@
 {% macro steer(e, section) -%}
 {{ head(e) }}
 {{ body(e) }}
+{{ not_answered_line(e) }}
 <div class="st dflt">unless you say otherwise: {{ e.default or '—' }}</div>
 {{ recommends(e) }}
 {%- set whole = card_whole(mode, e) %}
