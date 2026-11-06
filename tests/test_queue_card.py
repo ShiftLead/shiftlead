@@ -77,7 +77,10 @@ def test_attach_raw_carries_each_items_row_tied_and_repo_and_keeps_the_page_unch
     assert items["b1"]["repo"] == "s" and items["b1"]["tied"] == {"by": "context", "ref": "s#TD-021"}
     assert items["red_pr:s:5"]["repo"] == "s" and items["red_pr:s:5"]["tied"]["by"] == "pr"
     assert items["fork_pr:s:6"]["repo"] == "s" and items["fork_pr:s:6"]["tied"]["by"] == "title"
-    assert items["ledger:s:TD-20"]["repo"] == "s" and items["ledger:s:TD-20"]["tied"] == {"by": "entry", "ref": "s#TD-020"}
+    assert items["ledger:s:TD-20"]["repo"] == "s" and items["ledger:s:TD-20"]["tied"] == {
+        "by": "entry",
+        "ref": "s#TD-020",
+    }
     # `mentioned` keeps its shape; `mentioned_items` names the item, its row kind, kind and words
     assert got["mentioned"] == {"s#TD-30": {"m1": "TD-21: SECRET-ASK? TD-30 SECRET-MENTION waits on it"}}
     assert got["mentioned_items"] == {"s#TD-30": [{"item": "m1", "row_kind": "", "kind": "ask",
@@ -111,6 +114,12 @@ def test_card_view_finds_a_card_by_any_entry_it_holds():
     assert view("s#TD-2") == {"completed": {"closed": at(3), "pr": 12}}
 
 
+def test_a_card_in_no_group_the_page_draws_is_none():
+    q = queue()
+    q["cards"][0]["group"] = "elsewhere"
+    assert card_view(q, {}, "s#TD-10", NOW, [], words=True) is None
+
+
 def test_a_bare_id_two_repos_hold_is_ambiguous():
     q = queue()
     q["cards"].append(card(row("db", "TD-21", "db's own"), place=3))
@@ -135,9 +144,25 @@ def test_without_words_no_mail_is_in_the_card_and_the_rest_is_whole():
     (b1,) = [m for m in cut["wants"]["decide"] if m["item"] == "board:k1"]
     assert b1["row"]["text"].startswith("**Pick** one.")  # a board line keeps its text
     (held,) = cut["wants"]["answered"]
-    assert held["row"]["answered"] == {"asker": "g1", "name": "grinder-1", "kind": "ask", "age": "1h", "mid": "m-8", "until": ""}
-    assert cut["card"]["top"]["answered"] == {"mid": "m-9", "asker": "g1", "name": "grinder-1", "kind": "ask", "until": "", "closed_at": None}
-    assert card_view(q, got, "TD-30", NOW, [], words=False)["mentioned"]["s#TD-30"] == [{"item": "m1", "row_kind": "", "kind": "ask"}]
+    assert held["row"]["answered"] == {
+        "asker": "g1",
+        "name": "grinder-1",
+        "kind": "ask",
+        "age": "1h",
+        "mid": "m-8",
+        "until": "",
+    }
+    assert cut["card"]["top"]["answered"] == {
+        "mid": "m-9",
+        "asker": "g1",
+        "name": "grinder-1",
+        "kind": "ask",
+        "until": "",
+        "closed_at": None,
+    }
+    assert card_view(q, got, "TD-30", NOW, [], words=False)["mentioned"]["s#TD-30"] == [
+        {"item": "m1", "row_kind": "", "kind": "ask"}
+    ]
 
 
 def test_the_endpoint_answers_its_five_statuses(tmp_path, monkeypatch):

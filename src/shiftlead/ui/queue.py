@@ -563,7 +563,9 @@ def card_view(
     cid = index[key][0]
     m = mail or {}
     view = queue_view(q, now, m, None, fleet)
-    shaped = next(c for g in ("in_progress", "waiting", "up_next") for c in view[g] if str(c["id"]) == cid)
+    shaped = next((c for g in ("in_progress", "waiting", "up_next") for c in view[g] if str(c["id"]) == cid), None)
+    if shaped is None:  # a card in no group the page draws: the page shows none, so neither does this
+        return None
     items = m.get("mentioned_items") or {}
 
     def row(r: Mapping[str, Any]) -> dict[str, Any]:
