@@ -68,6 +68,8 @@ def gh(monkeypatch):
     monkeypatch.setattr(cadence, "gate", lambda root: state["gated"])
     monkeypatch.setattr(sync, "held_globs", lambda root: [])
     monkeypatch.setattr(sync, "compare_review", lambda root, n, head: (None, True))  # reviewed, unless a test says
+    state["composes"] = (False, None)  # a tree older than step 5's line, unless a test says (TD-1419)
+    monkeypatch.setattr(cadence, "composes", lambda root: state["composes"])
     return state
 
 

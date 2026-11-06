@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import tempfile
 import tomllib
@@ -229,6 +230,7 @@ GH_TIMEOUT = 30.0
 GATE_TIMEOUT = 300.0
 SETTLED = ("merged", "refused", "gate", "error")  # a verdict at a head is final for that head; *off* is not
 REVIEWER = "sync-check"  # named for what it is, never a model (§6 step 3)
+MERGED_BY = "shiftlead-sync"  # step 5's `Merged-by:`, the same policy's second name (§6 *Sync* step 5)
 REVIEW_LINE = re.compile(r"^\s*cadence-review:\s*(SHIP|FIXED|BLOCK)\b(.*)$", re.IGNORECASE)  # the gate's REVIEW_RE
 SHA_RUN = re.compile(r"\b[0-9a-f]{7,40}\b")
 
@@ -342,9 +344,46 @@ def compare_review(root: Path | str, number: int, head: str) -> tuple[str | None
     return None, seen
 
 
-def merge(root: Path | str, number: int, head: str) -> str | None:
-    """`gh pr merge <n> --squash --match-head-commit <head>`, no body (§6 step 5); None when merged."""
-    return _gh(root, ["pr", "merge", str(number), "--squash", "--match-head-commit", head], GATE_TIMEOUT)[0]
+def merge(
+    root: Path | str, number: int, head: str, subject: str | None = None, body_file: Path | str | None = None
+) -> str | None:
+    """`gh pr merge <n> --squash --match-head-commit <head>` (§6 step 5), with `--subject` and `--body-file`
+    where step 5's line composed them, else no body (a pin older than agent-cadence TD-233); None when merged."""
+    args = ["pr", "merge", str(number), "--squash", "--match-head-commit", head]
+    if subject is not None:
+        args += ["--subject", subject]
+    if body_file is not None:
+        args += ["--body-file", str(body_file)]
+    return _gh(root, args, GATE_TIMEOUT)[0]
+
+
+def squash_env(env: dict[str, str]) -> dict[str, str]:
+    """`squash-message`'s environment from the resolver's (§6 *Sync* step 5): the merge is signed `Merged-by:
+    shiftlead-sync`, and never with a model, since the home runs none — `AGENT_MODEL` and `AGENT_MODEL_FILE`
+    are removed."""
+    return {**{k: v for k, v in env.items() if k not in ("AGENT_MODEL", "AGENT_MODEL_FILE")}, "AGENT_NAME": MERGED_BY}
+
+
+def compose(root: Path | str, number: int, gate_dir: Path | str) -> str | None:
+    """`forge.py squash-message <n> --gate <dir>/gate --out <dir>` through the resolver, in the registry
+    checkout, under `GATE_TIMEOUT` (it makes paginated `gh api` reads): None when `<dir>` holds `subject`,
+    `body` and `sha`, else why not, in one line."""
+    d = Path(gate_dir)
+    argv, env = cadence.command(
+        root, "run", cadence.FORGE_SCRIPT, cadence.SQUASH_WORD, str(number), "--gate", str(d / "gate"), "--out", str(d)
+    )
+    try:
+        cp = subprocess.run(
+            argv, capture_output=True, text=True, timeout=GATE_TIMEOUT, cwd=str(root), env=squash_env(env),
+            stdin=subprocess.DEVNULL,
+        )  # fmt: skip
+    except subprocess.TimeoutExpired:
+        return f"squash-message gave no answer in {GATE_TIMEOUT:.0f}s"
+    except OSError as e:
+        return f"squash-message could not run: {e.strerror or e}"
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or [f"squash-message exited {cp.returncode}"])[-1][:200]
+    return None
 
 
 def held_globs(root: Path | str) -> list[str] | None:
@@ -407,16 +446,32 @@ def judge(
         e.pop("waiting_since", None)
     if precheck:
         return {**e, "at": at, "prestart": True}
-    g = (gate or cadence.check)(root, number, GATE_TIMEOUT)
-    if g is None or g.get("verdict") not in ("pass", "fail"):
-        return _no_reading(e, "the gate gave no reading", at)
-    if g["verdict"] == "fail":
-        line = "; ".join(g.get("failed") or []) or "the gate failed"
-        if why := comment(root, number, block_body(line)):
-            return _no_reading(e, f"the BLOCK comment was not posted: {why}", at)
-        return {**e, "verdict": "gate", "why": line, "at": at}
-    return {**e, "verdict": "", "why": "", "at": at, "ready": True, "kind": "bump",
-            "commit": got.get("commit") or "", "files": len(got.get("files") or [])}  # fmt: skip
+    yes, why = cadence.composes(root)  # step 5's line where the tree composes it (TD-1419)
+    if yes is None:
+        return _no_reading(e, f"whether the tree composes the squash could not be read: {why}", at)
+    gate_dir = Path(tempfile.mkdtemp(prefix="sync-merge-")) if yes else None
+    ready = False
+    try:
+        run = gate or cadence.check
+        g = (
+            run(root, number, GATE_TIMEOUT)
+            if gate_dir is None
+            else run(root, number, GATE_TIMEOUT, trailers=gate_dir / "gate")
+        )
+        if g is None or g.get("verdict") not in ("pass", "fail"):
+            return _no_reading(e, "the gate gave no reading", at)
+        if g["verdict"] == "fail":
+            line = "; ".join(g.get("failed") or []) or "the gate failed"
+            if why := comment(root, number, block_body(line)):
+                return _no_reading(e, f"the BLOCK comment was not posted: {why}", at)
+            return {**e, "verdict": "gate", "why": line, "at": at}
+        ready = True
+        return {**e, "verdict": "", "why": "", "at": at, "ready": True, "kind": "bump",
+                "commit": got.get("commit") or "", "files": len(got.get("files") or []),
+                **({"gate_dir": str(gate_dir)} if gate_dir is not None else {})}  # fmt: skip
+    finally:
+        if gate_dir is not None and not ready:  # handed on only with `ready`: the merge removes it
+            shutil.rmtree(gate_dir, ignore_errors=True)
 
 
 def mark(prs: list[dict[str, Any]], sync: dict[str, Any], auto: bool) -> list[dict[str, Any]]:

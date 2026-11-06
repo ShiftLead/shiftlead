@@ -59,6 +59,8 @@ LAUNCHER = Path(__file__).with_name("agent_cadence.py")
 LAUNCHER_COMMIT = "29210e6c17c473cdeee50ba65e7bb1696819dfc3"
 TREE_TIMEOUT = 330.0  # one resolve: the launcher's first clone or fetch of a source is bounded at 300 s
 GATE_SCRIPT = "check_cadence.py"  # the gate, as the pinned tree's `files/scripts/` holds it
+FORGE_SCRIPT = "forge.py"  # the forge reader, whose `squash-message` composes cadence step 5's squash (TD-1412)
+SQUASH_WORD = "squash-message"
 # the copy's paths, while a repo still has a lock (a brief's layout slots, §5 *The seams*); agent-cadence's own
 # source holds each under `files/`, and a pinned tree's `files/` holds each by the same relative path
 COPY_GATE = SCRIPT
@@ -181,6 +183,20 @@ def tree(root: Path | str, timeout: float = TREE_TIMEOUT) -> tuple[Path | None, 
     got = _tree(root, timeout)
     _trees[key] = (time.monotonic(), got)
     return got
+
+
+def composes(root: Path | str) -> tuple[bool | None, str | None]:
+    """Whether `root`'s pinned tree composes step 5's squash (§6 *Sync* step 5, TD-1419): `(True, None)` where
+    its `scripts/forge.py` names `squash-message`, `(False, None)` where it does not (a pin older than
+    agent-cadence TD-233), `(None, why)` where the tree or the file could not be read — never taken as *no*."""
+    payload, why = tree(root)
+    if payload is None:
+        return None, why or "the pinned tree could not be resolved"
+    try:
+        text = (Path(payload) / "scripts" / FORGE_SCRIPT).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        return None, f"the pinned tree's scripts/{FORGE_SCRIPT} could not be read: {getattr(e, 'strerror', None) or e}"
+    return SQUASH_WORD in text, None
 
 
 def _tree(root: Path | str, timeout: float) -> tuple[Path | None, str | None]:
@@ -340,17 +356,22 @@ def settled(old: dict[str, Any] | None) -> bool:
     return bool(old and (old.get("merged") or old.get("closed")))
 
 
-def check(root: Path | str, pr: int, timeout: float = 120.0) -> dict[str, Any] | None:
+def check(
+    root: Path | str, pr: int, timeout: float = 120.0, trailers: Path | str | None = None
+) -> dict[str, Any] | None:
     """One run of the repo's gate on one PR in `root`: `{verdict, failed}`, or None for **no
     reading** — no gate, or a run that could not be made. `failed` is the `rule` of each row whose
     status is `fail`, in the script's order, and there is no reading for an exit of 2 (no such PR) or
-    output that is not the script's."""
+    output that is not the script's. `trailers`, a path, has the gate write its trailer file there
+    (`--trailers`, cadence step 5's first part, §6 *Sync* step 4)."""
     if not has_script(root):
         return None
+    extra = ["--trailers", str(trailers)] if trailers is not None else []
     if pinned(root):  # the pinned tree's script, through the resolver (TD-1014)
-        argv, env = command(root, "run", GATE_SCRIPT, "--pr", str(pr), "--json")
+        argv, env = command(root, "run", GATE_SCRIPT, "--pr", str(pr), "--json", *extra)
     else:
-        argv, env = ["python3", SOURCE_SCRIPT if is_source(root) else SCRIPT, "--pr", str(pr), "--json"], None
+        script = SOURCE_SCRIPT if is_source(root) else SCRIPT
+        argv, env = ["python3", script, "--pr", str(pr), "--json", *extra], None
     try:
         cp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=str(root), env=env)
     except (OSError, subprocess.TimeoutExpired):
