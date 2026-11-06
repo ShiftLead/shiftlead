@@ -1114,6 +1114,56 @@ def repo_key(root: Path | str) -> str:
     return Path(root).name.lower()
 
 
+def entries_at(
+    root: Path | str,
+    tree: Path | str,
+    ids: Collection[str],
+    *,
+    resolve: Resolve | None = None,
+    live: Live | None = None,
+) -> dict[str, dict[str, Any] | None] | None:
+    """The entries `ids` as the ledger in `tree` gives them — another worktree of `root`'s repo, the write-back's
+    own at origin's head (§4.4 *Each reading has one owner*, TD-1433) — each as `reading()` makes an entry of
+    `root`'s, keyed by `root`'s repo; an id no longer open there is None (archived). None when the tree's ledger
+    cannot be read."""
+    io = fs_io(tree)
+    rel, text, archive, faults = read_pair(ledger_path(tree), io)
+    if faults or text is None:
+        return None
+    got = entries(text, archive, resolve, live, rank_text=io[1](lb.rank_path(rel)), repo=repo_key(root))
+    done_parts = parts_of_open(archive, got)
+    want = {_norm(i): str(i) for i in ids}
+    mine = [e for e in got if _norm(e["id"]) in want]
+    for e in mine:
+        e["parts_archived"] = list(done_parts.get(_norm(e["id"]), []))
+    written(tree, rel, mine)
+    found = {_norm(e["id"]): e for e in mine}
+    return {i: found.get(n) for n, i in want.items()}
+
+
+def with_entries(led: dict[str, Any], by: Mapping[str, dict[str, Any] | None]) -> dict[str, Any]:
+    """The ledger reading `led` with each entry `by` names put in place of its own (None: taken out), and the
+    counts made again (TD-1433); a reading with no entries (an error) is returned as it is."""
+    ents = led.get("entries")
+    if not isinstance(ents, list) or not by:
+        return led
+    keys = {_norm(k): v for k, v in by.items()}
+    got = []
+    for e in ents:
+        n = _norm(str(e.get("id"))) if isinstance(e, dict) else None
+        if n in keys:
+            if keys[n] is not None:
+                got.append(keys[n])
+        else:
+            got.append(e)
+    return {
+        **led,
+        "entries": got,
+        "by_priority": {p: sum(1 for e in got if e.get("priority") == p) for p in PRIORITIES},
+        "by_kind": {k: sum(1 for e in got if e.get("for_page") == k) for k in KINDS},
+    }
+
+
 def reading(
     root: Path | str,
     now: datetime,

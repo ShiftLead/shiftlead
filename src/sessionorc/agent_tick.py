@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import time
 from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -154,6 +155,29 @@ def filled_for(cause: dict[str, Any] | None) -> str | None:
     else:
         what = cause.get("member")
     return f"{FILLED_FOR}{cause['by']}" + (f" — {what}" if what else "")
+
+
+# Seconds a write-back's entries are held over a checkout that has not pulled (TD-1433). A checkout on a feature
+# branch or a diverged main never holds the press's commit, so there the hold lasts this whole bound.
+PRESS_HOLD = 6 * 3600.0
+
+
+def _holds_commit(root: str, commit: str) -> bool:
+    """Whether the checkout's HEAD holds `commit` (the pull brought the press in); a commit it cannot test,
+    false."""
+    if not commit:
+        return True
+    try:
+        cp = subprocess.run(
+            ["git", "-C", root, "merge-base", "--is-ancestor", commit, "HEAD"],
+            capture_output=True,
+            timeout=30,
+            check=False,
+            stdin=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return cp.returncode == 0
 
 
 def _carry_live(reading: dict[str, Any], old: dict[str, Any]) -> None:
@@ -3570,6 +3594,7 @@ class TickMixin:
                 # a write-back re-read this board while the pass ran: its reading is the newer (`_reread_board`)
                 if self._boards_pressed.get(r, float("-inf")) >= began and r in self._repos:
                     v.update({k: self._repos[r][k] for k in ("boards", "work_orders") if k in self._repos[r]})
+            await self._hold_pressed(got)
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
             for r, v in changed.items():
                 self._turned_unserved(r, self._repos.get(r), v)
@@ -3894,6 +3919,40 @@ class TickMixin:
                     "at": str(old.get("at") or stamp),
                 }
         return out
+
+    def _pressed_entries(
+        self, root: str, tree: Path, ids: list[str], old: dict[str, Any]
+    ) -> dict[str, dict[str, Any] | None] | None:
+        """The entries `ids` a write-back wrote, as its tree gives them (`ledger.entries_at`), read as `_read_repos`
+        reads the checkout's — the registry resolving, the live commits where a promote reading has them, else each
+        live check's last `live` — and marked by the settle clock without recording (TD-1433). In a thread."""
+        live = self._live_commits() if self._promotes_read else None
+        reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
+        resolve = ledger_mod.Registry(hosts.local_host().repos())
+        by = ledger_mod.entries_at(root, tree, ids, resolve=resolve, live=reader)
+        if not by:
+            return by
+        mine = [e for e in by.values() if e is not None]
+        if live is None:
+            _carry_live({"ledger": {"entries": mine}}, old)
+        self._settle(root, str(old.get("remote") or ""), mine, datetime.now(UTC), fresh=False)
+        return by
+
+    async def _hold_pressed(self, got: dict[str, dict[str, Any]]) -> None:
+        """Each fresh reading in `got` of a repo with entries a write-back wrote (`_ledger_pressed`, TD-1433) takes
+        those entries in place of the checkout's while the checkout's HEAD lacks the press's commit — the pull
+        fast-forwards it only between turns (§6 *Pull*) — and for at most `PRESS_HOLD`; then the hold is dropped
+        and the checkout's own reading stands."""
+        for r, v in got.items():
+            hold = self._ledger_pressed.get(r)
+            if hold is None:
+                continue
+            gone = time.monotonic() - float(hold.get("at") or 0) > PRESS_HOLD
+            if gone or await asyncio.to_thread(_holds_commit, r, str(hold.get("commit") or "")):
+                self._ledger_pressed.pop(r, None)
+                continue
+            if isinstance(v.get("ledger"), dict):
+                v["ledger"] = ledger_mod.with_entries(v["ledger"], hold["entries"])
 
     @staticmethod
     def _fork_lines(root: str, prs: Any) -> Any:

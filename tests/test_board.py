@@ -1739,6 +1739,133 @@ def test_a_not_yet_on_a_gated_decide_keeps_it_waiting_in_the_same_write(repo):
     assert line.startswith("- [x] ") and "Decided: Not yet" in line and "kept waiting" in line
 
 
+async def test_a_go_lifts_the_entrys_card_at_once_and_holds_it_until_the_checkout_pulls(
+    agent, repo, tmp_path, monkeypatch
+):
+    """TD-1433 (§4.4 *Each reading has one owner*): after a Go on a gated decide item the write-back re-reads the
+    entry it lifted from its own tree, so the reading pushed right after the press has the gate gone and no
+    *for you* row (no **Lift the hold**) while the checkout's ledger still holds the gate; a tick's later read
+    of the checkout keeps the lifted entry until the checkout's HEAD holds the press's commit."""
+    from sessionorc import reports
+    from shiftlead.ui.inbox import ledger_for_you
+
+    _gated(repo)
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    await park_ticks(agent)
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
+    root = str(repo)
+
+    async def tick() -> dict:
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        return next(e for e in agent._repos[root]["ledger"]["entries"] if e["id"] == "TD-190")
+
+    assert (await tick())["for_page"] == "for-you"
+    at = origin_board(repo).splitlines().index(f"- [ ] {GATED}") + 1
+    async with LocalClient() as me:
+        got = await me.call(
+            "board_edit", board=str(repo / board.BOARD), line=at, text=GATED, action="decide", answer="Go",
+            answers=["Go", "Not yet"],
+        )  # fmt: skip
+    assert got["action"] == "decide"
+    assert "decision (paul)" in (repo / "docs" / "ledger" / "TD-190.md").read_text(), "the checkout has not pulled"
+
+    def lifted(e: dict) -> bool:
+        return e["for_page"] != "for-you" and not any("decision" in str(b) for b in e.get("blocked_by") or ())
+
+    now = next(e for e in agent._repos[root]["ledger"]["entries"] if e["id"] == "TD-190")
+    assert lifted(now), now
+    assert not [r for g in ledger_for_you(agent._repos, [])["groups"] for r in g["rows"] if r.get("id") == "TD-190"]
+    assert lifted(await tick()), "a tick's read of the checkout keeps the press's entry"
+    assert root in agent._ledger_pressed
+    git(repo, "pull", "-q", "--ff-only", "origin", "main")
+    assert lifted(await tick()) and root not in agent._ledger_pressed, "the pull brought it in: the hold is dropped"
+
+
+async def _press_go(agent, repo: Path, tmp_path: Path, monkeypatch, text: str):
+    """Register `repo` on a scratch home, read it once, press Go on the board's `text` item; returns the tick."""
+    from sessionorc import reports
+
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    await park_ticks(agent)
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
+
+    async def tick() -> dict[str, dict]:
+        agent._repos_read_at = float("-inf")
+        await agent._refresh_repos()
+        return {e["id"]: e for e in agent._repos[str(repo)]["ledger"]["entries"]}
+
+    await tick()
+    at = origin_board(repo).splitlines().index(f"- [ ] {text}") + 1
+    async with LocalClient() as me:
+        got = await me.call(
+            "board_edit", board=str(repo / board.BOARD), line=at, text=text, action="decide", answer="Go",
+            answers=["Go", "Not yet"],
+        )  # fmt: skip
+    assert got["action"] == "decide"
+    return tick
+
+
+def _lifted(e: dict) -> bool:
+    return e["for_page"] != "for-you" and not any("decision" in str(b) for b in e.get("blocked_by") or ())
+
+
+async def test_a_press_hold_past_its_bound_gives_way_to_the_checkouts_reading(agent, repo, tmp_path, monkeypatch):
+    """TD-1433: the hold lasts at most `PRESS_HOLD` — a checkout that never pulls the press's commit (a feature
+    branch, a diverged main) reads as itself again once the bound passes, and the hold is dropped."""
+    from sessionorc import agent_tick
+
+    _gated(repo)
+    tick = await _press_go(agent, repo, tmp_path, monkeypatch, GATED)
+    root = str(repo)
+    assert _lifted((await tick())["TD-190"]) and root in agent._ledger_pressed
+    agent._ledger_pressed[root]["at"] -= agent_tick.PRESS_HOLD + 1
+    again = (await tick())["TD-190"]
+    assert not _lifted(again), "past the bound the checkout's own gated entry stands"
+    assert root not in agent._ledger_pressed
+
+
+GATED_PARTS = (
+    "decide 2026-11-05 (session `grinder-ao-2` on kmaster) — **Go on TD-190?** Say. Context: TD-190 decision (paul). "
+    "Parts: TD-191, TD-192. Due: 2026-11-06. Answers: Go | Not yet."
+)
+
+
+async def test_a_go_on_a_design_and_its_parts_lifts_every_entry_it_wrote_at_once(agent, repo, tmp_path, monkeypatch):
+    """TD-1433: a lift that writes several entries (a design and its `Parts:`) re-reads each one it wrote, so no
+    part stays on the Queue with **Lift the hold** while the checkout has not pulled."""
+    from shiftlead.ui.inbox import ledger_for_you
+
+    _gated(repo)
+    for n in (191, 192):
+        part = GATED_ENTRY.replace("TD-190: A window to keep", f"TD-{n}: A part").replace(
+            "**Blocked by:** decision (paul)", "**Blocked by:** decision (paul)\n**Part of:** TD-190"
+        )
+        (repo / "docs" / "ledger" / f"TD-{n}.md").write_text(part)
+    b = repo / board.BOARD
+    b.write_text(b.read_text().replace(GATED, GATED_PARTS))
+    git(repo, "add", "-A")
+    git(repo, "commit", "-qm", "parts")
+    git(repo, "push", "-q", "origin", "main")
+    tick = await _press_go(agent, repo, tmp_path, monkeypatch, GATED_PARTS)
+    root = str(repo)
+    for n in (191, 192):
+        assert "decision (paul)" in (repo / "docs" / "ledger" / f"TD-{n}.md").read_text(), "the checkout has not pulled"
+    assert sorted(agent._ledger_pressed[root]["entries"]) == ["TD-190", "TD-191", "TD-192"]
+    ids = ("TD-190", "TD-191", "TD-192")
+    for reading in (agent._repos[root]["ledger"]["entries"], (await tick()).values()):
+        got = {e["id"]: e for e in reading if e["id"] in ids}
+        assert sorted(got) == list(ids) and all(_lifted(e) for e in got.values()), got
+    rows = [r.get("id") for g in ledger_for_you(agent._repos, [])["groups"] for r in g["rows"]]
+    assert not set(rows) & set(ids), rows
+
+
 def test_a_go_on_another_repos_gated_entry_is_answered_on_the_board_alone(repo):
     """An item naming another repo's entry is answered on the board alone and stays open: its lift is a tool PR
     there (ledgerboard's `_decide_ledger`), so no ledger is passed and nothing beside the board lands."""
