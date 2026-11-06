@@ -728,21 +728,23 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        in the last twenty-four hours, a start being one instant however many records it replayed (the
        home keeps `work_started: [at]` beside `work_waiting`) — **a start the team worked counts for
        nothing** (TD-1441; Paul, 2026-11-06: on a day of his answers the cap held a team his Go had
-       just unblocked). A start is *worked* once any of the team's records, live or ended, holds a
-       progress entry it declared itself (`source: declared`, never `derived` from a branch) reading
-       `claimed` or `done`, stamped at or after the start's instant and before the team's next start
-       by this rule (a person's or a schedule's Start between is not read: what its run claims
-       credits the start before it — accepted, since it only spares a start); a claim a replay carried (rule 5's waiting claims, TD-820) keeps its old stamp and
-       counts for nothing. The tick reads it for each start of the day not yet worked, before it
-       reads the bounds, and writes the start's instant into **`work_worked: [at]`** beside
-       `work_started` the tick it first holds, so a record pruned later takes nothing back; both lists
-       drop an instant past the day together. The cap counts `work_started` less `work_worked`; a
+       just unblocked). A start is *worked* once a record it replayed — one whose newest `restarts` entry is
+       the start's own (`why: work`, `start` equal to its instant) — holds a progress entry it
+       declared itself (`source: declared`, never `derived` from a branch) reading `claimed` or
+       `done`, stamped after that entry's `at`. A member the start did not replay never credits it,
+       nor does a run a later restart of the record began (a person's Start, a schedule's, rule 2's),
+       whose entry is then the newest; and the claims the replay renewed (rule 5's waiting claims,
+       TD-820, which `_replay` restamps with its entry's `at`) count for nothing until they move. The tick reads it for each start of
+       the day not yet worked on every tick, before any replay of that tick — a replay supersedes the
+       record in place and its progress with it, which is why the reading is kept — and writes the
+       start's instant into **`work_worked: [at]`** beside `work_started` the tick it first holds, so a record pruned later takes nothing back; both lists
+       drop an instant past the day together, pruned by the same reading. The cap counts `work_started` less `work_worked`; a
        start not yet read worked — the team still at it — counts, so a team never has more than
        `WORK_STARTS_DAY` starts on the day it has not yet shown work for. A runaway — a team started
        into lanes nobody can pick from, wound down, started again — claims nothing, so every one of
        its starts counts, and the cap holds it as before; one that does work is bounded by
        `WORK_EARLY` alone, at most two starts an hour. Rule 9's wind-down is unchanged: a team whose
-       lanes hold only entries gated on the person still winds down (rule 9 reads no lane, below), and
+       lanes hold only entries gated on the person still winds down (rule 9 holds no wind-down on a lane: that would make it a second reader of the lane, below), and
        the person's answer starts it again, a start its members then work; a start by this rule inside the last
        **`WORK_EARLY`** (thirty minutes); and its repo **over the team's balance line** (§6
        *Balance*), read here by the rule itself, since the mark goes with the team's last live
