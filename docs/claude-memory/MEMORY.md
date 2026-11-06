@@ -62,3 +62,4 @@
 - [Precheck and merge in one command](precheck-and-merge-in-one-command.md) — ~12 min precheck, main moves the ledger under it; precheck, gate and merge as one background command
 - [Show the unconstrained design pass](show-the-unconstrained-design-pass.md) — frontend-design on a mockup: render the skill's own pick beside the house-style refinement (TD-1203, 2026-10-28)
 - [Mockup from a static copy](mockup-from-a-static-copy.md) — edit a script-free copy of the live page in Playwright; prefix the mockup's classes, never nest links
+- [Work open asks before idle](work-open-asks-before-idle.md) — never end a turn on a list of open asks; the doorbell never rings a read ask again (TD-1435, 2026-11-06)
