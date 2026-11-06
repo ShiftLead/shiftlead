@@ -93,6 +93,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     FLOW_CLAUSE,  # noqa: F401
     GH_TIMEOUT,
     GIT_EVERY,  # noqa: F401
+    HELD_MAIL,  # noqa: F401
     HOME_EDITS,  # noqa: F401
     ID_RECHECK,  # noqa: F401
     IDLE_NUDGE,  # noqa: F401
