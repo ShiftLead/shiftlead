@@ -25,6 +25,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
 from sessionorc import build, hosts, identity, mail, paths, promote
+from sessionorc import unanswered as unanswered_mod
 from sessionorc.client import AgentError
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.ledger import SQUASH as SQUASH_PR
@@ -127,6 +128,25 @@ def suggested_answers(e: Any) -> list[str]:
 
 
 templates.env.globals["suggested_answers"] = suggested_answers
+
+
+def not_answered(e: Any) -> dict[str, str] | None:
+    """A taken-up question's one line (design §4.5a *Inbox row: taken up*, §4.9b *Why it did not answer*,
+    TD-1431): who did not answer, the read's time, and the home's fixed words for the state — the words from
+    `sessionorc.unanswered.words`, the one place they are written, as `ao inbox` prints them. None on an
+    entry carrying no `unanswered` stamp. A template global, so the Inbox row, the message page and the
+    Queue's mail item, which all draw through the row macro, draw the same line."""
+    stamp = e.get("unanswered") if isinstance(e, Mapping) else None
+    if not isinstance(stamp, Mapping):
+        return None
+    return {
+        "name": str(stamp.get("name") or stamp.get("by") or ""),
+        "at": unanswered_mod.clock(stamp.get("at")),
+        "words": unanswered_mod.words(stamp),
+    }
+
+
+templates.env.globals["not_answered"] = not_answered
 
 
 def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
