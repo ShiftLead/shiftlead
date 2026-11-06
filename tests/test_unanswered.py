@@ -304,3 +304,46 @@ def test_clock_names_the_day_when_not_today():
     other = (now - timedelta(days=2)).isoformat()
     assert unanswered.clock(other, now)[:3].isalpha()
     assert unanswered.clock("not a time", now) == "not a time"
+
+
+def test_a_withdrawn_or_declined_ask_reads_as_the_links_turn_too():
+    # §4.9b *What `ao pr held` reads meanwhile*: closed with no reply landed, whatever the reason
+    links = [{"stage": "review", "reader": "techlead-ao", "paths": ["b"]}]
+    for reason in ("withdrawn", "declined", "asker_gone"):
+        ask = {"id": "m", "to": ["ao-x-techlead-ao"], "at": Q, "open": False, "verdict": None, "replied_at": None}
+        got = reviewmod.walk(links, [{**ask, "closed_reason": reason}])
+        assert got["chain"][0]["state"] == "next" and got["turn"] == "techlead-ao"
+
+
+def test_words_fall_back_to_the_plain_line():
+    plain = "tl did not answer."
+    for stamp in (
+        {"state": "nonsense"},
+        {"state": "working", "waiting": "many"},
+        {"state": "gated"},
+        {"state": "gated", "gate": "max"},
+        {"state": "gated", "gate": {"resets": AT}},
+        {"state": "suspended"},
+        {"state": "fills_exhausted"},
+        {"state": "restart_ceiling"},
+        {"state": "scheduled"},
+        {"state": "ended"},
+    ):
+        assert _words({"by": "ao-x-tl", "name": "tl", "at": AT, **stamp}) == plain, stamp
+
+
+def test_ao_inbox_prints_the_line_only_under_a_stamped_entry(monkeypatch, capsys):
+    from shiftlead import cli
+
+    def entry(mid, **kw):
+        return {"id": mid, "from": "ao-x-w", "from_role": "other", "to": ["person"], "at": AT, "kind": "ask",
+                "text": f"text {mid}", "root": mid, **kw}  # fmt: skip
+
+    stamped = entry("m-1", unanswered={"by": "ao-x-tl", "name": "tl", "at": AT, "state": "not_filled"})
+    got = {"id": "person", "entries": [stamped, entry("m-2")], "unread": 0}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: got)
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    line = f"  not answered by tl (as read at {unanswered.clock(AT)}): tl was never filled for this question."
+    assert out.count("not answered by") == 1 and line in out
+    assert out.index("text m-1") < out.index(line) < out.index("text m-2")

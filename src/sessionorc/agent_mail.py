@@ -991,7 +991,7 @@ class MailMixin:
         r = records.get(sid)
         if r is None:
             return unanswered.read(None, sid, question_at=taken.at, at=at)
-        over = self._profile_over(r.profile, now, r.team) if r.profile else None
+        over = self._profile_over(r.profile, now, r.team)  # the fill's own reading (§6 rule 3), unguarded as it is
         kw = self._read_when_kwargs(r, now)
         tail = mail.read_when(r, taken.kind, now, person=False, lapses=False, unreachable=self._away(r), **kw)
         return unanswered.read(

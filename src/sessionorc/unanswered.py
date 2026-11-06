@@ -137,6 +137,17 @@ def read(
     return {k: v for k, v in out.items() if v is not None}
 
 
+# what each state's sentence names, without which `words` says the plain line
+_NEEDS = {
+    "suspended": ("since",),
+    "fills_exhausted": ("since",),
+    "restart_ceiling": ("since",),
+    "scheduled": ("start_at",),
+    "gated": ("gate",),
+    "ended": ("ended",),
+}
+
+
 def clock(value: Any, now: datetime | None = None) -> str:
     """A stamp's time as the Inbox draws times: local `HH:MM`, its weekday first when not today; the value
     as given when it is no time."""
@@ -158,6 +169,10 @@ def words(stamp: Mapping[str, Any], now: datetime | None = None) -> str:
     the same for every asker, its times local."""
     s = stamp.get("state")
     name = str(stamp.get("name") or stamp.get("by") or "")
+    plain = f"{name} did not answer."
+    # a stamp missing what its state's sentence names reads as the plain line, never a half sentence
+    if any(not stamp.get(k) for k in _NEEDS.get(str(s), ())) or s not in STATES:
+        return plain
     t = lambda key: clock(stamp.get(key), now)  # noqa: E731
     gate = stamp.get("gate") if isinstance(stamp.get("gate"), Mapping) else None
     seat = bool(stamp.get("seat"))
@@ -193,7 +208,9 @@ def words(stamp: Mapping[str, Any], now: datetime | None = None) -> str:
     elif s == "scheduled":
         text = f"{name} starts at {t('start_at')}"
     elif s == "gated":
-        text = f"{name}'s profile {(gate or {}).get('profile')} is paused by the usage gate {_until(gate or {}, now)}"
+        if gate is None or not gate.get("profile"):
+            return plain
+        text = f"{name}'s profile {gate['profile']} is paused by the usage gate {_until(gate, now)}"
     elif s == "limited":
         cap = f": {stamp['cap']}" if stamp.get("cap") else ""
         text = f"{name} is at its usage cap{cap} — " + (
@@ -210,12 +227,15 @@ def words(stamp: Mapping[str, Any], now: datetime | None = None) -> str:
         what = {"permission": "a permission", "question": "its own question"}.get(str(stamp.get("kind")), "you")
         text = f"{name} is waiting on {what} in its pane — its row under Needs you answers it"
     elif s in ("working", "idle"):
-        n = int(stamp.get("waiting") or 0)
+        try:
+            n = int(stamp.get("waiting") or 0)
+        except (TypeError, ValueError):
+            return plain
         text = f"{name} is {s} and has not answered, {n} question{'' if n == 1 else 's'} waiting"
         if stamp.get("tail"):
             text += f" — {stamp['tail']}"
     else:
-        return f"{name} did not answer."
+        return plain
     if stamp.get("lapsed"):
         text += f" — it was at its fill ceiling until {t('lapsed')}"
     return text + "."
