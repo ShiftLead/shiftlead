@@ -313,7 +313,21 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   - **`ledger:`** carries, beside the ledger, the `{ledger_check}` the briefs name: `python3
     scripts/ledger.py --check`, agent-cadence's, which every tree at or after `OLDEST` ships.
   **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (the gate,
-  `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as `<n>` after the rest), `{board}`
+  `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as `<n>` after the rest), `{merge}`
+  (cadence step 5's line, TD-1412: `m=$(mktemp -d); python3 scripts/check_cadence.py --pr {pr} --trailers
+  "$m/gate"; python3 scripts/forge.py squash-message {pr} --gate "$m/gate" --out "$m" && gh pr merge {pr}
+  --squash --match-head-commit "$(cat "$m/sha")" --subject "$(cat "$m/subject")" --body-file "$m/body"`,
+  one command whose squash ends in the `Merged-by:` trailer. The slot is filled without reading the tree,
+  so it adds no read to a brief's composition, a container node's included. Its text carries the old pin's
+  cure in one sentence after the line: *where the line is refused because `--trailers` is unrecognized or `squash-message` is not
+  a choice (a pin older than agent-cadence TD-233), merge with `gh pr merge {pr} --squash`*. That fallback lasts only until the repo's
+  next sync bump. The slot is the GitHub line, as `{gate}` and the home's PR reads assume `gh`; a
+  GitLab origin is outside these seams. The sync's own merge reads its tree instead (§6 *Sync*, `cadence.composes`). Every built-in brief or flow stage
+  that has a session merge a PR names `{merge}`, never a bare `gh pr merge`, and says it is typed whole as
+  one command, since `$m` does not survive a tool's separate calls: a line split at its `;` fails at
+  `squash-message`, which finds no gate file, and nothing merges. That is never a cue to fall back to
+  the bare merge. The merge stays the literal `gh pr merge` at the line's end, which a guard on that
+  command still sees), `{board}`
   (the board's path, whether or not the file is there: a missing board is the Repo page's warning,
   and the board's own reader says the Inbox is then the channel), `{ledger}` (the resolved ledger, a file or a
   v2 directory, §4.4 *Either layout*), `{ledger_check}`, `{cadence_rules}` (*read docs/cadence.md §1–§4*) —
@@ -321,11 +335,11 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   and the repo's own, each with its sentence: `{test}` (*no test command: run what the repo's README
   says*), `{lint}` (*no lint command: keep to the style of the code around the change*) and
   `{design_dir}` (`docs/design/` where the checkout holds it, else *no design directory: the README and
-  the code say what is true*). In a pinned repo (below) `{gate}`, `{ledger_check}` and
+  the code say what is true*). In a pinned repo (below) `{gate}`, `{merge}` (its two scripts), `{ledger_check}` and
   `{cadence_rules}` name what the resolver gives, as a session types it (`cadence.typed`): the vendored
   launcher under the host agent's own Python, its argv without `-C`, so the session's own checkout
   resolves — a worktree's ledger is the one checked, a bump branch runs its own pin — as
-  `<python> <launcher> run check_cadence.py --pr {pr}`, `… run ledger.py --check` and *read the file
+  `<python> <launcher> run check_cadence.py --pr {pr}`, `… run forge.py squash-message {pr} …` (only the launcher's words through `cadence.typed`; `{pr}`, `$m` and the rest of the line are appended as text, as `{gate}` appends ` --pr {pr}`, since `typed` quotes what it is given), `… run ledger.py --check` and *read the file
   `… path cadence.md` prints, §1–§4*. A session started on a container node, a team's member or the New
   session form's, is told the node's own launcher instead, `/shiftlead/venv/bin/agent-cadence` (the console script over the same launcher in the
   node's venv, §4.4a), since the home's paths are not the node's; a lock beside the pin keeps the copy's paths, and agent-cadence's own source its `files/` ones. They are read only when the brief

@@ -1722,9 +1722,48 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      (§4.4's test, over the live records). A head that moved means the PR was not checked: the pass
      drops it, and the next pass checks the new head. A record that now holds it means the merge is
      dropped and no verdict is written. The PR stays off the home's list while a live record holds
-     it, and comes back only once the claim ends. The merge is then `gh pr merge <n> --squash
-     --match-head-commit <head>`, with no body (cadence §4.2). The forge's head match is the one
-     atomic guard, and a push it refuses is the moved head again. A merge is followed by a `system`
+     it, and comes back only once the claim ends. **The merge is then cadence step 5's line**
+     (TD-1412, cadence §4.2). Its three parts are split across the two steps so the gate runs once. A
+     sync PR is a pin's bump, so its repo is pinned, and both scripts run through the resolver
+     (`cadence.command`, `cwd` the registry checkout), as `cadence.check` runs the gate.
+     **Step 4's gate run** takes `--trailers <dir>/gate` (`cadence.check(root, pr, timeout,
+     trailers=None)`, a new keyword that an injected `gate=` need not take when it is `None`). `judge`
+     makes `<dir>` itself (a `mkdtemp`) just before the gate, after the precheck road has returned. It
+     removes the directory on every road but one that sets `ready`, and on that one it hands it on as the
+     in-memory entry's `gate_dir`. The gate file's `expect` is the head the rows judged.
+     **Step 5.** `_sync_merge` pops `gate_dir` first, before any return, so it is never written to the
+     reading, and removes the directory in a `finally` that covers every exit. A cancel that lands while
+     `judge` still runs in its thread drops its result, and that one directory is left in the system's
+     temporary directory: accepted, as small and harmless. Then, in order:
+       - the sync-off and holder checks, unchanged;
+       - `forge.py squash-message <n> --gate <dir>/gate --out <dir>` under `GATE_TIMEOUT`, since it makes
+         paginated `gh api` reads;
+       - the head and the holders read again, just before the merge;
+       - `gh pr merge <n> --squash --match-head-commit <sha> --subject <subject> --body-file <dir>/body`.
+     The merge is made only when the sha in `<dir>/sha`, the PR head steps 1–3 proved and the head just
+     re-read are one. Any other combination is the moved head, and nothing is written. The forge's head
+     match is still the one atomic guard, and a push it refuses is the moved head again. A
+     `squash-message` refusal is *no reading* with its words, counted as step 4's are. `squash-message` runs
+     with `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL` and `AGENT_MODEL_FILE` removed from its
+     environment (its `merged_by` reads them; the gate reads none, so `cadence.check` needs no environment
+     of its own), so the squash ends in `Merged-by: shiftlead-sync`. It never names the person's
+     `user.name` and never a model, since the home runs none. `shiftlead-sync` and `sync-check`, which
+     signs step 4's BLOCK, are the same policy's two names: one signs the gate it failed, the other the
+     merge it made. **Whether the tree composes** is `cadence.composes(root)` (TD-1419), read on
+     the registry checkout's current pin just before step 4's gate, after `judge`'s earlier returns. It is `cadence.tree(root)`, the resolve the
+     gate's own reads use (a subprocess under `TREE_TIMEOUT`, its answer cached for `TREE_FOR`), and then
+     whether that payload's `scripts/forge.py` names `squash-message`.
+       - *Yes:* the line above.
+       - *No:* a tree read whose `scripts/forge.py` does not name `squash-message`, which is a pin older
+         than agent-cadence TD-233. Step 4's gate runs without `--trailers`, and the merge is as before,
+         `gh pr merge <n> --squash --match-head-commit <head>` with no body. So the bump that first
+         brings `squash-message` in is merged bare. Where no `Merged-by:` commit precedes it on the
+         default branch, the weekly read's cutoff, it is never listed; where one does (a session merged
+         through the line first), it is listed once, as the cost of the bump.
+       - *Unreadable:* `cadence.tree` gave `(None, why)`, or the file could not be read. That is *no reading* with its words,
+         counted, never taken as *no*.
+     `--trailers` is older than `squash-message` in agent-cadence (#141, then #143), so a tree that
+     composes also takes the flag. A merge is followed by a `system`
      note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — bump of the agent-cadence pin
      to <sha>*.
 
