@@ -736,7 +736,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        whose entry is then the newest, nor an unattended seat, which a start replays held and rule 3 fills for a cause
        (its fill is the newer entry: a cause's fill is not the lanes' work; a seat the start replays
        live is read as a member is); and the claims the replay renewed (rule 5's waiting claims,
-       TD-820, which `_replay` restamps with its entry's `at`) count for nothing until they move. The tick reads it for each start of
+       TD-820, which `_replay` restamps with its entry's `at`) count for nothing until they move or are declared again — the rule reads
+       the stamp, not the substance, so a member that re-declares a carried reference credits the start,
+       the lenient side and bounded as below. The tick reads it for each start of
        the day not yet worked, as its own step immediately before `_keep_running` in the tick, ahead of every pass that
        replays — a replay supersedes the record in place and its progress with it, which is why the
        reading is kept; so a member that claims and then crashes or restarts itself between two ticks
@@ -750,7 +752,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        `WORK_STARTS_DAY` starts on the day it has not yet shown work for. A runaway — a team started
        into lanes nobody can pick from, wound down, started again — claims nothing, so every one of
        its starts counts, and the cap holds it as before; one that does work is bounded by
-       `WORK_EARLY`, at most two starts an hour — a ceiling, not the expectation: the home writes a
+       `WORK_EARLY`, at most two starts an hour, and before that by `RESTART_CEILING`, since a `why:
+       work` entry is a counted restart: a record with three in two hours is left out of the replay, and
+       a start with none left holds as `nothing` (*no record to start*) — a ceiling, not the expectation: the home writes a
        member's lane ids into its `lane_seen` on the first tick after its `none` (rule 6), so the same entries are no news
        again and start nothing. Rule 9's wind-down is unchanged: a team whose
        lanes hold only entries gated on the person still winds down (rule 9 holds no wind-down on a lane: that would make it a second reader of the lane, below), and
