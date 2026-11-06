@@ -365,6 +365,13 @@ async def test_a_subscription_profiles_turns_reach_the_seat_ledger_and_nothing_t
         with pytest.raises(AgentError, match="day, week or month"):
             await person.call("seats", window="year")
         assert (await person.call("seats", window="month", at=None))["window"] == "month"  # the RPC takes `at`
+        # one record's reading (§4.4 *One record's reading*, TD-1406): every day the ledger holds, by its id or address
+        one = await person.call("seats", record=f"{rid}@{agent.host}")
+        assert (one["record"], one["whole"]["figure"], one["money"]) == (rid, 3.0, {"≈$": 3.0})
+        assert one["refs"][0]["ref"] == "TD-303" and one["unknown"] == {}
+        for extra in ({"window": "day"}, {"team": "t"}, {"by": "record"}, {"at": "2026-10-01"}):
+            with pytest.raises(AgentError, match="every day the ledger holds: not with"):
+                await person.call("seats", record=rid, **extra)
         with pytest.raises(AgentError, match="starts on the 1st"):
             await person.call("seats", window="month", at="2026-10-02")
         out = await person.call("set_settings", spend={"weights": {"claude-sonnet": {"input": 1}}})
@@ -511,6 +518,30 @@ def _day(figure, turns=1, metered=False, name="w", team="t", role="grinder", rep
 def _ledger(**days):
     """`{day: {rid: row}}`, a day written `d2026_10_17`."""
     return {"days": {k[1:].replace("_", "-"): v for k, v in days.items()}}
+
+
+def test_one_records_reading_sums_every_day_it_holds_keeps_units_apart_and_ranks_its_references():
+    a1 = _day(2.0, turns=3, input=10, output=20, cache_read=30, cache_write=40)
+    a1["refs"] = {"TD-1": {"figure": 1.5, "turns": 2}, seats.BETWEEN: {"figure": 0.5, "turns": 1}}
+    a2 = _day(5.0, turns=2, metered=True, model="paid")  # a metered day: `$`, never summed with `≈$`
+    a2["refs"] = {"TD-2": {"figure": 4.0, "turns": 1}, "TD-1": {"figure": 1.0, "turns": 1}}
+    a3 = _day(0.0, turns=4, model="odd", unweighed=4)
+    ledger = _ledger(
+        d2026_10_17={"a": a2, "b": _day(9.0)}, d2026_10_09={"a": a1}, d2026_10_12={"a": a3, "b": _day(1.0)}
+    )
+    got = seats.record_reading(ledger, "a@laptop")  # an address: the host part dropped
+    assert (got["record"], got["first_day"]) == ("a", "2026-10-09")
+    assert [d["day"] for d in got["days"]] == ["2026-10-09", "2026-10-12", "2026-10-17"]
+    assert got["money"] == {"≈$": 2.0, "$": 5.0}
+    w = got["whole"]
+    assert (w["figure"], w["turns"], w["between"], w["unweighed"]) == (7.0, 9, 0.5, 4)
+    assert w["tokens"] == {"input": 2010, "output": 20, "cache_read": 30, "cache_write": 40}
+    assert w["unweighed_tokens"] == 1000 and w["unit"] == "≈$"
+    assert got["refs"] == [{"ref": "TD-2", "figure": 4.0, "turns": 1}, {"ref": "TD-1", "figure": 2.5, "turns": 3}]
+    none = seats.record_reading(ledger, "gone")
+    assert (none["first_day"], none["days"], none["refs"], none["money"]) == (None, [], [], {})
+    with pytest.raises(ValueError, match="record's id"):
+        seats.record_reading(ledger, "@h")
 
 
 def test_a_month_and_a_week_sum_their_days_and_a_week_starts_on_monday():

@@ -4120,8 +4120,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.get("/api/spend")
     async def spend_api(request: Request):
         """The `seats` reading the Spend page draws, its `window`, `at` and `team` from the query
-        (§4.5a *Spend page: Day · Week · Month, the team chips, ‹ ›*)."""
-        return await spend_reading(spend_picks(request.query_params))
+        (§4.5a *Spend page: Day · Week · Month, the team chips, ‹ ›*); with `record`, **one record's
+        reading**, the Focus's ending card's (§4.4 *One record's reading*, §4.5a *Focus: ending card*,
+        TD-1406), every other pick refused beside it as the home refuses it."""
+        q = request.query_params
+        if q.get("record"):
+            given = {k: q[k] for k in ("window", "at", "team", "by") if q.get(k)}
+            return await call("seats", record=q["record"], **given)
+        return await spend_reading(spend_picks(q))
 
     @app.get("/api/shape")
     async def shape_api(team: str, window: str = "day"):

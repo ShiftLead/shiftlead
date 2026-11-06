@@ -3630,6 +3630,55 @@
     });
   };
 
+  // **The ending card** (design §4.5 *The Focus screen's anatomy* item 3, §4.5a **ending card**; TD-964, built by
+  // TD-1406): what an ended session cost, from one reading, the `seats` reading's `record` pick (`/api/spend?record=`),
+  // in the disconnect card's money-and-tokens rule (`AO.dropSays`: `≈$` and `$` apart, *unweighed* beside, every kind
+  // of token summed with the kinds on hover). `reading` is that reply, or null where the page never got it; `v` the
+  // record as drawn; `at` when it was read. Null where the card is not drawn: a live record, or one with no agent.
+  AO.END_TOP = 5;
+  AO.endCard = function (reading, v, at, now) {
+    if (!v || !["exited", "closed"].includes(v.state) || v.agent === false) return null;
+    now = typeof now === "number" ? now : Date.now();
+    const asof = Number.isFinite(at) ? usageClock(at, now) : null;
+    const days = reading && Array.isArray(reading.days) ? reading.days : [];
+    const whole = reading && reading.whole && typeof reading.whole === "object" ? reading.whole : null;
+    if (!whole || !days.length) return { none: true, asof };
+    const says = AO.dropSays({ money: reading.money && typeof reading.money === "object" ? reading.money : {},
+      unweighed: Number(whole.unweighed_tokens) || 0,
+      tokens: Object.fromEntries(AO.DROP_KINDS.map(([k]) => [k, Number((whole.tokens || {})[k]) || 0])) });
+    const total = AO.DROP_KINDS.reduce((n, [k]) => n + (Number((whole.tokens || {})[k]) || 0), 0);
+    const turns = Number(whole.turns) || 0;
+    const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const fd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(reading.first_day || ""));
+    const since = fd ? `${MON[Number(fd[2]) - 1]} ${Number(fd[3])}` : "";
+    // this run's length: the record's start to its ending's time (the exit's, else the close's)
+    const pad = (n) => String(n).padStart(2, "0"), hm = (t) => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+    const from = instant(v.started || v.created), to = instant((v.ended && v.ended.at) || v.closed_at);
+    let run = "";
+    if (from !== null && to !== null && to >= from) {
+      const mins = Math.round((to - from) / 60000), h = Math.floor(mins / 60);
+      run = `this run ${hm(from)} to ${hm(to)} (${h ? `${h}h ${mins % 60}m` : `${mins}m`})`;
+    }
+    const unit = whole.unit === "$" ? "$" : "≈$";
+    const cash = (x) => unit + Number(x).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const refs = (Array.isArray(reading.refs) ? reading.refs : []).filter((r) => r && r.ref).slice(0, AO.END_TOP);
+    const between = Number(whole.between) || 0;
+    const top = Math.max(0, between, ...refs.map((r) => Number(r.figure) || 0));
+    const bar = (f) => (top ? Math.round((Number(f) || 0) / top * 100) : 0);
+    const entries = refs.map((r) => ({ ref: String(r.ref), figure: cash(r.figure), pct: bar(r.figure) }));
+    if (between > 0) entries.push({ ref: "between entries", between: true, figure: cash(between), pct: bar(between) });
+    return {
+      money: says.money, since, tok: `${tokShort(total)} tokens`, kinds: says.kinds,
+      turns: `${turns.toLocaleString("en-US")} turn${turns === 1 ? "" : "s"}`, run, entries, asof,
+    };
+  };
+  // the one read, when the page draws the ending and on a reload — never polled
+  AO.endRead = function (id) {
+    return fetch(`/api/spend?record=${encodeURIComponent(id)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+  };
+
   // Deny's optional reason (design §4.5a, TD-117): one line beside Deny that goes back with the
   // refusal through the hook, for the session to read. Never required, so an empty box is a bare
   // Deny — the body carries no `reason` at all rather than an empty one.
@@ -6586,7 +6635,66 @@
     // gone with it on the first pane byte; never over the pane, and the retry line is the terminal's.
     const dropEl = $("#fdrop");
     let dropShown = false;
+    // The ending card (`AO.endCard`, §4.5a **ending card**, TD-1406): read once when the page draws the ending (and so
+    // on a reload), drawn between the banner and the pane, in the pane's place when the pane is gone; where it stands
+    // the disconnect card is never drawn.
+    const endEl = $("#fend"), wrapEl = $("#termwrap");
+    let endFor = null, endGot = null, endAt = null, endShown = false;
+    const endPaint = (v) => {
+      const c = AO.endCard(endGot, v, endAt, Date.now());
+      const node = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+      const kids = [];
+      if (!c || c.none) {
+        kids.push(node("div", "ecnone dim", "no reading"));
+      } else {
+        const head = node("div", "echead");
+        const money = node("span", "ecmoney", c.money);
+        money.title = "API-equivalent at your weights where it reads ≈$ — a subscription's turns, never a bill; $ is a metered profile's bill (design §4.4 Spend per seat)";
+        const tok = node("span", "", c.tok); tok.title = c.kinds;
+        const rest = node("span", "ecmeta dim");
+        rest.append(tok, ` in ${c.turns}` + (c.run ? `; ${c.run}` : ""));
+        head.append(money, node("span", "ecwho", `spent by ${v.name || v.id}` + (c.since ? ` since ${c.since}` : "")), rest);
+        kids.push(head);
+        if (c.entries.length) {
+          const by = node("div", "ecby");
+          by.append(node("div", "ecbyh", "By entry"));
+          for (const e of c.entries) {
+            const row = node("div", "ecrow");
+            const bar = node("span", "ecbar"); bar.style.width = `${e.pct}%`;
+            const track = node("span", "ectrack"); track.append(bar);
+            row.append(node("span", e.between ? "ecref dim" : "ecref mono", e.ref), track, node("span", "ecfig mono", e.figure));
+            by.append(row);
+          }
+          kids.push(by);
+        }
+      }
+      const foot = node("div", "ecfoot dim", c && c.asof ? `as of ${c.asof} · ` : "");
+      const link = node("a", "", `Open ${v.name || v.id} in Spend`);
+      link.href = v.team ? `/spend?team=${encodeURIComponent(v.team)}` : "/spend";
+      foot.append(link);
+      kids.push(foot);
+      endEl.replaceChildren(...kids);
+    };
+    const drawEnd = (v) => {
+      if (!endEl) return;
+      const ended = !!v && ["exited", "closed"].includes(v.state) && v.agent !== false;
+      endShown = ended;
+      endEl.classList.toggle("hidden", !ended || endAt === null);  // drawn once its one read has answered
+      // in the pane's place when the pane is gone: nothing of the terminal is drawn under it
+      if (wrapEl) wrapEl.classList.toggle("hidden", ended && (paneGone || AO.paneIsGone(v)));
+      if (!ended) { endFor = null; return; }
+      if (dropShown) drawDrop(false);
+      if (endFor !== v.state) {  // the ending drawn: read it once, never again until another ending is drawn
+        endFor = v.state; endGot = null; endAt = null;
+        AO.endRead(id).then((j) => {
+          endGot = j; endAt = Date.now();
+          if (endShown) { endEl.classList.remove("hidden"); endPaint(lastV || v); }
+        });
+      }
+      if (endAt !== null) endPaint(v);
+    };
     const drawDrop = (on) => {
+      if (on && endShown) on = false;  // the ending card stands: the disconnect card is never drawn
       if (!dropEl || (!on && !dropShown)) return;
       dropShown = on;
       dropEl.classList.toggle("hidden", !on);
@@ -7372,6 +7480,7 @@
         if (mk) { ex.appendChild(mk.content.cloneNode(true)); AO.applyHelpMarks(ex); }
         ex.classList.remove("hidden");
       } else ex.classList.add("hidden");
+      drawEnd(v);
       // the soft-key row (§4.5a, TD-990): gone with the ending, back on its other side while the page has a
       // terminal, and with the record's mode — Hand back hides it before its re-attach, Take over shows it
       if (softEl) softEl.classList.toggle("hidden", !AO.softShown(v, paneGone));
