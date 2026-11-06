@@ -651,7 +651,7 @@
    the row kind, because a session's permission and its stalled row are two rows. A permission, a
    question and `limited` are never offered one: something is waiting on the tool's own clock. #}
 {% macro state_snooze(e) -%}
-{%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open') or e.mark == 'cadence' %}
+{%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open', 'held_mail') or e.mark == 'cadence' %}
 {%- if not drawn_on_queue %}
 <details class="more"><summary class="btn sm ghost" title="set this row aside until later; the state itself is untouched">Snooze</summary>
   <div class="menu">
@@ -715,6 +715,15 @@
   <span class="st" title="{{ help_title('idle-open') }}">idle · open work — its team has no manager, so it is yours to judge</span>
   <span class="grow"></span>
   {{ state_snooze(e) }}
+  {{ open_btn(e, 'Open') }}
+  {%- elif e.row == 'held_mail' %}
+  {#- §4.5a **Inbox row: held · mail waiting** (§4.5 *A taken-over member*, TD-1440): a member the person took
+      over and left, its mail unrung for half an hour. **Hand back** is Focus's own two calls, stamped
+      `via: inbox`, and does not confirm; a refusal is the toast and the row stands. -#}
+  <span class="st" title="{{ help_title('held-mail') }}">held · mail waiting — Hand back returns it to its team and its doorbell</span>
+  <span class="grow"></span>
+  {{ state_snooze(e) }}
+  <button class="btn sm primary" data-act="mode" data-via="inbox" data-id="{{ e.sid }}" data-unattended="0" title="{{ help_title('held-mail') }}">Hand back</button>
   {{ open_btn(e, 'Open') }}
   {%- elif e.mark == 'cadence' %}
   {#- §4.5a **Inbox row: cadence check failed** (§6 rule 10, TD-258): the member was told once and

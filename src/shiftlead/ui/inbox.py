@@ -31,7 +31,7 @@ from sessionorc import queue as queue_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import workorders as workorders_mod
-from sessionorc.agent_common import WRAPUP_GRACE, fill_ceiling, fill_lapses
+from sessionorc.agent_common import HELD_MAIL, WRAPUP_GRACE, fill_ceiling, fill_lapses
 from sessionorc.client import call_sync
 from sessionorc.models import (
     normalize_ref,
@@ -42,7 +42,7 @@ from shiftlead import teamrun
 
 from . import render as rendermod
 from . import uiconf
-from .cards import _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
+from .cards import MODE_VIA_WORDS, _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
 from .queue import item_home
 
@@ -115,6 +115,7 @@ STATE_SUBJECTS = {
     "stalled": "stalled?",
     "unpushed": "exited with unpushed work",
     "idle_open": "idle · open work",
+    "held_mail": "held · mail waiting",
     "unclosed": "manager did not close",
     "alarm": "identity alarm",
 }
@@ -225,6 +226,33 @@ def idle_open_mark(v: dict[str, Any], views: Collection[dict[str, Any]], now: da
     nudged = _clock(v.get("nudged_at"))
     words = f"idle {idle}".strip() + (f" with {ref} open" if ref else " with its work open")
     return str(mark.get("at") or ""), words + (f", nudged {nudged}" if nudged else "")
+
+
+def held_mail_mark(v: dict[str, Any], names: Mapping[str, str], now: datetime) -> tuple[str, str] | None:
+    """Design §4.5a **Inbox row: held · mail waiting** (§4.5 *A taken-over member*, TD-1440): `(the row's
+    time, its words)` for a live agent record that is a member (`team` or `controllers`, not `by_person`),
+    held (interactive: its mail does not wake it) and `idle`, whose view carries unrung mail
+    (`unread_unrung`) with its clock, `held_mail_at`, at least `HELD_MAIL` old — else None. Derived from
+    the view, with no stored field: *techlead-ao-1 · held by you since 05:41 from Focus · 5 unread since
+    05:56 — its mail does not wake it while you hold it*, the stamp read as the Session card's *mode* row."""
+    if v.get("agent") is False or v.get("unattended") or v.get("state") != "idle" or v.get("by_person"):
+        return None
+    if not (v.get("team") or v.get("controllers")) or not v.get("unread_unrung"):
+        return None
+    start = _instant(v.get("held_mail_at"))
+    if start is None or now - start < HELD_MAIL:
+        return None
+    held = "held since before this was recorded"
+    if at := _clock(v.get("mode_at")):
+        by = v.get("mode_by")
+        who = "by you" if by == "person" else (f"by {names.get(str(by)) or by}" if by else "")
+        via = MODE_VIA_WORDS.get(str(v.get("mode_via") or ""), "")
+        held = " ".join(x for x in ("held", who, f"since {at}", via) if x)
+    n = int(v["unread_unrung"])
+    since = _clock(v.get("oldest_unread_at"))
+    unread = f"{n} unread" + (f" since {since}" if since else "")
+    name = v.get("name") or v.get("id")
+    return str(v.get("held_mail_at")), f"{name} · {held} · {unread} — its mail does not wake it while you hold it"
 
 
 def _pr_parts(prs: Collection[int], directory: Any, tail: str) -> list[dict[str, str]]:
@@ -395,6 +423,8 @@ def state_rows(
             )
         if mark := idle_open_mark(v, views, now):
             rows.append({**base(v, "idle_open", mark[1]), "at": mark[0] or v.get("since") or "", "age": ""})
+        if mark := held_mail_mark(v, names, now):
+            rows.append({**base(v, "held_mail", mark[1]), "at": mark[0], "age": ""})
         if mark := unclosed_mark(v, now):
             rows.append({**base(v, "unclosed", mark[1]), "at": mark[0], "age": ""})
         for c in cadence_marks(v, names):

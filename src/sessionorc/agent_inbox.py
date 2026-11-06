@@ -271,6 +271,8 @@ class InboxMixin:
         # (§4.5a *Inbox row: team start*, §6 rule 8) the same way, keyed `work:<team>`, and `lanes` — a defined
         # team with no record (§6 rule 8 *A team with no record*, TD-781) — keyed `lanes:<team>`
         # `idle_open` (§4.5a *Inbox row: idle · open work*, TD-259): a record's row, keyed as `stalled` is
+        # `held_mail` (§4.5a *Inbox row: held · mail waiting*, TD-1440) the same way; not `held`, which is
+        # *merged without its read*'s
         # `cadence:<pr>` (§4.5a *Inbox row: cadence check failed*, TD-258): a record's row and one a
         # PR, so the key carries the PR's number
         # `red_pr` (§4.5a *Inbox row: red PR*, TD-613): keyed `red_pr:<repo>:<n>`, a PR and not a record
@@ -284,6 +286,7 @@ class InboxMixin:
             "alarm",
             "restart",
             "idle_open",
+            "held_mail",
             "promote",
             "work",
             "lanes",
@@ -294,7 +297,7 @@ class InboxMixin:
         if not cadence and kind not in rows:
             raise RpcError(
                 f"unknown row kind {kind!r}; the state rows are: "
-                f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, cadence:<pr>, promote, work, "
+                f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, held_mail, cadence:<pr>, promote, work, "
                 "lanes, red_pr, fork_pr, ci_not_run"
             )
         key = f"{self._addr(id)}|{kind}"
