@@ -646,7 +646,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 /* the ending card (§4.5a **ending card**, TD-1406): quiet beside the banner — the money its one large figure */
 .endcard { margin: 0 0 8px; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
 .endcard .echead { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; }
-.endcard .ecmoney { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 28px; font-weight: 500; line-height: 1; }
+.endcard .ecmoney { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: calc(var(--t-body) * 1.85); font-weight: 500; line-height: 1; }
 .endcard .ecmeta { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono); }
 .endcard .ecby { display: flex; flex-direction: column; gap: 6px; }
 .endcard .ecbyh { font-weight: 600; font-size: var(--t-small); }
