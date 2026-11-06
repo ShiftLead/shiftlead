@@ -523,13 +523,30 @@ class SpendMixin:
         await self._save_seats()
 
     async def rpc_seats(
-        self, window: str = "day", team: str | None = None, by: str | None = None, at: str | None = None
+        self,
+        window: str | None = None,
+        team: str | None = None,
+        by: str | None = None,
+        at: str | None = None,
+        record: str | None = None,
     ) -> dict[str, Any]:
         """The seat ledger's reading (design §4.4 *Spend per seat*, §4.7 `ao spend`; TD-830, TD-859): over a
-        `day`, `week` or `month`, `at` its first day, per seat (per record under `by: record`), per role,
-        team and repo, per finished entry, and *outside shiftlead*; the window's `series`, the `teams`
-        against the previous period and the `top` seats; `unknown` the profiles whose spend could not be
-        read, whose seats read *spend unknown*. Read-only, and open to a session."""
+        `day` (the default), `week` or `month`, `at` its first day, per seat (per record under `by: record`),
+        per role, team and repo, per finished entry, and *outside shiftlead*; the window's `series`, the
+        `teams` against the previous period and the `top` seats; `unknown` the profiles whose spend could not
+        be read, whose seats read *spend unknown*. `record` in place of a period is **one record's reading**
+        (§4.4 *One record's reading*, TD-1406) over every day the ledger holds, refused beside a `window`,
+        `at`, `team` or `by`. Read-only, and open to a session."""
+        if record:
+            given = [k for k, v in (("window", window), ("at", at), ("team", team), ("by", by)) if v]
+            if given:
+                raise RpcError(f"seats record reads every day the ledger holds: not with {', '.join(given)}")
+            try:
+                one = seats.record_reading(self._seats, record)
+            except ValueError as e:
+                raise RpcError(str(e)) from None
+            return one | {"unknown": dict(sorted(self._seat_reason.items()))}
+        window = window or "day"
         if by not in (None, "", "seat", "record"):
             raise RpcError(f"seats by seat or record, not {by!r}")
         now = datetime.now().astimezone()

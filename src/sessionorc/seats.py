@@ -557,6 +557,47 @@ def reading(
     return out
 
 
+def record_reading(ledger: dict[str, Any], record: str) -> dict[str, Any]:
+    """**One record's reading** (design §4.4 *Spend per seat*, *One record's reading*; TD-964, built by
+    TD-1406), the Focus's ending card: `record`'s rows over every day the ledger holds — its `figure`,
+    turns and tokens by kind summed over its models, *unweighed* tokens apart, as `whole` and per day;
+    `money`, the figure by unit, a subscription's `≈$` and a metered profile's `$` apart and never summed;
+    `refs`, each reference's figure and turns, most spent first (`between` is `whole`'s, not a ref's);
+    and `first_day`, the oldest day holding a row for it (None where none does). `record` is an id or an
+    address (`id@host`): the ledger keys a row by the bare id."""
+    rid = str(record or "").split("@", 1)[0]
+    if not rid:
+        raise ValueError("a seats record is a record's id")
+    whole, money = _blank(), {}
+    days, refs = [], {}
+    for d in sorted(ledger.get("days") or {}):
+        rows = (ledger.get("days") or {}).get(d)
+        row = rows.get(rid) if isinstance(rows, dict) else None
+        if not isinstance(row, dict):
+            continue
+        acc = _blank()
+        _add_row(acc, row)
+        _add_row(whole, row)
+        unit = _unit(acc)
+        money[unit] = round(money.get(unit, 0.0) + acc["figure"], 4)
+        days.append({"day": d, **_rounded(acc)})
+        for ref, r in (row.get("refs") or {}).items():
+            if ref == BETWEEN or not isinstance(r, dict):
+                continue
+            into = refs.setdefault(ref, {"ref": ref, "figure": 0.0, "turns": 0})
+            into["figure"] += float(r.get("figure") or 0.0)
+            into["turns"] += int(r.get("turns") or 0)
+    ranked = sorted(refs.values(), key=lambda r: (-r["figure"], r["ref"]))
+    return {
+        "record": rid,
+        "first_day": days[0]["day"] if days else None,
+        "whole": _rounded(whole),
+        "money": money,
+        "days": days,
+        "refs": [r | {"figure": round(r["figure"], 4)} for r in ranked],
+    }
+
+
 def _series(
     rows: list[Any], window: str, start: date, today: date, begins: str | None, team: str | None
 ) -> list[dict[str, Any]]:

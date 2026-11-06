@@ -186,6 +186,10 @@
       <button class="btn sm ghost" data-act="close" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free.">Cancel</button>
     </div>{% endif %}
     <div class="inline-banner hidden" id="fexited"></div>
+    {#- design §4.5a **ending card** (§4.5 *The Focus screen's anatomy* item 3, TD-964, built by TD-1406): what the ended
+        session cost, from the `seats` reading's `record` pick; drawn by `app.js` (`AO.endCard`) once its one read
+        answers, between the banner and the pane, in the pane's place when the pane is gone -#}
+    <div class="card endcard hidden" id="fend" title="what this session cost: read when the ending was drawn; the last minute's turns may not be in yet — reload to read again. The Spend page has the live figures."></div>
     {#- §4.5 screen 2 *Focus watches* (TD-096, TD-296 #11): the read-only line sits over the terminal,
         not in it — tmux's attach switches xterm to its alternate buffer, which hid a line written there -#}
     <div class="note termro hidden" id="termro">watching: this session is unattended, so the terminal is read-only — Take over (above) to type.</div>

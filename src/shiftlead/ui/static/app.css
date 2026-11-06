@@ -643,6 +643,18 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .dropcard .dcfig { white-space: nowrap; }
 .dropcard .dcwin { grid-column: 1 / -1; display: flex; gap: 4px 16px; flex-wrap: wrap; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono-s); padding-top: 4px; border-top: 1px dashed var(--line); }
 .dropcard .dcfoot { grid-column: 1 / -1; }
+/* the ending card (§4.5a **ending card**, TD-1406): quiet beside the banner — the money its one large figure */
+.endcard { margin: 0 0 8px; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.endcard .echead { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; }
+.endcard .ecmoney { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: calc(var(--t-body) * 1.85); font-weight: 500; line-height: 1; }
+.endcard .ecmeta { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: var(--t-mono); }
+.endcard .ecby { display: flex; flex-direction: column; gap: 6px; }
+.endcard .ecbyh { font-weight: 600; font-size: var(--t-small); }
+.endcard .ecrow { display: grid; grid-template-columns: minmax(8em, 140px) minmax(0, 420px) max-content; align-items: center; gap: 12px; font-size: var(--t-small); }
+.endcard .ectrack { display: block; height: 10px; }
+.endcard .ecbar { display: block; height: 10px; background: var(--idle); opacity: .45; border-radius: 2px; }
+.endcard .ecfig { text-align: right; }
+.endcard .ecfoot { font-size: var(--t-small); }
 .inline-banner { padding: 8px 10px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-fg); font-size: var(--t-body); }
 .kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: var(--t-body); margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
 .gitfiles { line-height: 1.7; margin-top: 6px; } .gitpick { margin-top: 8px; flex-wrap: nowrap; } .gitpick select { flex: 1; min-width: 0; width: auto; height: 26px; padding: 0 6px; font-size: var(--t-small); text-overflow: ellipsis; } .gitpickline { margin-top: 6px; overflow-wrap: anywhere; } .recentfiles { line-height: 1.7; overflow-wrap: anywhere; } .recentfiles .fmark { font-weight: 600; } .recentlinks { line-height: 1.7; min-width: 0; } .recentlinks div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
@@ -709,7 +721,7 @@ html.phonefocus .page.focus { position: fixed; left: 0; right: 0; top: var(--vvt
 html.phonefocus .focus .main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; }
 html.phonefocus #side, html.phonefocus #fhead, html.phonefocus #facts, html.phonefocus #help-focus,
 html.phonefocus .focus .termro, html.phonefocus .composerbar, html.phonefocus .cfoldhint { display: none !important; }
-html.phonefocus .focus .inline-banner, html.phonefocus .focus .dropcard { margin: 0; border-radius: 0; flex: none; }
+html.phonefocus .focus .inline-banner, html.phonefocus .focus .dropcard, html.phonefocus .focus .endcard { margin: 0; border-radius: 0; flex: none; }
 html.phonefocus .termwrap { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--term); }
 html.phonefocus .termwrap .termbox, html.phonefocus .termwrap.cfold .termbox { flex: 1; min-height: 0; height: auto; border-radius: 0; padding: 4px 4px 0; }
 /* a touch selects nothing and a long press is the link's (§4.6): no selection handles, no iOS callout; the helper text
