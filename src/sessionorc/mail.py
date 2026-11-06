@@ -21,7 +21,7 @@ from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
-from sessionorc import adapters
+from sessionorc import adapters, naming
 from sessionorc.models import (
     GRANTS,
     PERSON,
@@ -634,6 +634,22 @@ def undecided_mail(s: Session) -> list[MailEntry]:
     if mark.get("id") in ids:
         return [e for e in s.inbox[ids.index(mark["id"]) + 1 :] if not e.read_at]
     return [e for e in s.inbox if not e.read_at and e.at >= str(mark.get("at") or "")]
+
+
+def held_unread(s: Session, home: str) -> list[MailEntry]:
+    """What a hold keeps from the doorbell (design §4.5 *A taken-over member*, TD-1440): the record's
+    undecided mail (`undecided_mail`, the one list the doorbell rings) **addressed** to it — a copy is
+    not — of any kind and from anyone, a closed entry still unread included. An address is compared
+    whole, a bare one naming a session on `home`, the host whose store holds the inbox, as
+    `asks_waiting` reads it. The `mail_decided` watermark moves only when a wake is decided, and none
+    is while the record is held, so mail landed during the hold counts and mail rung before it does not."""
+    mine = (s.id, s.host or home)
+
+    def where(address: str) -> tuple[str, str]:
+        sid, host = naming.split_address(address)
+        return sid, host or home
+
+    return [e for e in undecided_mail(s) if any(where(x) == mine for x in e.to)]
 
 
 def charged_wakes(s: Session, now: datetime) -> int:

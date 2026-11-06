@@ -44,6 +44,15 @@ from sessionorc.models import (
 )
 
 
+def _instant_key(at: str) -> datetime:
+    """An instant off a record, for ordering; an unreadable one sorts first, so it never moves a clock on."""
+    try:
+        got = agent_common._parse(str(at))
+    except (TypeError, ValueError):
+        return datetime.min.replace(tzinfo=UTC)
+    return got if got.tzinfo else got.replace(tzinfo=UTC)
+
+
 class ServeMixin:
     # -- one org, to a client (design §4.4a "A node's records at the home") -----------------------
 
@@ -88,6 +97,7 @@ class ServeMixin:
         v["read_when"]["refill"] = mail.read_when(
             s, "reply", now, unreachable=down, rings=rings, refills=True, modal_limit=modal
         )
+        v.update(self._held_mail(s, v))
         if s.host == self.host:
             if self.mode == "node":
                 v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)
@@ -109,6 +119,33 @@ class ServeMixin:
                 # to the tool's own dialog at that host. An overlay too — the record keeps its pending.
                 v["pending"] = {**v["pending"], "host_unreachable": True}
         return v
+
+    def _held_mail(self, s: Session, v: dict[str, Any]) -> dict[str, Any]:
+        """The held row's reading (design §4.5 *A taken-over member*, §4.5a *Inbox row: held · mail
+        waiting*, TD-1440), on the view: `unread_unrung`, the count of the record's undecided mail
+        addressed to it (`mail.held_unread`), `oldest_unread_at`, the oldest of it, and `held_mail_at`,
+        the row's clock — the later of that and `mode_at`, the oldest alone with no stamp. Computed only
+        at the home (which holds the inbox and `mail_decided`, §4.4a), for a live agent record that is a
+        member (`team` or `controllers`, not `by_person`) and held (`mail_wakes` false); none on every
+        other record and with no such mail, so a push scans no other inbox."""
+        none = {"unread_unrung": None, "oldest_unread_at": None, "held_mail_at": None}
+        if (
+            self.mode == "node"
+            or not v.get("agent")
+            or s.state in ("exited", "closed")
+            or not (s.team or s.controllers)
+            or v.get("by_person")
+            or mail.mail_wakes(s)
+        ):
+            return none
+        got = mail.held_unread(s, self.host)
+        if not got:
+            return none
+        oldest = min((e.at for e in got), key=_instant_key)
+        start = oldest
+        if s.mode_at and _instant_key(str(s.mode_at)) > _instant_key(oldest):
+            start = str(s.mode_at)
+        return {"unread_unrung": len(got), "oldest_unread_at": oldest, "held_mail_at": start}
 
     def _views(self) -> list[dict[str, Any]]:
         # one graph for the batch, not one per record: `_views` runs on nearly every RPC through

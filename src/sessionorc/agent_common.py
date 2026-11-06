@@ -150,6 +150,9 @@ SHELL_WAIT = timedelta(hours=2)
 # §6 rules 2 and 4 (TD-103 slice 4): how long a member sits hook-confirmed idle with open work before
 # the one nudge, and how long a wanted restart held by work left waits before it is the Inbox's.
 IDLE_NUDGE = timedelta(minutes=20)
+# §4.5 *A taken-over member* (TD-1440): how long a held member's unrung mail waits, counted from the take-over
+# at the earliest, before the Inbox's *held · mail waiting* row is drawn
+HELD_MAIL = timedelta(minutes=30)
 # §4.4 *A red PR nobody holds is a work order* (TD-613): how long an open PR reads red or conflicting
 # before its idle holder is told, and again before an unheld one is a `pr:<n>` work order.
 ORPHAN_AFTER = timedelta(hours=1)

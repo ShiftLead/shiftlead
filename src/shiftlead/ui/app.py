@@ -303,6 +303,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     find_words,  # noqa: F401
     fork_pr_rows,
     handed_rows,  # noqa: F401
+    held_mail_mark,  # noqa: F401
     held_mark,  # noqa: F401
     horizon_left,
     horizon_of,  # noqa: F401

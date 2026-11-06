@@ -36,7 +36,18 @@ SHAPE_KEYS = ("state", "team", "controllers", "name", "seat", "unattended")
 # draw — Focus's members' lanes and reports, the Inbox's unseen and open-work rows, a claim. `seen_at`, so a
 # look that clears the unseen mark on a working record re-reads (§4.2 *Unseen*, TD-1228); its `turn_at`
 # moves only with `state`, which `SHAPE_KEYS` carries
-LIGHT_KEYS = ("lane", "report", "progress", "seen_at", "idle_open", "out_of_work")
+LIGHT_KEYS = (
+    "lane",
+    "report",
+    "progress",
+    "seen_at",
+    "idle_open",
+    "out_of_work",
+    # the held row's reading (§4.5a *Inbox row: held · mail waiting*, TD-1440): a read or a flip recounts at once
+    "unread_unrung",
+    "oldest_unread_at",
+    "held_mail_at",
+)
 WINDOWS = ("day", "week", "month")
 LEDGER_VIEWS = ("open", *WINDOWS)  # the Technical debt selector: the open entries, or a window
 PRIORITY_BARS = (("high", "High"), ("medium", "Medium"), ("low", "Low"))

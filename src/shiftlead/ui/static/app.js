@@ -1158,6 +1158,7 @@
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
     suspend: "suspending…", promote: "promoting…", ci_rerun: "re-running…", work_start: "starting…", restart: "restarting…",
     resume: "resuming…", "reopen-push": "resuming…", "resume-form": "resuming…", pause: "pausing…",
+    mode: "switching…",  // the held row's Hand back (§4.5a *Inbox row: held · mail waiting*, TD-1440)
   };
   const PRESS_NOT = {
     board_done: "checked off", board_snooze: "snoozed", snooze: "snoozed", attention_snooze: "snoozed",

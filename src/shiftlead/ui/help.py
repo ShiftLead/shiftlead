@@ -386,6 +386,18 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "held-mail",
+        "held · mail waiting",
+        "an Inbox row",
+        (
+            "A session with a team or controllers that you took over and left: it is interactive, so its mail "
+            "does not wake it, and unread mail its doorbell has not rung for has waited half an hour, counted "
+            "from the take-over at the earliest. Hand back returns it to its team and its doorbell; Open it if "
+            "you meant to hold it; Snooze sets the row aside and changes nothing on the session. The row leaves "
+            "by itself when the session reads its mail, changes mode or ends."
+        ),
+    ),
+    Help(
         "cadence-failed",
         "cadence check failed",
         "an Inbox row",
@@ -914,6 +926,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "board-go-with-it",
             "restart",
             "idle-open",
+            "held-mail",
             "cadence-failed",
             "held-missed",
         ),
