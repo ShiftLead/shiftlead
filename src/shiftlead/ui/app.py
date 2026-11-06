@@ -306,6 +306,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     held_mark,  # noqa: F401
     horizon_left,
     horizon_of,  # noqa: F401
+    held_mail_mark,  # noqa: F401
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
     kind_subject,  # noqa: F401
