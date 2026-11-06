@@ -262,7 +262,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      hook-confirmed for two minutes (`SEAT_IDLE_GRACE`, so a fill is not closed before its prompt
      lands) — fifteen (`SEAT_ASK_LINGER`, TD-1422) for a seat whose trigger is `asks`, so a question
      that lands while it lingers rings it as mail rings any idle session and a trickle of asks is
-     one fill, not one fill each — with nothing dirty or unpushed and **no live subagent and no live background shell** (§4.2 *Working on its own*,
+     one fill, not one fill each (fifteen since the asks that tripped
+     the ceiling on 2026-11-05 came 7 to 18 minutes apart; an idle seat at the composer spends no
+     tokens, so the linger costs a pane and the context it carries into the next ask, and a fill
+     it saves is one fewer under `FILL_CEILING`) — with nothing dirty or unpushed and **no live subagent and no live background shell** (§4.2 *Working on its own*,
      TD-734, TD-761: a seat that ended its turn on an Agent-tool reviewer or a background CI wait is working, as its card says; its
      two minutes count from the later of `since`, `subagent_at` and `shells_at`, as rule 4's do), is
      closed (a seat that left work is the board's) — **unless it waits on a PR of its own**: an open PR on the branch it has checked out, as the
