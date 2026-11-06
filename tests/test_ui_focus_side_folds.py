@@ -150,3 +150,11 @@ def test_a_closed_record_draws_no_ready_to_close_card(tmp_path, monkeypatch, sta
         "if (checkList) checkList.innerHTML = checks.map(" in js and "if (closeBtn) { closeBtn.disabled = !ready;" in js
     )
     assert 'if (readyCard && v.state === "closed") readyCard.remove();' in js
+    assert 'renderRail(v, ready && v.state !== "closed");' in js  # …and no ✓ glyph that would open nothing
+
+
+def test_the_cards_unread_badge_opens_the_folded_inbox():
+    """The Sessions card's unread badge links to `/focus/<id>#inbox` (card.html): with Inbox folded at
+    first, the link opens the card rather than scrolling to a folded line (TD-1407 review)."""
+    js = (UI / "static" / "app.js").read_text()
+    assert 'location.hash === "#inbox" && es.length) { $("#inboxcard").open = true;' in js

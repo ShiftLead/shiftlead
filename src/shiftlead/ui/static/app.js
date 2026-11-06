@@ -7586,7 +7586,7 @@
       // …and the next act only on the person's own session (`own`): a team member runs itself
       $("#fready").classList.toggle("hidden", !(ready && v.own));
       $("#fclose").classList.toggle("hidden", !(ready && v.own));
-      renderRail(v, ready);
+      renderRail(v, ready && v.state !== "closed");  // a closed record has no Ready to close card to open
     }
     // **» put away** / **«** (§4.5 *The panel put away*, §4.5a, TD-412): the panel to a 28px rail,
     // the terminal taking the width (the fit's observer on `#term` refits it and the pty hears the
@@ -7689,7 +7689,8 @@
         inboxN = es.length; renderRail();
         $("#inboxlist").innerHTML = es.slice().reverse().map((e) => AO.mailEntry(e, id)).join("");
         AO.reopenFolds($("#inboxlist"));
-        if (inboxFirst && location.hash === "#inbox" && es.length) $("#inboxcard").scrollIntoView({ block: "nearest" });
+        // the card's unread badge links here (`#inbox`): the card opens, folded at first as it is (TD-964)
+        if (inboxFirst && location.hash === "#inbox" && es.length) { $("#inboxcard").open = true; $("#inboxcard").scrollIntoView({ block: "nearest" }); }
         inboxFirst = false;
       }, 150);
     }
