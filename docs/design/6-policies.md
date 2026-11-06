@@ -1744,9 +1744,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      The merge is made only when the sha in `<dir>/sha`, the PR head steps 1–3 proved and the head just
      re-read are one. Any other combination is the moved head, and nothing is written. The forge's head
      match is still the one atomic guard, and a push it refuses is the moved head again. A
-     `squash-message` refusal is *no reading* with its words, counted as step 4's are. The scripts run
-     with `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL` and `AGENT_MODEL_FILE` removed from their
-     environment, so the squash ends in `Merged-by: shiftlead-sync`. It never names the person's
+     `squash-message` refusal is *no reading* with its words, counted as step 4's are. `squash-message` runs
+     with `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL` and `AGENT_MODEL_FILE` removed from its
+     environment (its `merged_by` reads them; the gate reads none, so `cadence.check` needs no environment
+     of its own), so the squash ends in `Merged-by: shiftlead-sync`. It never names the person's
      `user.name` and never a model, since the home runs none. `shiftlead-sync` and `sync-check`, which
      signs step 4's BLOCK, are the same policy's two names: one signs the gate it failed, the other the
      merge it made. **Whether the tree composes** is `cadence.composes(root)` (§5 *The seams*, TD-1418), read on

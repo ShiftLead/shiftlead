@@ -320,12 +320,16 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   one command whose squash ends in the `Merged-by:` trailer. In a tree whose `scripts/forge.py` does not name
   `squash-message` it is `gh pr merge {pr} --squash`, as before. `cadence.composes(root)` says which (§6 *Sync*
   reads it too). It has three answers: yes, no (a tree that was read and whose `forge.py` lacks
-  `squash-message`) and unreadable. Unreadable is raised, as `repoconfig.layout`'s other failed reads are,
+  `squash-message`) and unreadable. Unreadable is raised as `OSError(why)`, the type `repoconfig.layout`'s other failed reads take,
   and never told as no, so a brief is never silently given the bare merge. It reads the tree the gate runs from. That is the pinned tree (`cadence.tree`), the
   checkout's `scripts/`, or agent-cadence's own `files/scripts/`. On a container node the pin
   (`docs/cadence.toml`'s source and ref) is read from the node's checkout through `cfg.read`, and the tree
   is the home's own copy of that pin (`agent_cadence.ensure_tree(source, ref)`, its scripts under `files/scripts/`,
-  as `cadence.tree` gives the payload), cached per pin. A copy's
+  as `cadence.tree` gives the payload), cached per pin. That road is bounded: where the node's pin is the
+  registry checkout's for the repo (the common case), the tree is that checkout's `cadence.tree(root)`, already
+  resolved. Otherwise `ensure_tree` runs under `TREE_TIMEOUT` and after the launcher's own interface check, as
+  `cadence.tree` runs it. A timeout there is unreadable, so a New session or a team start fails in words within
+  that bound rather than waiting on a fetch. A copy's
   `scripts/forge.py` is read across the link as the other files are. Every built-in brief or flow stage
   that has a session merge a PR names `{merge}`, never a bare `gh pr merge`, and says it is typed whole as
   one command, since `$m` does not survive a tool's separate calls and a line split at its `;` merges
