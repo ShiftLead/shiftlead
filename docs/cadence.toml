@@ -49,7 +49,9 @@
 # for no fault of the PR's. The path stays short — /var/tmp/pc.XXXXXX, and pytest's --basetemp
 # under it in place of /tmp/pytest-of-<user>/pytest-<n> — since the suite's unix sockets live under
 # tmp_path and a socket's path is capped near 108 bytes (one under ~/.cache/aopre2 failed 38 tests).
-precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test --basetemp=$T/p"
+# After the sync, the tree's own vendored launcher validates the ledger's host-log sources and gates
+# (design §4.4 *The source*, TD-1388), needing nothing on PATH.
+precheck = "T=$(mktemp -d /var/tmp/pc.XXXXXX) && trap 'rm -rf \"$T\"' EXIT && pdm use \"$(PATH=/usr/local/bin:/usr/bin:/bin command -v python3)\" && pdm sync -G ui -G dev && pdm run python src/sessionorc/agent_cadence.py -C . run hostlog.py validate --repo-config docs/ledger/log-sources.toml --ledger docs/ledger && pdm run lint && TMPDIR=$T TERM=xterm-256color pdm run test --basetemp=$T/p"
 
 # --- opt-outs (cadence.md Adoption checklist step 9): what this repo does not adopt, each
 # naming the ADR that decided it. Read by sync.sh and sync.sh --verify; --verify reports each

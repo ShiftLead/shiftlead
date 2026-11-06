@@ -15,9 +15,10 @@ promote:
   smoke: '"$HOME/.local/share/shiftlead-venv/bin/python" scripts/smoke.py'
 
 # The paths a PR must have read before it merges (design §4.9c *What is the repo's: `held:`*; TD-310):
-# the host agent's package and the briefs. Under a flow every review stage holds them, whoever wrote
-# the PR; a team with no flow reads a role's own `review:`, and this file writes none.
-held: ["src/sessionorc/**", "docs/briefs/**"]
+# the host agent's package, the briefs, and the ledger's host-log sources (§4.4 *The source*, TD-1388).
+# Under a flow every review stage holds them, whoever wrote the PR; a team with no flow reads a role's own
+# `review:`, and this file writes none.
+held: ["src/sessionorc/**", "docs/briefs/**", "docs/ledger/log-sources.toml"]
 
 # The commands the built-in briefs' {test} and {lint} fill with (design §5 *The seams* `commands:`; TD-588):
 # the briefs name no repo's layout, so this repo's own lives here.
