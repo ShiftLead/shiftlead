@@ -121,7 +121,7 @@ def test_a_held_start_says_which_bound():
             "resets": (NOW + timedelta(hours=3)).isoformat(),
         },
         "its stop time has passed": {"why": "until", "until": AT},
-        "started 3 times today": {"why": "day", "count": 3},
+        "started 3 times today and found no work": {"why": "day", "count": 3},
         "started 12m ago and wound down again": {"why": "early", "started": early},
         "laptop is unreachable": {"why": "link", "host": "laptop"},
         "laptop and nas are unreachable": {"why": "link", "host": "laptop", "hosts": ["laptop", "nas"]},
@@ -258,7 +258,7 @@ def test_the_inbox_draws_the_row_with_its_three_controls_and_counts_it(page):
     assert 'data-act="clear_work" data-id="person" data-team="wt"' in html and "not started:" not in html
     assert c.get("/api/person/inbox").json()["needs"] == 1
     work["wt"]["held"] = {"why": "day", "count": 3}
-    assert "not started: started 3 times today" in c.get("/inbox").text
+    assert "not started: started 3 times today and found no work" in c.get("/inbox").text
     assert c.post("/api/person/clear_work", json={"team": "wt"}).json()["cleared"] is True
     assert c.post("/api/person/clear_work", json={}).status_code == 400
     assert c.post("/api/person/attention_snooze", json={"id": "work:wt", "kind": "work", "until": "x"}).json()["ok"]
@@ -298,7 +298,7 @@ def test_a_running_teams_row_starts_its_members_through_work_start(page):
     assert ("work_start", {"team": "wt"}) in calls
     answers["work_start"] = {"team": "wt", "started": False, "ids": ["TD-213"], "held": {"why": "day", "count": 3}}
     held = c.post("/api/person/work_start", json={"team": "wt"})
-    assert held.status_code == 409 and held.json()["detail"] == "started 3 times today"
+    assert held.status_code == 409 and held.json()["detail"] == "started 3 times today and found no work"
     answers["work_start"] = {"team": "wt", "started": False, "ids": [], "held": None}
     assert c.post("/api/person/work_start", json={"team": "wt"}).status_code == 409
     assert c.post("/api/person/work_start", json={}).status_code == 400
@@ -346,7 +346,7 @@ def test_a_stopped_teams_row_says_how_it_stopped_and_is_never_a_running_teams():
     assert started["text"].endswith("· not started: a stopped team is started by Start")
     # a hold the home wrote is its own words; a mark with no `stopped` is the wound-down row as it was
     (held,) = work_rows({"t": mark(stopped={"by": "other", "at": stop}, held={"why": "day", "count": 3})}, {})
-    assert held["held"] == "started 3 times today"
+    assert held["held"] == "started 3 times today and found no work"
     (down,) = work_rows({"t": mark()}, {"t": AT}, NOW, on_work=lambda t: "start")
     assert down["held"] == "" and down["stopped"] == "" and not down["later"]
     s = inbox_sections([], states=list(rows.values()))

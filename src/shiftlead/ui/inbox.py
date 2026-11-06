@@ -952,7 +952,7 @@ def work_held(held: Any, now: datetime) -> str:
         return "its stop time has passed"
     if why == "day":
         n = held.get("count")
-        return f"started {n} time{'' if n == 1 else 's'} today"
+        return f"started {n} time{'' if n == 1 else 's'} today and found no work"
     if why == "early":
         ago = _age(held.get("started"), now)
         return f"started {ago + ' ago' if ago else 'just now'} and wound down again"

@@ -360,6 +360,7 @@ class TickMixin:
         await self._enforce_usage_gate(snapshot_at)
         await self._subagent_flips(snapshot_at)
         await self._retire_anchors()
+        await self._work_worked(snapshot_at)  # before any replay this tick supersedes a claim (TD-1462)
         await self._keep_running(snapshot_at)
         await self._finished_pass(snapshot_at)
         await self._schedules(snapshot_at)
@@ -2432,6 +2433,54 @@ class TickMixin:
         except OSError:
             log.exception("writing the home's host record failed")
 
+    async def _work_worked(self, now: datetime) -> None:
+        """Rule 8's **worked** reading (design §6 rule 8 *idle starts*, TD-1462): on every tick at the
+        home, before `_keep_running` replays anything, each instant in a team's `work_started` not yet in
+        its `work_worked` is added there once a record of the team — live or ended — has the start's own
+        `restarts` entry as its newest (`why: work`, `start` that instant) and holds a declared `claimed`
+        or `done` stamped strictly after that entry. A claim the replay carried is restamped with the
+        entry's own `at`, so it never counts; a record a later restart superseded has another newest
+        entry, and so has a seat the start replayed held, once rule 3 fills it. Kept, since the next
+        replay takes the claim with the record it supersedes. The same step prunes both lists to
+        `WORK_DAY`, `work_worked` to the instants still started, and saves the home's record when
+        either changed. `_work_held` counts only the starts not worked toward `WORK_STARTS_DAY`."""
+        if self.mode != "home":
+            return
+        teams = self._host_rec.get("teams") or {}
+        if not any(isinstance(rec, dict) and ("work_started" in rec or "work_worked" in rec) for rec in teams.values()):
+            return
+        by_team: dict[str, list[Session]] = {}
+        for r in self._graph().values():
+            if r.team:
+                by_team.setdefault(r.team, []).append(r)
+        dirty = False
+        for team, rec in teams.items():
+            if not isinstance(rec, dict) or not ("work_started" in rec or "work_worked" in rec):
+                continue
+            try:
+                started = [t for t in rec.get("work_started") or [] if _recent(t, now, agent_common.WORK_DAY)]
+                worked = [t for t in rec.get("work_worked") or [] if t in started]
+                for t in started:
+                    if t not in worked and _start_worked(t, by_team.get(team) or []):
+                        worked.append(t)
+                        log.info("rule 8: %s's start at %s was worked", team, t)
+                for key, got in (("work_started", started), ("work_worked", worked)):
+                    if got == (rec.get(key) or []) and (got or key not in rec):
+                        continue
+                    dirty = True
+                    if got:
+                        rec[key] = got
+                    else:
+                        rec.pop(key, None)
+            except Exception:  # noqa: BLE001 — one team's surprise is a log line, never the others'
+                log.exception("reading %s's worked starts for rule 8 failed", team)
+        if dirty:
+            try:
+                self.host_store.save(self._host_rec)
+            except OSError:
+                log.exception("writing the home's host record failed")
+            await self._push_changes()
+
     async def _work_start(
         self,
         team: str,
@@ -2470,7 +2519,8 @@ class TickMixin:
             named = set(mark.get("members") or {})
             replays = [r for r in replays if r.name in named]
         standing = (rec.get("work_waiting") or {}).get("held")
-        held = self._work_held(replays, started, conf, now, team, records, standing)
+        worked = rec.get("work_worked") or []
+        held = self._work_held(replays, started, conf, now, team, records, standing, worked)
         bare = {k: v for k, v in mark.items() if k != "held"}
         if held is None:
             down = list(
@@ -2530,10 +2580,12 @@ class TickMixin:
         team: str,
         records: list[Session] | None = None,
         standing: Any = None,
+        worked: Collection[str] = (),
     ) -> dict[str, Any] | None:
         """The bound that holds rule 8's start back, in the design's order, or None (§6 rule 8): a
         member's profile over its usage line; the team's stop time passed and not cleared;
-        `WORK_STARTS_DAY` starts in the day; a start inside `WORK_EARLY`; its repo over the team's
+        `WORK_STARTS_DAY` idle starts in the day — `started` less the `worked` ones (`_work_worked`,
+        TD-1462); a start inside `WORK_EARLY` of the last, worked or not; its repo over the team's
         balance line (`_work_balance`). Nothing to replay holds it too: the row of `ask` is the
         person's way to start a team the rule cannot. A standing balance hold that an earlier bound
         displaces is kept beside it as `balance`, so a failed reading when that bound lifts does not
@@ -2551,8 +2603,9 @@ class TickMixin:
         with contextlib.suppress(TypeError, ValueError):
             if until and _parse(str(until)) <= now:
                 return {"why": "until", "until": str(until), **kept}
-        if len(started) >= agent_common.WORK_STARTS_DAY:
-            return {"why": "day", "count": len(started), **kept}
+        idle = [t for t in started if t not in worked]
+        if len(idle) >= agent_common.WORK_STARTS_DAY:
+            return {"why": "day", "count": len(idle), **kept}
         if started and _recent(started[-1], now, agent_common.WORK_EARLY):
             return {"why": "early", "started": started[-1], **kept}
         return self._work_balance(conf.get("balance"), records or replays, now, prior)
@@ -5711,6 +5764,26 @@ def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:
                 folder.rmdir()
         except OSError as e:  # gone meanwhile, or not ours to remove: the next sweep tries again
             log.warning("could not prune draft %s: %s", folder, e)
+
+
+def _start_worked(start: str, records: list[Session]) -> bool:
+    """Whether rule 8's start at `start` was worked (`TickMixin._work_worked`, TD-1462): a record whose
+    newest `restarts` entry is that start's own and that declared a claim or a done after it."""
+    for r in records:
+        last = r.restarts[-1] if r.restarts else None
+        if not isinstance(last, dict) or last.get("why") != "work" or last.get("start") != start:
+            continue
+        try:
+            at = _parse(str(last.get("at")))
+        except (TypeError, ValueError):
+            continue
+        for p in r.progress:
+            if p.source != "declared" or p.status not in ("claimed", "done"):
+                continue
+            with contextlib.suppress(TypeError, ValueError):
+                if _parse(str(p.at)) > at:
+                    return True
+    return False
 
 
 def _recent_files(directory: str) -> list[dict[str, Any]] | None:
