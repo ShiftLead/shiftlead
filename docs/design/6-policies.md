@@ -391,9 +391,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
      `dropped` entry, a declared `claimed` entry with no `done` or `dropped` that is not a waiting
      claim (rule 5, TD-820: its next move is someone else's), for a seat,
-     `seat_due` set (a question waiting on an idle techlead), or, for any member, seat or not, an open
-     `ask` in its inbox from another session, read or not (`asks_waiting`, TD-1435: a read ask is never
-     rung again, since the doorbell rings only undecided mail) — and no declaration, no pending, not
+     `seat_due` set (a question waiting on an idle techlead), or, for a member that is no seat, a
+     question waiting on it, read or not (`asks_waiting`: an open `ask` or `steer` addressed to it from any
+     sender, the person's included, less one it passed up, and an answer to its own question waiting;
+     TD-1435: a read question is never rung again, since the doorbell rings only undecided mail) — and no
+     declaration (a member that declared `none` is not nudged for its questions either: its brief reads its
+     inbox before declaring), no pending, not
      gated, **no live subagent and no live background shell** (§4.2 *Working on its own*, the card's reading: its own work is
      running, and its card says *working*; TD-734, TD-761; the twenty minutes count from the later of
      `since`, `subagent_at` and `shells_at`, and *idle · open work* is not marked, nor a standing one read as
@@ -415,7 +418,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      you owe …*) where there is none; several are counted and named three at most, *and n more*,
      and a seat's clause counts its own answered questions, a handed entry being the part before
      it; the slot's *idle · open work* follows this nudge as it follows any other, a debt being
-     work the member left; a finished member is never sent to, and its debt is the Inbox's
+     work the member left — **but not a nudge for questions alone** (TD-1435): a member idle with nothing
+     open but the questions waiting on it is not marked, and is not rule 3's `open` cause, since each
+     question has an asker who hears of its lapse or asks again (§4.10 *How the sender hears that one
+     closed without a reply*), and a manager cannot read the member's inbox to act on it; a finished member is never sent to, and its debt is the Inbox's
      *Waiting on them* and nothing more. The line holds nothing a session wrote; it is recorded on
      `sends` as the home's own (`system`). A node's member is not nudged yet: the composer is read
      on the member's host, and no node act does that. Once per idle stretch (`nudged_at`; a
