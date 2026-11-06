@@ -183,6 +183,27 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "resume-form",
+        "Resume with changes…",
+        "the ending banner",
+        (
+            'Opens the New session form filled in from this record: its name, directory, tool, profile, role and '
+            'team, and Unattended as the record had it. Press it to bring a finished session back with '
+            "something changed, unattended again or under another profile. Nothing starts until the form's Start,"
+            ' and a changed name starts a record beside this one rather than in its place.'
+        ),
+    ),
+    Help(
+        "new-here",
+        "New session here",
+        "the ending banner",
+        (
+            "Opens the New session form with this session's directory filled in and nothing else. Press it to "
+            'start fresh work in the same place. It does not continue this conversation, which is Resume, and it '
+            'leaves this record as it is.'
+        ),
+    ),
+    Help(
         "side-panel",
         "» put away",
         "Focus side panel",
@@ -341,7 +362,7 @@ HELP: tuple[Help, ...] = (
     Help(
         "restart",
         "Restart",
-        "the Inbox restart row, a card's *more ▾*",
+        "the Inbox restart row, a card's *more ▾*, the ending banner",
         (
             "Puts this session back in its team's run as its launch record started it: closed if it is still "
             "there, then started again under the same name, team, lane and brief, unattended if it was "
@@ -823,7 +844,7 @@ GROUPS: dict[str, tuple[str, ...]] = {
         "who-for-what",
     ),
     "focus": ("wrap-up", "kill", "close", "message"),
-    "exited": ("resume", "forget"),
+    "exited": ("resume", "resume-form", "new-here", "forget", "restart"),
 }
 # where each group's *every control → Help* lands on the Help page
 GROUP_SCREEN = {"team": "org", "focus": "focus", "exited": "focus"}
@@ -856,6 +877,8 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "wrap-up",
             "kill",
             "resume",
+            "resume-form",
+            "new-here",
             "side-panel",
             "prompts",
             "pane-link",

@@ -1027,9 +1027,9 @@ def test_a_closed_card_leads_with_forget_its_menu_draws_what_applies_and_its_hov
     kept = card.render(s=view(_card(state="exited", exit_code=0)))
     assert all(g in menu(kept) for g in gone) and 'data-act="remove"' not in menu(kept)
     assert acts(card.render(s=view(_card(state="exited", exit_code=0, pane=False)))) == ["message", "remove"]
-    # the Details banner says the same beside its Forget, from the view's field
+    # the ending banner's Forget says the same on its hover's second line, from the view's field (TD-964, TD-1405)
     js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
-    assert 'v.closed_keep ? ` <span class="meta">${esc(v.closed_keep)}</span>`' in js
+    assert '(v.closed_keep ? `\\n${v.closed_keep}` : "")' in js
 
 
 def test_a_closed_card_says_who_closed_it_and_keeps_the_declaration_after_the_ending(tmp_path, monkeypatch):
@@ -1414,11 +1414,11 @@ def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
     assert "Flow on Settings →" in panel and repo.index("helppanel") < repo.index("changed by PR")
     assert "data-members" not in head.render(g={"team": "", "label": "No team", "members": []})
     ui_dir = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
-    js = (ui_dir / "static" / "app.js").read_text()
+    focus = (ui_dir / "templates" / "focus.html").read_text()
     # TD-250 slice 3: Restart is the way back into the team's run; Resume with changes… is for a
-    # record with no launch record
-    assert "To put it back in ${esc(v.team)}'s run: <b>Restart</b> in its card's <b>more ▾</b>" in js
-    assert "With no launch record: <b>Resume with changes…</b> and tick <b>Unattended</b>" in js
+    # record with no launch record — said in the ending banner's i panel since TD-964 (TD-1405)
+    assert "Restart puts it back in its team's run as its launch record started it" in focus
+    assert "With no launch record, use Resume with changes… and tick Unattended." in focus
     skill = (ui_dir.parent / "team_skill.md").read_text()
     assert "**One member back**" in skill and "**Members…** on the team card" in skill
     back = skill[skill.index("**One member back**") :]

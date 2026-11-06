@@ -209,6 +209,22 @@ def ending_hover(s: Mapping[str, Any], names: Mapping[str, str] | None = None, n
     return f"{words} · {when}" if when else words
 
 
+def ending_unnamed(s: Mapping[str, Any], names: Mapping[str, str] | None = None, now: datetime | None = None) -> bool:
+    """True where an ended record does not name its ending (§4.5 *The Focus screen's anatomy* item 3, TD-964): its
+    words before the time and any *· after wrap-up* are bare *exited*, bare *killed*, bare *closed* (a close whose
+    closer is not recorded) or *pane gone …* (a pane the tick found gone). Only there does the ending banner guess
+    at the cause; an ending the record names needs no guess. False for any state but `exited` and `closed`."""
+    state = s.get("state")
+    if state == "closed":
+        words = closer_words(s, names)
+    elif state == "exited":
+        words = exit_words(s, names, now)
+    else:
+        return False
+    words = words.removesuffix(" · after wrap-up")
+    return words in ("exited", "killed", "closed") or words.startswith("pane gone")
+
+
 def restart_words(entry: Mapping[str, Any]) -> str:
     """One `restarts` entry as `ao status -v` says it (design §4.7, §4.10 *A lapsed cache is started
     again, not rung*, TD-467): *cache lapsed · idle 5h · 191k* for the doorbell's restart — the hours

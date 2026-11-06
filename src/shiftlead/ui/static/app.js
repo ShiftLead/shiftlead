@@ -6642,7 +6642,7 @@
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       mk.retryAt = null; mk.open = false; drawMark();
       if (softEl) softEl.classList.add("hidden");  // no terminal, no keys
-      term.write(`\r\n\x1b[90m[shiftlead] ${text}\x1b[0m\r\n`);
+      if (text) term.write(`\r\n\x1b[90m[shiftlead] ${text}\x1b[0m\r\n`);
     }
     function openTerm() {
       if (paneGone) return;
@@ -6693,6 +6693,8 @@
       ws.onclose = (e) => {
         jumper.closed();
         if (paneGone) return;  // the push already ended it
+        // …and a pane the page's latest view knows is gone writes no retry line (TD-964, TD-1405): the banner says it
+        if (AO.paneIsGone(lastV)) { endTerm(""); return; }
         mk.open = false; drawMark();
         tlog("closed", e.code, e.reason || "");
         // The rule is `AO.termClose` (above), so a test can reach it; this is what acts on it.
@@ -6719,7 +6721,7 @@
       if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
       delay = 500; openTerm();
     }
-    if (AO.paneIsGone(s)) { paneGone = true; term.write("\x1b[90m[shiftlead] this session's pane is gone (killed, closed, or the tmux server restarted).\x1b[0m\r\n"); }
+    if (AO.paneIsGone(s)) { paneGone = true; term.write("\x1b[90m[shiftlead] this session's pane is gone (see the banner).\x1b[0m\r\n"); }
     else openTerm();
     // the key bar's **ctrl** (TD-1300): the next key — the bar's own, which `term.input` brings here, or the phone's
     // keyboard's — goes as its control byte
@@ -7259,10 +7261,12 @@
       }
       const mm = $("#fmodemenu"); if (mm) mm.hidden = !!v.unattended;
       const fm = $("#fmode"); if (fm) fm.textContent = v.unattended ? "unattended" : "interactive";
-      const cp = $("#composer"); if (cp) cp.classList.toggle("hidden", !!v.unattended);
+      // no composer on an unattended session, nor on an ended one, which has nothing to send to (TD-964, TD-1405)
+      const noComposer = !!v.unattended || v.state === "exited" || v.state === "closed";
+      const cp = $("#composer"); if (cp) cp.classList.toggle("hidden", noComposer);
       // the bar goes with the composer on an unattended session, and says why nothing can be sent (TD-500)
       const cb = $("#composerbar");
-      if (cb) { const was = cb.classList.contains("hidden"); cb.classList.toggle("hidden", !!v.unattended); if (was !== !!v.unattended) fill(); }
+      if (cb) { const was = cb.classList.contains("hidden"); cb.classList.toggle("hidden", noComposer); if (was !== noComposer) fill(); }
       if (cbar) cbar.redraw();
       const tp = $("#tpaste");
       if (tp) tp.title = "paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click)" + (v.unattended ? " — not while you are watching: Take over first" : "");
@@ -7330,41 +7334,40 @@
         susp.classList.toggle("hidden", !v.suspended_note);
         susp.title = v.suspended_note || "";
       }
-      // An exited session keeps its dead pane on purpose (exit code, last lines, run log); say so
-      // and offer the two useful next steps instead of leaving tmux's "Pane is dead" to explain it.
+      // The ending banner (§4.5 *The Focus screen's anatomy* item 3, TD-964, built by TD-1405): its first line is the
+      // ending in the card's words and its time and the buttons, and nothing else is written on it — the guess at the
+      // cause only where the record does not name the ending (`ending_unnamed`) and the pane is gone; what was grey
+      // text is in its **i** panel's paragraphs (`#help-exited`), and the transcript is the acts line's **Transcript**.
       const ex = $("#fexited");
       if (v.state === "exited" || v.state === "closed") {
-        const code = v.exit_code == null ? "" : ` (exit code ${v.exit_code})`;
         const q = `dir=${encodeURIComponent(v.dir || "")}&adapter=${encodeURIComponent(v.adapter || "claude-code")}`;
-        const kept = v.state === "exited" && v.pane !== false;  // a kill/close destroys the pane (TD-023)
-        // …and, where the header draws **Transcript** (§4.5a, TD-166), *or read its transcript*
-        const read = v.adapter_id ? ` — or <a href="/transcript/${id}" target="_blank" rel="noopener">read its transcript</a>` : "";
-        // the first line is the ending in the card's words and its time (§4.5a **state pill hover**, TD-490)
-        const ending = v.ending_text ? `<div class="endwords"><b>${esc(v.ending_text)}</b></div>` : "";
-        ex.innerHTML = `${ending}This session's process has ${esc(v.state)}${esc(code)}. ${kept ? `The pane is kept so its last screen and run log stay readable${read}.` : `Its pane is gone (killed, or the tmux server restarted); the run log stays readable${read}.`} `
-          // design §4.5a **Focus (exited / closed)** (TD-081 step 2, Paul: *a resume option that
-          // requires no input from me*): **Resume** is one press and no form — the same name, so
-          // the record is replaced in place and keeps its mail — and **Resume with changes…** is
-          // that same create as a filled-in form. A `closed` record resumes too: §4.5a says
-          // *`exited` or `closed` holding a tool session id*, and the link that stood here
-          // offered neither, which is how a resume became a second record beside the first.
-          + (v.adapter_id && (v.state === "exited" || v.state === "closed")
+        const gone = AO.paneIsGone(v);
+        const words = v.ending_text || v.state;
+        const guess = v.ending_unnamed && gone ? ` <span class="meta endguess">— its pane is gone: killed, or the tmux server restarted</span>` : "";
+        ex.innerHTML = `<b class="endwords">${esc(words)}</b>${guess} `
+          // design §4.5a **Focus (exited / closed)** (TD-081 step 2): **Resume** is one press and no form — the same
+          // name, so the record is replaced in place and keeps its mail — and **Resume with changes…** is that same
+          // create as a filled-in form; a `closed` record resumes too
+          + (v.adapter_id
             ? `<button class="btn sm primary" data-act="resume" data-id="${id}">Resume</button> `
               + `<button class="btn sm" data-act="resume-form" data-id="${id}">Resume with changes…</button> `
             : "")
-          + `<a class="btn sm" href="/new?${q}">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`
-          // how long a closed record stays, beside its Forget (§4.5 row 6, TD-266): the view's fixed words
-          + (v.closed_keep ? ` <span class="meta">${esc(v.closed_keep)}</span>` : "");
-        // §4.5a *The help text* (TD-167): Resume's and Forget's titles and the banner's *i* mark, all
-        // from the page's own fixed text (`#help-exited`, `#exitedmark`), never composed here
+          + `<a class="btn sm" href="/new?${q}" data-help-key="new-here">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`
+          // **Restart** where the card draws it (its `restartable`), confirming as the card's does (§4.5a *card: more ▾*)
+          + (v.restartable
+            ? ` <button class="btn sm" data-act="restart" data-id="${id}"${v.restart_marked ? "" : ` data-confirm="Restart ${esc(v.name || id)}? It is closed if still there and started again from its launch record, in its team."`}>Restart</button>`
+            : "");
+        // §4.5a *The help text* (TD-167): each button's title from the page's own fixed text (`#help-exited`), never
+        // composed here — Forget's with *forgotten by itself …* on a line of its own on a closed record (§4.5a, TD-964)
         const hp = $("#help-exited");
         if (hp) {
-          $$('[data-act="resume"]', ex).forEach((b) => { b.title = hp.dataset.titleResume || ""; });
-          $$('[data-act="remove"]', ex).forEach((b) => { b.title = hp.dataset.titleForget || ""; });
+          const titles = { resume: hp.dataset.titleResume, "resume-form": hp.dataset.titleResumeForm, restart: hp.dataset.titleRestart };
+          Object.entries(titles).forEach(([act, tt]) => $$(`[data-act="${act}"]`, ex).forEach((b) => { b.title = tt || ""; }));
+          $$('[data-help-key="new-here"]', ex).forEach((b) => { b.title = hp.dataset.titleNewHere || ""; });
+          $$('[data-act="remove"]', ex).forEach((b) => { b.title = (hp.dataset.titleForget || "") + (v.closed_keep ? `\n${v.closed_keep}` : ""); });
         }
-        // design §4.9a *One member back, today* (TD-172, TD-250): a team's member comes back into
-        // its team's run by Restart — Resume alone starts it attended — so the banner says so
-        if (v.team) ex.insertAdjacentHTML("beforeend", `<div class="note memberback">To put it back in ${esc(v.team)}'s run: <b>Restart</b> in its card's <b>more ▾</b>, or <code>ao restart</code> — Resume alone starts it attended. With no launch record: <b>Resume with changes…</b> and tick <b>Unattended</b>.</div>`);
+        // a team's member: the i panel's Resume-vs-Restart paragraph (design §4.9a *One member back, today*)
+        const mb = $("#fmemberback"); if (mb) mb.classList.toggle("hidden", !v.team);
         const mk = $("#exitedmark");
         if (mk) { ex.appendChild(mk.content.cloneNode(true)); AO.applyHelpMarks(ex); }
         ex.classList.remove("hidden");

@@ -170,7 +170,12 @@
     {{ hm.panel('focus', 'focus') }}
     {#- the exited banner's group (Resume, Forget): the banner is the script's, so its mark is added
         there (`AO.focus`) and points at this panel, which is in the page always -#}
-    {{ hm.panel('exited', 'exited') }}
+    {#- the ending banner's i panel (TD-964, TD-1405): what the banner's grey text said, as paragraphs before the
+        controls' own — how long a closed record is kept, and on a team member (`app.js` shows it) Resume vs Restart -#}
+    {% call hm.panel('exited', 'exited') %}
+    <p>A closed record is {{ closed_keep() }}; until then its run log stays readable.</p>
+    <p class="hidden" id="fmemberback">On a team's member, Resume starts it attended, under you; Restart puts it back in its team's run as its launch record started it. With no launch record, use Resume with changes… and tick Unattended.</p>
+    {% endcall %}
     <template id="exitedmark">{{ hm.mark('exited', 'exited') }}</template>
     <div class="inline-banner hidden" id="fbanner"></div>
     {#- design §4.5a **starts** note on Focus (§6 *Start time*, TD-152): a scheduled record has no terminal
@@ -213,7 +218,7 @@
       {%- endfor %}
       <button type="button" tabindex="-1" class="skd" data-page="main" aria-label="back to the keys">‹</button>
     </div>
-    <div class="card composer{% if folded %} overlay folded{% endif %}{% if s.unattended %} hidden{% endif %}" id="composer">
+    <div class="card composer{% if folded %} overlay folded{% endif %}{% if s.unattended or s.state in ('exited', 'closed') %} hidden{% endif %}" id="composer">
       {#- on a phone the composer is a sheet over the terminal (§4.5a *the input bar · ⌨*, TD-1299): its name and ✕,
           which closes it with its draft kept; not drawn on the desktop page -#}
       <div class="csheethead"><span class="h2 mono" id="csheettitle">{{ s.name }}</span><span class="grow"></span><button type="button" class="btn sm ghost" id="csheetx" aria-label="close the composer: the draft is kept" title="close: the draft is kept">✕</button></div>
@@ -248,7 +253,7 @@
     {#- the bar: the text opens the composer (also `c`, a paste on the bar, a file dropped on it or the
         terminal); its Attach is the composer's road, which then needs the box; its Send sends the draft.
         While folded, the reason nothing can be sent is the bar's text, and an upload in flight shows here -#}
-    <div class="card composerbar row gap{% if s.unattended %} hidden{% endif %}" id="composerbar">
+    <div class="card composerbar row gap{% if s.unattended or s.state in ('exited', 'closed') %} hidden{% endif %}" id="composerbar">
       {%- set invite = '✎ ' ~ ('Compose a prompt…' if s.agent else 'Type a command…') ~ ' (c · or paste / drop a file)' %}
       <button type="button" class="cbtext grow" id="cbtext" data-invite="{{ invite }}" title="open the composer (c)">{{ invite }}</button>
       <button type="button" class="btn sm" id="cbattach" title="attach files: the composer opens with their paths in it"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
