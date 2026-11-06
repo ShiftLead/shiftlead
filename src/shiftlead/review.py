@@ -50,7 +50,8 @@ def walk(links: list[dict[str, Any]], asks: list[dict[str, Any]] | None, *, olde
     """Where a held PR stands along its chain (§4.9c *Whose turn it is*, TD-315 slice 4): `links` the
     record's links that hold the PR, in the flow's order, and `asks` its author's asks carrying the
     PR as `pr_reads` gives them (None: the home did not say). Each link gets a `state` — `passed` (its
-    reader's last answer was `pass` or `merged`), `asked` (an ask is open, or answered with no verdict),
+    reader's last answer was `pass` or `merged`), `asked` (an ask is open, or answered with no verdict; one
+    closed with no reply reads as never asked),
     `findings`, `next` (the first link not passed, never asked: the author's turn to ask it) or
     `later` — and `at`, the time of what set it. `turn` is the first link not passed, None once every
     link has passed or when the home did not say; `merges` the last link's reader, the one that
@@ -67,6 +68,10 @@ def walk(links: list[dict[str, Any]], asks: list[dict[str, Any]] | None, *, olde
         else:
             mine = [a for a in asks if older or any(addressed(x, readers) == link["reader"] for x in a["to"])]
             last = mine[-1] if mine else None
+            if last is not None and last.get("open") is False and last.get("replied_at") is None:
+                # closed with no reply landed — taken to the person, lapsed or expired (§4.9b *Why it did
+                # not answer*, TD-1430): the link is the author's to ask again, never still `asked`
+                last = None
             if last is None:
                 row["state"], row["at"] = ("later" if turn is not None else "next"), None
             elif last.get("verdict") in ("pass", "merged"):

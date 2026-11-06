@@ -18,6 +18,7 @@ from sessionorc import (
     agent_common,
     hosts,
     mail,
+    unanswered,
 )
 from sessionorc import work as work_mod
 from sessionorc.agent_common import (
@@ -816,6 +817,9 @@ class MailMixin:
             # §4.10 *One open copy of a question* (TD-1379): read here, once `about` has its default and
             # `subject` is derived, and before anything lands — no `await` falls between this and the landing
             self._check_one_open_copy(records, sender, entry)
+        if taken is not None:
+            # §4.9b *Why it did not answer* (TD-1430): the addressee's record as it stands, on every copy
+            entry.unanswered = self._unanswered(records, taken, now)
         landed: list[str] = []
         failed: list[str] = []
         for sid in copies:
@@ -907,13 +911,7 @@ class MailMixin:
             self._save(r)
         await self._push_changes()
         now = datetime.now(UTC)
-        away = {
-            sid
-            for sid in (*named, *landed)
-            if sid != PERSON
-            and records[sid].host != self.host
-            and not (self.links.get(records[sid].host) or {}).get("up")
-        }
+        away = {sid for sid in (*named, *landed) if sid != PERSON and self._away(records[sid])}
         # §4.10 *When it is read* (TD-168): one sentence per addressee, after delivery — the kind a
         # reply reads as a note does, an ask's own bound, a session's sender told of a spent budget
         span = None
@@ -927,12 +925,7 @@ class MailMixin:
                 person=sender == PERSON,
                 bound=span,
                 unreachable=sid in away,
-                rings=getattr(adapters.get(records[sid].adapter), "composer", None) is not None,
-                # a lapsed cache is restarted, not rung (§4.10, TD-467): the home's own records alone
-                cache=records[sid].host == self.host and agent_common.cache_restarts(records[sid], now),
-                # a modal limit has no reset to name (§4.3, TD-944): a node's record's tail is the node's
-                modal_limit=records[sid].host == self.host
-                and agent_common.limit_is_modal(records[sid], adapters.get(records[sid].adapter)),
+                **self._read_when_kwargs(records[sid], now),
                 # a reply that closes a question the seat itself sent fills a seat on call — the person's
                 # or a session's, on a handed entry's thread or on its own (§4.9b *an answer waiting*,
                 # TD-1051; review of #760: an outcome note or a seat's FYI on the thread refills nothing)
@@ -967,6 +960,52 @@ class MailMixin:
             "advice": advice,
         }
 
+    def _away(self, r: Session) -> bool:
+        """Whether a record's host is not this one and its link is down (§4.4a *When the recipient's host is
+        unreachable*): what a send says of an addressee, and what the take-up's stamp reads (§4.9b)."""
+        return r.host != self.host and not (self.links.get(r.host) or {}).get("up")
+
+    def _read_when_kwargs(self, r: Session, now: datetime) -> dict[str, bool]:
+        """The record's own facts `mail.read_when` reads, as the send computes them."""
+        adapter = adapters.get(r.adapter)
+        return {
+            "rings": getattr(adapter, "composer", None) is not None,
+            # a lapsed cache is restarted, not rung (§4.10, TD-467): the home's own records alone
+            "cache": r.host == self.host and agent_common.cache_restarts(r, now),
+            # a modal limit has no reset to name (§4.3, TD-944): a node's record's tail is the node's
+            "modal_limit": r.host == self.host and agent_common.limit_is_modal(r, adapter),
+        }
+
+    def _unanswered(self, records: dict[str, Session], taken: MailEntry, now: datetime) -> dict[str, Any]:
+        """The stamp a take-up writes on its question (design §4.9b *Why it did not answer*, TD-1430): the
+        first of `taken.to` walked to its newest record as a send's addressee is — a walk that writes no
+        forward — and read as it stands, by `unanswered.read`."""
+        sid = taken.to[0] if taken.to else ""
+        seen = {sid}
+        while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
+            sid = self._successor(sid, r) or sid
+            if sid in seen:
+                break
+            seen.add(sid)
+        at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        r = records.get(sid)
+        if r is None:
+            return unanswered.read(None, sid, question_at=taken.at, at=at)
+        over = self._profile_over(r.profile, now, r.team) if r.profile else None
+        kw = self._read_when_kwargs(r, now)
+        tail = mail.read_when(r, taken.kind, now, person=False, lapses=False, unreachable=self._away(r), **kw)
+        return unanswered.read(
+            r,
+            sid,
+            question_at=taken.at,
+            at=at,
+            unreachable=self._away(r),
+            over=over,
+            modal=kw["modal_limit"],
+            waiting=len([i for i in r.asks_ids(home=self.host) if i != taken.id]),
+            tail=tail,
+        )
+
     @staticmethod
     def _copy(entry: MailEntry) -> MailEntry:
         """A record's own copy of an entry: same values, no shared lists."""
@@ -981,6 +1020,7 @@ class MailMixin:
             # sessions, so each controller's copy must hold them (§4.10 *Suggested answers*)
             answers=list(entry.answers),
             shots=list(entry.shots),
+            unanswered=dict(entry.unanswered) if entry.unanswered else None,
         )
 
     def _pair(self, r: Session, other: str, now: datetime) -> Tally:
