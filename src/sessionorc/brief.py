@@ -32,6 +32,7 @@ TEMPLATE_SLOT = "{repo}"
 # file beside its template — they are one repo's, not the package's — so its replay takes the stored prompt.
 LAYOUT_SLOTS = (
     "{gate}",
+    "{merge}",
     "{board}",
     "{ledger}",
     "{ledger_check}",

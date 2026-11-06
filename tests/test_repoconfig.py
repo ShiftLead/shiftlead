@@ -675,3 +675,63 @@ def test_an_unset_ledger_resolves_by_the_default_rule_and_a_set_one_is_kept(tmp_
     assert repoconfig.load(tmp_path / "away", read=far).ledger == "docs/ledger"
     assert asked[-1] == tmp_path / "away" / "docs" / "ledger" / "README.md"
     assert repoconfig.load(tmp_path / "away", read=lambda p: None).ledger == "docs/technical_debt.md"
+
+
+def _step5(check: str, squash: str, pr: str = "{pr}") -> str:
+    """Cadence step 5's line as §5 *The seams* writes `{merge}`, over `check` and `squash`, then its fallback."""
+    return (
+        f'm=$(mktemp -d); {check} --pr {pr} --trailers "$m/gate"; {squash} {pr} --gate "$m/gate" --out "$m" && '
+        f'gh pr merge {pr} --squash --match-head-commit "$(cat "$m/sha")" --subject "$(cat "$m/subject")" '
+        f'--body-file "$m/body" Where the line is refused because --trailers is unrecognized or squash-message is '
+        f"not a choice (a pin older than agent-cadence TD-233), merge with gh pr merge {pr} --squash."
+    )
+
+
+def test_merge_names_cadence_step_5s_line_in_every_form(tmp_path):
+    """TD-1418, design §5 *The seams* (`{merge}`): the pinned form puts only the launcher's words through
+    `cadence.typed` — under the node's venv where set — and appends `$m` and `{pr}` unquoted; the copy and
+    agent-cadence's own source name their scripts as `{gate}` does; each ends in the fallback sentence."""
+    copy = repoconfig.layout(repoconfig.load_text(None, tmp_path))["{merge}"]
+    assert copy == _step5("python3 scripts/check_cadence.py", "python3 scripts/forge.py squash-message")
+    (tmp_path / "sync.sh").write_text("x\n")
+    (tmp_path / "files").mkdir()
+    source = repoconfig.layout(repoconfig.load_text(None, tmp_path))["{merge}"]
+    assert source == _step5("python3 files/scripts/check_cadence.py", "python3 files/scripts/forge.py squash-message")
+    (tmp_path / "sync.sh").unlink()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "cadence.toml").write_text(f'[agent-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n')
+    launcher = f"{shlex.quote(sys.executable)} {shlex.quote(str(cadence.LAUNCHER))}"
+    pinned = repoconfig.layout(repoconfig.load_text(None, tmp_path))["{merge}"]
+    assert pinned == _step5(f"{launcher} run check_cadence.py", f"{launcher} run forge.py squash-message")
+    assert "'$m" not in pinned and "'{pr}'" not in pinned and "-C" not in pinned.split()
+    cfg = repoconfig.load_text(None, tmp_path)
+    cfg.venv = "/shiftlead/venv"  # a container node's own launcher
+    node = repoconfig.layout(cfg)["{merge}"]
+    word = "/shiftlead/venv/bin/agent-cadence"
+    assert node == _step5(f"{word} run check_cadence.py", f"{word} run forge.py squash-message")
+
+
+def test_merge_reads_no_file_and_its_pr_is_filled(tmp_path):
+    """TD-1418: `{merge}` adds no read to a brief's composition — its words are the same whatever a reader
+    answers beyond what `{gate}` already reads — and composed, every `{pr}` in it is the brief's `<n>`."""
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "cadence.toml").write_text(f'[agent-cadence]\nsource = "/src"\nref = "{"a" * 40}"\n')
+    seen: list = []
+
+    def read(path):
+        seen.append(path)
+        return path.read_text(encoding="utf-8") if path.is_file() else None
+
+    cfg = repoconfig.load_text(None, tmp_path)
+    cfg.read = read
+    before = repoconfig.layout(cfg)
+    reads = list(seen)
+    seen.clear()
+    # what layout reads is what it read before `{merge}`: the pin, the lock, the source marks, the design dir
+    assert not any("forge" in str(p) or "check_cadence" in str(p) for p in reads)
+    (tmp_path / "b.md").write_text("merge: {merge}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {plain: {brief: b.md}}\n")
+    text, made = repoconfig.resolve_role(repoconfig.load(tmp_path), "plain").compose()
+    assert "{pr}" not in text and "{merge}" not in text
+    assert f"merge: {before['{merge}'].replace('{pr}', '<n>')}\n" in text
+    assert made["slots"]["{merge}"] == {"text": before["{merge}"]} and list(made["slots"])[-1] == "{pr}"

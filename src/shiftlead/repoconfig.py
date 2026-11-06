@@ -184,12 +184,14 @@ HANDED_ENTRY = {
 
 
 # The layout slots (design §5 *The seams*, TD-588, TD-1011): what a built-in brief names of a repo's layout,
-# never a literal of one repo's. The cadence's four (`{gate}`, `{board}`, `{ledger_check}`, `{cadence_rules}`)
-# and `{ledger}` fill with agent-cadence's values and have no sentence, since an unserved repo composes no brief;
-# the repo's own three fill with its own or with the seam's fixed sentence, never empty text. `{pr}` inside
-# `{gate}` is filled after them. Recorded as text slots, so a replay fills them as the launch did (§6 rule 7).
+# never a literal of one repo's. The cadence's five (`{gate}`, `{merge}`, `{board}`, `{ledger_check}`,
+# `{cadence_rules}`) and `{ledger}` fill with agent-cadence's values and have no sentence, since an unserved repo
+# composes no brief; the repo's own three fill with its own or with the seam's fixed sentence, never empty text.
+# `{pr}` inside `{gate}` and `{merge}` is filled after them. Recorded as text slots, so a replay fills them as the
+# launch did (§6 rule 7).
 LAYOUT_SLOTS = (
     "{gate}",
+    "{merge}",
     "{board}",
     "{ledger}",
     "{ledger_check}",
@@ -203,6 +205,13 @@ PR_IN_BRIEF = "<n>"
 DESIGN_DIR = "docs/design/"
 PIN_HEADER = "[agent-cadence]"  # a pinned repo's `docs/cadence.toml` table (dev-cadence TD-129)
 SOURCE_PREFIX = "files/"  # agent-cadence's own source holds every agent-cadence path under it (§5 *The seams*)
+FORGE_SCRIPT = "forge.py"  # agent-cadence's forge reader, whose `squash-message` composes step 5's squash
+# The old pin's cure after step 5's line (§5 *The seams*, TD-1412): a pin older than agent-cadence TD-233 has
+# neither `--trailers` nor `squash-message`, and until the repo's next sync bump its sessions merge bare.
+MERGE_FALLBACK = (
+    "Where the line is refused because --trailers is unrecognized or squash-message is not a choice "
+    f"(a pin older than agent-cadence TD-233), merge with gh pr merge {PR_PLACEHOLDER} --squash."
+)
 NO_TEST = "no test command: run what the repo's README says"
 NO_LINT = "no lint command: keep to the style of the code around the change"
 NO_DESIGN_DIR = "no design directory: the README and the code say what is true"
@@ -220,8 +229,9 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
     read the way the file was, `cfg.read`; in a pinned repo (`[agent-cadence]` in its `docs/cadence.toml`, no lock)
     the resolver's command as a session types it, `cadence.typed` (TD-1014), under `cfg.venv` where set —
     and `board:` and `ledger:` where the file sets them; `{test}` and `{lint}` `commands:`'s, `{design_dir}`
-    the directory where the checkout holds it, each else its seam's sentence. `{gate}` still holds `{pr}`: the
-    brief's text fills it last."""
+    the directory where the checkout holds it, each else its seam's sentence. `{merge}` is cadence step 5's
+    line over the same two scripts, read from no file (`merge_line`). `{gate}` and `{merge}` still hold `{pr}`:
+    the brief's text fills it last."""
 
     def there(rel: str) -> bool:
         if cfg.root is None:
@@ -266,15 +276,19 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
     pre = SOURCE_PREFIX if source else ""
     if not pre and pinned():  # the resolver's command, as the session types it (TD-1014)
         venv = cfg.venv  # a container node's own, where the session types it (TD-1014)
-        gate = f"{cadence.typed('run', cadence.GATE_SCRIPT, venv=venv)} --pr {PR_PLACEHOLDER}"
+        check = cadence.typed("run", cadence.GATE_SCRIPT, venv=venv)
+        gate = f"{check} --pr {PR_PLACEHOLDER}"
+        merge = merge_line(check, cadence.typed("run", FORGE_SCRIPT, "squash-message", venv=venv))
         ledger_check = cadence.typed("run", Path(cadence.COPY_LEDGER).name, "--check", venv=venv)
         rules = f"read the file `{cadence.typed('path', Path(cadence.COPY_RULES).name, venv=venv)}` prints, §1–§4"
     else:
         gate = f"python3 {pre}{cadence.COPY_GATE} --pr {PR_PLACEHOLDER}"
+        merge = merge_line(f"python3 {pre}{cadence.COPY_GATE}", f"python3 {pre}scripts/{FORGE_SCRIPT} squash-message")
         ledger_check = f"python3 {pre}{cadence.COPY_LEDGER} --check"
         rules = f"read {pre}{cadence.COPY_RULES} §1–§4"
     return {
         "{gate}": gate,
+        "{merge}": merge,
         "{board}": cfg.board or str(workorders.BOARD),
         "{ledger}": cfg.ledger,
         "{ledger_check}": ledger_check,
@@ -283,6 +297,19 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
         "{design_dir}": DESIGN_DIR if there(DESIGN_DIR) else NO_DESIGN_DIR,
         "{cadence_rules}": rules,
     }
+
+
+def merge_line(check: str, squash: str) -> str:
+    """Cadence step 5's line (§5 *The seams*, TD-1412) over the words that run the gate and `forge.py
+    squash-message`, then its fallback sentence: one command, whose squash ends in `Merged-by:`. Only those
+    words come from the caller (in a pinned repo, `cadence.typed`'s); the rest is appended as text, since
+    `typed` would quote `$m` and `{pr}`."""
+    pr = PR_PLACEHOLDER
+    return (
+        f'm=$(mktemp -d); {check} --pr {pr} --trailers "$m/gate"; {squash} {pr} --gate "$m/gate" --out "$m" '
+        f'&& gh pr merge {pr} --squash --match-head-commit "$(cat "$m/sha")" --subject "$(cat "$m/subject")" '
+        f'--body-file "$m/body" {MERGE_FALLBACK}'
+    )
 
 
 def work_text(
@@ -644,7 +671,7 @@ class Role:
         named = [slot for slot in LAYOUT_SLOTS if slot in text]
         if named:  # read only when a brief names one: a node's files are asked across the link
             given = layout(self.config if self.config is not None else RepoConfig(root=self.root))
-            # `{pr}` last, so the `{pr}` a `{gate}` carries is filled too
+            # `{pr}` last, so the `{pr}` a `{gate}` or `{merge}` carries is filled too
             for slot, value in (*((slot, given[slot]) for slot in named), (PR_PLACEHOLDER, PR_IN_BRIEF)):
                 text = text.replace(slot, value)
                 slots[slot] = {"text": value}

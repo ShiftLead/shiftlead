@@ -341,9 +341,9 @@ ao roles
 The built-in templates hold every shiftlead mechanic — the lane loop, claims and leases, the
 cadence review and merge, asking and outcomes, the declarations a run ends with, the usage gate's
 pause, the never-list of `ao` verbs — and move with the package on every promote. They name no
-repo's layout: where a brief needs one it holds a slot — `{gate}`, `{board}`, `{ledger}`,
+repo's layout: where a brief needs one it holds a slot — `{gate}`, `{merge}`, `{board}`, `{ledger}`,
 `{ledger_check}`, `{test}`, `{lint}`, `{design_dir}`, `{cadence_rules}` — filled at the start: the cadence's
-(`{gate}`, `{board}`, `{ledger}`, `{ledger_check}`, `{cadence_rules}`) with agent-cadence's paths and the
+(`{gate}`, `{merge}` (cadence step 5's line), `{board}`, `{ledger}`, `{ledger_check}`, `{cadence_rules}`) with agent-cadence's paths and the
 repo's `.shiftlead.yml` `board` and `ledger`, the repo's own (`{test}`, `{lint}`, `{design_dir}`) from its
 `commands` or its checkout, else the seam's own sentence (*no test command: run what the repo's README
 says*), never empty (design §5 *The seams*). **A repo whose standing rules, scratch tools or reviewers differ says so in its own
