@@ -523,6 +523,7 @@ class RemoteMixin:
         mux = self._node_mux(host)
         sent = dict(params)
         sent.pop("prompt_from", None)  # the launch record's alone, and the home writes a node's (§6 rule 7)
+        sent.pop("via", None)  # a mode change's control: the home stamps its copy, the node writes nothing (TD-1439)
         if home_copy is not None and sent.get("reap", True) is True and host in containers.container_nodes():
             # a record the home holds on a host sharing the directory is inside: the node cannot see it, and
             # `worktree_kept` is the node's to write, so the why goes as the close's `reap` (§4.1, TD-979)
@@ -576,6 +577,9 @@ class RemoteMixin:
             held = self.remote.get(host, {}).get(str(reply["record"].get("id"))) if method == "create" else None
             if held is not None:
                 self._set_by_person(held, host, person, reply["record"], params)
+                # the start's mode stamp, home-owned, so never on the replica (§4.5 *A taken-over member*, TD-1439)
+                held.mode_at, held.mode_by, held.mode_via = held.created, None, "start"
+                self._remote_store(host).save(held)
             if held is not None and held.supervised:  # the home holds a node session's launch record (§6)
                 # what the node made of the call — an auto-name, a worktree's resolved repo — so a
                 # replay recreates this session, not a new one (review of PR #447)
@@ -588,7 +592,11 @@ class RemoteMixin:
         result = reply.get("result")
         if method in HOME_EDITS:
             # the home's own copy carries the edit, and its view — addressed — is what the caller gets
-            await getattr(self, f"rpc_{method}")(**params)
+            mirror = getattr(self, f"rpc_{method}")
+            # who acted, in the home's form as the gate verified it — not `who`, rewritten for the node —
+            # so the home's copy is stamped as on one host (`set_mode`, TD-1439)
+            extra = {"caller": caller} if method == "set_mode" else {}
+            await mirror(**params, **extra)
             result = self._view(self.remote[host][rid])
         elif method == "name_check" and isinstance(result, dict):
             for key in ("id", "holder"):  # the node's bare ids, addressed for the caller (review of PR #213)

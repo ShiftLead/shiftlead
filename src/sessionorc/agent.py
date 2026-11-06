@@ -101,6 +101,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     LAUNCH_KEYS,  # noqa: F401
     LEASE_TTL,  # noqa: F401
     LINKS_EVERY,  # noqa: F401
+    MODE_VIAS,
     MODEL_EVERY,  # noqa: F401
     MODEL_FILE,  # noqa: F401
     NODE_ACTS,  # noqa: F401
@@ -278,6 +279,13 @@ from sessionorc.store import (
     UsageStore,
 )
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, Tmux
+
+
+def _stamp_start(s: Session) -> None:
+    """A record's start stamps its mode (design §4.5 *A taken-over member*, TD-1439): `mode_at` its
+    `created`, `mode_via` `start`, and no `mode_by` — a person's create and a policy's both arrive with
+    no caller, so a start names nobody. The home's alone: a node's record is stamped on the home's copy."""
+    s.mode_at, s.mode_by, s.mode_via = s.created, None, "start"
 
 
 def _inherits_made(new: Session, old: Any) -> bool:
@@ -1651,6 +1659,7 @@ class HostAgent(
                 # never passed — `supervised` and `seat` as the record is written, the caller as every
                 # caller is read. A node's is the home's, set on its copy from this create's reply.
                 s.by_person = mail.as_person(caller, self._graph()) and not s.supervised and not s.seat
+                _stamp_start(s)  # a start names nobody: a person's create and a policy's both have no caller
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
                 kept = bool(keep_mail or starting is not None or (resume and holder.adapter_id == resume))
@@ -1745,6 +1754,8 @@ class HostAgent(
             start_at=starts,
         )
         s.set_state(state, confidence="hook")  # type: ignore[arg-type]
+        if self.mode != "node":
+            _stamp_start(s)  # its later start runs `create`, which stamps again (TD-1439)
         if state == "closed":
             s.closed_at = s.created
             s.closer = {"by": "start", "why": "held"}
@@ -3382,11 +3393,22 @@ class HostAgent(
         return self._view(s)
 
     async def rpc_set_mode(
-        self, id: str, unattended: bool, pause_prompt: str | None = None, resume_prompt: str | None = None
+        self,
+        id: str,
+        unattended: bool,
+        pause_prompt: str | None = None,
+        resume_prompt: str | None = None,
+        via: str | None = None,
+        caller: Any = None,
     ) -> dict[str, Any]:
         """The mode toggle and `ao mode`. The usage gate's two texts ride along as the wrap-up's
         ride `set_stop` (design §6, TD-100): a session made unattended after its create would
-        otherwise be gated with nothing to type. Given only when set; an empty one clears it."""
+        otherwise be gated with nothing to type. Given only when set; an empty one clears it.
+
+        A real change is stamped and logged (design §4.5 *A taken-over member*, TD-1439): `mode_at`,
+        `mode_by` (`person`, or the calling session's id in the home's form) and `mode_via` (the press's
+        control, one of `MODE_VIAS`, else none). The home's alone: a node's run writes neither, and the
+        home's mirror of the forwarded act stamps its copy."""
         s = self._find(id)  # the home's own copy of another host's record too (4a)
         if unattended and not adapters.has_agent(s.adapter):
             raise RpcError(
@@ -3399,6 +3421,17 @@ class HostAgent(
             raise RpcError(
                 f"{s.name} has not started: a scheduled start is unattended — `ao at` moves it, Cancel "
                 f"forgets it; switch it to interactive once it runs (design §6 Start time, §9 invariant 5)"
+            )
+        if bool(unattended) != s.unattended and self.mode != "node":
+            s.mode_at = now_iso()
+            s.mode_by = "person" if mail.as_person(caller, self._graph()) else str(caller)
+            s.mode_via = via if isinstance(via, str) and via in MODE_VIAS else None
+            log.info(
+                "%s: mode %s by %s via %s",
+                self._address(s),
+                "unattended" if unattended else "interactive",
+                s.mode_by,
+                s.mode_via or "-",
             )
         s.unattended = bool(unattended)
         if pause_prompt is not None:
