@@ -689,7 +689,8 @@
       restart. **Restart** (§6 rule 2 *A person's restart*, TD-250) puts it back in its team's run
       from its launch record — never on a seat's row; a refusal is the toast and the row stands.
       **Resume** is the banner's one-press Resume — the session comes back attended. -#}
-  <span class="st">the host agent will not restart it — yours now</span>
+  {#- a seat's plain fill mark lapses after the hour (§6 rule 3, TD-1422); every other mark, the held one's too, is yours -#}
+  <span class="st">{{ 'fills again after the hour' if e.lapses else 'the host agent will not restart it — yours now' }}</span>
   <span class="grow"></span>
   {{ state_snooze(e) }}
   {% if e.restartable %}<button class="btn sm" data-act="restart" data-id="{{ e.sid }}" title="{{ help_title('restart') }}">Restart</button>{% endif %}

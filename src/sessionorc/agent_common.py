@@ -137,6 +137,9 @@ RESTART_SETTLE = timedelta(seconds=60)
 FILL_CEILING = 6
 FILL_WINDOW = timedelta(hours=1)
 SEAT_IDLE_GRACE = timedelta(minutes=2)
+# how long a seat whose trigger is `asks` (the techlead, the fact-checker) stays open idle with nothing
+# waiting, so a trickle of asks is one fill rather than one each (§6 rule 3, TD-1422)
+SEAT_ASK_LINGER = timedelta(minutes=15)
 # how long rule 3 leaves an idle seat open on a PR of its own that no reader holds (§6 rule 3, TD-366):
 # its fact-check or CI runs in the background and wakes it; past this the seat is closed as before
 SEAT_PR_WAIT = timedelta(hours=2)
@@ -260,6 +263,12 @@ def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[
 INTENT_FIELDS = HOME_OWNED - frozenset(
     {"inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "superseded_by"}
 )
+
+
+def fill_lapses(mark: Any) -> bool:
+    """A seat's fill ceiling that lapses after `FILL_WINDOW` (§6 rule 3 *The ceiling is a rate, not a stop*,
+    TD-1422): `{why: fill}` without `held`. A lost brief's, a crash ceiling and a held second trip stay."""
+    return isinstance(mark, dict) and mark.get("why") == "fill" and not mark.get("held")
 
 
 def closer_of(caller: Any, closer: Any, at: str) -> dict[str, Any]:

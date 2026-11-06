@@ -128,6 +128,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     RESUME_MIN,  # noqa: F401
     ROUND_LINE_CAP,  # noqa: F401
     SCHEDULE_LATE,  # noqa: F401
+    SEAT_ASK_LINGER,  # noqa: F401
     SEAT_IDLE_GRACE,  # noqa: F401
     SEAT_PR_WAIT,  # noqa: F401
     SEND_STALL_SECONDS,  # noqa: F401

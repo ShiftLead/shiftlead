@@ -10,8 +10,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks
 
-from sessionorc import reports
-from sessionorc.agent import FILL_CEILING, SEAT_IDLE_GRACE, SEAT_PR_WAIT
+from sessionorc import agent_notify, reports
+from sessionorc.agent import FILL_CEILING, FILL_WINDOW, SEAT_ASK_LINGER, SEAT_IDLE_GRACE, SEAT_PR_WAIT
 from sessionorc.client import LocalClient
 from sessionorc.models import PR_CLOSED, MailEntry, ProgressEntry, Session
 
@@ -50,7 +50,9 @@ def _end(agent, sid: str) -> None:
 
 def _idle(agent, sid: str, now: datetime, **git) -> None:
     rec = agent.sessions[sid]
-    rec.state, rec.confidence, rec.since = "idle", "hook", _iso(now - SEAT_IDLE_GRACE - timedelta(seconds=1))
+    # idle just past the seat's own close: `SEAT_ASK_LINGER` for an `asks` seat, else `SEAT_IDLE_GRACE` (TD-1422)
+    grace = SEAT_ASK_LINGER if (rec.seat or {}).get("trigger") == "asks" else SEAT_IDLE_GRACE
+    rec.state, rec.confidence, rec.since = "idle", "hook", _iso(now - grace - timedelta(seconds=1))
     rec.git = {"branch": "main", "dirty": 0, "unpushed": 0, **git}
 
 
@@ -173,6 +175,115 @@ async def test_a_fellows_lost_brief_ceiling_does_not_trip_the_fill_ceiling(agent
 
 def _mins(n: int) -> list[timedelta]:
     return [timedelta(minutes=5 * (i + 1)) for i in range(n)]
+
+
+async def test_a_plain_fill_mark_lapses_after_the_hour_and_the_seat_is_filled_when_due(agent, tmp_path):
+    """§6 rule 3 *The ceiling is a rate, not a stop* (TD-1422): a plain fill mark is cleared on the first pass
+    after `FILL_WINDOW`, cause due or not, `fill_lapsed` written; the seat is then filled when due, and the
+    replay carries `fill_lapsed`. A suspended seat keeps its mark."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        a = await _seat(person, tmp_path, name="a", controllers=["ao-x-mgr"])
+        held = await _seat(person, tmp_path, name="s", controllers=["ao-z-mgr"])
+        old = _iso(now - FILL_WINDOW - timedelta(minutes=1))
+        for sid in (a, held):
+            _end(agent, sid)
+            agent.sessions[sid].restart_ceiling = {"at": old, "count": 6, "why": "fill"}
+        agent.sessions[held].suspended = True
+        ra = agent.sessions[a]
+        await agent._keep_running(now)
+        assert ra.restart_ceiling is None and ra.fill_lapsed and ra.fill_lapsed["at"], "lapsed with no cause due"
+        assert agent.sessions[a] is ra, "nothing due: not filled"
+        assert agent.sessions[held].restart_ceiling, "a suspended seat keeps its mark"
+        ra.seat_due = {"at": _iso(now), "by": "every"}
+        await agent._keep_running(now)
+        new = agent.sessions[a]
+        assert new is not ra and new.fill_lapsed == ra.fill_lapsed, "filled when due, and the lapse carried"
+        for sid in (a, held):
+            await person.call("kill", id=sid)
+
+
+async def test_a_fill_mark_not_yet_an_hour_old_a_lost_brief_mark_and_a_held_mark_stay(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    old = _iso(now - FILL_WINDOW - timedelta(minutes=1))
+    marks = {
+        "young": {"at": _iso(now - timedelta(minutes=30)), "count": 6, "why": "fill"},
+        "lost": {"at": old, "count": 1, "why": "lost-brief"},
+        "held": {"at": old, "count": 6, "why": "fill", "held": True},
+    }
+    async with LocalClient() as person:
+        ids = {}
+        for name, mark in marks.items():
+            ids[name] = await _seat(person, tmp_path, name=name, controllers=[f"ao-{name}-mgr"])
+            _end(agent, ids[name])
+            agent.sessions[ids[name]].restart_ceiling = dict(mark)
+        await agent._keep_running(now)
+        for name, mark in marks.items():
+            assert agent.sessions[ids[name]].restart_ceiling == mark, name
+            assert agent.sessions[ids[name]].fill_lapsed is None, name
+        for sid in ids.values():
+            await person.call("kill", id=sid)
+
+
+async def test_a_trip_whose_fills_all_postdate_a_lapse_is_held_and_one_counting_an_older_fill_is_plain(agent, tmp_path):
+    """The held second trip (TD-1422): every counted fill newer than the newest `fill_lapsed.at` among the
+    fellows, that lapse no more than two windows old, writes `held: true`; a trip counting an older fill, or
+    after a lapse older than two hours, is plain."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    cases = {
+        "after": (timedelta(minutes=50), _mins(FILL_CEILING), True),
+        "older": (timedelta(minutes=20), _mins(FILL_CEILING), False),  # fills at 25..30 min predate it
+        "stale": (2 * FILL_WINDOW + timedelta(minutes=1), _mins(FILL_CEILING), False),
+    }
+    async with LocalClient() as person:
+        for name, (lapse, agos, want) in cases.items():
+            a = await _seat(person, tmp_path, name=f"{name}-a", controllers=[f"ao-{name}-mgr"])
+            b = await _seat(person, tmp_path, name=f"{name}-b", controllers=[f"ao-{name}-mgr"])
+            for sid in (a, b):
+                _end(agent, sid)
+            agent.sessions[a].seat_due = {"at": _iso(now), "by": "every"}
+            agent.sessions[a].restarts = [{"at": _iso(now - ago), "why": "fill"} for ago in agos]
+            agent.sessions[b].fill_lapsed = {"at": _iso(now - lapse)}  # the group's lapse, on a fellow
+            ra = agent.sessions[a]
+            await agent._keep_running(now)
+            assert ra.restart_ceiling and ra.restart_ceiling["why"] == "fill", name
+            assert bool(ra.restart_ceiling.get("held")) is want, name
+            if want:
+                await agent._keep_running(now + FILL_WINDOW + timedelta(minutes=1))
+                assert ra.restart_ceiling and ra.restart_ceiling.get("held"), "a held mark never lapses"
+            for sid in (a, b):
+                await person.call("kill", id=sid)
+
+
+async def test_an_asks_seat_lingers_fifteen_minutes_idle_and_a_team_seat_closes_at_the_grace(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        tl = await _seat(person, tmp_path, name="tl", trigger="asks", after=None)
+        mgr = await _seat(person, tmp_path, name="mgr", trigger="team", after=None)
+        for sid in (tl, mgr):
+            _idle(agent, sid, now)
+            agent.sessions[sid].since = _iso(now - timedelta(minutes=3))
+            agent.sessions[sid].asks_ids = lambda **kw: []
+        await agent._keep_running(now)
+        assert agent.sessions[tl].state == "idle", "an asks seat idle 3 minutes with nothing waiting lingers"
+        assert agent.sessions[mgr].state == "closed", "a manager on call still closes at SEAT_IDLE_GRACE"
+        agent.sessions[tl].since = _iso(now - SEAT_ASK_LINGER - timedelta(seconds=1))
+        await agent._keep_running(now)
+        assert agent.sessions[tl].state == "closed", "closed at fifteen"
+        for sid in (tl, mgr):
+            await person.call("kill", id=sid)
+
+
+def test_a_seats_plain_fill_mark_is_not_told_and_a_held_one_is():
+    s = Session(id="x", name="x", kind="interactive", adapter="shell", dir="/", seat={"trigger": "asks"})
+    s.restart_ceiling = {"at": "2026-11-05T15:04:38Z", "count": 6, "why": "fill"}
+    assert agent_notify._restart_at(s) == "", "a plain mark lapses and is not told"
+    s.restart_ceiling["held"] = True
+    assert agent_notify._restart_at(s) == "2026-11-05T15:04:38Z", "a held mark is told, once per its at"
 
 
 async def test_an_idle_seat_with_nothing_due_and_nothing_left_is_closed(agent, tmp_path):

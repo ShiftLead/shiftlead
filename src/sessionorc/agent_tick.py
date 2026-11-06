@@ -67,6 +67,7 @@ from sessionorc.agent_common import (
     RESTART_WINDOW,
     RESUME_MIN,
     SCHEDULE_LATE,
+    SEAT_ASK_LINGER,
     SEAT_IDLE_GRACE,
     SEAT_PR_WAIT,
     SETTLED,
@@ -3044,6 +3045,7 @@ class TickMixin:
             await self._carry_controllers()  # a node member's own record takes the new lead now (TD-712)
         if new is not None:
             new.restarts = history
+            new.fill_lapsed = s.fill_lapsed  # a lapsed fill ceiling outlives every replay (§6 rule 3, TD-1422)
             held = {e.ref: e for e in new.progress if e.source == "declared" and e.status == "claimed"}
             for e in carried:
                 e.at = entry["at"]  # a renewal of the lease (§4.8 *A claim is a lease*)
@@ -3114,6 +3116,16 @@ class TickMixin:
             await self._push_changes()
         if s.host != self.host and s.host not in self._link_muxes:
             return  # its link is down: left as it is, looked at again next tick (§4.4a)
+        mark = s.restart_ceiling
+        if agent_common.fill_lapses(mark) and not _recent(mark.get("at"), now, FILL_WINDOW):
+            # a plain fill ceiling lapses after the hour, cause due or not, so the row leaves on time (TD-1422)
+            log.info(
+                "%s: its fill ceiling of %s lapsed after %s — the tick fills it again", s.id, mark["at"], FILL_WINDOW
+            )
+            s.restart_ceiling = None
+            s.fill_lapsed = {"at": now.replace(microsecond=0).isoformat().replace("+00:00", "Z")}
+            self._save(s)
+            await self._push_changes()
         if s.state in ("exited", "closed") and s.seat_due:
             await self._fill(s, now, records)
         elif s.state == "idle" and self._seat_done(s) and self._seat_has_run(s, now):
@@ -3399,8 +3411,26 @@ class TickMixin:
             )
             if not tripped:
                 s.restart_ceiling = {"at": now_iso(), "count": len(fills), "why": "fill"}
+                # a second trip running holds (TD-1422): every fill it counts postdates the newest lapse among
+                # the fellows, a lapse no more than two windows old
+                lapses = [
+                    str(r.fill_lapsed.get("at") or "")
+                    for r in fellows
+                    if isinstance(r.fill_lapsed, dict) and r.fill_lapsed.get("at")
+                ]
+                lapse = max(lapses, default="")
+                if (
+                    lapse
+                    and _recent(lapse, now, 2 * FILL_WINDOW)
+                    and all(_parse(str(e.get("at"))) > _parse(lapse) for e in fills)
+                ):
+                    s.restart_ceiling["held"] = True
                 log.warning(
-                    "%s: %d seat fills in %s — the ceiling; it is a person's now", s.id, len(fills), FILL_WINDOW
+                    "%s: %d seat fills in %s — the ceiling%s",
+                    s.id,
+                    len(fills),
+                    FILL_WINDOW,
+                    "; tripped twice running, it is a person's now" if s.restart_ceiling.get("held") else "",
                 )
                 self._save(s)
                 await self._push_changes()
@@ -3462,7 +3492,7 @@ class TickMixin:
             s.state == "idle"
             and s.told
             and idle is not None
-            and now - idle >= SEAT_IDLE_GRACE
+            and now - idle >= (SEAT_ASK_LINGER if (s.seat or {}).get("trigger") == "asks" else SEAT_IDLE_GRACE)
             and not agent_common.on_its_own(s, now)
             and git
             and not git.get("dirty")

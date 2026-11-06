@@ -62,6 +62,15 @@ STATE_CLASS = {"needs-you": "needs", "stalled?": "stalled"}
 STATE_ICON_CLASSES = frozenset({STATE_CLASS.get(s, s) for s in typing.get_args(State)} | {"oncall", "waiting"})
 
 
+def fill_words(ceiling: Mapping[str, Any]) -> str:
+    """A seat's fill ceiling in the row's and the card's words (§6 rule 3, §4.5 screen 10, TD-1422): a plain
+    mark *fills again after the hour*, a held second trip *tripped twice running — yours*."""
+    n = ceiling.get("count")
+    n = n if isinstance(n, int) else "?"
+    tail = "tripped twice running — yours" if ceiling.get("held") else "fills again after the hour"
+    return f"fills exhausted · {n} in 1 h · {tail}"
+
+
 def state_icons() -> dict[str, str]:
     """Each state class's tab icon, `static/icons/state-<class>.svg` by its hashed URL: what Focus's
     link carries in `data-icons`, so `AO.focusIcon` swaps it as the state moves (TD-1155)."""
@@ -1063,12 +1072,18 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     elif d.get("seat") and isinstance(d.get("restart_ceiling"), dict):
         # §6 rule 3's fill ceiling (TD-103): the seats sharing its controller were filled six times
         # in the hour, and this one's fill tripped it — an ending, as the crash ceiling's is
-        n = d["restart_ceiling"].get("count")
-        kind, text = "bad", f"fills exhausted · {n if isinstance(n, int) else '?'} in 1 h"
-        full = (
-            f"{text}: the host agent filled this seat and the ones beside it as often as it will "
-            "(design §6) — it is yours now: Resume it, or Forget it"
-        )
+        # (TD-1422): a plain mark lapses after the hour, a held second trip is the person's
+        kind, text = "bad", fill_words(d["restart_ceiling"])
+        if d["restart_ceiling"].get("held"):
+            full = (
+                f"{text}: the host agent filled this seat and the ones beside it as often as it will, twice running "
+                "(design §6) — it is yours now: Resume it, or Forget it"
+            )
+        else:
+            full = (
+                f"{text}: the host agent filled this seat and the ones beside it as often as it will this hour "
+                "(design §6) — it fills it again after the hour, when it is due"
+            )
     elif d.get("seat") and d.get("seat_off"):
         # a switch-made sweep seat while the switch or its repo is off (§4.9b, TD-1091): never due
         text = d["seat_off"]

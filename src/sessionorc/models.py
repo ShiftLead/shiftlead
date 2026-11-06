@@ -142,6 +142,7 @@ HOME_OWNED = frozenset(
         "by_person",
         "restarts",
         "restart_ceiling",
+        "fill_lapsed",
         "closed_for",
         "finished_sent_at",
         "restart_blocked",
@@ -1302,6 +1303,11 @@ class Session:
     # reached: the tick stops and the session is a person's. Both the home's (§4.4a).
     restarts: list[dict[str, Any]] = field(default_factory=list)
     restart_ceiling: dict[str, Any] | None = None
+    # `{at}` when a seat's plain fill ceiling (`restart_ceiling` `{why: fill}` without `held`) lapsed after
+    # `FILL_WINDOW` (§6 rule 3 *The ceiling is a rate, not a stop*, TD-1422): carried by every replay, never an
+    # entry in `restarts`, and read by the next trip, which holds (`held: true`) when every fill it counts
+    # postdates the lapse. The home's (§4.4a).
+    fill_lapsed: dict[str, Any] | None = None
     # The tick's mark after its own close for a restart, `{why, closed_at}`: the rule (`wanted`, rule 2's,
     # or `brief`, rule 7's) and the `closed_at` that close wrote. Any close the home runs clears it, and
     # a close it never hears of as an act (a person's at the node) writes a new `closed_at` that no
