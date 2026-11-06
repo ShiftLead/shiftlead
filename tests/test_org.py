@@ -667,7 +667,7 @@ def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monk
     # the held paths are the repo's top-level `held:`; no role writes a `review:` (the flow gives the
     # reader); the profile is still the org overlay's
     cfg = repoconfig.load(repo)
-    assert cfg.held == ["src/sessionorc/**", "docs/briefs/**"]
+    assert cfg.held == ["src/sessionorc/**", "docs/briefs/**", "docs/ledger/log-sources.toml"]
     for name, profile in (("grinder", "grind"), ("designer", "grind-fable")):
         role = repoconfig.resolve_role(cfg, name, aggregate.roles)
         assert (role.review, role.profile) == (None, profile)
@@ -683,7 +683,7 @@ def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monk
     assert under.flow.stage_of("grinder").lane == ["free-pick", "owner:grinder"]
     assert under.flow.stage_of("designer").lane == ["design-first", "owner:designer"]
     assert (under.reader["reader"], under.reader["bound"]) == ("techlead", "2h")
-    assert set(under.reader["held"]) == {"src/sessionorc/**", "docs/briefs/**"}
+    assert set(under.reader["held"]) == {"src/sessionorc/**", "docs/briefs/**", "docs/ledger/log-sources.toml"}
     assert teams.entry_role(aggregate, team, "feature", host, host) == "designer"
     assert teams.flow_redundant(aggregate, team, host, host) == []
 

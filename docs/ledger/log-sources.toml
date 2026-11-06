@@ -1,0 +1,11 @@
+# The sources a host-log gate in this ledger may name (design §4.4 *The home keeps a log of what it
+# witnesses*, *The source*; ledgerboard TD-045 rule 8; TD-1388). `witnessed` is the home's witness log:
+# its month files, one JSON record a line. A home whose store is elsewhere (SHIFTLEAD_HOME) says so in
+# its own host file (`host-log.toml` in the store), never here. `.shiftlead.yml`'s `held:` lists this file.
+
+[sources.witnessed]
+shape = "directory"
+path = "~/.shiftlead/witnessed"
+match = ["*.jsonl"]
+records = "jsonl"
+fields = { at = "at", kind = "kind", text = "text", id = "id", repo = "repo" }
