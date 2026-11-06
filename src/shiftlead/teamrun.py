@@ -1351,7 +1351,7 @@ def wait_words(e: Mapping[str, Any], short: bool = False) -> str:
     why = (
         str(w.get("why") or "")
         or (f"event ({w['name']})" if w.get("name") else "")
-        or ("no date" if w.get("on") == "until" else "an event")
+        or "an event"
     )
     if short and len(why) > WAIT_CLAMP:
         why = why[: WAIT_CLAMP - 1].rstrip() + "…"
