@@ -194,12 +194,12 @@ button.unseen-n { background: none; border: 1px solid var(--new); border-radius:
 .reports .rep .st.done { color: var(--done); }
 .reports .rep .st.dropped { text-decoration: line-through; }
 /* the Focus Inbox panel, the card's unread chip and the mail composer (design §4.5a, §4.10) */
-.inbox .mail { padding: 6px 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 3px; }
-.inbox .mail .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
+.inbox .mail, .sent .mail { padding: 6px 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 3px; }
+.inbox .mail .ref, .sent .mail .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
 .inbox .mail.unread .ref { font-weight: 600; }
-.inbox .mail .st { font-size: var(--t-mono-s); color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
-.inbox .mail .body { font-size: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
-.inbox .mail .body.md { white-space: normal; }
+.inbox .mail .st, .sent .mail .st { font-size: var(--t-mono-s); color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
+.inbox .mail .body, .sent .mail .body { font-size: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+.inbox .mail .body.md, .sent .mail .body.md { white-space: normal; }
 .badge.unread { color: var(--new-fg); background: var(--new-bg); border-color: var(--new); text-decoration: none; }
 /* the top bar's Inbox number: what is waiting on a person, not unread mail (§4.5a, TD-069) */
 .badge.needs { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); text-decoration: none; }

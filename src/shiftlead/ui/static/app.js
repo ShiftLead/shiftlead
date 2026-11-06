@@ -7761,7 +7761,7 @@
         if (!r.ok) return;
         got = await r.json();
       } catch (e) { return; }
-      const es = (got.entries || []).slice().sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+      const es = (got.entries || []).slice().reverse().sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
       $("#sentlist").innerHTML = es.map(AO.sentEntry).join("") || `<div class="note">nothing kept</div>`;
       AO.reopenFolds($("#sentlist"));
     }

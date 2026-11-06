@@ -86,10 +86,11 @@ def test_the_narrow_template_draws_the_strip_the_bars_and_a_sheet_row_per_card(t
         "git",
         "reports",
         "inbox",
+        "sent",
         "ready",
         "session",
     ]
-    for card in ("working", "prompts", "git", "reports", "inbox", "ready", "session"):
+    for card in ("working", "prompts", "git", "reports", "inbox", "sent", "ready", "session"):
         assert f'data-side="{card}"' in html, card  # each row opens a card the side panel draws
     assert sheet.index('data-card="session"') < sheet.index('data-for="fkill"')
     acts = re.findall(r'data-for="(\w+)"', sheet)
