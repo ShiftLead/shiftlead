@@ -672,7 +672,7 @@ async def test_an_entry_whose_wait_ends_is_told_once_and_not_before(agent, tmp_p
 
     await park_ticks(agent)
     now = datetime.now(UTC)
-    tomorrow = (now.astimezone() + timedelta(days=1)).date().isoformat()
+    tomorrow = (now + timedelta(days=1)).date().isoformat()  # a UTC day, as a wait reads it (TD-1417)
     waits = {"on": "until", "date": tomorrow, "why": "CI runs then"}
     async with LocalClient() as person:
         led = settle.mark_waits([_e("TD-001"), {**_e("TD-002"), "waits": waits}], now)

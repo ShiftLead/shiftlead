@@ -18,7 +18,7 @@ from sessionorc import ledger, mail, settle, work
 from sessionorc.client import AgentError, LocalClient
 
 NOW = datetime.now(UTC)
-TOMORROW = (NOW.astimezone().date() + timedelta(days=1)).isoformat()
+TOMORROW = (NOW.date() + timedelta(days=1)).isoformat()  # a UTC day, as a wait reads it (TD-1395, TD-1417)
 GRINDER = ["free-pick", "owner:grinder"]
 
 
