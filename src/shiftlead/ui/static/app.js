@@ -5742,7 +5742,7 @@
     return unread ? `<span class="badge unread">${unread} unread of ${total}</span>` : `${total}, all read`;
   };
   // the Sent card's summary (§4.5a *Focus side panel: Sent*, TD-1409): *n sent*, and *, m waiting* in
-  // amber while an ask of its is open — the record's counts of what the outbox keeps
+  // amber while an ask or steer of its is open — the record's counts of what the outbox keeps
   AO.sentSummary = function (sent, waiting) {
     if (!sent) return "";
     return waiting ? `${sent} sent<span class="waiting">, ${waiting} waiting</span>` : `${sent} sent`;
@@ -7750,7 +7750,7 @@
       card.classList.toggle("hidden", !n);
       const sum = $("#sentcount");
       sum.innerHTML = AO.sentSummary(n, waiting);
-      sum.title = waiting ? `${waiting} ask${waiting === 1 ? "" : "s"} still waiting for an answer` : "";
+      sum.title = waiting ? `${waiting} ask${waiting === 1 ? "" : "s"} or steer${waiting === 1 ? "" : "s"} still waiting for an answer` : "";
       const sig = JSON.stringify([n, waiting, v.mail || {}, v.unread || 0]);
       if (sig !== sentSig) { sentSig = sig; if (card.open) refreshSent(); }
     }
