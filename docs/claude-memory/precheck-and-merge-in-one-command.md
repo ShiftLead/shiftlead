@@ -12,9 +12,11 @@ The sixth merged because precheck, gate and merge ran in one command:
 
 ```bash
 agent-cadence run precheck.py --pr N > pre.txt 2>&1; echo "precheck $?"
-agent-cadence run check_cadence.py --pr N > gate.txt 2>&1; rc=$?
-[ $rc = 0 ] && gh pr merge N --squash && gh pr view N --json state -q .state
+m=$(mktemp -d); agent-cadence run check_cadence.py --pr N --trailers "$m/gate"; agent-cadence run forge.py squash-message N --gate "$m/gate" --out "$m" && gh pr merge N --squash --match-head-commit "$(cat "$m/sha")" --subject "$(cat "$m/subject")" --body-file "$m/body"
+gh pr view N --json state -q .state
 ```
+
+The second line is cadence step 5's line (TD-233): the gate hands its reading to `forge.py squash-message`, which refuses a gate that did not pass, so its `&&` is the gate and the squash ends in `Merged-by:`.
 
 Run it in the background, after the PR's `headRefOid` matches the pushed head.
 

@@ -22,7 +22,7 @@
 - [gh comment bodies go in a file](gh-comment-bodies-go-in-a-file.md) — `--body "…"` lets bash run its backticks; use `--body-file`
 - [Dates are local, PR numbers are real](dates-and-pr-numbers-are-local-and-real.md) — `date` before a dated ledger edit (kmaster is local time); PR numbers: cadence §2.8
 - [Read inbox before merging](read-inbox-before-merging.md) — merge rights change by mail; a held-path PR (`ao pr held N`) is handed over: its author sends the techlead seat the `ask --pr` once green, or it sits unasked (#1842)
-- [Gate a merge on the check's exit code](gate-a-merge-on-the-checks-exit-code.md) — step 5 merges on exit 0; capture it from the check itself, never through `| head`
+- [Gate a merge on the check's exit code](gate-a-merge-on-the-checks-exit-code.md) — merge only through cadence step 5's line, whose `&&` is the gate; any other gate captures the check's own exit, never through `| head`
 - [Reviewer prompts keep out of the anchor](reviewer-prompts-keep-out-of-the-anchor.md) — cadence §4.8: refs or its own worktree; name the anchor path only for `git fetch`
 - [Scratch-worktree tests import the main checkout](scratch-worktree-tests-import-main-checkout.md) — run a branch's tests with `PYTHONPATH=$PWD/src` and the main venv
 - [Retarget a stacked PR with the API](retarget-a-stacked-pr-with-the-api.md) — `gh pr edit` (--base, --body-file) fails on projectCards; PATCH pulls/N, rebase --onto, delete the base last
