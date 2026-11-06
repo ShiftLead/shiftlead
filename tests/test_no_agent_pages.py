@@ -73,8 +73,8 @@ def test_focus_of_a_shell_draws_a_shells_controls_and_an_agents_draws_its_own(cl
         sh, ag = client.get(f"/focus/{shell}").text, client.get(f"/focus/{agent}").text
         absent = (
             'data-act="wrapup"', 'data-act="message"', 'id="fmodeact"', 'id="fmodemenu"', 'id="fready"',
-            'id="workingcard"', 'id="reportscard"', 'id="inboxcard"', 'id="sentcard"', 'data-side="ready"', 'id="adapter_id"',
-            'id="fgrants"', 'id="fcontrollers"', "Compose a prompt…",
+            'id="workingcard"', 'id="reportscard"', 'id="inboxcard"', 'id="sentcard"', 'data-side="ready"',
+            'id="adapter_id"', 'id="fgrants"', 'id="fcontrollers"', "Compose a prompt…",
         )  # fmt: skip
         for word in absent:
             assert word not in sh, word
