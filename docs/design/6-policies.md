@@ -736,11 +736,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        whose entry is then the newest, nor a seat, which a start replays held and rule 3 fills for a cause
        (its fill is the newer entry: a cause's fill is not the lanes' work); and the claims the replay renewed (rule 5's waiting claims,
        TD-820, which `_replay` restamps with its entry's `at`) count for nothing until they move. The tick reads it for each start of
-       the day not yet worked, as its own first step, before `_keep_running` and every other pass that
+       the day not yet worked, as its own step immediately before `_keep_running` in the tick, ahead of every pass that
        replays — a replay supersedes the record in place and its progress with it, which is why the
        reading is kept; so a member that claims and then crashes or restarts itself between two ticks
        is read before its record is replaced, and one a person restarts by hand inside that interval
-       reads idle (accepted: the error is a start counted, never one spared) — and writes the
+       reads idle (accepted: the error is a start counted, never one spared); a node member's record is
+       read from the home's copy, so a down link reads the last snapshot, and the start stays counted
+       until the link brings the claim — and writes the
        start's instant into **`work_worked: [at]`** beside `work_started` the tick it first holds, so a record pruned later takes nothing back; both lists
        drop an instant past the day together, pruned by the same reading. The cap counts `work_started` less `work_worked`; a
        start not yet read worked — the team still at it — counts, so a team never has more than
