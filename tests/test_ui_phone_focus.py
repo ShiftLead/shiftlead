@@ -450,3 +450,30 @@ def test_the_stylesheet_pins_one_screen_and_draws_the_bars_on_a_phone_only():
     # the old narrow Focus is gone: no half-height terminal, no static composer under it
     assert ".termbox { height: 50vh; }" not in css and ".termwrap.cfold .termbox { height: 50vh; }" not in css
     assert "position: static; display: flex; box-shadow: none; max-height: none;" not in css
+
+
+def test_take_over_and_hand_back_share_the_acts_lines_slot_and_switch_to_unattended_is_more_s(tmp_path, monkeypatch):
+    """TD-1408 (TD-964's slice 4, design §4.5a *Focus: Take over*, *more ▾*): Take over on an unattended session and
+    Hand back on a held member stand in the acts line's one slot — Hand back a bordered plain `btn sm`, never the
+    outlined `next` — with more ▾'s toggle hidden; on an interactive session with no team and no controllers the
+    slot is empty and *Switch to unattended* is more ▾'s alone."""
+
+    def slot(html: str) -> tuple[str, str, bool]:
+        act = re.search(r'<button class="([^"]*)" id="fmodeact"[^>]*>([^<]*)</button>', html, re.S)
+        menu = re.search(r'<button id="fmodemenu"[^>]*?( hidden)?\s+title="[^"]*">([^<]*)</button>', html, re.S)
+        assert act and menu
+        assert act.group(2) == menu.group(2)  # both read `mode_act`
+        return act.group(1), act.group(2), not menu.group(1)
+
+    cls, word, in_menu = slot(_page(tmp_path, monkeypatch, unattended=True))
+    # outlined, or plain beside an outlined Close session while the checklist passes (§4.5 *The card's anatomy*)
+    assert (word, in_menu) == ("Take over", False) and cls.split() in (["btn", "sm", "next"], ["btn", "sm", "link"])
+    for held in ({"team": "t"}, {"controllers": ["ao-x-m"]}):
+        cls, word, in_menu = slot(_page(tmp_path, monkeypatch, unattended=False, **held))
+        assert (word, in_menu) == ("Hand back", False) and cls.split() == ["btn", "sm"], held
+    cls, word, in_menu = slot(_page(tmp_path, monkeypatch, unattended=False))
+    assert (word, in_menu) == ("Switch to unattended", True) and "hidden" in cls.split()
+    for ended in ("exited", "closed"):  # an ended record draws the toggle nowhere
+        for mode in ({"unattended": True}, {"unattended": False, "team": "t"}, {"unattended": False}):
+            cls, word, in_menu = slot(_page(tmp_path, monkeypatch, state=ended, **mode))
+            assert "hidden" in cls.split() and not in_menu, (ended, mode)
