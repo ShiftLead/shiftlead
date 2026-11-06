@@ -319,9 +319,10 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   --squash --match-head-commit "$(cat "$m/sha")" --subject "$(cat "$m/subject")" --body-file "$m/body"`,
   one command whose squash ends in the `Merged-by:` trailer. The slot is filled without reading the tree,
   so it adds no read to a brief's composition, a container node's included. Its text carries the old pin's
-  cure in one sentence after the line: *where `squash-message` is refused as an unknown word (a pin older than
-  agent-cadence TD-233), merge with `gh pr merge {pr} --squash`*. That fallback lasts only until the repo's
-  next sync bump. The sync's own merge reads its tree instead (§6 *Sync*, `cadence.composes`). Every built-in brief or flow stage
+  cure in one sentence after the line: *where the line is refused because `--trailers` is unrecognized or `squash-message` is not
+  a choice (a pin older than agent-cadence TD-233), merge with `gh pr merge {pr} --squash`*. That fallback lasts only until the repo's
+  next sync bump. The slot is the GitHub line, as `{gate}` and the home's PR reads assume `gh`; a
+  GitLab origin is outside these seams. The sync's own merge reads its tree instead (§6 *Sync*, `cadence.composes`). Every built-in brief or flow stage
   that has a session merge a PR names `{merge}`, never a bare `gh pr merge`, and says it is typed whole as
   one command, since `$m` does not survive a tool's separate calls and a line split at its `;` merges
   with no trailer. The merge stays the literal `gh pr merge` at the line's end, which a guard on that

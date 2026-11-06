@@ -1751,7 +1751,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `user.name` and never a model, since the home runs none. `shiftlead-sync` and `sync-check`, which
      signs step 4's BLOCK, are the same policy's two names: one signs the gate it failed, the other the
      merge it made. **Whether the tree composes** is `cadence.composes(root)` (TD-1419), read on
-     the registry checkout's current pin before step 4's gate. It is `cadence.tree(root)`, the resolve the
+     the registry checkout's current pin just before step 4's gate, after `judge`'s earlier returns. It is `cadence.tree(root)`, the resolve the
      gate's own reads use (a subprocess under `TREE_TIMEOUT`, its answer cached for `TREE_FOR`), and then
      whether that payload's `scripts/forge.py` names `squash-message`.
        - *Yes:* the line above.
