@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "the snapshot does not match the ledger: TD-9: archived"
+ }
+}

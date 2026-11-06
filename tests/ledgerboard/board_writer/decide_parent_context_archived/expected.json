@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "decide",
+  "refused": "the ledger half: TD-8, the item's Context entry, is archived — the answer lifts nothing; it takes review"
+ }
+}

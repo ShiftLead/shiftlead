@@ -30,6 +30,501 @@
    ]
   ]
  ],
+ "parts_problems": {
+  "context-archived-no-entry": {
+   "lift": {
+    "refused": "TD-4, the item's Context entry, is not among the entries given"
+   },
+   "problems": [
+    "TD-4: archived"
+   ]
+  },
+  "context-archived-no-text": {
+   "lift": {
+    "refused": "TD-4, the item's Context entry, is archived — the answer lifts nothing; it takes review"
+   },
+   "problems": [
+    "TD-4: archived"
+   ]
+  },
+  "context-archived-open": {
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": [
+    "TD-4: archived"
+   ]
+  },
+  "context-archived-status": {
+   "lift": {
+    "refused": "TD-4, the item's Context entry, is archived — the answer lifts nothing; it takes review"
+   },
+   "problems": [
+    "TD-4: archived"
+   ]
+  },
+  "context-missing": {
+   "lift": {
+    "refused": "TD-4, the item's Context entry, is not among the entries given"
+   },
+   "problems": [
+    "TD-4: missing"
+   ]
+  },
+  "detail-block": {
+   "problems": []
+  },
+  "detail-block-faulty": {
+   "problems": [
+    "TD-9: missing"
+   ]
+  },
+  "detail-board": {
+   "problems": []
+  },
+  "input-archived-bare-string": {
+   "problems": []
+  },
+  "input-archived-junk": {
+   "problems": []
+  },
+  "input-first-key-wins": {
+   "problems": []
+  },
+  "input-keys-not-ids": {
+   "problems": []
+  },
+  "input-none-before-valid": {
+   "problems": [
+    "TD-9: missing"
+   ]
+  },
+  "input-text-no-entry": {
+   "problems": [
+    "TD-9: missing"
+   ]
+  },
+  "input-value-not-string": {
+   "problems": [
+    "TD-9: missing",
+    "TD-10: missing"
+   ]
+  },
+  "line-19-digit-context": {
+   "lift": {
+    "refused": "TD-1111111111111111111, the item's Context entry, is not among the entries given"
+   },
+   "problems": [
+    "line: context: not one entry and one decision"
+   ]
+  },
+  "line-19-digit-part": {
+   "problems": [
+    "line: TD-1111111111111111111: not an id"
+   ]
+  },
+  "line-arabic-part": {
+   "problems": [
+    "line: TD-١٢: not an id"
+   ]
+  },
+  "line-event": {
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: event (build-green) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: event (build-green) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": [
+    "line: context: not one entry and one decision"
+   ]
+  },
+  "line-twice": {
+   "problems": [
+    "line: TD-009: twice"
+   ]
+  },
+  "line-two-entries": {
+   "lift": {
+    "refused": "the item's Context names no one entry and one gate, decision (<person>) or event (<name>)"
+   },
+   "problems": [
+    "line: context: not one entry and one decision"
+   ]
+  },
+  "line-words-after-gate": {
+   "covers": {
+    "TD-10": [],
+    "TD-9": []
+   },
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": [
+    "line: context: not one entry and one decision"
+   ]
+  },
+  "line-words-after-gate-pr": {
+   "covers": {
+    "TD-10": [],
+    "TD-9": []
+   },
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": [
+    "line: context: not one entry and one decision"
+   ]
+  },
+  "line-xrepo-context": {
+   "lift": {
+    "refused": "other#TD-4 is another repo's entry — its lift is a tool PR there, through lift_gate"
+   },
+   "problems": [
+    "line: context: not one entry and one decision"
+   ]
+  },
+  "line-xrepo-part": {
+   "lift": {
+    "refused": "other#TD-9 is another repo's entry — a part is Part of its parent, in the same ledger"
+   },
+   "problems": [
+    "line: other#TD-9: another repo's entry"
+   ]
+  },
+  "match": {
+   "covers": {
+    "TD-10": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ],
+    "TD-9": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ]
+   },
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": []
+  },
+  "match-padded": {
+   "covers": {
+    "TD-10": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ],
+    "TD-9": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ]
+   },
+   "lift": {
+    "ok": {
+     "TD-009": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-010": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": []
+  },
+  "match-parent-carries": {
+   "covers": {
+    "TD-10": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ],
+    "TD-9": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ]
+   },
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-4": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": []
+  },
+  "match-person-case": {
+   "covers": {
+    "TD-10": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ],
+    "TD-9": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ]
+   },
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (Pat) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: decision (Pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": []
+  },
+  "match-words-before": {
+   "covers": {
+    "TD-10": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ],
+    "TD-9": [
+     [
+      "example.com/acme/widgets",
+      "open"
+     ]
+    ]
+   },
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": []
+  },
+  "none-act": {
+   "problems": []
+  },
+  "none-closed": {
+   "problems": []
+  },
+  "none-decided": {
+   "problems": []
+  },
+  "none-int": {
+   "problems": []
+  },
+  "none-nested-item": {
+   "problems": []
+  },
+  "none-no-parts": {
+   "problems": []
+  },
+  "none-not-an-item": {
+   "problems": []
+  },
+  "none-null": {
+   "problems": []
+  },
+  "none-parts-word": {
+   "problems": []
+  },
+  "none-two-items": {
+   "problems": []
+  },
+  "order-context-and-part": {
+   "problems": [
+    "TD-4: missing",
+    "TD-9: not Part of TD-4"
+   ]
+  },
+  "order-first-fault": {
+   "problems": [
+    "TD-9: not Part of TD-4"
+   ]
+  },
+  "order-two-faulty": {
+   "problems": [
+    "TD-9: missing",
+    "TD-10: not Part of TD-4"
+   ]
+  },
+  "part-archived-no-entry": {
+   "lift": {
+    "refused": "TD-9, a part the item lists, is not among the entries given"
+   },
+   "problems": [
+    "TD-9: archived"
+   ]
+  },
+  "part-archived-no-text": {
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-4": [
+      "gate lift skipped: TD-9 no longer carries decision (pat)"
+     ]
+    }
+   },
+   "problems": [
+    "TD-9: archived"
+   ]
+  },
+  "part-archived-open": {
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-9": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ]
+    }
+   },
+   "problems": [
+    "TD-9: archived"
+   ]
+  },
+  "part-archived-status": {
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-4": [
+      "gate lift skipped: TD-9 no longer carries decision (pat)"
+     ]
+    }
+   },
+   "problems": [
+    "TD-9: archived"
+   ]
+  },
+  "part-missing": {
+   "lift": {
+    "refused": "TD-9, a part the item lists, is not among the entries given"
+   },
+   "problems": [
+    "TD-9: missing"
+   ]
+  },
+  "part-not-carrying": {
+   "lift": {
+    "ok": {
+     "TD-10": [
+      "gate lifted: decision (pat) — by pat; answer \"Go\""
+     ],
+     "TD-4": [
+      "gate lift skipped: TD-9 no longer carries decision (pat)"
+     ]
+    }
+   },
+   "problems": [
+    "TD-9: does not carry decision (pat)"
+   ]
+  },
+  "part-of-5000-digits": {
+   "problems": [
+    "TD-9: not Part of TD-4"
+   ]
+  },
+  "part-of-arabic-digits": {
+   "problems": [
+    "TD-9: not Part of TD-4"
+   ]
+  },
+  "part-of-none": {
+   "lift": {
+    "refused": "TD-9, a part the item lists, is not Part of TD-4 — the snapshot does not match"
+   },
+   "problems": [
+    "TD-9: not Part of TD-4"
+   ]
+  },
+  "part-of-other": {
+   "lift": {
+    "refused": "TD-9, a part the item lists, is not Part of TD-4 — the snapshot does not match"
+   },
+   "problems": [
+    "TD-9: not Part of TD-4"
+   ]
+  },
+  "part-of-xrepo": {
+   "lift": {
+    "refused": "TD-9, a part the item lists, is not Part of TD-4 — the snapshot does not match"
+   },
+   "problems": [
+    "TD-9: not Part of TD-4"
+   ]
+  },
+  "read-no-space": {
+   "problems": []
+  },
+  "read-repeat": {
+   "problems": []
+  },
+  "read-spaces": {
+   "problems": []
+  },
+  "read-stray-word": {
+   "problems": []
+  }
+ },
  "refused": {
   "a bad repo": {
    "refused": "repo is this repo's origin path (owner/name) or its basename, not 'acme widgets'"

@@ -1070,6 +1070,667 @@
         "Not yet"
       ],
       "context": "TD-12, TD-13 see the decision (made last week)"
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-10",
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      },
+      "default": 0
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-015"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-10",
+        "TD-9"
+      ],
+      "answers": [
+        "go — build both",
+        "Build one",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      },
+      "lifts": [
+        "go",
+        "Build one"
+      ],
+      "hide_until": "2026-01-15"
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4, TD-5 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "other#TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "act",
+      "parts": [
+        "TD-9"
+      ]
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Yes",
+        "No"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Yes",
+        "No"
+      ],
+      "detail": {
+        "context": "Two\nlines.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": "TD-9",
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        9
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        null
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-1111111111111111111 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-١٢ decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "td-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-77777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777777"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        " TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-١٢"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-1111111111111111111"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-9\n"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-15",
+        "TD-015"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "other#TD-15"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-4"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-004"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 event (build-green)",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat) — design ready",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat), PR #3 merged",
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "Design TD-4 decision (pat)",
+      "kind": "decide",
+      "parts": [
+        "TD-9",
+        "TD-10"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": "TD-4 decision (pat)",
+      "kind": null,
+      "parts": [
+        "TD-9"
+      ]
+    },
+    {
+      "fn": "item_line",
+      "text": "Go on the builds?",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": null,
+      "context": null,
+      "kind": "decide",
+      "parts": [
+        "TD-9"
+      ],
+      "answers": [
+        "Go",
+        "Not yet"
+      ],
+      "detail": {
+        "context": "The design is done.",
+        "question": "Go on its builds?",
+        "recommended": "Go: the rounds ended."
+      }
     }
   ],
   "predicates": [
@@ -1491,7 +2152,8 @@
     "- [ ] decide 2026-01-15 (session `w-1` on box-1) — Go? Context: PR #5 decision (pat). Due: 2026-01-20. Answers: Go | Not yet.",
     "- [ ] \tact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
     "- [ ]  act 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
-    "- [ ] \u000bact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20."
+    "- [ ] \u000bact 2026-01-05 (n/a) — Rotate the key. Context: TD-7. Due: 2026-01-20.",
+    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the builds? Context: TD-4 decision (pat). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go (default) | Not yet."
   ],
   "canonical_items": [
     "- [ ] 2026-01-15 (session `w-1` on box-1) — Ship it. Context: TD-7. due: 2026-01-20.",
@@ -1593,7 +2255,8 @@
     "- [ ] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. — Pat, 2026-01-06: later. Answers: now | later.",
     "- [x] act 2026-01-05 (session `s-1`) — Rotate. Context: TD-1. Due: 2026-01-10. Hide until: 2026-01-12. Closed: 2026-01-13.",
     "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-20. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B.",
-    "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-25. Hide until: 2026-01-22. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B. Decided: Option A (by pat) (2026-01-21)."
+    "- [ ] decide 2026-01-05 (session `w-1`) — Go on the parts? Context: TD-12 decision (pat). Parts: TD-15, TD-16. Due: 2026-01-25. Hide until: 2026-01-22. Answers: Option A | Option B | Not yet. Lifts: Option A | Option B. Decided: Option A (by pat) (2026-01-21).",
+    "- [ ] decide 2026-01-15 (session `w-1`) — Go on the builds? Context: TD-4 decision (pat). Parts: TD-9, TD-10. Due: 2026-01-20. Answers: Go (default) | Not yet."
   ],
   "respaces": [
     {

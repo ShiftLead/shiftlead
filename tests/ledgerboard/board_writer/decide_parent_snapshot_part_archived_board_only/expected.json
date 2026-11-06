@@ -1,0 +1,14 @@
+{
+ "exit": 0,
+ "out": {
+  "action": "decide",
+  "board_only": true,
+  "entries": [],
+  "item_notes": [],
+  "line": 15,
+  "paths": [
+   "board.md"
+  ],
+  "subject": "ledgerboard: decide Go on the report suite?: Go (session n/a)"
+ }
+}

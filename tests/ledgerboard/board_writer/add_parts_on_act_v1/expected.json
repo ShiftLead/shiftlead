@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "only a decide lists its parts (parts), not an act"
+ }
+}

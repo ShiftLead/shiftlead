@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "--ledger on an add is the ledger a --parts snapshot is checked against: give --parts too"
+ }
+}

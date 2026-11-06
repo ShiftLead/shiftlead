@@ -128,6 +128,7 @@
   false,
   true,
   false,
+  true,
   true
  ],
  "decide_lift": {
@@ -140,8 +141,50 @@
   "answerer_off_people_refused": {
    "refused": "lee is not on the board's People: (pat) — only a listed person answers"
   },
+  "archived_context_refused": {
+   "refused": "TD-500, the item's Context entry, is archived — the answer lifts nothing; it takes review"
+  },
   "archived_entry_refused": {
    "refused": "TD-550, the item's Context entry, is archived — the answer lifts nothing; it takes review"
+  },
+  "archived_member_ignored": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"\n- 2026-01-15: gate lift skipped: TD-506 no longer carries decision (Pat)\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Go\"\n"
+   }
+  },
+  "archived_part_also_open": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Go\"\n",
+    "TD-506": "## TD-506: A part moved to the archive by hand, still reading Open\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Part of:** TD-500\n\n**Why:** the second half of the work, done another way and archived without its Status changed.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Go\"\n"
+   }
+  },
+  "archived_part_kept_waiting": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n**Blocked by:** decision (Pat)\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: kept waiting: decision (Pat) — by pat; answer \"Not yet\"\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9, decision (pat)\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: kept waiting: decision (pat) — by pat; answer \"Not yet\"\n"
+   }
+  },
+  "archived_part_no_input": {
+   "refused": "TD-506, a part the item lists, is not among the entries given"
+  },
+  "archived_part_skipped": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"\n- 2026-01-15: gate lift skipped: TD-506 no longer carries decision (Pat)\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Go\"\n"
+   }
+  },
+  "archived_part_skipped_event": {
+   "ok": {
+    "TD-508": "## TD-508: A parent waiting on a release to ship\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-05\n**Status:** Open\n\n**Why:** its parts build on the release.\n\n**Event (ships):** the release ships.\ncheck: pr-merged acme/tools#57\n\n**Log:**\n- 2026-01-05: gate added: event (ships)\n- 2026-01-15: gate lifted: event (ships) — by pat; answer \"Drop the gate\"\n- 2026-01-15: gate lift skipped: TD-509 no longer carries event (ships)\n"
+   }
+  },
+  "archived_part_two_spellings": {
+   "ok": {
+    "TD-500": "## TD-500: A parent waiting on its go\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-02\n**Status:** Open\n\n**Why:** the design is still being shaped.\n\n**Ask:** say go once the parts read right.\n\n**Log:**\n- 2026-01-02: filed by pat, session w-1: \"file the parent\"\n- 2026-01-02: gate added: decision (Pat)\n- 2026-01-15: gate lifted: decision (Pat) — by pat; answer \"Go\"\n- 2026-01-15: gate lift skipped: TD-006 no longer carries decision (Pat)\n",
+    "TD-501": "## TD-501: The first part, waiting on the same go and an entry\n\n**Priority:** Medium\n**Type:** feature\n**Added:** 2026-01-03\n**Status:** Open\n**Blocked by:** TD-9\n**Part of:** TD-500\n\n**Why:** the first half of the work.\n\n**Ask:** the parent's go.\n\n**Log:**\n- 2026-01-15: gate lifted: decision (pat) — by pat; answer \"Go\"\n"
+   }
   },
   "bad_answered_by_refused": {
    "refused": "Answered by is owner or any, not 'everyone'"

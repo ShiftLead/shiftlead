@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "a --parts snapshot is checked against the ledger: pass --ledger (the v2 directory), or keep it as ledger/ beside the board"
+ }
+}

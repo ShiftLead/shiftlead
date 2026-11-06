@@ -1,0 +1,7 @@
+{
+ "exit": 1,
+ "out": {
+  "action": "add",
+  "refused": "--parts is a decide's snapshot, asked as a question: a decided item takes none"
+ }
+}

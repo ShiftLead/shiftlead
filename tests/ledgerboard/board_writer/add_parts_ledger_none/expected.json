@@ -1,0 +1,7 @@
+{
+ "exit": 2,
+ "out": {
+  "action": "add",
+  "refused": "nowhere: no such ledger"
+ }
+}
