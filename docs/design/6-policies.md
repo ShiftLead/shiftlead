@@ -724,9 +724,41 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        again at the cost of one short run. Five bounds, each
        read before the first replay and each leaving the row of `ask` in its place, saying which: a
        profile of any member **over its usage line** (§6 *Usage gate*); the team's **stop time**
-       passed and not cleared; **`WORK_STARTS_DAY`** (three) starts of that team by this rule in the
-       last twenty-four hours, a start being one instant however many records it replayed (the home
-       keeps `work_started: [at]` beside `work_waiting`); a start by this rule inside the last
+       passed and not cleared; **`WORK_STARTS_DAY`** (three) **idle starts** of that team by this rule
+       in the last twenty-four hours, a start being one instant however many records it replayed (the
+       home keeps `work_started: [at]` beside `work_waiting`) — **a start the team worked counts for
+       nothing** (TD-1441; Paul, 2026-11-06: on a day of his answers the cap held a team his Go had
+       just unblocked). A start is *worked* once a record it replayed — one whose newest `restarts` entry is
+       the start's own (`why: work`, `start` equal to its instant) — holds a progress entry it
+       declared itself (`source: declared`, never `derived` from a branch) reading `claimed` or
+       `done`, stamped after that entry's `at`. A member the start did not replay never credits it,
+       nor does a run a later restart of the record began (a person's Start, a schedule's, rule 2's),
+       whose entry is then the newest, nor an unattended seat, which a start replays held and rule 3 fills for a cause
+       (its fill is the newer entry: a cause's fill is not the lanes' work; a seat the start replays
+       live is read as a member is); and the claims the replay renewed (rule 5's waiting claims,
+       TD-820, which `_replay` restamps with its entry's `at`) count for nothing until they move or are declared again — the rule reads
+       the stamp, not the substance, so a member that re-declares a carried reference credits the start,
+       the lenient side and bounded as below. The tick reads it for each start of
+       the day not yet worked, as its own step immediately before `_keep_running` in the tick, ahead of every pass that
+       replays — a replay supersedes the record in place and its progress with it, which is why the
+       reading is kept; so a member that claims and then crashes or restarts itself between two ticks
+       is read before its record is replaced, and one a person restarts by hand inside that interval
+       reads idle (accepted: the error is a start counted, never one spared); a node member's record is
+       read from the home's copy, so a down link reads the last snapshot, and the start stays counted
+       until the link brings the claim — and writes the
+       start's instant into **`work_worked: [at]`** beside `work_started` the tick it first holds, so a record pruned later takes nothing back; both lists
+       drop an instant past the day together, pruned by the same reading. The cap counts `work_started` less `work_worked`; a
+       start not yet read worked — the team still at it — counts, so a team never has more than
+       `WORK_STARTS_DAY` starts on the day it has not yet shown work for. A runaway — a team started
+       into lanes nobody can pick from, wound down, started again — claims nothing, so every one of
+       its starts counts, and the cap holds it as before; one that does work is bounded by
+       `WORK_EARLY`, at most two starts an hour, and before that by `RESTART_CEILING`, since a `why:
+       work` entry is a counted restart: a record with three in two hours is left out of the replay, and
+       a start with none left holds as `nothing` (*no record to start*) — a ceiling, not the expectation: the home writes a
+       member's lane ids into its `lane_seen` on the first tick after its `none` (rule 6), so the same entries are no news
+       again and start nothing. Rule 9's wind-down is unchanged: a team whose
+       lanes hold only entries gated on the person still winds down (rule 9 holds no wind-down on a lane: that would make it a second reader of the lane, below), and
+       the person's answer starts it again, a start its members then work; a start by this rule inside the last
        **`WORK_EARLY`** (thirty minutes); and its repo **over the team's balance line** (§6
        *Balance*), read here by the rule itself, since the mark goes with the team's last live
        member: the team's `balance` against the registry root its records name — one, since a team works
@@ -740,7 +772,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        reads the line afresh, a failed reading writing no new hold. A person's turn of `on_work` is
        the person's own start or stop, and is read so. A bound that holds writes
        **`held: {why}`** on `work_waiting` — `usage` with the `profile` and, when the reading has
-       one, the window's `resets`, `until` with the instant, `day` with the `count`, `early` with
+       one, the window's `resets`, `until` with the instant, `day` with the `count` of idle starts, `early` with
        the last start, `balance` with the `repo` and the `crossed` lines in the mark's shape —
        re-read on every tick, so the start follows on the tick the bound lifts; a team with no
        record left to replay is held as `nothing`, and one with a member on a node whose link is
@@ -772,7 +804,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      that runs on has only the members the mark names replayed, each alone — its launch record,
      `why: work` with its `ids`, `start` and `of` counting the members replayed, its mail kept —
      under the same five bounds, the usage line read for its profile, one such start counting as one
-     of the team's `WORK_STARTS_DAY`; a named member at its ceiling, suspended, sat out, run-only, or
+     of the team's `WORK_STARTS_DAY` while idle, read worked as a whole-team start is; a named member at its ceiling, suspended, sat out, run-only, or
      without a launch record is left, and a mark naming only such members holds as `nothing`. Under `ask`
      the row reads *ao-grind · grinder-ao-1 finished 00:56 · its lane gained TD-428* (§4.5a **Inbox
      row: team start**), and its
