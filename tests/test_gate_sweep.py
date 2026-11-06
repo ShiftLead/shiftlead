@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import sys
 from datetime import date
@@ -378,3 +379,283 @@ def test_a_closed_lift_asked_about_in_a_sweep_pr_not_yet_fetched_is_not_asked_ag
     assert got["applied"][0] == (
         "lift TD-7 event (x-merged): its PR #1 was closed unmerged — not reopened; asked on the board already"
     )
+
+
+# ── host-log: the home runs agent-cadence's reader per gate (§4.4 *The check*, TD-1388) ─────────
+
+HOSTLOG = """## TD-9: Waits on a press
+
+**Priority:** Low
+**Added:** 2026-11-01
+**Status:** Open
+**Blocked by:** event (applied)
+
+**Why:** w.
+
+**Event (applied):** the person applies ao-grind.
+check: host-log witnessed kind press "apply ao-grind"
+
+**Fix:** f.
+
+**Log:**
+- 2026-11-04: gate added: event (applied)
+"""
+SOURCES = '[sources.witnessed]\nshape = "directory"\npath = "~/.shiftlead/witnessed"\n'
+WITNESSED_TABLE = """[sources.witnessed]
+shape = "directory"
+path = "~/.shiftlead/witnessed"
+match = ["*.jsonl"]
+records = "jsonl"
+fields = { at = "at", kind = "kind", text = "text", id = "id", repo = "repo" }
+"""
+HOST = {"repo": "o/r", "visibility": "public", "host_file": Path("/store/host-log.toml")}
+GATE = {
+    "id": "TD-9",
+    "name": "applied",
+    "check": lb.parse_check('host-log witnessed kind press "apply ao-grind"'),
+    "since": "2026-11-04",
+}
+
+
+@pytest.fixture
+def reader(monkeypatch, tmp_path):
+    """`hostlog.py` as a stub: it records its argv and standard input, then prints `out` and exits `code`
+    (`sleep` seconds first); `cadence.command` hands it out for `hostlog.py` and records the call."""
+    rec = tmp_path / "reader.json"
+    said = {"out": json.dumps({"outcome": "passed", "evidence": "witnessed/w-1"}), "code": 0, "sleep": 0}
+    conf = tmp_path / "reader-conf.json"
+    stub = tmp_path / "hostlog_stub.py"
+    stub.write_text(
+        "import json, sys, time\n"
+        f"c = json.load(open({str(conf)!r}))\n"
+        f"json.dump({{'argv': sys.argv[1:], 'stdin': sys.stdin.read()}}, open({str(rec)!r}, 'w'))\n"
+        "time.sleep(c['sleep'])\n"
+        "print(c['out'])\n"
+        "sys.exit(c['code'])\n"
+    )
+    calls: list[tuple] = []
+    prev = cadence.command  # the `repo` fixture's, where it ran first: every other script still goes there
+
+    def command(where, word, *args):
+        if args[:1] != ("hostlog.py",):
+            return prev(where, word, *args)
+        calls.append((str(where), word, *args))
+        conf.write_text(json.dumps(said))
+        return [sys.executable, str(stub), *args[1:]], dict(os.environ)
+
+    monkeypatch.setattr(cadence, "command", command)
+    monkeypatch.setattr(cadence, "pinned", lambda root: True)
+    monkeypatch.setattr(cadence, "is_source", lambda root: False)
+    monkeypatch.setattr(cadence, "tree", lambda root: (tmp_path, None))
+
+    def ran() -> dict | None:
+        return json.loads(rec.read_text()) if rec.exists() else None
+
+    return said, calls, ran
+
+
+def test_host_log_gates_are_the_open_entries_host_log_checks():
+    assert gatesweep.host_log_gates(EVENT + "\n" + HOSTLOG + "\n" + PERSON) == [GATE]
+    undated = HOSTLOG.split("**Log:**")[0]
+    assert gatesweep.host_log_gates(undated)[0]["since"] is None
+    assert gatesweep.host_log_gates(HOSTLOG.replace("**Status:** Open", "**Status:** Resolved 2026-11-05")) == []
+    assert gatesweep.check_line(GATE["check"]) == 'host-log witnessed kind press "apply ao-grind"'
+    many = lb.parse_check('host-log witnessed times 3 "x y"')
+    assert gatesweep.check_line(many) == 'host-log witnessed times 3 "x y"'
+
+
+def test_the_reader_is_run_with_the_homes_host_file_and_the_check_last(reader, tmp_path):
+    said, calls, ran = reader
+    got = gatesweep.host_log(tmp_path, GATE, conf=SOURCES, host=HOST)
+    assert got == {"outcome": "passed", "evidence": "witnessed/w-1", "why": None}
+    [call] = calls
+    assert call[:4] == (str(tmp_path), "run", "hostlog.py", "check")
+    assert ran()["argv"] == [
+        "check", "--repo-config", "-", "--host-config", "/store/host-log.toml", "--repo", "o/r",
+        "--visibility", "public", "--since", "2026-11-04", 'host-log witnessed kind press "apply ao-grind"',
+    ]  # fmt: skip
+    assert ran()["stdin"] == SOURCES, "the repo's log-sources.toml on standard input"
+    gatesweep.host_log(tmp_path, {**GATE, "since": None}, conf="", host={**HOST, "visibility": "private"})
+    assert "--since" not in ran()["argv"] and ran()["stdin"] == ""
+    assert ran()["argv"][ran()["argv"].index("--visibility") + 1] == "private"
+    gatesweep.host_log(tmp_path, GATE, conf="", host={**HOST, "visibility": "internal"})
+    assert ran()["argv"][ran()["argv"].index("--visibility") + 1] == "public", "internal is passed as public"
+
+
+def test_each_reader_answer_maps_to_its_outcome(reader, tmp_path, monkeypatch):
+    said, _, _ = reader
+
+    def answer(out: str, code: int = 0) -> dict:
+        said.update(out=out, code=code)
+        return gatesweep.host_log(tmp_path, GATE, conf="", host=HOST)
+
+    assert answer(json.dumps({"outcome": "not yet", "count": 0})) == {
+        "outcome": "not yet",
+        "evidence": None,
+        "why": "0 counted",
+    }
+    assert answer(json.dumps({"outcome": "error", "problem": "outside every root"}))["outcome"] == "error"
+    assert answer(json.dumps({"outcome": "none", "problem": "no host file"})) == {
+        "outcome": None,
+        "evidence": None,
+        "why": "no host file",
+    }
+    assert answer(json.dumps({"outcome": "passed", "evidence": "e"}), code=1)["outcome"] == "error", "non-zero"
+    assert answer("not json")["outcome"] == "error"
+    assert answer(json.dumps(["passed"]))["outcome"] == "error", "not one JSON object"
+    assert answer(json.dumps({"outcome": "maybe"}))["outcome"] == "error"
+    monkeypatch.setattr(gatesweep, "HOSTLOG_TIMEOUT", 0.5)
+    said["sleep"] = 5
+    got = answer(json.dumps({"outcome": "passed"}))
+    assert got["outcome"] == "error" and "gave no answer in" in got["why"], "the hard timeout"
+
+
+def test_a_repo_the_reader_cannot_run_for_is_error_without_a_run(reader, tmp_path, monkeypatch):
+    _, calls, _ = reader
+    assert "no <repo> id" in gatesweep.host_log(tmp_path, GATE, conf="", host={**HOST, "repo": None})["why"]
+    monkeypatch.setattr(cadence, "tree", lambda root: (None, "fetch failed"))
+    assert gatesweep.host_log(tmp_path, GATE, conf="", host=HOST) == {
+        "outcome": "error",
+        "evidence": None,
+        "why": "agent-cadence's pinned tree could not be made: fetch failed",
+    }
+    monkeypatch.setattr(cadence, "pinned", lambda root: False)
+    assert gatesweep.host_log(tmp_path, GATE, conf="", host=HOST)["outcome"] == "error"
+    assert calls == [], "none of them ran the reader"
+    monkeypatch.setattr(cadence, "tree", lambda root: (tmp_path, None))
+    monkeypatch.setattr(cadence, "is_source", lambda root: True)
+    assert gatesweep.host_log(tmp_path, GATE, conf="", host=HOST)["outcome"] == "passed", "agent-cadence's own source"
+    assert len(calls) == 1
+
+
+def test_a_source_checkout_is_what_cadence_is_source_reads(tmp_path):
+    (tmp_path / "files").mkdir()
+    (tmp_path / "launcher").mkdir()
+    (tmp_path / "launcher" / "INTERFACE").write_text("1\n")
+    assert cadence.is_source(tmp_path) and not cadence.pinned(tmp_path)
+
+
+def test_the_homes_answers_replace_event_checks_rows_for_host_log_gates(reader, tmp_path, caplog):
+    said, calls, ran = reader
+    root = tmp_path / "h"
+    (root / "docs" / "ledger").mkdir(parents=True)
+    (root / gatesweep.LOG_SOURCES).write_text(SOURCES)
+    _git("init", "-q", "-b", "main", str(root))
+    _git("-C", str(root), "add", "-A")
+    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "seed")
+    (root / gatesweep.LOG_SOURCES).write_text("# a working-tree edit, not the base's\n")
+    theirs = [PASSED, {"id": "TD-9", "name": "applied", "outcome": None, "evidence": None, "why": "no host file"}]
+    said["out"] = json.dumps({"outcome": "error", "problem": "the source is private"})
+    caplog.set_level(logging.INFO, logger="shiftlead.agent")
+    got = gatesweep.host_log_rows(root, "main", EVENT + "\n" + HOSTLOG, theirs, HOST)
+    assert got == [
+        PASSED,
+        {"id": "TD-9", "name": "applied", "outcome": "error", "evidence": None, "why": "the source is private"},
+    ]
+    assert ran()["stdin"] == SOURCES, "read from the base the ledger was read from"
+    assert "TD-9 event (applied), host-log error — the source is private" in caplog.text, "the problem is logged"
+    (root / gatesweep.LOG_SOURCES).unlink()
+    _git("-C", str(root), "rm", "-q", "--cached", gatesweep.LOG_SOURCES)
+    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "drop")
+    gatesweep.host_log_rows(root, "main", HOSTLOG, [], HOST)
+    assert ran()["stdin"] == "", "no file: empty input"
+    calls.clear()
+    assert gatesweep.host_log_rows(root, "main", EVENT, [PASSED], HOST) == [PASSED] and calls == []
+
+
+def test_a_passed_host_log_gate_is_lifted_with_the_readers_evidence_and_a_none_is_left_out(repo, reader):
+    root, ran = repo
+    said, _, _ = reader
+    (root / "docs" / "ledger" / "TD-9.md").write_text(HOSTLOG)
+    _git("-C", str(root), "add", "-A")
+    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "td9")
+    _git("-C", str(root), "push", "-q", "origin", "main")
+    _git("-C", str(root), "fetch", "-q", "origin")
+    said["out"] = json.dumps({"outcome": "none", "problem": "no host file"})
+    p = gatesweep.plan(root, [], today_utc=UTC, today_local=LOCAL, host=HOST)
+    assert {x["id"] for x in p["lifts"]} == {"TD-7"} and "TD-9" not in json.dumps(p["to_file"]), "none: left out"
+    said["out"] = json.dumps({"outcome": "passed", "evidence": "witnessed/w-3"})
+    p = gatesweep.plan(root, [], today_utc=UTC, today_local=LOCAL, host=HOST)
+    assert {"id": "TD-9", "gate": "event (applied)", "kind": "event", "evidence": "witnessed/w-3"} in p["lifts"]
+
+
+def test_forge_visibility_reads_gh_and_glab(monkeypatch, tmp_path):
+    seen: list = []
+
+    def gh(root, *args):
+        seen.append(("gh", str(root), args))
+        return subprocess.CompletedProcess(args, 0, "INTERNAL\n", "")
+
+    monkeypatch.setattr(gatesweep, "_gh", gh)
+    assert gatesweep.forge_visibility(tmp_path, "git@github.com:o/r.git") == "internal"
+    assert seen[0][2] == ("repo", "view", "--json", "visibility", "--jq", ".visibility")
+    monkeypatch.setattr(gatesweep, "_gh", lambda root, *a: subprocess.CompletedProcess(a, 1, "", "no"))
+    assert gatesweep.forge_visibility(tmp_path, "git@github.com:o/r.git") is None
+
+    def glab(directory, host, path, timeout):
+        seen.append(("glab", host, path))
+        return {"visibility": "private"}, None
+
+    monkeypatch.setattr(gatesweep.reports, "_glab_api", glab)
+    assert gatesweep.forge_visibility(tmp_path, "git@gitlab.com:g/sub/r.git") == "private"
+    assert seen[-1] == ("glab", "gitlab.com", "projects/g%2Fsub%2Fr")
+    assert gatesweep.forge_visibility(tmp_path, "git@example.org:o/r.git") is None, "no forge it can ask"
+
+
+async def test_the_tick_hands_the_sweep_the_repo_id_visibility_and_host_file(agent, monkeypatch, tmp_path):
+    from sessionorc import witness
+
+    root = str(tmp_path / "s")
+    reads: list[str] = []
+    answers = iter([None, "private"])
+
+    def vis(r, remote):
+        reads.append(remote)
+        return next(answers)
+
+    hosts: list = []
+
+    def sweep(root, others, **kw):
+        hosts.append(kw["host"])
+        return {"checks": [], "lifts": [], "to_file": {}, "to_close": {}, "applied": []}, None
+
+    monkeypatch.setattr(gatesweep, "eligible", lambda r: (True, None))
+    monkeypatch.setattr(gatesweep, "forge_visibility", vis)
+    monkeypatch.setattr(gatesweep, "sweep", sweep)
+    agent._repos[root] = {"remote": "git@github.com:o/r.git"}
+    await agent._sweep_pass(UTC)
+    assert hosts[-1] == {"repo": "o/r", "visibility": "public", "host_file": witness.host_file()}, "unread: public"
+    await agent._sweep_pass(date(2026, 11, 6))
+    assert hosts[-1]["visibility"] == "private", "a failed read is tried again at the next due reading"
+    await agent._sweep_pass(date(2026, 11, 7))
+    assert hosts[-1]["visibility"] == "private" and len(reads) == 2, "a read once made is kept for the agent's life"
+
+
+def test_against_the_real_reader_a_press_today_lifts_a_gate_added_yesterday_and_one_yesterday_does_not(tmp_path):
+    """The pinned `hostlog.py` itself, through `cadence.command` for this checkout, on a test home whose
+    `witnessed/start` predates yesterday and whose host file the home wrote, with this repo's committed
+    `log-sources.toml` (the design's table) on standard input."""
+    from datetime import UTC, datetime, timedelta
+
+    from conftest import pinned_script
+
+    from sessionorc import witness
+
+    pinned_script("hostlog.py")  # skips where the pinned tree cannot be reached
+    root = Path(__file__).resolve().parents[1]
+    store = Path(os.path.realpath(tmp_path / "store"))
+    log_dir = store / "witnessed"
+    now = datetime.now(UTC)
+    witness.ensure_start(now - timedelta(days=3), root=log_dir)
+    assert witness.ensure_host_file(store)
+    host = {"repo": "o/r", "visibility": "public", "host_file": witness.host_file(store)}
+    committed = root / gatesweep.LOG_SOURCES  # #2996's; the design's table until it merges
+    conf = committed.read_text(encoding="utf-8") if committed.is_file() else WITNESSED_TABLE
+    gate = {**GATE, "since": (now - timedelta(days=1)).date().isoformat()}
+    witness.append("press", "o/r", "apply ao-grind", at=now - timedelta(days=1), root=log_dir)
+    witness.append("press", "elsewhere/r", "apply ao-grind", at=now, root=log_dir)  # another repo's
+    got = gatesweep.host_log(root, gate, conf=conf, host=host)
+    assert got["outcome"] == "not yet", got
+    rec = witness.append("press", "o/r", "apply ao-grind", at=now, root=log_dir)
+    got = gatesweep.host_log(root, gate, conf=conf, host=host)
+    assert got["outcome"] == "passed" and got["evidence"] == f"witnessed/{rec['id']}", got

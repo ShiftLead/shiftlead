@@ -1655,13 +1655,15 @@ class TickMixin:
                     continue
                 self._sweep_quiet = {(r, w) for r, w in self._sweep_quiet if r != root}
                 others = [r for r in roots if r != root and Path(r).is_dir()]
+                host = await self._host_log_args(root)
                 got, why = await asyncio.to_thread(
-                    lambda r=root, o=others: gatesweep_mod.sweep(
+                    lambda r=root, o=others, h=host: gatesweep_mod.sweep(
                         r,
                         o,
                         today_utc=today,
                         today_local=date.today(),  # noqa: DTZ011 — a board's date is the person's
                         by=by,
+                        host=h,
                     )
                 )
                 if got is None:
@@ -1670,6 +1672,25 @@ class TickMixin:
                 log.info("%s: gate sweep — %s", root, gatesweep_mod.summary(got))
         except Exception:  # noqa: BLE001 — a detached task: log it, and tomorrow's pass tries again
             log.exception("the gate sweep pass failed")
+
+    async def _host_log_args(self, root: str) -> dict[str, Any]:
+        """What the event runner hands `hostlog.py check` for `root`'s host-log gates (§4.4 *The check*, TD-1388):
+        its `<repo>` id (`_repo_id`, on the loop), its visibility (`private` only for a private repo; an internal,
+        unknown or unread one `public`), read from the forge once per agent start and a failed read tried again
+        at the next due reading, and the home's host file."""
+        rid = await self._repo_id(root)
+        vis = self._visibility.get(root)
+        if vis is None:
+            remote = str((self._repos.get(root) or {}).get("remote") or "")
+            if not remote:
+                remote = await asyncio.to_thread(reports.git_origin, root)
+            if got := await asyncio.to_thread(gatesweep_mod.forge_visibility, root, remote):
+                self._visibility[root] = vis = got
+        return {
+            "repo": rid,
+            "visibility": "private" if vis == "private" else "public",
+            "host_file": witness.host_file(),
+        }
 
     def _conventions_once(self, root: str, line: str) -> None:
         """Rule 12's info line for `root`, logged once while it lasts (TD-1046)."""

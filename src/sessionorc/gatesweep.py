@@ -9,7 +9,9 @@ branch names and idempotence rules so a by-hand sweep and the home never write t
   their archives), each from its clone's `origin/<default>` as last fetched.
 - **The checks.** Each open `event (<name>)` gate's typed check through the pinned `event_checks.py --json`,
   run in a detached worktree of `origin/<default>`; a gate it gives no answer for is left out of `sweep()`'s
-  results (never lifted, never filed as broken).
+  results (never lifted, never filed as broken). A `host-log` gate is answered by the home itself (§4.4 *The
+  check*, TD-1388): agent-cadence's reader, `hostlog.py check`, run per gate with the home's own host file,
+  in place of whatever `event_checks.py` said of it.
 - **The writes**, each from a worktree of its own at `origin/<default>`, never the registered checkout: each
   lift its own PR on `lift/TD-n/<gate>`, written by the pinned `ledger.py lift`; this repo's board items and
   closes one PR on `sweep/<UTC date>`. The home opens them and merges none: they take ordinary review
@@ -26,6 +28,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import re
 import shutil
 import subprocess
@@ -33,11 +36,14 @@ import tempfile
 from datetime import date
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
-from sessionorc import cadence
+from sessionorc import cadence, reports
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc.ledgerboard import board as lb_board
+
+log = logging.getLogger("shiftlead.agent")
 
 LEDGER = "docs/ledger"  # a split ledger: the sweep reads no v1 file here
 SWEEP_BRANCH = "sweep/"  # the board PR's branch: sweep/<UTC date>
@@ -46,6 +52,8 @@ SESSION = "gate-sweep"  # the session an item the sweep files names
 GIT_TIMEOUT = 60.0
 GH_TIMEOUT = 60.0
 SCRIPT_TIMEOUT = 600.0  # one pinned script: `event_checks.py`'s forge calls (30 s each), or one `ledger.py lift`
+HOSTLOG_TIMEOUT = 120.0  # one `hostlog.py check`: a fixed hard bound over the reader's own (at most 90 s)
+LOG_SOURCES = "docs/ledger/log-sources.toml"  # the repo's host-log sources, read where its ledger was
 
 
 class SweepError(Exception):
@@ -185,9 +193,141 @@ def checks(tree: Path) -> list[dict[str, Any]]:
     return [r for r in rows if isinstance(r, dict) and r.get("id") and r.get("name")]
 
 
-def plan(root: Path | str, others: list[Path | str], *, today_utc: date, today_local: date) -> dict[str, Any]:
+# ── host-log: the home's own reader run (§4.4 *The check*, TD-1388) ──────────────────────────────
+
+
+def host_log_gates(text: str) -> list[dict[str, Any]]:
+    """Every open entry's event gate whose section's check is `host-log`, in ledger order: `{id, name, check,
+    since}`, `check` the vendored `parse_check()` reading and `since` the gate's `gate_added()` day (None when it
+    gives none). A gate whose section is missing or unreadable is not here: `event_checks.py` reports it."""
+    out = []
+    for tid, body in lb._entry_texts(text).items():
+        found = lb.entries(body)
+        if not found or lb.first_word(found[0]["fields"].get("status")) in lb.ARCHIVED_WORDS:
+            continue
+        secs = lb.event_sections(body)
+        for name in dict.fromkeys(lb.parse_gates(found[0]["blocked_raw"])["events"]):
+            mine = [x for x in secs if x["name"] == name]
+            if len(mine) != 1 or mine[0]["problem"] or (mine[0]["check"] or {}).get("type") != "host-log":
+                continue
+            added = lb.gate_added(body, f"event ({name})")
+            out.append(
+                {"id": tid, "name": name, "check": mine[0]["check"], "since": added.isoformat() if added else None}
+            )
+    return out
+
+
+def check_line(c: dict[str, Any]) -> str:
+    """A `host-log` check as `parse_check()` read it, written back as one argument: `host-log <source> [kind
+    <kind>] [times <N>] "<text>"`."""
+    words = ["host-log", c["source"]] + (["kind", c["kind"]] if c.get("kind") else [])
+    words += ["times", str(c["times"])] if c.get("times", 1) != 1 else []
+    return " ".join([*words, f'"{c["text"]}"'])
+
+
+def forge_visibility(root: Path | str, remote: str) -> str | None:
+    """The repo's visibility on its forge, lower case (`private`, `internal`, `public`), or None when it could not
+    be read: GitHub's `gh repo view --json visibility` run in `root` (never `isPrivate`, true for an internal repo
+    too), GitLab's project `visibility` through `glab api`."""
+    kind, where = reports.forge_of(remote)
+    try:
+        if kind == "gitlab":
+            host, _, path = where.partition("/")
+            got, why = reports._glab_api(root, host, f"projects/{quote(path, safe='')}", GH_TIMEOUT)
+            word = str(got.get("visibility") or "") if isinstance(got, dict) and why is None else ""
+        elif kind == "github":
+            cp = _gh(root, "repo", "view", "--json", "visibility", "--jq", ".visibility")
+            word = cp.stdout.strip() if cp.returncode == 0 else ""
+        else:
+            word = ""
+    except (OSError, subprocess.SubprocessError):
+        word = ""
+    word = word.lower()
+    return word if word in ("private", "internal", "public") else None
+
+
+def host_log(root: Path | str, gate: dict[str, Any], *, conf: str, host: dict[str, Any]) -> dict[str, Any]:
+    """One `host-log` gate's `{outcome, evidence, why}` from agent-cadence's reader, run through `root`'s pin as
+    the home runs every agent-cadence word, with `conf` (the repo's `log-sources.toml`) on standard input and
+    `host`'s `repo` id, `visibility` and `host_file`. The reader's `none` is outcome None (left out of the sweep's
+    results); a non-zero exit, output that is not one JSON object, or no answer in HOSTLOG_TIMEOUT is `error`, as
+    is a repo the reader cannot run for: neither pinned nor agent-cadence's source, no `<repo>` id, no tree."""
+
+    def err(why: str) -> dict[str, Any]:
+        return {"outcome": "error", "evidence": None, "why": why}
+
+    if not (cadence.pinned(root) or cadence.is_source(root)):
+        return err("the repo neither pins agent-cadence nor is its source, so hostlog.py cannot run for it")
+    if not host.get("repo"):
+        return err("the repo's origin gives no <repo> id")
+    payload, why = cadence.tree(root)
+    if payload is None:
+        return err(f"agent-cadence's pinned tree could not be made: {why}")
+    args = ["--repo-config", "-", "--host-config", str(host["host_file"]), "--repo", str(host["repo"])]
+    args += ["--visibility", "private" if host.get("visibility") == "private" else "public"]
+    args += ["--since", gate["since"]] if gate.get("since") else []
+    argv, env = cadence.command(root, "run", "hostlog.py", "check", *args, check_line(gate["check"]))
+    try:
+        cp = subprocess.run(
+            argv,
+            input=conf,
+            capture_output=True,
+            text=True,
+            timeout=HOSTLOG_TIMEOUT,
+            cwd=str(root),
+            env=env,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return err(f"hostlog.py gave no answer in {HOSTLOG_TIMEOUT:.0f} s")
+    except OSError as e:
+        return err(f"hostlog.py could not run: {e}")
+    try:
+        out = json.loads(cp.stdout) if cp.returncode == 0 else None
+    except ValueError:
+        out = None
+    if not isinstance(out, dict) or out.get("outcome") not in (*lb.CHECK_OUTCOMES, "none"):
+        return err(f"hostlog.py gave no outcome (exit {cp.returncode}): {(cp.stderr or '').strip()[:200]}")
+    problem = out.get("problem")
+    if out["outcome"] == "none":
+        return {"outcome": None, "evidence": None, "why": problem or "this host serves no such source"}
+    if out["outcome"] == "passed":
+        return {"outcome": "passed", "evidence": out.get("evidence"), "why": None}
+    return {"outcome": out["outcome"], "evidence": None, "why": problem or f"{out.get('count', 0)} counted"}
+
+
+def host_log_rows(
+    root: Path | str, base: str, text: str, rows: list[dict[str, Any]], host: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """`rows` (`event_checks.py`'s answers) with each `host-log` gate's answer replaced by the home's own,
+    one gate at a time, the reader given the repo's `log-sources.toml` from `base` (empty when it has none);
+    each answer's `why` (the reader's `problem`) goes to the home's log, never the board."""
+    gates = host_log_gates(text)
+    if not gates:
+        return rows
+    mine = {(g["id"], g["name"]) for g in gates}
+    out = [r for r in rows if (r.get("id"), r.get("name")) not in mine]
+    conf = _show(root, base, LOG_SOURCES) or ""
+    for g in gates:
+        got = host_log(root, g, conf=conf, host=host)
+        if got["why"]:
+            log.info("%s: %s event (%s), host-log %s — %s", root, g["id"], g["name"], got["outcome"], got["why"])
+        out.append({"id": g["id"], "name": g["name"], **got})
+    return out
+
+
+def plan(
+    root: Path | str,
+    others: list[Path | str],
+    *,
+    today_utc: date,
+    today_local: date,
+    host: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The sweep's plan for the repo at `root`: `sweep()`'s `{to_file, to_close, lifts}` with `repo`, `base`,
-    `boards` (each board read, by its sweep name) and `checks`. Raises SweepError when it cannot be made."""
+    `boards` (each board read, by its sweep name) and `checks`. With `host` (`{repo, visibility, host_file}`,
+    the home's) each `host-log` gate is answered by the home's own reader run (`host_log_rows`). Raises
+    SweepError when it cannot be made."""
     base = ledger_mod.default_ref(root)
     if base is None:
         raise SweepError("no origin/<default>")
@@ -214,6 +354,8 @@ def plan(root: Path | str, others: list[Path | str], *, today_utc: date, today_l
             roots.setdefault(lb.origin_key(b[0]) or b[1], str(other))
     with Tree(root, base) as tree:
         rows = checks(tree)
+    if host is not None:
+        rows = host_log_rows(root, base, text, rows, host)
     results = {(r["id"], r["name"]): (r.get("outcome"), r.get("evidence")) for r in rows if r.get("outcome")}
     try:
         out = lb.sweep([text, archive or ""], boards, results, today_utc, today_local, repo=repo)
@@ -568,11 +710,17 @@ def _apply_own(
 
 
 def sweep(
-    root: Path | str, others: list[Path | str], *, today_utc: date, today_local: date, by: str
+    root: Path | str,
+    others: list[Path | str],
+    *,
+    today_utc: date,
+    today_local: date,
+    by: str,
+    host: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any] | None, str | None]:
     """One sweep of `root`: `(reading, None)` — the plan with `applied`, its lines — or `(None, why)`."""
     try:
-        p = plan(root, others, today_utc=today_utc, today_local=today_local)
+        p = plan(root, others, today_utc=today_utc, today_local=today_local, host=host)
     except (SweepError, lb.Refused, OSError, subprocess.SubprocessError) as e:
         return None, str(e)
     return {**p, "applied": apply(root, p, today_utc=today_utc, today_local=today_local, by=by)}, None

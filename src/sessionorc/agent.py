@@ -723,6 +723,9 @@ class HostAgent(
         self._sweep_task: asyncio.Task[None] | None = None
         self._swept_on: dict[str, date] = {}
         self._sweep_quiet: set[tuple[str, str]] = set()
+        # and each root's forge visibility, read once per agent start for its host-log gates (TD-1388): kept in
+        # memory, never in the saved repo facts; a failed read is not kept, so the next due reading tries again
+        self._visibility: dict[str, str] = {}
         # rule 11 (TD-258): the detached read of merged PRs against `held:`, when it last ran, what
         # was settled (address, the record's `created`, PR) and when each PR was last tried
         self._held_task: asyncio.Task[None] | None = None
