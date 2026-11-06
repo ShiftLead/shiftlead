@@ -179,3 +179,29 @@ def test_a_waits_line_beside_a_lifted_until_hovers_its_line():
     )
     got = _read(text)["TD-001"]
     assert got["waiting"]["on"] == "event" and teamrun.wait_line(got) == "Waits: event — a sync"
+
+
+HOSTLOG = '**Event (push-on):** the person turns push on\ncheck: host-log witnessed kind press "push-on"\n'
+
+
+@pytest.mark.parametrize(
+    ("blocked", "section", "on"),
+    [
+        ("event (push-on)", HOSTLOG, "event"),  # a home-witnessed event (TD-1295, TD-1388)
+        ("event (flake-again)", EVENT, "event"),  # a typed check the forge answers
+        (f"until {TOMORROW}", "", "until"),  # an occurrence nothing witnesses: the day of the next look
+    ],
+)
+def test_a_live_checks_gate_keeps_it_out_of_the_lanes_until_it_lifts(blocked, section, on):
+    """A live check whose build is live waits on its gate, not its `Kind:` line (§4.4 *An entry says what it
+    waits for*, §4.9b; TD-1385): its gate marks it waiting, it stays a *live check*, and no lane takes it; the
+    same entry with the gate lifted is the lane's."""
+    head = "## TD-007: a live check\n\n**Priority:** Medium\n**Owner:** grinder\n"
+    head += "**Kind:** live-check #5\n**Status:** Open\n"
+    gated = head + f"**Blocked by:** {blocked}\n\n**Why:** a reason.\n" + (f"\n{section}" if section else "")
+    got = _read(gated, live=lambda n: True)["TD-007"]
+    assert got["live"] == "yes" and got["for_page"] == "live-check"
+    assert got["waiting"]["on"] == on and not ledger.lane_matches(GRINDER, got), "its build is live, its gate holds"
+    lifted = _read(head + "\n**Why:** a reason.\n" + (f"\n{section}" if section else ""), live=lambda n: True)
+    lifted = lifted["TD-007"]
+    assert "waiting" not in lifted and ledger.lane_matches(GRINDER, lifted), "lifted, it is the lane's"
