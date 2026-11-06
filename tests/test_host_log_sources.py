@@ -10,7 +10,6 @@ import tomllib
 from pathlib import Path
 
 import yaml
-
 from conftest import pinned_script
 
 ROOT = Path(__file__).resolve().parents[1]
