@@ -542,11 +542,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      design-first` — a decision owed to the designer is that `Kind:`, never a `decision (designer)`
      item (TD-1296), and a decision on an entry's `Blocked by:` matches no lane: the person's,
      `decision (paul)`, is *for you* (§4.4 *Repo facts*) —, and `free-pick` a
-     pickable entry whose kind is `build` or unwritten — or `live-check`, **once its build is
-     live** (§4.9b *A live check is a grinder's once its build is live*) — and **every open
+     pickable entry whose kind is `build` or unwritten — or `live-check`, **once its `event (live…)` gates are
+     lifted** (§4.9b *A live check waits on a gate for its build to be live*, TD-1437) — and **every open
      decided line of the repo's board**, a work order `board:<key>` (§4.4 *Board write-back*),
      which `owner:<word>` never narrows out, since a line has no owner, and **every red PR nobody holds**, a work order `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), the same: the grinders' pick list takes both first (§4.9b *No anchor seat*) — so an
-     evaluation, a decision and a live check whose build is not live match no lane, and a ledger
+     evaluation, a decision and a live check whose gate stands match no lane, and a ledger
      with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of
      references gains nothing, and any other lane word matches nothing until a role gives it a
      meaning here. **An `owner:<word>` in a lane narrows it**: with one or more, an entry matches
@@ -569,8 +569,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      once. **`lane_seen` is the lane's memory, never the ledger's**: on every reading, an id in it
      that the reading holds and the lane no longer matches is removed, its drop mark under
      `dropped` removed with it, for a live member and a gone one alike, so an entry that leaves
-     the lane and comes back is news once more — a build that became a live check and then went
-     live, a `Blocked by` that reopened and cleared, an `Owner:` that moved away and back; an id
+     the lane and comes back is news once more — a live check whose `event (live…)` gates were
+     lifted, a `Blocked by` that reopened and cleared, an `Owner:` that moved away and back; an id
      the reading does not hold is kept, since an entry absent from the checkout's file is archived
      or the checkout's moment, not the lane's. The reading is one function (`sessionorc.work`),
      the memory pruned and the news read in one pass, so rule 6 and rule 8 never disagree on what is new; it keys on the id alone, since
@@ -579,8 +579,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      an entry comes back, and the reading sees them all. **Unknown is not *not live***: until the
      promote's first reading since the host agent started, no live commit is known, and a reading
      taken then gives each live check the `live` its checkout's last reading gave it (`no` for one
-     that reading did not hold), so a restart never takes a live check out of a lane and brings it
-     back as news (TD-516). It is mail, so the doorbell is what
+     that reading did not hold), so a restart never changes a live check's *not live #n* words
+     (TD-516); since TD-1437 the reading holds nothing, and a live check's lane is its gate's. It is mail, so the doorbell is what
      wakes the member, under every rule the doorbell has (§4.10: hook-confirmed idle, an empty
      composer, a pending stop beats it, **one unit of the wake budget**), and a node's member is
      reached as any mail reaches it. What the member does is its own: a claim clears
@@ -1323,6 +1323,39 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   unknown*. The home reads the block from the checkout, so it stands as soon as the checkout's
   `main` holds it; with `auto` off, the row or `ao promote` is the person's press, and CLAUDE.md's
   pair by hand stays the fallback while the agent is down.
+  **The live ref (TD-1437).** For each repo with a `promote:` block, the home keeps a tag on the
+  repo's origin, **`promote/live`**, at the live commit, so a check run against the forge can see what
+  runs (§4.9b *A live check waits on a gate for its build to be live*). A tag rather than a branch: it is
+  in no branch list or PR base picker, and a branch protection rule never refuses it; it must not be
+  matched by a tag protection rule. It says which commit is live, so on a public repo that is public
+  too. When the pass that reads **live** (a full one or a watch) finds it at a commit of `origin/main` — a promote or a rollback
+  concluding, or a copy installed by hand that `check` reads — the home pushes it from the checkout
+  when it differs from the stored lease (or none is stored), off the loop, once per such commit — so the
+  first pass after the restart a promote of this repo causes still pushes it:
+  `git push --force-with-lease=refs/tags/promote/live:<lease> origin <live>:refs/tags/promote/live`.
+  The lease is **`promotes.<repo>.live_ref`**, the sha the home last pushed, written to
+  `~/.shiftlead/promotes/<repo>/live_ref` beside `last.json` and read from there at the home's start,
+  since a promote of this repo restarts the home that pushed it.
+  The home pushes only with a lease or onto an absent tag: with none stored (the first push, a store
+  lost, or after a refusal) it reads the tag and a branch of that name with `git ls-remote`, pushes when there is neither, adopts it
+  as the lease when it already names the live commit (a push that landed before its lease was
+  stored), and otherwise reads it as someone else's. A push refused for its lease first reads the tag again, as the no-lease read does: one
+  already at the live commit (a push that landed before its lease was written) is adopted, with no
+  note; no tag and no branch there clears the lease, with no note, and the next pass pushes onto the absent tag.
+  Otherwise a
+  refusal, or a tag found with no lease, clears the
+  stored lease and sends the person one `system` note, as the promote's *promoted* notes go (§4.10),
+  once per sha the tag or branch was found at: *the promote/live tag on <repo> was moved by someone else: delete
+  it (`git push origin :refs/tags/promote/live`) and the home pushes it again*; until then the checks read what
+  that tag names, and a lift from it is caught by review. Any other failure is logged and retried on the next full pass. A live that is *unknown*, or a
+  commit `origin/main` does not hold, moves nothing. The tag is the home's alone: no session pushes
+  it (the briefs say so), and a lift read from a tag someone else moved is caught as any forged lift
+  is, by review. A push that lands clears that repo's last-swept day (the event runner's `_swept_on`,
+  §4.4), or, while its sweep is running, adds it to `_resweep`, which clears its day when that run
+  ends; the check reads the forge, so the next sweep reads the gate at once, and only its lift PR is
+  written from the clone as last fetched. GitHub and GitLab both answer `file-contains` at a tag (the
+  forge reader resolves a ref by name); a branch of the same name may shadow it, so a branch
+  `promote/live` on origin is read as a refusal too.
   **A rollback** is a person's press with a commit: `ao promote --sha <commit>` or `--back` (§4.7),
   never the page's, since the page may be what broke, and the policy's only after a failed smoke
   (*The smoke* below).
