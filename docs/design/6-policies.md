@@ -267,7 +267,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      tokens, so the linger costs a pane and the context it carries into the next ask, and a fill
      it saves is one fewer under `FILL_CEILING`) — with nothing dirty or unpushed and **no live subagent and no live background shell** (§4.2 *Working on its own*,
      TD-734, TD-761: a seat that ended its turn on an Agent-tool reviewer or a background CI wait is working, as its card says; its
-     two minutes count from the later of `since`, `subagent_at` and `shells_at`, as rule 4's do), is
+     grace — two minutes, or the linger — counts from the later of `since`, `subagent_at` and `shells_at`, as rule 4's do), is
      closed (a seat that left work is the board's) — **unless it waits on a PR of its own**: an open PR on the branch it has checked out, as the
      repo reading has it; a claim on its record carrying a PR not read merged or closed (`pr`, or
      `review_pr`); or a claim derived from that branch whose PR no reading has yet — a close would
@@ -280,20 +280,26 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      1 h*) on the seat whose fill tripped it and the Inbox row as for a crash, its siblings merely
      refused fills until the hour rolls; fills are not crash restarts and do not count toward
      `RESTART_CEILING`. **The ceiling is a rate, not a stop** (TD-1422): the tripping seat's
-     `why: fill` mark lapses as its siblings' refusal does — once the mark's `at` is `FILL_WINDOW`
-     old the tick clears it, appends `{at, why: lapse}` to the seat's `restarts` (counted toward
-     nothing, as `person` is), and the Inbox row leaves with the mark; the seat is filled on the next
-     pass its cause is due, under the same count. A seat that answers a trickle of asks one fill
-     each reaches six in an hour by working, and a mark that waited for a person left every later
-     ask waiting with it. **A second trip holds**: a trip whose seat's `restarts` carry a `lapse`
-     inside `FILL_WINDOW` writes the mark with `held: true`, which never lapses — two hours running
-     at the ceiling is a loop or a load the rate cannot serve, and either is a person's; the row's
-     words gain *· again after the hour*. A lost brief's ceiling (`why: lost-brief`) never lapses.
-     **A person brings a seat back** with Restart (§6 rule 2 *A person's restart*, `ao restart`):
-     on a seat whose `restart_ceiling` says `why: fill`, lapsed or held, the press clears the mark,
-     writes the seat's `restarts` as `[{at, why: person}]`, and creates nothing — the fill is this
-     rule's, made on the next pass the seat is due, and that one fill is made whatever its fellows'
-     count, since a person asked for it (it is written `{why: fill}` and counts from then). The card draws the count toward a `prs:` trigger from `seat_count` (*on
+     `why: fill` mark lapses as its siblings' refusal does — on every pass the tick makes over the
+     seat, cause due or not and before it reads the seat's state, a plain mark whose `at` is
+     `FILL_WINDOW` old is cleared and **`fill_lapsed: {at}`** written on the record (home-owned, carried
+     to the record a fill creates as `restarts` is, cleared by a person's Restart; no reader of
+     `restarts` sees it, so it is no restart, no chip and no count), and the Inbox row leaves with the
+     mark; the seat is filled on the next pass its cause is due, under the same count. A seat that
+     answers a trickle of asks one fill each reaches six in an hour by working, and a mark that
+     waited for a person left every later ask waiting with it. **A second trip holds**: a trip whose
+     six counted fills were all made after the newest `fill_lapsed.at` among the fellows `_fill`
+     counts over (the group's, wherever the trip lands) writes the mark with `held: true`, which never
+     lapses — an hour of fresh fills at the ceiling straight after a lapse is a loop or a load the rate
+     cannot serve, and either is a person's; a trip that counts fills from before the lapse is plain
+     and lapses again. The words say which: a plain mark reads *fills exhausted · 6 in 1 h · fills
+     again after the hour*, a held one *fills exhausted · 6 in 1 h · tripped twice running — yours*. A
+     lost brief's ceiling (`why: lost-brief`) never lapses. **A person brings a seat back** with
+     Restart (§6 rule 2 *A person's restart*, `ao restart`): on a seat whose `restart_ceiling` says
+     `why: fill`, plain or held, the press clears the mark and `fill_lapsed`, writes the seat's
+     `restarts` as `[{at, why: person}]`, and creates nothing — the fill is this rule's, made on the
+     next pass the seat is due, and that one fill is made whatever its fellows' count, since a person
+     asked for it (it is written `{why: fill}` and counts from then). The card draws the count toward a `prs:` trigger from `seat_count` (*on
      call — runs after 10 PRs · 4 of 10*).
      **No seat is filled in a main checkout** (§4.9b *No anchor seat*, retired 2026-10-15): no seat
      carries the trigger `work` or a lane, so no fill is gated by a checkout and no record carries
