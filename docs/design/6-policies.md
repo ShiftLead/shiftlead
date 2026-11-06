@@ -283,7 +283,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      1 h*) on the seat whose fill tripped it and the Inbox row as for a crash, its siblings merely
      refused fills until the hour rolls; fills are not crash restarts and do not count toward
      `RESTART_CEILING`. **The ceiling is a rate, not a stop** (TD-1422): the tripping seat's
-     `why: fill` mark lapses an hour after the trip, as the last of its fellows' refusals does — on every pass the tick makes over the
+     `why: fill` mark lapses an hour after the trip, outlasting its fellows' refusals, which end as the oldest counted fill rolls out of `FILL_WINDOW` — on every pass the tick makes over the
      seat, cause due or not (after the pass writes `seat_due` and finds the seat's link up, before it
      reads the seat's state; a suspended or sat-out seat, which the pass leaves, keeps its mark and
      row; a node's seat's lapse is written and pushed as its trip is), a plain mark whose `at` is
