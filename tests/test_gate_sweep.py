@@ -322,7 +322,7 @@ def test_every_gh_call_names_its_repo_and_an_at_name_reaches_the_pr_body_in_a_co
     clone's own (`repo view` as its argument); an item's `@name` copied into another repo's PR body would
     notify, so it goes in a code span there."""
     root, x = other
-    ask = PERSON.replace("**Ask:** Should it go?", "**Ask:** Should it go, @someone?")
+    ask = PERSON.replace("**Ask:** Should it go?", "**Ask:** Should it go, @someone? Ask `run @kept` too")
     (root / "docs" / "ledger" / "TD-8.md").write_text(ask)
     _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qam", "at")
     _git("-C", str(root), "push", "-q", "origin", "main")
@@ -332,6 +332,16 @@ def test_every_gh_call_names_its_repo_and_an_at_name_reaches_the_pr_body_in_a_co
         return f"git@github.com:o/{Path(real_url(r)).name.removesuffix('-origin.git')}.git"
 
     monkeypatch.setattr(gatesweep, "origin_url", github)
+    real_sweep = gatesweep.lb.sweep
+
+    def titled(*a, **kw):  # a Context carrying an @ (an entry's title in it): it reaches the body in a span too
+        out = real_sweep(*a, **kw)
+        for items in out["to_file"].values():
+            for it in items:
+                it["context"] = f"{it['context']} @titled"
+        return out
+
+    monkeypatch.setattr(gatesweep.lb, "sweep", titled)
     got, why = gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
     assert why is None, why
     assert any(a.endswith("pull/1") for a in got["applied"] if a.startswith("board ")), got["applied"]
@@ -341,13 +351,21 @@ def test_every_gh_call_names_its_repo_and_an_at_name_reaches_the_pr_body_in_a_co
             named = call[2] if call[:2] == ["repo", "view"] else call[call.index("--repo") + 1]
             assert named == slug, call
     (pr,) = _forge(x)["prs"].values()
-    assert "`@someone`" in pr["body"] and "@someone" not in pr["body"].replace("`@someone`", ""), pr["body"]
+    body = pr["body"]
+    assert "`@someone`" in body and "@someone" not in body.replace("`@someone`", ""), body
+    assert "`run @kept`" in body and "``" not in body, "a span already there is left whole"
+    assert "`@titled`" in body and "@titled" not in body.replace("`@titled`", ""), body
     assert "@someone?" in _branch(x, pr["head"], "docs/user_attention.md"), "the board keeps the words as written"
 
 
 def test_unmention_puts_each_at_name_in_a_code_span_and_leaves_the_rest():
     assert gatesweep.unmention("ask @paul and @org/team, not a@b.c or `@kept`") == (
         "ask `@paul` and `@org/team`, not a@b.c or `@kept`"
+    )
+    # a span already there is left whole, never wrapped again (review of #3040): `run @paul` stays one span
+    assert (
+        gatesweep.unmention("try `run @paul` then @bob, or ``a `@x` b``")
+        == "try `run @paul` then `@bob`, or ``a `@x` b``"
     )
 
 

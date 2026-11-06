@@ -22,7 +22,7 @@ branch names and idempotence rules so a by-hand sweep and the home never write t
   this repo is open there, no item a notices PR from this repo merged or closed within the re-ask window
   already filed, and nothing on a board more visible than this repo (its items carry this repo's words, an
   `@name` in the PR body in a code span), each said in the run's lines. Every `gh` call names its repo
-  (`--repo`, from the clone's origin), never the remote `gh` would infer.
+  (`--repo`, from the clone's origin) where the origin names one, never the remote `gh` would infer.
 
 `due`, `lift_branch` and `summary` are pure; the rest shells out and is called in a thread."""
 
@@ -385,7 +385,8 @@ def gh_repo(root: Path | str) -> str | None:
 
 def _gh(root: Path | str, *args: str) -> subprocess.CompletedProcess[str]:
     """`gh` in `root`, aimed at `root`'s origin by `--repo` (`repo view`: its argument) rather than whatever
-    remote `gh` would infer, which may be an upstream."""
+    remote `gh` would infer, which may be an upstream. An origin that names no repo (a local path) has no forge
+    repo to name, and `gh` infers there as before."""
     if (slug := gh_repo(root)) is not None:
         args = (*args[:2], slug, *args[2:]) if args[:2] == ("repo", "view") else (*args, "--repo", slug)
     return subprocess.run(
@@ -605,12 +606,14 @@ def visibility(root: Path | str) -> str:
     return got.upper()
 
 
-MENTION = re.compile(r"(?<![\w`])@([A-Za-z0-9][\w-]*(?:/[\w.-]+)?)")
+# a code span (left as it is: an `@name` inside one notifies nobody), else an `@name` or `@org/team` outside one
+MENTION = re.compile(r"(`+)(?:.*?)\1|(?<![\w`])@([A-Za-z0-9][\w-]*(?:/[\w.-]+)?)", re.S)
 
 
 def unmention(text: str) -> str:
-    """`text` with each `@name` (and `@org/team`) in a code span, so a PR body copying it notifies nobody."""
-    return MENTION.sub(r"`@\1`", text)
+    """`text` with each `@name` (and `@org/team`) outside a code span put in one, so a PR body copying it notifies
+    nobody; a span already there is left as it is."""
+    return MENTION.sub(lambda m: m.group(0) if m.group(1) else f"`@{m.group(2)}`", str(text))
 
 
 def _held_by_notices(there: Path | str, mark: re.Pattern[str], ctx: str, today_utc: date) -> int | None:
@@ -705,8 +708,8 @@ def _other_board(
                 "repo's board, whose `People:` names the person.",
                 "",
             ]
-            + [f"- file: [{it['kind']}] {unmention(it['text'])} — Context: {it['context']}" for it in items]
-            + [f"- close: {k}" for k in keys]
+            + [f"- file: [{it['kind']}] {unmention(it['text'])} — Context: {unmention(it['context'])}" for it in items]
+            + [f"- close: {unmention(k)}" for k in keys]
             + ["", "Review it like any PR (cadence §4)."]
         )
         url = _ship(there, tree, branch, base.removeprefix("origin/"), subject, body)
