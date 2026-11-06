@@ -265,6 +265,12 @@ INTENT_FIELDS = HOME_OWNED - frozenset(
 )
 
 
+def fill_ceiling(mark: Any) -> bool:
+    """A seat's fill ceiling, plain or held (§6 rule 3, TD-1422): `{why: fill}` — what a person's restart
+    clears (§6 rule 2 *A person's restart*). A lost brief's and a crash ceiling are not."""
+    return isinstance(mark, dict) and mark.get("why") == "fill"
+
+
 def fill_lapses(mark: Any) -> bool:
     """A seat's fill ceiling that lapses after `FILL_WINDOW` (§6 rule 3 *The ceiling is a rate, not a stop*,
     TD-1422): `{why: fill}` without `held`. A lost brief's, a crash ceiling and a held second trip stay."""

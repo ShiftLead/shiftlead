@@ -3541,7 +3541,11 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # person's restart*, TD-250): the RPC is a person's alone and makes every refusal before
             # it touches anything, so its words are the toast and the row stands
             s = await call("restart", id=sid)
-            return JSONResponse({"ok": True, "id": s.get("id") or sid, "unattended": bool(s.get("unattended"))})
+            # a seat at its fill ceiling comes back as itself, cleared, and the toast says so (TD-1422)
+            seat = (s.get("name") or s.get("id") or sid) if s.get("seat") is not None else None
+            return JSONResponse(
+                {"ok": True, "id": s.get("id") or sid, "unattended": bool(s.get("unattended")), "seat": seat}
+            )
         elif action == "send":
             # the page's key (design §4.10 *A send lands once*, TD-806): a repeat answers as the first
             await call("send", id=sid, text=body.get("text", ""), key=body.get("key"))

@@ -3568,9 +3568,10 @@ def test_a_leftover_seat_held_hold_draws_no_inbox_row(tmp_path, monkeypatch):
 
 def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tmp_path, monkeypatch):
     """§4.5a **Inbox row: restart** and **more ▾** → **Restart** (§6 rule 2 *A person's restart*,
-    TD-250 slice 2): drawn beside Resume on the row of a supervised record that is not a seat — the
-    *fills exhausted* row keeps Open, Resume and Dismiss alone — and in the card's menu for a
-    supervised idle, exited or closed record, confirming only when no restart mark stands."""
+    TD-250 slice 2): drawn beside Resume on the row of a supervised record that is not a seat, and on
+    the *fills exhausted* row with no confirm, since it clears the mark and starts nothing (TD-1429) —
+    and in the card's menu for a supervised idle, exited or closed record that is not a seat,
+    confirming only when no restart mark stands."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from shiftlead.ui.app import templates, view
 
@@ -3587,7 +3588,8 @@ def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tm
     restart = {r["sid"]: r for r in state_rows_of(records) if r["row"] == "restart"}
     member, seat = rows("needs", [restart["ao-m"]]), rows("needs", [restart["ao-s"]])
     assert member.index('data-act="restart" data-id="ao-m"') < member.index('data-act="resume" data-id="ao-m"')
-    assert 'data-act="restart"' not in seat and 'data-act="resume" data-id="ao-s"' in seat and ">Dismiss<" in seat
+    assert 'data-act="restart" data-id="ao-s" title=' in seat and "data-confirm" not in seat
+    assert 'data-act="resume" data-id="ao-s"' in seat and ">Dismiss<" in seat
     # the caption (§4.5a, TD-1422): a plain fill mark fills again after the hour; every other, held too, is yours
     assert ">fills again after the hour<" in seat and "yours now" not in seat
     assert ">the host agent will not restart it — yours now<" in member
@@ -3601,6 +3603,10 @@ def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tm
     twice = next(r for r in state_rows_of([held]) if r["row"] == "restart")
     assert twice["text"] == "fills exhausted · 3 in 1 h · tripped twice running — yours"
     assert ">the host agent will not restart it — yours now<" in rows("needs", [twice])
+    assert 'data-act="restart" data-id="ao-t"' in rows("needs", [twice]), "a held fill mark's row too"
+    lost = rec("ao-l", "exited", supervised=True, seat={"trigger": "asks"}, restart_ceiling=ceiling)
+    lost_row = next(r for r in state_rows_of([lost]) if r["row"] == "restart")
+    assert 'data-act="restart"' not in rows("needs", [lost_row]), "a seat's crash ceiling is no fill's"
 
     def menu(r):
         html = templates.get_template("card.html").render(s=view(r, records))
@@ -3855,3 +3861,30 @@ def test_the_message_page_heads_with_the_subject_and_its_tab_says_it(client, tmp
     assert "<title>merge the font fix · Inbox · ShiftLead</title>" in html
     assert '<span class="h1 msgsubj">merge the font fix</span>' in html
     assert ".msgpage .msgentry > .mailrow > .subj { display: none; }" in (UI / "static" / "app.css").read_text()
+
+
+def test_the_restart_press_on_a_seat_answers_with_its_name_for_the_cleared_toast(client, monkeypatch):
+    """§4.5a *Inbox row: restart* on the *fills exhausted* row (TD-1429): the RPC hands back the seat's own
+    view, and the press's answer carries its name, so the toast reads `ao restart`'s words; a member's
+    restart carries none, and app.js keeps its *restarted from its launch record* toast for it."""
+    from shiftlead.ui import app as ui
+
+    views = {
+        "ao-x-tl": {"id": "ao-x-tl", "name": "tl", "seat": {"trigger": "asks"}, "unattended": True},
+        "ao-x-w": {"id": "ao-x-w-2", "name": "w", "seat": None, "unattended": True},
+    }
+    real = ui.LocalClient.call
+
+    async def call(self, method, **kw):
+        return views[kw["id"]] if method == "restart" else await real(self, method, **kw)
+
+    monkeypatch.setattr(ui.LocalClient, "call", call)
+    assert client.post("/api/sessions/ao-x-tl/restart").json() == {
+        "ok": True,
+        "id": "ao-x-tl",
+        "unattended": True,
+        "seat": "tl",
+    }
+    assert client.post("/api/sessions/ao-x-w/restart").json()["seat"] is None
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
+    assert "res.seat ? `${res.seat} · fills exhausted cleared — rule 3 fills it when it is due`" in js

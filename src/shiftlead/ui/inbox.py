@@ -31,7 +31,7 @@ from sessionorc import queue as queue_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import workorders as workorders_mod
-from sessionorc.agent_common import WRAPUP_GRACE, fill_lapses
+from sessionorc.agent_common import WRAPUP_GRACE, fill_ceiling, fill_lapses
 from sessionorc.client import call_sync
 from sessionorc.models import (
     normalize_ref,
@@ -385,7 +385,10 @@ def state_rows(
                     **base(v, "restart", mark[1], subject=restart_subject(mark[1], v.get("name") or v["id"])),
                     "at": mark[0] or v.get("since") or "",
                     "age": "",
-                    "restartable": bool(v.get("restartable")),  # never a seat: *fills exhausted* has no Restart
+                    # a card's flag, never a seat's; the *fills exhausted* row draws its own Restart, which
+                    # clears the mark and starts nothing (§4.5a, §6 rule 2, TD-1422)
+                    "restartable": bool(v.get("restartable"))
+                    or (v.get("seat") is not None and fill_ceiling(v.get("restart_ceiling"))),
                     # a seat's plain fill mark lapses after the hour: the caption says so (§4.5a, TD-1422)
                     "lapses": fill_lapses(v.get("restart_ceiling")),
                 }

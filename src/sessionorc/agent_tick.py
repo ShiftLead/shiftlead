@@ -132,6 +132,13 @@ FILLED_FOR = "[shiftlead] you are filled for: "
 NOT_RESTARTS = ("person", "start", "schedule", "work")
 
 
+def _person_cleared(restarts: list[Any]) -> bool:
+    """A person's restart cleared this seat's fill ceiling and no fill has come since (§6 rule 2, TD-1422):
+    a `{why: person}` entry with no `fill` entry after it. Its next fill goes past the count, once."""
+    whys = [e.get("why") for e in restarts if isinstance(e, dict) and e.get("why") in ("person", "fill")]
+    return bool(whys) and whys[-1] == "person"
+
+
 def filled_for(cause: dict[str, Any] | None) -> str | None:
     """The closing line of a manager on call's fill prompt (§6 rule 3 *A fill says why it came*,
     TD-410), in fixed words from its `seat_due`: *[shiftlead] you are filled for: <by> — <member>*, the
@@ -3388,7 +3395,9 @@ class TickMixin:
         """A due seat, ended, is filled — unless its profile is paused, or it or its fellows are at
         the fill ceiling: six fills an hour over all seats sharing a controller (the graph, never the
         team badge). The seat whose fill tripped it gets `restart_ceiling` and the Inbox row; its
-        fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`."""
+        fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`.
+        A seat whose ceiling a person's restart cleared (a `{why: person}` entry with no fill after it)
+        is filled once past the count; that fill is written and counted as any (§6 rule 2, TD-1422)."""
         if s.restart_ceiling or self._profile_gated(s.profile, now, s.team):
             return
         mine = set(self._ctl(s))
@@ -3401,7 +3410,7 @@ class TickMixin:
             for e in r.restarts
             if isinstance(e, dict) and e.get("why") == "fill" and _recent(e.get("at"), now, FILL_WINDOW)
         ]
-        if len(fills) >= FILL_CEILING:
+        if len(fills) >= FILL_CEILING and not _person_cleared(s.restarts):
             tripped = any(
                 r is not s
                 and isinstance(r.restart_ceiling, dict)
