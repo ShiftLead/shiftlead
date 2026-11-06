@@ -85,8 +85,9 @@ CACHE_FLOOR = 100_000
 # Rule 9 (§6, TD-241): the home winds a team down once its reading of *finished* has held this long —
 # a finished member may claim again on rule 6's news, and a manager's round may have the wind-down in hand
 FINISHED_SETTLE = timedelta(minutes=10)
-# Rule 8's `on_work: start` (§6, TD-227 slice 4): at most this many starts of one team by the rule in
-# `WORK_DAY`, and none inside `WORK_EARLY` of the last — a team that found nothing, started into the same nothing
+# Rule 8's `on_work: start` (§6, TD-227 slice 4): at most this many idle starts of one team by the rule in
+# `WORK_DAY` — a start no record it replayed worked (TD-1462) — and none inside `WORK_EARLY` of the last, worked
+# or not — a team that found nothing, started into the same nothing
 WORK_STARTS_DAY = 3
 WORK_DAY = timedelta(hours=24)
 WORK_EARLY = timedelta(minutes=30)

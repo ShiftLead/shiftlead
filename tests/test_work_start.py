@@ -603,3 +603,151 @@ async def test_finished_alone_passes_over_each_record_that_is_not_a_finished_mem
     assert [r.name for r in work.finished_alone(recs)] == ["grinder-ao-1", "grinder-ao-2"], guard
     await agent._work_marks(later)
     assert _team_rec(agent)["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"]}, guard
+
+
+# TD-1462, design §6 rule 8 *idle starts*: a start the team worked counts for nothing toward the day's cap
+
+
+def _worked_team(agent, started: list[str], *recs: Session, team: str = "w") -> None:
+    agent._host_rec.setdefault("teams", {})[team] = {"work_started": list(started)}
+    for r in recs:
+        r.team, r.host = team, agent.host
+        agent.sessions[r.id] = r
+
+
+def _entry(start: str, why: str = "work", at: str | None = None) -> dict:
+    return {"at": at or start, "why": why, "ids": ["TD-002"], "start": start, "of": 1}
+
+
+def _claim(at: str, ref: str = "TD-002", **kw):
+    from sessionorc.models import ProgressEntry
+
+    return ProgressEntry(ref=ref, at=at, **kw)
+
+
+def _worked(agent, team: str = "w") -> list[str]:
+    return ((agent._host_rec.get("teams") or {}).get(team) or {}).get("work_worked") or []
+
+
+async def test_a_start_is_worked_by_a_declared_claim_after_its_own_entry(agent, monkeypatch):
+    await park_ticks(agent)
+    monkeypatch.setattr(agent, "_profile_over", lambda profile, now, team="": None)
+    now = datetime.now(UTC)
+    s1, s2, s3 = (_iso(now - timedelta(hours=h)) for h in (20, 10, 5))
+    after = lambda t, m=1: _iso(datetime.fromisoformat(t.replace("Z", "+00:00")) + timedelta(minutes=m))  # noqa: E731
+    _worked_team(
+        agent, [s1, s2, s3],
+        _rec("a", restarts=[_entry(s1)], progress=[_claim(after(s1))]),
+        _rec("b", restarts=[_entry(s1), _entry(s2)], progress=[_claim(after(s2), status="done", pr=7)]),
+        _rec("c", restarts=[_entry(s3)], progress=[_claim(after(s3, 3), ref="TD-003")]),
+    )  # fmt: skip
+    await agent._work_worked(now)
+    assert _worked(agent) == [s1, s2, s3]
+    assert agent.host_store.load()["teams"]["w"]["work_worked"] == [s1, s2, s3], "saved"
+    assert agent._work_held([_rec("x")], [s1, s2, s3], {}, now, "w", worked=_worked(agent)) is None, (
+        "three worked starts leave a fourth open"
+    )
+    assert agent._work_held([_rec("x")], [s1, s2, s3], {}, now, "w") == {"why": "day", "count": 3}, "three idle"
+    assert agent._work_held([_rec("x")], [s1, s2, s3], {}, now, "w", worked=[s1]) is None, "two idle"
+    early = _iso(now - WORK_EARLY + timedelta(minutes=1))
+    assert agent._work_held([_rec("x")], [early], {}, now, "w", worked=[early]) == {"why": "early", "started": early}, (
+        "WORK_EARLY reads every start, a worked one too"
+    )
+
+
+async def test_what_never_works_a_start(agent):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    s1 = _iso(now - timedelta(hours=5))
+    before, later = _iso(now - timedelta(hours=6)), _iso(now - timedelta(hours=4))
+    other = _iso(now - timedelta(hours=3))
+    _worked_team(
+        agent, [s1],
+        _rec("early", restarts=[_entry(s1)], progress=[_claim(before)]),  # a claim before the start
+        _rec("same", restarts=[_entry(s1)], progress=[_claim(s1)]),  # the carried claim, restamped with the entry's at
+        _rec("derived", restarts=[_entry(s1)], progress=[_claim(later, source="derived", branch="td002-x")]),
+        _rec("dropped", restarts=[_entry(s1)], progress=[_claim(later, status="dropped")]),
+        _rec("unstarted", restarts=[], progress=[_claim(later)]),  # a member the start did not replay
+        _rec("another", restarts=[_entry(other)], progress=[_claim(later)]),  # another start's member
+        # a person's Start superseded the record: its newest entry is not the start's
+        _rec("restarted", restarts=[_entry(s1), {"at": later, "why": "start"}], progress=[_claim(later)]),
+        # a seat the start replayed held, then filled for a cause
+        _rec("seat", seat={"trigger": "asks"}, restarts=[_entry(s1), {"at": later, "why": "fill"}],
+             progress=[_claim(later)]),
+    )  # fmt: skip
+    await agent._work_worked(now)
+    assert _worked(agent) == [], "none of them worked the start"
+    assert "work_worked" not in ((agent.host_store.load().get("teams") or {}).get("w") or {})
+
+
+async def test_a_carried_claim_moved_or_declared_again_works_the_start(agent):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    s1 = _iso(now - timedelta(hours=5))
+    later = _iso(now - timedelta(hours=4))
+    carried = _claim(s1)
+    rec = _rec("a", restarts=[_entry(s1)], progress=[carried])
+    _worked_team(agent, [s1], rec)
+    await agent._work_worked(now)
+    assert _worked(agent) == []
+    carried.status, carried.pr, carried.at = "done", 9, later  # marked done later
+    await agent._work_worked(now)
+    assert _worked(agent) == [s1]
+
+
+async def test_only_the_start_a_claim_follows_is_worked_and_a_worked_start_outlives_its_record(agent):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    s1, s2 = _iso(now - timedelta(hours=10)), _iso(now - timedelta(hours=5))
+    between = _iso(now - timedelta(hours=8))
+    # the claim between start 1 and start 2, on the record start 1 replayed; start 2 replayed another record
+    a = _rec("a", restarts=[_entry(s1)], progress=[_claim(between)])
+    b = _rec("b", restarts=[_entry(s1), _entry(s2)], progress=[])
+    _worked_team(agent, [s1, s2], a, b)
+    await agent._work_worked(now)
+    assert _worked(agent) == [s1]
+    # the worked start's record is closed and pruned: it stays worked
+    del agent.sessions[a.id]
+    await agent._work_worked(now)
+    assert _worked(agent) == [s1]
+    # past the day, the instant leaves both lists, and the lists go when empty
+    await agent._work_worked(now + timedelta(hours=14, minutes=1))
+    assert agent._host_rec["teams"]["w"] == {"work_started": [s2]}
+    await agent._work_worked(now + timedelta(hours=20))
+    assert agent._host_rec["teams"]["w"] == {}
+    assert agent.host_store.load()["teams"]["w"] == {}, "saved"
+
+
+async def test_a_member_that_claims_and_crashes_is_read_before_rule_1_replays_it(agent, monkeypatch):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    s1 = _iso(now - timedelta(hours=1))
+    rec = _rec("a", restarts=[_entry(s1)], progress=[_claim(_iso(now - timedelta(minutes=20)))], state="exited")
+    _worked_team(agent, [s1], rec)
+    order: list[str] = []
+
+    async def keep_running(at):
+        order.append("keep_running")
+        assert _worked(agent) == [s1], "read before any replay this tick"
+        rec.progress = []  # the replay takes the claim with the record it supersedes
+
+    monkeypatch.setattr(agent, "_keep_running", keep_running)
+    await agent.tick()
+    assert order == ["keep_running"] and _worked(agent) == [s1], "kept"
+
+
+async def test_three_worked_starts_leave_a_fourth_start_open_through_the_marks(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    replays = _Replays()
+    monkeypatch.setattr(agent, "_replay", replays)
+    later = await _settled(agent, tmp_path, _rec("manager-ao", lane=["TD-900"]), _rec("grinder-ao-1"))
+    day = [_iso(later - timedelta(hours=h)) for h in (20, 10, 5)]
+    teams = agent._host_rec.setdefault("teams", {})
+    teams.setdefault("g", {})["work_started"] = list(day)
+    await agent._work_marks(later)
+    assert replays.calls == [] and _team_rec(agent)["work_waiting"]["held"] == {"why": "day", "count": 3}
+    teams["g"]["work_worked"] = list(day)
+    await agent._work_marks(later)
+    assert [c[0] for c in replays.calls] == ["grinder-ao-1", "manager-ao"]
+    assert "work_waiting" not in _team_rec(agent) and len(_team_rec(agent)["work_started"]) == 4
