@@ -4552,7 +4552,7 @@ def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
     if mail and (row.get("from_name") or row.get("from")):
         head.append(f"from {row.get('from_name') or row.get('from')}")
     if mail and row.get("at"):
-        head.append(str(row["at"]))
+        head.append(_card_time(row["at"]))
     if x.get("on_row"):
         head.append(f"on {x['on_row']}")
     if which == "board":
@@ -4587,6 +4587,14 @@ def _card_item_lines(x: Mapping[str, Any], cut: bool) -> list[str]:
     return lines
 
 
+def _card_time(at: Any) -> str:
+    """A message's time as §4.7's example writes it, `2026-11-05 14:12`; anything unparsable as it is."""
+    try:
+        return datetime.fromisoformat(str(at)).strftime("%Y-%m-%d %H:%M")
+    except ValueError:
+        return str(at)
+
+
 def _card_row_line(r: Mapping[str, Any]) -> str:
     """One row of the card's `Part of:` tree (§4.7 *The rows*), indented by its depth."""
     holder = r.get("holder") if isinstance(r.get("holder"), Mapping) else None
@@ -4604,12 +4612,12 @@ def _card_row_line(r: Mapping[str, Any]) -> str:
     return "  " * (1 + int(r.get("depth") or 0)) + first + ("  " + " · ".join(rest) if rest else "")
 
 
-def _card_text(got: Mapping[str, Any]) -> list[str]:
+def _card_text(got: Mapping[str, Any], cut: bool | None = None) -> list[str]:
     """`ao card`'s text form (§4.7 *What it prints*): the header, the rows with every fold opened, the wants with
     each item's block, then what the items mention."""
     card = got.get("card") or {}
     top = card.get("top") or {}
-    cut = got.get("mail") == "ids"
+    cut = got.get("mail") == "ids" if cut is None else cut or got.get("mail") == "ids"
     group = str(card.get("group") or "")
     where: list[str] = []
     if group == "up_next":
@@ -4687,7 +4695,8 @@ def cmd_card(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(got, indent=1, default=str))  # its rows carry dates
         return 0
-    print("\n".join(_card_text(got)))
+    # the cut follows the road taken, whatever a UI answers (§4.7: the UI road carries no mail's words)
+    print("\n".join(_card_text(got, cut=bool(args.ui or os.environ.get("SHIFTLEAD_SESSION")))))
     return 0
 
 
