@@ -264,7 +264,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      lands) — fifteen (`SEAT_ASK_LINGER`, TD-1422) for a seat whose trigger is `asks`, so a question
      that lands while it lingers rings it as mail rings any idle session and a trickle of asks is
      one fill, not one fill each; where the ring cannot reach it, the ask waits as on any idle seat
-     — its wake budget spent (§4.10), it is read at rule 4's nudge; its profile gated, it is rung
+     — its wake budget spent (§4.10), it is rung when the budget refills, or read at rule 4's nudge, which reaches a home seat alone; its profile gated, it is rung
      after the gate, as a fill would have waited on it (fifteen since the asks that tripped
      the ceiling on 2026-11-05 came 7 to 18 minutes apart; an idle seat at the composer spends no
      tokens, so the linger costs a pane and the context it carries into the next ask, and a fill
@@ -287,8 +287,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      seat, cause due or not (after the pass writes `seat_due` and finds the seat's link up, before it
      reads the seat's state; a suspended or sat-out seat, which the pass leaves, keeps its mark and
      row; a node's seat's lapse is written and pushed as its trip is), a plain mark whose `at` is
-     `FILL_WINDOW` old is cleared and **`fill_lapsed: {at}`** written on the record (home-owned, carried
-     to the record a fill creates as `restarts` is, cleared by a person's Restart; no reader of
+     `FILL_WINDOW` old is cleared and **`fill_lapsed: {at}`** written on the record (`at` the lapse's own time, not the mark's; home-owned, carried
+     to the record any replay creates, as `restarts` is, cleared by a person's Restart; no reader of
      `restarts` sees it, so it is no restart, no chip and no count), and the Inbox row leaves with the
      mark; the seat is filled on the next pass its cause is due, under the same count. A seat that
      answers a trickle of asks one fill each reaches six in an hour by working, and a mark that
