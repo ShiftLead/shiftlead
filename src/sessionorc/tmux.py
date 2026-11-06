@@ -142,6 +142,7 @@ class Tmux:
         if argv:
             args += ["--", *self._fit(name, argv, around=sum(len(a.encode()) + 1 for a in args))]
         args += [";", "set-option", "-w", "-t", f"={name}:", "remain-on-exit", "on"]
+        args += [";", "set-option", "-t", f"={name}:", "status", "off"]  # Focus's header says it (§4.6, TD-1410)
         if logfile is not None:
             logfile.parent.mkdir(parents=True, exist_ok=True)
             args += [";", "pipe-pane", "-t", f"={name}:", f"cat >> '{logfile}'"]
@@ -211,6 +212,20 @@ class Tmux:
                 )
             )
         return out
+
+    def status_off(self, prefix: str = "ao-") -> list[str]:
+        """Turn tmux's status bar off on every session named `prefix…` that has it on, and return their
+        names: the host agent's start takes in sessions created before `new_session` set it (design §4.6
+        *Attach behaviour with another client present*, TD-1410). Only the sessions themselves are
+        touched, never the server's global options, so the person's own sessions keep their bar."""
+        cp = self.run("list-sessions", "-F", "#{session_name}\t#{status}", check=False)
+        if cp.returncode != 0:
+            return []  # no server
+        names = [n for n, _, s in (line.partition("\t") for line in cp.stdout.splitlines()) if n.startswith(prefix)
+                 and s != "off"]
+        for n in names:
+            self.run("set-option", "-t", f"={n}:", "status", "off", check=False)
+        return names
 
     def server_pid(self) -> int | None:
         """The tmux server's pid, or None with no server: what design §4.8a's detached-process check
