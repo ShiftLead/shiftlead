@@ -393,8 +393,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      claim (rule 5, TD-820: its next move is someone else's), for a seat,
      `seat_due` set (a question waiting on an idle techlead), or, for a member that is no seat, a
      question waiting on it, read or not (`asks_waiting`: an open `ask` or `steer` addressed to it from any
-     sender, the person's included, less one it passed up, and an answer to its own question waiting;
-     TD-1435: a read question is never rung again, since the doorbell rings only undecided mail) — and no
+     sender, the person's included, less one it passed up — an answer to its own question is a seat's
+     count alone, since a member reads its own on the doorbell; TD-1435: a read question is never rung again, since the doorbell rings only undecided mail) — and no
      declaration (a member that declared `none` is not nudged for its questions either: its brief reads its
      inbox before declaring), no pending, not
      gated, **no live subagent and no live background shell** (§4.2 *Working on its own*, the card's reading: its own work is
