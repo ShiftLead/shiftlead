@@ -1723,21 +1723,30 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      drops it, and the next pass checks the new head. A record that now holds it means the merge is
      dropped and no verdict is written. The PR stays off the home's list while a live record holds
      it, and comes back only once the claim ends. **The merge is then cadence step 5's line**
-     (TD-1412, cadence §4.2), run as a session runs it, in the registry checkout, each script found as
-     `cadence.check` finds the gate (through the resolver in a pinned repo, the copy's `scripts/` else): the gate again with `--trailers <dir>/gate`, then `forge.py
-     squash-message <n> --gate <dir>/gate --out <dir>`, then `gh pr merge <n> --squash
-     --match-head-commit <the gate's sha> --subject <subject> --body-file <body>`, in a `mktemp -d`
-     directory removed after. The scripts run with `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL`
-     and `AGENT_MODEL_FILE` removed from their environment, so the squash ends in `Merged-by:
-     shiftlead-sync`. It never names the person's `user.name` and never a model, since the home runs
-     none. The gate run here exits 0 or the merge is not made. A non-zero exit, or a `squash-message`
-     refusal, is *no reading* with its words, counted as step 4's are, and a sha in the gate file other
-     than `<head>` is the moved head (nothing written). The gate file's sha is `<head>`, so the forge's head
-     match is still the one atomic guard, and a push it refuses is the moved head again. **A tree with
-     no `squash-message`** (a pin older than agent-cadence TD-233, or a copy older than it) merges as before, `gh pr
-     merge <n> --squash --match-head-commit <head>` with no body: `cadence.composes(root)` says which,
-     true when the tree the gate runs from holds a `scripts/forge.py` whose text names
-     `squash-message`. A merge is followed by a `system`
+     (TD-1412, cadence §4.2), its three parts split across the two steps so the gate runs once. Each
+     script is found as `cadence.check` finds the gate: through the resolver in a pinned repo, the
+     copy's `scripts/` otherwise. agent-cadence's own source never reaches here, since a sync PR is a
+     pin's bump. **Step 4's gate run** takes `--trailers <dir>/gate`, `<dir>` a `mkdtemp` the pass
+     makes for that PR. The gate file's `expect` is the head the rows judged, so it binds what follows
+     to the head step 4 read. `<dir>` rides on the in-memory entry `judge` returns as `gate_dir` and is
+     never written to the reading. **Step 5** runs `forge.py squash-message <n> --gate <dir>/gate --out
+     <dir>` under `GATE_TIMEOUT` (it makes paginated `gh api` reads), then re-reads the head and the
+     holders as above, now just before the merge, then runs `gh pr merge <n> --squash
+     --match-head-commit <dir>/sha's sha --subject <subject> --body-file <dir>/body`. `<dir>` is removed
+     in a `finally` on every road, a dropped merge and an error included. The scripts run with
+     `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL` and `AGENT_MODEL_FILE` removed from their
+     environment, so the squash ends in `Merged-by: shiftlead-sync`. It never names the person's
+     `user.name` and never a model, since the home runs none. `shiftlead-sync` and step 3's
+     `sync-check` are the same policy's two names: one signs the comment of a gate it ran, the other the
+     merge it made. A `squash-message` refusal is *no reading* with its words, counted as step 4's are.
+     A sha in `<dir>/sha` other than the re-read head is the moved head, and nothing is written. That
+     sha is the head step 4 judged, so the forge's head match is still the one atomic guard, and a push
+     it refuses is the moved head again. **A tree with no `squash-message`** (a pin older than
+     agent-cadence TD-233, or a copy older than it) runs step 4's gate without `--trailers` and merges
+     as before, `gh pr merge <n> --squash --match-head-commit <head>` with no body.
+     `cadence.composes(root)` says which (TD-1418): true when the tree the gate runs from holds a
+     `scripts/forge.py` whose text names `squash-message`. `--trailers` is older than `squash-message`
+     in agent-cadence (#141, then #143), so a tree that composes also takes the flag. A merge is followed by a `system`
      note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — bump of the agent-cadence pin
      to <sha>*.
 

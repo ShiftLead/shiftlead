@@ -317,10 +317,16 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   (cadence step 5's line, TD-1412: `m=$(mktemp -d); python3 scripts/check_cadence.py --pr {pr} --trailers
   "$m/gate"; python3 scripts/forge.py squash-message {pr} --gate "$m/gate" --out "$m" && gh pr merge {pr}
   --squash --match-head-commit "$(cat "$m/sha")" --subject "$(cat "$m/subject")" --body-file "$m/body"`,
-  one command whose squash ends in the `Merged-by:` trailer; in a tree whose `scripts/forge.py` does not name
-  `squash-message`, `cadence.composes` false as §6 *Sync* reads it, it is `gh pr merge {pr} --squash`, as
-  before. Every built-in brief or flow stage that has a session merge a PR names `{merge}`, never a
-  bare `gh pr merge`, and the merge stays the literal `gh pr merge` at the line's end, which a guard on that
+  one command whose squash ends in the `Merged-by:` trailer. In a tree whose `scripts/forge.py` does not name
+  `squash-message` it is `gh pr merge {pr} --squash`, as before. `cadence.composes(root)` says which (§6 *Sync*
+  reads it too), and it reads the tree the gate runs from. That is the pinned tree (`cadence.tree`), the
+  checkout's `scripts/`, or agent-cadence's own `files/scripts/`. On a container node the pin
+  (`docs/cadence.toml`'s source and ref) is read from the node's checkout through `cfg.read`, and the tree
+  is the home's own copy of that pin (`agent_cadence.ensure_tree(source, ref)`), cached per pin. A copy's
+  `scripts/forge.py` is read across the link as the other files are. Every built-in brief or flow stage
+  that has a session merge a PR names `{merge}`, never a bare `gh pr merge`, and says it is typed whole as
+  one command, since `$m` does not survive a tool's separate calls and a line split at its `;` merges
+  with no trailer. The merge stays the literal `gh pr merge` at the line's end, which a guard on that
   command still sees), `{board}`
   (the board's path, whether or not the file is there: a missing board is the Repo page's warning,
   and the board's own reader says the Inbox is then the channel), `{ledger}` (the resolved ledger, a file or a
@@ -333,7 +339,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   `{cadence_rules}` name what the resolver gives, as a session types it (`cadence.typed`): the vendored
   launcher under the host agent's own Python, its argv without `-C`, so the session's own checkout
   resolves — a worktree's ledger is the one checked, a bump branch runs its own pin — as
-  `<python> <launcher> run check_cadence.py --pr {pr}`, `… run forge.py squash-message {pr} …`, `… run ledger.py --check` and *read the file
+  `<python> <launcher> run check_cadence.py --pr {pr}`, `… run forge.py squash-message {pr} …` (only the launcher's words through `cadence.typed`; `{pr}`, `$m` and the rest of the line are appended as text, as `{gate}` appends ` --pr {pr}`, since `typed` quotes what it is given), `… run ledger.py --check` and *read the file
   `… path cadence.md` prints, §1–§4*. A session started on a container node, a team's member or the New
   session form's, is told the node's own launcher instead, `/shiftlead/venv/bin/agent-cadence` (the console script over the same launcher in the
   node's venv, §4.4a), since the home's paths are not the node's; a lock beside the pin keeps the copy's paths, and agent-cadence's own source its `files/` ones. They are read only when the brief
