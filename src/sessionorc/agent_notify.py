@@ -51,6 +51,8 @@ def _restart_at(s: Any) -> str:
     `restart_mark` read from the same fields — a ceiling, a hold by work left, an early wanted."""
     if s.superseded_by:
         return ""
+    if s.seat and agent_common.fill_lapses(s.restart_ceiling):
+        return ""  # a seat's plain fill mark lapses after the hour and is never told (§4.10 *What is told*, TD-1422)
     for mark in (s.restart_ceiling, s.restart_blocked):
         if isinstance(mark, dict):
             return str(mark.get("at") or "")

@@ -1011,6 +1011,8 @@ def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeyp
     records = [
         rec("ao-c", "exited", exit_code=1, git=_ahead3, restart_ceiling={"at": at, "count": 3}),
         rec("ao-f", "exited", restart_ceiling={"at": at, "count": 6, "why": "fill"}),
+        # the same seat once its plain mark lapsed (§6 rule 3, TD-1422): the mark is gone, and so is the row
+        rec("ao-l", "exited", fill_lapsed={"at": at}),
         rec(
             "ao-h",
             "idle",
@@ -1028,7 +1030,8 @@ def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeyp
     assert sorted(restart) == ["ao-c", "ao-d", "ao-e", "ao-f", "ao-h", "ao-r"]
     assert {r["row"] for r in got if r["sid"] == "ao-c"} == {"restart", "unpushed"}, "beside its state row"
     assert restart["ao-c"]["text"].startswith("restarts exhausted · 3 in 2 h") and restart["ao-c"]["at"] == at
-    assert restart["ao-f"]["text"].startswith("fills exhausted · 6 in 1 h")
+    # the row reads exactly the card's line (§6 rule 3, TD-1422)
+    assert restart["ao-f"]["text"] == "fills exhausted · 6 in 1 h · fills again after the hour"
     assert "2 uncommitted and 1 unpushed" in restart["ao-h"]["text"]
     # an early one says what decided it, the home's words on the mark (§4.9a, TD-249 slice 6)
     assert restart["ao-e"]["text"] == "restart wanted · early — context full"
@@ -3585,6 +3588,19 @@ def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tm
     member, seat = rows("needs", [restart["ao-m"]]), rows("needs", [restart["ao-s"]])
     assert member.index('data-act="restart" data-id="ao-m"') < member.index('data-act="resume" data-id="ao-m"')
     assert 'data-act="restart"' not in seat and 'data-act="resume" data-id="ao-s"' in seat and ">Dismiss<" in seat
+    # the caption (§4.5a, TD-1422): a plain fill mark fills again after the hour; every other, held too, is yours
+    assert ">fills again after the hour<" in seat and "yours now" not in seat
+    assert ">the host agent will not restart it — yours now<" in member
+    held = rec(
+        "ao-t",
+        "exited",
+        supervised=True,
+        seat={"trigger": "asks"},
+        restart_ceiling={**ceiling, "why": "fill", "held": True},
+    )
+    twice = next(r for r in state_rows_of([held]) if r["row"] == "restart")
+    assert twice["text"] == "fills exhausted · 3 in 1 h · tripped twice running — yours"
+    assert ">the host agent will not restart it — yours now<" in rows("needs", [twice])
 
     def menu(r):
         html = templates.get_template("card.html").render(s=view(r, records))

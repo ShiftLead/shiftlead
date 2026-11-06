@@ -1297,7 +1297,24 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
         _card(state="exited", pane=False, seat=prs, restart_ceiling={"at": "x", "count": 6, "why": "fill"}),
         seats={"ao-w": "runs after 10 PRs"},
     )["slot"]
-    assert full["text"] == "fills exhausted · 6 in 1 h" and full["kind"] == "bad"
+    assert full["text"] == "fills exhausted · 6 in 1 h · fills again after the hour" and full["kind"] == "bad"
+    assert full["full"] == (
+        "fills exhausted · 6 in 1 h · fills again after the hour: the host agent filled this seat and the ones "
+        "beside it as often as it will this hour (design §6) — the host agent fills it again after the hour, when "
+        "it is due"
+    ), "a plain mark lapses, in §4.5's words"
+    # a second trip running holds (§6 rule 3, TD-1422): the person's
+    held = view(
+        _card(
+            state="exited",
+            pane=False,
+            seat=prs,
+            restart_ceiling={"at": "x", "count": 6, "why": "fill", "held": True},
+        ),
+        seats={"ao-w": "runs after 10 PRs"},
+    )["slot"]
+    assert held["text"] == "fills exhausted · 6 in 1 h · tripped twice running — yours" and held["kind"] == "bad"
+    assert held["full"].endswith("it is yours now: Resume it, or Forget it")
     # a seat's lost-brief replays at `RESTART_CEILING` leave a ceiling with no `why`: no fill (TD-720)
     replays = view(
         _card(state="exited", pane=False, seat=prs, restart_ceiling={"at": "x", "count": 3}),

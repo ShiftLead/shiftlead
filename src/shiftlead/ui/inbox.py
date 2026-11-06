@@ -31,7 +31,7 @@ from sessionorc import queue as queue_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import workorders as workorders_mod
-from sessionorc.agent_common import WRAPUP_GRACE
+from sessionorc.agent_common import WRAPUP_GRACE, fill_lapses
 from sessionorc.client import call_sync
 from sessionorc.models import (
     normalize_ref,
@@ -42,7 +42,7 @@ from shiftlead import teamrun
 
 from . import render as rendermod
 from . import uiconf
-from .cards import _clock, _first_line, alarm_note, alarm_to_view, subagent_held
+from .cards import _clock, _first_line, alarm_note, alarm_to_view, fill_words, subagent_held
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
 from .queue import item_home
 
@@ -171,9 +171,8 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
                 "brief lost twice — no hook reached it at its launch, nor after the host agent relaunched it once"
             )
         if ceiling.get("why") == "fill":
-            return str(ceiling.get("at") or ""), (
-                f"fills exhausted · {n} in 1 h — the seats beside it were filled as often as the host agent will"
-            )
+            # the card's line (§6 rule 3 *The ceiling is a rate, not a stop*, TD-1422): a plain mark lapses
+            return str(ceiling.get("at") or ""), fill_words(ceiling)
         return str(ceiling.get("at") or ""), (
             f"restarts exhausted · {n} in 2 h — it exited on its own each time and the host agent restarted it "
             "up to its ceiling"
@@ -387,6 +386,8 @@ def state_rows(
                     "at": mark[0] or v.get("since") or "",
                     "age": "",
                     "restartable": bool(v.get("restartable")),  # never a seat: *fills exhausted* has no Restart
+                    # a seat's plain fill mark lapses after the hour: the caption says so (§4.5a, TD-1422)
+                    "lapses": fill_lapses(v.get("restart_ceiling")),
                 }
             )
         if mark := idle_open_mark(v, views, now):
