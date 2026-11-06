@@ -12,10 +12,9 @@ import shutil
 import subprocess
 
 import pytest
+import test_ui_spend
 from test_ui_drop_card import PROBE
 from test_ui_spend import client, fake
-
-from sessionorc import seats
 
 pytestmark = pytest.mark.unit
 
@@ -112,11 +111,11 @@ def test_focus_reads_the_record_once_and_places_the_card_after_the_banner():
 def test_the_route_asks_the_home_for_one_records_reading(monkeypatch, tmp_path):
     calls: list = []
     c = client(monkeypatch, tmp_path, fake(calls))
-    led = {"days": {"2026-10-17": {"g1": {"models": {}, "refs": {}, "metered": False}}}}
-    monkeypatch.setattr(seats, "reading", lambda *a, **k: seats.record_reading(led, k["record"]))
-    got = c.get("/api/spend?record=g1@kmaster")
-    assert calls == [{"record": "g1@kmaster"}]
-    assert got.json()["record"] == "g1" and got.json()["first_day"] == "2026-10-17"
+    monkeypatch.setattr(
+        test_ui_spend, "reading", lambda **kw: {"record": kw["record"].split("@")[0]}
+    )  # the home's answer
+    assert c.get("/api/spend?record=g1@kmaster").json() == {"record": "g1"}
+    assert calls == [{"record": "g1@kmaster"}]  # the address as given: the home drops its host part
     calls.clear()
     c.get("/api/spend?record=g1&window=week&team=t")
     assert calls == [{"record": "g1", "window": "week", "team": "t"}]  # passed on, for the home to refuse
