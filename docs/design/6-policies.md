@@ -1722,9 +1722,22 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      (§4.4's test, over the live records). A head that moved means the PR was not checked: the pass
      drops it, and the next pass checks the new head. A record that now holds it means the merge is
      dropped and no verdict is written. The PR stays off the home's list while a live record holds
-     it, and comes back only once the claim ends. The merge is then `gh pr merge <n> --squash
-     --match-head-commit <head>`, with no body (cadence §4.2). The forge's head match is the one
-     atomic guard, and a push it refuses is the moved head again. A merge is followed by a `system`
+     it, and comes back only once the claim ends. **The merge is then cadence step 5's line**
+     (TD-1412, cadence §4.2), run as a session runs it, in the registry checkout, each script found as
+     `cadence.check` finds the gate (through the resolver in a pinned repo, the copy's `scripts/` else): the gate again with `--trailers <dir>/gate`, then `forge.py
+     squash-message <n> --gate <dir>/gate --out <dir>`, then `gh pr merge <n> --squash
+     --match-head-commit <the gate's sha> --subject <subject> --body-file <body>`, in a `mktemp -d`
+     directory removed after. The scripts run with `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL`
+     and `AGENT_MODEL_FILE` removed from their environment, so the squash ends in `Merged-by:
+     shiftlead-sync`. It never names the person's `user.name` and never a model, since the home runs
+     none. The gate run here exits 0 or the merge is not made. A non-zero exit, or a `squash-message`
+     refusal, is *no reading* with its words, counted as step 4's are, and a sha in the gate file other
+     than `<head>` is the moved head (nothing written). The gate file's sha is `<head>`, so the forge's head
+     match is still the one atomic guard, and a push it refuses is the moved head again. **A tree with
+     no `squash-message`** (a pin older than agent-cadence TD-233, or a copy older than it) merges as before, `gh pr
+     merge <n> --squash --match-head-commit <head>` with no body: `cadence.composes(root)` says which,
+     true when the tree the gate runs from holds a `scripts/forge.py` whose text names
+     `squash-message`. A merge is followed by a `system`
      note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — bump of the agent-cadence pin
      to <sha>*.
 
