@@ -30,7 +30,7 @@ People: paul
   - **Context:** TD-1451, a build of TD-1437's design (PR #3025): the briefs write an event (live) gate with each new live check and each fix one waits on; every open live check gets its gate. Held with the design by its end-of-rounds item.
   - **Question:** Go with TD-1451 once TD-1437's end-of-rounds item is answered Go?
   - **Recommended:** Go — it is part of the design above; the three land in order, TD-1450 first.
-- [ ] decide 2026-11-06 (session `designer-ao-1` on kmaster) — Go with TD-1450, a build of TD-1437's design, once TD-1437's end-of-rounds item is answered Go? Context: TD-1450 decision (paul). Due: 2026-11-09. Answers: Go (default) | Not yet.
+- [x] decide 2026-11-06 (session `designer-ao-1` on kmaster) — Go with TD-1450, a build of TD-1437's design, once TD-1437's end-of-rounds item is answered Go? Context: TD-1450 decision (paul). Due: 2026-11-09. Answers: Go (default) | Not yet. Decided: Go (by paul) (2026-11-06). Closed: 2026-11-06 — lifted.
   - **Context:** TD-1450, a build of TD-1437's design (PR #3025): the home keeps the promote/live tag at the live commit on the repo's origin (a lease persisted beside last.json; a refusal is a note to you), sweeps the repo's gates on the next tick, and lists its lift PR as a pr: work order. Held with the design by its end-of-rounds item.
   - **Question:** Go with TD-1450 once TD-1437's end-of-rounds item is answered Go?
   - **Recommended:** Go — it is part of the design above; the three land in order, TD-1450 first.
