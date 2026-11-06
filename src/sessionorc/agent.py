@@ -3425,7 +3425,7 @@ class HostAgent(
         if bool(unattended) != s.unattended and self.mode != "node":
             s.mode_at = now_iso()
             s.mode_by = "person" if mail.as_person(caller, self._graph()) else str(caller)
-            s.mode_via = via if via in MODE_VIAS else None
+            s.mode_via = via if isinstance(via, str) and via in MODE_VIAS else None
             log.info(
                 "%s: mode %s by %s via %s",
                 self._address(s),

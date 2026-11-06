@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import inspect
 import json
 import secrets
 from pathlib import Path
@@ -596,7 +595,7 @@ class RemoteMixin:
             mirror = getattr(self, f"rpc_{method}")
             # who acted, in the home's form as the gate verified it — not `who`, rewritten for the node —
             # so the home's copy is stamped as on one host (`set_mode`, TD-1439)
-            extra = {"caller": caller} if "caller" in inspect.signature(mirror).parameters else {}
+            extra = {"caller": caller} if method == "set_mode" else {}
             await mirror(**params, **extra)
             result = self._view(self.remote[host][rid])
         elif method == "name_check" and isinstance(result, dict):
