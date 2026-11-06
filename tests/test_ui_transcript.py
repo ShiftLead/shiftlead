@@ -168,11 +168,11 @@ def test_the_focus_header_offers_transcript_only_with_a_tool_session_id(tmp_path
 
 @pytest.mark.unit
 def test_the_page_script_keeps_the_button_and_the_banner_s_words_in_step():
-    """The header's button follows `adapter_id` on the delta, and the exited banner gains *or read
-    its transcript* where the button is drawn (TD-166 fix 3)."""
+    """The header's button follows `adapter_id` on the delta (TD-166 fix 3); the ending banner no longer says
+    *read its transcript*, which is the acts line's **Transcript** (TD-964, TD-1405)."""
     js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
     assert 'tr.classList.toggle("hidden", !v.adapter_id)' in js
-    assert "read its transcript</a>" in js and "const read = v.adapter_id ?" in js
+    assert "read its transcript" not in js
     assert "AO.transcript = function" in js and "?part=1&before=" in js
 
 

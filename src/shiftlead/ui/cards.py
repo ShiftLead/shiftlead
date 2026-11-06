@@ -39,6 +39,7 @@ from shiftlead.ending import (
     NO_CLOSER,
     closer_words,
     ending_hover,
+    ending_unnamed,
     exit_words,
     own_work,
     pill_of,
@@ -68,6 +69,7 @@ def state_icons() -> dict[str, str]:
 
 
 templates.env.globals["state_icons"] = state_icons
+templates.env.globals["closed_keep"] = lambda: closed_keep()  # the ending banner's i panel (TD-1405), defined below
 
 # -- identity alarms (design §4.8a, TD-077 step 2) -------------------------------------------------
 
@@ -657,6 +659,8 @@ def view(
     # the ending with its time: the pill's hover where nothing outranks it, and always the Focus end banner's first line
     d["ending_text"] = ending_hover(s, names, now)
     d["pill_title"] = pill_title(d, d["ending_text"])
+    # …and whether the ending banner guesses at the cause: only where the record does not name it (TD-964, TD-1405)
+    d["ending_unnamed"] = ending_unnamed(s, names, now)
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
     return d
