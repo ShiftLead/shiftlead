@@ -180,7 +180,7 @@ class SyncMixin:
         subject = body = None
         if gate_dir is not None:
             if why := await asyncio.to_thread(sync_mod.compose, root, n, gate_dir):
-                return sync_mod._no_reading(e, f"squash-message refused: {why}", now_iso())
+                return sync_mod._no_reading(e, why, now_iso())
             try:
                 sha = (gate_dir / "sha").read_text(encoding="utf-8").strip()
                 subject = (gate_dir / "subject").read_text(encoding="utf-8")

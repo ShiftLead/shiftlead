@@ -182,7 +182,7 @@ async def test_every_exit_of_the_merge_removes_the_dir_and_writes_no_gate_dir(ag
     if road in ("sha", "reread"):
         assert got is None, "the moved head: nothing written"
     if road == "refused":
-        assert got["tries"] == 1 and "squash-message refused" in got["why"]
+        assert got["tries"] == 1 and got["why"] == "squash-message: refused — no name"
     if road == "held-before":
         assert "compose" not in _names(gh)
 
