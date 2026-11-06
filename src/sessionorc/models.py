@@ -1485,7 +1485,15 @@ class Session:
         d["asks_waiting"] = self.asks_waiting()
         d["prs_waiting"] = self.prs_waiting()
         d["mail"] = self.mail_marks()
+        # design §4.5a *Focus side panel: Sent* (TD-1409): the outbox as counts, never bodies — what
+        # the session sent that the outbox keeps, and its questions still waiting for their answer
+        d["sent"] = len(self.outbox)
+        d["sent_open"] = self.sent_open()
         return d
+
+    def sent_open(self) -> int:
+        """The `ask`s and `steer`s this session sent that are still open — the Sent card's *m waiting*."""
+        return sum(1 for e in self.outbox if e.kind in ("ask", "steer") and e.open)
 
     def unread(self) -> int:
         return sum(1 for e in self.inbox if not e.read_at)

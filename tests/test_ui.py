@@ -1267,6 +1267,13 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
     # the row's two halves, server-rendered (TD-138)
     assert (e["lead_html"], e["rest_html"]) == ("<p>are you done?</p>", "")
     assert rec(worker)["unread"] == 1  # the panel's read marked nothing: a person is not the session
+    # **Sent** (§4.5a *Focus side panel: Sent*, TD-1409): the asker's outbox, counted on its record
+    # and read through `?sent=1` — recipients by name, the ask *waiting* while it is open
+    assert (rec(lead)["sent"], rec(lead)["sent_open"]) == (1, 1) and rec(worker)["sent"] == 0
+    assert 'id="sentcard"' in client.get(f"/focus/{lead}").text
+    [out] = client.get(f"/api/sessions/{lead}/inbox?sent=1").json()["entries"]
+    assert (out["id"], out["to"], out["to_names"], out["kind"]) == (ask, [worker], ["mworker"], "ask")
+    assert out["answered_by"] is None and out["lead_html"] == "<p>are you done?</p>"
 
     # **Message**: a note from the person, into this session's inbox
     assert client.post(f"/api/sessions/{worker}/message", json={"kind": "reply", "text": "x"}).status_code == 400
@@ -1286,6 +1293,10 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
     assert (back["from"], back["kind"], back["reply_to"], back["text"]) == ("person", "reply", ask, "yes, merged")
     asked = next(x for x in client.get(f"/api/sessions/{worker}/inbox").json()["entries"] if x["id"] == ask)
     assert asked["closed_by"] == r.json()["id"]
+    # …and the asker's Sent card reads it answered, by whoever's reply sits in its own inbox
+    [out] = client.get(f"/api/sessions/{lead}/inbox?sent=1").json()["entries"]
+    assert out["closed_by"] == r.json()["id"] and out["answered_by"] == "person"
+    assert (rec(lead)["sent"], rec(lead)["sent_open"]) == (1, 0)
 
     # delete: this session's copy only
     before = [x["id"] for x in client.get(f"/api/sessions/{worker}/inbox").json()["entries"]]

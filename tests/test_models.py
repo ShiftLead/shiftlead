@@ -264,6 +264,13 @@ def test_mail_survives_the_store_roundtrip_and_stays_out_of_the_view():
         and s.view(bookkeeping=True)["threads"] == {"m-1": {"count": 1, "bound_hit": False, "at": []}}
     )
     assert v["mail"]["open_asks"] == ["m-1"] and v["sends"][0]["id"] == "s-1"
+    # the Sent card's counts (§4.5a *Focus side panel: Sent*, TD-1409): the outbox kept, its open questions
+    assert (v["sent"], v["sent_open"]) == (1, 0)
+    mine = MailEntry(id="m-4", from_="ao-x", to=["ao-lead"], at="2026-09-16T10:02:00Z", kind="ask", text="ok?")
+    s.outbox.append(mine)
+    assert (s.view()["sent"], s.view()["sent_open"]) == (2, 1)
+    mine.closed_reason = "expired"
+    assert (s.view()["sent"], s.view()["sent_open"]) == (2, 0)
     ask.closed_by = "m-3"
     assert not ask.open and s.mail_marks()["open_asks"] == []
 

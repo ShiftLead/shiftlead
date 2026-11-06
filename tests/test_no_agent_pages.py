@@ -73,8 +73,8 @@ def test_focus_of_a_shell_draws_a_shells_controls_and_an_agents_draws_its_own(cl
         sh, ag = client.get(f"/focus/{shell}").text, client.get(f"/focus/{agent}").text
         absent = (
             'data-act="wrapup"', 'data-act="message"', 'id="fmodeact"', 'id="fmodemenu"', 'id="fready"',
-            'id="workingcard"', 'id="reportscard"', 'id="inboxcard"', 'data-side="ready"', 'id="adapter_id"',
-            'id="fgrants"', 'id="fcontrollers"', "Compose a prompt…",
+            'id="workingcard"', 'id="reportscard"', 'id="inboxcard"', 'id="sentcard"', 'data-side="ready"',
+            'id="adapter_id"', 'id="fgrants"', 'id="fcontrollers"', "Compose a prompt…",
         )  # fmt: skip
         for word in absent:
             assert word not in sh, word
@@ -103,9 +103,9 @@ def test_focus_renders_a_shell_from_the_view_without_the_agents_cards():
     # Send never steers a shell, and the hint says what Send does to one
     assert "const steering = agent && (" in render and '"types the line and presses Enter"' in render
     # Reports and Inbox are not read for it, and the checks give way to Close on any live state
-    assert "if (v.agent !== false) { renderReports(v); renderInbox(v); }" in render
+    assert "if (v.agent !== false) { renderReports(v); renderInbox(v); renderSent(v); }" in render
     assert 'const now = v.pane !== false && !["closed", "scheduled"].includes(v.state);' in render
     assert 'const aid = $("#adapter_id"); if (aid)' in render
     # the page's other readers of the cards a shell lacks are guarded
-    assert 'if (!$("#inboxcard")) return;' in js
+    assert 'if (!$("#inboxcard")) return;' in js and "if (!card) return;  // a record with no agent sends no mail" in js
     assert 'reports: txt($("#reportscount"))' in js

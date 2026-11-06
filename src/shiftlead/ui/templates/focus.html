@@ -353,6 +353,14 @@
       <summary class="row gap"><span class="h2">Inbox</span><span class="meta sumval" id="inboxcount"></span></summary>
       <div id="inboxlist"></div>
       <div class="note">Mail addressed to this session. Opening it here marks nothing read — only the session's own <code>ao inbox</code> does. Reply goes to the sender's inbox; delete removes this session's copy only.</div>
+    </details>
+    {# design §4.5a Focus side panel **Sent** (§4.9b, TD-1409): the Inbox's other half — what this
+       session addressed to others. Counts ride the record (`sent`, `sent_open`); the bodies are
+       fetched through `inbox` with `sent`, a person's read, each time the card is unfolded. #}
+    <details class="card pad side sent{% if not s.sent %} hidden{% endif %}" data-side="sent" id="sentcard">
+      <summary class="row gap"><span class="h2">Sent</span><span class="meta sumval" id="sentcount"></span></summary>
+      <div id="sentlist"></div>
+      <div class="note">Mail this session sent, newest first: an ask is <i>waiting</i> until it is answered. Nothing here is a control — a reply is the recipient's to send.</div>
     </details>{% endif %}
     {# design §4.5a Focus (lead) **Members** list (§4.8, TD-036): every session whose
        `controllers` name this one — the lead's central view. Derived from the records on
@@ -454,7 +462,7 @@
       {%- set rows = [] %}
       {%- if s.agent %}{% set rows = rows + [('working', '✎', 'Working'), ('prompts', '❯', 'Prompts')] %}{% endif %}
       {%- if not s.reaped %}{% set rows = rows + [('git', '⎇', 'Git')] %}{% endif %}
-      {%- if s.agent %}{% set rows = rows + [('reports', '✓', 'Reports'), ('inbox', '✉', 'Inbox')] %}{% endif %}
+      {%- if s.agent %}{% set rows = rows + [('reports', '✓', 'Reports'), ('inbox', '✉', 'Inbox'), ('sent', '↗', 'Sent')] %}{% endif %}
       {%- if s.holds_control %}{% set rows = rows + [('members', '☷', 'Members')] %}{% endif %}
       {%- if s.agent %}{% set rows = rows + [('ready', '☐', 'Ready to close')] %}{% endif %}
       {%- set rows = rows + [('session', 'ⓘ', 'Session')] %}
