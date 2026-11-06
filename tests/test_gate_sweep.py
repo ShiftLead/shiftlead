@@ -631,6 +631,29 @@ async def test_the_tick_hands_the_sweep_the_repo_id_visibility_and_host_file(age
     assert hosts[-1]["visibility"] == "private" and len(reads) == 2, "a read once made is kept for the agent's life"
 
 
+async def test_a_root_whose_host_log_arguments_raise_is_still_swept_with_no_repo_id(agent, monkeypatch, tmp_path):
+    a, b = str(tmp_path / "a"), str(tmp_path / "b")
+    hosts: dict[str, dict] = {}
+
+    def sweep(root, others, **kw):
+        hosts[root] = kw["host"]
+        return {"checks": [], "lifts": [], "to_file": {}, "to_close": {}, "applied": []}, None
+
+    async def args(root):
+        if root == a:
+            raise ValueError("a malformed remote")
+        return {"repo": "o/b", "visibility": "public", "host_file": "h"}
+
+    monkeypatch.setattr(gatesweep, "eligible", lambda r: (True, None))
+    monkeypatch.setattr(gatesweep, "sweep", sweep)
+    monkeypatch.setattr(agent, "_host_log_args", args)
+    agent._repos[a] = {"remote": "x"}
+    agent._repos[b] = {"remote": "git@github.com:o/b.git"}
+    await agent._sweep_pass(date(2026, 11, 6))
+    assert hosts[a]["repo"] is None, "its host-log gates answer error, as a root with no origin id"
+    assert hosts[b]["repo"] == "o/b", "the pass goes on to the next root"
+
+
 def test_against_the_real_reader_a_press_today_lifts_a_gate_added_yesterday_and_one_yesterday_does_not(tmp_path):
     """The pinned `hostlog.py` itself, through `cadence.command` for this checkout, on a test home whose
     `witnessed/start` predates yesterday and whose host file the home wrote, with this repo's committed

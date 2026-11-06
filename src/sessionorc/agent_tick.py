@@ -1655,7 +1655,11 @@ class TickMixin:
                     continue
                 self._sweep_quiet = {(r, w) for r, w in self._sweep_quiet if r != root}
                 others = [r for r in roots if r != root and Path(r).is_dir()]
-                host = await self._host_log_args(root)
+                try:
+                    host = await self._host_log_args(root)
+                except Exception:  # noqa: BLE001 — one root's bad origin is that root's host-log `error`, not the pass's
+                    log.warning("the host-log arguments for %s could not be read", root, exc_info=True)
+                    host = {"repo": None, "visibility": "public", "host_file": witness.host_file()}
                 got, why = await asyncio.to_thread(
                     lambda r=root, o=others, h=host: gatesweep_mod.sweep(
                         r,
