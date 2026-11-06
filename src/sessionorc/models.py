@@ -519,6 +519,10 @@ class MailEntry:
     # mail the person reads; a reply, an outcome note and an *answered for you* entry carry their
     # question's — a thread has one subject. None on session mail sent without one.
     subject: str | None = None
+    # Why a question taken up from a session was not answered (design §4.9b *Why it did not answer*,
+    # TD-1430): the stamp `unanswered.read` makes of the addressee's record at the take-up, on the new
+    # question's every copy. Written only by the take-up branch of the send — never taken from a caller.
+    unanswered: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root

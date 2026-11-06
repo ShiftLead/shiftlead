@@ -28,6 +28,7 @@ from sessionorc import mail as mailmod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
+from sessionorc import unanswered as unanswered_mod
 from sessionorc.adapters import short_model
 from sessionorc.cadence import said as cadence_said
 from sessionorc.client import AgentError, AgentUnavailable
@@ -4090,11 +4091,20 @@ def cmd_msg(args: argparse.Namespace) -> int:
             print(f"landed — host unreachable: {', '.join(got['unreachable'])}")
         for asked, now in (got.get("forwarded") or {}).items():
             print(f"forwarded: {asked} was resumed as {now}")
+        if isinstance(e.get("unanswered"), dict):  # §4.9b *Why it did not answer* (TD-1430): what the person reads
+            print(_unanswered_line(e["unanswered"]))
         # design §4.10 *When it is read* (TD-168): the reply ends with when each addressee reads it
         for sid, when in (got.get("read_when") or {}).items():
             print(f"{sid}: {when}")
 
     return emit(args, got, prose)
+
+
+def _unanswered_line(stamp: dict[str, Any]) -> str:
+    """A taken-up question's one line (design §4.9b *Why it did not answer*, §4.7 `ao inbox`, TD-1430): the
+    label with the read's time, then the home's fixed words for the state."""
+    name = stamp.get("name") or stamp.get("by")
+    return f"not answered by {name} (as read at {unanswered_mod.clock(stamp.get('at'))}): {unanswered_mod.words(stamp)}"
 
 
 def _left(iso: str) -> str:
@@ -4325,6 +4335,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  {st['text']}")
             for line in str(e["text"]).splitlines() or [""]:
                 print(f"  {line}")
+            if isinstance(e.get("unanswered"), dict):  # a question taken up: why it was not answered (§4.9b)
+                print(f"  {_unanswered_line(e['unanswered'])}")
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
             if r := e.get("recommend"):  # passed up: the passer's line, labelled as its own (design §4.9b)
