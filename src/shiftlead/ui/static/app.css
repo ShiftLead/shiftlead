@@ -618,6 +618,7 @@ details.side > summary .h2::before { content: "▾ "; color: var(--muted); font-
    shrinks for it, the value is cut with … first; amber only where it asks something of the person */
 details.side > summary .h2 { flex: none; } details.side > summary .sumval { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 details.side > summary .sumval.warnish { color: var(--warn-fg); }
+details.side > summary .sumval .waiting, #sentlist .st.waiting { color: var(--warn-fg); }  /* the Sent card's open asks (TD-1409) */
 details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side .kv dd .controllers { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 6px; } .termbox .xterm { height: 100%; }
 /* a finger's drag on the terminal is tmux's scroll, never the page's (§4.6, TD-989); xterm.js's viewport is a scroll

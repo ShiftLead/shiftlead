@@ -3709,12 +3709,19 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return JSONResponse({"ok": True})
 
     @app.get("/api/sessions/{sid}/inbox")
-    async def api_inbox(sid: str, request: Request):
+    async def api_inbox(sid: str, request: Request, sent: bool = False):
         """design §4.5a Focus side panel **Inbox** (§4.10 "A bounded body"): bodies never ride the
         pushed record, so the panel fetches them here. No caller — a person's read, which sets no
         `read_at`, because a person is not the session. Each sender gets its name beside its id,
         and its text the two halves the Inbox row draws (`shaped`, TD-138): the panel folds the
-        same way, from the same renderer, and composes no markup of its own from a session's text."""
+        same way, from the same renderer, and composes no markup of its own from a session's text.
+
+        `?sent=1` is the **Sent** card's read (§4.5a *Focus side panel: Sent*, TD-1409): the
+        session's outbox through `inbox` with `sent`, a person's read of any session's, each entry
+        with its recipients' names, and a closed question's `answered_by` — the name of whoever
+        sent the reply that closed it, read from this session's own inbox, where that reply sits."""
+        if sent:
+            return await _sent_read(sid, request)
         got = await call("inbox", id=sid)
         fleet = await call("list")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
@@ -3724,6 +3731,20 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does
             e["reply_when"] = str(((records.get(e["from"]) or {}).get("read_when") or {}).get("note") or "")
+            s = shaped(e.get("text"), origin)
+            e["lead_html"], e["rest_html"] = str(s["lead"]), str(s["rest"])
+        return got
+
+    async def _sent_read(sid: str, request: Request) -> dict[str, Any]:
+        got, mine, fleet = await asyncio.gather(call("inbox", id=sid, sent=True), call("inbox", id=sid), call("list"))
+        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        name = lambda who: "person" if who == "person" else names.get(who, who)  # noqa: E731
+        repliers = {e["id"]: e["from"] for e in mine.get("entries") or ()}  # the replies sit in its own inbox
+        origin = page_origin(request)
+        for e in got["entries"]:
+            e["to_names"] = [name(x) for x in e.get("to") or ()]
+            by = repliers.get(e.get("closed_by") or "")
+            e["answered_by"] = name(by) if by else None
             s = shaped(e.get("text"), origin)
             e["lead_html"], e["rest_html"] = str(s["lead"]), str(s["rest"])
         return got

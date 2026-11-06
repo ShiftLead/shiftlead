@@ -38,6 +38,15 @@ console.log(JSON.stringify({
   keys: cards.map(AO.sideFoldKey),
   kept: cards.filter(AO.sideFoldKept),
   inbox: [AO.inboxSummary(1, 5), AO.inboxSummary(0, 6), AO.inboxSummary(0, 0)],
+  sent: [AO.sentSummary(3, 1), AO.sentSummary(2, 0), AO.sentSummary(0, 0)],
+  states: [
+    { kind: "ask" }, { kind: "ask", closed_reason: "replied", closed_by: "m-9", answered_by: "techlead" },
+    { kind: "ask", closed_reason: "replied", closed_by: "m-9" }, { kind: "ask", expired_at: "x" },
+    { kind: "steer", closed_reason: "lapsed" }, { kind: "ask", closed_reason: "asked_person" },
+    { kind: "ask", closed_reason: "withdrawn" }, { kind: "note" },
+  ].map(AO.sentState),
+  entry: AO.sentEntry({ id: "m-1", kind: "ask", to: ["ao-a-1", "person"], to_names: ["techlead", "person"],
+    subject: "TD-9 <b>merge?</b>", about: "TD-9", at: "2026-11-06T10:00:00Z", lead_html: "<p>ok?</p>", rest_html: "" }),
   ready: [
     AO.readySummary([["agent idle", true], ["tree clean", true]]),
     AO.readySummary([["agent idle", true], ["branch pushed", false], ["outcomes reported (1 owed)", false]]),
@@ -158,3 +167,51 @@ def test_the_cards_unread_badge_opens_the_folded_inbox():
     first, the link opens the card rather than scrolling to a folded line (TD-1407 review)."""
     js = (UI / "static" / "app.js").read_text()
     assert 'location.hash === "#inbox" && es.length) { $("#inboxcard").open = true;' in js
+
+
+@pytest.mark.unit
+def test_the_sent_summary_counts_what_was_sent_and_its_waiting_asks_in_amber():
+    """§4.5a *Focus side panel: Sent* (TD-1409): *n sent*, and *, m waiting* in amber while an ask is open."""
+    waiting, done, empty = _probe()["sent"]
+    assert waiting == '3 sent<span class="waiting">, 1 waiting</span>' and done == "2 sent" and empty == ""
+    css = (UI / "static" / "app.css").read_text()
+    assert "details.side > summary .sumval .waiting, #sentlist .st.waiting { color: var(--warn-fg); }" in css
+
+
+@pytest.mark.unit
+def test_a_sent_question_reads_waiting_then_what_closed_it_and_the_entry_has_no_controls():
+    got = _probe()
+    assert got["states"] == [
+        "waiting", "answered by techlead", "answered", "expired",
+        "lapsed · the sender went with its default", "passed to the person", "withdrawn", "",
+    ]  # fmt: skip
+    e = got["entry"]
+    assert 'title="to ao-a-1, person">to techlead, person</span>' in e and "re TD-9" in e
+    assert "TD-9 &lt;b&gt;merge?&lt;/b&gt;" in e and "<p>ok?</p>" in e  # the subject escaped, the body pre-shaped
+    assert '<span class="st waiting">waiting</span>' in e
+    assert "data-act" not in e and "<button" not in e  # display only: no Reply, no Delete
+
+
+@pytest.mark.parametrize(("sent", "hidden"), [(0, True), (2, False)])
+def test_the_sent_card_starts_folded_and_is_drawn_only_when_the_outbox_holds_something(
+    tmp_path, monkeypatch, sent, hidden
+):
+    _, html = _render(tmp_path, monkeypatch, sent=sent, sent_open=0)
+    card = _card(html, "sent")
+    assert " open" not in card and ("hidden" in card) is hidden
+    assert 'data-card="sent"' in html  # a row of the narrow sheet, between Inbox and Ready to close
+    assert html.index('data-card="inbox"') < html.index('data-card="sent"') < html.index('data-card="ready"')
+    # the side panel's reading order: Inbox, then Sent
+    assert html.index('data-side="inbox"') < html.index('data-side="sent"')
+
+
+@pytest.mark.unit
+def test_the_sent_card_fetches_bodies_on_each_unfold_and_counts_from_the_record():
+    js = (UI / "static" / "app.js").read_text()
+    assert "fetch(`/api/sessions/${encodeURIComponent(id)}/inbox?sent=1`)" in js
+    assert (
+        'addEventListener("toggle", (ev) => { if (ev.target === ev.currentTarget && ev.target.open) refreshSent(); });'
+        in js
+    )
+    assert "sum.innerHTML = AO.sentSummary(n, waiting);" in js
+    assert "renderInbox(v); renderSent(v); }" in js

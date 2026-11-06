@@ -5741,6 +5741,42 @@
     if (!total) return "";
     return unread ? `<span class="badge unread">${unread} unread of ${total}</span>` : `${total}, all read`;
   };
+  // the Sent card's summary (§4.5a *Focus side panel: Sent*, TD-1409): *n sent*, and *, m waiting* in
+  // amber while an ask of its is open — the record's counts of what the outbox keeps
+  AO.sentSummary = function (sent, waiting) {
+    if (!sent) return "";
+    return waiting ? `${sent} sent<span class="waiting">, ${waiting} waiting</span>` : `${sent} sent`;
+  };
+  // what became of a sent question, in the words the Inbox page's FYI section gives each close path
+  // (§4.5 screen 6): *waiting* while it is open, *answered by <name>* once a reply closed it
+  AO.sentState = function (e) {
+    if (e.kind !== "ask" && e.kind !== "steer") return "";
+    const r = e.closed_reason;
+    return r === "replied" || (!r && e.closed_by) ? (e.answered_by ? `answered by ${e.answered_by}` : "answered")
+      : r === "expired" || (!r && e.expired_at) ? "expired"
+      : r === "lapsed" ? "lapsed · the sender went with its default"
+      : r === "go_with_it" ? "closed · go with it"
+      : r === "declined" ? "declined · the sender was told"
+      : r === "asker_gone" ? "closed · the asker is gone"
+      : r === "withdrawn" ? "withdrawn"
+      : r === "asked_person" ? "passed to the person"
+      : r ? r
+      : "waiting";
+  };
+  // One entry of the Sent card: its recipients (ids on hover), kind, subject, `about` and age, the
+  // body folded as an Inbox entry's is, and a question's state. Display only: no Reply, no Delete.
+  AO.sentEntry = function (e) {
+    const st = AO.sentState(e);
+    const to = (e.to_names || e.to || []).join(", ");
+    return `<div class="mail sent" data-msg="${esc(e.id)}">`
+      + `<div class="row gap"><span class="ref" title="to ${esc((e.to || []).join(", "))}">to ${esc(to)}</span>`
+      + `<span class="st kind">${esc(e.kind)}</span>${e.about ? `<span class="st">re ${esc(e.about)}</span>` : ""}`
+      + `<span class="grow"></span><span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
+      + (e.subject ? `<div class="st subj">${esc(e.subject)}</div>` : "")
+      + AO.foldBody(e)
+      + (st ? `<div class="row gap"><span class="st${st === "waiting" ? " waiting" : ""}">${esc(st)}</span></div>` : "")
+      + `</div>`;
+  };
   // the Ready to close card's summary (TD-964): ✓ once every check passes, else the first failing
   // check and *+n* for the rest, in amber; the hover names every failing check
   AO.readySummary = function (checks) {
@@ -6512,7 +6548,7 @@
       const checks = $$("#checks > div");
       const sums = {
         working: text("#workingtext"), prompts: text("#promptscount"), git: text("#gitline"), reports: text("#reportscount"),
-        inbox: text("#inboxcount"), members: text("#memberscount"),
+        inbox: text("#inboxcount"), sent: text("#sentcount"), members: text("#memberscount"),
         ready: checks.length ? `${checks.filter((c) => c.classList.contains("ok")).length} of ${checks.length}` : "",
         session: text('details.side[data-side="session"] > summary .meta'),
       };
@@ -7553,7 +7589,7 @@
       AO.paintLinks(v, $("#flinks"), $("#flinksdt"));
       // a record with no agent draws no Reports, Inbox or grants (§4.5a *A record with no agent*, TD-666):
       // nothing is derived for it and nothing reads its inbox — the template leaves the cards out
-      if (v.agent !== false) { renderReports(v); renderInbox(v); }
+      if (v.agent !== false) { renderReports(v); renderInbox(v); renderSent(v); }
       renderGrants(v);
       renderStop(v);
       renderMembership(v);
@@ -7703,6 +7739,33 @@
         inboxFirst = false;
       }, 150);
     }
+    // design §4.5a Focus side panel **Sent** (§4.9b, TD-1409): the counts ride the record (`sent`,
+    // `sent_open`) and draw the summary; the bodies are a person's read through `inbox` with `sent`,
+    // fetched when the card is unfolded and again on each unfold — and while it is open, when the counts move.
+    let sentSig = null;
+    function renderSent(v) {
+      const card = $("#sentcard");
+      if (!card) return;  // a record with no agent sends no mail (TD-666)
+      const n = v.sent || 0, waiting = v.sent_open || 0;
+      card.classList.toggle("hidden", !n);
+      const sum = $("#sentcount");
+      sum.innerHTML = AO.sentSummary(n, waiting);
+      sum.title = waiting ? `${waiting} ask${waiting === 1 ? "" : "s"} still waiting for an answer` : "";
+      const sig = JSON.stringify([n, waiting, v.mail || {}, v.unread || 0]);
+      if (sig !== sentSig) { sentSig = sig; if (card.open) refreshSent(); }
+    }
+    async function refreshSent() {
+      let got;
+      try {
+        const r = await fetch(`/api/sessions/${encodeURIComponent(id)}/inbox?sent=1`);
+        if (!r.ok) return;
+        got = await r.json();
+      } catch (e) { return; }
+      const es = (got.entries || []).slice().sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+      $("#sentlist").innerHTML = es.map(AO.sentEntry).join("") || `<div class="note">nothing kept</div>`;
+      AO.reopenFolds($("#sentlist"));
+    }
+    if ($("#sentcard")) $("#sentcard").addEventListener("toggle", (ev) => { if (ev.target === ev.currentTarget && ev.target.open) refreshSent(); });
     // design §4.5a controllers chip + Members list (§4.8, TD-036). Both are membership, which is
     // read *across* records: a change on another session (a controller renamed, removed, or gone; a
     // member's state, lane or report) comes to this page as this session's own delta again, which
