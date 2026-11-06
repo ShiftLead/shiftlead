@@ -376,6 +376,9 @@ def view(
     short = [f for f in ("dirty" if git.get("dirty") else "", str(git.get("unpushed") or "")) if f]
     d["flag_short"] = " · ".join(short) if d["flag"] else ""
     prof = s.get("profile") or ""
+    # the Session card's summary value (design §4.5 *The Focus screen's anatomy*, TD-964): the model
+    # in use, or the tool alone until one is read; tool · account · model is its hover
+    d["model_short"] = short_model(str(s.get("adapter") or ""), s.get("model")) or str(s.get("adapter") or "")
     if s.get("adapter") == "shell":
         d["profile_line"] = "shell"
     else:

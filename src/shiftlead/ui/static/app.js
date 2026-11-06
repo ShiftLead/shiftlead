@@ -5728,6 +5728,29 @@
   };
 
   // ---- Focus ----
+  // The side panel's remembered folds (§4.5 *The Focus screen's anatomy*, TD-964): read under
+  // `focus.fold.<card>`, a new key, so a browser that remembered a newly folded card open
+  // (Reports, Inbox, Sent, Ready to close) starts from the new default; the cards whose default did
+  // not change fall back to what the browser chose under the old `focus.side.<card>`.
+  AO.sideFoldKey = (card) => `focus.fold.${card}`;
+  AO.sideFoldKept = (card) => !["reports", "inbox", "sent", "ready"].includes(card);
+  // the Inbox card's summary (TD-964): *n unread of m* in the rail's blue, *m, all read* in grey
+  AO.inboxSummary = function (unread, total) {
+    if (!total) return "";
+    return unread ? `<span class="badge unread">${unread} unread of ${total}</span>` : `${total}, all read`;
+  };
+  // the Ready to close card's summary (TD-964): ✓ once every check passes, else the first failing
+  // check and *+n* for the rest, in amber; the hover names every failing check
+  AO.readySummary = function (checks) {
+    const bad = (checks || []).filter(([, ok]) => !ok).map(([n]) => n);
+    if (!(checks || []).length) return { text: "", title: "", warn: false };
+    if (!bad.length) return { text: "✓", title: "every check passes", warn: false };
+    return {
+      text: `✗ ${bad[0]}${bad.length > 1 ? `, +${bad.length - 1}` : ""}`,
+      title: bad.map((n) => `✗ ${n}`).join(" · "),
+      warn: true,
+    };
+  };
   // The rail's glyphs (§4.5 *The panel put away*, TD-412): one per side card that has something to
   // say, in the panel's order — `card` is the `data-side` a press opens ("" for needs-you, whose
   // prompt is the identity line's, never the panel's), `title` the card's heading and its line.
@@ -7515,6 +7538,9 @@
       // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
       if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }
       AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));
+      // the Session card's summary (TD-964): the model once read, the tool until then; its hover the profile line
+      const fmodel = $("#fmodel");
+      if (fmodel && v.model_short != null) { fmodel.textContent = v.model_short; if (v.profile_line) fmodel.title = v.profile_line; }
       AO.paintLinks(v, $("#flinks"), $("#flinksdt"));
       // a record with no agent draws no Reports, Inbox or grants (§4.5a *A record with no agent*, TD-666):
       // nothing is derived for it and nothing reads its inbox — the template leaves the cards out
@@ -7531,14 +7557,25 @@
         return;
       }
       const checks = v.ready || [];
-      $("#checks").innerHTML = checks.map(([n, ok]) => `<div class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✗"} ${esc(n)}</div>`).join("");
+      // no Ready to close card on a `closed` record (TD-964): the template leaves it out, and one
+      // that closes while the page is open loses it, there being nothing left to close
+      const readyCard = $('details.side[data-side="ready"]');
+      if (readyCard && v.state === "closed") readyCard.remove();
+      const readySum = $("#readysum");
+      if (readySum) {
+        const sum = AO.readySummary(checks);
+        readySum.textContent = sum.text; readySum.title = sum.title; readySum.classList.toggle("warnish", sum.warn);
+      }
+      const checkList = $("#checks");
+      if (checkList) checkList.innerHTML = checks.map(([n, ok]) => `<div class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✗"} ${esc(n)}</div>`).join("");
       // design §4.5a Focus header **Close session** (TD-156): the checklist passing on an idle or
       // exited session puts *ready to close ✓* on the identity line, in the card's words, and the
       // outlined Close session on the acts line; the side card's small Close is the same act.
       // the agent's own state is the checklist's first row (TD-679): one test, not a second one here
       const ready = !!(checks.length && checks.every(([, ok]) => ok));
-      $("#closebtn").disabled = !ready;
-      $("#closebtn").classList.toggle("hidden", !v.own);  // a member's checklist has no button: its Close is more ▾'s
+      const closeBtn = $("#closebtn");
+      // a member's checklist has no button: its Close is more ▾'s
+      if (closeBtn) { closeBtn.disabled = !ready; closeBtn.classList.toggle("hidden", !v.own); }
       // more ▾'s Close also on the person's own session whose only failing row is a shell past SHELL_WAIT,
       // its confirm naming the shell (§4.5a *Close session*, TD-761: `shell_close`, the card's reading)
       const cm = $("#fclosemenu");
@@ -7549,7 +7586,7 @@
       // …and the next act only on the person's own session (`own`): a team member runs itself
       $("#fready").classList.toggle("hidden", !(ready && v.own));
       $("#fclose").classList.toggle("hidden", !(ready && v.own));
-      renderRail(v, ready);
+      renderRail(v, ready && v.state !== "closed");  // a closed record has no Ready to close card to open
     }
     // **» put away** / **«** (§4.5 *The panel put away*, §4.5a, TD-412): the panel to a 28px rail,
     // the terminal taking the width (the fit's observer on `#term` refits it and the pty hears the
@@ -7648,11 +7685,12 @@
         } catch (e) { return; }
         const es = got.entries || [];
         $("#inboxcard").classList.toggle("hidden", !es.length);
-        $("#inboxcount").textContent = es.length ? `${got.unread} unread · ${es.length}` : "";
+        $("#inboxcount").innerHTML = AO.inboxSummary(got.unread || 0, es.length);
         inboxN = es.length; renderRail();
         $("#inboxlist").innerHTML = es.slice().reverse().map((e) => AO.mailEntry(e, id)).join("");
         AO.reopenFolds($("#inboxlist"));
-        if (inboxFirst && location.hash === "#inbox" && es.length) $("#inboxcard").scrollIntoView({ block: "nearest" });
+        // the card's unread badge links here (`#inbox`): the card opens, folded at first as it is (TD-964)
+        if (inboxFirst && location.hash === "#inbox" && es.length) { $("#inboxcard").open = true; $("#inboxcard").scrollIntoView({ block: "nearest" }); }
         inboxFirst = false;
       }, 150);
     }
@@ -7713,9 +7751,11 @@
     // The side panel's folds (design §4.5 *The Focus screen's anatomy*, TD-156): every card a
     // `<details>`, the template's `open` its default, this browser's choice remembered per card as
     // a team's fold is. A button in a card's summary (Ready to close's Close) must not also fold it.
+    // TD-964 folded Reports, Inbox, Sent and Ready to close at first, so the choice is read under a
+    // new key (`AO.sideFoldKey`); a card whose default did not change falls back to the old key's value.
     $$("details.side").forEach((d) => {
-      const key = `focus.side.${d.dataset.side}`;
-      d.open = store.get(key, d.open);
+      const key = AO.sideFoldKey(d.dataset.side);
+      d.open = store.get(key, AO.sideFoldKept(d.dataset.side) ? store.get(`focus.side.${d.dataset.side}`, d.open) : d.open);
       d.addEventListener("toggle", () => store.set(key, d.open));
     });
     document.addEventListener("click", (e) => { if (e.target.closest("details.side > summary button")) e.preventDefault(); });

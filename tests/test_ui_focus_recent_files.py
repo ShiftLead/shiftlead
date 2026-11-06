@@ -212,7 +212,7 @@ def test_focus_paints_the_row_and_the_rail_from_each_view_with_its_editor():
     rail = focus[focus.index("    function renderRail(v, ready) {") :]
     rail = rail[: rail.index("\n    }\n")]
     assert "      const html = AO.railHtml(railV, railReady, inboxN, lines, s.editor);" in rail
-    assert '$("#railglyphs")' in rail and "renderRail(v, ready);" in render
+    assert '$("#railglyphs")' in rail and 'renderRail(v, ready && v.state !== "closed");' in render
 
 
 def test_focus_draws_the_editor_button_on_the_session_cards_summary_and_not_the_header(client, tmp_path):  # noqa: F811

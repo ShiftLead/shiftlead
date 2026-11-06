@@ -614,6 +614,10 @@ details.side .doing { margin-top: 8px; font-size: var(--t-small); line-height: 1
 /* the side panel's folds: the heading is the disclosure, a chevron before it, Session folded by default */
 details.side > summary { list-style: none; cursor: pointer; align-items: center; } details.side > summary::-webkit-details-marker { display: none; }
 details.side > summary .h2::before { content: "▾ "; color: var(--muted); font-weight: 400; } details.side:not([open]) > summary .h2::before { content: "▸ "; }
+/* a folded card's value on its summary (§4.5 *The Focus screen's anatomy*, TD-964): the heading never
+   shrinks for it, the value is cut with … first; amber only where it asks something of the person */
+details.side > summary .h2 { flex: none; } details.side > summary .sumval { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.side > summary .sumval.warnish { color: var(--warn-fg); }
 details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side .kv dd .controllers { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 6px; } .termbox .xterm { height: 100%; }
 /* a finger's drag on the terminal is tmux's scroll, never the page's (§4.6, TD-989); xterm.js's viewport is a scroll
