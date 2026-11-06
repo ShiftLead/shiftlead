@@ -256,3 +256,59 @@ def test_the_orders_holder_names_the_wait_before_a_covered_members_holder(tmp_pa
     for rec in (member, order):
         rec.repo = rec.dir = root
     assert _row(_read({root: r}, [member, order]), "r#TD-001")["state"] == "answered — waiting on zulu"
+
+
+@pytest.mark.unit
+def test_a_line_carried_to_another_repos_entry_names_it_qualified(tmp_path):
+    """TD-1424: a bare `TD-m` is its own board's repo's, so a line carried to another repo's entry keeps the
+    qualifier in the member's word — *waiting on o#TD-005*, never this repo's TD-005."""
+    held = _entry(1, "the held one", **HELD)
+    root, r = _setup(tmp_path, [held], _closed("TD-001", "carried to o#TD-005"))
+    other, o = _repo(tmp_path, "o", [_entry(5, "the round", Priority="High", Added="2026-10-15")])
+    assert _row(_read({root: r, other: o}), "r#TD-001")["state"] == "answered — waiting on o#TD-005"
+    # the same repo's entry named qualified reads bare, as a bare ref does
+    root2, r2 = _setup(tmp_path / "q", [held, _entry(5, "the round", Priority="High", Added="2026-10-15")],
+                       _closed("TD-001", "carried to r#TD-005"))  # fmt: skip
+    assert _row(_read({root2: r2}), "r#TD-001")["state"] == "answered — waiting on TD-005"
+
+
+@pytest.mark.unit
+def test_carried_to_two_entries_with_only_the_second_open_waits_on_the_second(tmp_path):
+    held = _entry(1, "the held one", **HELD)
+    root, r = _setup(tmp_path, [held, _entry(6, "the second", Priority="High", Added="2026-10-15")],
+                     _closed("TD-001", "carried to TD-005 and TD-006"))  # fmt: skip
+    assert _row(_read({root: r}), "r#TD-001")["state"] == "answered — waiting on TD-006"
+
+
+@pytest.mark.unit
+def test_a_kept_waiting_log_line_reads_no_waits_until_when_the_picked_line_is_not_a_kept_waiting_close(tmp_path):
+    """F61: the member's `kept waiting` Log line counts only under a line closed `— kept waiting.`"""
+    log = '\n**Log:**\n- 2026-10-10: kept waiting: decision (paul) — by paul; answer "Not yet"\n'
+    held = _entry(1, "the held one", **HELD) + log
+    root, r = _setup(tmp_path, [held], _open("TD-001"))
+    assert _row(_read({root: r}), "r#TD-001")["state"] == "answered — waiting on a pick"
+    root2, r2 = _setup(tmp_path / "c", [held], _closed("TD-001", "One more round, recorded on TD-001"))
+    assert _row(_read({root2: r2}), "r#TD-001")["answered"] is None, "closed in other words, nobody holds it"
+    rec = _worker("ao-r-designer", "TD-001")
+    rec.repo = rec.dir = root2
+    row = _row(_read({root2: r2}, [rec]), "r#TD-001")
+    assert row["state"] == "answered — waiting on designer" and "until" not in row["answered"]
+
+
+@pytest.mark.unit
+def test_a_new_undecided_line_naming_the_parent_design_asks_again_for_its_build(tmp_path):
+    design = _entry(1, "the design", Priority="High", Kind="design-first", Blocked_by="decision (paul)")
+    build = _entry(2, "a build", Priority="High", Part_of="TD-001", Blocked_by="decision (paul)", Added="2026-10-01")
+    root, r = _setup(tmp_path, [design, build], _open("TD-001"))
+    assert _row(_read({root: r}), "r#TD-002")["state"] == "answered — waiting on a pick"
+    root2, r2 = _setup(tmp_path / "n", [design, build], _open("TD-001"), _open("TD-001", decided=None))
+    q = _read({root2: r2})
+    assert _row(q, "r#TD-002")["answered"] is None and _row(q, "r#TD-001")["answered"] is None
+
+
+@pytest.mark.unit
+def test_decided_by_the_person_capitalised_is_the_persons_answer(tmp_path):
+    root, r = _setup(
+        tmp_path, [_entry(1, "the held one", **HELD)], _open("TD-001", decided="Go (by Paul) (2026-10-15)")
+    )
+    assert _row(_read({root: r}), "r#TD-001")["state"] == "answered — waiting on a pick"
