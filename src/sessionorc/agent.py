@@ -918,6 +918,8 @@ class HostAgent(
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
         self.tmux.ensure_server()
+        if quieted := self.tmux.status_off(naming.PREFIX):  # sessions from before TD-1410 (design §4.6)
+            log.info("tmux status bar turned off on %d session(s)", len(quieted))
         self._witness_loop = asyncio.get_running_loop()
         self._witness_begin()
         await asyncio.to_thread(self._recover_reaps)  # a reap a promote cut off (§4.1, TD-979)

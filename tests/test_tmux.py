@@ -183,3 +183,22 @@ def test_a_command_too_long_for_tmux_is_launched_through_a_script(tmux, tmp_path
     with pytest.raises(tmux_mod.TmuxError, match="past what a process can be started with"):
         tmux_mod.Tmux._fit("ao-huge", ["claude", "x" * 130_000])
     assert not (tmp_path / "home" / "launch" / "ao-short.sh").exists()
+
+
+def test_a_new_session_has_no_status_bar(tmux):
+    """Focus's header says what tmux's bar would, and a resize by another client would leave stale
+    copies of the bar in the browser's terminal (design §4.6, TD-1410)."""
+    tmux.new_session("ao-t-bar", "/", ["sleep", "30"], {})
+    assert tmux.run("show-options", "-v", "-t", "=ao-t-bar:", "status").stdout.strip() == "off"
+    assert tmux.status_off() == [], "nothing left to turn off"
+
+
+def test_the_agents_start_turns_off_the_bar_on_older_ao_sessions_only(tmux):
+    """A session made before TD-1410 keeps tmux's default bar until the host agent's start takes it in;
+    a session not named `ao-…` is the person's and keeps its own."""
+    for name in ("ao-t-old", "mine"):
+        tmux.run("new-session", "-d", "-s", name, "sleep", "30")
+    assert tmux.status_off() == ["ao-t-old"]
+    show = lambda n: tmux.run("show-options", "-v", "-t", f"={n}:", "status").stdout.strip()  # noqa: E731
+    assert show("ao-t-old") == "off"
+    assert show("mine") != "off" and tmux.run("show-options", "-gv", "status").stdout.strip() == "on"
