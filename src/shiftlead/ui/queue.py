@@ -49,12 +49,17 @@ def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None)
     steer or note whose `about` names an entry an open card holds (else the first `TD-n` of its subject
     and text, the others its mentions), a board line whose `Context:` names one, and a red PR whose title
     or branch names one; `inbox` for the rest — a state row, a promote or team-start row, mail about no
-    entry, an entry on a completed card or found nowhere."""
-    inbox = {"home": "inbox", "on_card": "", "on_row": "", "mentions": []}
+    entry, an entry on a completed card or found nowhere. `tied` says how its entry was found (screen 6 *What
+    tied it*, TD-1411): `{by, ref}`, `by` where its first held ref — the one that sets `on_card` — was read
+    (`context` for a board line; `about`, else `words`, the subject and text read as one, for mail; `pr` for a red
+    PR, its title and branch read as one; `title` for a fork's PR) and `ref` that ref as the card's index matched it;
+    None for an `inbox` home. Nothing on the page draws it."""
+    inbox = {"home": "inbox", "on_card": "", "on_row": "", "mentions": [], "tied": None}
     if not index:
         return inbox
     kind = e.get("row")
     if kind == "board":
+        by = "context"
         m = CONTEXT.search(str(e.get("text") or ""))
         refs = _refs(m.group(1)) if m else []
         # a bare `TD-n` on a repo's board is that repo's entry, never another's (TD-1355, TD-1400), as
@@ -65,33 +70,41 @@ def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None)
         # its home is the first of its refs an open card holds, the later held ones its mentions (TD-1400)
         refs = [r for r in refs if r in index]
     elif kind == "red_pr":
-        refs = _refs(f"{e.get('branch') or ''} {e.get('title') or ''}")
+        refs, by = _refs(f"{e.get('branch') or ''} {e.get('title') or ''}"), "pr"
     elif kind == "fork_pr":  # by its title alone: a fork's branch is a stranger's name (TD-1292)
-        refs = _refs(str(e.get("title") or ""))
+        refs, by = _refs(str(e.get("title") or "")), "title"
     elif kind and not e.get("handed_row"):
         return inbox  # a state row, an alarm, a promote, a team start, the trail: no entry's
     else:
         about = _refs(e.get("about"))
         refs = about or _refs(f"{e.get('subject') or ''} {e.get('text') or ''}")
+        by = "about" if about else "words"
         if about:
             refs += [r for r in _refs(f"{e.get('subject') or ''} {e.get('text') or ''}") if r not in about]
     if not refs or refs[0] not in index:
         return inbox
     card, row = index[refs[0]]
     mentions = [index[r][1] for r in refs[1:] if r in index and index[r][1] != row]
-    return {"home": "queue", "on_card": card, "on_row": row, "mentions": list(dict.fromkeys(mentions))}
+    return {
+        "home": "queue",
+        "on_card": card,
+        "on_row": row,
+        "mentions": list(dict.fromkeys(mentions)),
+        "tied": {"by": by, "ref": refs[0]},
+    }
 
 
 def ledger_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None) -> dict[str, Any]:
     """Where a ledger row of the Inbox's (`ledger_for_you`'s, §4.5 screen 6 *The ledger's entries that wait on
     you*) is drawn: on the card that holds its entry, `<repo>#TD-n`, as its block of what needs the person
     (screen 12, TD-771); in *Later* where no open card holds it — a home that serves no Queue, an entry found
-    nowhere — so nothing is lost."""
+    nowhere — so nothing is lost. Its `tied` (screen 6 *What tied it*, TD-1411) is `{by: "entry", ref:
+    "<repo>#TD-n"}`, None in *Later*."""
     refs = _refs(f"{e.get('name') or ''}#{e.get('id') or ''}")
     if not index or not refs or refs[0] not in index:
-        return {"home": "inbox", "on_card": "", "on_row": "", "mentions": []}
+        return {"home": "inbox", "on_card": "", "on_row": "", "mentions": [], "tied": None}
     card, row = index[refs[0]]
-    return {"home": "queue", "on_card": card, "on_row": row, "mentions": []}
+    return {"home": "queue", "on_card": card, "on_row": row, "mentions": [], "tied": {"by": "entry", "ref": refs[0]}}
 
 
 def line_names(e: Mapping[str, Any]) -> set[str]:
@@ -304,8 +317,31 @@ def waits_on_me(mine: Iterable[str], wants: Mapping[str, Any]) -> list[str]:
     return out
 
 
+def item_id(e: Mapping[str, Any]) -> str:
+    """An attached item's id as `ao card` prints it (§4.7 *`ao card`*, TD-1411): `item_ref`, else *fork PR
+    <repo>#<n>* for a fork's PR (its `pr`, so two repos' cannot collide), else its row's `id`."""
+    if ref := item_ref(e):
+        return ref
+    if e.get("row") == "fork_pr":
+        return f"fork PR {e.get('repo')}#{e.get('pr')}"
+    return str(e.get("id") or "")
+
+
+def _repo_of(e: Mapping[str, Any]) -> str:
+    """An attached item's repo (TD-1411): a board line's `repo_name`, a ledger row's `name`, a PR row's `repo`;
+    "" for mail."""
+    row = e.get("row")
+    key = {"board": "repo_name", "ledger": "name", "red_pr": "repo", "fork_pr": "repo"}.get(str(row or ""))
+    return str(e.get(key) or "") if key else ""
+
+
 def attach(
-    sections: Mapping[str, Any], drawn: Any, later: Any = (), start: Any = None, with_of: Any = None
+    sections: Mapping[str, Any],
+    drawn: Any,
+    later: Any = (),
+    start: Any = None,
+    with_of: Any = None,
+    raw: bool = False,
 ) -> dict[str, Any]:
     """The Inbox's rows the Queue draws (`home: queue`, §4.5 screen 6 *Where a row is drawn*), by the card each
     is attached to and the card's section it is in (§4.5 screen 12 *What is attached to a card*, TD-828):
@@ -320,11 +356,18 @@ def attach(
     own session holding a ledger item's entry on its card, where one does: the item's want is then `with_you`, no
     kind, drawn *with you in <name>* with its Open session (§4.5 screen 12 *Three wants*, TD-1281). Else a ledger item
     whose `later` row carries `answered` — a held entry whose question the person answered (TD-1316) — is the want
-    `answered`, no kind and no Start session, drawn *answered — waiting on <asker>* beside *with you*."""
+    `answered`, no kind and no Start session, drawn *answered — waiting on <asker>* beside *with you*.
+
+    With `raw` (`ao card`'s read, §4.7, TD-1411) each item also carries `row`, the Inbox row it was drawn from,
+    `tied`, that row's (`item_home`'s), and `repo` (`_repo_of`), and the answer also carries `mentioned_items`,
+    `{row qid: [{item, row_kind, kind, words}]}` — one per item as `mentioned` holds one, in `attach`'s order:
+    `item` the naming item's `item_id`, `row_kind` its row's `row` ("" for mail), `kind` its row's `kind`, else
+    *red PR* or *fork PR*, and `words` its first eight words. The page's call passes no `raw`."""
     cards: dict[str, dict[str, list[Any]]] = {}
     mentioned: dict[str, dict[str, str]] = {}
+    mentioned_items: dict[str, dict[str, dict[str, str]]] = {}
     rows: dict[int, str] = {}  # each item's row kind, by the order it was put (its `_n`, dropped at the end)
-    raw: dict[int, Mapping[str, Any]] = {}  # each item's row, by its `_n`: what a board line covers is read off it
+    src: dict[int, Mapping[str, Any]] = {}  # each item's row, by its `_n`: what a board line covers is read off it
 
     def put(e: Mapping[str, Any], sec: str, drawn_as: str, mid: Any, kind: str) -> None:
         want = want_of(e, sec)
@@ -337,7 +380,7 @@ def attach(
         pr_row = e.get("row") in ("red_pr", "fork_pr")  # a PR's row starts no session (TD-1246, TD-1292)
         go = start(card, ref) if start is not None and want in (*WANTS, "with_you") and not pr_row else {}
         rows[len(rows)] = str(e.get("row") or "")  # its row kind, kept beside the item rather than drawn in it
-        raw[len(rows) - 1] = e
+        src[len(rows) - 1] = e
         cards.setdefault(card, {}).setdefault(sec, []).append(
             {
                 "_n": len(rows) - 1,
@@ -352,6 +395,7 @@ def attach(
                 "fork": e.get("row") == "fork_pr",  # a fork's PR: no Start session, as a red PR's (TD-1292)
                 "running": sec == "steering",
                 "on_row": e["on_row"],
+                **({"row": dict(e), "tied": e.get("tied"), "repo": _repo_of(e)} if raw else {}),
             }
         )
 
@@ -366,6 +410,11 @@ def attach(
             words = " ".join(str(e.get("subject") or e.get("text") or "").split()[:8])
             for m in e.get("mentions") or ():
                 mentioned.setdefault(m, {}).setdefault(str(e.get("id") or words), words)
+                if raw:
+                    row = str(e.get("row") or "")
+                    kind = str(e.get("kind") or {"red_pr": "red PR", "fork_pr": "fork PR"}.get(row, ""))
+                    one = {"item": item_id(e), "row_kind": row, "kind": kind, "words": words}
+                    mentioned_items.setdefault(m, {}).setdefault(str(e.get("id") or words), one)
         if sec == "needs":
             for e in later or ():
                 if e.get("later_section") == "coming":
@@ -377,7 +426,7 @@ def attach(
     for got in cards.values():
         lines = [m for items in got.values() for m in items if rows[m["_n"]] == "board" and m["want"] in WANTS]
         asked = {m["on_row"] for m in lines}
-        names = set().union(*(line_names(raw[m["_n"]]) for m in lines)) if lines else set()
+        names = set().union(*(line_names(src[m["_n"]]) for m in lines)) if lines else set()
         for sec, items in got.items():
             # only the entry's own question goes: *with you* and *answered* are no question to draw over
             got[sec] = [
@@ -386,13 +435,19 @@ def attach(
                 if not (
                     rows[m["_n"]] == "ledger"
                     and m["want"] in WANTS
-                    and (m["on_row"] in asked or covered_by(raw[m["_n"]], names))
+                    and (m["on_row"] in asked or covered_by(src[m["_n"]], names))
                 )
             ]
     for got in cards.values():
         for items in got.values():
             for m in items:
                 del m["_n"]
+    if raw:
+        return {
+            "cards": cards,
+            "mentioned": mentioned,
+            "mentioned_items": {k: list(v.values()) for k, v in mentioned_items.items()},
+        }
     return {"cards": cards, "mentioned": mentioned}
 
 
@@ -418,6 +473,130 @@ def card_wants(got: Mapping[str, list[Any]] | None, top: str, one_repo: bool) ->
         "read": sum(len(v) for v in out["read"].values()),
     }
     return out
+
+
+# what `card_view` keeps of a mail item's row, a ledger row's `answered` and a queue row's `answered` where it
+# serves no mail's words (`ao card` under a pane, §4.7, TD-1411): ids, kinds, names and times, never the words
+NOT_MAIL = ("board", "ledger", "red_pr", "fork_pr")
+MAIL_KEEP = ("id", "kind", "from", "from_name", "at")
+HELD_ANSWERED_KEEP = ("asker", "name", "kind", "age", "mid", "until", "board")
+ROW_ANSWERED_KEEP = ("mid", "asker", "name", "kind", "until", "closed_at")
+
+
+def _keep(d: Any, keys: tuple[str, ...]) -> Any:
+    return {k: d[k] for k in keys if k in d} if isinstance(d, Mapping) else d
+
+
+def _cut_row(r: Mapping[str, Any]) -> dict[str, Any]:
+    """A card's row (or top) with no mail's words: its `answered` cut to `ROW_ANSWERED_KEEP`, and each `mentioned`
+    item a message names it in without its words."""
+    out = dict(r)
+    if out.get("answered"):
+        out["answered"] = _keep(out["answered"], ROW_ANSWERED_KEEP)
+    out["mentioned"] = [_cut_mention(m) for m in out.get("mentioned") or ()]
+    return out
+
+
+def _cut_mention(m: Mapping[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in m.items() if k != "words"} if m.get("row_kind") not in NOT_MAIL else dict(m)
+
+
+def _cut_item(m: Mapping[str, Any]) -> dict[str, Any]:
+    """An attached item with no mail's words: a mail row cut to `MAIL_KEEP`, a ledger row's `answered` to
+    `HELD_ANSWERED_KEEP`; a board line, a ledger row and a PR row otherwise whole (the repos' files and the
+    forge's)."""
+    out = dict(m)
+    row = out.get("row")
+    if isinstance(row, Mapping):
+        if row.get("row") not in NOT_MAIL:
+            out["row"] = _keep(row, MAIL_KEEP)
+        elif row.get("answered"):
+            out["row"] = {**row, "answered": _keep(row["answered"], HELD_ANSWERED_KEEP)}
+    return out
+
+
+def card_view(
+    queue: Mapping[str, Any] | None,
+    mail: Mapping[str, Any] | None,
+    id: str,
+    now: datetime,
+    fleet: Iterable[Mapping[str, Any]] | None,
+    *,
+    words: bool,
+) -> dict[str, Any] | None:
+    """One Queue card whole, cut from the page's own view (§4.7 *`ao card`*, §4.4 *One owner*, TD-1411):
+    `{card, wants, mentioned, mail, at}` for the open card holding `id` — any entry it holds, its top or a row,
+    open or archived, as `card_index` reads it (`<repo>#TD-n`, a bare `TD-n` one repo alone holds, an origin path).
+    `mail` is `attach`'s answer with `raw`. `card` is `queue_view`'s shaped card but its `lines` and `wants`, each
+    row's `mentioned` the row's `mentioned_items`; `wants` its `card_wants`, each item's `item` its `item_id`, its
+    `row` in place of its `html`; `mentioned` the card's rows' `mentioned_items`; `at` the reading's. None where no
+    open card holds `id`; `{ambiguous: [...]}` for a bare `TD-n` two repos' open cards hold; `{completed: {closed,
+    pr}}` for a `<repo>#TD-n` on a completed card. With `words=False` no mail's words are in it (`_cut_item`,
+    `_cut_row`, `_cut_mention`) and `mail` reads `ids`, else `full`."""
+    q = queue or {}
+    key = (_refs(id) or [id])[0]
+    index = card_index(q)
+    if key not in index:
+        if "#" not in key:
+            held = sorted(
+                {
+                    got[0]
+                    for c in q.get("cards") or ()
+                    if isinstance(c, Mapping) and c.get("top")
+                    for r in [c["top"], *(c.get("rows") or ())]
+                    if (got := _refs(str(r.get("qid") or ""))) and "#" in got[0] and got[0].partition("#")[2] == key
+                }
+            )
+            if len(held) > 1:
+                return {"ambiguous": held}
+            return None
+        for c in q.get("completed") or ():
+            for e in (c.get("entries") or ()) if isinstance(c, Mapping) else ():
+                if isinstance(e, Mapping) and (_refs(str(e.get("qid") or "")) or [""])[0] == key:
+                    return {
+                        "completed": {
+                            "closed": e.get("closed") or c.get("closed"),
+                            "pr": e.get("pr") if e.get("pr") is not None else c.get("pr"),
+                        }
+                    }
+        return None
+    cid = index[key][0]
+    m = mail or {}
+    view = queue_view(q, now, m, None, fleet)
+    shaped = next(c for g in ("in_progress", "waiting", "up_next") for c in view[g] if str(c["id"]) == cid)
+    items = m.get("mentioned_items") or {}
+
+    def row(r: Mapping[str, Any]) -> dict[str, Any]:
+        return {**r, "mentioned": list(items.get(str(r.get("qid") or "")) or ())}
+
+    card = {k: v for k, v in shaped.items() if k not in ("lines", "wants")}
+    card["top"] = row(card["top"])
+    card["rows"] = [row(r) for r in card.get("rows") or ()]
+
+    def item(x: Mapping[str, Any]) -> dict[str, Any]:
+        out = {k: v for k, v in x.items() if k != "html"}
+        r = out.get("row")
+        out["item"] = item_id(r) if isinstance(r, Mapping) else str(out.get("item") or "")
+        return out
+
+    w = shaped["wants"]
+    wants = {
+        **w,
+        **{g: [item(x) for x in w.get(g) or ()] for g in (*WANTS, "with_you", "answered")},
+        "read": {line: [item(x) for x in xs] for line, xs in (w.get("read") or {}).items()},
+    }
+    qids = [str(r.get("qid") or "") for r in (card["top"], *card["rows"])]
+    mentioned = {k: list(items[k]) for k in qids if k in items}
+    if not words:
+        card["top"] = _cut_row(card["top"])
+        card["rows"] = [_cut_row(r) for r in card["rows"]]
+        wants = {
+            **wants,
+            **{g: [_cut_item(x) for x in wants[g]] for g in (*WANTS, "with_you", "answered")},
+            "read": {line: [_cut_item(x) for x in xs] for line, xs in wants["read"].items()},
+        }
+        mentioned = {k: [_cut_mention(x) for x in v] for k, v in mentioned.items()}
+    return {"card": card, "wants": wants, "mentioned": mentioned, "mail": "full" if words else "ids", "at": q.get("at")}
 
 
 def _item_kind(e: Mapping[str, Any], sec: str) -> str:

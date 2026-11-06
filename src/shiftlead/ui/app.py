@@ -417,6 +417,7 @@ from .queue import (
     attach,
     card_index,
     card_session,
+    card_view,
     card_wants,
     filter_chips,
     item_start,
@@ -1032,6 +1033,16 @@ def repos_omit(paths: tuple[str, ...]) -> None:
         memo["omit"] = paths
 
 
+class CardRefused(Exception):
+    """A read behind `Readings.card` the home refused (§4.7 *`ao card`*, TD-1411): `kind` is `down` (a 503 from any
+    read), `no_queue` (the `queue` RPC's refusal) or `refused` (any other read's, the `person` read's among them),
+    `why` the host's words."""
+
+    def __init__(self, kind: str, why: str) -> None:
+        super().__init__(why)
+        self.kind, self.why = kind, why
+
+
 class Readings:
     """The readings the Inbox is counted from (design §4.4 *Each reading has one owner*, *The Inbox's
     counts*; TD-616): the person inbox, the state rows, the board's horizon and the build chip, each
@@ -1380,6 +1391,49 @@ class Readings:
         got["handed"] = handed_rows(got.get("handed") or (), records, at)
         return got
 
+    @timing.timed("ledger")
+    async def ledger_view(self, fleet: list[dict[str, Any]], inbox: Any = ()) -> dict[str, Any]:
+        """The ledger's rows of *Later* (§4.5 screen 6, TD-368, TD-565) from the home's repo facts and the
+        definitions' team per repo; empty when either cannot be read — nothing is then drawn. `inbox` is the
+        person inbox's entries (`person_inbox`'s), which draw a held entry the person answered as *answered —
+        waiting on <asker>* (TD-1316). The Queue draws these rows on their cards (TD-771)."""
+        repos: dict[str, Any] = {}
+        named: dict[str, str] = {}
+        with contextlib.suppress(Exception):
+            repos = await self.repos()
+        with contextlib.suppress(Exception):
+            named = repo_teams(await self.defs(), host_name())
+        return ledger_for_you(repos, fleet, named, None, inbox)
+
+    async def card(self, id: str, words: bool) -> dict[str, Any] | None:
+        """One Queue card whole (§4.7 *`ao card`*, §4.4 *One owner*, TD-1411): the one read behind both of `ao
+        card`'s roads — the `queue` RPC whole and the `list` RPC, `card_mail` with `raw`, then `card_view`. It sets
+        the reading the Queue page sets (`REPOS_OMIT_INBOX`) over a repo memo: a request's (the endpoint, whose
+        middleware has read the settings), else one of its own, with the person's display settings read as `ao
+        inbox --counts` reads them. A read the home refuses raises `CardRefused`; it adds no suppression of its own."""
+        if _REPOS_MEMO.get() is not None:
+            repos_omit(REPOS_OMIT_INBOX)
+            return await self._card(id, words)
+        token = _REPOS_MEMO.set({"omit": REPOS_OMIT_INBOX})
+        try:
+            with contextlib.suppress(Exception):  # display settings: a failed read keeps the defaults
+                uiconf.set_read(await self.call("settings"))
+            return await self._card(id, words)
+        finally:
+            _REPOS_MEMO.reset(token)
+
+    async def _card(self, id: str, words: bool) -> dict[str, Any] | None:
+        try:
+            queue = await self.call("queue")
+        except HTTPException as e:
+            raise CardRefused("down" if e.status_code == 503 else "no_queue", str(e.detail)) from e
+        try:
+            fleet = await self.call("list")
+            _, mail = await card_mail(self, fleet, card_index(queue), None, queue.get("cards") or (), raw=True)
+        except HTTPException as e:
+            raise CardRefused("down" if e.status_code == 503 else "refused", str(e.detail)) from e
+        return card_view(queue, mail, id, datetime.now(UTC), fleet, words=words)
+
     async def counts_now(self, watching: bool) -> dict[str, Any]:
         """The top bar's numbers (`INBOX_COUNTS`) from the Inbox's own sections, nothing rendered
         (TD-611 slice 1), the classification on a worker thread (slice 2): what `counts` holds and
@@ -1654,6 +1708,8 @@ def create_app() -> FastAPI:
         inbox_html=inbox_html,
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
         queue_cards=rd.queue_cards,  # where an Inbox row is drawn (§4.5 screen 6, TD-771)
+        ledger_view=rd.ledger_view,  # the ledger's rows of *Later*, which the Queue draws on their cards (TD-771)
+        card=rd.card,  # one Queue card whole, `ao card`'s read (§4.7, TD-1411)
         team_spend=rd.team_spend,  # each team card's *spend* figure (TD-832)
         needs_cache=needs_cache,  # the Inbox's needs rows for the Org's *asked you* lines (TD-354)
         # the Inbox's counts, kept once and pushed (§4.4, TD-616); `LocalClient` read when it connects
@@ -4008,14 +4064,14 @@ def _help_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
 
 async def card_mail(
-    h: SimpleNamespace, fleet: list[dict[str, Any]], index: Any, drawn: Any = None, cards: Any = ()
+    h: Any, fleet: list[dict[str, Any]], index: Any, drawn: Any = None, cards: Any = (), raw: bool = False
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """What is attached to each Queue card (§4.5 screen 12 *What is attached to a card*, TD-771, TD-828): the
     Inbox's own sections over the same reads, and `attach`'s cards, each `home: queue` row in its card's section —
     with *Later*'s ledger rows and the board's lines not yet due, folded or not, whose entry a card holds. `drawn(e,
     section, choices)` draws a row (the Queue page, by the Inbox's own renderer), each Decide or Do item with its
     own Start session on its card of `cards` (`item_start`, TD-1246); the start road draws none and reads each
-    item's id."""
+    item's id. `h` is the app's namespace or a `Readings`; `raw` is `attach`'s (`ao card`'s read, TD-1411)."""
     choices = board_choices()  # once for the request, never once a row (§4.5 *Page loads*, TD-879)
     inbox, states = await h.person_inbox(fleet, choices=choices), await h.person_states(fleet)
     hz = with_standings((await h.board_view(choices))[0], fleet)
@@ -4039,6 +4095,7 @@ async def card_mail(
             later,
             (lambda c, item: item_start(by_id[c], item, fleet) if c in by_id else {}) if by_id else None,
             (lambda c, item: _with_you(by_id.get(c), item)) if by_id else None,
+            raw=raw,
         )
     return sections, mail
 
@@ -4058,6 +4115,24 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     session — and every read of `settings.yml` through its `settings` read; this process reads only
     the files the clients read (`profiles.yml`, `hosts.yml`, the org, each repo's `.shiftlead.yml`)."""
     call = h.call
+
+    @app.get("/api/queue/card")
+    async def queue_card(id: str = "") -> JSONResponse:
+        """One Queue card whole for `ao card` under a pane or with `--ui` (§4.7 *`ao card`*, TD-1411): `Readings.card`
+        with no mail's words — each mail item its id, kind, sender and time. 200 with the card, `completed` or
+        `ambiguous`; 404 where no open card holds `id`; 503 with the host agent down; 502 from a home that serves no
+        Queue; 400 for any other refused read."""
+        try:
+            got = await h.card(id, words=False)
+        except CardRefused as e:
+            if e.kind == "down":
+                return JSONResponse({"agent_down": True}, status_code=503)
+            if e.kind == "no_queue":
+                return JSONResponse({"error": f"the home did not serve the Queue: {e.why}"}, status_code=502)
+            return JSONResponse({"error": e.why}, status_code=400)
+        if got is None:
+            return JSONResponse({"error": f"no open card holds {id}"}, status_code=404)
+        return JSONResponse(json.loads(json.dumps(got, default=str)))  # rows carry dates
 
     @app.get("/queue", response_class=HTMLResponse)
     async def queue_page(request: Request):
@@ -4704,21 +4779,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     call, person_view, inbox_html = h.call, h.person_view, h.inbox_html
     board_view = h.board_view
 
-    @timing.timed("ledger")
-    async def ledger_view(fleet: list[dict[str, Any]], inbox: Any = ()) -> dict[str, Any]:
-        """The ledger's rows of *Later* (§4.5 screen 6, TD-368, TD-565) from the home's repo facts and the
-        definitions' team per repo; empty when either cannot be read — nothing is then drawn. `inbox` is the
-        person inbox's entries (`person_inbox`'s), which draw a held entry the person answered as *answered —
-        waiting on <asker>* (TD-1316)."""
-        repos: dict[str, Any] = {}
-        named: dict[str, str] = {}
-        with contextlib.suppress(Exception):
-            repos = await h.repos()
-        with contextlib.suppress(Exception):
-            named = repo_teams(await h.defs(), host_name())
-        return ledger_for_you(repos, fleet, named, None, inbox)
-
-    h.ledger_view = ledger_view  # the Queue draws these rows on their cards (TD-771)
+    ledger_view = h.ledger_view  # `Readings.ledger_view`: the Queue draws these rows on their cards (TD-771)
 
     @app.get("/inbox", response_class=HTMLResponse)
     async def inbox_page(request: Request):

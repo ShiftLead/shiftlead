@@ -341,7 +341,13 @@ def test_an_item_is_drawn_where_its_entry_is():
     assert idx["TD-021"] == ("s#TD-20", "s#TD-21") and idx["s#TD-009"] == ("s#TD-10", "s#TD-9")
     assert item_home(mail("m1", "x", about="TD-21"), idx)["on_row"] == "s#TD-21"  # `about` first
     got = item_home(mail("m2", "TD-20: shall I split it? TD-30 waits on it"), idx)
-    assert got == {"home": "queue", "on_card": "s#TD-20", "on_row": "s#TD-20", "mentions": ["s#TD-30"]}
+    assert got == {
+        "home": "queue",
+        "on_card": "s#TD-20",
+        "on_row": "s#TD-20",
+        "mentions": ["s#TD-30"],
+        "tied": {"by": "words", "ref": "TD-020"},
+    }
     # an entry on a completed card, or on none, a state row and mail about nothing: the Inbox's
     for e in (mail("m3", "TD-1 is done"), mail("m4", "TD-99?"), mail("m5", "no id"), {"row": "state", "id": "x"}):
         assert item_home(e, idx)["home"] == "inbox"
@@ -397,7 +403,13 @@ def test_a_board_lines_bare_ref_its_repo_holds_only_archived_never_homes_on_anot
     line = {"row": "board", "id": "b", "key": "k", "kind": "decide", "repo_name": "contractmatch",
             "text": "**Works?** Context: TD-051 (archived), TD-017. Due: 2026-10-29."}  # fmt: skip
     got = item_home(line, index)
-    assert got == {"home": "queue", "on_card": "contractmatch#TD-017", "on_row": "contractmatch#TD-017", "mentions": []}
+    assert got == {
+        "home": "queue",
+        "on_card": "contractmatch#TD-017",
+        "on_row": "contractmatch#TD-017",
+        "mentions": [],
+        "tied": {"by": "context", "ref": "contractmatch#TD-017"},
+    }
     assert item_home({**line, "text": "Context: TD-051 (archived)."}, index)["home"] == "inbox"
     assert asked_entries([line]) == {"contractmatch#TD-051", "contractmatch#TD-017"}
     both = {**index, "contractmatch#TD-051": ("contractmatch#TD-051", "contractmatch#TD-051")}
