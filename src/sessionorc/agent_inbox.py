@@ -1118,7 +1118,10 @@ class InboxMixin:
                 hold = self._ledger_pressed.setdefault(root, {"entries": {}})
                 hold["entries"].update(by)
                 hold.update(commit=commit, at=time.monotonic())
-                led = ledger_mod.with_entries(led, by)
+                if root not in self._repos:
+                    return
+                # the ledger as it stands now: a tick's that landed while the entries were read is the newer
+                led = ledger_mod.with_entries(self._repos[root].get("ledger") or led, by)
         self._repos[root] = {**self._repos[root], "boards": bds, "work_orders": wos, **({"ledger": led} if led else {})}
         # marked again as it lands: a tick's pass that began while this read ran is older too (review of TD-615)
         self._boards_pressed[root] = time.monotonic()
