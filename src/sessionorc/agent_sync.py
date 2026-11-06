@@ -8,6 +8,7 @@ the head read again and the merge pinned to the head. Its outcome is the repo re
 from __future__ import annotations
 
 import asyncio
+import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -156,18 +157,45 @@ class SyncMixin:
 
     async def _sync_merge(self, root: str, pr: dict[str, Any], e: dict[str, Any]) -> dict[str, Any] | None:
         """Step 5: the holders and the head read again just before the merge. A new holder drops the merge
-        with no verdict; a moved head drops it unwritten; the merge pinned with `--match-head-commit`."""
+        with no verdict; a moved head drops it unwritten; the merge pinned with `--match-head-commit`. Where
+        `judge` handed on a `gate_dir` (the tree composes, TD-1419), the merge is cadence step 5's line: the
+        squash composed by `forge.py squash-message` first, the head and holders read again after it, and the
+        merge made only when the composed sha, the proved head and the re-read head are one. `gate_dir` is
+        never written to the reading, and is removed on every exit."""
+        gate_dir = e.pop("gate_dir", None)
+        try:
+            return await self._sync_merge_in(root, pr, e, Path(gate_dir) if gate_dir else None)
+        finally:
+            if gate_dir:
+                await asyncio.to_thread(shutil.rmtree, gate_dir, True)
+
+    async def _sync_merge_in(
+        self, root: str, pr: dict[str, Any], e: dict[str, Any], gate_dir: Path | None
+    ) -> dict[str, Any] | None:
         n, head = int(pr["number"]), str(pr["head"])
         if not (await asyncio.to_thread(self._sync_on)).get(Path(root).name, True):
             return e  # turned off while the pass ran: nothing merged
         if self._sync_held_by(root, pr):
             return e  # no verdict: back on the list once the claim ends
+        subject = body = None
+        if gate_dir is not None:
+            if why := await asyncio.to_thread(sync_mod.compose, root, n, gate_dir):
+                return sync_mod._no_reading(e, why, now_iso())
+            try:
+                sha = (gate_dir / "sha").read_text(encoding="utf-8").strip()
+                subject = (gate_dir / "subject").read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as err:
+                return sync_mod._no_reading(e, f"the composed squash could not be read: {err}", now_iso())
+            body = gate_dir / "body"
+            if self._sync_held_by(root, pr):
+                return e  # held while it composed: no verdict
         now = await asyncio.to_thread(cadence.head, root, n)
         if now is None:
             return sync_mod._no_reading(e, "the PR's head could not be read before the merge", now_iso())
-        if now != (head, "open"):
+        if now != (head, "open") or (gate_dir is not None and sha != head):
             return None
-        if why := await asyncio.to_thread(sync_mod.merge, root, n, head):
+        composed = {"subject": subject, "body_file": body} if gate_dir is not None else {}
+        if why := await asyncio.to_thread(sync_mod.merge, root, n, head, **composed):
             if await asyncio.to_thread(cadence.head, root, n) not in (None, (head, "open")):
                 return None  # the head moved under the merge: the forge's match refused it, and nothing is written
             return sync_mod._no_reading(e, f"the merge was refused: {why}", now_iso())
