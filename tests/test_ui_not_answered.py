@@ -78,6 +78,7 @@ def test_the_held_pr_authors_past_the_bound_ask_offers_both_answers_in_order(pat
     a = text.index('--answer "Ask the reader again — I brought it back"')
     assert a < text.index('--answer "I\'ll read it"')
     assert "saying the reader did not answer" not in text
+    assert "nothing of why" in text and "On answer 0:" in text and "On answer 1" in text
 
 
 @pytest.mark.unit
