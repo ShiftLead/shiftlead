@@ -473,3 +473,7 @@ def test_take_over_and_hand_back_share_the_acts_lines_slot_and_switch_to_unatten
         assert (word, in_menu) == ("Hand back", False) and cls.split() == ["btn", "sm"], held
     cls, word, in_menu = slot(_page(tmp_path, monkeypatch, unattended=False))
     assert (word, in_menu) == ("Switch to unattended", True) and "hidden" in cls.split()
+    for ended in ("exited", "closed"):  # an ended record draws the toggle nowhere
+        for mode in ({"unattended": True}, {"unattended": False, "team": "t"}, {"unattended": False}):
+            cls, word, in_menu = slot(_page(tmp_path, monkeypatch, state=ended, **mode))
+            assert "hidden" in cls.split() and not in_menu, (ended, mode)

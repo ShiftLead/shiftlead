@@ -594,9 +594,12 @@ def view(
             "switch this session to unattended: the terminal goes read-only, and its manager and the policies "
             "pick it up again. A stop time that passed while you held it is cleared; one still ahead stays"
         )
-    # where the toggle is drawn (TD-964, TD-1408): Take over and Hand back share the acts line's one slot;
-    # *Switch to unattended* alone is more ▾'s
-    d["mode_slot"] = d["mode_act"] in ("Take over", "Hand back")
+    # where the toggle is drawn (TD-964, TD-1408): Take over and Hand back share the acts line's one slot,
+    # *Switch to unattended* alone is more ▾'s, and an ended record draws it nowhere (§4.5a *Focus: Take over*)
+    if not d["mode_act"] or s.get("state") in ("exited", "closed"):
+        d["mode_place"] = ""
+    else:
+        d["mode_place"] = "slot" if d["mode_act"] in ("Take over", "Hand back") else "menu"
     # Membership, both directions (design §4.8, §4.5a, TD-036 step 3). `controllers` is on the
     # record; `members` is derived across the records on every render and never stored — the same
     # rule `ao status -v` follows, so the page and the CLI cannot disagree. A controller whose

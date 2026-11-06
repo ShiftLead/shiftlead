@@ -7375,7 +7375,7 @@
       // composer is closed on an unattended session — it types, and typing is the disruption.
       // …**Take over** on the acts line as the next act, and **Hand back** in the same slot, a plain
       // bordered button; *Switch to unattended* alone in more ▾ (§4.5 *The Focus screen's anatomy*,
-      // TD-964, TD-1408). Both read `mode_act`, and `mode_slot` says which one is shown. Until 2026-09-25 a card-era line below rewrote every mode
+      // TD-964, TD-1408). Both read `mode_act`, and `mode_place` says which one is shown (none on an ended record). Until 2026-09-25 a card-era line below rewrote every mode
       // button's text to the bare mode word, so the header read *unattended* where the design
       // said *Take over* (seen on Paul's screenshot for TD-156).
       for (const el of [$("#fmodeact"), $("#fmodemenu")]) {
@@ -7383,7 +7383,7 @@
         el.textContent = v.mode_act; el.title = v.mode_title || "";
         el.dataset.unattended = v.unattended ? "1" : "0";
       }
-      const ma = $("#fmodeact"); if (ma) ma.classList.toggle("hidden", !v.mode_slot);
+      const ma = $("#fmodeact"); if (ma) ma.classList.toggle("hidden", v.mode_place !== "slot");
       // one outlined act (§4.5 *The card's anatomy*, row 6): Close session outranks Take over,
       // which is drawn plain beside it while the checklist passes; Hand back is never the outlined one
       if (ma) {
@@ -7399,7 +7399,7 @@
         $("#workingtext").textContent = (dg && dg.text) || "";
         $("#workingage").textContent = dg && dg.age ? `says · ${dg.age} ago` : "";
       }
-      const mm = $("#fmodemenu"); if (mm) mm.hidden = !!v.mode_slot;
+      const mm = $("#fmodemenu"); if (mm) mm.hidden = v.mode_place !== "menu";
       const fm = $("#fmode"); if (fm) fm.textContent = v.unattended ? "unattended" : "interactive";
       // no composer on an unattended session, nor on an ended one, which has nothing to send to (TD-964, TD-1405)
       const noComposer = !!v.unattended || v.state === "exited" || v.state === "closed";
