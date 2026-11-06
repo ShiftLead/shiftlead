@@ -673,9 +673,10 @@ async def test_an_entry_whose_wait_ends_is_told_once_and_not_before(agent, tmp_p
     await park_ticks(agent)
     now = datetime.now(UTC)
     tomorrow = (now + timedelta(days=1)).date().isoformat()  # a UTC day, as a wait reads it (TD-1417)
-    waits = {"on": "until", "date": tomorrow, "why": "CI runs then"}
+    gated = {**_e("TD-002", pickable="no"), "blocked_by": [f"until {tomorrow}"]}
+    gated["gates"] = {"until": [tomorrow], "events": []}  # its `Blocked by: until <tomorrow>`, as read (TD-1398)
     async with LocalClient() as person:
-        led = settle.mark_waits([_e("TD-001"), {**_e("TD-002"), "waits": waits}], now)
+        led = settle.mark_waits([_e("TD-001"), gated], now)
         sid = await _finished(agent, person, tmp_path, "w", ["free-pick", "owner:grinder"], led)
         rec = agent.sessions[sid]
         await agent._keep_running(now)

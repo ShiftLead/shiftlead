@@ -15,8 +15,19 @@ from test_queue import NOW, _by_id, _cards, _entry, _repo
 from sessionorc import rank, settle
 
 
+def _ev(name: str, why: str) -> str:
+    """An `**Event (<name>):**` section, its line the why the wait phrase says."""
+    return f"**Event ({name}):** {why}\ncheck: pr-merged o/r#5\n\n"
+
+
+def _w(on: str, until: str = "", why: str = "") -> dict[str, Any]:
+    """A `waiting` mark set directly: a row that waits beside an open id, which the queue's leaf reads, though
+    the home marks only an entry its gates alone hold (TD-1398)."""
+    return {"waiting": {"on": on, "until": until, "name": "", "why": why}}
+
+
 def _read(tmp: Path, entries: list[str], **marks: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """The cards of one repo `r`, its `Waits:` lines marked as the home marks them, `marks` per id set on top."""
+    """The cards of one repo `r`, its gates marked as the home marks them, `marks` per id set on top."""
     root, r = _repo(tmp, "r", entries)
     settle.mark_waits(r["ledger"]["entries"], NOW)
     for e in r["ledger"]["entries"]:
@@ -32,7 +43,7 @@ def test_blocked_only_by_the_persons_entry_is_up_next_and_beside_an_open_id_it_w
         _entry(1, "the person's", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
         _entry(2, "after it alone", Priority="High", Blocked_by="TD-001"),
         _entry(11, "the person's too", Priority="Medium", Owner="paul", Blocked_by="decision (paul)"),
-        _entry(12, "an event", Priority="Medium", Waits="event — the next promote"),
+        _entry(12, "an event", Priority="Medium", Blocked_by="event (promote)") + _ev("promote", "the next promote"),
         _entry(13, "after both", Priority="Medium", Blocked_by="TD-011, TD-012"),
     ])  # fmt: skip
     one, two = cards["r#TD-001"], cards["r#TD-011"]
@@ -44,17 +55,17 @@ def test_blocked_only_by_the_persons_entry_is_up_next_and_beside_an_open_id_it_w
 
 def test_the_wait_columns_order_top_entry_then_earliest_date_then_event_then_the_reasons(tmp_path):
     cards = _read(tmp_path, [
-        # the top entry's own Waits: line comes first, though a row's date is earlier
-        _entry(10, "top waits", Priority="High", Waits="until 2026-10-30 — the trial"),
-        _entry(11, "row waits sooner", Priority="High", Waits="until 2026-10-20", Blocked_by="TD-010"),
+        # the top entry's own gate comes first, though a row's date is earlier
+        _entry(10, "top waits", Priority="High", Blocked_by="until 2026-10-30"),
+        _entry(11, "row waits sooner", Priority="High", Blocked_by="TD-010"),
         # a top entry with none: the earliest date of the rows
         _entry(20, "a live check", Priority="High", Kind="live-check #5"),
-        _entry(21, "later", Priority="High", Waits="until 2026-10-25", Blocked_by="TD-020"),
-        _entry(22, "sooner", Priority="High", Waits="until 2026-10-22", Blocked_by="TD-020"),
-        _entry(23, "an event", Priority="High", Waits="event — x", Blocked_by="TD-020"),
+        _entry(21, "later", Priority="High", Blocked_by="TD-020"),
+        _entry(22, "sooner", Priority="High", Blocked_by="TD-020"),
+        _entry(23, "an event", Priority="High", Blocked_by="TD-020"),
         # no date: an event before settling and a build not yet live
         _entry(30, "a live check", Priority="High", Kind="live-check #6"),
-        _entry(31, "an event", Priority="High", Waits="event — the reset", Blocked_by="TD-030"),
+        _entry(31, "an event", Priority="High", Blocked_by="TD-030"),
         _entry(32, "settling", Priority="High", Blocked_by="TD-030"),
         # settling before not live
         _entry(40, "a live check", Priority="High", Kind="live-check #7"),
@@ -63,7 +74,9 @@ def test_the_wait_columns_order_top_entry_then_earliest_date_then_event_then_the
         _entry(60, "another's decision", Priority="High", Blocked_by="decision (techlead)"),
         _entry(70, "a typo'd id", Priority="High", Blocked_by="TD-999"),
         _entry(71, "another repo's", Priority="High", Blocked_by="nowhere#TD-1"),
-    ], TD_032={"settling": True}, TD_041={"settling": True})  # fmt: skip
+    ], TD_032={"settling": True}, TD_041={"settling": True}, TD_011=_w("until", "2026-10-20"),
+       TD_021=_w("until", "2026-10-25"), TD_022=_w("until", "2026-10-22"), TD_023=_w("event", why="x"),
+       TD_031=_w("event", why="the reset"))  # fmt: skip
     wait = {k: c["wait"] for k, c in cards.items()}
     assert wait["r#TD-010"] == {"column": "Oct 30", "phrase": "waits until Oct 30", "id": "r#TD-010"}
     assert wait["r#TD-020"] == {"column": "Oct 22", "phrase": "waits until Oct 22", "id": "r#TD-022"}
@@ -78,7 +91,7 @@ def test_the_wait_columns_order_top_entry_then_earliest_date_then_event_then_the
 
 
 def test_a_date_that_has_begun_reads_as_unwritten(tmp_path):
-    cards = _read(tmp_path, [_entry(1, "past", Priority="High", Waits="until 2026-10-16")])
+    cards = _read(tmp_path, [_entry(1, "past", Priority="High", Blocked_by="until 2026-10-16")])
     assert cards["r#TD-001"]["group"] == "up_next" and cards["r#TD-001"]["wait"] is None
 
 
@@ -101,7 +114,7 @@ def test_a_cycle_of_open_ids_reads_as_past_reach(tmp_path):
 def test_in_progress_is_in_progress_whatever_waits_says(tmp_path):
     from test_queue import _rec
 
-    root, r = _repo(tmp_path, "r", [_entry(1, "an event", Priority="High", Waits="event — x")])
+    root, r = _repo(tmp_path, "r", [_entry(1, "an event", Priority="High", Blocked_by="event (x)")])
     settle.mark_waits(r["ledger"]["entries"], NOW)
     (c,) = _cards({root: r}, [_rec("w", root, "TD-001")])["cards"]
     assert c["group"] == "in_progress" and c["wait"] is None
@@ -110,9 +123,9 @@ def test_in_progress_is_in_progress_whatever_waits_says(tmp_path):
 def test_up_next_is_numbered_without_gaps_and_a_waiting_card_would_be_its_place(tmp_path):
     cards = _read(tmp_path, [
         _entry(1, "high", Priority="High"),
-        _entry(2, "high, waits", Priority="High", Waits="until 2026-11-01"),
+        _entry(2, "high, waits", Priority="High", Blocked_by="until 2026-11-01"),
         _entry(3, "medium", Priority="Medium"),
-        _entry(4, "low, waits", Priority="Low", Waits="event — y"),
+        _entry(4, "low, waits", Priority="Low", Blocked_by="event (y)"),
     ])  # fmt: skip
     assert [(k, c["group"], c["place"]) for k, c in cards.items()] == [
         ("r#TD-001", "up_next", 1), ("r#TD-002", "waiting", None), ("r#TD-003", "up_next", 2),
@@ -125,7 +138,7 @@ def test_up_next_is_numbered_without_gaps_and_a_waiting_card_would_be_its_place(
 def test_a_waiting_card_refuses_a_move_and_is_no_neighbour(tmp_path):
     cards = list(_read(tmp_path, [
         _entry(1, "high", Priority="High"),
-        _entry(2, "waits", Priority="High", Waits="event — z"),
+        _entry(2, "waits", Priority="High", Blocked_by="event (z)"),
         _entry(3, "medium", Priority="Medium"),
     ]).values())  # fmt: skip
     with pytest.raises(rank.Refused, match="r#TD-002's card is Waiting, which does not move"):
@@ -140,18 +153,18 @@ def test_an_old_clock_held_mark_is_no_status_and_no_need(tmp_path):
     """TD-1297: the clock keeps no hold, so a `held` mark left on an entry is read as nothing — a card reads
     by its members as they are; an entry held out of the lanes is a `decision (<person>)` row."""
     cards = _read(tmp_path, [
-        _entry(1, "marked, waits", Priority="High", Waits="event — a"),
-        _entry(2, "waits", Priority="High", Waits="event — b", Blocked_by="TD-001"),
+        _entry(1, "marked, waits", Priority="High", Blocked_by="event (a)"),
+        _entry(2, "waits", Priority="High", Blocked_by="TD-001"),
         _entry(11, "marked", Priority="Medium", Blocked_by="TD-012"),
         _entry(12, "ready", Priority="Medium"),
-    ], TD_001=HELD, TD_011=HELD)  # fmt: skip
+    ], TD_001=HELD, TD_011=HELD, TD_002=_w("event", why="b"))  # fmt: skip
     assert (cards["r#TD-001"]["status"], cards["r#TD-001"]["group"]) == ("waiting", "waiting")
     assert (cards["r#TD-012"]["status"], cards["r#TD-012"]["group"]) == ("ready", "up_next")
     assert all(r["state"] != "held (person)" for c in cards.values() for r in [c["top"], *c["rows"]])
 
 
 def test_a_long_wait_phrase_wraps_inside_the_card(tmp_path, monkeypatch):
-    """§4.5 screen 12 *A card*, TD-1341: a Waiting card's wait phrase is the whole `Waits:` line, so it may wrap —
+    """§4.5 screen 12 *A card*, TD-1341: a Waiting card's wait phrase is a gate's whole Event line, so it may wrap —
     the stylesheet lets the phrase's span break and its group shrink to the card, while the pill and the short words
     stay on one line; the card's `overflow: hidden` then has nothing to clip."""
     import test_ui_queue as tq
@@ -217,7 +230,7 @@ def test_ao_rank_list_prints_waiting_unnumbered_after_in_progress_with_its_phras
 
     root, r = _repo(tmp_path, "r", [
         _entry(1, "high", Priority="High"),
-        _entry(2, "waits", Priority="High", Waits="until 2026-10-30"),
+        _entry(2, "waits", Priority="High", Blocked_by="until 2026-10-30"),
         _entry(3, "held", Priority="Low"),
     ])  # fmt: skip
     settle.mark_waits(r["ledger"]["entries"], NOW)

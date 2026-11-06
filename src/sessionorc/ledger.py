@@ -82,23 +82,7 @@ def _header(fields: dict[str, str], body: str) -> dict[str, str]:
     return fields
 
 
-WAITS = ("until", "event")  # a `**Waits:**` line's first words (design §4.4 *An entry says what it waits for*)
-
-
-def waits_of(value: str) -> dict[str, str] | None:
-    """A `**Waits:**` line read (design §4.4 *An entry says what it waits for*, TD-715, built by TD-716):
-    `{on, date, why}`, `on` its first word, `until` or `event`; `date` the first `YYYY-MM-DD` after
-    `until` ('' for an `event`, or an `until` that names none); `why` the rest, its leading dash dropped.
-    None for no line, or a first word outside the two (`ledger.py --check` flags that one)."""
-    words = (value or "").strip()
-    first = words.split()[0].lower() if words.split() else ""
-    if first not in WAITS:
-        return None
-    rest = words[len(first) :]
-    date = ""
-    if first == "until" and (m := DATE.search(rest)):
-        date, rest = m.group(0), rest[m.end() :]
-    return {"on": first, "date": date, "why": rest.strip().lstrip("—–-").strip()}
+WAITS = ("until", "event")  # what a `waiting` mark is `on` (design §4.4 *An entry says what it waits for*)
 
 
 def is_gate(item: str) -> bool:
@@ -327,21 +311,14 @@ def kind_of(entry: dict[str, Any]) -> str:
 
 NO_KIND = "fits no page kind — check its Owner, Kind and Blocked by"
 NO_LANE = "no lane takes an evaluation — write it as a build whose Fix is the write-up, or as design-first"
-NO_DATE = "Waits: until names no date"  # it waits with no end (§4.4 *What a wait does*, TD-716)
 
 
 def flags(entries: list[dict[str, Any]]) -> list[str]:
     """This reader's flag on each entry no page kind takes (§4.4 *Repo facts*, TD-418), on each
-    evaluation, which no lane takes (§4.9b *No anchor seat*, TD-757), and on each `Waits: until` that
-    names no date (TD-716): the Repo page's *other* list and `ao repo` say it, and the bar still draws
-    the entry."""
+    evaluation, which no lane takes (§4.9b *No anchor seat*, TD-757): the Repo page's *other* list and
+    `ao repo` say it, and the bar still draws the entry."""
     out = [f"{e['id']}: {NO_KIND}" for e in entries if e.get("for_page") == "other"]
-    out += [f"{e['id']}: {NO_LANE}" for e in entries if e.get("for_page") == "evaluation"]
-    return out + [
-        f"{e['id']}: {NO_DATE}"
-        for e in entries
-        if isinstance(e.get("waits"), dict) and e["waits"].get("on") == "until" and not e["waits"].get("date")
-    ]
+    return out + [f"{e['id']}: {NO_LANE}" for e in entries if e.get("for_page") == "evaluation"]
 
 
 def _buildlike(entry: dict[str, Any]) -> bool:
@@ -555,9 +532,8 @@ def entries(
     PRs its line names, and `live`, `yes` when `live` says every one of them is live and `no`
     otherwise — no callable, no PR named (§4.9b, TD-323). `sig` is a hash of the entry's section text,
     which the home's settle clock compares (§4.4 *A new entry settles before it is pickable*, TD-710).
-    An entry whose header block carries a `**Waits:**` line has `waits` (`waits_of`, TD-716), and one whose
-    `Blocked by:` holds an `until` or `event` gate has `gates` (`gates_of`, TD-1395); whether it still waits
-    is the home's clock's, its `waiting` mark (`settle.mark_waits`). An entry whose Log carries a `kept
+    An entry whose `Blocked by:` holds an `until` or `event` gate has `gates` (`gates_of`, TD-1395); whether
+    it still waits is the home's clock's, its `waiting` mark (`settle.mark_waits`). An entry whose Log carries a `kept
     waiting` line has `kept_waiting`, the newest such line's date by gate (`kept_waiting_of`, TD-1368). `team`
     is its `**Team:**` line's first word ('' for none), and `needs_team: {why}` marks an entry `team_need`
     finds lacking (§4.4 *An entry names its team*, TD-730).
@@ -608,8 +584,6 @@ def entries(
             "lined": int(m.group(1)[3:]) in lined,
             "sig": hashlib.sha256(t[m.start() : nxt.start() if nxt else len(t)].encode()).hexdigest()[:16],
         }
-        if waits := waits_of(read["fields"].get("waits", "")):  # the header block's line alone (§4.4)
-            e["waits"] = waits
         if gates := gates_of(read["blocked_raw"], t[m.start() : nxt.start() if nxt else len(t)]):
             e["gates"] = gates  # what `settle.mark_waits` reads a wait from (§4.4, TD-1395)
         if e["kind"] == "live-check":

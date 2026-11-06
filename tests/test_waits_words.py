@@ -25,8 +25,16 @@ GRINDER = ["free-pick", "owner:grinder"]
 
 
 def _entry(n: int, waits: str = "") -> str:
+    """An entry whose wait is `until <date> — …` or `event — <why>`, written as its gate: `until <date>`, or
+    `event (e<n>)` with an Event section whose line is the why (TD-1398: no `**Waits:**` line is read)."""
     head = f"## TD-{n:03d}: entry {n}\n\n**Priority:** Medium\n**Owner:** grinder\n**Kind:** build\n"
-    return head + (f"**Waits:** {waits}\n" if waits else "") + "**Status:** Open\n\n**Why:** a reason.\n"
+    body = "\n**Why:** a reason.\n"
+    if waits.startswith("until "):
+        head += f"**Blocked by:** until {waits.split()[1]}\n"
+    elif waits.startswith("event"):
+        head += f"**Blocked by:** event (e{n})\n"
+        body += f"\n**Event (e{n}):** {waits.partition('— ')[2]}\ncheck: pr-merged o/r#5\n"
+    return head + "**Status:** Open\n" + body
 
 
 def _read(*parts: str) -> list[dict]:
@@ -51,14 +59,12 @@ def test_the_words_of_a_wait():
     assert teamrun.wait_words(by["TD-003"]).startswith("waits: the next cadence-sync PR, which nobody")
     short = teamrun.wait_words(by["TD-003"], short=True)
     assert short.endswith("…") and len(short) <= len("waits: ") + teamrun.WAIT_CLAMP
-    assert teamrun.wait_line(by["TD-002"]) == f"Waits: until {TOMORROW} — CI runs on or after then"
+    assert teamrun.wait_line(by["TD-002"]) == f"until {TOMORROW}"
     assert teamrun.waits_tally(["TD-002", "TD-003", "TD-004"], by) == (
         f"2 until a date (the first {TOMORROW}), 1 on an event"
     )
     assert teamrun.waits_tally(["TD-003"], by) == "1 on an event"
-    # an `until` that names no date waits with no end, and says its words
-    nodate = _read(_entry(5, "until the next audit"))[0]
-    assert teamrun.wait_words(nodate) == "waits: the next audit"
+    assert teamrun.wait_line(by["TD-003"]).startswith("event (e3) — the next cadence-sync PR, which nobody")
     # a wait whose day has begun says nothing: the words read the home's mark, not the line
     assert teamrun.wait_words(settle.mark_waits([by["TD-002"]], NOW + timedelta(days=1))[0]) == ""
 
@@ -129,7 +135,7 @@ def test_the_repo_pages_row_draws_the_waits_mark():
     r = {"ledger": {"entries": entries}}
     rows = {e["id"]: e for lst in repo_ui.ledger_lists(r, [], None, NOW) for e in lst["rows"]}
     assert rows["TD-001"]["wait"] == "" and rows["TD-002"]["wait"] == f"waits until {TOMORROW[5:]}"
-    assert rows["TD-002"]["wait_line"] == f"Waits: until {TOMORROW} — CI runs on or after then"
+    assert rows["TD-002"]["wait_line"] == f"until {TOMORROW}"
     assert rows["TD-003"]["wait"].startswith("waits: the next") and rows["TD-003"]["wait"].endswith("…")
     src = (pathlib.Path(repo_ui.__file__).parent / "templates" / "queue_row.html").read_text(encoding="utf-8")
     assert '<span class="meta waits" title="{{ e.wait_line }}">· {{ e.wait }}</span>' in src

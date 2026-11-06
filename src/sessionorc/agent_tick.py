@@ -3988,9 +3988,8 @@ class TickMixin:
     @staticmethod
     def _settle(root: str, remote: str, entries: list[Any], now: datetime, *, fresh: bool) -> None:
         """Mark a ledger reading's entries `settling` or `held` from the home's clock, and `waiting` from
-        their `until` and `event` gates in `Blocked by:` (and a retired `Waits:` line still standing;
-        `sessionorc.settle`, §4.4, TD-710, TD-716, TD-1392), keyed by the checkout's origin
-        (its path where it has none); `fresh` records the reading first — never while the checkout's
+        their `until` and `event` gates in `Blocked by:` (`sessionorc.settle`, §4.4, TD-710, TD-716, TD-1392),
+        keyed by the checkout's origin (its path where it has none); `fresh` records the reading first — never while the checkout's
         origin is not yet known, since the clock is keyed by it and a first reading under another key
         would settle everything at the epoch. The durations are the repo's `settle:` over the install's
         over the built-in. A clock that cannot be written marks no settling, and says so in the log:

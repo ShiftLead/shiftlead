@@ -402,7 +402,7 @@ def ledger_lists(
     where the ledger was not read and the lanes could not be (`lanes` None or the entries unread).
     An entry the home's settle clock withholds carries `settle`, *settles in 7m*, drawn with no press
     (§4.5a *Repo page: settles in 7m on an entry*, TD-710); one whose wait stands carries `wait`, *waits
-    until 10-16* or *waits: <words>*, and `wait_line`, its gates with their Event lines or its `Waits:` line
+    until 10-16* or *waits: <words>*, and `wait_line`, its gates with their Event lines
     whole (TD-716, TD-1395), and its `blocked_by` drops the gates the mark says; `held` is the
     claim's, as ever."""
     now = now or datetime.now(UTC)

@@ -1056,7 +1056,7 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
         return "stalled"
 
     def waits(e: Mapping[str, Any]) -> bool:
-        if e.get("waiting") or e.get("waits") or e.get("settling"):
+        if e.get("waiting") or e.get("settling"):
             return True
         if e.get("kind") == "live-check" and e.get("live") != "yes":
             return True
@@ -1088,10 +1088,10 @@ def _wait(
 ) -> dict[str, str] | None:
     """A card's `waits` and what it waits for (§4.4 *Waiting*, TD-918): None when it does not wait, else
     `{column, phrase, id}` read from a leaf. `waits` holds when every open member that is not the person's
-    own waits — a `Waits:` line in force, a live check whose build is not live, settling, blocked by open
+    own waits — an `until` or `event` gate in force, a live check whose build is not live, settling, blocked by open
     ids or open parts once the person's own are set aside, blocked past the org's reach, or no lane takes it — and at
     least one is not the person's own. The leaf is a member that waits for a reason of its own, the first
-    that applies: the top entry with a `Waits:` line, the earliest `Waits:` date, an event, settling, a
+    that applies: the top entry with a gate, the earliest `until` date, an event, settling, a
     live check not live, past reach — ties by key; a cycle of open ids with none is read as past reach."""
     own = {q for q in members if _own(open_[q])}
     rest = [q for q in members if q not in own]
@@ -1125,9 +1125,7 @@ def _wait(
             day = date.fromisoformat(str(w["until"]))
             words = f"{day:%b} {day.day}"
             return {"column": words, "phrase": f"waits until {words}", "id": q}
-        why = str(w.get("why") or "")  # the Event line's words, or the Waits line's (TD-1395)
-        if not why and isinstance(open_[q].get("waits"), Mapping):
-            why = str(open_[q]["waits"].get("why") or "")
+        why = str(w.get("why") or "")  # the Event line's words (TD-1395)
         return {"column": "event", "phrase": f"waits on {why}" if why else "waits on an event", "id": q}
 
     leaves = sorted((q for q in rest if of_its_own(q)), key=by_key)

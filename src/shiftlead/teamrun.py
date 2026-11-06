@@ -1341,7 +1341,7 @@ WAIT_CLAMP = 40  # the Repo page's *waits: <words>*, clamped; the whole line is 
 def wait_words(e: Mapping[str, Any], short: bool = False) -> str:
     """What an entry whose wait stands waits for (design §4.4 *An entry says what it waits for*, §4.7
     `ao repo`, §4.5a *Repo page: waits mark*, TD-716, TD-1395): *waits until 2026-10-16* (`short`: *waits
-    until 10-16*), else *waits: <its Event line's words, or the Waits line's>* (`short`: clamped); '' while
+    until 10-16*), else *waits: <its Event line's words>* (`short`: clamped); '' while
     it does not wait. Read from the home's `waiting` mark, so a date passed says nothing."""
     w = e.get("waiting")
     if not isinstance(w, dict):
@@ -1350,7 +1350,6 @@ def wait_words(e: Mapping[str, Any], short: bool = False) -> str:
         return f"waits until {date[5:] if short else date}"
     why = (
         str(w.get("why") or "")
-        or str((e.get("waits") or {}).get("why") or "")
         or (f"event ({w['name']})" if w.get("name") else "")
         or ("no date" if w.get("on") == "until" else "an event")
     )
@@ -1361,27 +1360,18 @@ def wait_words(e: Mapping[str, Any], short: bool = False) -> str:
 
 def wait_line(e: Mapping[str, Any]) -> str:
     """What the Repo page's waits mark shows on hover (TD-716, TD-1395): the gates that hold, each event with
-    its Event line whole, *until 2026-11-20; event (flake-again) — the test fails again*; else the entry's
-    `**Waits:**` line whole."""
+    its Event line whole, *until 2026-11-20; event (flake-again) — the test fails again*; '' while it does
+    not wait."""
     w, g = e.get("waiting"), e.get("gates")
-    from_gates = (
-        isinstance(w, dict)
-        and isinstance(g, dict)
-        and ledger_mod.only_gated(e)
-        and (bool(w.get("name")) or (w.get("on") == "until" and w.get("until") in (g.get("until") or ())))
-    )  # the wait is the gates', not a `Waits:` line standing beside a lifted one
-    if from_gates:
-        said = [f"until {w['until']}"] if w.get("on") == "until" and w.get("until") else []
-        said += [
-            f"event ({x.get('name')})" + (f" — {x['why']}" if x.get("why") else "")
-            for x in g.get("events") or []
-            if isinstance(x, dict)
-        ]
-        return "; ".join(said)
-    w = e.get("waits") or {}
-    if not isinstance(w, dict) or not w.get("on"):
+    if not (isinstance(w, dict) and isinstance(g, dict) and ledger_mod.only_gated(e)):
         return ""
-    return " ".join(x for x in ("Waits:", w["on"], w.get("date") or "", f"— {w['why']}" if w.get("why") else "") if x)
+    said = [f"until {w['until']}"] if w.get("on") == "until" and w.get("until") else []
+    said += [
+        f"event ({x.get('name')})" + (f" — {x['why']}" if x.get("why") else "")
+        for x in g.get("events") or []
+        if isinstance(x, dict)
+    ]
+    return "; ".join(said)
 
 
 def waits_tally(ids: Collection[str], entries: Mapping[str, Mapping[str, Any]]) -> str:

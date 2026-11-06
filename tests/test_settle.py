@@ -191,7 +191,7 @@ def test_a_clock_that_cannot_be_written_marks_no_settling_says_so_and_still_mark
     root.mkdir()
     got = _ledger(
         _entry(1),
-        _entry(2).replace("**Kind:** design-first\n", "**Kind:** design-first\n**Waits:** event — the next sync PR\n"),
+        _entry(2).replace("**Kind:** design-first\n", "**Kind:** design-first\n**Blocked by:** event (sync)\n"),
     )
     with caplog.at_level("WARNING", logger="shiftlead.agent"):
         TickMixin._settle(str(root), "https://github.com/o/r.git", got, T0, fresh=True)  # does not raise (TD-719)
