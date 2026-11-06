@@ -427,9 +427,10 @@ def test_a_build_covered_only_by_its_designs_carried_line_offers_lift_the_hold(t
 
 
 def test_a_stale_open_decided_line_is_a_need_standing_in_its_members_place(tmp_path):
-    """TD-1424 (TD-1368's Done when): an open decided line `BOARD_WAIT_DAYS` past its answer comes back to Needs
-    you (`board_waits` false) while it still takes the rows of the entries it covers, so the line is the one
-    Decide item in their place."""
+    """TD-1424 (TD-1368's Done when, its reading half): an open decided line `BOARD_WAIT_DAYS` past its answer is a
+    need again (`board_waits` false, so Needs you, counted) and still takes the rows of the entries it covers —
+    stale or not, the member draws no row of its own. Where the line is then drawn on the card, in the member's
+    block's place, is `test_an_undecided_covering_line_stands_in_the_rows_place_on_later_and_the_card`'s `attach`."""
     from shiftlead.ui.inbox import BOARD_WAIT_DAYS, board_answered, board_waits
 
     old = (NOW.date() - timedelta(days=BOARD_WAIT_DAYS)).isoformat()
