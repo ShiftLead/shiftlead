@@ -42,7 +42,7 @@ People: paul
   - **Context:** TD-1444, a build of TD-1434's design (PR #3015): a question taken up from a member held interactive says taken_over in the home's words (who took it over, when, and that Hand back returns it). Held with the design by its end-of-rounds item.
   - **Question:** Go with TD-1444 once TD-1434's end-of-rounds item is answered Go?
   - **Recommended:** Go — small; it waits on TD-1430's unanswered stamp, TD-1439 and TD-1440.
-- [ ] decide 2026-11-06 (session `designer-ao-1` on kmaster) — Go with TD-1439, a build of TD-1434's design, once TD-1434's end-of-rounds item is answered Go? Context: TD-1439 decision (paul). Due: 2026-11-09. Answers: Go (default) | Not yet.
+- [x] decide 2026-11-06 (session `designer-ao-1` on kmaster) — Go with TD-1439, a build of TD-1434's design, once TD-1434's end-of-rounds item is answered Go? Context: TD-1439 decision (paul). Due: 2026-11-09. Answers: Go (default) | Not yet. Decided: Go (by paul) (2026-11-06). Closed: 2026-11-06 — lifted.
   - **Context:** TD-1439, a build of TD-1434's design (PR #3015): every mode change is stamped mode_at, mode_by and mode_via and logged by the home, and Focus's Session card shows who took a session over, when and from where. Held with the design by its end-of-rounds item.
   - **Question:** Go with TD-1439 once TD-1434's end-of-rounds item is answered Go?
   - **Recommended:** Go — it is the trace the entry said needs no design, and it lands first: TD-1440 and TD-1444 read its stamp.
