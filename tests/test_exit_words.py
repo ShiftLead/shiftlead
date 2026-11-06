@@ -182,7 +182,7 @@ def test_the_focus_script_draws_the_hover_and_the_banners_first_line():
 
     js = (Path(cli.__file__).parent / "ui" / "static" / "app.js").read_text()
     assert 'title="${esc(v.pill_title || "")}"><span class="dot">' in js
-    assert '<div class="endwords"><b>${esc(v.ending_text)}</b></div>' in js
+    assert "const words = v.ending_text || v.state;" in js and '<b class="endwords">${esc(words)}</b>' in js
 
 
 @pytest.mark.unit
