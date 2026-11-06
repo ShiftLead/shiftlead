@@ -1732,8 +1732,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      removes the directory on every road but one that sets `ready`, and on that one it hands it on as the
      in-memory entry's `gate_dir`. The gate file's `expect` is the head the rows judged.
      **Step 5.** `_sync_merge` pops `gate_dir` first, before any return, so it is never written to the
-     reading, and removes the directory in a `finally` that covers every exit. The pass's call from
-     `judge` to `_sync_merge` is wrapped so a cancelled pass removes it too. A cancel that lands while
+     reading, and removes the directory in a `finally` that covers every exit. A cancel that lands while
      `judge` still runs in its thread drops its result, and that one directory is left in the system's
      temporary directory: accepted, as small and harmless. Then, in order:
        - the sync-off and holder checks, unchanged;
