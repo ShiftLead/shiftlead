@@ -157,7 +157,9 @@ def filled_for(cause: dict[str, Any] | None) -> str | None:
     return f"{FILLED_FOR}{cause['by']}" + (f" — {what}" if what else "")
 
 
-PRESS_HOLD = 6 * 3600.0  # seconds a write-back's entries are held over a checkout that has not pulled (TD-1433)
+# Seconds a write-back's entries are held over a checkout that has not pulled (TD-1433). A checkout on a feature
+# branch or a diverged main never holds the press's commit, so there the hold lasts this whole bound.
+PRESS_HOLD = 6 * 3600.0
 
 
 def _holds_commit(root: str, commit: str) -> bool:
