@@ -478,3 +478,64 @@ def test_take_over_and_hand_back_share_the_acts_lines_slot_and_switch_to_unatten
         for mode in ({"unattended": True}, {"unattended": False, "team": "t"}, {"unattended": False}):
             cls, word, in_menu = slot(_page(tmp_path, monkeypatch, state=ended, **mode))
             assert "hidden" in cls.split() and not in_menu, (ended, mode)
+
+
+def test_take_over_on_a_member_confirms_wherever_it_is_drawn_and_hand_back_never_does(tmp_path, monkeypatch):
+    """TD-1440 (design §4.5 *A taken-over member*, §4.5a *Focus: Take over*): on a member — a team or controllers,
+    not the person's own — the acts line's Take over, the Watching line's and the card's more ▾ *Switch to
+    interactive* carry the confirm; a non-member's and the person's own team session's are one press; Hand back
+    never confirms. The narrow sheet's entry is a proxy that clicks `#fmodeact`, so the confirm runs once."""
+    from shiftlead.ui.app import templates, view
+
+    text = (
+        "Take over phone-1? While you hold it, its mail does not wake it, and asks to it wait for you. "
+        "Hand back returns it."
+    )
+
+    def confirms(html: str) -> dict[str, str | None]:
+        out = {}
+        for eid in ("fmodeact", "fwatchgo"):
+            tag = re.search(rf'<button[^>]*id="{eid}"[^>]*>', html, re.S) or re.search(
+                rf'<button[^>]*data-unattended="1"[^>]*id="{eid}">', html, re.S
+            )
+            assert tag, eid
+            got = re.search(r'data-confirm="([^"]*)"', tag.group(0))
+            out[eid] = got.group(1) if got else None
+        return out
+
+    for member in ({"team": "t"}, {"controllers": ["ao-x-m"]}):
+        assert confirms(_page(tmp_path, monkeypatch, unattended=True, **member)) == {
+            "fmodeact": text,
+            "fwatchgo": text,
+        }, member
+        assert confirms(_page(tmp_path, monkeypatch, unattended=False, **member)) == {
+            "fmodeact": None,
+            "fwatchgo": None,
+        }, "Hand back never confirms"
+    for one in ({}, {"team": "t", "by_person": True}):
+        assert confirms(_page(tmp_path, monkeypatch, unattended=True, **one)) == {"fmodeact": None, "fwatchgo": None}
+    # the narrow sheet's Take over carries no data-act of its own: a press clicks #fmodeact, whose confirm runs once
+    sheet = re.search(r'<button[^>]*data-for="fmodeact"[^>]*>', _page(tmp_path, monkeypatch, unattended=True, team="t"))
+    assert sheet and "data-act" not in sheet.group(0) and "data-confirm" not in sheet.group(0)
+
+    def card(**rec) -> str | None:
+        s = {"id": "ao-x-c", "name": "c", "kind": "agent", "state": "idle", "dir": str(tmp_path), **rec}
+        html = templates.get_template("card.html").render(s=view(s))
+        tag = re.search(r'<button data-act="mode" data-via="card"[^>]*>', html)
+        assert tag, rec
+        got = re.search(r'data-confirm="([^"]*)"', tag.group(0))
+        return got.group(1) if got else None
+
+    assert card(unattended=True, team="t").startswith("Take over c? While you hold it")
+    assert card(unattended=False, team="t") is None and card(unattended=True) is None
+    assert view({"id": "x", "state": "idle", "unattended": True, "team": "t", "agent": False})["mode_confirm"] == ""
+
+
+def test_the_focus_delta_sets_and_clears_take_overs_confirm():
+    """TD-1440: app.js's Focus delta handler follows `mode_confirm` onto `#fmodeact` and `#fwatchgo`, so a
+    membership change while Focus is open is followed, and the generic confirm check runs before the mode branch."""
+    js = (pathlib.Path(__file__).parent.parent / "src/shiftlead/ui/static/app.js").read_text(encoding="utf-8")
+    assert 'for (const el of [ma, $("#fwatchgo")]) {' in js
+    assert "if (v.mode_confirm) el.dataset.confirm = v.mode_confirm; else delete el.dataset.confirm;" in js
+    click = js.index("if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;")
+    assert click < js.index('if (action === "mode") body = {', click)

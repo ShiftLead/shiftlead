@@ -7540,6 +7540,12 @@
         el.dataset.unattended = v.unattended ? "1" : "0";
       }
       const ma = $("#fmodeact"); if (ma) ma.classList.toggle("hidden", v.mode_place !== "slot");
+      // Take over on a member confirms (§4.5 *A taken-over member*, TD-1440): set or cleared from the view, so a
+      // membership or mode change while Focus is open is followed; Hand back carries none
+      for (const el of [ma, $("#fwatchgo")]) {
+        if (!el) continue;
+        if (v.mode_confirm) el.dataset.confirm = v.mode_confirm; else delete el.dataset.confirm;
+      }
       // one outlined act (§4.5 *The card's anatomy*, row 6): Close session outranks Take over,
       // which is drawn plain beside it while the checklist passes; Hand back is never the outlined one
       if (ma) {

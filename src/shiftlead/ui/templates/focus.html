@@ -118,7 +118,7 @@
          takes the same slot once a member is held, a bordered plain button (TD-964, TD-1408); *Switch to
          unattended*, on a session with no team and no controllers, alone sits in more ▾; an ended record
          draws neither (`mode_place`). #}
-      {% if s.agent %}<button class="btn sm{% if s.unattended %} {{ 'link' if s.own and s.ready_ok else 'next' }}{% endif %}{% if s.mode_place != 'slot' %} hidden{% endif %}" id="fmodeact" data-act="mode" data-via="focus" data-id="{{ s.id }}"
+      {% if s.agent %}<button class="btn sm{% if s.unattended %} {{ 'link' if s.own and s.ready_ok else 'next' }}{% endif %}{% if s.mode_place != 'slot' %} hidden{% endif %}" id="fmodeact" data-act="mode" data-via="focus" data-id="{{ s.id }}"{% if s.mode_confirm %} data-confirm="{{ s.mode_confirm }}"{% endif %}
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
       <button class="btn sm link" id="fmessage" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">✉ Message</button>
@@ -274,7 +274,7 @@
     {%- set ended = s.state in ('exited', 'closed') %}
     {% if s.agent %}<div class="fwatch{% if not s.unattended or ended %} hidden{% endif %}" id="fwatch" title="{{ help_title('watching-line') }}">
       <span class="q">Watching. This session runs unattended.</span>
-      <button type="button" class="btn" data-act="mode" data-via="focus" data-id="{{ s.id }}" data-unattended="1" id="fwatchgo">Take over</button>
+      <button type="button" class="btn" data-act="mode" data-via="focus" data-id="{{ s.id }}" data-unattended="1"{% if s.mode_confirm %} data-confirm="{{ s.mode_confirm }}"{% endif %} id="fwatchgo">Take over</button>
     </div>{% endif %}
     {#- design §4.5a **the input bar · ⌨** (§4.5 *Phone layout*, TD-1299): on a phone, the composer's folded bar in its
         own words, a press opening the composer as a sheet over the terminal; ⌨ gives the terminal focus, the one

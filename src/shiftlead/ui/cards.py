@@ -594,6 +594,16 @@ def view(
             "switch this session to unattended: the terminal goes read-only, and its manager and the policies "
             "pick it up again. A stop time that passed while you held it is cleared; one still ahead stays"
         )
+    # Take over on a member confirms first, wherever it is drawn (§4.5 *A taken-over member*, §4.5a *Focus: Take
+    # over*, TD-1440): a record with a team or controllers that the person did not start by hand, since holding it
+    # stops its doorbell. Empty on a non-member and on an interactive record: Hand back never confirms.
+    member = bool(s.get("team") or s.get("controllers")) and not s.get("by_person")
+    d["mode_confirm"] = (
+        f"Take over {s.get('name') or s.get('id')}? While you hold it, its mail does not wake it, and asks to it "
+        "wait for you. Hand back returns it."
+        if d["agent"] and s.get("unattended") and member
+        else ""
+    )
     # where the toggle is drawn (TD-964, TD-1408): Take over and Hand back share the acts line's one slot,
     # *Switch to unattended* alone is more ▾'s, and an ended record draws it nowhere (§4.5a *Focus: Take over*)
     if not d["mode_act"] or s.get("state") in ("exited", "closed"):
