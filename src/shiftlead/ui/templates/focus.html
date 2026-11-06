@@ -114,9 +114,10 @@
       <button class="btn sm next{% if not close_now %} hidden{% endif %}" id="fclose" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.close_confirm }}"
               title="{{ help_title('close') }}">Close session</button>
       {# design §4.5a Focus header **mode toggle** (TD-096, *Focus watches*): named for what it does —
-         Take over an unattended session (read-only until then) is the next act here; Hand back and
-         Switch to unattended, the same toggle the other way, sit in more ▾ (TD-156). #}
-      {% if s.agent %}<button class="btn sm {{ 'link' if s.own and s.ready_ok else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
+         Take over an unattended session (read-only until then) is the next act here, and **Hand back**
+         takes the same slot once a member is held, a bordered plain button (TD-964, TD-1408); *Switch to
+         unattended*, on a session with no team and no controllers, alone sits in more ▾. #}
+      {% if s.agent %}<button class="btn sm{% if s.unattended %} {{ 'link' if s.own and s.ready_ok else 'next' }}{% endif %}{% if not s.mode_slot %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
       <button class="btn sm link" id="fmessage" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">✉ Message</button>
@@ -151,7 +152,7 @@
           <button id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click){% if s.unattended %} — not while you are watching: Take over first{% endif %}">⎘ Paste <span class="key">Ctrl+V</span></button>
           {# design §4.5a *Focus: copy on select* (TD-164, built by TD-174): the person's, in settings.yml, on by default #}
           <label id="tcopyselrow" class="menutoggle" title="copy on select: a selection is copied as soon as you release the mouse (or Shift+click), silently — Ctrl+C and Copy work either way. Yours everywhere: settings.yml person.terminal.copy_on_select"><input type="checkbox" id="tcopysel"{% if copy_on_select %} checked{% endif %}> Copy on select</label>
-          {% if s.agent %}<button id="fmodemenu" data-act="mode" data-id="{{ s.id }}" data-unattended="{{ 1 if s.unattended else 0 }}"{% if s.unattended %} hidden{% endif %}
+          {% if s.agent %}<button id="fmodemenu" data-act="mode" data-id="{{ s.id }}" data-unattended="{{ 1 if s.unattended else 0 }}"{% if s.mode_slot %} hidden{% endif %}
                   title="{{ s.mode_title }}">{{ s.mode_act }}</button>{% endif %}
           <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
           {# Close for a team member (TD-156, Paul): its team's Wind down or Start closes it, so the
