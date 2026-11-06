@@ -12,7 +12,7 @@ Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgri
 
 - A scripted ledger edit parses through `ledger.py` or ledgerboard, never a hand regex on
   `## TD-NNN:` — the template comment is itself headed `## TD-001` (cadence §2.12, TD-137).
-- `gh pr merge --squash` is silently refused while CI is still pending (`mergeStateStatus`
+- A merge (cadence step 5's line) is silently refused while CI is still pending (`mergeStateStatus`
   UNSTABLE); `gh pr view N --json state` then still says OPEN. Poll
   `gh pr view N --json statusCheckRollup` for `SUCCESS` first. `gh pr checks` output has a
   space in the check name, so `awk '{print $2}'` is wrong.
