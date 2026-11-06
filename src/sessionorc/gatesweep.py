@@ -19,8 +19,10 @@ branch names and idempotence rules so a by-hand sweep and the home never write t
   again; one whose PR was closed unmerged is never reopened, and an `act` item asks why, once; nothing more
   is filed while an earlier `sweep/` PR is open. Items for another registered repo's board go to that repo as one
   PR on `notices/<this repo>-sweep-<UTC date>`, from a worktree of its clone: nothing while an earlier one from
-  this repo is open there, and nothing on a board more visible than this repo (its items carry this repo's
-  words), each said in the run's lines.
+  this repo is open there, no item a notices PR from this repo merged or closed within the re-ask window
+  already filed, and nothing on a board more visible than this repo (its items carry this repo's words, an
+  `@name` in the PR body in a code span), each said in the run's lines. Every `gh` call names its repo
+  (`--repo`, from the clone's origin), never the remote `gh` would infer.
 
 `due`, `lift_branch` and `summary` are pure; the rest shells out and is called in a thread."""
 
@@ -375,7 +377,17 @@ def plan(
 # ── writing ───────────────────────────────────────────────────────────────────────────────────
 
 
+def gh_repo(root: Path | str) -> str | None:
+    """`root`'s repo as `gh` names it, `<host>/<owner>/<repo>` from its origin; None for an origin that names
+    none (a local path), where `gh` infers it from the directory as before."""
+    return lb.origin_key(origin_url(root))
+
+
 def _gh(root: Path | str, *args: str) -> subprocess.CompletedProcess[str]:
+    """`gh` in `root`, aimed at `root`'s origin by `--repo` (`repo view`: its argument) rather than whatever
+    remote `gh` would infer, which may be an upstream."""
+    if (slug := gh_repo(root)) is not None:
+        args = (*args[:2], slug, *args[2:]) if args[:2] == ("repo", "view") else (*args, "--repo", slug)
     return subprocess.run(
         ["gh", *args],
         capture_output=True,
@@ -387,13 +399,13 @@ def _gh(root: Path | str, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def prs(root: Path | str, *narrow: str, state: str = "all") -> list[dict[str, Any]]:
+def prs(root: Path | str, *narrow: str, state: str = "all", extra: tuple[str, ...] = ()) -> list[dict[str, Any]]:
     """The repo's pull requests in `state` (`all` or `open`), as `[{number, state (open|merged|closed), head,
-    files}]`: the newest 300, or with `narrow` (`--head <branch>`, `--search <q>`) those it matches. A one-open
-    rule reads `open`, so an open PR older than the newest 300 of every state still counts."""
-    cp = _gh(
-        root, "pr", "list", "--state", state, "--limit", "300", *narrow, "--json", "number,state,headRefName,files"
-    )
+    files}]` and each of `extra`'s fields (a string, empty when the forge gave none): the newest 300, or with
+    `narrow` (`--head <branch>`, `--search <q>`) those it matches. A one-open rule reads `open`, so an open PR
+    older than the newest 300 of every state still counts."""
+    fields = ",".join(["number", "state", "headRefName", "files", *extra])
+    cp = _gh(root, "pr", "list", "--state", state, "--limit", "300", *narrow, "--json", fields)
     if cp.returncode != 0:
         raise SweepError(_words(cp, "gh pr list"))
     try:
@@ -406,6 +418,7 @@ def prs(root: Path | str, *narrow: str, state: str = "all") -> list[dict[str, An
             "state": str(r.get("state") or "").lower(),
             "head": str(r.get("headRefName") or ""),
             "files": [str(f.get("path") or "") for f in r.get("files") or [] if isinstance(f, dict)],
+            **{k: str(r.get(k) or "") for k in extra},
         }
         for r in rows
         if isinstance(r, dict) and "number" in r
@@ -553,7 +566,6 @@ def _own_board(
     p: dict[str, Any],
     items: list[dict],
     keys: list[str],
-    opened: list[dict],
     today_utc: date,
     today_local: date,
     by: str,
@@ -585,13 +597,39 @@ VISIBILITY = {"PRIVATE": 0, "INTERNAL": 1, "PUBLIC": 2}
 
 
 def visibility(root: Path | str) -> str:
-    """The repo's visibility on its forge (`gh repo view`), `PRIVATE`, `INTERNAL` or `PUBLIC`; SweepError when
-    it cannot be read — an unread visibility writes nothing."""
-    cp = _gh(root, "repo", "view", "--json", "visibility", "--jq", ".visibility")
-    got = cp.stdout.strip().upper()
-    if cp.returncode != 0 or got not in VISIBILITY:
-        raise SweepError(_words(cp, "gh repo view") if cp.returncode != 0 else f"visibility {got or 'unread'}")
-    return got
+    """The repo's visibility on its forge (`forge_visibility`: `gh repo view`, or GitLab's through `glab api`),
+    `PRIVATE`, `INTERNAL` or `PUBLIC`; SweepError when it cannot be read — an unread visibility writes nothing."""
+    got = forge_visibility(root, origin_url(root))
+    if got is None:
+        raise SweepError(f"{Path(root).name}: its visibility on its forge could not be read")
+    return got.upper()
+
+
+MENTION = re.compile(r"(?<![\w`])@([A-Za-z0-9][\w-]*(?:/[\w.-]+)?)")
+
+
+def unmention(text: str) -> str:
+    """`text` with each `@name` (and `@org/team`) in a code span, so a PR body copying it notifies nobody."""
+    return MENTION.sub(r"`@\1`", text)
+
+
+def _held_by_notices(there: Path | str, mark: re.Pattern[str], ctx: str, today_utc: date) -> int | None:
+    """The number of a notices PR from this repo (its branch matching `mark`) merged or closed within the re-ask window
+    (`lb.SWEEP_REASK_DAYS`) whose body files an item with `Context: <ctx>`, else None: a closed one is the
+    person's no for that window, and a merged one the clone has not fetched yet would file the item twice. A
+    PR whose date the forge did not give holds it too."""
+    line = re.compile(rf"— Context: {re.escape(ctx)}$", re.M)
+    for q in prs(there, "--search", f'"Context: {ctx}" in:body', extra=("body", "closedAt", "mergedAt")):
+        if not mark.match(q["head"]) or q["state"] not in ("merged", "closed") or not line.search(q["body"]):
+            continue
+        when = q["mergedAt"] or q["closedAt"]
+        try:
+            day = date.fromisoformat(when[:10]) if when else None
+        except ValueError:
+            day = None
+        if day is None or (today_utc - day).days <= lb.SWEEP_REASK_DAYS:
+            return q["number"]
+    return None
 
 
 def _qualify(repo: str, it: dict[str, Any]) -> dict[str, Any]:
@@ -642,6 +680,16 @@ def _other_board(
     earlier = [q for q in prs(there, state="open") if mark.match(q["head"])]
     if earlier:
         return f"board {board}: an earlier sweep PR #{earlier[0]['number']} from this repo is open there — {n} wait"
+    held = {}
+    for it in items:
+        if (num := _held_by_notices(there, mark, str(it["context"]), today_utc)) is not None:
+            held[str(it["context"])] = num
+    if held:
+        items = [it for it in items if str(it["context"]) not in held]
+        heard = "; ".join(f"{c} by #{num}" for c, num in held.items())
+        if not items and not keys:
+            return f"board {board}: nothing to file — held by a notices PR merged or closed there: {heard}"
+        n = f"{len(items)} to file, {len(keys)} to close; held by a notices PR merged or closed there: {heard}"
     base = ledger_mod.default_ref(there)
     if base is None:
         return f"board {board}: not done — its clone has no origin/<default> ({n})"
@@ -657,7 +705,7 @@ def _other_board(
                 "repo's board, whose `People:` names the person.",
                 "",
             ]
-            + [f"- file: [{it['kind']}] {it['text']} — Context: {it['context']}" for it in items]
+            + [f"- file: [{it['kind']}] {unmention(it['text'])} — Context: {it['context']}" for it in items]
             + [f"- close: {k}" for k in keys]
             + ["", "Review it like any PR (cadence §4)."]
         )
@@ -703,7 +751,7 @@ def _apply_own(
             said.append(f"lift {x['id']} {x['gate']}: not done — {e}")
     if items or keys or extra:
         try:
-            said.append(_own_board(root, p, items + extra, keys, opened, today_utc, today_local, by))
+            said.append(_own_board(root, p, items + extra, keys, today_utc, today_local, by))
         except (SweepError, lb.Refused, OSError, subprocess.SubprocessError) as e:
             said.append(f"board: not done — {e}")
     return said

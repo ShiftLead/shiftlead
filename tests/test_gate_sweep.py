@@ -286,16 +286,69 @@ def test_an_open_notices_pr_older_than_the_newest_300_still_holds_the_next(other
     assert len(_forge(x)["prs"]) == 302
 
 
-def test_a_closed_or_merged_notices_pr_and_another_repos_sweep_branch_hold_nothing(other):
+def test_a_notices_pr_merged_or_closed_past_the_reask_window_and_another_repos_sweep_branch_hold_nothing(other):
     root, x = other
     gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
     state = _forge(x)
-    state["prs"]["1"]["state"] = "merged"
+    state["prs"]["1"].update(state="merged", merged_at="2026-09-01T10:00:00Z")  # past lb.SWEEP_REASK_DAYS
     state["prs"]["2"] = {"base": "main", "head": "notices/x-sweep-sweep-2026-11-05", "title": "t", "body": "",
                          "state": "open"}  # fmt: skip
     _set_forge(x, prs=state["prs"])
     got, _ = gatesweep.sweep(root, [x], today_utc=date(2026, 11, 6), today_local=date(2026, 11, 6), by="kmaster")
     assert any(a.endswith("pull/3") for a in got["applied"]), got["applied"]
+
+
+@pytest.mark.parametrize("how", ["closed", "merged"])
+def test_a_notices_pr_closed_unmerged_or_merged_unfetched_holds_its_items_for_the_reask_window(other, how):
+    """TD-1425: a notices PR the person closed unmerged is their no for the re-ask window, and one merged that
+    the clone has not fetched has filed the item already: neither is filed again until the window ends."""
+    root, x = other
+    gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    state = _forge(x)
+    state["prs"]["1"].update(state=how, **{f"{how}_at": "2026-11-05T12:00:00Z"})
+    _set_forge(x, prs=state["prs"])
+    nov6 = date(2026, 11, 6)
+    got, _ = gatesweep.sweep(root, [x], today_utc=nov6, today_local=nov6, by="kmaster")
+    (line,) = [a for a in got["applied"] if a.startswith("board ")]
+    assert "nothing to file — held by a notices PR merged or closed there" in line and "by #1" in line, line
+    assert len(_forge(x)["prs"]) == 1, "nothing filed twice"
+    late = date(2026, 12, 6)  # 31 days on: the window is over and the item is asked again
+    got, _ = gatesweep.sweep(root, [x], today_utc=late, today_local=late, by="kmaster")
+    assert any(a.endswith("pull/2") for a in got["applied"]), got["applied"]
+
+
+def test_every_gh_call_names_its_repo_and_an_at_name_reaches_the_pr_body_in_a_code_span(other, monkeypatch):
+    """TD-1425: `gh` infers its repo from the directory and may pick an upstream remote, so every call names the
+    clone's own (`repo view` as its argument); an item's `@name` copied into another repo's PR body would
+    notify, so it goes in a code span there."""
+    root, x = other
+    ask = PERSON.replace("**Ask:** Should it go?", "**Ask:** Should it go, @someone?")
+    (root / "docs" / "ledger" / "TD-8.md").write_text(ask)
+    _git("-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qam", "at")
+    _git("-C", str(root), "push", "-q", "origin", "main")
+    real_url = gatesweep.origin_url
+
+    def github(r):  # the bare origin `<name>-origin.git` read as github.com/o/<name>
+        return f"git@github.com:o/{Path(real_url(r)).name.removesuffix('-origin.git')}.git"
+
+    monkeypatch.setattr(gatesweep, "origin_url", github)
+    got, why = gatesweep.sweep(root, [x], today_utc=UTC, today_local=LOCAL, by="kmaster")
+    assert why is None, why
+    assert any(a.endswith("pull/1") for a in got["applied"] if a.startswith("board ")), got["applied"]
+    for forge, slug in ((_forge(root), "github.com/o/r"), (_forge(x), "github.com/o/x")):
+        assert forge["calls"], "the sweep called gh"
+        for call in forge["calls"]:
+            named = call[2] if call[:2] == ["repo", "view"] else call[call.index("--repo") + 1]
+            assert named == slug, call
+    (pr,) = _forge(x)["prs"].values()
+    assert "`@someone`" in pr["body"] and "@someone" not in pr["body"].replace("`@someone`", ""), pr["body"]
+    assert "@someone?" in _branch(x, pr["head"], "docs/user_attention.md"), "the board keeps the words as written"
+
+
+def test_unmention_puts_each_at_name_in_a_code_span_and_leaves_the_rest():
+    assert gatesweep.unmention("ask @paul and @org/team, not a@b.c or `@kept`") == (
+        "ask `@paul` and `@org/team`, not a@b.c or `@kept`"
+    )
 
 
 def test_a_board_more_visible_than_this_repo_is_not_written(other):
