@@ -230,11 +230,14 @@ async def test_a_fill_mark_not_yet_an_hour_old_a_lost_brief_mark_and_a_held_mark
 async def test_a_trip_whose_fills_all_postdate_a_lapse_is_held_and_one_counting_an_older_fill_is_plain(agent, tmp_path):
     """The held second trip (TD-1422): every counted fill newer than the newest `fill_lapsed.at` among the
     fellows, that lapse no more than two windows old, writes `held: true`; a trip counting an older fill, or
-    after a lapse older than two hours, is plain."""
+    after a lapse older than two hours, is plain. A fill stamped in the lapse's own second came after it (the
+    same pass), and a lapse exactly two windows old still counts."""
     await park_ticks(agent)
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(microsecond=0)
     cases = {
         "after": (timedelta(minutes=50), _mins(FILL_CEILING), True),
+        "equal": (timedelta(minutes=50), [*_mins(FILL_CEILING - 1), timedelta(minutes=50)], True),
+        "bound": (2 * FILL_WINDOW, _mins(FILL_CEILING), True),
         "older": (timedelta(minutes=20), _mins(FILL_CEILING), False),  # fills at 25..30 min predate it
         "stale": (2 * FILL_WINDOW + timedelta(minutes=1), _mins(FILL_CEILING), False),
     }

@@ -1298,7 +1298,11 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
         seats={"ao-w": "runs after 10 PRs"},
     )["slot"]
     assert full["text"] == "fills exhausted · 6 in 1 h · fills again after the hour" and full["kind"] == "bad"
-    assert "fills it again after the hour" in full["full"] and "yours" not in full["full"], "a plain mark lapses"
+    assert full["full"] == (
+        "fills exhausted · 6 in 1 h · fills again after the hour: the host agent filled this seat and the ones "
+        "beside it as often as it will this hour (design §6) — the host agent fills it again after the hour, when "
+        "it is due"
+    ), "a plain mark lapses, in §4.5's words"
     # a second trip running holds (§6 rule 3, TD-1422): the person's
     held = view(
         _card(

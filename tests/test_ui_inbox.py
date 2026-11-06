@@ -1011,6 +1011,8 @@ def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeyp
     records = [
         rec("ao-c", "exited", exit_code=1, git=_ahead3, restart_ceiling={"at": at, "count": 3}),
         rec("ao-f", "exited", restart_ceiling={"at": at, "count": 6, "why": "fill"}),
+        # the same seat once its plain mark lapsed (§6 rule 3, TD-1422): the mark is gone, and so is the row
+        rec("ao-l", "exited", fill_lapsed={"at": at}),
         rec(
             "ao-h",
             "idle",

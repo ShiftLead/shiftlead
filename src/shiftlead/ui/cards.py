@@ -1082,7 +1082,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         else:
             full = (
                 f"{text}: the host agent filled this seat and the ones beside it as often as it will this hour "
-                "(design §6) — it fills it again after the hour, when it is due"
+                "(design §6) — the host agent fills it again after the hour, when it is due"
             )
     elif d.get("seat") and d.get("seat_off"):
         # a switch-made sweep seat while the switch or its repo is off (§4.9b, TD-1091): never due

@@ -294,7 +294,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      answers a trickle of asks one fill each reaches six in an hour by working, and a mark that
      waited for a person left every later ask waiting with it. **A second trip holds**: a trip whose
      every counted fill was made after the newest `fill_lapsed.at` among the fellows `_fill` counts
-     over (the group's, wherever the trip lands), that lapse no more than `2 × FILL_WINDOW` old (an
+     over (the group's, wherever the trip lands; a fill stamped in the lapse's own second is after it, since a
+     pass writes the lapse before it fills), that lapse no more than `2 × FILL_WINDOW` old, two windows included (an
      older one is no lapse straight before, and is ignored) writes the mark with `held: true`, which never
      lapses — so a trip within two hours of a lapse is held unless it counts a fill made before the
      lapse (only in its first hour can one): fills at the ceiling straight after a lapse are a loop or

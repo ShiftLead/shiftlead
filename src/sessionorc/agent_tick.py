@@ -3411,8 +3411,9 @@ class TickMixin:
             )
             if not tripped:
                 s.restart_ceiling = {"at": now_iso(), "count": len(fills), "why": "fill"}
-                # a second trip running holds (TD-1422): every fill it counts postdates the newest lapse among
-                # the fellows, a lapse no more than two windows old
+                # a second trip running holds (TD-1422): no fill it counts predates the newest lapse among the
+                # fellows (a fill in the lapse's own second came after it, in the same pass), a lapse no more than
+                # two windows old
                 lapses = [
                     str(r.fill_lapsed.get("at") or "")
                     for r in fellows
@@ -3421,8 +3422,8 @@ class TickMixin:
                 lapse = max(lapses, default="")
                 if (
                     lapse
-                    and _recent(lapse, now, 2 * FILL_WINDOW)
-                    and all(_parse(str(e.get("at"))) > _parse(lapse) for e in fills)
+                    and _recent(lapse, now, 2 * FILL_WINDOW + timedelta(microseconds=1))  # two windows, inclusive
+                    and all(_parse(str(e.get("at"))) >= _parse(lapse) for e in fills)
                 ):
                     s.restart_ceiling["held"] = True
                 log.warning(
