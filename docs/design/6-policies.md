@@ -1723,30 +1723,42 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      drops it, and the next pass checks the new head. A record that now holds it means the merge is
      dropped and no verdict is written. The PR stays off the home's list while a live record holds
      it, and comes back only once the claim ends. **The merge is then cadence step 5's line**
-     (TD-1412, cadence §4.2), its three parts split across the two steps so the gate runs once. Each
-     script is found as `cadence.check` finds the gate: through the resolver in a pinned repo, the
-     copy's `scripts/` otherwise. agent-cadence's own source never reaches here, since a sync PR is a
-     pin's bump. **Step 4's gate run** takes `--trailers <dir>/gate`, `<dir>` a `mkdtemp` the pass
-     makes for that PR. The gate file's `expect` is the head the rows judged, so it binds what follows
-     to the head step 4 read. `<dir>` rides on the in-memory entry `judge` returns as `gate_dir` and is
-     never written to the reading. **Step 5** runs `forge.py squash-message <n> --gate <dir>/gate --out
-     <dir>` under `GATE_TIMEOUT` (it makes paginated `gh api` reads), then re-reads the head and the
-     holders as above, now just before the merge, then runs `gh pr merge <n> --squash
-     --match-head-commit <dir>/sha's sha --subject <subject> --body-file <dir>/body`. `<dir>` is removed
-     in a `finally` on every road, a dropped merge and an error included. The scripts run with
-     `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL` and `AGENT_MODEL_FILE` removed from their
+     (TD-1412, cadence §4.2). Its three parts are split across the two steps so the gate runs once. A
+     sync PR is a pin's bump, so its repo is pinned, and both scripts run through the resolver
+     (`cadence.command`, `cwd` the registry checkout), as `cadence.check` runs the gate.
+     **Step 4's gate run** takes `--trailers <dir>/gate` (`cadence.check(root, pr, timeout,
+     trailers=None)`, a new keyword that an injected `gate=` need not take when it is `None`). `judge`
+     makes `<dir>` itself (a `mkdtemp`) just before the gate, after the precheck road has returned. It
+     removes the directory on every road but one that sets `ready`, and on that one it hands it on as the
+     in-memory entry's `gate_dir`. The gate file's `expect` is the head the rows judged.
+     **Step 5.** `_sync_merge` pops `gate_dir` first, before any return, so it is never written to the
+     reading, and removes the directory in a `finally` that covers every exit. The pass's call from
+     `judge` to `_sync_merge` is wrapped so a cancelled pass removes it too. Then, in order:
+       - the sync-off and holder checks, unchanged;
+       - `forge.py squash-message <n> --gate <dir>/gate --out <dir>` under `GATE_TIMEOUT`, since it makes
+         paginated `gh api` reads;
+       - the head and the holders read again, just before the merge;
+       - `gh pr merge <n> --squash --match-head-commit <sha> --subject <subject> --body-file <dir>/body`.
+     The merge is made only when the sha in `<dir>/sha`, the PR head steps 1–3 proved and the head just
+     re-read are one. Any other combination is the moved head, and nothing is written. The forge's head
+     match is still the one atomic guard, and a push it refuses is the moved head again. A
+     `squash-message` refusal is *no reading* with its words, counted as step 4's are. The scripts run
+     with `AGENT_NAME=shiftlead-sync` and with `AGENT_MODEL` and `AGENT_MODEL_FILE` removed from their
      environment, so the squash ends in `Merged-by: shiftlead-sync`. It never names the person's
-     `user.name` and never a model, since the home runs none. `shiftlead-sync` and step 3's
-     `sync-check` are the same policy's two names: one signs the comment of a gate it ran, the other the
-     merge it made. A `squash-message` refusal is *no reading* with its words, counted as step 4's are.
-     A sha in `<dir>/sha` other than the re-read head is the moved head, and nothing is written. That
-     sha is the head step 4 judged, so the forge's head match is still the one atomic guard, and a push
-     it refuses is the moved head again. **A tree with no `squash-message`** (a pin older than
-     agent-cadence TD-233, or a copy older than it) runs step 4's gate without `--trailers` and merges
-     as before, `gh pr merge <n> --squash --match-head-commit <head>` with no body.
-     `cadence.composes(root)` says which (TD-1418): true when the tree the gate runs from holds a
-     `scripts/forge.py` whose text names `squash-message`. `--trailers` is older than `squash-message`
-     in agent-cadence (#141, then #143), so a tree that composes also takes the flag. A merge is followed by a `system`
+     `user.name` and never a model, since the home runs none. `shiftlead-sync` and step 3's `sync-check`
+     are the same policy's two names: one signs the comment on a gate it ran, the other the merge it
+     made. **Whether the tree composes** is `cadence.composes(root)` (§5 *The seams*, TD-1418), read on
+     the registry checkout's current pin before step 4's gate.
+       - *Yes:* the line above.
+       - *No:* a tree read whose `scripts/forge.py` does not name `squash-message`, which is a pin older
+         than agent-cadence TD-233. Step 4's gate runs without `--trailers`, and the merge is as before,
+         `gh pr merge <n> --squash --match-head-commit <head>` with no body. So the bump that first
+         brings `squash-message` in is merged bare. It comes before the repo's first `Merged-by:`, the
+         weekly read's cutoff, and is never listed.
+       - *Unreadable:* the tree could not be resolved or read. That is *no reading* with its words,
+         counted, never taken as *no*.
+     `--trailers` is older than `squash-message` in agent-cadence (#141, then #143), so a tree that
+     composes also takes the flag. A merge is followed by a `system`
      note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — bump of the agent-cadence pin
      to <sha>*.
 
