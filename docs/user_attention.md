@@ -14,7 +14,7 @@ People: paul
   - **Context:** TD-1414 is a build of TD-1411's design (the command, ao card <id>), held with it by decision (paul) while TD-1411's end-of-rounds item, beside this one, is open. Each build carries its own hold, and a board item can name only one entry's here, so each has its own item.
   - **Question:** Go with TD-1414 once TD-1411's design is accepted?
   - **Recommended:** Go — Answer as you answer TD-1411's item: Go lifts this build's hold too; Not yet keeps it waiting.
-- [ ] decide 2026-11-05 (session `designer-ao-1` on kmaster) — Go with TD-1413, a build of TD-1411's design, once TD-1411's end-of-rounds item is answered Go? Context: TD-1413 decision (paul). Due: 2026-11-08. Answers: Go (default) | Not yet.
+- [x] decide 2026-11-05 (session `designer-ao-1` on kmaster) — Go with TD-1413, a build of TD-1411's design, once TD-1411's end-of-rounds item is answered Go? Context: TD-1413 decision (paul). Due: 2026-11-08. Answers: Go (default) | Not yet. Decided: Go (by paul) (2026-11-05). Closed: 2026-11-05 — lifted.
   - **Context:** TD-1413 is a build of TD-1411's design (the UI half: card_view, Readings.card, /api/queue/card, tied), held with it by decision (paul) while TD-1411's end-of-rounds item, beside this one, is open. Each build carries its own hold, and a board item can name only one entry's here, so each has its own item.
   - **Question:** Go with TD-1413 once TD-1411's design is accepted?
   - **Recommended:** Go — Answer as you answer TD-1411's item: Go lifts this build's hold too; Not yet keeps it waiting.
