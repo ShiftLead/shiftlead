@@ -804,7 +804,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      that runs on has only the members the mark names replayed, each alone — its launch record,
      `why: work` with its `ids`, `start` and `of` counting the members replayed, its mail kept —
      under the same five bounds, the usage line read for its profile, one such start counting as one
-     of the team's `WORK_STARTS_DAY`; a named member at its ceiling, suspended, sat out, run-only, or
+     of the team's `WORK_STARTS_DAY` while idle, read worked as a whole-team start is; a named member at its ceiling, suspended, sat out, run-only, or
      without a launch record is left, and a mark naming only such members holds as `nothing`. Under `ask`
      the row reads *ao-grind · grinder-ao-1 finished 00:56 · its lane gained TD-428* (§4.5a **Inbox
      row: team start**), and its
