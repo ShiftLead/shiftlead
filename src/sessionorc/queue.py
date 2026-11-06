@@ -378,7 +378,8 @@ def board_hold(
     `Added:` no earlier than a day before the `Decided:`; one closed `— kept waiting.` until its `kept waiting`
     Log date plus `REASK_DAYS`; one closed in other words while a live claim holds a covered member, within
     `BOARD_WAIT_DAYS` of its `Closed:`. `{kind: "board", asker, closed_at, outcome: None, line: {key, open, to}}`,
-    `asker` a record's id, `TD-m` or *a pick*; a kept-waiting one `{kind: "board", until, line}`, no `asker`."""
+    `asker` a record's id, `TD-m` (`<repo>#TD-m` when not the member's repo) or *a pick*; a kept-waiting one
+    `{kind: "board", until, line}`, no `asker`."""
     me = qid(str(member.get("repo") or ""), str(member.get("id") or ""))
     parent = parent_qid(member)
     today = now.astimezone().date()  # the board's dates are civil dates, local
@@ -421,7 +422,10 @@ def board_hold(
         if not got:
             return None
         tq = next((q for q in got if q in claims), got[0])
-        asker = claims.get(tq) or tq.partition("#")[2]
+        # a bare `TD-m` is its own board's repo's (§4.5 screen 12 *Where a row is drawn*): another repo's keeps
+        # its qualifier, so a carried-to agent-cadence#TD-221 never reads as this repo's TD-221 (TD-1424)
+        repo, _, tid = tq.partition("#")
+        asker = claims.get(tq) or (tid if repo == me.partition("#")[0] else tq)
         return {"kind": "board", "asker": asker, "closed_at": ln["decided"], "outcome": None, "line": line}
     if why.startswith("kept waiting"):
         kept = _civil((member.get("kept_waiting") or {}).get(_GATE))

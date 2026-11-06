@@ -412,3 +412,29 @@ def test_a_kept_wait_keeps_its_age(tmp_path):
     r["ledger"]["entries"][0]["kept_waiting"] = {"decision (paul)": DECIDED}
     (row,) = _rows(repos, [])
     assert row["answered"]["age"] == "1d" and "on the board, 1d ago — it waits until 2026-11-14" in _render(row)
+
+
+def test_a_build_covered_only_by_its_designs_carried_line_offers_lift_the_hold(tmp_path):
+    """TD-1424 (TD-1368's Done when): a build whose only covering line names its design reads answered, and its
+    row offers Lift the hold in its ⋯, as the design's own row does."""
+    to = {"id": "TD-61", "title": "the carried work", "for_page": "pickable", "added": DECIDED, "owner": "grinder"}
+    rows = _rows(_board_repos(tmp_path, carried=[_carried("TD-60")], extra=[_build(), to]), [])
+    (row,) = [r for r in rows if r["id"] == "TD-62"]
+    assert row["answered"]["kind"] == "board" and row["answered"]["asker"] == "TD-061"
+    html = _render(row)
+    assert '<span class="st qans">answered — waiting on TD-061</span>' in html
+    assert ">Lift the hold</button>" in html.split('class="more qdots"')[1]
+
+
+def test_a_stale_open_decided_line_is_a_need_standing_in_its_members_place(tmp_path):
+    """TD-1424 (TD-1368's Done when): an open decided line `BOARD_WAIT_DAYS` past its answer comes back to Needs
+    you (`board_waits` false) while it still takes the rows of the entries it covers, so the line is the one
+    Decide item in their place."""
+    from shiftlead.ui.inbox import BOARD_WAIT_DAYS, board_answered, board_waits
+
+    old = (NOW.date() - timedelta(days=BOARD_WAIT_DAYS)).isoformat()
+    line = _line("TD-60")
+    line["decided"] = {"text": "Go", "date": old}
+    assert _ids(_board_repos(tmp_path, [line], extra=[_build()])) == []
+    got = board_answered({"decided": line["decided"]}, NOW.date().isoformat())
+    assert got["stale"] and not board_waits(got)
