@@ -733,17 +733,23 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        declared itself (`source: declared`, never `derived` from a branch) reading `claimed` or
        `done`, stamped after that entry's `at`. A member the start did not replay never credits it,
        nor does a run a later restart of the record began (a person's Start, a schedule's, rule 2's),
-       whose entry is then the newest; and the claims the replay renewed (rule 5's waiting claims,
+       whose entry is then the newest, nor a seat, which a start replays held and rule 3 fills for a cause
+       (its fill is the newer entry: a cause's fill is not the lanes' work); and the claims the replay renewed (rule 5's waiting claims,
        TD-820, which `_replay` restamps with its entry's `at`) count for nothing until they move. The tick reads it for each start of
-       the day not yet worked on every tick, before any replay of that tick — a replay supersedes the
-       record in place and its progress with it, which is why the reading is kept — and writes the
+       the day not yet worked, as its own first step, before `_keep_running` and every other pass that
+       replays — a replay supersedes the record in place and its progress with it, which is why the
+       reading is kept; so a member that claims and then crashes or restarts itself between two ticks
+       is read before its record is replaced, and one a person restarts by hand inside that interval
+       reads idle (accepted: the error is a start counted, never one spared) — and writes the
        start's instant into **`work_worked: [at]`** beside `work_started` the tick it first holds, so a record pruned later takes nothing back; both lists
        drop an instant past the day together, pruned by the same reading. The cap counts `work_started` less `work_worked`; a
        start not yet read worked — the team still at it — counts, so a team never has more than
        `WORK_STARTS_DAY` starts on the day it has not yet shown work for. A runaway — a team started
        into lanes nobody can pick from, wound down, started again — claims nothing, so every one of
        its starts counts, and the cap holds it as before; one that does work is bounded by
-       `WORK_EARLY` alone, at most two starts an hour. Rule 9's wind-down is unchanged: a team whose
+       `WORK_EARLY`, at most two starts an hour — a ceiling, not the expectation: a member that
+       declares `none` writes its lane's ids into `lane_seen` (rule 6), so the same entries are no news
+       again and start nothing. Rule 9's wind-down is unchanged: a team whose
        lanes hold only entries gated on the person still winds down (rule 9 holds no wind-down on a lane: that would make it a second reader of the lane, below), and
        the person's answer starts it again, a start its members then work; a start by this rule inside the last
        **`WORK_EARLY`** (thirty minutes); and its repo **over the team's balance line** (§6
