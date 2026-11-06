@@ -111,7 +111,7 @@ def test_in_lanes_reads_each_lane_with_its_records_team_and_counts_a_marked_entr
 
 
 def test_a_settling_or_waiting_entry_that_needs_a_team_reads_as_that_first():
-    got = _read(_entry(1, extra=f"**Waits:** until {TOMORROW} — CI\n"), _entry(2))
+    got = _read(_entry(1, extra=f"**Blocked by:** until {TOMORROW}\n"), _entry(2))
     got["TD-002"]["settling"] = {"until": (NOW + timedelta(minutes=7)).isoformat()}
     assert all(e.get("needs_team") for e in got.values())
     assert settle.wait_refusal(got["TD-001"]).startswith(f"TD-001 waits until {TOMORROW}")

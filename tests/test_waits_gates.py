@@ -104,14 +104,6 @@ def test_an_open_id_or_a_decision_beside_a_gate_is_not_waiting():
     assert "waiting" not in got["TD-003"] and got["TD-003"]["for_page"] == "for-you"
 
 
-def test_a_waits_line_still_standing_reads_as_before_its_date_a_utc_day():
-    head = "## TD-001: entry 1\n\n**Priority:** Medium\n**Owner:** grinder\n**Kind:** build\n"
-    got = _read(head + f"**Waits:** until {TOMORROW} — CI\n**Status:** Open\n\n**Why:** a reason.\n")["TD-001"]
-    assert got["waiting"] == {"on": "until", "until": TOMORROW, "name": "", "why": "CI"}
-    assert teamrun.wait_line(got) == f"Waits: until {TOMORROW} — CI"
-    assert settle.wait_refusal(got).startswith(f"TD-001 waits until {TOMORROW}")
-
-
 def test_the_claim_refusals_words():
     got = _read(_entry(1, f"until {TOMORROW}"), _entry(2, "event (flake-again)", event=True))
     assert settle.wait_refusal(got["TD-001"]).startswith(f"TD-001 waits until {TOMORROW} (design §4.4")
@@ -168,17 +160,6 @@ def test_a_queue_card_whose_member_waits_on_an_event_is_waiting_with_its_event_l
     assert one["group"] == "waiting" and one["status"] == "waiting", "a gate gives no `unreachable`"
     assert one["wait"] == {"column": "event", "phrase": "waits on the test fails again in a precheck", "id": "r#TD-011"}
     assert two["group"] == "waiting" and two["wait"]["phrase"] == "waits until Jan 30"
-
-
-def test_a_waits_line_beside_a_lifted_until_hovers_its_line():
-    head = "## TD-001: entry 1\n\n**Priority:** Medium\n**Owner:** grinder\n**Kind:** build\n"
-    text = (
-        head
-        + "**Waits:** event — a sync\n**Status:** Open\n"
-        + f"**Blocked by:** until {TODAY.isoformat()}\n\n**Why:** a reason.\n"
-    )
-    got = _read(text)["TD-001"]
-    assert got["waiting"]["on"] == "event" and teamrun.wait_line(got) == "Waits: event — a sync"
 
 
 HOSTLOG = '**Event (push-on):** the person turns push on\ncheck: host-log witnessed kind press "push-on"\n'

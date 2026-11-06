@@ -95,10 +95,8 @@ def mark_waits(entries: list[dict[str, Any]], now: datetime) -> list[dict[str, A
     while its date is after the home's UTC day, else `event` while one stands — `name` its first event's and
     `why` that event's Event line. A gate-only entry none of whose gates stands any more (an `until` whose
     UTC day has come in a carried reading) reads pickable with them removed, before the sweep removes them.
-    **Else from a `**Waits:**` line** still standing (`waits`): an `until` while the UTC day is before its
-    date — one that names no date waits with no end — and an `event` while the line is there, `why` its
-    words. It needs no record and no `settle:` span, so a repo with neither, or a clock that cannot be
-    written, still marks waits. Returns `entries`."""
+    A retired `**Waits:**` line is not read (TD-1398). It needs no record and no `settle:` span, so a repo
+    with neither, or a clock that cannot be written, still marks waits. Returns `entries`."""
     today = now.astimezone(UTC).date().isoformat()
     for e in entries:
         e.pop("waiting", None)
@@ -119,30 +117,21 @@ def mark_waits(entries: list[dict[str, Any]], now: datetime) -> list[dict[str, A
                     [b for b in e.get("blocked_by") or [] if not ledger_mod.is_gate(b)],
                     "yes",
                 )
-        w = e.get("waits")
-        if not isinstance(w, dict) or w.get("on") not in ("until", "event"):
-            continue
-        date = str(w.get("date") or "")
-        if w["on"] == "until" and date and date <= today:
-            continue  # its day has begun: the line reads as unwritten
-        e["waiting"] = {"on": w["on"], "until": date, "name": "", "why": str(w.get("why") or "")}
     return entries
 
 
 def wait_refusal(entry: dict[str, Any] | None) -> str | None:
     """Why a declared claim on a waiting entry is refused (design §4.4 *What a wait does*, TD-716, TD-1395),
-    or None: *TD-463 waits until 2026-10-16*, *TD-463 waits on event (flake-again)*, or, from a `Waits:`
-    line, *TD-685 waits: the next cadence-sync PR*. `--force` passes it, since the session may know the
-    event has come; that session's PR drops the `until` or lifts the event gate (or removes the line)."""
+    or None: *TD-463 waits until 2026-10-16* or *TD-463 waits on event (flake-again)*. `--force` passes it,
+    since the session may know the event has come; that session's PR drops the `until` or lifts the event
+    gate."""
     if not isinstance(entry, dict) or not isinstance(entry.get("waiting"), dict):
         return None
     i, w = str(entry.get("id") or ""), entry["waiting"]
     if w.get("on") == "until" and w.get("until"):
         said = f"{i} waits until {w['until']}"
-    elif w.get("name"):
-        said = f"{i} waits on event ({w['name']})"
     else:
-        said = f"{i} waits: {w.get('why') or w.get('on') or 'an event'}"
+        said = f"{i} waits on event ({w.get('name') or '?'})"
     return f"{said} (design §4.4 *An entry says what it waits for*); claim it anyway with --force if the wait is over"
 
 

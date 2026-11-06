@@ -1240,7 +1240,7 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qcount.qdone { color: var(--working-fg); font-weight: 600; }
 .qcount.qdone::before { content: "● "; color: var(--working); }
 .qstatus { white-space: nowrap; color: var(--strong); }
-/* a Waiting card's wait phrase is a whole `Waits:` or `Blocked by:` line: it wraps inside the card rather than run
+/* a Waiting card's wait phrase is a gate's whole Event line: it wraps inside the card rather than run
    past it, where the card's `overflow: hidden` would clip it and the pill beside it (§4.5 screen 12 *A card*,
    TD-1341); the short words and the pill stay on one line */
 .qstatus.s-waits { white-space: normal; overflow-wrap: anywhere; min-width: 0; }

@@ -189,7 +189,7 @@ def test_the_cards_status_by_need_and_a_designers_decision_item_reads_blocked(tm
         _entry(1, "the person's, beside a stalled one", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
         _entry(2, "stalled", Priority="High", Blocked_by="TD-001"),
         _entry(3, "someone else's decision", Priority="High", Blocked_by="decision (techlead)"),
-        _entry(4, "waits", Priority="High", Waits="event — a thing"),
+        _entry(4, "waits", Priority="High", Blocked_by="event (thing)"),
         _entry(5, "after it", Priority="High", Blocked_by="TD-004"),
         _entry(6, "the designer's decision", Priority="High", Kind="build", Blocked_by="decision (designer)"),
         _entry(7, "an unknown id", Priority="High", Blocked_by="TD-999"),
@@ -287,7 +287,7 @@ def test_review_findings_designer_item_archived_claim_no_hold_one_flag(tmp_path)
     `decision (designer)` item beside an open id is past reach, so its card is blocked, and a row carries
     no `held`: the person's entry reads its need."""
     root, r = _repo(tmp_path, "r", [
-        _entry(1, "open", Priority="High", Owner="grinder", Waits="event — a thing"),
+        _entry(1, "open", Priority="High", Owner="grinder", Blocked_by="event (thing)"),
         _entry(2, "after it and the designer", Priority="High", Blocked_by="TD-001, decision (designer)"),
         _entry(3, "the person's, held", Priority="High", Owner="paul", Blocked_by="decision (paul)"),
         _entry(4, "unclaimed, high", Priority="High", Owner="grinder"),
