@@ -202,7 +202,7 @@ def test_terminal_bridge(client, subprocess_agent, tmp_path):
     tmux = Tmux(socket_name=subprocess_agent.sock_name)
     assert (
         tmux.run("display", "-p", "-t", f"={sid}:", "#{window_width}x#{window_height}", check=False).stdout.strip()
-        == "120x29"  # tmux's status line takes one of the 30 rows
+        == "120x30"  # an ao-* session has no tmux status line, so the window has all 30 rows (TD-1410)
     )
     client.post(f"/api/sessions/{sid}/kill")
 
@@ -233,7 +233,8 @@ def test_the_term_socket_sends_the_clients_frame_for_the_real_window(client, sub
         got = frames()[-1]
         out = tmux.run("display", "-p", "-t", f"={sid}:", "#{session_attached} #{window_width} #{window_height}")
         n, w, h = (int(x) for x in out.stdout.split())
-        assert got == {"clients": n, "window": [w, h + 1]} == {"clients": 1, "window": [100, 20]}
+        # no status line (TD-1410): the window's rows are the client's, none counted for the bar
+        assert got == {"clients": n, "window": [w, h]} == {"clients": 1, "window": [100, 20]}
     client.post(f"/api/sessions/{sid}/kill")
 
 
