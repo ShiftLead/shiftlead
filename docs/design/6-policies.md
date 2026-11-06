@@ -283,7 +283,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      1 h*) on the seat whose fill tripped it and the Inbox row as for a crash, its siblings merely
      refused fills until the hour rolls; fills are not crash restarts and do not count toward
      `RESTART_CEILING`. **The ceiling is a rate, not a stop** (TD-1422): the tripping seat's
-     `why: fill` mark lapses as its siblings' refusal does — on every pass the tick makes over the
+     `why: fill` mark lapses an hour after the trip, as the last of its fellows' refusals does — on every pass the tick makes over the
      seat, cause due or not (after the pass writes `seat_due` and finds the seat's link up, before it
      reads the seat's state; a suspended or sat-out seat, which the pass leaves, keeps its mark and
      row; a node's seat's lapse is written and pushed as its trip is), a plain mark whose `at` is
@@ -296,9 +296,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      every counted fill was made after the newest `fill_lapsed.at` among the fellows `_fill` counts
      over (the group's, wherever the trip lands), that lapse no more than `2 × FILL_WINDOW` old (an
      older one is no lapse straight before, and is ignored) writes the mark with `held: true`, which never
-     lapses — an hour of fresh fills at the ceiling straight after a lapse is a loop or a load the rate
-     cannot serve, and either is a person's; a trip that counts fills from before the lapse is plain
-     and lapses again. The words say which: a plain mark reads *fills exhausted · 6 in 1 h · fills
+     lapses — so a trip within two hours of a lapse is held unless it counts a fill made before the
+     lapse (only in its first hour can one): fills at the ceiling straight after a lapse are a loop or
+     a load the rate cannot serve, and either is a person's. The words say which: a plain mark reads *fills exhausted · 6 in 1 h · fills
      again after the hour*, a held one *fills exhausted · 6 in 1 h · tripped twice running — yours*. A
      lost brief's ceiling (`why: lost-brief`) never lapses. **A person brings a seat back** with
      Restart (§6 rule 2 *A person's restart*, `ao restart`): on a seat whose `restart_ceiling` says
