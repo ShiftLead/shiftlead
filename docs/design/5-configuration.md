@@ -324,8 +324,9 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   next sync bump. The slot is the GitHub line, as `{gate}` and the home's PR reads assume `gh`; a
   GitLab origin is outside these seams. The sync's own merge reads its tree instead (§6 *Sync*, `cadence.composes`). Every built-in brief or flow stage
   that has a session merge a PR names `{merge}`, never a bare `gh pr merge`, and says it is typed whole as
-  one command, since `$m` does not survive a tool's separate calls and a line split at its `;` merges
-  with no trailer. The merge stays the literal `gh pr merge` at the line's end, which a guard on that
+  one command, since `$m` does not survive a tool's separate calls: a line split at its `;` fails at
+  `squash-message`, which finds no gate file, and nothing merges. That is never a cue to fall back to
+  the bare merge. The merge stays the literal `gh pr merge` at the line's end, which a guard on that
   command still sees), `{board}`
   (the board's path, whether or not the file is there: a missing board is the Repo page's warning,
   and the board's own reader says the Inbox is then the channel), `{ledger}` (the resolved ledger, a file or a
