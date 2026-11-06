@@ -23,12 +23,21 @@ LITERALS = re.compile(
 REPO = Path(__file__).resolve().parents[1]
 # the slots each preset's template names: a role that silently loses one fails here
 NAMED = {
-    "grinder": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{ledger_check}", "{lint}", "{test}"},
-    "hunter": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{test}"},
-    "manager": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{test}"},
-    "techlead": {"{board}", "{design_dir}", "{gate}", "{ledger}"},
-    "auditor": {"{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{test}"},
-    "sweeper": {"{board}", "{cadence_rules}", "{gate}", "{test}"},
+    "grinder": {
+        "{board}",
+        "{cadence_rules}",
+        "{design_dir}",
+        "{gate}",
+        "{ledger_check}",
+        "{lint}",
+        "{merge}",
+        "{test}",
+    },
+    "hunter": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{merge}", "{test}"},
+    "manager": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{merge}", "{test}"},
+    "techlead": {"{board}", "{design_dir}", "{gate}", "{ledger}", "{merge}"},
+    "auditor": {"{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{merge}", "{test}"},
+    "sweeper": {"{board}", "{cadence_rules}", "{gate}", "{merge}", "{test}"},
     "fact-checker": set(),
     "designer": {"{board}", "{cadence_rules}"},
 }
@@ -60,11 +69,12 @@ def test_a_bare_repos_brief_says_each_seam_in_its_own_words(tmp_path, role):
     # the cadence's slots and `{ledger}` are agent-cadence's paths in any repo (an unserved one composes no
     # brief, TD-1011); outside the slots the text names no layout
     rest = text
-    for slot in ("{gate}", "{board}", "{ledger}", "{ledger_check}", "{cadence_rules}"):
+    # `{merge}` first: its line holds `{gate}`'s text
+    for slot in ("{merge}", "{gate}", "{board}", "{ledger}", "{ledger_check}", "{cadence_rules}"):
         if slot in made["slots"]:
             rest = rest.replace(made["slots"][slot]["text"].replace("{pr}", "<n>"), slot)
     assert not LITERALS.search(rest), LITERALS.search(rest)
-    assert not re.search(r"\{(gate|board|ledger|ledger_check|test|lint|design_dir|cadence_rules|pr)\}", text)
+    assert not re.search(r"\{(gate|merge|board|ledger|ledger_check|test|lint|design_dir|cadence_rules|pr)\}", text)
     named = {s for s in repoconfig.LAYOUT_SLOTS if s in made["slots"]}
     assert named == NAMED[role]
     if "{gate}" in named:
@@ -89,3 +99,16 @@ def test_this_repos_brief_reads_its_own_layout(role):
             assert given[slot] == words and words in text, slot
     if "{gate}" in given:
         assert f"{cadence.typed('run', 'check_cadence.py')} --pr <n>" in text
+    if "{merge}" in given:
+        assert f"{cadence.typed('run', 'forge.py', 'squash-message')} <n> --gate" in text
+
+
+def test_no_built_in_merges_outside_step_5s_line():
+    """TD-1418, design §5 *The seams* (`{merge}`): every built-in brief and flow stage that has a session merge a
+    PR names `{merge}`, typed whole as one command, never a bare `gh pr merge`; the bare merge is only the
+    fallback sentence inside `{merge}`'s own fill."""
+    found = [name for name, text in built_ins() if "gh pr merge" in text]
+    assert found == []
+    for name, text in built_ins():
+        if "{merge}" in text and name != "team_skill.md":
+            assert "typed whole as one command" in text, name

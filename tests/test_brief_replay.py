@@ -513,3 +513,25 @@ def test_a_record_from_before_the_layout_slots_replays_its_stored_prompt(tmp_pat
         "{pr}": {"text": "<n>"},
     }
     assert brief.fill(made)[0] == "base: repo | python3 scripts/check_cadence.py --pr <n>\n"
+
+
+@pytest.mark.unit
+def test_a_record_from_before_merge_replays_its_stored_prompt(tmp_path):
+    """TD-1418, design §4.9c *A record written before the layout slots*: the replay check reads `{merge}` among
+    the layout slots, so a record made before a brief named it — its base now naming `{merge}`, its slots not —
+    is `Unreadable` and replays its stored prompt; one that recorded it fills it, `{pr}` after it."""
+    from shiftlead import repoconfig
+
+    assert "{merge}" in brief.LAYOUT_SLOTS and len(brief.LAYOUT_SLOTS) == 9
+    base = tmp_path / "grinder.md"
+    base.write_text("base: {repo} | gate {gate} | {merge}\n")
+    sup = tmp_path / "sup.md"
+    sup.write_text("repo\n")
+    gate = {"text": "python3 scripts/check_cadence.py --pr {pr}"}
+    made = {"base": str(base), "slots": {"{repo}": {"file": str(sup)}, "{gate}": gate, "{pr}": {"text": "<n>"}}}
+    with pytest.raises(brief.Unreadable, match=r"\{merge\}"):
+        brief.fill(made)
+    line = repoconfig.merge_line("python3 scripts/check_cadence.py", "python3 scripts/forge.py squash-message")
+    made["slots"] = {"{repo}": {"file": str(sup)}, "{gate}": gate, "{merge}": {"text": line}, "{pr}": {"text": "<n>"}}
+    filled = brief.fill(made)[0]
+    assert "{pr}" not in filled and line.replace("{pr}", "<n>") in filled
