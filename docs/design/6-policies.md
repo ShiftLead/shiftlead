@@ -390,8 +390,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
      `dropped` entry, a declared `claimed` entry with no `done` or `dropped` that is not a waiting
-     claim (rule 5, TD-820: its next move is someone else's), or, for a seat,
-     `seat_due` set (a question waiting on an idle techlead) — and no declaration, no pending, not
+     claim (rule 5, TD-820: its next move is someone else's), for a seat,
+     `seat_due` set (a question waiting on an idle techlead), or, for any member, seat or not, an open
+     `ask` in its inbox from another session, read or not (`asks_waiting`, TD-1435: a read ask is never
+     rung again, since the doorbell rings only undecided mail) — and no declaration, no pending, not
      gated, **no live subagent and no live background shell** (§4.2 *Working on its own*, the card's reading: its own work is
      running, and its card says *working*; TD-734, TD-761; the twenty minutes count from the later of
      `since`, `subagent_at` and `shells_at`, and *idle · open work* is not marked, nor a standing one read as
@@ -400,7 +402,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      sent **one fixed line** through `send`'s path: *[shiftlead] you have been idle 20 minutes with
      `<ref>` open — end the run with one of `ao progress done <ref> --pr N`, `ao progress drop
      <ref> --why`, `ao progress none --why` or `ao progress restart --why`*, naming the first open
-     reference — for a seat, the number waiting: *you have N questions waiting — run `ao inbox`*,
+     reference — and the asks waiting, for a seat (once `seat_due` is set) or any other member: *you have
+     N questions waiting — run `ao inbox`*, after the open reference where there is one and alone where there
+     is none,
      and an entry the person handed it (§4.10 *An entry handed to a seat*) named apart, since one
      already read wants its outcome and not another read: *1 entry the person handed you owes its
      outcome — `ao msg person --outcome done|blocked|dropped "…" --for <id>`*. **An outcome the
