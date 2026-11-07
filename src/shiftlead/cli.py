@@ -4248,6 +4248,8 @@ def _sent(args: argparse.Namespace) -> int:
             print(f"\n→ {to} · {e['id']} · {e['kind']}{reply}{_subj(e)} · {e['at']}{about}{state}")
             for line in str(e["text"]).splitlines() or [""]:
                 print(f"  {line}")
+            if e.get("waits") and not e.get("closed_reason"):  # a move a count holds (§4.9b, TD-1480)
+                print(f"  {e['waits']}")
 
     return emit(args, got, prose)
 
@@ -4395,6 +4397,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  {_unanswered_line(e['unanswered'])}")
             if routed := mailmod.routed_line(e.get("routed")):  # moved from a seat that could not answer (§4.9b)
                 print(f"  {routed}")
+            if e.get("waits") and not e.get("closed_reason"):  # a move a count holds (§4.9b, TD-1480)
+                print(f"  {e['waits']}")
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
             if r := e.get("recommend"):  # passed up: the passer's line, labelled as its own (design §4.9b)

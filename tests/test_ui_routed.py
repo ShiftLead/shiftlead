@@ -119,3 +119,46 @@ def test_a_handed_entry_waiting_on_an_unable_seat_says_why_under_waiting_on_them
     assert "waits: techlead-ao-1 limited, resets 08:00Z" in html
     able = inbox_sections([], now=at, handed=handed_rows([handed_entry("m-h1")], {rec["id"]: rec}, at))
     assert "waits:" not in rows("waiting", able["waiting"])
+
+
+@pytest.mark.unit
+def test_a_handed_entry_whose_move_is_held_says_the_moves_own_line():
+    """§4.9b *A question already waiting* (TD-1480): a handed entry the tick would move but a count holds carries
+    `waits`, and *Waiting on them* draws that line in place of the seat's own."""
+    from datetime import UTC, datetime
+
+    from test_ui_inbox import handed_entry
+
+    from shiftlead.ui.app import handed_rows, inbox_sections
+
+    at = datetime(2026, 9, 19, 12, tzinfo=UTC)
+    rec = {"id": "ao-shiftlead-techlead-ao-1", "name": "techlead-ao-1", "team": "ao-grind", "state": "limited"}
+    fleet = {rec["id"]: {**rec, "seat_unable": "limited, resets 08:00Z"}}
+    held = {**handed_entry("m-h1"), "waits": "waits on techlead-db-1: its inbox holds 50 unread entries"}
+    got = inbox_sections([], now=at, handed=handed_rows([held], fleet, at))
+    html = rows("waiting", got["waiting"])
+    assert "waits on techlead-db-1: its inbox holds 50 unread entries" in html and "waits: techlead-ao-1" not in html
+
+
+def test_ao_inbox_and_sent_print_a_waits_line_only_while_it_is_open(monkeypatch, capsys):
+    """§4.9b *A question already waiting* (TD-1480): `ao inbox` and `ao inbox --sent` print an open entry's
+    `waits` indented under its text; a closed one's is not printed, and a rerouted one names its close."""
+    line = "waits on the person: you have m-0 open to the person"
+
+    def e(mid, **kw):
+        return {"id": mid, "from": "ao-x-w", "from_role": "other", "to": ["ao-x-tl"], "at": "t", "kind": "ask",
+                "text": f"text {mid}", "root": mid, **kw}  # fmt: skip
+
+    got = {"id": "ao-x-w", "entries": [e("m-1", waits=line), e("m-2", waits=line, closed_reason="rerouted")]}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {**got, "unread": 0})
+    for argv in (["inbox"], ["inbox", "--sent"]):
+        assert cli.main(argv) == 0
+        out = capsys.readouterr().out
+        assert out.count(line) == 1 and out.index("text m-1") < out.index(line) < out.index("text m-2")
+        assert "rerouted" in out
+
+
+@pytest.mark.unit
+def test_a_rerouted_question_says_so_on_its_row():
+    html = rows("fyi", [entry("m-1", "ask", text="q?", closed_reason="rerouted", closed_at="t")])
+    assert "closed · routed around a seat that could not answer" in html

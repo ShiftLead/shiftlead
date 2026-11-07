@@ -218,6 +218,7 @@ async def test_entry_add_hands_the_words_to_the_seat_with_no_bound(agent, tmp_pa
             "team": "ao-grind",
             "priority": "medium",
             "picked": False,
+            "teams": teams,  # a blank pick's order, which the tick's move reads (TD-1480)
         }
         assert e.handed_entry and rec.asks_waiting() == 1
         # three days on, past any `ask`'s default bound, the sweep leaves it standing
@@ -309,6 +310,49 @@ async def test_a_blank_pick_goes_to_the_first_able_techlead_and_a_persons_pick_w
         chained = await person.call("entry_add", repo="shiftlead", type="debt", text="chained", teams=teams)
         assert (chained["to"], chained["team"]) == (second, "ao-grind"), "its successor is limited"
         for sid in (first, second, third):
+            await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_blank_pick_waiting_on_a_seat_that_turns_unable_moves_and_a_persons_pick_stays(agent, tmp_path):
+    """A question already waiting (§4.9b, TD-1480): a handed entry with a blank pick on a techlead that turns
+    unable moves the first tick another servicing team's techlead is able — closed `rerouted` (owing nothing
+    there), its copy keeping `entry` (its `team` the new team's), `draft`, the handed mark and no bound, carrying
+    `routed` — while the person's own pick, and an entry its seat already settled, stay on their seat; the old
+    seat's outcome on it is refused."""
+    repo = tmp_path / "shiftlead"
+    repo.mkdir()
+    _registry(tmp_path, repo)
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        first = await _seat_session(person, tmp_path / "a")
+        second = await _seat_session(person, tmp_path / "b")
+        teams = [{"team": "db", "seat": first}, {"team": "ao-grind", "seat": second}]
+        agent.sessions[second].state, agent.sessions[second].limited_reset = "limited", None
+        blank = await person.call("entry_add", repo="shiftlead", type="debt", text="blank", teams=teams)
+        mine = await person.call("entry_add", repo="shiftlead", type="debt", text="mine", teams=teams, team="db")
+        assert blank["to"] == first and mine["to"] == first
+        settled = await person.call("entry_add", repo="shiftlead", type="debt", text="settled", teams=teams)
+        async with LocalClient(caller=first) as c:
+            await c.call("msg", to=PERSON, text="blocked on a decision", outcome="blocked", for_=settled["id"])
+        agent.sessions[first].state, agent.sessions[first].limited_reset = "limited", None
+        await agent._reroute_waiting(datetime.now(UTC))
+        held = {e.id: e for e in agent.sessions[first].inbox}
+        assert held[blank["id"]].open, "none able: it waits where it is"
+        agent.sessions[second].state = "idle"
+        await agent._reroute_waiting(datetime.now(UTC))
+        old = held[blank["id"]]
+        assert old.closed_reason == "rerouted" and not old.owes and agent.sessions[first].asks_waiting() == 1
+        assert held[mine["id"]].open, "the person's pick waits on its own seat"
+        assert held[settled["id"]].closed_reason is None, "a settled entry is not moved"
+        assert not any(e.root == settled["id"] for e in agent.sessions[second].inbox)
+        moved = next(e for e in agent.sessions[second].inbox if e.root == blank["id"])
+        assert moved.handed_entry and moved.owes and moved.bound is None and moved.routed["seat"] == first
+        assert (moved.entry["team"], moved.entry["picked"], moved.entry["repo"]) == ("ao-grind", False, "shiftlead")
+        async with LocalClient(caller=first) as c:
+            with pytest.raises(AgentError, match="routed around while you could not answer"):
+                await c.call("msg", to=PERSON, text="done", outcome="done", for_=blank["id"])
+        for sid in (first, second):
             await person.call("kill", id=sid)
 
 

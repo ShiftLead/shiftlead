@@ -2029,7 +2029,9 @@ def handed_rows(
                 "holder_state": str(e.get("holder_state") or rec.get("state") or ""),
                 # §4.5a *Inbox row: routed around* (§4.9b, TD-1443): a handed entry waiting on a seat that
                 # cannot answer says why, under *Waiting on them*
-                "holder_waits": mail_mod.seat_waits_line(
+                # — or, where a move to another team's seat is held by a count, the move's own line (TD-1480)
+                "holder_waits": e.get("waits")
+                or mail_mod.seat_waits_line(
                     str(e.get("holder_name") or rec.get("name") or holder), rec.get("seat_unable")
                 ),
                 "holder_open": holder if holder in records else "",
