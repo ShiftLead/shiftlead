@@ -377,8 +377,8 @@ def carried(content: str, archive: str | None = None) -> list[dict[str, Any]]:
     TD-1368): every closed `decide` line with a `Decided:` whose `Context:` names an entry, of the board's text and
     then its archive's, as `{key, ref, decided, decided_by, closed, to, at, refs, parts}` — `ref` the `Context:`'s
     first entry ref, `refs` all of them (gate words after a ref read past), `parts` its `Parts:` ids, `closed`
-    `{date, why}` (the reason after the date's dash, '' for none), `to` the reason's *carried to* ids, and `at` one
-    index over every line of both files — the board's line, then the archive's after the board's last."""
+    `{date, why}` (the reason after the date's dash, '' for none), `to` the reason's *carried to* or *see* ids, and
+    `at` one index over every line of both files — the board's line, then the archive's after the board's last."""
     out: list[dict[str, Any]] = []
     base = 0
     for text in (content, archive or ""):
