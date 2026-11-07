@@ -1725,23 +1725,32 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   gone with live still elsewhere, or `PROMOTE_BOUND` (twenty minutes) passed — the process killed at
   the bound as the stop time kills, and only while it is still the run: the intent keeps the
   process's start time beside its pid, so after a restart of the home a pid taken again by another
-  process reads gone and is never killed — → **failed**: `failed.json` `{sha, at, log, exit, why}`
-  beside it, the Inbox row under *Needs you*, and **a failure blocks only the commit it failed at**
-  (TD-1554, Paul's Hold on TD-1437). The commit it blocks is `failed.json`'s **`blocks`**: a promote's own
-  `sha`; a rollback's `from`, the commit it went back from (a person's rollback or the smoke's; never the
-  old commit it failed to reach, which `auto` would never start), and nothing when
-  that `from` was not read (`SHIFTLEAD_PROMOTE_FROM` empty: `blocks` null); a `failed.json` written before
-  `blocks` was blocks its `sha`. `auto` starts
-  nothing while main's head is that commit, and retries once main's head moves past it — a run at the new
-  head, the settle and the wait as ever, the row reading the policy's clock (§4.5a) meanwhile. A person's
-  press — Promote of main's head, that commit among them (a retry is the person's word), or a rollback
-  (below) — is never refused by it. **Every start clears it** — the press's, `auto`'s retry, the smoke's
-  rollback — once the run has started: under the promote lock, after `start` returns with the intent
-  written, so a start that raises (its tree not made, its process not spawned, the intent it had written
-  then removed) leaves no intent and the failure as it was, and `failed.json` and `inflight.json` never stand together. A run that fails writes its own in its
-  place. **A reading clears it too** when live reads main's head (installed there by hand) and main's head
-  is not `blocks` (a `blocks` of null among them): no start is left to clear it, and nothing remains for it to block. Nothing else
-  clears it: there is no Dismiss. Sessions are never told: no send, no state change; they
+  process reads gone and is never killed — → **failed**: `failed.json` `{sha, at, log, exit, why, blocks}`
+  beside it, the Inbox row under *Needs you*, a `system` note to the person inbox (*promote of `<repo>`
+  `<sha7>` failed — <why>*, FYI, uncounted, §4.10), so the reason outlives a row the next start takes away,
+  and **a failure blocks only the commit it failed at** (TD-1554, Paul's Hold on TD-1437). The commit it
+  blocks is `failed.json`'s **`blocks`**:
+  - a promote's own `sha`;
+  - the smoke's rollback's `from`, the commit the smoke failed on, or null when that `from` was not read
+    (`SHIFTLEAD_PROMOTE_FROM` empty);
+  - a person's rollback's `main`, main's head as the press read it (kept on the intent as the hold's `main`
+    is): the rollback took no hold, so the commit the person meant to keep from running stays blocked; a
+    merge after the press moves main past it and `auto` goes on — accepted, as the person's rollback never
+    took hold;
+  - and, in a `failed.json` written before `blocks` was, its `sha`.
+  `auto` starts nothing while main's head is that commit, and retries once main's head moves past it — a run
+  at the new head, the settle and the wait as ever, the row reading the policy's clock (§4.5a) meanwhile. A
+  person's press — Promote of main's head, that commit among them (a retry is the person's word), or a
+  rollback (below) — is never refused by it. **Every start clears it**, on the one start path every run
+  takes, once the run has started: under the promote lock, after `start` returns with the intent written,
+  so a start that raises (its tree not made, its process not spawned, the intent it had written then
+  removed) leaves no intent and the failure as it was. A home that dies between the intent and the clear
+  restarts with both files; the pass that finds `failed.json` beside `inflight.json` clears the failure, the
+  intent being the newer fact, so the two never stand together past one pass. A run that fails writes its
+  own in its place. **A reading clears it too** when live reads main's head (installed there by hand) and
+  main's head has moved past a `blocks` that names a commit: no start is left to clear it, and nothing
+  remains for it to block. A `blocks` of null is cleared by a start alone. Nothing else clears it: there is
+  no Dismiss. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
   contract, and a blocked `wait` ends with the socket as §4.7 says. This repo's block is CLAUDE.md's
   pair: `run` rebuilds the live venv from the checkout (its path from where it runs, never written
@@ -1785,10 +1794,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   **A copy installed by hand** — CLAUDE.md's pair, or its going back by hand — is tagged only by a run.
   While live reads main's head and `last.json` does not name it with `done`, the row (§4.5a *Inbox row:
   promote*) is drawn under FYI, uncounted, *installed by hand — promote to tag it* — never while a run is in
-  flight, a failure blocks that commit or a hold stands, whose rows stand in its place (the held row's
+  flight, any failure stands or a hold stands, whose rows stand in its place (the held row's
   Promote is the same press) — and its **Promote**, or
   `ao promote`, is taken, never refused as *nothing to promote*: the press runs `run` again at that commit,
-  its smoke too, and the pass that concludes it writes `done` and tags it. Its `from` is the commit itself,
+  its smoke too, and the pass that concludes it writes `done` and tags it, its note reading *promoted
+  `<repo>` `<sha7>` again — tagged* (a rollback to the live commit's: *rolled back `<repo>` to `<sha7>` again
+  — tagged*). The press at main's head is refused as *nothing to promote* only when a run finished there
+  **and** no failure blocks it, so a failure at main's head is always a press away from its retry. Its `from` is the commit itself,
   so a smoke that fails on it rolls nothing back (*It never rolls back a rollback*): a failure stands,
   blocking that commit, with live where it was. `auto` never starts it: live at
   main's head is nothing for the policy to promote, so a hand install under `auto` is tagged by the next run
