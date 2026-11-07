@@ -5,10 +5,17 @@ state, `pr list` lists them (`--head`, and a `--search` of one quoted phrase in 
 and `pr close` closes it. `FAKE_GH_FAIL=create|merge` makes that step fail; `merge-after` merges and
 fails the reply, and `merge-after-moved` also changes origin's board elsewhere right after;
 `FAKE_GH_VIEW_FAIL` makes `pr view` fail. State lives beside the bare origin, with every call's argv in
-`calls`."""
+`calls`.
+
+**One call at a time** (TD-1472): every call reads the state, changes it and writes it back, and the agent's
+own tick calls `gh` too (the gate sweep's `pr list` and `repo view`) while a test's write-back runs. Without
+a lock, a call that read the state before `pr create` wrote it back after, losing PR 1 (`gh pr merge:
+KeyError: '1'`), and two writes interleaved into one file (`JSONDecodeError: Extra data`). Each call now
+holds an exclusive lock beside the state for its whole run, and each write replaces the file whole."""
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import subprocess
@@ -21,16 +28,27 @@ def git(*args: str, cwd: str | None = None) -> subprocess.CompletedProcess[str]:
     return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=False)
 
 
+def _write(state_file: Path, state: dict) -> None:
+    tmp = state_file.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state))
+    os.replace(tmp, state_file)
+
+
 def main(argv: list[str]) -> int:
     origin = git("remote", "get-url", "origin").stdout.strip()
     if not origin:
         print("no origin", file=sys.stderr)
         return 1
-    state_file = Path(origin) / "fake-gh.json"
+    with open(Path(origin) / "fake-gh.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return _call(argv, origin, Path(origin) / "fake-gh.json")
+
+
+def _call(argv: list[str], origin: str, state_file: Path) -> int:
     state = json.loads(state_file.read_text()) if state_file.exists() else {"prs": {}}
     fail = os.environ.get("FAKE_GH_FAIL", "")
     state.setdefault("calls", []).append(argv)  # every call, so a test can read what each one named
-    state_file.write_text(json.dumps(state))
+    _write(state_file, state)
     if argv[:2] == ["pr", "create"]:
         if fail == "create":
             print("could not create the pull request", file=sys.stderr)
@@ -44,7 +62,7 @@ def main(argv: list[str]) -> int:
             "body": opts.get("--body", ""),
             "state": "open",
         }
-        state_file.write_text(json.dumps(state))
+        _write(state_file, state)
         print(f"https://github.com/o/r/pull/{n}")
         return 0
     if argv[:2] == ["pr", "merge"]:
@@ -65,7 +83,7 @@ def main(argv: list[str]) -> int:
                 print("push failed", file=sys.stderr)
                 return 1
         pr["state"] = "merged"
-        state_file.write_text(json.dumps(state))
+        _write(state_file, state)
         if fail == "merge-after-moved":  # merged, then origin's board changed elsewhere at once
             with tempfile.TemporaryDirectory() as tmp:
                 work = str(Path(tmp) / "w")
@@ -116,7 +134,7 @@ def main(argv: list[str]) -> int:
         return 0
     if argv[:2] == ["pr", "close"]:
         state["prs"][argv[2]]["state"] = "closed"
-        state_file.write_text(json.dumps(state))
+        _write(state_file, state)
         return 0
     print(f"fake gh: {argv}", file=sys.stderr)
     return 1
