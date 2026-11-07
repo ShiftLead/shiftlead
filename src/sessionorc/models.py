@@ -90,6 +90,11 @@ NODE_OWNED = frozenset(
         "tail",
         "title",
         "last_output",
+        "screen_hash",
+        "screen_at",
+        "work_at",
+        "tool_open_at",
+        "stalled_ticks",
         "exit_code",
         "ended",
         "git",
@@ -1147,7 +1152,18 @@ class Session:
     worktree_reaping: dict[str, Any] | None = None
     branch_kept: dict[str, str] = field(default_factory=dict)
     branches_deleted: list[str] = field(default_factory=list)
-    last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
+    last_output: str | None = None  # ISO time the run log last grew (no longer the liveness clock, TD-1443)
+    # The liveness clocks (design §4.2 *Liveness cross-check*, TD-1475): `screen_hash`, a hash of the pane's
+    # text with the adapter's volatile rows masked, and `screen_at`, the tick it last changed — kept together,
+    # so a restart that finds the same text keeps the clock; `work_at`, the last hook event naming work (a
+    # tool use, a prompt, a turn's end); `tool_open_at`, the oldest open tool call's opening while any is open
+    # (it holds both clocks up to `OPEN_TOOL_CEILING`, and survives a restart); `stalled_ticks`, 0 unless
+    # `stalled?`, one more each tick while it is (§4.9b `seat_able` reads it, comparing no clock across hosts).
+    screen_hash: str | None = None
+    screen_at: str | None = None
+    work_at: str | None = None
+    tool_open_at: str | None = None
+    stalled_ticks: int = 0
     run_log: str | None = None
     # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):
     # the name is reused, so the previous run stays reachable from the record that took it over.

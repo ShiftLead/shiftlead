@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import copy
 import dataclasses
+import hashlib
 import json
 import os
 import re
@@ -61,6 +62,7 @@ from sessionorc.agent_common import (
     LAUNCH_KEYS,
     LEASE_TTL,
     MODEL_EVERY,
+    OPEN_TOOL_CEILING,
     ORPHAN_AFTER,
     OWED_NAMED,
     PRUNE_EVERY,
@@ -5083,10 +5085,8 @@ class TickMixin:
                 s.set_state(saved[0], confidence=saved[2], pending=saved[1])
         elif self._title_verdict(s, adapter, pane, now):
             pass  # the tool's own title replaced the record's state (§4.2 *A title the tool writes its state into*)
-        elif s.state == "working" and s.last_output and now - _parse(s.last_output) > STALL_AFTER:
-            # Hook-fed adapters: the liveness cross-check applies to `working` alone — a
-            # `needs-you` or `idle` session is silent by design.
-            s.set_state("stalled?", confidence="tick")
+        if not pane.dead and adapter.state_source != "scraped":
+            self._stall_check(s, adapter, now)
         self.store.save(s)
 
     @staticmethod
@@ -5100,6 +5100,52 @@ class TickMixin:
         if not getattr(m, "resets", None):
             return pending  # a rule that names no reset is given none (review of #3081)
         return dataclasses.replace(pending, text=screen_mod.resets_text(pending.text, _parse(s.limited_reset)))
+
+    @staticmethod
+    def _masked_hash(s: Session, adapter: Any) -> str:
+        """A hash of the pane's painted text with the adapter's volatile rows masked (design §4.3 *An
+        adapter names its volatile rows*, TD-1475): each row a `volatile_rows` regex matches, and every row
+        after the last one `volatile_after` matches (a footer, a status line). An adapter naming none masks
+        nothing."""
+        rows = [screen_mod.painted_text(r) for r in s.tail]
+        after = getattr(adapter, "volatile_after", None)
+        if after and (hits := [i for i, r in enumerate(rows) if re.search(after, r)]):
+            rows = rows[: hits[-1] + 1]
+        pats = tuple(getattr(adapter, "volatile_rows", None) or ())
+        rows = ["" if any(re.search(p, r) for p in pats) else r for r in rows]
+        return hashlib.sha256("\n".join(rows).encode("utf-8", "replace")).hexdigest()[:16]
+
+    def _stall_check(self, s: Session, adapter: Any, now: datetime) -> None:
+        """The liveness cross-check (design §4.2, TD-1475), on every record the tick leaves `working`,
+        whichever branch set it: `stalled?` once nothing is new for `STALL_AFTER` — the later of `screen_at`
+        (the masked screen's last change) and `work_at` (the last work-naming hook event) — unless a tool call
+        is open (`tool_open_at`, up to `OPEN_TOOL_CEILING`) or a subagent is live. A tick-read `stalled?`
+        with something new is `working` again. `stalled_ticks` counts the ticks it has read `stalled?`."""
+        h = self._masked_hash(s, adapter)
+        stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        moved = s.screen_hash is not None and h != s.screen_hash  # a first sight is no news
+        if h != s.screen_hash or not s.screen_at:
+            s.screen_hash, s.screen_at = h, stamp
+        due = self._stall_due(s, now)
+        worked = bool(s.work_at and s.since and s.work_at > s.since)
+        if s.state == "working" and due:
+            s.set_state("stalled?", confidence="tick")
+        elif s.state == "stalled?" and s.confidence == "tick" and not due and (moved or worked):
+            s.set_state("working", confidence="tick")
+        s.stalled_ticks = s.stalled_ticks + 1 if s.state == "stalled?" else 0
+
+    @staticmethod
+    def _stall_due(s: Session, now: datetime) -> bool:
+        """Whether nothing new has been seen for `STALL_AFTER`, by `_stall_check`'s clocks."""
+        if agent_common.subagents_live(s, now):
+            return False
+        try:
+            if s.tool_open_at and now - _parse(s.tool_open_at) <= OPEN_TOOL_CEILING:
+                return False
+            clocks = [_parse(x) for x in (s.screen_at, s.work_at) if x]
+        except ValueError:
+            return False
+        return bool(clocks) and now - max(clocks) > STALL_AFTER
 
     def _hook_fresh(self, sid: str, now: datetime) -> bool:
         last = self._last_hook.get(sid)
@@ -5256,6 +5302,7 @@ class TickMixin:
             self._end_entries(s, lambda p: p.subagent == stopped, sure=True)
         if not queued:
             self._track_call(sid, event)  # a replayed event touches no list: no waiter outlived the outage
+        self._track_clocks(s, event, queued=queued, stale=stale)
         if event.get("prompt") or (event.get("state") == "idle" and not event.get("subagent")):
             self._prompts_due.add(sid)  # the prompts read on the next tick, not a minute later (§4.2, TD-976)
         if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):
@@ -5544,6 +5591,46 @@ class TickMixin:
         elif edge == "end" and threads is not None and (calls := threads.get(thread)):
             threads[thread] = [c for c in calls if c[0] != tid]
 
+    def _track_clocks(self, s: Session, event: dict[str, Any], *, queued: bool, stale: bool) -> None:
+        """The hook half of the liveness clocks (design §4.2 *Liveness cross-check*, TD-1475): `work_at` at an
+        event naming work — a tool use (any thread), a prompt, a turn's end; not a notification — and the
+        open tool calls, keyed by the adapter's per-call id: a pre-tool event opens one, its post-tool event
+        closes it, and a stop, a session start, a prompt or the end clears them all. `tool_open_at` is the
+        oldest opening while any is open; after a restart, which empties memory, the record's stands until
+        one of those clears it or the first post-tool event does. An adapter with no per-call id opens none."""
+        sid, stamp = s.id, now_iso()
+        main = not event.get("subagent")
+        turn_end = event.get("state") == "idle" and main
+        work = event.get("prompt") or event.get("call") or event.get("event") or event.get("subagent_seen")
+        if (work or turn_end) and not stale:
+            s.work_at = stamp
+        if queued:
+            return  # a replayed call is no open one: what it opened has long ended or been cleared
+        if (
+            event.get("prompt")
+            or turn_end
+            or event.get("subagents_reset")
+            or event.get("state") in ("exited", "closed")
+        ):
+            self._tool_open.pop(sid, None)
+            s.tool_open_at = None
+            return
+        tid, edge = event.get("tool_use_id"), event.get("call")
+        if not isinstance(tid, str) or not tid or edge not in ("start", "end"):
+            return
+        opened = self._tool_open.get(sid)
+        if opened is None:
+            # memory lost (a restart): the record's opening stands, as "" until a post-tool event ends it
+            opened = self._tool_open[sid] = {"": s.tool_open_at} if s.tool_open_at else {}
+        if edge == "start":
+            opened.setdefault(tid, stamp)
+            while len(opened) > OPEN_CALLS * OPEN_THREADS:
+                del opened[next(iter(opened))]
+        else:
+            opened.pop(tid, None)
+            opened.pop("", None)
+        s.tool_open_at = min(opened.values()) if opened else None
+
     def _take_call(self, sid: str, subagent: str | None, sig: Any) -> str | None:
         """The oldest open call of the thread with the permission's `call_sig`, consumed: its
         `tool_use_id` keys the waiter, and two parallel calls of one signature are matched in order."""
@@ -5574,6 +5661,7 @@ class TickMixin:
             self._hook_state,
             self._live_hook_at,
             self._open_calls,
+            self._tool_open,
             self._sure_end,
             self._killed_at,
             self._mail_hints,

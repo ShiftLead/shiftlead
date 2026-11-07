@@ -6,8 +6,6 @@ stall check still runs), never held for its screen; `ao explain` shows the title
 from __future__ import annotations
 
 import json
-import os
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -151,11 +149,9 @@ async def test_the_ticks_own_readings_stand_but_a_stall_ends_when_the_tool_moves
 
 async def test_an_equal_verdict_falls_through_to_the_stall_check(agent, gem, tmp_path):
     s = _rec(tmp_path, state="working")
-    log = tmp_path / "run.log"
-    log.write_text("x")
-    old = time.time() - 3600
-    os.utime(log, (old, old))
-    s.run_log = str(log)
+    # nothing new on the screen for an hour (design §4.2 *Liveness cross-check*, TD-1475)
+    s.screen_hash = agent_tick.TickMixin._masked_hash(s, gem)
+    s.screen_at = (datetime.now(UTC) - timedelta(hours=1)).isoformat().replace("+00:00", "Z")
     assert _look(agent, s, WORKING).state == "stalled?" and s.confidence == "tick"
 
 

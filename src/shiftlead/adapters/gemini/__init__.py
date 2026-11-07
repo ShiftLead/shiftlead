@@ -250,6 +250,11 @@ class GeminiAdapter:
     # the tool writes its state into its terminal title: the tick asks `explain` with the pane's title
     # and writes its verdict with `confidence: title` (design §4.2 *A title the tool writes its state into*)
     state_in_title = True
+    # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*,
+    # TD-1475): the spinner line (a braille glyph) with its *still on it…* elapsed timer, and the footer under
+    # the composer's lower edge (workspace, sandbox, model, context)
+    volatile_rows = (r"^\s*[\u2800-\u28ff]\s", r"\(esc to cancel\b")
+    volatile_after = r"^\s*\u2580{8,}\s*$"
     # no hook answers a confirmation: a pending permission is answered in the terminal (§4.3, §4.5a)
     permission_channel = False
     # held from its start, through `SessionStart`'s `additionalContext` (design §4.3 `start_context`)

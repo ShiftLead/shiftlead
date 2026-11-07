@@ -108,6 +108,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     NODE_ACTS,  # noqa: F401
     NODE_READS,  # noqa: F401
     NOTICE_LAG,  # noqa: F401
+    OPEN_TOOL_CEILING,  # noqa: F401
     ORPHAN_AFTER,  # noqa: F401
     OWED_NAMED,  # noqa: F401
     PASTE_SHOW_SECONDS,  # noqa: F401
@@ -688,6 +689,11 @@ class HostAgent(
         # session id → thread (a subagent's id, or None) → its open calls, `(tool_use_id, call_sig)` oldest
         # first: what a permission, which names no call, is matched to (§4.2, TD-950). In memory only.
         self._open_calls: dict[str, dict[str | None, list[tuple[str, str]]]] = {}
+        # session id → each open tool call's id (every thread) → when it opened: what holds the liveness
+        # clocks (design §4.2 *Liveness cross-check*, TD-1475). Apart from `_open_calls`, which matches a
+        # permission to its call and keeps a thread's calls until that thread ends: these are all cleared by
+        # a stop, a session start or a prompt. In memory; the record's `tool_open_at` is the restart-safe half.
+        self._tool_open: dict[str, dict[str, str]] = {}
         # session id → when its last open prompt had a sure end (`time.monotonic()`): a decision, the asked
         # call's own event, or an event naming no call; the tool's notice inside `NOTICE_LAG` of it is that
         # prompt's (§4.2 *Open prompts are a stack*, TD-950). In memory only: a restart lets one notice through.

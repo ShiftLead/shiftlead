@@ -84,6 +84,12 @@ class Adapter(Protocol):
     #                                                      TD-785); False where unset. A verdict read off
     #                                                      the title is a `Match` with `title=True`; any
     #                                                      other `explain` returns is a screen rule's (§4.3)
+    #   volatile_rows: tuple[str, ...]                    regexes over a pane row's painted text: rows a spinner
+    #   volatile_after: str | None                        or a timer repaints, and the rows after the last one
+    #                                                      `volatile_after` matches (a footer, a status line),
+    #                                                      masked from the liveness clock's screen (design §4.3
+    #                                                      *An adapter names its volatile rows*, TD-1475);
+    #                                                      none named: nothing masked
     #   title(pane_title: str) -> str | None              the session's name as the tool holds it, read from
     #                                                      the terminal title the tool set (tmux `#{pane_title}`,
     #                                                      carried on `PaneInfo.title`) with the tool's own

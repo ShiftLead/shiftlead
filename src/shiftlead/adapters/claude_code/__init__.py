@@ -554,6 +554,11 @@ class ClaudeCodeAdapter:
     name = "claude-code"
     label = "Claude"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
+    # rows its repaints move, masked from the liveness clock (design §4.3 *An adapter names its volatile rows*,
+    # TD-1475): the spinner line (*✶ Hatching… (4m 50s · ↓ 19.3k tokens …)*), and everything under the
+    # composer's lower rule — the mode line and the status line
+    volatile_rows = (r"^\s*\S\s+[^()]+…\s*\(",)
+    volatile_after = r"^\s*\u2500{8,}\s*$"
     start_context = True  # `--append-system-prompt-file`, given at every launch of the conversation (§4.3, TD-283)
     permission_channel = True  # a pending permission is answered through the hook's decision (§4.3, §4.5a)
     asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
