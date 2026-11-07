@@ -321,6 +321,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     look_pair,  # noqa: F401
     look_review,  # noqa: F401
     look_shots,  # noqa: F401
+    needs_person,  # noqa: F401
     origin_case,  # noqa: F401
     origin_firsts,  # noqa: F401
     origin_note,  # noqa: F401
@@ -1070,7 +1071,8 @@ class Readings:
         (§4.5 screen 6 *Where a row is drawn*, TD-771): empty from a home that serves no Queue, so every
         row is the Inbox's, as before it."""
         try:
-            return card_index(await self.call("queue", omit=["completed"]))
+            # the completed cards' ids alone: an item that needs the person draws on its kept card (TD-1468)
+            return card_index(await self.call("queue", omit=["completed.entries", "completed.titles"]))
         except Exception:  # an older home, a node's link down: the Inbox draws everything
             return {}
 

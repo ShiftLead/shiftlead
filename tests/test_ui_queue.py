@@ -471,11 +471,12 @@ def test_a_bare_ref_on_a_red_pr_a_fork_pr_or_a_question_is_its_own_repos():
     # the Inbox's rows read the asker's repo from its record, `from` → the record's `repo` root
     fleet = [{"id": "g1", "repo": "/home/k/a"}]
     secs = inbox_sections([ask], now=NOW, cards=index, fleet=fleet)
-    assert secs["needs"][0]["home"] == "inbox" and secs["queue_n"] == 0
+    # never on b's card: a question that needs the person and whose entry no card holds draws on its loose card
+    assert secs["needs"][0]["on_card"] == "loose:a#TD-051" and secs["queue_n"] == 1  # (TD-1468)
     secs = inbox_sections([ask], now=NOW, cards=index, fleet=[{"id": "g1", "repo": "/home/k/b/"}])
     assert secs["needs"][0]["on_row"] == "b#TD-051"
     orphan = {**ask, "from": "gone@kmaster", "orphaned": {"repo": "/home/k/a", "ref": "TD-051", "how": "closed"}}
-    assert inbox_sections([orphan], now=NOW, cards=index)["needs"][0]["home"] == "inbox"
+    assert inbox_sections([orphan], now=NOW, cards=index)["needs"][0]["on_card"] == "loose:a#TD-051"
 
 
 def test_the_inbox_names_an_askers_repo_as_the_reading_names_it():
@@ -491,7 +492,7 @@ def test_the_inbox_names_an_askers_repo_as_the_reading_names_it():
     secs = inbox_sections([ask], now=NOW, cards=index, fleet=fleet, roots=roots)
     assert secs["needs"][0]["on_row"] == "b#TD-051", "named as the reading names it"
     secs = inbox_sections([{**ask, "from": "g2"}], now=NOW, cards=index, fleet=fleet, roots=roots)
-    assert secs["needs"][0]["home"] == "inbox", "a's question is about a's TD-051"
+    assert secs["needs"][0]["on_card"] == "loose:a#TD-051", "a's question is about a's TD-051 (TD-1468)"
     assert asker_repos([{**ask, "from": "g1"}], fleet) == {"m-a": "b-checkout"}, "no roots: the directory's name"
     assert asker_repos([{**ask, "from": "person"}], fleet, roots) == {}, "the person's own: no asker, bare"
 

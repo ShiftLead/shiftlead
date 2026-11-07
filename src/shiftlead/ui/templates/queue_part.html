@@ -23,6 +23,9 @@
     <span class="grow"></span>
     <span class="qwins" role="group" aria-label="the window">{% for w, label in labels.items() %}<button type="button" class="qwin" data-win="{{ w }}" aria-pressed="{{ 'true' if w == 'day' else 'false' }}">{{ label }} ({{ q.completed.counts[w] }})</button>{% endfor %}</span>
   </div>
+  {#- a kept card (TD-1468): a completed card an open item that needs the person is attached to, drawn as a card at
+      the head of the group whatever the window, outside its count, until the item closes #}
+  {% if q.kept %}<div class="qcards qkepts">{% for c in q.kept %}{{ qc.card(c) }}{% endfor %}</div>{% endif %}
   <div class="rlist qdone">
   {% for ln in (q.completed.sent if q.completed.sent is defined else q.completed.lines) %}
     <div class="qdline{% if ln.entries %} opens{% endif %}{% if ln.off %} qoff{% endif %}" data-n="{{ ln.n }}" data-repo="{{ ln.repo }}" data-find="{{ ln.find }}" data-key="{{ ln.kind }}:{{ ln.show }}" data-w="{{ ln.wins | join(' ') }}"{% if 'day' not in ln.wins %} hidden{% endif %}>
@@ -40,10 +43,12 @@
 {# In progress — a card an open member of which a session holds, or a PR naming one names; then the other work #}
 <section class="rsec qgroup" id="qinprogress" data-group="in_progress">
   <div class="row gap rsh"><span class="h2 qghead" role="button" tabindex="0" aria-expanded="true" title="fold or open the group">In progress {{ share(q.shown_in.in_progress if q.shown_in else q.n.in_progress, q.n.in_progress) }}</span> <span class="qsub qgfoldword">folded</span> <span class="qsub">someone holds an entry, or its PR is open</span></div>
-  {% if q.in_progress or q.other %}
+  {% if q.in_progress or q.other or q.loose %}
   <div class="qcards">
   {% for c in q.in_progress %}{{ qc.card(c) }}{% endfor %}
   {% for o in q.other %}<div class="qother{% if o.off %} qoff{% endif %}" data-other="1"><span class="qsub">other work</span>{{ holder(o.holder) }}<span class="mono">{{ o.ref }}</span>{% if o.pr %}<span class="qsub">#{{ o.pr }}</span>{% endif %}</div>{% endfor %}
+  {#- a loose card (TD-1468): an open item that needs the person names a ref no card holds; after the other work #}
+  {% for c in q.loose or [] %}{{ qc.card(c) }}{% endfor %}
   </div>
   {% else %}<div class="rlist"><div class="rrow qsub">nobody holds an entry</div></div>{% endif %}
 </section>

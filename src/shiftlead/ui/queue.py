@@ -17,11 +17,14 @@ from typing import Any
 from urllib.parse import quote
 
 from sessionorc.queue import (  # noqa: F401 — the home's
+    LOOSE,
     TD_REF,
     asker_repos,
     card_entries,
     card_index,
     held_refs,
+    kept_or_loose,
+    named_refs,
     own_refs,
     qid,
 )
@@ -52,7 +55,10 @@ FILTERS = {"needs-you": "Needs you"}
 
 
 def item_home(
-    e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None, askers: Mapping[str, str] | None = None
+    e: Mapping[str, Any],
+    index: Mapping[str, tuple[str, str]] | None,
+    askers: Mapping[str, str] | None = None,
+    needs: bool = False,
 ) -> dict[str, Any]:
     """Where an Inbox item is drawn (§4.5 screen 6 *Where a row is drawn*, screen 12 *What is attached to a
     card*): `{home, on_card, on_row, mentions}` — `queue` with the card and row its entry is on, for a question,
@@ -68,10 +74,18 @@ def item_home(
     A bare `TD-n` is its own repo's wherever the row names one (screen 6 *A bare ref elsewhere*, TD-1509): a board
     line's `repo_name`, a red PR's or a fork PR's `repo`, a mail item's sender's repo (`askers`, `{mail id: repo}`,
     `asker_repos`: its stamped `repo`, else its orphan stamp's, else its sender's record's, TD-1467); a row with
-    none is looked up bare, by `card_index`'s one-repo rule."""
+    none is looked up bare, by `card_index`'s one-repo rule.
+
+    `needs` says the item needs the person (an open `ask` or `steer` to them, an undecided Decide or Do line;
+    `needs_person`, the caller's): one whose refs no open card holds draws on the completed card that holds the
+    first of them, **kept** (`card_index`'s `kept:<ref>` keys), else on a **loose card**, `loose:<ref>` its first
+    ref, `on_row` that ref, no mentions (§4.5 screen 6 *Every item that needs the person draws on a card*,
+    TD-1468); one naming no entry stays in the Inbox, and so does every row where `index` is empty (a home that
+    serves no Queue)."""
     inbox = {"home": "inbox", "on_card": "", "on_row": "", "mentions": [], "tied": None}
     if not index:
         return inbox
+    named: list[str] = []  # every ref it names, in order: its kept or loose card's where no open card holds one
     kind = e.get("row")
     if kind == "board":
         by = "context"
@@ -82,6 +96,7 @@ def item_home(
         # rather than on another repo's that happens to share the number; a line with no repo is looked up bare
         if name := str(e.get("repo_name") or ""):
             refs = list(dict.fromkeys(f"{name}#{r}" if "#" not in r else r for r in refs))
+        named = refs
         # its home is the first of its refs an open card holds, the later held ones its mentions (TD-1400)
         refs = [r for r in refs if r in index]
     elif kind == "red_pr":
@@ -95,9 +110,17 @@ def item_home(
         # its sender's live record's, TD-1467), and its home the first of its refs an open card holds, `about`'s
         # first, the later held ones its mentions — never the first ref alone (§4.5 screen 6)
         repo = (askers or {}).get(str(e.get("id") or ""))
-        refs, by = held_refs(e.get("about"), f"{e.get('subject') or ''} {e.get('text') or ''}", index, repo)
+        words = f"{e.get('subject') or ''} {e.get('text') or ''}"
+        refs, by = held_refs(e.get("about"), words, index, repo)
+        named, about = named_refs(e.get("about"), words, repo)
     if not refs or refs[0] not in index:
-        return inbox
+        got = kept_or_loose(named, index) if needs and kind in (None, "", "board") else None
+        if not got:
+            return inbox
+        card, row, ref = got
+        if kind != "board":
+            by = "about" if ref in about else "words"
+        return {"home": "queue", "on_card": card, "on_row": row, "mentions": [], "tied": {"by": by, "ref": ref}}
     card, row = index[refs[0]]
     mentions = [index[r][1] for r in refs[1:] if r in index and index[r][1] != row]
     return {
@@ -407,6 +430,13 @@ def attach(
                 "html": drawn({**e, "want": want, "start": go, **({"with_you": mine} if mine else {})}, drawn_as),
                 "kind": kind,
                 "want": want,
+                # on a loose card its first words, the card's head (TD-1468); `_cut_item` drops them from a read
+                # with no words
+                **(
+                    {"subject": str(e.get("subject") or "") or " ".join(str(e.get("text") or "").split()[:12])}
+                    if card.startswith(LOOSE)
+                    else {}
+                ),
                 "red": e.get("row") == "red_pr",
                 "fork": e.get("row") == "fork_pr",  # a fork's PR: no Start session, as a red PR's (TD-1292)
                 "running": sec == "steering",
@@ -521,7 +551,7 @@ def _cut_item(m: Mapping[str, Any]) -> dict[str, Any]:
     """An attached item with no mail's words: a mail row cut to `MAIL_KEEP`, a ledger row's `answered` to
     `HELD_ANSWERED_KEEP`; a board line, a ledger row and a PR row otherwise whole (the repos' files and the
     forge's)."""
-    out = dict(m)
+    out = {k: v for k, v in m.items() if k != "subject"}
     row = out.get("row")
     if isinstance(row, Mapping):
         if row.get("row") not in NOT_MAIL:
@@ -910,6 +940,16 @@ def queue_view(
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]
     waiting = [c for c in shaped if c.get("group") == "waiting"]
     up_next = [c for c in shaped if c.get("group") == "up_next"]
+    attached = (mail or {}).get("cards") or {}
+    kept = [
+        k
+        for c in q.get("completed") or []
+        if isinstance(c, Mapping) and (k := _kept_card(c, attached.get(str(c.get("id"))), one_repo, mentioned))
+    ]
+    # a loose card is drawn while an item that needs the person is attached to it (TD-1468)
+    loose = [_loose_card(cid, got, one_repo) for cid, got in sorted(attached.items()) if cid.startswith(LOOSE)]
+    loose = [c for c in loose if c["wants"]["n"]["decide"] or c["wants"]["n"]["do"]]
+    kept_ids = {str(c["id"]) for c in kept}
 
     readings: dict[str, Any] = {}
 
@@ -920,8 +960,8 @@ def queue_view(
 
     lines: list[dict[str, Any]] = []
     for c in q.get("completed") or []:
-        if not isinstance(c, Mapping):
-            continue
+        if not isinstance(c, Mapping) or str(c.get("id")) in kept_ids:
+            continue  # a kept card is drawn as a card, outside the window's count, until its item closes (TD-1468)
         ents = [e for e in c.get("entries") or [] if isinstance(e, Mapping)]
         at = _when(c.get("at") or c.get("closed"), now)
         top = next((e for e in ents if e.get("qid") == c.get("id")), ents[0] if ents else {})
@@ -997,14 +1037,16 @@ def queue_view(
         other.append({"ref": ref, "pr": o.get("pr"), "holder": h if h.get("id") else None})
 
     n = {
-        "cards": len(shaped),
-        "in_progress": len(in_progress),
+        "cards": len(shaped) + len(kept) + len(loose),
+        "in_progress": len(in_progress) + len(loose),
         "waiting": len(waiting),
         "up_next": len(up_next),
-        "needs_you": sum(1 for c in shaped if c.get("status") == "needs you"),
+        "needs_you": sum(1 for c in [*shaped, *kept, *loose] if c.get("status") == "needs you"),
     }
     return {
         "completed": {"lines": lines, "counts": counts},
+        "kept": kept,
+        "loose": loose,
         "in_progress": in_progress,
         "waiting": waiting,
         "up_next": up_next,
@@ -1014,6 +1056,106 @@ def queue_view(
         "one_repo": one_repo,
         "repos": sorted(repos - {""}),
         "served": q.get("at") is not None or bool(cards),
+    }
+
+
+def _side_status(wants: Mapping[str, Any]) -> str:
+    """A kept or loose card's status (TD-1468): *needs you* while an item on it is not a running steer, else
+    *steer*, as an open card's mail raises it (`_mail_status`)."""
+    return "needs you" if any(not m.get("running") for w in WANTS for m in wants.get(w) or ()) else "steer"
+
+
+def _kept_card(
+    c: Mapping[str, Any], got: Mapping[str, list[Any]] | None, one_repo: bool, mentioned: Mapping[str, Any]
+) -> dict[str, Any] | None:
+    """A completed card an open item that needs the person is attached to, drawn as a card (§4.5 screen 12
+    *Recently completed*, TD-1468): its entries its rows, archived, the top one its header; status *needs you*,
+    group `kept`, at the head of Recently completed whatever the window. None while nothing that needs the person
+    is attached to it — it is then its line."""
+    cid = str(c.get("id") or "")
+    wants = card_wants(got, cid, one_repo)
+    if not (wants["n"]["decide"] or wants["n"]["do"]):
+        return None
+    ents = [e for e in c.get("entries") or () if isinstance(e, Mapping)]
+
+    def done(e: Mapping[str, Any]) -> dict[str, Any]:
+        q = str(e.get("qid") or "")
+        pr = e.get("pr")
+        archived = {
+            "qid": q,
+            "repo": q.partition("#")[0],
+            "id": q.rpartition("#")[2],
+            "title": e.get("title") or (c.get("titles") or {}).get(q) or "",
+            "priority": e.get("priority") or "",
+            "state": f"done #{pr}" if pr else "done",
+            "pr": pr,
+            "archived": True,
+            "closed": e.get("closed"),
+            "resolved": e.get("resolved"),
+        }
+        return _row(archived, one_repo, mentioned)
+
+    ids = [str(q) for q in c.get("ids") or ()] or [str(e.get("qid") or "") for e in ents]
+    by = {str(e.get("qid") or ""): e for e in ents}
+    top = done(by.get(cid) or {"qid": cid})
+    rows = [done(by.get(q) or {"qid": q}) for q in ids if q != cid]
+    return {
+        "id": cid,
+        "group": "kept",
+        "status": _side_status(wants),
+        "edge": card_edge("kept", _side_status(wants), wants),
+        "top": top,
+        "rows": rows,
+        "lines": [{"row": r} for r in rows],
+        "wants": wants,
+        "ids": [cid, *(r["qid"] for r in rows)],
+        "repos": sorted({str(top.get("repo") or "")} - {""}),
+        "of": len(ids),
+        "chips": not one_repo,
+        "find": _find_text([top, *rows]),
+        "session": {},
+        "items_start": False,
+        "items_n": items_n(wants),
+    }
+
+
+def _loose_card(cid: str, got: Mapping[str, list[Any]] | None, one_repo: bool) -> dict[str, Any]:
+    """A loose card (§4.5 screen 12 *In progress*, TD-1468): an open item that needs the person names a ref no card
+    holds, `loose:<ref>`; its head the ref and its first item's subject, no members, no number, no ⋯ but the
+    items' own, status *needs you*, at the end of In progress."""
+    ref = cid[len(LOOSE) :]
+    wants = card_wants(got, ref, one_repo)
+    first = next((m for w in WANTS for m in wants[w]), {})
+    repo = ref.partition("#")[0] if "#" in ref else ""
+    top = {
+        "qid": ref,
+        "repo": repo,
+        "id": "",
+        "title": str(first.get("subject") or ""),
+        "priority": "",
+        "state": "",
+        "show": _show(ref, one_repo) if "#" in ref else ref,
+        "afters": [],
+        "anchor": "",
+        "ext": None,
+        "mentioned": [],
+    }
+    return {
+        "id": cid,
+        "group": "loose",
+        "status": _side_status(wants),
+        "edge": "",
+        "top": top,
+        "rows": [],
+        "lines": [],
+        "wants": wants,
+        "ids": [],
+        "repos": [repo] if repo else [],
+        "chips": False,
+        "find": _find_text([top]),
+        "session": {},
+        "items_start": False,
+        "items_n": items_n(wants),
     }
 
 
@@ -1161,6 +1303,7 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
         return all(_finds(w, text) for w in words)
 
     cards = [*(view.get("in_progress") or ()), *(view.get("waiting") or ()), *(view.get("up_next") or ())]
+    extra = [*(view.get("kept") or ()), *(view.get("loose") or ())]  # each *needs you* (TD-1468)
     # the summary's needs-you counts (TD-1311): `k` the cards the chips and the find pass that need the person,
     # whatever the switch is — the legend's *need you* and the switch's own number, which its press leaves as
     # it was — and per group those among its shown cards, the segment's hatch
@@ -1173,6 +1316,14 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
         k += int(nf and wants)
         if ok and wants and c.get("group") in needs:
             needs[str(c["group"])] += 1
+    for c in extra:
+        nf = by_repo_find(c.get("repos"), str(c.get("find") or ""))
+        wants = c.get("status") == "needs you"
+        ok = nf and wants if picks.get("filter") == "needs-you" else nf
+        c["off"] = not ok
+        k += int(nf and wants)
+        if ok and wants and c.get("group") == "loose":
+            needs["in_progress"] += 1
     status_pick = bool(picks.get("filter"))
     for ln in (view.get("completed") or {}).get("lines") or ():
         ln["off"] = status_pick or not by_repo_find([ln.get("repo")], str(ln.get("find") or ""))
@@ -1188,11 +1339,12 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
             where = [repo] if repo else list(view.get("repos") or ())
             view["find_miss"] = {"id": tid, "repos": [{"name": r, "url": f"/repo/{quote(r)}#{tid}"} for r in where]}
     view["picks"] = dict(picks)
-    view["shown"] = sum(1 for c in cards if not c["off"])
+    loose = view.get("loose") or ()
+    view["shown"] = sum(1 for c in [*cards, *extra] if not c["off"])  # a kept card is shown too (TD-1468)
     # each group's share while a pick or a find is on (§4.5 screen 12 *Groups*: *Up next (4 of 28)*)
     done = (view.get("completed") or {}).get("lines") or ()
     view["shown_in"] = {
-        "in_progress": sum(1 for c in view.get("in_progress") or () if not c["off"]),
+        "in_progress": sum(1 for c in [*(view.get("in_progress") or ()), *loose] if not c["off"]),
         "waiting": sum(1 for c in view.get("waiting") or () if not c["off"]),
         "up_next": sum(1 for c in view.get("up_next") or () if not c["off"]),
         "completed": {w: sum(ln["n"] for ln in done if w in ln["wins"] and not ln["off"]) for w in WINDOWS},

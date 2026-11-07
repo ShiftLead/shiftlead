@@ -28,7 +28,7 @@
     {%- elif c.chips and c.places and not repo %}<span class="qplace multi" title="{{ help_title('up-next-number') }}">{% for p in c.places %}<span class="qpn"><span class="qn">{{ p.n }}</span><span class="qprepo" title="its place among {{ p.repo }}'s Up next cards">{{ p.repo }}</span></span>{% endfor %}</span>
     {%- else %}<span class="qplace">{{ c.place if c.place else '' }}</span>{% endif %}
     <div class="qmain">
-    <span class="qid mono strong">{{ t.show }}</span>{{ pbadge(t.priority) }}
+    <span class="qid mono strong">{{ t.show }}</span>{% if c.group != 'loose' %}{{ pbadge(t.priority) }}{% endif %}
     <span class="qtitle">{{ t.title }}</span>
     <span class="qright">
       {#- the move arrows, Start session, then the ⋯ (TD-914), a gap, then the facts #}

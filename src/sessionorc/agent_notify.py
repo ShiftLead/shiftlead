@@ -63,13 +63,16 @@ def _restart_at(s: Any) -> str:
     return ""
 
 
-def _card(e: Any, index: dict[str, tuple[str, str]], askers: Mapping[str, str]) -> tuple[str, str] | None:
-    """The open card a mail row is drawn on, as the Inbox's `item_home` reads it (§4.5 screen 6 *Where a row is
-    drawn*, TD-795), a bare `TD-n` read as its asker's repo's (`askers`, `queue.asker_repos`, TD-1509); None for one
+def _card(
+    e: Any, index: dict[str, tuple[str, str]], askers: Mapping[str, str], needs: bool = False
+) -> tuple[str, str] | None:
+    """The card a mail row is drawn on, as the Inbox's `item_home` reads it (§4.5 screen 6 *Where a row is
+    drawn*, TD-795), a bare `TD-n` read as its asker's repo's (`askers`, `queue.asker_repos`, TD-1509) — an open
+    question to the person (`needs`) on its kept or loose card where no open card holds it (TD-1468); None for one
     set aside with a reviewer (`snoozed_for`), which the Inbox keeps."""
     if e.snoozed_for:
         return None
-    return queue_mod.mail_card(e.about, f"{e.subject or ''} {e.text or ''}", index, askers.get(e.id))
+    return queue_mod.mail_card(e.about, f"{e.subject or ''} {e.text or ''}", index, askers.get(e.id), needs)
 
 
 def _work_ids(mark: dict[str, Any]) -> list[str]:
@@ -112,7 +115,9 @@ class NotifyMixin:
             ref = reference_of(e.about) or ""
             if e.kind == "ask" and e.open:
                 line = notify.ask_line(name, team, ref)
-                rows[e.id] = _Row(e.passed_up or e.at, line, e.id, e.id, mail=True, until=e.snoozed_until, card=card)
+                ask_card = _card(e, index, askers, needs=True)  # its kept or loose card too (TD-1468)
+                at = e.passed_up or e.at
+                rows[e.id] = _Row(at, line, e.id, e.id, mail=True, until=e.snoozed_until, card=ask_card)
             outcome = e.outcome or {}
             if outcome.get("state") == "blocked":
                 line = notify.blocked_line(name, team, ref)

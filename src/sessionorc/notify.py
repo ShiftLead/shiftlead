@@ -126,8 +126,13 @@ def mail_path(mid: str) -> str:
     return f"/inbox/{urllib.parse.quote(mid, safe='')}"
 
 
-def queue_path(card: str, row: str, mid: str) -> str:
-    return "/queue?" + urllib.parse.urlencode({"card": card, "row": row, "item": mid})
+def queue_path(card: str, row: str | None, mid: str) -> str:
+    """A Queue item's address (§4.5 screen 12 *Addresses*): `card=`, `row=` and `item=`, each percent-encoded — a
+    loose card's id (`loose:<repo>#TD-n`) carries a `#` — and no `row=` on a loose card, which has none (TD-1468)."""
+    q = {"card": card, "row": row, "item": mid}
+    if card.startswith("loose:") or not row:
+        del q["row"]
+    return "/queue?" + urllib.parse.urlencode(q)
 
 
 def body(line: str) -> str:

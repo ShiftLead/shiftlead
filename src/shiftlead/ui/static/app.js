@@ -4878,6 +4878,7 @@
       if (on.length) bar.push({ key, word, color, n: on.length, needs: on.filter((el) => el.dataset.status === "needs you").length });
       shown += on.length;
     });
+    shown += $$(".qgroup .qcard.g-kept:not(.qoff)", lists).length;  // a kept card is shown, in no bar group (TD-1468)
     bar.forEach((s) => { s.flex = AO.qBarFlex(s.n, shown); });
     const all = $$(".qgroup .qcard", lists);
     const k = all.filter((el) => el.dataset.status === "needs you" && pass(el, { ...picks, filter: "" })).length;
@@ -4961,7 +4962,9 @@
     function applyGroups() {
       const folded = new Set(store.get(groupKey, [])), finding = !!($("#qfindbox", box) || {}).value;
       $$(".qgroup", box).forEach((g) => {
-        const found = finding && !!g.querySelector(".qcard:not(.qoff), .qdline:not(.qoff):not([hidden])");
+        // a kept card opens its group as a find does (TD-1468): it needs the person, whatever the fold remembers
+        const found = (finding && !!g.querySelector(".qcard:not(.qoff), .qdline:not(.qoff):not([hidden])"))
+          || !!g.querySelector(".qcard.g-kept:not(.qoff)");
         const f = folded.has(g.dataset.group) && !found;
         g.classList.toggle("qgfolded", f);
         const h = $(".qghead", g); if (h) h.setAttribute("aria-expanded", f ? "false" : "true");
@@ -5064,6 +5067,10 @@
     // `<repo>#TD-n` where the page writes one bare), else an Inbox item drawn on a row by its id
     function onCard(id) {
       if (!id) return null;
+      // a kept or a loose card by its own id first (TD-1468): `loose:other#TD-9` is no anchor, and its bare `TD-9`
+      // may be another card's
+      const own = $(`.qcard.g-kept[data-card="${CSS.escape(id)}"], .qcard.g-loose[data-card="${CSS.escape(id)}"]`, box);
+      if (own) return own;
       const el = document.getElementById(id) || document.getElementById(id.replace(/^.*#/, ""))
         || $(`.mailrow[data-msg="${CSS.escape(id)}"]`, box) || $(`[data-card="${CSS.escape(id)}"]`, box);
       return el && box.contains(el) ? el : null;

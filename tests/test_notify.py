@@ -260,8 +260,8 @@ async def test_an_ask_and_an_alarm_are_told_and_a_steer_is_not(agent, sent, tmp_
 
 async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp_path):
     """§4.10 *What a message says* (TD-795): a question whose item is drawn on the Queue — its `about` an
-    entry an open card holds — is linked to that card, `/queue?card=…&row=…&item=…`; one about no open
-    entry to its message page, `/inbox/<id>`."""
+    entry an open card holds — is linked to that card, `/queue?card=…&row=…&item=…`; one about an id found nowhere
+    to its loose card, `/queue?card=loose%3A…&item=…` with no `row=` (TD-1468)."""
     _on()
     t0 = datetime.now(UTC)
     s = _session(agent, tmp_path, state="idle", since=_z(t0))
@@ -275,7 +275,7 @@ async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp
         await _pass(agent, t0 + timedelta(seconds=61))
         links = sorted(t.split("\n")[1] for _, t in sent)
         assert links == [
-            "http://kmaster:8765/inbox/m-c3",
+            "http://kmaster:8765/queue?card=loose%3ATD-099&item=m-c3",
             "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-020&item=m-c2",
             "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-021&item=m-c1",
         ]
@@ -300,9 +300,9 @@ async def test_a_questions_bare_ref_is_its_askers_repos_on_telegram(agent, sent,
     try:
         await _pass(agent, t0 + timedelta(seconds=61))
         links = sorted(t.split("\n")[1] for _, t in sent)
-        assert links == [
-            "http://kmaster:8765/inbox/m-r1",
+        assert links == [  # a's on its loose card, never b's (TD-1468)
             "http://kmaster:8765/queue?card=b%23TD-051&row=b%23TD-051&item=m-r2",
+            "http://kmaster:8765/queue?card=loose%3Aa%23TD-051&item=m-r1",
         ]
     finally:
         agent._queue = None
