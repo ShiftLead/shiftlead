@@ -175,6 +175,11 @@ def test_answered_hold_links_a_question_by_its_own_stamped_repo(tmp_path):
     mine.repo = "alpha"
     _, cards = _top({a: ra, c: rc}, [mine], [_asker_in(c)])
     assert cards["alpha#TD-001"]["top"]["answered"] is not None, "its own stamp, not its asker's record now"
+    # read off the question itself, with no caller's map: bare `TD-001` from gamma is never alpha's
+    member, states = {"repo": "alpha", "id": "TD-001"}, {"ao-r-designer": "working"}
+    both = queue.open_refs(["alpha#TD-001", "gamma#TD-001"])
+    assert queue._mail_hold(member, [other], states, both, NOW) is None
+    assert queue._mail_hold(member, [mine], states, both, NOW)["mid"] == "m-1"
 
 
 def test_an_origin_path_ref_links_its_repos_member(tmp_path):

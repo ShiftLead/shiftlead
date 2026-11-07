@@ -347,7 +347,9 @@ def _mail_hold(
         if _get(q, "kind") not in ("ask", "steer") or _get(q, "closed_reason") not in ("replied", "go_with_it"):
             continue
         words = f"{_get(q, 'subject') or ''} {_get(q, 'text') or ''}"
-        ref = first_ref(_get(q, "about"), words, (asker_repo or {}).get(str(_get(q, "id"))))
+        # the question's own stamped repo first, never the member's (TD-1467), else the caller's map (`mail_repo`'s)
+        own = str(_get(q, "repo") or "").strip() or (asker_repo or {}).get(str(_get(q, "id")))
+        ref = first_ref(_get(q, "about"), words, own)
         if not ref or refs_open.get(ref) != me:
             continue
         at = _aware(_get(q, "closed_at"))

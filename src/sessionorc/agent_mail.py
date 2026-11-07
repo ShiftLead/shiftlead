@@ -783,6 +783,9 @@ class MailMixin:
         me = records.get(sender) if sender != PERSON else None
         if sender != PERSON and me is None:
             raise RpcError(f"{sender} cannot send mail: this host agent has no record of it (design §4.10)")
+        # the sender's repo for the envelope (§4.10, TD-1467), read here, before any count or gate is checked: from
+        # the first check to the landing no `await` falls, so two sends can never both pass a cap one of them fills
+        stamped_repo = await self._record_repo(me)
         named = [self._addr(x) for x in ([to] if isinstance(to, str) else list(to or [])) if str(x).strip()]
         named = list(dict.fromkeys(named))
         if PERSON in named and sender == PERSON:
@@ -1143,7 +1146,7 @@ class MailMixin:
         entry.shots_at = mail.shots_at(shots_at) if looks else None
         entry.shots_ref = mail.shots_ref(shots_ref) if entry.shots_at else None
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
-        entry.repo = await self._record_repo(me)  # and its sender's repo, beside it (§4.10, TD-1467)
+        entry.repo = stamped_repo  # and its sender's repo, beside it (§4.10, TD-1467)
         # §4.10 *A subject on every entry* (TD-561): a thread has one subject, so an answer, an outcome
         # and a follow-up carry their question's; mail the person reads is given one or warned, never
         # refused; mail between sessions takes a given one and derives nothing (a session reads the text)
