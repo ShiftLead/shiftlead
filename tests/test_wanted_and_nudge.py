@@ -182,6 +182,75 @@ async def test_a_seat_owing_an_outcome_is_nudged_with_no_question_waiting(agent,
         await person.call("kill", id=sid)
 
 
+def _asked(mid: str, to: str, at: str, from_: str = "ao-peer", **kw) -> MailEntry:
+    """A question addressed to the member, read already unless `read_at` is given."""
+    return MailEntry(id=mid, from_=from_, to=[to], at=at, kind="ask", text="which?", **{"read_at": at, **kw})
+
+
+async def test_a_member_that_is_no_seat_is_nudged_for_the_questions_waiting_on_it(agent, composerstubs, tmp_path):
+    """Rule 4 (TD-1435, TD-1456): a question waiting on a member that is no seat, read or not, is named
+    — alone, after its open reference, from the person too — once per stretch; a closed one, an
+    answer to its own question and a finished member are not; and questions alone mark no
+    *idle · open work*. A seat's line is unchanged."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    long = IDLE_NUDGE + timedelta(minutes=1)
+    at = _iso(now)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path, name="w")
+        rec = agent.sessions[sid]
+        rec.inbox = [_asked("m-1", sid, at)]
+        await _idle_for(agent, sid, now, long)
+        await agent._keep_running(now)
+        lines = await _submitted(agent, sid)
+        assert lines == [
+            "SUBMITTED [shiftlead] you have been idle 20 minutes: you have 1 questions waiting — run `ao inbox`"
+        ]
+        assert rec.nudged_at
+        await agent._keep_running(now + timedelta(minutes=30))
+        assert len(await _submitted(agent, sid)) == 1, "once per stretch"
+        # questions alone are not *idle · open work*, however long it stays idle after the nudge
+        await agent._idle_open(rec, now + 3 * IDLE_NUDGE)
+        assert rec.idle_open is None
+
+        # the person's question counts too, unread or not; with a claim open the claim comes first
+        rec.inbox.append(_asked("m-2", sid, at, from_="person", read_at=None))
+        rec.progress = [ProgressEntry(ref="TD-004", status="claimed", source="declared")]
+        line = agent._nudge_line(rec)
+        assert line and line.startswith("[shiftlead] you have been idle 20 minutes with `TD-004` open — end the run")
+        assert line.endswith("`ao progress restart --why`; you have 2 questions waiting — run `ao inbox`")
+        rec.progress = []
+
+        # a replied or lapsed question is closed; an unread answer to its own question is the doorbell's
+        rec.inbox = [
+            _asked("m-3", sid, at, closed_reason="replied"),
+            _asked("m-4", sid, at, closed_reason="lapsed"),
+            MailEntry(id="m-6", from_="ao-peer", to=[sid], at=at, kind="reply", text="this one", reply_to="m-5"),
+        ]
+        rec.outbox = [
+            MailEntry(id="m-5", from_=sid, to=["ao-peer"], at=at, kind="ask", text="?", closed_reason="replied",
+                      closed_by="m-6")
+        ]  # fmt: skip
+        assert agent._nudge_line(rec) is None
+
+        # a member that declared is not nudged for its questions
+        rec.inbox, rec.outbox = [_asked("m-7", sid, at)], []
+        rec.out_of_work = {"at": at, "why": "nothing open"}
+        await agent.rpc_hook(sid, state="working")
+        await _idle_for(agent, sid, now + timedelta(hours=1), long)
+        rec.out_of_work = {"at": at, "why": "nothing open"}
+        await agent._keep_running(now + timedelta(hours=1))
+        assert len(await _submitted(agent, sid)) == 1
+
+        # a seat's line is unchanged: its questions are named only once `seat_due` is set
+        rec.out_of_work = None
+        rec.seat = {"role": "techlead"}
+        assert agent._nudge_line(rec) is None
+        rec.seat_due = {"at": at, "cause": "asks"}
+        assert agent._nudge_line(rec) == "[shiftlead] you have 1 questions waiting — run `ao inbox`"
+        await person.call("kill", id=sid)
+
+
 async def test_a_wanted_restart_with_its_work_pushed_is_closed_and_restarted(agent, composerstubs, tmp_path):
     await park_ticks(agent)
     now = datetime.now(UTC)

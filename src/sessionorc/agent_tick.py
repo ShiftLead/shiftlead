@@ -1334,8 +1334,9 @@ class TickMixin:
 
     async def _idle_nudge(self, s: Session, now: datetime) -> None:
         """Rule 4 (design §6): a supervised member hook-confirmed `idle` for `IDLE_NUDGE` with open work
-        — a lane reference not done or dropped, a declared claim not done or dropped, for a seat a
-        question waiting, or an outcome owed to the person (TD-258) — and nothing declared, is sent
+        — a lane reference not done or dropped, a declared claim not done or dropped, a question
+        waiting (for a seat once `seat_due` is set; TD-1456), or an outcome owed to the person (TD-258)
+        — and nothing declared, is sent
         one fixed line naming it, once per idle
         stretch (`nudged_at`; a stretch ends when the state changes). It spends no wake budget. The
         send needs the pane here: a node's member is not nudged yet (TD-103)."""
@@ -2977,14 +2978,26 @@ class TickMixin:
             parts += [owed] if owed else []
             return "[shiftlead] " + "; ".join(parts) if parts else None
         ref = self._open_ref(s, {e.ref for e in self._waiting_claims(s)})  # a waiting claim is not open work (TD-820)
+        # a question waiting on a member that is no seat, read or not (TD-1435, TD-1456): the doorbell rings only
+        # undecided mail, so one read and left open is named here; an answer to its own question is a seat's alone
+        n = s.asks_waiting(home=self.host)
+        h = s.asks_waiting(home=self.host, handed_only=True) if n else 0
+        parts = [f"you have {n - h} questions waiting — run `ao inbox`"] if n > h else []
+        if h:
+            parts.append(
+                f"{h} {'entry' if h == 1 else 'entries'} the person handed you "
+                f"{'owes its' if h == 1 else 'owe their'} outcome — "
+                '`ao msg person --outcome done|blocked|dropped "…" --for <id>`'
+            )
         owed = self._owed_part(s.owed())
+        parts += [owed] if owed else []
         minutes = int(IDLE_NUDGE.total_seconds() // 60)
         if ref is None:
-            return f"[shiftlead] you have been idle {minutes} minutes: {owed}" if owed else None
+            return f"[shiftlead] you have been idle {minutes} minutes: " + "; ".join(parts) if parts else None
         return (
             f"[shiftlead] you have been idle {minutes} minutes with `{ref}` open "
             f"— end the run with one of `ao progress done {ref} --pr N`, `ao progress drop {ref} --why`, "
-            "`ao progress none --why` or `ao progress restart --why`" + (f"; {owed}" if owed else "")
+            "`ao progress none --why` or `ao progress restart --why`" + "".join(f"; {p}" for p in parts)
         )
 
     async def _policy_send(self, s: Session, text: str) -> bool:
