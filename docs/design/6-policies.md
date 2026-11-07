@@ -1742,9 +1742,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   - and, in a `failed.json` written before `blocks` was, its `sha`.
   `fail` tells them apart by the intent: `kind: rollback` with `by: smoke` blocks `from`, any other
   rollback `main`, a promote its `sha`.
-  `auto` starts nothing while main's head is that commit, and retries once main's head **moves past it** —
-  `blocks` an ancestor of main's head and not main's head itself — a run at the new head, the settle and the
-  wait as ever, the row reading the policy's clock (§4.5a) meanwhile: `ahead_since` is then read from that move, so
+  `auto` starts nothing while main's head is that commit — the policy's one test, `blocks` = main's head —
+  and retries once main's head is any other commit, a run at the new head, the settle and the wait as ever,
+  the row reading the policy's clock (§4.5a) meanwhile. Where main's head **moves past it** — `blocks` an
+  ancestor of main's head and not main's head itself, the test the reading's clear (below) and `ahead_since`
+  use — `ahead_since` is read from that move, so
   a failed commit that sat ahead of live past `PROMOTE_MAX_WAIT` does not spend the next merge's cap. A
   person's press — Promote of main's head, that commit among them (a retry is the person's word), or a
   rollback (below) — is never refused by it. **Every start clears it**, on the one start path every run
@@ -1879,7 +1881,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     branch is never promoted, CLAUDE.md; a hotfix is a merge and then a press), and when it is live
     already and a run finished at it (`last.json` names it with `done`; a copy installed by hand there is
     taken, *A copy installed by hand*). Main's head is the plain press, by the path above. `--back` is `from` in
-    `~/.shiftlead/promotes/<repo>/last.json` — `{sha, from, at, by, kind}`, written on the first pass whose
+    `~/.shiftlead/promotes/<repo>/last.json` — `{sha, from, at, by, kind, done}`, `done` set by the conclusion alone (*The live ref*), the rest written on the first pass whose
     `check` reads the run's commit (*The smoke*, *When and where*: `read_at`), `from` being what
     `check` read before the run — so a run killed at the bound after that reading leaves it, and
     `--back` then goes to its `from` — and is refused when there is no such
